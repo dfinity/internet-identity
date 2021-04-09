@@ -1,13 +1,13 @@
 use ic_cdk::api::call::reject;
 use ic_cdk_macros::{query, update};
-use ic_types::Principal;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 type UserId = u64;
 type CredentialId = Vec<u8>;
 type Alias = String;
-type Entry = (Alias, Principal, Option<CredentialId>);
+type PublicKey = Vec<u8>;
+type Entry = (Alias, PublicKey, Option<CredentialId>);
 
 thread_local! {
     static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
@@ -17,7 +17,7 @@ thread_local! {
 fn register(
     user_id: UserId,
     alias: Alias,
-    principal: Principal,
+    public_key: PublicKey,
     credential_id: Option<CredentialId>,
 ) {
     MAP.with(|m| {
@@ -26,23 +26,23 @@ fn register(
             reject("this user is already registered");
             return;
         }
-        m.insert(user_id, vec![(alias, principal, credential_id)]);
+        m.insert(user_id, vec![(alias, public_key, credential_id)]);
     })
 }
 
 #[update]
-fn add(user_id: UserId, alias: Alias, principal: Principal, credential: Option<CredentialId>) {
+fn add(user_id: UserId, alias: Alias, public_key: PublicKey, credential: Option<CredentialId>) {
     MAP.with(|m| {
         let mut m = m.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
             for e in entries.iter_mut() {
-                if e.1 == principal {
+                if e.1 == public_key {
                     e.0 = alias;
                     e.2 = credential;
                     return;
                 }
             }
-            entries.push((alias, principal, credential))
+            entries.push((alias, public_key, credential))
         } else {
             reject("this user is not registered yet");
         }
@@ -50,10 +50,10 @@ fn add(user_id: UserId, alias: Alias, principal: Principal, credential: Option<C
 }
 
 #[update]
-fn remove(user_id: UserId, principal: Principal) {
+fn remove(user_id: UserId, public_key: PublicKey) {
     MAP.with(|m| {
         if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
-            if let Some(i) = entries.iter().position(|e| e.1 == principal) {
+            if let Some(i) = entries.iter().position(|e| e.1 == public_key) {
                 entries.swap_remove(i as usize);
             }
         }

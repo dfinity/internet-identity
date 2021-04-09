@@ -1,10 +1,11 @@
 type UserId = nat64;
 type CredentialId = vec nat8;
 type Alias = text;
+type PublicKey = vec nat8
 
 service : {
-  register : (UserId, Alias, principal, opt CredentialId) -> ();
-  add : (UserId, Alias; principal, opt CredentialId) -> ();
-  remove : (UserId, principal) -> ();
-  lookup : (UserId) -> (vec (Alias, principal, opt CredentialId));
+  register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  remove : (UserId, PublicKey) -> ();
+  lookup : (UserId) -> (vec (Alias, PublicKey, opt CredentialId));
 }
