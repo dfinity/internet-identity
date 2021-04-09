@@ -1,7 +1,7 @@
 type UserId = nat64;
 type CredentialId = vec nat8;
 type Alias = text;
-type PublicKey = vec nat8
+type PublicKey = vec nat8;
 
 service : {
   register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
