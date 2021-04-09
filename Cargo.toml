@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "src/idp_service",
+]
+
+[profile.release]
+lto = true
+opt-level = 'z'

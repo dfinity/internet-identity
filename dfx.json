@@ -1,8 +1,10 @@
 {
   "canisters": {
     "idp_service": {
-      "main": "src/idp_service/main.mo",
-      "type": "motoko"
+      "type": "custom",
+      "candid": "src/idp_service/idp_service.did",
+      "wasm": "target/wasm32-unknown-unknown/release/idp_service.wasm",
+      "build": "cargo build --release --target wasm32-unknown-unknown"
     },
     "frontend": {
       "dependencies": ["idp_service"],
