@@ -1,0 +1,29 @@
+{
+  "canisters": {
+    "idp_service": {
+      "main": "src/idp_service/main.mo",
+      "type": "motoko"
+    },
+    "frontend": {
+      "dependencies": ["idp_service"],
+      "frontend": {
+        "entrypoint": "src/frontend/src/index.html"
+      },
+      "source": ["src/frontend/assets", "dist/frontend/"],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "dfx": "0.7.0-beta.2",
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}
