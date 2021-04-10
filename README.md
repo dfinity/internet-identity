@@ -9,5 +9,6 @@ NodeJS (with npm) version TBD
 
 ## Running Locally
 
+- `npm install`
 - `dfx start [--clean] [--background]`
 - `dfx deploy`
