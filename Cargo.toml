@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "src/hashtree",
     "src/idp_service",
 ]
 
