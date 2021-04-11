@@ -7,5 +7,5 @@ service : {
   register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   remove : (UserId, PublicKey) -> ();
-  lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId});
+  lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId}) query;
 }
