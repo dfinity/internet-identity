@@ -144,6 +144,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "certified_map"
+version = "0.1.0"
+dependencies = [
+ "hashtree",
+ "hex",
+]
+
+[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
