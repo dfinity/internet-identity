@@ -378,10 +378,14 @@ dependencies = [
 name = "idp_service"
 version = "0.1.0"
 dependencies = [
+ "certified_map",
+ "hashtree",
  "ic-cdk",
  "ic-cdk-macros",
  "ic-types",
  "serde",
+ "serde_bytes",
+ "serde_cbor",
 ]
 
 [[package]]

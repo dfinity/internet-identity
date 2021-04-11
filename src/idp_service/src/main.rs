@@ -1,4 +1,8 @@
-use ic_cdk_macros::{query, update};
+use certified_map::RbTree;
+use hashtree::HashTree;
+use ic_cdk::api::{data_certificate, set_certified_data};
+use ic_cdk_macros::{init, query, update};
+use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -10,6 +14,45 @@ type Entry = (Alias, PublicKey, Option<CredentialId>);
 
 thread_local! {
     static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
+    static SIGS: RefCell<RbTree> = RefCell::new(RbTree::new());
+}
+
+fn update_root_hash(t: &RbTree) {
+    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &t.root_hash());
+    set_certified_data(&prefixed_root_hash[..]);
+}
+
+fn sign_payload(t: &mut RbTree, payload: Vec<u8>) {
+    t.insert(payload, vec![]);
+    update_root_hash(t);
+}
+
+fn remove_payload_signature(t: &mut RbTree, payload: Vec<u8>) {
+    t.insert(payload, vec![]);
+    update_root_hash(t);
+}
+
+fn get_payload_signature<'a>(t: &'a RbTree, payload: &[u8]) -> Option<Vec<u8>> {
+    #[derive(Serialize)]
+    struct Sig<'a> {
+        #[serde(with = "serde_bytes")]
+        certificate: Vec<u8>,
+        tree: HashTree<'a>,
+    }
+
+    if t.get(payload).is_none() {
+        return None;
+    }
+
+    let sig = Sig {
+        certificate: data_certificate()?,
+        tree: hashtree::labeled(b"sig", t.witness(payload)),
+    };
+
+    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
+    cbor.self_describe().unwrap();
+    sig.serialize(&mut cbor).unwrap();
+    Some(cbor.into_inner())
 }
 
 #[update]
@@ -56,6 +99,11 @@ fn remove(user_id: UserId, pk: PublicKey) {
 #[query]
 fn lookup(user_id: UserId) -> Vec<Entry> {
     MAP.with(|m| m.borrow().get(&user_id).cloned().unwrap_or_default())
+}
+
+#[init]
+fn init() {
+    SIGS.with(|sigs| update_root_hash(&sigs.borrow()));
 }
 
 fn main() {}
