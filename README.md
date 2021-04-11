@@ -11,10 +11,20 @@ To learn more before you start working with idp_service, see the following docum
 - [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
 - [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
 
-If you want to start working on your project right away, you might want to try the following commands:
+To run the idp_service canister, proceed as follows
 
 ```bash
-cd idp_service/
-dfx help
-dfx config --help
+cd idp_service/src
+dfx start --background
+dfx canister create idp_service
+dfx canister create frontend
+dfx build
+dfx canister install idp_service
 ```
+
+Then the canister can be used as
+
+```bash
+dfx canister call idp_service register '(123, "test", {1; 2; 3}; null)'
+```
+
