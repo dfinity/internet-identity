@@ -1,7 +1,7 @@
-use certified_map::RbTree;
 use hashtree::HashTree;
 use ic_cdk::api::{data_certificate, set_certified_data};
 use ic_cdk_macros::{init, query, update};
+use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -13,26 +13,21 @@ type Alias = String;
 type Entry = (Alias, PublicKey, Option<CredentialId>);
 
 thread_local! {
-    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
-    static SIGS: RefCell<RbTree> = RefCell::new(RbTree::new());
+    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::default());
+    static SIGS: RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
 }
 
-fn update_root_hash(t: &RbTree) {
-    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &t.root_hash());
+fn update_root_hash(m: &SignatureMap) {
+    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
     set_certified_data(&prefixed_root_hash[..]);
 }
 
-fn sign_payload(t: &mut RbTree, payload: Vec<u8>) {
-    t.insert(payload, vec![]);
-    update_root_hash(t);
-}
+#[allow(dead_code)]
+fn get_signature(m: &SignatureMap, seed: &[u8], message: &[u8]) -> Option<Vec<u8>> {
+    let certificate = data_certificate()?;
+    let witness = m.witness(seed, message)?;
+    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
-fn remove_payload_signature(t: &mut RbTree, payload: Vec<u8>) {
-    t.insert(payload, vec![]);
-    update_root_hash(t);
-}
-
-fn get_payload_signature<'a>(t: &'a RbTree, payload: &[u8]) -> Option<Vec<u8>> {
     #[derive(Serialize)]
     struct Sig<'a> {
         #[serde(with = "serde_bytes")]
@@ -40,14 +35,7 @@ fn get_payload_signature<'a>(t: &'a RbTree, payload: &[u8]) -> Option<Vec<u8>> {
         tree: HashTree<'a>,
     }
 
-    if t.get(payload).is_none() {
-        return None;
-    }
-
-    let sig = Sig {
-        certificate: data_certificate()?,
-        tree: hashtree::labeled(b"sig", t.witness(payload)),
-    };
+    let sig = Sig { certificate, tree };
 
     let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
     cbor.self_describe().unwrap();
