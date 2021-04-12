@@ -1,18 +1,18 @@
 use super::*;
 use std::convert::AsRef;
 
-fn insert(t: &mut RbTree, k: impl AsRef<[u8]>, v: impl AsRef<[u8]>) {
+fn insert(t: &mut RbTree<Vec<u8>>, k: impl AsRef<[u8]>, v: impl AsRef<[u8]>) {
     t.insert(k.as_ref().to_vec(), v.as_ref().to_vec())
 }
 
 #[test]
 fn test_witness() {
-    let mut t = RbTree::new();
+    let mut t = RbTree::<Vec<u8>>::new();
     for i in 0u64..10 {
         let key = (1 + 2 * i).to_be_bytes();
         let val = (1 + 2 * i).to_le_bytes();
         insert(&mut t, key, val);
-        assert_eq!(t.get(&key[..]), Some(&val[..]));
+        assert_eq!(t.get(&key[..]).map(|v| &v[..]), Some(&val[..]));
     }
 
     for i in 0u64..10 {
@@ -70,7 +70,7 @@ fn test_witness() {
         let key = (1 + 2 * i).to_be_bytes();
         let val = (1 + 2 * i).to_le_bytes();
 
-        assert_eq!(t.get(&key[..]), Some(&val[..]));
+        assert_eq!(t.get(&key[..]).map(|v| &v[..]), Some(&val[..]));
 
         t.delete(&key[..]);
         for j in 0u64..10 {
@@ -90,7 +90,7 @@ fn test_witness() {
 
 #[test]
 fn test_key_neighbors() {
-    let mut t = RbTree::new();
+    let mut t = RbTree::<Vec<u8>>::new();
     t.insert(vec![1], vec![10]);
     t.insert(vec![3], vec![30]);
 
@@ -109,7 +109,7 @@ fn test_key_neighbors() {
 
 #[test]
 fn test_prefix_neighbor() {
-    let mut t = RbTree::new();
+    let mut t = RbTree::<Vec<u8>>::new();
     insert(&mut t, b"a/b", vec![0]);
     insert(&mut t, b"a/b/c", vec![1]);
     insert(&mut t, b"a/b/d", vec![2]);
@@ -123,33 +123,33 @@ fn test_prefix_neighbor() {
 
 #[test]
 fn simple_delete_test() {
-    let mut t = RbTree::new();
+    let mut t = RbTree::<Vec<u8>>::new();
     insert(&mut t, b"x", b"a");
     insert(&mut t, b"y", b"b");
     insert(&mut t, b"z", b"c");
 
     t.delete(b"x");
     assert_eq!(t.get(b"x"), None);
-    assert_eq!(t.get(b"y"), Some(&b"b"[..]));
-    assert_eq!(t.get(b"z"), Some(&b"c"[..]));
+    assert_eq!(t.get(b"y").map(|v| &v[..]), Some(&b"b"[..]));
+    assert_eq!(t.get(b"z").map(|v| &v[..]), Some(&b"c"[..]));
 
     t.delete(b"y");
-    assert_eq!(t.get(b"y"), None);
-    assert_eq!(t.get(b"z"), Some(&b"c"[..]));
+    assert_eq!(t.get(b"y").map(|v| &v[..]), None);
+    assert_eq!(t.get(b"z").map(|v| &v[..]), Some(&b"c"[..]));
 
     t.delete(b"z");
-    assert_eq!(t.get(b"z"), None);
+    assert_eq!(t.get(b"z").map(|v| &v[..]), None);
 }
 
 #[test]
 fn simple_delete_test_2() {
-    let mut t = RbTree::new();
+    let mut t = RbTree::<Vec<u8>>::new();
     insert(&mut t, b"x", b"y");
     insert(&mut t, b"z", b"w");
 
     t.delete(b"z");
     assert_eq!(t.get(b"z"), None);
-    assert_eq!(t.get(b"x"), Some(&b"y"[..]));
+    assert_eq!(t.get(b"x").map(|v| &v[..]), Some(&b"y"[..]));
 }
 
 #[test]
@@ -157,14 +157,14 @@ fn map_model_test() {
     use std::collections::HashMap;
 
     let mut hm: HashMap<Vec<u8>, Vec<u8>> = HashMap::new();
-    let mut rb = RbTree::new();
+    let mut rb = RbTree::<Vec<u8>>::new();
 
     for i in 0..100u64 {
         hm.insert(i.to_be_bytes().to_vec(), i.to_be_bytes().to_vec());
         insert(&mut rb, i.to_be_bytes(), i.to_be_bytes());
 
         for k in hm.keys() {
-            assert_eq!(hm.get(k).map(|v| &v[..]), rb.get(k));
+            assert_eq!(hm.get(k), rb.get(k));
         }
     }
     let keys: Vec<_> = hm.keys().cloned().collect();
@@ -177,7 +177,31 @@ fn map_model_test() {
         assert!(rb.get(&k).is_none());
 
         for k in hm.keys() {
-            assert_eq!(hm.get(k).map(|v| &v[..]), rb.get(k));
+            assert_eq!(hm.get(k), rb.get(k));
         }
+    }
+}
+
+#[test]
+fn test_nested_witness() {
+    let mut rb: RbTree<RbTree<Vec<u8>>> = RbTree::new();
+    let mut nested = RbTree::new();
+    nested.insert(b"bottom".to_vec(), b"data".to_vec());
+    rb.insert(b"top".to_vec(), nested);
+
+    let ht = rb.nested_witness(&b"top"[..], |v| v.witness(&b"bottom"[..]));
+
+    assert_eq!(ht.reconstruct(), rb.root_hash());
+    match ht {
+        HashTree::Labeled(lt, tt) => {
+            assert_eq!(lt, b"top");
+            match &(*tt) {
+                HashTree::Labeled(lb, _) => {
+                    assert_eq!(lb, b"bottom");
+                }
+                other => panic!("unexpected nested tree: {:?}", other),
+            }
+        }
+        other => panic!("expected a labeled tree, got {:?}", other),
     }
 }
