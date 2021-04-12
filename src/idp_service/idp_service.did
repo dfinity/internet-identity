@@ -14,6 +14,16 @@ type HttpResponse = record {
   headers: vec HeaderField;
   body: blob;
 };
+type Timestamp = nat64;
+type Delegation = record {
+  pubkey: PublicKey;
+  expiration: Timestamp;
+  targets: opt vec principal;
+};
+type SignedDelegation = record {
+  delegation: Delegation;
+  signature: blob;
+};
 
 service : {
   register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
@@ -21,4 +31,5 @@ service : {
   remove : (UserId, PublicKey) -> ();
   lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId}) query;
   http_request: (request: HttpRequest) -> (HttpResponse) query;
+  get_delegation: (UserId, PublicKey, Timestamp, opt vec principal) -> (SignedDelegation) query;
 }

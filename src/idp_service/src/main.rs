@@ -1,6 +1,6 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data};
-use ic_cdk::export::candid::{CandidType, Deserialize};
+use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
@@ -12,6 +12,21 @@ type CredentialId = Vec<u8>;
 type PublicKey = Vec<u8>;
 type Alias = String;
 type Entry = (Alias, PublicKey, Option<CredentialId>);
+type Timestamp = u64;
+type Signature = Vec<u8>;
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Delegation {
+    pubkey: PublicKey,
+    expiration: Timestamp,
+    targets: Option<Vec<Principal>>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct SignedDelegation {
+    delegation: Delegation,
+    signature: Signature,
+}
 
 mod hash;
 
@@ -131,6 +146,31 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             body: format!("Asset {} not found.", asset).as_bytes().into(),
         },
     })
+}
+
+#[query]
+fn get_delegation(
+    user_id: UserId,
+    pubkey: PublicKey,
+    expiration: Timestamp,
+    targets: Option<Vec<Principal>>,
+) -> SignedDelegation {
+    MAP.with(|m| {
+        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
+            if entries.iter().position(|e| e.1 == pubkey) == None {
+                panic!("User ID and public key pair not found.");
+            }
+        }
+    });
+
+    SignedDelegation {
+        delegation: Delegation {
+            pubkey,
+            expiration,
+            targets,
+        },
+        signature: Vec::new(), // empty signature for now.
+    }
 }
 
 #[init]
