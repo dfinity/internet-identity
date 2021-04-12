@@ -3,9 +3,26 @@
 ## Requirements
 
 ### Software
-`dfx` version 0.7.0-beta.2 or later
-Rust version TBD
-NodeJS (with npm) version TBD
+
+* `dfx` version from the branch at https://github.com/dfinity/sdk/pull/1587.
+
+  One easy way to fetch it built from the nix cache is to run
+  ```
+  nix-build -E '(import (builtins.fetchGit { url = "git@github.com:dfinity/sdk"; ref = "joachim/idp";}) {}).dfx.standalone' -o /tmp/idp-dfx
+  ```
+  and then run it as `/tmp/idp-dfx/bin/dfx`:
+  ```
+  /tmp/idp-dfx/bin/dfx --version
+  dfx 0.7.0-beta.2.idp
+  ```
+  After upgrading it may help to run
+  ```
+  /tmp/idp-dfx/bin/dfx cache delete --help
+  ```
+
+* Rust version 1.50
+
+* NodeJS (with npm) version TBD
 
 ## Running Locally
 
