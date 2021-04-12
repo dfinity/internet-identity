@@ -1,25 +1,25 @@
 # idp_service
 
-Welcome to your new idp_service project and to the internet computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
+## Requirements
 
-To get started, you might want to explore the project directory structure and the default configuration file. Working with this project in your development environment will not affect any production deployment or identity tokens.
+### Software
+`dfx` version 0.7.0-beta.2 or later
+Rust version TBD
+NodeJS (with npm) version TBD
 
-To learn more before you start working with idp_service, see the following documentation available online:
+## Running Locally
 
 - [Quick Start](https://sdk.dfinity.org/docs/quickstart/quickstart-intro.html)
 - [SDK Developer Tools](https://sdk.dfinity.org/docs/developers-guide/sdk-guide.html)
 - [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
 - [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
 
-To run the idp_service canister, proceed as follows
+To run the idp_service canisters, proceed as follows after cloning the repository
 
 ```bash
-cd idp_service/src
-dfx start --background
-dfx canister create idp_service
-dfx canister create frontend
-dfx build
-dfx canister install idp_service
+npm install
+dfx start [--clean] [--background]
+dfx deploy
 ```
 
 Then the canister can be used as
@@ -28,3 +28,7 @@ Then the canister can be used as
 dfx canister call idp_service register '(123, "test", {1; 2; 3}; null)'
 ```
 
+To open the front-end, you can run the following and open the URL.
+```bash
+echo "http://localhost:8000?canisterId=$(dfx canister id frontend)"
+```
