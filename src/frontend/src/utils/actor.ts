@@ -6,15 +6,15 @@ import {
 import _SERVICE, { UserId, Alias, PublicKey, CredentialId } from "../typings";
 
 const agent = new HttpAgent();
-export const actor = Actor.createActor<_SERVICE>(idp_idl, {
+export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent,
   canisterId: idp_canister_id,
 });
 
-class IDPActor {
+export class IDPActor {
   actor: _SERVICE;
   constructor(overrideActor?: _SERVICE) {
-    this.actor = overrideActor ?? actor;
+    this.actor = overrideActor ?? baseActor;
   }
   register = (
     userId: UserId,
@@ -50,4 +50,5 @@ class IDPActor {
   };
 }
 
-export default IDPActor;
+const actor = new IDPActor();
+export default actor;

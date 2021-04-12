@@ -1,22 +1,5 @@
-let mockActor = {
-  register: jest.fn(),
-  add: jest.fn(),
-  remove: jest.fn(),
-  lookup: jest.fn(),
-};
-
-jest.mock("@dfinity/agent", () => {
-  class HttpAgent {}
-  return {
-    HttpAgent,
-    Actor: {
-      createActor: () => mockActor,
-    },
-  };
-});
-
-import IDPActor from "../utils/actor";
-
+import { IDPActor } from "../utils/actor";
+const { mockActor } = globalThis;
 describe("Actor Interface", () => {
   const testUser = BigInt(1234);
   const testAlias = "my desktop";
