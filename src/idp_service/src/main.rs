@@ -1,4 +1,4 @@
-use hashtree::HashTree;
+use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
@@ -23,9 +23,9 @@ fn update_root_hash(m: &SignatureMap) {
 }
 
 #[allow(dead_code)]
-fn get_signature(m: &SignatureMap, seed: &[u8], message: &[u8]) -> Option<Vec<u8>> {
+fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let witness = m.witness(seed, message)?;
+    let witness = m.witness(&seed_hash[..], &msg_hash[..])?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
