@@ -1,13 +1,13 @@
 use super::*;
 use std::convert::AsRef;
 
-fn insert(t: &mut RbTree<Vec<u8>>, k: impl AsRef<[u8]>, v: impl AsRef<[u8]>) {
+fn insert(t: &mut RbTree<Vec<u8>, Vec<u8>>, k: impl AsRef<[u8]>, v: impl AsRef<[u8]>) {
     t.insert(k.as_ref().to_vec(), v.as_ref().to_vec())
 }
 
 #[test]
 fn test_witness() {
-    let mut t = RbTree::<Vec<u8>>::new();
+    let mut t = RbTree::<Vec<u8>, Vec<u8>>::new();
     for i in 0u64..10 {
         let key = (1 + 2 * i).to_be_bytes();
         let val = (1 + 2 * i).to_le_bytes();
@@ -90,7 +90,7 @@ fn test_witness() {
 
 #[test]
 fn test_key_neighbors() {
-    let mut t = RbTree::<Vec<u8>>::new();
+    let mut t = RbTree::<Vec<u8>, Vec<u8>>::new();
     t.insert(vec![1], vec![10]);
     t.insert(vec![3], vec![30]);
 
@@ -109,7 +109,7 @@ fn test_key_neighbors() {
 
 #[test]
 fn test_prefix_neighbor() {
-    let mut t = RbTree::<Vec<u8>>::new();
+    let mut t = RbTree::<Vec<u8>, Vec<u8>>::new();
     insert(&mut t, b"a/b", vec![0]);
     insert(&mut t, b"a/b/c", vec![1]);
     insert(&mut t, b"a/b/d", vec![2]);
@@ -123,7 +123,7 @@ fn test_prefix_neighbor() {
 
 #[test]
 fn simple_delete_test() {
-    let mut t = RbTree::<Vec<u8>>::new();
+    let mut t = RbTree::<Vec<u8>, Vec<u8>>::new();
     insert(&mut t, b"x", b"a");
     insert(&mut t, b"y", b"b");
     insert(&mut t, b"z", b"c");
@@ -143,7 +143,7 @@ fn simple_delete_test() {
 
 #[test]
 fn simple_delete_test_2() {
-    let mut t = RbTree::<Vec<u8>>::new();
+    let mut t = RbTree::<Vec<u8>, Vec<u8>>::new();
     insert(&mut t, b"x", b"y");
     insert(&mut t, b"z", b"w");
 
@@ -157,7 +157,7 @@ fn map_model_test() {
     use std::collections::HashMap;
 
     let mut hm: HashMap<Vec<u8>, Vec<u8>> = HashMap::new();
-    let mut rb = RbTree::<Vec<u8>>::new();
+    let mut rb = RbTree::<Vec<u8>, Vec<u8>>::new();
 
     for i in 0..100u64 {
         hm.insert(i.to_be_bytes().to_vec(), i.to_be_bytes().to_vec());
@@ -184,7 +184,7 @@ fn map_model_test() {
 
 #[test]
 fn test_nested_witness() {
-    let mut rb: RbTree<RbTree<Vec<u8>>> = RbTree::new();
+    let mut rb: RbTree<Vec<u8>, RbTree<Vec<u8>, Vec<u8>>> = RbTree::new();
     let mut nested = RbTree::new();
     nested.insert(b"bottom".to_vec(), b"data".to_vec());
     rb.insert(b"top".to_vec(), nested);
