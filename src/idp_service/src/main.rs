@@ -200,4 +200,21 @@ fn init() {
     });
 }
 
+#[allow(dead_code)]
+fn delegation_hash(d: &Delegation) -> Hash {
+    use hash::{hash_of_map, Value};
+
+    let mut m = HashMap::new();
+    m.insert("pubkey", Value::Bytes(d.pubkey.as_slice()));
+    m.insert("expiration", Value::U64(d.expiration));
+    if let Some(targets) = d.targets.as_ref() {
+        let mut arr = Vec::with_capacity(targets.len());
+        for t in targets.iter() {
+            arr.push(Value::Bytes(t.as_ref()));
+        }
+        m.insert("targets", Value::Array(arr));
+    }
+    hash_of_map(m)
+}
+
 fn main() {}
