@@ -221,9 +221,7 @@ mod tests {
     #[test]
     fn message_id_array_reference_4() {
         assert_eq!(
-            hash_array(vec![Value::Array(vec![
-                Value::String("a".to_string())
-            ])]),
+            hash_array(vec![Value::Array(vec![Value::String("a".to_string())])]),
             // hash(hash(hash("a"))
             hex!("eb48bdfa15fc43dbea3aabb1ee847b6e69232c0f0d9705935e50d60cce77877f"),
         );
