@@ -9,6 +9,8 @@ type PublicKey = Vec<u8>;
 type Alias = String;
 type Entry = (Alias, PublicKey, Option<CredentialId>);
 
+mod hash;
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HeaderField {
     key: String,
