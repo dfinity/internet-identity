@@ -1,9 +1,9 @@
 use certified_map::{AsHashTree, RbTree};
 use hashtree::{leaf_hash, Hash, HashTree};
 
-struct Found;
+struct Unit;
 
-impl AsHashTree for Found {
+impl AsHashTree for Unit {
     fn root_hash(&self) -> Hash {
         leaf_hash(&b""[..])
     }
@@ -13,25 +13,30 @@ impl AsHashTree for Found {
 }
 
 #[derive(Default)]
-pub struct SignatureMap(RbTree<Hash, RbTree<Hash, Found>>);
+pub struct SignatureMap(RbTree<Hash, RbTree<Hash, Unit>>);
 
 impl SignatureMap {
     pub fn put(&mut self, seed: Hash, message: Hash) {
         if self.0.get(&seed[..]).is_none() {
             let mut submap = RbTree::new();
-            submap.insert(message, Found);
+            submap.insert(message, Unit);
             self.0.insert(seed, submap);
         } else {
             self.0.modify(&seed[..], |submap| {
-                submap.insert(message, Found);
+                submap.insert(message, Unit);
             });
         }
     }
 
     pub fn delete(&mut self, seed: Hash, message: Hash) {
+        let mut is_empty = false;
         self.0.modify(&seed[..], |m| {
             m.delete(&message[..]);
+            is_empty = m.is_empty();
         });
+        if is_empty {
+            self.0.delete(&seed[..]);
+        }
     }
 
     pub fn root_hash(&self) -> Hash {
