@@ -7,7 +7,9 @@
     "start": "webpack serve --port 8080",
     "generate:types": "didc bind ./src/idp_service/idp_service.did -t ts > src/frontend/src/typings.d.ts",
     "build": "webpack",
-    "test": "jest"
+    "test": "jest",
+    "prestart": "npm run generate:types",
+    "prebuild": "npm run generate:types"
   },
   "devDependencies": {
     "@dfinity/agent": "0.7.1",
