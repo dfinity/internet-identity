@@ -1,5 +1,5 @@
-use ic_cdk::export::{candid::{CandidType, Deserialize}};
-use ic_cdk_macros::{query, update, init};
+use ic_cdk::export::candid::{CandidType, Deserialize};
+use ic_cdk_macros::{init, query, update};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -29,7 +29,6 @@ struct HttpResponse {
     headers: Vec<HeaderField>,
     body: Vec<u8>,
 }
-
 
 thread_local! {
     static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
@@ -106,13 +105,25 @@ fn initialize_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
-        let asset = include_str!("../../frontend/assets/sample-asset.txt");
-        a.insert("/sample-asset.txt".to_string(), asset.as_bytes().into());
-
-        let asset = include_str!("../../frontend/assets/main.css");
-        a.insert("/main.css".to_string(), asset.as_bytes().into());
+        a.insert(
+            "/sample-asset.txt".to_string(),
+            include_str!("../../frontend/assets/sample-asset.txt")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/main.css".to_string(),
+            include_str!("../../frontend/assets/main.css")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/logo.png".to_string(),
+            include_bytes!("../../frontend/assets/logo.png")
+                .to_owned()
+                .into(),
+        );
     });
 }
-
 
 fn main() {}
