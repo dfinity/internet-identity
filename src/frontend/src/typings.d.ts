@@ -1,5 +1,4 @@
 import type { Principal } from "@dfinity/agent";
-import type BigNumber from "bignumber.js";
 export type Alias = string;
 export type CredentialId = Array<number>;
 export type HeaderField = [string, string];
@@ -15,7 +14,7 @@ export interface HttpResponse {
   status_code: number;
 }
 export type PublicKey = Array<number>;
-export type UserId = BigNumber;
+export type UserId = bigint;
 export default interface _SERVICE {
   add: (
     arg_0: UserId,

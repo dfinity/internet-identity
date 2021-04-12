@@ -79,8 +79,8 @@ function generateWebpackConfigForCanister(name, info) {
     module: {
       rules: [
         { test: /\.(ts|tsx)$/, loader: "ts-loader" },
-        { test: /\.css$/, use: ['style-loader', 'css-loader'] }
-      ]
+        { test: /\.css$/, use: ["style-loader", "css-loader"] },
+      ],
     },
     plugins: [
       new HtmlWebpackPlugin({

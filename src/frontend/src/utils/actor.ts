@@ -13,33 +13,33 @@ export const actor = Actor.createActor<_SERVICE>(idp_idl, {
 
 class IDPActor {
   actor: _SERVICE;
-  constructor(actor: _SERVICE) {
-    this.actor = actor;
+  constructor(overrideActor?: _SERVICE) {
+    this.actor = overrideActor ?? actor;
   }
-  retister = (
+  register = (
     userId: UserId,
     alias: Alias,
     publicKey: PublicKey,
-    credentialId?: CredentialId
+    credentialId?: string
   ) => {
     return this.actor.register(
       userId,
       alias,
       publicKey,
-      credentialId ? [credentialId] : []
+      credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
     );
   };
   add = (
     userId: UserId,
     alias: Alias,
     publicKey: PublicKey,
-    credentialId?: CredentialId
+    credentialId?: string
   ) => {
     return this.actor.add(
       userId,
       alias,
       publicKey,
-      credentialId ? [credentialId] : []
+      credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
     );
   };
   remove = (userId: UserId, publicKey: PublicKey) => {
