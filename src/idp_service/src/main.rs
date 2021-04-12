@@ -1,4 +1,5 @@
-use ic_cdk_macros::{query, update};
+use ic_cdk::export::{candid::{CandidType, Deserialize}};
+use ic_cdk_macros::{query, update, init};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -8,8 +9,31 @@ type PublicKey = Vec<u8>;
 type Alias = String;
 type Entry = (Alias, PublicKey, Option<CredentialId>);
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HeaderField {
+    key: String,
+    value: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HttpRequest {
+    method: String,
+    url: String,
+    headers: Vec<HeaderField>,
+    body: Vec<u8>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HttpResponse {
+    status_code: u16,
+    headers: Vec<HeaderField>,
+    body: Vec<u8>,
+}
+
+
 thread_local! {
     static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
+    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::new());
 }
 
 #[update]
@@ -57,5 +81,38 @@ fn remove(user_id: UserId, pk: PublicKey) {
 fn lookup(user_id: UserId) -> Vec<Entry> {
     MAP.with(|m| m.borrow().get(&user_id).cloned().unwrap_or_default())
 }
+
+#[query]
+fn http_request(req: HttpRequest) -> HttpResponse {
+    let parts: Vec<&str> = req.url.split("?").collect();
+    let asset = parts[0].to_string();
+
+    ASSETS.with(|a| match a.borrow().get(&asset) {
+        Some(value) => HttpResponse {
+            status_code: 200,
+            headers: vec![],
+            body: value.clone(),
+        },
+        None => HttpResponse {
+            status_code: 404,
+            headers: vec![],
+            body: format!("Asset {} not found.", asset).as_bytes().into(),
+        },
+    })
+}
+
+#[init]
+fn initialize_assets() {
+    ASSETS.with(|a| {
+        let mut a = a.borrow_mut();
+
+        let asset = include_str!("../../frontend/assets/sample-asset.txt");
+        a.insert("/sample-asset.txt".to_string(), asset.as_bytes().into());
+
+        let asset = include_str!("../../frontend/assets/main.css");
+        a.insert("/main.css".to_string(), asset.as_bytes().into());
+    });
+}
+
 
 fn main() {}
