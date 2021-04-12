@@ -1,5 +1,9 @@
+use hashtree::{Hash, HashTree};
+use ic_cdk::api::{data_certificate, set_certified_data};
 use ic_cdk::export::candid::{CandidType, Deserialize};
 use ic_cdk_macros::{init, query, update};
+use idp_service::signature_map::SignatureMap;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -33,8 +37,35 @@ struct HttpResponse {
 }
 
 thread_local! {
-    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::new());
+    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::default());
+    static SIGS: RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::new());
+}
+
+fn update_root_hash(m: &SignatureMap) {
+    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
+    set_certified_data(&prefixed_root_hash[..]);
+}
+
+#[allow(dead_code)]
+fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
+    let certificate = data_certificate()?;
+    let witness = m.witness(seed_hash, msg_hash)?;
+    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
+
+    #[derive(Serialize)]
+    struct Sig<'a> {
+        #[serde(with = "serde_bytes")]
+        certificate: Vec<u8>,
+        tree: HashTree<'a>,
+    }
+
+    let sig = Sig { certificate, tree };
+
+    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
+    cbor.self_describe().unwrap();
+    sig.serialize(&mut cbor).unwrap();
+    Some(cbor.into_inner())
 }
 
 #[update]
@@ -103,7 +134,8 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 #[init]
-fn initialize_assets() {
+fn init() {
+    SIGS.with(|sigs| update_root_hash(&sigs.borrow()));
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 

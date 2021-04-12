@@ -212,6 +212,10 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
         Self { root: Node::null() }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.root.is_null()
+    }
+
     pub fn get(&self, key: &[u8]) -> Option<&V> {
         unsafe {
             let mut root = self.root;
