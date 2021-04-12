@@ -1,5 +1,6 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data};
+use ic_cdk::export::candid::{CandidType, Deserialize};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
@@ -12,9 +13,33 @@ type PublicKey = Vec<u8>;
 type Alias = String;
 type Entry = (Alias, PublicKey, Option<CredentialId>);
 
+mod hash;
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HeaderField {
+    key: String,
+    value: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HttpRequest {
+    method: String,
+    url: String,
+    headers: Vec<HeaderField>,
+    body: Vec<u8>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct HttpResponse {
+    status_code: u16,
+    headers: Vec<HeaderField>,
+    body: Vec<u8>,
+}
+
 thread_local! {
     static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::default());
     static SIGS: RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
+    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::new());
 }
 
 fn update_root_hash(m: &SignatureMap) {
@@ -25,7 +50,7 @@ fn update_root_hash(m: &SignatureMap) {
 #[allow(dead_code)]
 fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let witness = m.witness(&seed_hash[..], &msg_hash[..])?;
+    let witness = m.witness(seed_hash, msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
@@ -89,9 +114,50 @@ fn lookup(user_id: UserId) -> Vec<Entry> {
     MAP.with(|m| m.borrow().get(&user_id).cloned().unwrap_or_default())
 }
 
+#[query]
+fn http_request(req: HttpRequest) -> HttpResponse {
+    let parts: Vec<&str> = req.url.split("?").collect();
+    let asset = parts[0].to_string();
+
+    ASSETS.with(|a| match a.borrow().get(&asset) {
+        Some(value) => HttpResponse {
+            status_code: 200,
+            headers: vec![],
+            body: value.clone(),
+        },
+        None => HttpResponse {
+            status_code: 404,
+            headers: vec![],
+            body: format!("Asset {} not found.", asset).as_bytes().into(),
+        },
+    })
+}
+
 #[init]
 fn init() {
     SIGS.with(|sigs| update_root_hash(&sigs.borrow()));
+    ASSETS.with(|a| {
+        let mut a = a.borrow_mut();
+
+        a.insert(
+            "/sample-asset.txt".to_string(),
+            include_str!("../../frontend/assets/sample-asset.txt")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/main.css".to_string(),
+            include_str!("../../frontend/assets/main.css")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/logo.png".to_string(),
+            include_bytes!("../../frontend/assets/logo.png")
+                .to_owned()
+                .into(),
+        );
+    });
 }
 
 fn main() {}

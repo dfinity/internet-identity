@@ -13,10 +13,10 @@ impl AsHashTree for Found {
 }
 
 #[derive(Default)]
-pub struct SignatureMap(RbTree<RbTree<Found>>);
+pub struct SignatureMap(RbTree<Hash, RbTree<Hash, Found>>);
 
 impl SignatureMap {
-    pub fn put(&mut self, seed: Vec<u8>, message: Vec<u8>) {
+    pub fn put(&mut self, seed: Hash, message: Hash) {
         if self.0.get(&seed[..]).is_none() {
             let mut submap = RbTree::new();
             submap.insert(message, Found);
@@ -28,9 +28,9 @@ impl SignatureMap {
         }
     }
 
-    pub fn delete(&mut self, seed: &[u8], message: &[u8]) {
-        self.0.modify(seed, |m| {
-            m.delete(message);
+    pub fn delete(&mut self, seed: Hash, message: Hash) {
+        self.0.modify(&seed[..], |m| {
+            m.delete(&message[..]);
         });
     }
 
@@ -38,11 +38,11 @@ impl SignatureMap {
         self.0.root_hash()
     }
 
-    pub fn witness(&self, seed: &[u8], message: &[u8]) -> Option<HashTree<'_>> {
-        self.0.get(seed)?.get(message)?;
+    pub fn witness(&self, seed: Hash, message: Hash) -> Option<HashTree<'_>> {
+        self.0.get(&seed[..])?.get(&message[..])?;
         let witness = self
             .0
-            .nested_witness(seed, |nested| nested.witness(message));
+            .nested_witness(&seed[..], |nested| nested.witness(&message[..]));
         Some(witness)
     }
 }

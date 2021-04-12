@@ -38,7 +38,17 @@ impl AsHashTree for Vec<u8> {
     }
 }
 
-impl<T: AsHashTree + 'static> AsHashTree for RbTree<T> {
+impl AsHashTree for Hash {
+    fn root_hash(&self) -> Hash {
+        leaf_hash(&self[..])
+    }
+
+    fn as_hash_tree(&self) -> HashTree<'_> {
+        Leaf(&self[..])
+    }
+}
+
+impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> AsHashTree for RbTree<K, V> {
     fn root_hash(&self) -> Hash {
         if self.root.is_null() {
             Empty.reconstruct()
@@ -55,11 +65,11 @@ impl<T: AsHashTree + 'static> AsHashTree for RbTree<T> {
 // 2. Children of a red node are black.
 // 3. Every path from a node goes through the same number of black
 //    nodes.
-pub struct Node<T> {
-    key: Vec<u8>,
-    value: T,
-    left: *mut Node<T>,
-    right: *mut Node<T>,
+pub struct Node<K, V> {
+    key: K,
+    value: V,
+    left: *mut Node<K, V>,
+    right: *mut Node<K, V>,
     color: Color,
 
     /// Hash of the data hash subtree.  It depends only on the key and
@@ -71,10 +81,10 @@ pub struct Node<T> {
     subtree_hash: Hash,
 }
 
-impl<T: AsHashTree + 'static> Node<T> {
-    fn new(key: Vec<u8>, value: T) -> *mut Self {
+impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
+    fn new(key: K, value: V) -> *mut Self {
         let value_hash = value.root_hash();
-        let data_hash = labeled_hash(key.as_slice(), &value_hash);
+        let data_hash = labeled_hash(key.as_ref(), &value_hash);
         Box::into_raw(Box::new(Self {
             key,
             value,
@@ -105,22 +115,22 @@ impl<T: AsHashTree + 'static> Node<T> {
     }
 
     fn null() -> *mut Self {
-        std::ptr::null::<Self>() as *mut Node<T>
+        std::ptr::null::<Self>() as *mut Node<K, V>
     }
 
     unsafe fn data_tree<'a>(n: *mut Self) -> HashTree<'a> {
         debug_assert!(!n.is_null());
 
-        labeled((*n).key.as_slice(), (*n).value.as_hash_tree())
+        labeled((*n).key.as_ref(), (*n).value.as_hash_tree())
     }
 
     unsafe fn subtree_with<'a>(
         n: *mut Self,
-        f: impl FnOnce(&'a T) -> HashTree<'a>,
+        f: impl FnOnce(&'a V) -> HashTree<'a>,
     ) -> HashTree<'a> {
         debug_assert!(!n.is_null());
 
-        labeled((*n).key.as_slice(), f(&(*n).value))
+        labeled((*n).key.as_ref(), f(&(*n).value))
     }
 
     unsafe fn full_data_tree<'a>(n: *mut Self) -> HashTree<'a> {
@@ -137,7 +147,7 @@ impl<T: AsHashTree + 'static> Node<T> {
     unsafe fn witness_tree<'a>(n: *mut Self) -> HashTree<'a> {
         debug_assert!(!n.is_null());
         let value_hash = (*n).value.root_hash();
-        labeled((*n).key.as_slice(), Pruned(value_hash))
+        labeled((*n).key.as_ref(), Pruned(value_hash))
     }
 
     unsafe fn full_witness_tree<'a>(n: *mut Self) -> HashTree<'a> {
@@ -181,32 +191,32 @@ impl<T: AsHashTree + 'static> Node<T> {
 
 /// Implements mutable Leaf-leaning red-black trees as defined in
 /// https://www.cs.princeton.edu/~rs/talks/LLRB/LLRB.pdf
-pub struct RbTree<T: AsHashTree + 'static> {
-    root: *mut Node<T>,
+pub struct RbTree<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> {
+    root: *mut Node<K, V>,
 }
 
-impl<T: AsHashTree + 'static> Drop for RbTree<T> {
+impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Drop for RbTree<K, V> {
     fn drop(&mut self) {
         unsafe { Node::delete(self.root) }
     }
 }
 
-impl<T: AsHashTree + 'static> Default for RbTree<T> {
+impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Default for RbTree<K, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: AsHashTree + 'static> RbTree<T> {
+impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
     pub fn new() -> Self {
         Self { root: Node::null() }
     }
 
-    pub fn get(&self, key: &[u8]) -> Option<&T> {
+    pub fn get(&self, key: &[u8]) -> Option<&V> {
         unsafe {
             let mut root = self.root;
             while !root.is_null() {
-                match key.cmp((*root).key.as_slice()) {
+                match key.cmp((*root).key.as_ref()) {
                     Equal => return Some(&(*root).value),
                     Less => root = (*root).left,
                     Greater => root = (*root).right,
@@ -216,11 +226,11 @@ impl<T: AsHashTree + 'static> RbTree<T> {
         }
     }
 
-    pub fn modify(&mut self, key: &[u8], f: impl FnOnce(&mut T)) {
+    pub fn modify(&mut self, key: &[u8], f: impl FnOnce(&mut V)) {
         unsafe {
             let mut root = self.root;
             while !root.is_null() {
-                match key.cmp((*root).key.as_slice()) {
+                match key.cmp((*root).key.as_ref()) {
                     Equal => {
                         f(&mut (*root).value);
                         (*root).subtree_hash = Node::subtree_hash(root);
@@ -256,7 +266,7 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     pub fn nested_witness<'a>(
         &'a self,
         key: &[u8],
-        f: impl FnOnce(&'a T) -> HashTree<'a>,
+        f: impl FnOnce(&'a V) -> HashTree<'a>,
     ) -> HashTree<'a> {
         if let Some(t) = self.lookup_and_build_witness(key, f) {
             return t;
@@ -281,18 +291,19 @@ impl<T: AsHashTree + 'static> RbTree<T> {
 
     pub fn for_each<'a, F>(&'a self, mut f: F)
     where
-        F: 'a + FnMut(&'a [u8], &'a T),
+        F: 'a + FnMut(&'a [u8], &'a V),
     {
-        unsafe fn visit<'a, T, F>(n: *mut Node<T>, f: &mut F)
+        unsafe fn visit<'a, K, V, F>(n: *mut Node<K, V>, f: &mut F)
         where
-            F: 'a + FnMut(&'a [u8], &'a T),
-            T: 'a + AsHashTree,
+            F: 'a + FnMut(&'a [u8], &'a V),
+            K: 'static + AsRef<[u8]>,
+            V: 'a + AsHashTree,
         {
             debug_assert!(!n.is_null());
             if !(*n).left.is_null() {
                 visit((*n).left, f)
             }
-            (*f)((*n).key.as_slice(), &(*n).value);
+            (*f)((*n).key.as_ref(), &(*n).value);
             if !(*n).right.is_null() {
                 visit((*n).right, f)
             }
@@ -304,11 +315,14 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     }
 
     fn witness_range_above<'a>(&'a self, lo: &[u8]) -> HashTree<'a> {
-        unsafe fn go<'a, T: AsHashTree + 'static>(n: *mut Node<T>, lo: &[u8]) -> HashTree<'a> {
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            n: *mut Node<K, V>,
+            lo: &[u8],
+        ) -> HashTree<'a> {
             if n.is_null() {
                 return Empty;
             }
-            match (*n).key.as_slice().cmp(lo) {
+            match (*n).key.as_ref().cmp(lo) {
                 Equal => three_way_fork(
                     Node::left_hash_tree(n),
                     Node::witness_tree(n),
@@ -330,11 +344,14 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     }
 
     fn witness_range_below<'a>(&'a self, hi: &[u8]) -> HashTree<'a> {
-        unsafe fn go<'a, T: AsHashTree + 'static>(n: *mut Node<T>, hi: &[u8]) -> HashTree<'a> {
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            n: *mut Node<K, V>,
+            hi: &[u8],
+        ) -> HashTree<'a> {
             if n.is_null() {
                 return Empty;
             }
-            match (*n).key.as_slice().cmp(hi) {
+            match (*n).key.as_ref().cmp(hi) {
                 Equal => three_way_fork(
                     Node::full_witness_tree((*n).left),
                     Node::witness_tree(n),
@@ -357,15 +374,15 @@ impl<T: AsHashTree + 'static> RbTree<T> {
 
     fn witness_range_exclusive<'a>(&'a self, lo: &[u8], hi: &[u8]) -> HashTree<'a> {
         debug_assert!(lo <= hi, "lo = {:?} > hi = {:?}", lo, hi);
-        unsafe fn go<'a, T: AsHashTree + 'static>(
-            n: *mut Node<T>,
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            n: *mut Node<K, V>,
             lo: &[u8],
             hi: &[u8],
         ) -> HashTree<'a> {
             if n.is_null() {
                 return Empty;
             }
-            let k = (*n).key.as_slice();
+            let k = (*n).key.as_ref();
             match (lo.cmp(k), k.cmp(hi)) {
                 (Less, Less) => three_way_fork(
                     go((*n).left, lo, hi),
@@ -399,12 +416,15 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     }
 
     fn left_neighbor<'a>(&'a self, key: &[u8]) -> Option<&'a [u8]> {
-        unsafe fn go<'a, T>(n: *mut Node<T>, key: &[u8]) -> Option<&'a [u8]> {
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V>(
+            n: *mut Node<K, V>,
+            key: &[u8],
+        ) -> Option<&'a [u8]> {
             if n.is_null() {
                 return None;
             }
-            match (*n).key.as_slice().cmp(key) {
-                Less => go((*n).right, key).or_else(|| Some((*n).key.as_slice())),
+            match (*n).key.as_ref().cmp(key) {
+                Less => go((*n).right, key).or_else(|| Some((*n).key.as_ref())),
                 Greater | Equal => go((*n).left, key),
             }
         }
@@ -412,12 +432,15 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     }
 
     fn right_neighbor<'a>(&'a self, key: &[u8]) -> Option<&'a [u8]> {
-        unsafe fn go<'a, T>(n: *mut Node<T>, key: &[u8]) -> Option<&'a [u8]> {
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V>(
+            n: *mut Node<K, V>,
+            key: &[u8],
+        ) -> Option<&'a [u8]> {
             if n.is_null() {
                 return None;
             }
-            match (*n).key.as_slice().cmp(key) {
-                Greater => go((*n).left, key).or_else(|| Some((*n).key.as_slice())),
+            match (*n).key.as_ref().cmp(key) {
+                Greater => go((*n).left, key).or_else(|| Some((*n).key.as_ref())),
                 Less | Equal => go((*n).right, key),
             }
         }
@@ -431,11 +454,14 @@ impl<T: AsHashTree + 'static> RbTree<T> {
             }
             &x[0..p.len()] == &p[..]
         }
-        unsafe fn go<'a, T>(n: *mut Node<T>, prefix: &[u8]) -> Option<&'a [u8]> {
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V>(
+            n: *mut Node<K, V>,
+            prefix: &[u8],
+        ) -> Option<&'a [u8]> {
             if n.is_null() {
                 return None;
             }
-            let node_key = (*n).key.as_slice();
+            let node_key = (*n).key.as_ref();
             match node_key.cmp(prefix) {
                 Greater if is_prefix_of(prefix, node_key) => go((*n).right, prefix),
                 Greater => go((*n).left, prefix).or_else(|| Some(node_key)),
@@ -448,17 +474,17 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     fn lookup_and_build_witness<'a>(
         &'a self,
         key: &[u8],
-        f: impl FnOnce(&'a T) -> HashTree<'a>,
+        f: impl FnOnce(&'a V) -> HashTree<'a>,
     ) -> Option<HashTree<'a>> {
-        unsafe fn go<'a, T: AsHashTree + 'static>(
-            n: *mut Node<T>,
+        unsafe fn go<'a, K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            n: *mut Node<K, V>,
             key: &[u8],
-            f: impl FnOnce(&'a T) -> HashTree<'a>,
+            f: impl FnOnce(&'a V) -> HashTree<'a>,
         ) -> Option<HashTree<'a>> {
             if n.is_null() {
                 return None;
             }
-            match key.cmp((*n).key.as_slice()) {
+            match key.cmp((*n).key.as_ref()) {
                 Equal => Some(three_way_fork(
                     Node::left_hash_tree(n),
                     Node::subtree_with(n, f),
@@ -485,21 +511,21 @@ impl<T: AsHashTree + 'static> RbTree<T> {
         unsafe { go(self.root, key, f) }
     }
 
-    pub fn insert(&mut self, key: Vec<u8>, value: T) {
-        unsafe fn go<T: AsHashTree + 'static>(
-            mut h: *mut Node<T>,
-            k: Vec<u8>,
-            v: T,
-        ) -> *mut Node<T> {
+    pub fn insert(&mut self, key: K, value: V) {
+        unsafe fn go<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+            k: K,
+            v: V,
+        ) -> *mut Node<K, V> {
             if h.is_null() {
                 return Node::new(k, v);
             }
 
-            match k.as_slice().cmp((*h).key.as_slice()) {
+            match k.as_ref().cmp((*h).key.as_ref()) {
                 Equal => {
                     let value_hash = v.root_hash();
                     (*h).value = v;
-                    (*h).data_hash = labeled_hash(k.as_slice(), &value_hash);
+                    (*h).data_hash = labeled_hash(k.as_ref(), &value_hash);
                     (*h).subtree_hash = Node::subtree_hash(h);
                 }
                 Less => {
@@ -526,7 +552,9 @@ impl<T: AsHashTree + 'static> RbTree<T> {
     }
 
     pub fn delete(&mut self, key: &[u8]) {
-        unsafe fn move_red_left<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> {
+        unsafe fn move_red_left<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+        ) -> *mut Node<K, V> {
             flip_colors(h);
             if is_red((*(*h).right).left) {
                 (*h).right = rotate_right((*h).right);
@@ -536,7 +564,9 @@ impl<T: AsHashTree + 'static> RbTree<T> {
             h
         }
 
-        unsafe fn move_red_right<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> {
+        unsafe fn move_red_right<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+        ) -> *mut Node<K, V> {
             flip_colors(h);
             if is_red((*(*h).left).left) {
                 h = rotate_right(h);
@@ -546,14 +576,18 @@ impl<T: AsHashTree + 'static> RbTree<T> {
         }
 
         #[inline]
-        unsafe fn min<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> {
+        unsafe fn min<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+        ) -> *mut Node<K, V> {
             while !(*h).left.is_null() {
                 h = (*h).left;
             }
             h
         }
 
-        unsafe fn delete_min<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> {
+        unsafe fn delete_min<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+        ) -> *mut Node<K, V> {
             if (*h).left.is_null() {
                 debug_assert!((*h).right.is_null());
                 Node::delete(h);
@@ -567,8 +601,11 @@ impl<T: AsHashTree + 'static> RbTree<T> {
             balance(h)
         }
 
-        unsafe fn go<T: AsHashTree + 'static>(mut h: *mut Node<T>, key: &[u8]) -> *mut Node<T> {
-            if key < (*h).key.as_slice() {
+        unsafe fn go<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+            key: &[u8],
+        ) -> *mut Node<K, V> {
+            if key < (*h).key.as_ref() {
                 if !is_red((*h).left) && !is_red((*(*h).left).left) {
                     h = move_red_left(h);
                 }
@@ -578,7 +615,7 @@ impl<T: AsHashTree + 'static> RbTree<T> {
                 if is_red((*h).left) {
                     h = rotate_right(h);
                 }
-                if key == (*h).key && (*h).right.is_null() {
+                if key == (*h).key.as_ref() && (*h).right.is_null() {
                     debug_assert!((*h).left.is_null());
                     Node::delete(h);
                     return Node::null();
@@ -588,7 +625,7 @@ impl<T: AsHashTree + 'static> RbTree<T> {
                     h = move_red_right(h);
                 }
 
-                if key == (*h).key.as_slice() {
+                if key == (*h).key.as_ref() {
                     let m = min((*h).right);
                     std::mem::swap(&mut (*h).key, &mut (*m).key);
                     std::mem::swap(&mut (*h).value, &mut (*m).value);
@@ -636,7 +673,7 @@ fn three_way_fork<'a>(l: HashTree<'a>, m: HashTree<'a>, r: HashTree<'a>) -> Hash
 }
 
 // helper functions
-unsafe fn is_red<T>(x: *const Node<T>) -> bool {
+unsafe fn is_red<K, V>(x: *const Node<K, V>) -> bool {
     if x.is_null() {
         false
     } else {
@@ -644,7 +681,9 @@ unsafe fn is_red<T>(x: *const Node<T>) -> bool {
     }
 }
 
-unsafe fn balance<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> {
+unsafe fn balance<K: AsRef<[u8]> + 'static, V: AsHashTree + 'static>(
+    mut h: *mut Node<K, V>,
+) -> *mut Node<K, V> {
     assert!(!h.is_null());
 
     if is_red((*h).right) && !is_red((*h).left) {
@@ -659,7 +698,9 @@ unsafe fn balance<T: AsHashTree + 'static>(mut h: *mut Node<T>) -> *mut Node<T> 
     h
 }
 /// Make a left-leaning link lean to the right.
-unsafe fn rotate_right<T: AsHashTree + 'static>(h: *mut Node<T>) -> *mut Node<T> {
+unsafe fn rotate_right<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+    h: *mut Node<K, V>,
+) -> *mut Node<K, V> {
     debug_assert!(!h.is_null());
     debug_assert!(is_red((*h).left));
 
@@ -675,7 +716,9 @@ unsafe fn rotate_right<T: AsHashTree + 'static>(h: *mut Node<T>) -> *mut Node<T>
     x
 }
 
-unsafe fn rotate_left<T: AsHashTree + 'static>(h: *mut Node<T>) -> *mut Node<T> {
+unsafe fn rotate_left<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+    h: *mut Node<K, V>,
+) -> *mut Node<K, V> {
     debug_assert!(!h.is_null());
     debug_assert!(is_red((*h).right));
 
@@ -691,14 +734,14 @@ unsafe fn rotate_left<T: AsHashTree + 'static>(h: *mut Node<T>) -> *mut Node<T> 
     x
 }
 
-unsafe fn flip_colors<T>(h: *mut Node<T>) {
+unsafe fn flip_colors<K, V>(h: *mut Node<K, V>) {
     (*h).color = (*h).color.flip();
     (*(*h).left).color = (*(*h).left).color.flip();
     (*(*h).right).color = (*(*h).right).color.flip();
 }
 
-unsafe fn is_balanced<T>(root: *mut Node<T>) -> bool {
-    unsafe fn go<T>(node: *mut Node<T>, mut num_black: usize) -> bool {
+unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
+    unsafe fn go<K, V>(node: *mut Node<K, V>, mut num_black: usize) -> bool {
         if node.is_null() {
             return num_black == 0;
         }
@@ -720,13 +763,13 @@ unsafe fn is_balanced<T>(root: *mut Node<T>) -> bool {
     go(root, num_black)
 }
 
-struct DebugView<T>(*const Node<T>);
+struct DebugView<K, V>(*const Node<K, V>);
 
-impl<T> fmt::Debug for DebugView<T> {
+impl<K: AsRef<[u8]>, V> fmt::Debug for DebugView<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe fn go<T>(
+        unsafe fn go<K: AsRef<[u8]>, V>(
             f: &mut fmt::Formatter<'_>,
-            h: *const Node<T>,
+            h: *const Node<K, V>,
             offset: usize,
         ) -> fmt::Result {
             if h.is_null() {
@@ -737,7 +780,7 @@ impl<T> fmt::Debug for DebugView<T> {
                     "{:width$}[{}] {:?}",
                     "",
                     if is_red(h) { "R" } else { "B" },
-                    (*h).key,
+                    (*h).key.as_ref(),
                     width = offset
                 )?;
                 go(f, (*h).left, offset + 2)?;
