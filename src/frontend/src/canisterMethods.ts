@@ -5,6 +5,7 @@ import IDPService, {
   // @ts-ignore
   canisterId as idp_service_id,
 } from "dfx-generated/idp_service";
+import BigNumber from "bignumber.js";
 
 const agent = new HttpAgent();
 const idp_service = Actor.createActor(idp_service_idl, {
@@ -36,10 +37,19 @@ export async function remove(userId: string, publicKey: number[]) {
 export async function lookup(userId: string) {
   return idp_service.lookup(userId);
 }
+export async function get_delegation(
+  userId: string,
+  publicKey: number[],
+  timestamp: BigNumber,
+  targets: Principal[] = []
+) {
+  return idp_service.get_delegation(userId, publicKey, timestamp, targets);
+}
 
 export default {
   register,
   add,
   remove,
   lookup,
+  get_delegation,
 };

@@ -2,6 +2,16 @@ declare module "dfx-generated/idp_service" {
   import { Principal, PublicKey } from "@dfinity/agent";
   import BigNumber from "bignumber.js";
 
+  export interface Delegation {
+    pubKey: number[];
+    expiration: BigNumber;
+    targets: Principal[];
+  }
+  export interface SignedDelegation {
+    delegation: Delegation;
+    signature: Blob;
+  }
+
   export interface HttpResponse {
     method: string;
     url: string;
@@ -32,6 +42,12 @@ declare module "dfx-generated/idp_service" {
     ) => Promise<null>;
     remove: (userId: string, publicKey: number[]) => Promise<null>;
     lookup: (userId: string) => Promise<any>;
+    get_delegation: (
+      userId: string,
+      publicKey: number[],
+      timestamp: BigNumber,
+      scope: Principal[]
+    ) => Promise<SignedDelegation>;
     http_request: () => Promise<any>;
   }
   const IDPService: IDPService;
