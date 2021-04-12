@@ -1,6 +1,10 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
+use ic_cdk::export::candid::{
+    parser::{types::FuncMode, value::IDLValue},
+    types::{Compound, Field, Function, Label, Serializer, Type, TypeId},
+    CandidType, Deserialize, Principal,
+};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
@@ -49,6 +53,45 @@ struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
     body: Vec<u8>,
+    streaming_strategy: Option<StreamingStrategy>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Token {}
+
+#[derive(Clone, Debug, Deserialize)]
+enum StreamingStrategy {
+    Callback { callback: IDLValue, token: Token },
+}
+
+impl CandidType for StreamingStrategy {
+    fn id() -> TypeId {
+        TypeId::of::<StreamingStrategy>()
+    }
+
+    fn _ty() -> Type {
+        Type::Variant(vec![])
+    }
+
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        let mut ser = serializer.serialize_variant(0)?;
+        match self {
+            StreamingStrategy::Callback { callback, token } => {
+                ser.serialize_element(callback)?;
+                ser.serialize_element(token)?;
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct StreamingCallbackHttpResponse {
+    body: Vec<u8>,
+    token: Option<Token>,
 }
 
 thread_local! {
@@ -139,11 +182,13 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 200,
             headers: vec![],
             body: value.clone(),
+            streaming_strategy: None,
         },
         None => HttpResponse {
             status_code: 404,
             headers: vec![],
             body: format!("Asset {} not found.", asset).as_bytes().into(),
+            streaming_strategy: None,
         },
     })
 }

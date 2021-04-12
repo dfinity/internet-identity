@@ -13,6 +13,18 @@ type HttpResponse = record {
   status_code: nat16;
   headers: vec HeaderField;
   body: blob;
+  streaming_strategy: opt StreamingStrategy;
+};
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+type Token = record {};
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
 };
 type Timestamp = nat64;
 type Delegation = record {
