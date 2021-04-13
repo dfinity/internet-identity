@@ -270,7 +270,7 @@ fn persist_data() {
         let m = s.map.borrow();
         if let Err(err) = stable_save((m.clone(),)) {
             ic_cdk::trap(&format!(
-                "An error occured while saving data to stable memory: {}",
+                "An error occurred while saving data to stable memory: {}",
                 err
             ));
         }
@@ -297,7 +297,7 @@ fn retrieve_data() {
             });
         }
         Err(err) => ic_cdk::trap(&format!(
-            "An error occured while retrieving data from stable memory: {}",
+            "An error occurred while retrieving data from stable memory: {}",
             err
         )),
     }
