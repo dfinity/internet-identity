@@ -4,7 +4,7 @@
       "type": "custom",
       "candid": "src/idp_service/idp_service.did",
       "wasm": "target/wasm32-unknown-unknown/release/idp_service.wasm",
-      "build": "idp_service/build.sh"
+      "build": "src/idp_service/build.sh"
     },
     "frontend": {
       "dependencies": ["idp_service"],

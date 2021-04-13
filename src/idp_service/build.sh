@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 IDP_DIR="$(dirname "$0")"
 
 cargo build --manifest-path "$IDP_DIR/Cargo.toml" --target wasm32-unknown-unknown --release
