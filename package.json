@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.7.1",
+    "@dfinity/agent": "0.8.0",
     "@testing-library/jest-dom": "^5.11.10",
     "@testing-library/react": "^11.2.6",
     "@types/jest": "^24.9.1",
