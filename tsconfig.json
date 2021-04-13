@@ -1,7 +1,6 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "noEmit": true,
     "noImplicitAny": false,
     "allowJs": true,
     "checkJs": false,
@@ -25,5 +24,6 @@
         "./.dfx/local/canisters/idp_service/idp_service.js"
       ]
     }
-  }
+  },
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

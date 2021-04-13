@@ -65,9 +65,9 @@ function generateWebpackConfigForCanister(name, info) {
       path: path.join(__dirname, "dist", name),
     },
     devServer: {
+      port: 8080,
       proxy: {
-        prefix: "/api",
-        url: "http://localhost:8000",
+        "/api": "http://localhost:8000",
       },
     },
 
@@ -80,6 +80,10 @@ function generateWebpackConfigForCanister(name, info) {
       rules: [
         { test: /\.(ts|tsx)$/, loader: "ts-loader" },
         { test: /\.css$/, use: ["style-loader", "css-loader"] },
+        {
+          test: /\.(png|jpg|gif)$/i,
+          type: "asset/resource",
+        },
       ],
     },
     plugins: [

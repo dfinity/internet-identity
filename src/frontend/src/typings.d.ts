@@ -1,6 +1,11 @@
 import type { Principal } from "@dfinity/agent";
 export type Alias = string;
 export type CredentialId = Array<number>;
+export interface Delegation {
+  pubkey: PublicKey;
+  targets: [] | [Array<Principal>];
+  expiration: Timestamp;
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   url: string;
@@ -14,6 +19,11 @@ export interface HttpResponse {
   status_code: number;
 }
 export type PublicKey = Array<number>;
+export interface SignedDelegation {
+  signature: Array<number>;
+  delegation: Delegation;
+}
+export type Timestamp = bigint;
 export type UserId = bigint;
 export default interface _SERVICE {
   add: (
@@ -22,6 +32,12 @@ export default interface _SERVICE {
     arg_2: PublicKey,
     arg_3: [] | [CredentialId]
   ) => Promise<undefined>;
+  get_delegation: (
+    arg_0: UserId,
+    arg_1: PublicKey,
+    arg_2: Timestamp,
+    arg_3: [] | [Array<Principal>]
+  ) => Promise<SignedDelegation>;
   http_request: (arg_0: HttpRequest) => Promise<HttpResponse>;
   lookup: (
     arg_0: UserId

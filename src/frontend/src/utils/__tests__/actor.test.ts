@@ -1,4 +1,4 @@
-import { IDPActor } from "../utils/actor";
+import { IDPActor } from "../actor";
 const { mockActor } = globalThis;
 describe("Actor Interface", () => {
   const testUser = BigInt(1234);

@@ -6,7 +6,7 @@ interface Props {}
 function LookupIdentity(props: Props) {
   const {} = props;
 
-  const handleSubmit = (e: React.SyntheticEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const target = e.target as HTMLFormElement;
     const lookupUser = target.querySelector("#lookupUser") as HTMLInputElement;
@@ -17,7 +17,8 @@ function LookupIdentity(props: Props) {
       "#lookupPublicKey"
     ) as HTMLInputElement;
 
-    actor.lookup(BigInt(lookupUser.value));
+    const returnedValue = await actor.lookup(BigInt(lookupUser.value));
+    console.info(returnedValue);
 
     return false;
   };
