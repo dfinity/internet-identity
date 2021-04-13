@@ -26,9 +26,7 @@ function AddIdentity(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} data-testid="addForm">
-      <button type="submit" id="add-identity">
-        Add Identity
-      </button>
+      <h2>Add an identity</h2>
       <label htmlFor="addUser">
         User (expects a number)
         <input type="text" name="addUser" id="addUser" required />
@@ -41,6 +39,9 @@ function AddIdentity(props: Props) {
         Public Key (expects a comma-separated list of numbers)
         <input type="text" name="addPublicKey" id="addPublicKey" required />
       </label>
+      <button type="submit" id="add-identity">
+        Add Identity
+      </button>
     </form>
   );
 }

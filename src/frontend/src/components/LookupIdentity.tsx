@@ -25,13 +25,14 @@ function LookupIdentity(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} data-testid="lookupForm">
-      <button type="submit" id="lookup-identity">
-        Lookup Identity
-      </button>
+      <h2>Lookup Identity</h2>
       <label htmlFor="lookupUser">
         User (expects a number)
         <input type="text" name="lookupUser" id="lookupUser" required />
       </label>
+      <button type="submit" id="lookup-identity">
+        Lookup Identity
+      </button>
     </form>
   );
 }

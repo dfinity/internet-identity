@@ -24,9 +24,7 @@ function RemoveIdentity(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} data-testid="removeForm">
-      <button type="submit" id="remove-identity">
-        Remove Identity
-      </button>
+      <h2>Remove an Identity</h2>
       <label htmlFor="removeUser">
         User (expects a number)
         <input type="text" name="removeUser" id="removeUser" required />
@@ -40,6 +38,9 @@ function RemoveIdentity(props: Props) {
           required
         />
       </label>
+      <button type="submit" id="remove-identity">
+        Remove Identity
+      </button>
     </form>
   );
 }

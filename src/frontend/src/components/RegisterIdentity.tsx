@@ -30,9 +30,7 @@ function RegisterIdentity(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} data-testid="registerForm">
-      <button type="submit" id="register-identity">
-        Register Identity
-      </button>
+      <h2>Register an identity</h2>
       <label htmlFor="registerUser">
         User (expects a number)
         <input type="text" name="registerUser" id="registerUser" required />
@@ -50,6 +48,9 @@ function RegisterIdentity(props: Props) {
           required
         />
       </label>
+      <button type="submit" id="register-identity">
+        Register Identity
+      </button>
     </form>
   );
 }
