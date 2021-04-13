@@ -148,6 +148,37 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     })
 }
 
+#[update]
+fn request_delegation(
+    user_id: UserId,
+    pubkey: PublicKey,
+    expiration: Timestamp,
+    targets: Option<Vec<Principal>>,
+) {
+    MAP.with(|m| {
+        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
+            if entries.iter().position(|e| e.1 == pubkey) == None {
+                panic!("User ID and public key pair not found.");
+            }
+        }
+    });
+
+    let seed_hash = hash::hash_string(user_id.to_string().as_str());
+    let msg_hash = delegation_hash(&Delegation {
+        pubkey,
+        expiration,
+        targets,
+    });
+
+    // TODO: also put those into a priority queue ordered by
+    // expiration date and GC them periodically.
+    SIGS.with(|sigs| {
+        let mut sigs = sigs.borrow_mut();
+        sigs.put(seed_hash, msg_hash);
+        update_root_hash(&sigs);
+    });
+}
+
 #[query]
 fn get_delegation(
     user_id: UserId,

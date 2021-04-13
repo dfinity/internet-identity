@@ -40,13 +40,11 @@ fn hash_key_val(key: &str, val: Value<'_>) -> Vec<u8> {
     key_hash
 }
 
-fn hash_string(value: &str) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(value.as_bytes());
-    hasher.finalize().into()
+pub fn hash_string(value: &str) -> Hash {
+    hash_bytes(value.as_bytes())
 }
 
-fn hash_bytes(value: &[u8]) -> Hash {
+pub fn hash_bytes(value: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(&value);
     hasher.finalize().into()
