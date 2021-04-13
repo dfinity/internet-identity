@@ -54,7 +54,6 @@ struct HttpResponse {
 struct State {
     map: RefCell<HashMap<UserId, Vec<Entry>>>,
     sigs: RefCell<SignatureMap>,
-    assets: RefCell<HashMap<String, Vec<u8>>>,
 }
 
 impl Default for State {
@@ -62,13 +61,13 @@ impl Default for State {
         Self {
             map: RefCell::new(HashMap::default()),
             sigs: RefCell::new(SignatureMap::default()),
-            assets: RefCell::new(HashMap::default()),
         }
     }
 }
 
 thread_local! {
     static STATE: State = State::default();
+    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
 }
 
 fn update_root_hash(m: &SignatureMap) {
@@ -148,7 +147,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split("?").collect();
     let asset = parts[0].to_string();
 
-    STATE.with(|s| match s.assets.borrow().get(&asset) {
+    ASSETS.with(|a| match a.borrow().get(&asset) {
         Some(value) => HttpResponse {
             status_code: 200,
             headers: vec![],
@@ -190,8 +189,8 @@ fn get_delegation(
 #[init]
 fn init() {
     STATE.with(|state| update_root_hash(&state.sigs.borrow()));
-    STATE.with(|state| {
-        let mut a = state.assets.borrow_mut();
+    ASSETS.with(|a| {
+        let mut a = a.borrow_mut();
 
         a.insert(
             "/sample-asset.txt".to_string(),
