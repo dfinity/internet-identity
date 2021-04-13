@@ -1,4 +1,4 @@
-import credentialRecovery from "../utils/credentialRecovery";
+import credentialRecovery from "../credentialRecovery";
 
 // Implements requirements for #IC-138
 describe("Credential Recovery", () => {

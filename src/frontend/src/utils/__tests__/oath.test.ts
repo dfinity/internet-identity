@@ -1,4 +1,4 @@
-import oath from "../utils/oath";
+import oath from "../oath";
 
 // Implements requirements for #IC-140
 describe("Support for oath endpoints", () => {

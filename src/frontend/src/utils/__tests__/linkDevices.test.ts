@@ -1,4 +1,4 @@
-import linkDevices from "../utils/linkDevices";
+import linkDevices from "../linkDevices";
 
 // Implements feature requirements for #IC-132
 describe("Linking devices for an IC User Number", () => {
