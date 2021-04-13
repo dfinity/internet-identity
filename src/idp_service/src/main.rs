@@ -1,3 +1,4 @@
+use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
@@ -84,11 +85,11 @@ fn get_signature(
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let msg_hash = delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    });
+    }));
     let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
@@ -108,11 +109,11 @@ fn get_signature(
 }
 
 fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
-    let msg_hash = delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    });
+    }));
     sigs.put(seed_hash(user_id), msg_hash);
     update_root_hash(&sigs);
 }
@@ -123,11 +124,11 @@ fn remove_signature(
     pk: PublicKey,
     expiration: Timestamp,
 ) {
-    let msg_hash = delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    });
+    }));
     sigs.delete(seed_hash(user_id), msg_hash);
     update_root_hash(sigs);
 }
@@ -159,6 +160,7 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
                     e.0 = alias;
                     e.2 = expiration;
                     e.3 = credential;
+                    add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
                     return;
                 }
             }
@@ -266,7 +268,7 @@ fn seed_hash(user_id: UserId) -> Hash {
 }
 
 fn delegation_hash(d: &Delegation) -> Hash {
-    use hash::{hash_of_map, Value};
+    use hash::Value;
 
     let mut m = HashMap::new();
     m.insert("pubkey", Value::Bytes(d.pubkey.as_slice()));
@@ -278,7 +280,8 @@ fn delegation_hash(d: &Delegation) -> Hash {
         }
         m.insert("targets", Value::Array(arr));
     }
-    hash_of_map(m)
+    let map_hash = hash::hash_of_map(m);
+    hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
 fn main() {}
