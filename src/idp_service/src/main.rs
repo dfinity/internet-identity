@@ -51,10 +51,23 @@ struct HttpResponse {
     body: Vec<u8>,
 }
 
+struct State {
+    map: RefCell<HashMap<UserId, Vec<Entry>>>,
+    sigs: RefCell<SignatureMap>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            map: RefCell::new(HashMap::default()),
+            sigs: RefCell::new(SignatureMap::default()),
+        }
+    }
+}
+
 thread_local! {
-    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::default());
-    static SIGS: RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
-    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::new());
+    static STATE: State = State::default();
+    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
 }
 
 fn update_root_hash(m: &SignatureMap) {
@@ -85,8 +98,8 @@ fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Ve
 
 #[update]
 fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
-    MAP.with(|m| {
-        let mut m = m.borrow_mut();
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
         if m.get(&user_id).is_some() {
             panic!("this user is already registered");
         }
@@ -96,8 +109,8 @@ fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<
 
 #[update]
 fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<CredentialId>) {
-    MAP.with(|m| {
-        let mut m = m.borrow_mut();
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
             for e in entries.iter_mut() {
                 if e.1 == pk {
@@ -115,8 +128,8 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
 
 #[update]
 fn remove(user_id: UserId, pk: PublicKey) {
-    MAP.with(|m| {
-        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
+    STATE.with(|s| {
+        if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 entries.swap_remove(i as usize);
             }
@@ -126,7 +139,7 @@ fn remove(user_id: UserId, pk: PublicKey) {
 
 #[query]
 fn lookup(user_id: UserId) -> Vec<Entry> {
-    MAP.with(|m| m.borrow().get(&user_id).cloned().unwrap_or_default())
+    STATE.with(|s| s.map.borrow().get(&user_id).cloned().unwrap_or_default())
 }
 
 #[query]
@@ -155,8 +168,8 @@ fn get_delegation(
     expiration: Timestamp,
     targets: Option<Vec<Principal>>,
 ) -> SignedDelegation {
-    MAP.with(|m| {
-        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
+    STATE.with(|s| {
+        if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
             if entries.iter().position(|e| e.1 == pubkey) == None {
                 panic!("User ID and public key pair not found.");
             }
@@ -175,7 +188,7 @@ fn get_delegation(
 
 #[init]
 fn init() {
-    SIGS.with(|sigs| update_root_hash(&sigs.borrow()));
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
