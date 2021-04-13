@@ -15,7 +15,6 @@ type HttpResponse = record {
   headers: vec HeaderField;
   body: blob;
 };
-type Timestamp = nat64;
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
