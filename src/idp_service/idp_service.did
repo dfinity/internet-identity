@@ -31,5 +31,5 @@ service : {
   remove : (UserId, PublicKey) -> ();
   lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId}) query;
   http_request: (request: HttpRequest) -> (HttpResponse) query;
-  get_delegation: (UserId, PublicKey, Timestamp, opt vec principal) -> (SignedDelegation) query;
+  get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
 }

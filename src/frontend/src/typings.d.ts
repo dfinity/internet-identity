@@ -34,9 +34,7 @@ export default interface _SERVICE {
   ) => Promise<undefined>;
   get_delegation: (
     arg_0: UserId,
-    arg_1: PublicKey,
-    arg_2: Timestamp,
-    arg_3: [] | [Array<Principal>]
+    arg_1: PublicKey
   ) => Promise<SignedDelegation>;
   http_request: (arg_0: HttpRequest) => Promise<HttpResponse>;
   lookup: (

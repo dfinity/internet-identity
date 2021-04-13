@@ -1,5 +1,6 @@
+use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data};
+use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
@@ -7,11 +8,13 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
+
 type UserId = u64;
 type CredentialId = Vec<u8>;
 type PublicKey = Vec<u8>;
 type Alias = String;
-type Entry = (Alias, PublicKey, Option<CredentialId>);
+type Entry = (Alias, PublicKey, Timestamp, Option<CredentialId>);
 type Timestamp = u64;
 type Signature = Vec<u8>;
 
@@ -51,10 +54,23 @@ struct HttpResponse {
     body: Vec<u8>,
 }
 
+struct State {
+    map: RefCell<HashMap<UserId, Vec<Entry>>>,
+    sigs: RefCell<SignatureMap>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            map: RefCell::new(HashMap::default()),
+            sigs: RefCell::new(SignatureMap::default()),
+        }
+    }
+}
+
 thread_local! {
-    static MAP: RefCell<HashMap<UserId, Vec<Entry>>> = RefCell::new(HashMap::default());
-    static SIGS: RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
-    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::new());
+    static STATE: State = State::default();
+    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
 }
 
 fn update_root_hash(m: &SignatureMap) {
@@ -62,10 +78,19 @@ fn update_root_hash(m: &SignatureMap) {
     set_certified_data(&prefixed_root_hash[..]);
 }
 
-#[allow(dead_code)]
-fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
+fn get_signature(
+    sigs: &SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let witness = m.witness(seed_hash, msg_hash)?;
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
@@ -83,30 +108,64 @@ fn get_signature(m: &SignatureMap, seed_hash: Hash, msg_hash: Hash) -> Option<Ve
     Some(cbor.into_inner())
 }
 
+fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    sigs.put(seed_hash(user_id), msg_hash);
+    update_root_hash(&sigs);
+}
+
+fn remove_signature(
+    sigs: &mut SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    sigs.delete(seed_hash(user_id), msg_hash);
+    update_root_hash(sigs);
+}
+
 #[update]
 fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
-    MAP.with(|m| {
-        let mut m = m.borrow_mut();
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
         if m.get(&user_id).is_some() {
             panic!("this user is already registered");
         }
-        m.insert(user_id, vec![(alias, pk, credential_id)]);
+        let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+        m.insert(
+            user_id,
+            vec![(alias, pk.clone(), expiration, credential_id)],
+        );
+        add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
     })
 }
 
 #[update]
 fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<CredentialId>) {
-    MAP.with(|m| {
-        let mut m = m.borrow_mut();
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
+            let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
                 if e.1 == pk {
                     e.0 = alias;
-                    e.2 = credential;
+                    e.2 = expiration;
+                    e.3 = credential;
+                    add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
                     return;
                 }
             }
-            entries.push((alias, pk, credential))
+            entries.push((alias, pk.clone(), expiration, credential));
+            add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
         } else {
             panic!("this user is not registered yet");
         }
@@ -115,18 +174,24 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
 
 #[update]
 fn remove(user_id: UserId, pk: PublicKey) {
-    MAP.with(|m| {
-        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
+    STATE.with(|s| {
+        let mut remove_user = false;
+        if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
-                entries.swap_remove(i as usize);
+                let (_, _, expiration, _) = entries.swap_remove(i as usize);
+                remove_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+                remove_user = entries.is_empty();
             }
+        }
+        if remove_user {
+            s.map.borrow_mut().remove(&user_id);
         }
     })
 }
 
 #[query]
 fn lookup(user_id: UserId) -> Vec<Entry> {
-    MAP.with(|m| m.borrow().get(&user_id).cloned().unwrap_or_default())
+    STATE.with(|s| s.map.borrow().get(&user_id).cloned().unwrap_or_default())
 }
 
 #[query]
@@ -149,33 +214,31 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 #[query]
-fn get_delegation(
-    user_id: UserId,
-    pubkey: PublicKey,
-    expiration: Timestamp,
-    targets: Option<Vec<Principal>>,
-) -> SignedDelegation {
-    MAP.with(|m| {
-        if let Some(entries) = m.borrow_mut().get_mut(&user_id) {
-            if entries.iter().position(|e| e.1 == pubkey) == None {
-                panic!("User ID and public key pair not found.");
+fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
+    STATE.with(|state| {
+        let mut m = state.map.borrow_mut();
+        if let Some(entries) = m.get_mut(&user_id) {
+            if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
+                let signature =
+                    get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
+                        .unwrap_or_else(|| panic!("no signature found"));
+                return SignedDelegation {
+                    delegation: Delegation {
+                        pubkey,
+                        expiration: *expiration,
+                        targets: None,
+                    },
+                    signature,
+                };
             }
         }
-    });
-
-    SignedDelegation {
-        delegation: Delegation {
-            pubkey,
-            expiration,
-            targets,
-        },
-        signature: Vec::new(), // empty signature for now.
-    }
+        panic!("User ID and public key pair not found.");
+    })
 }
 
 #[init]
 fn init() {
-    SIGS.with(|sigs| update_root_hash(&sigs.borrow()));
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
@@ -200,9 +263,12 @@ fn init() {
     });
 }
 
-#[allow(dead_code)]
-fn delegation_hash(d: &Delegation) -> Hash {
-    use hash::{hash_of_map, Value};
+fn seed_hash(user_id: UserId) -> Hash {
+    hash::hash_string(user_id.to_string().as_str())
+}
+
+fn delegation_signature_msg(d: &Delegation) -> Hash {
+    use hash::Value;
 
     let mut m = HashMap::new();
     m.insert("pubkey", Value::Bytes(d.pubkey.as_slice()));
@@ -214,7 +280,8 @@ fn delegation_hash(d: &Delegation) -> Hash {
         }
         m.insert("targets", Value::Array(arr));
     }
-    hash_of_map(m)
+    let map_hash = hash::hash_of_map(m);
+    hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
 fn main() {}
