@@ -85,7 +85,7 @@ fn get_signature(
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let msg_hash = hash_bytes(delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
@@ -109,7 +109,7 @@ fn get_signature(
 }
 
 fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
-    let msg_hash = hash_bytes(delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
@@ -124,7 +124,7 @@ fn remove_signature(
     pk: PublicKey,
     expiration: Timestamp,
 ) {
-    let msg_hash = hash_bytes(delegation_hash(&Delegation {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
@@ -267,7 +267,7 @@ fn seed_hash(user_id: UserId) -> Hash {
     hash::hash_string(user_id.to_string().as_str())
 }
 
-fn delegation_hash(d: &Delegation) -> Hash {
+fn delegation_signature_msg(d: &Delegation) -> Hash {
     use hash::Value;
 
     let mut m = HashMap::new();
