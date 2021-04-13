@@ -2,7 +2,8 @@ import * as React from "react";
 import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/extend-expect";
 import RegisterIdentity from "../RegisterIdentity";
-const { mockActor } = globalThis;
+import { testGlobal } from "../../../../../setupTests";
+const { mockActor } = testGlobal;
 describe("RegisterIdentity", () => {
   const testUser = BigInt(1234);
   const testAlias = "my desktop";

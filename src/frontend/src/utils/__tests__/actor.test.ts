@@ -1,5 +1,6 @@
+import { testGlobal } from "../../../../../setupTests";
 import { IDPActor } from "../actor";
-const { mockActor } = globalThis;
+const { mockActor } = testGlobal;
 describe("Actor Interface", () => {
   const testUser = BigInt(1234);
   const testAlias = "my desktop";

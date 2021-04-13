@@ -11,6 +11,8 @@ globalThis.mockActor = {
   lookup: jest.fn(),
 };
 
+export const testGlobal: any = { ...globalThis };
+
 jest.mock("@dfinity/agent", () => {
   class HttpAgent {}
   return {
