@@ -10,11 +10,6 @@ NodeJS (with npm) version TBD
 
 ## Running Locally
 
-- [Quick Start](https://sdk.dfinity.org/docs/quickstart/quickstart-intro.html)
-- [SDK Developer Tools](https://sdk.dfinity.org/docs/developers-guide/sdk-guide.html)
-- [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
-- [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
-
 To run the idp_service canisters, proceed as follows after cloning the repository
 
 ```bash
