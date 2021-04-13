@@ -1,0 +1,13 @@
+[package]
+name = "hashtree"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+serde = "1"
+serde_bytes = "0.11"
+sha2 = "0.9"
+
+[dev-dependencies]
+hex = "0.4"
+serde_cbor = "0.11"

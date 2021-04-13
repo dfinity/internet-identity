@@ -1,34 +1,58 @@
 body {
-    font-family: sans-serif;
-    font-size: 1.5rem;
+  font-family: sans-serif;
+  font-size: 1.5rem;
 }
 
 img {
-    max-width: 50vw;
-    max-height: 25vw;
-    display: block;
-    margin: auto;
+  max-width: 50vw;
+  max-height: 25vw;
+  display: block;
+  margin: auto;
 }
 section {
-    display: flex;
-    flex-flow: row wrap;
-    max-width: 40vw;
-    margin: auto;
-    align-items: baseline;
+  display: flex;
+  flex-flow: row wrap;
+  max-width: 40vw;
+  margin: auto;
+  align-items: baseline;
 }
 
 #clickMeBtn {
-    padding: 5px 20px;
-    margin: 10px auto;
-    float: right;
+  padding: 5px 20px;
+  margin: 10px auto;
+  float: right;
 }
 
 #greeting {
-    margin: 10px auto;
-    padding: 10px 60px;
-    border: 1px solid #222;
+  margin: 10px auto;
+  padding: 10px 60px;
+  border: 1px solid #222;
 }
 
 #greeting:empty {
-    display: none;
+  display: none;
+}
+
+form,
+label {
+  display: flex;
+}
+
+form {
+  margin-bottom: 2rem;
+  flex-direction: column;
+}
+
+button[type="submit"] {
+  padding: 1rem 2rem;
+  margin-right: auto;
+}
+
+label {
+  flex-direction: row;
+  margin-bottom: 1rem;
+}
+
+input {
+  height: fit-content;
 }

@@ -1,6 +1,6 @@
 const path = require("path");
 const webpack = require("webpack");
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+const HtmlWebpackPlugin = require("html-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
 
@@ -40,7 +40,9 @@ function generateWebpackConfigForCanister(name, info) {
     entry: {
       // The frontend.entrypoint points to the HTML file for this build, so we need
       // to replace the extension to `.js`.
-      index: path.join(__dirname, info.frontend.entrypoint).replace(/\.html$/, ".js"),
+      index: path
+        .join(__dirname, info.frontend.entrypoint)
+        .replace(/\.html$/, ".tsx"),
     },
     devtool: "source-map",
     optimization: {
@@ -51,16 +53,22 @@ function generateWebpackConfigForCanister(name, info) {
       alias: aliases,
       extensions: [".js", ".ts", ".jsx", ".tsx"],
       fallback: {
-        "assert": require.resolve("assert/"),
-        "buffer": require.resolve("buffer/"),
-        "events": require.resolve("events/"),
-        "stream": require.resolve("stream-browserify/"),
-        "util": require.resolve("util/"),
+        assert: require.resolve("assert/"),
+        buffer: require.resolve("buffer/"),
+        events: require.resolve("events/"),
+        stream: require.resolve("stream-browserify/"),
+        util: require.resolve("util/"),
       },
     },
     output: {
       filename: "[name].js",
       path: path.join(__dirname, "dist", name),
+    },
+    devServer: {
+      port: 8080,
+      proxy: {
+        "/api": "http://localhost:8000",
+      },
     },
 
     // Depending in the language or framework you are using for
@@ -68,21 +76,25 @@ function generateWebpackConfigForCanister(name, info) {
     // webpack configuration. For example, if you are using React
     // modules and CSS as described in the "Adding a stylesheet"
     // tutorial, uncomment the following lines:
-    // module: {
-    //  rules: [
-    //    { test: /\.(ts|tsx|jsx)$/, loader: "ts-loader" },
-    //    { test: /\.css$/, use: ['style-loader','css-loader'] }
-    //  ]
-    // },
+    module: {
+      rules: [
+        { test: /\.(ts|tsx)$/, loader: "ts-loader" },
+        { test: /\.css$/, use: ["style-loader", "css-loader"] },
+        {
+          test: /\.(png|jpg|gif)$/i,
+          type: "asset/resource",
+        },
+      ],
+    },
     plugins: [
       new HtmlWebpackPlugin({
         template: path.join(__dirname, info.frontend.entrypoint),
-        filename: 'index.html',
-        chunks: ['index'],
+        filename: "index.html",
+        chunks: ["index"],
       }),
       new webpack.ProvidePlugin({
-        Buffer: [require.resolve('buffer/'), 'Buffer'],
-        process: require.resolve('process/browser'),
+        Buffer: [require.resolve("buffer/"), "Buffer"],
+        process: require.resolve("process/browser"),
       }),
     ],
   };
