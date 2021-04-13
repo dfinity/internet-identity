@@ -21,7 +21,7 @@ dfx deploy
 Then the canister can be used as
 
 ```bash
-dfx canister call idp_service register '(123, "test", {1; 2; 3}; null)'
+dfx canister call idp_service register '(123, "test", vec {1; 2; 3}, null)'
 ```
 
 To open the front-end, you can run the following and open the URL.
