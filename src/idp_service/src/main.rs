@@ -267,8 +267,7 @@ fn init() {
 #[pre_upgrade]
 fn persist_data() {
     STATE.with(|s| {
-        let m = s.map.borrow();
-        if let Err(err) = stable_save((m.clone(),)) {
+        if let Err(err) = stable_save((s.map.take(),)) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
@@ -283,17 +282,16 @@ fn retrieve_data() {
         Ok((map,)) => {
             STATE.with(|s| {
                 // Restore user map.
-                let mut m = s.map.borrow_mut();
-                *m = map;
+                s.map.replace(map);
 
                 // Recompute the signatures based on the user map.
-                let mut sigs = s.sigs.borrow_mut();
-                *sigs = SignatureMap::default();
-                for (user_id, entries) in m.iter() {
+                let mut sigs = SignatureMap::default();
+                for (user_id, entries) in s.map.borrow().iter() {
                     for (_, pk, expiration, _) in entries.iter() {
                         add_signature(&mut sigs, *user_id, pk.clone(), *expiration);
                     }
                 }
+                s.sigs.replace(sigs);
             });
         }
         Err(err) => ic_cdk::trap(&format!(
