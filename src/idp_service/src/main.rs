@@ -74,66 +74,6 @@ thread_local! {
     static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
 }
 
-fn update_root_hash(m: &SignatureMap) {
-    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
-    set_certified_data(&prefixed_root_hash[..]);
-}
-
-fn get_signature(
-    sigs: &SignatureMap,
-    user_id: UserId,
-    pk: PublicKey,
-    expiration: Timestamp,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate()?;
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
-    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
-
-    #[derive(Serialize)]
-    struct Sig<'a> {
-        #[serde(with = "serde_bytes")]
-        certificate: Vec<u8>,
-        tree: HashTree<'a>,
-    }
-
-    let sig = Sig { certificate, tree };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
-}
-
-fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    sigs.put(seed_hash(user_id), msg_hash);
-    update_root_hash(&sigs);
-}
-
-fn remove_signature(
-    sigs: &mut SignatureMap,
-    user_id: UserId,
-    pk: PublicKey,
-    expiration: Timestamp,
-) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    sigs.delete(seed_hash(user_id), msg_hash);
-    update_root_hash(sigs);
-}
-
 #[update]
 fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
     STATE.with(|s| {
@@ -308,6 +248,66 @@ fn delegation_signature_msg(d: &Delegation) -> Hash {
     }
     let map_hash = hash::hash_of_map(m);
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
+}
+
+fn update_root_hash(m: &SignatureMap) {
+    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
+    set_certified_data(&prefixed_root_hash[..]);
+}
+
+fn get_signature(
+    sigs: &SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) -> Option<Vec<u8>> {
+    let certificate = data_certificate()?;
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
+    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
+
+    #[derive(Serialize)]
+    struct Sig<'a> {
+        #[serde(with = "serde_bytes")]
+        certificate: Vec<u8>,
+        tree: HashTree<'a>,
+    }
+
+    let sig = Sig { certificate, tree };
+
+    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
+    cbor.self_describe().unwrap();
+    sig.serialize(&mut cbor).unwrap();
+    Some(cbor.into_inner())
+}
+
+fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    sigs.put(seed_hash(user_id), msg_hash);
+    update_root_hash(&sigs);
+}
+
+fn remove_signature(
+    sigs: &mut SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) {
+    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    }));
+    sigs.delete(seed_hash(user_id), msg_hash);
+    update_root_hash(sigs);
 }
 
 fn main() {}
