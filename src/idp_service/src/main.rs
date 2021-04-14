@@ -2,7 +2,8 @@ use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
-use ic_cdk_macros::{init, query, update};
+use ic_cdk::storage::{stable_restore, stable_save};
+use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
@@ -249,6 +250,43 @@ fn init() {
                 .into(),
         );
     });
+}
+
+#[pre_upgrade]
+fn persist_data() {
+    STATE.with(|s| {
+        if let Err(err) = stable_save((s.map.take(),)) {
+            ic_cdk::trap(&format!(
+                "An error occurred while saving data to stable memory: {}",
+                err
+            ));
+        }
+    })
+}
+
+#[post_upgrade]
+fn retrieve_data() {
+    match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
+        Ok((map,)) => {
+            STATE.with(|s| {
+                // Restore user map.
+                s.map.replace(map);
+
+                // Recompute the signatures based on the user map.
+                let mut sigs = SignatureMap::default();
+                for (user_id, entries) in s.map.borrow().iter() {
+                    for (_, pk, expiration, _) in entries.iter() {
+                        add_signature(&mut sigs, *user_id, pk.clone(), *expiration);
+                    }
+                }
+                s.sigs.replace(sigs);
+            });
+        }
+        Err(err) => ic_cdk::trap(&format!(
+            "An error occurred while retrieving data from stable memory: {}",
+            err
+        )),
+    }
 }
 
 fn seed_hash(user_id: UserId) -> Hash {
