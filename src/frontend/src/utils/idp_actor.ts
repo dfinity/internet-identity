@@ -53,5 +53,5 @@ export class IDPActor {
   };
 }
 
-const actor = new IDPActor();
-export default actor;
+const idp_actor = new IDPActor();
+export default idp_actor;

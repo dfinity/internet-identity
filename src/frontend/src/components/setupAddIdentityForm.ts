@@ -1,28 +1,39 @@
-import actor from "../utils/actor";
+import idp_actor from "../utils/idp_actor";
+import { resetForm } from "../utils/resetForm";
 
 function setupAddIdentityForm() {
-  const identityForm = document.getElementById("addForm") as HTMLFormElement;
+  const form = document.getElementById("addForm") as HTMLFormElement;
+  const submitButton = form.querySelector(
+    'button[type="submit"]'
+  ) as HTMLButtonElement;
 
   const handleSubmit = (e) => {
+    // Enter pending state
     e.preventDefault();
-    const addUser = identityForm.querySelector("#addUser") as HTMLInputElement;
-    const addAlias = identityForm.querySelector(
-      "#addAlias"
-    ) as HTMLInputElement;
-    const addPublicKey = identityForm.querySelector(
-      "#addPublicKey"
-    ) as HTMLInputElement;
+    submitButton.setAttribute("disabled", "true");
 
-    actor.add(
-      BigInt(addUser.value),
-      addAlias.value,
-      addPublicKey.value.split(",").map((num) => Number(num))
-    );
+    // Read values from inputs
+    const addUser = form.querySelector("#addUser") as HTMLInputElement;
+    const addAlias = form.querySelector("#addAlias") as HTMLInputElement;
+
+    // Send values through actor
+    idp_actor
+      .add(BigInt(addUser.value), addAlias.value)
+      .then((returnValue) => {
+        console.info("successfully added identity", returnValue);
+
+        // Clean up
+        resetForm(form);
+      })
+      .catch((err) => {
+        console.error(err);
+        submitButton.removeAttribute("disabled");
+      });
 
     return false;
   };
 
-  identityForm.onsubmit = handleSubmit;
+  form.onsubmit = handleSubmit;
 }
 
 export default setupAddIdentityForm;

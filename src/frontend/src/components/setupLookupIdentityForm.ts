@@ -1,15 +1,33 @@
-import actor from "../utils/actor";
+import idp_actor from "../utils/idp_actor";
+import { resetForm } from "../utils/resetForm";
 
 function setupLookupIdentityForm() {
   const form = document.getElementById("lookupForm") as HTMLFormElement;
+  const submitButton = form.querySelector(
+    'button[type="submit"]'
+  ) as HTMLButtonElement;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
+    // Enter pending state
     e.preventDefault();
-    const target = e.target as HTMLFormElement;
-    const lookupUser = target.querySelector("#lookupUser") as HTMLInputElement;
+    submitButton.setAttribute("disabled", "true");
 
-    const returnedValue = await actor.lookup(BigInt(lookupUser.value));
-    console.info(returnedValue);
+    // Read values from inputs
+    const lookupUser = form.querySelector("#lookupUser") as HTMLInputElement;
+
+    // Send values through actor
+    idp_actor
+      .lookup(BigInt(lookupUser.value))
+      .then((returnValue) => {
+        console.info("successfully looked up identity", returnValue);
+
+        // Clean up
+        resetForm(form);
+      })
+      .catch((err) => {
+        console.error(err);
+        submitButton.removeAttribute("disabled");
+      });
 
     return false;
   };

@@ -1,6 +1,7 @@
 const path = require("path");
 const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
 
@@ -40,9 +41,7 @@ function generateWebpackConfigForCanister(name, info) {
     entry: {
       // The frontend.entrypoint points to the HTML file for this build, so we need
       // to replace the extension to `.js`.
-      index: path
-        .join(__dirname, info.frontend.entrypoint)
-        .replace(/\.html$/, ".ts"),
+      index: path.join(__dirname, info.frontend.entrypoint),
     },
     devtool: "source-map",
     optimization: {
@@ -62,7 +61,7 @@ function generateWebpackConfigForCanister(name, info) {
     },
     output: {
       filename: "[name].js",
-      path: path.join(__dirname, "dist", name),
+      path: path.join(__dirname, "dist"),
     },
     devServer: {
       port: 8080,
@@ -87,10 +86,13 @@ function generateWebpackConfigForCanister(name, info) {
       ],
     },
     plugins: [
-      new HtmlWebpackPlugin({
-        template: path.join(__dirname, info.frontend.entrypoint),
-        filename: "index.html",
-        chunks: ["index"],
+      new CopyPlugin({
+        patterns: [
+          {
+            from: path.join(__dirname, "src", "frontend", "assets"),
+            to: path.join(__dirname, "dist"),
+          },
+        ],
       }),
       new webpack.ProvidePlugin({
         Buffer: [require.resolve("buffer/"), "Buffer"],

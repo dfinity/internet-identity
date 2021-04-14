@@ -19,6 +19,7 @@
     "@types/react-router-dom": "5.1.7",
     "assert": "2.0.0",
     "buffer": "6.0.3",
+    "copy-webpack-plugin": "^8.1.1",
     "events": "3.3.0",
     "file-loader": "^6.2.0",
     "html-webpack-plugin": "5.3.1",
@@ -40,6 +41,7 @@
   },
   "dependencies": {
     "@dfinity/authentication": "^0.7.1",
+    "@dfinity/identity": "^0.8.0",
     "@material-ui/core": "^4.11.3",
     "@types/react": "17.0.3",
     "css-loader": "^5.2.1",
