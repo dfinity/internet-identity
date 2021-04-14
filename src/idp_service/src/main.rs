@@ -248,18 +248,6 @@ fn init() {
                 .as_bytes()
                 .into(),
         );
-        a.insert(
-            "/main.css".to_string(),
-            include_str!("../../frontend/assets/main.css")
-                .as_bytes()
-                .into(),
-        );
-        a.insert(
-            "/logo.png".to_string(),
-            include_bytes!("../../frontend/assets/logo.png")
-                .to_owned()
-                .into(),
-        );
     });
 }
 

@@ -1,6 +1,7 @@
 type UserId = nat64;
 type CredentialId = vec nat8;
 type Alias = text;
+type Timestamp = nat64;
 type PublicKey = vec nat8;
 type HeaderField = record { text; text; };
 type HttpRequest = record {
@@ -14,7 +15,6 @@ type HttpResponse = record {
   headers: vec HeaderField;
   body: blob;
 };
-type Timestamp = nat64;
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -29,7 +29,7 @@ service : {
   register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   remove : (UserId, PublicKey) -> ();
-  lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId}) query;
+  lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
   http_request: (request: HttpRequest) -> (HttpResponse) query;
   get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
 }
