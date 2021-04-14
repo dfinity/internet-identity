@@ -2,6 +2,7 @@
 
 IDP_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
+
 cargo build --manifest-path "$IDP_DIR/Cargo.toml" --target $TARGET --release
 
 cargo install ic-cdk-optimizer --root "$IDP_DIR"/../../target
