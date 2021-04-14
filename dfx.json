@@ -11,7 +11,7 @@
       "frontend": {
         "entrypoint": "src/frontend/src/index.ts"
       },
-      "source": ["src/frontend/assets", "dist/frontend/"],
+      "source": ["src/frontend/assets", "dist"],
       "type": "assets"
     }
   },
