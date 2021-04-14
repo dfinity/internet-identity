@@ -103,15 +103,7 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
-            let mut authenticated = false;
-            for e in entries.iter() {
-                if caller() == Principal::self_authenticating(e.1.clone()) {
-                    authenticated = true;
-                }
-            }
-            if !authenticated {
-                ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
-            }
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
 
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
@@ -136,15 +128,7 @@ fn remove(user_id: UserId, pk: PublicKey) {
     STATE.with(|s| {
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
-            let mut authenticated = false;
-            for e in entries.iter() {
-                if caller() == Principal::self_authenticating(e.1.clone()) {
-                    authenticated = true;
-                }
-            }
-            if !authenticated {
-                ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
-            }
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
 
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 let (_, _, expiration, _) = entries.swap_remove(i as usize);
@@ -336,6 +320,20 @@ fn remove_signature(
     }));
     sigs.delete(seed_hash(user_id), msg_hash);
     update_root_hash(sigs);
+}
+
+// Checks if the caller is authenticated against any of the public keys provided 
+// and traps if not.
+fn trap_if_not_authenticated(public_keys: Vec<PublicKey>) {
+    let mut authenticated = false;
+    for pk in public_keys.into_iter() {
+        if caller() == Principal::self_authenticating(pk) {
+            authenticated = true;
+        }
+    }
+    if !authenticated {
+        ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+    }
 }
 
 fn main() {}
