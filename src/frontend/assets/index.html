@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>idp_service</title>
+    <base href="/" />
+  </head>
+  <body>
+    <main>
+      <div class="MuiContainer-root MuiContainer-maxWidthLg">
+        <h1 class="MuiTypography-root MuiTypography-h1">IDP service</h1>
+        <form id="registerForm">
+          <h2>Register an identity</h2>
+          <label for="registerUser"
+            >User (expects a number)<input
+              type="text"
+              name="registerUser"
+              id="registerUser"
+              required /></label
+          ><label for="registerAlias"
+            >Alias (expects a string)<input
+              type="text"
+              name="registerAlias"
+              id="registerAlias"
+              required /></label
+          ><button type="submit" id="register-identity">
+            Register Identity
+          </button>
+        </form>
+        <form id="addForm">
+          <h2>Add an identity</h2>
+          <label for="addUser"
+            >User (expects a number)<input
+              type="text"
+              name="addUser"
+              id="addUser"
+              required /></label
+          ><label for="addAlias"
+            >Alias (expects a string)<input
+              type="text"
+              name="addAlias"
+              id="addAlias"
+              required /></label
+          ><button type="submit" id="add-identity">Add Identity</button>
+        </form>
+        <form id="lookupForm">
+          <h2>Lookup Identity</h2>
+          <label for="lookupUser"
+            >User (expects a number)<input
+              type="text"
+              name="lookupUser"
+              id="lookupUser"
+              required /></label
+          ><button type="submit" id="lookup-identity">Lookup Identity</button>
+        </form>
+        <form id="removeForm">
+          <h2>Remove an Identity</h2>
+          <label for="removeUser"
+            >User (expects a number)<input
+              type="text"
+              name="removeUser"
+              id="removeUser"
+              required /></label
+          ><button type="submit" id="remove-identity">Remove Identity</button>
+        </form>
+      </div>
+    </main>
+    <script src="index.js"></script>
+  </body>
+</html>

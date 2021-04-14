@@ -10,11 +10,6 @@ NodeJS (with npm) version TBD
 
 ## Running Locally
 
-- [Quick Start](https://sdk.dfinity.org/docs/quickstart/quickstart-intro.html)
-- [SDK Developer Tools](https://sdk.dfinity.org/docs/developers-guide/sdk-guide.html)
-- [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
-- [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
-
 To run the idp_service canisters, proceed as follows after cloning the repository
 
 ```bash
@@ -26,7 +21,7 @@ dfx deploy
 Then the canister can be used as
 
 ```bash
-dfx canister call idp_service register '(123, "test", {1; 2; 3}; null)'
+dfx canister call idp_service register '(123, "test", vec {1; 2; 3}, null)'
 ```
 
 To open the front-end, you can run the following and open the URL.
@@ -51,4 +46,4 @@ dfx deploy
 
 Then, run `npm start` to start webpack-dev-server.
 
-Unit tests can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner.
+Unit tests are tbd. They can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner. Frontend tests are not required to pass at this time.

@@ -4,14 +4,14 @@
       "type": "custom",
       "candid": "src/idp_service/idp_service.did",
       "wasm": "target/wasm32-unknown-unknown/release/idp_service.wasm",
-      "build": "cargo build --release --target wasm32-unknown-unknown"
+      "build": "src/idp_service/build.sh"
     },
     "frontend": {
       "dependencies": ["idp_service"],
       "frontend": {
-        "entrypoint": "src/frontend/src/index.html"
+        "entrypoint": "src/frontend/src/index.ts"
       },
-      "source": ["src/frontend/assets", "dist/frontend/"],
+      "source": ["src/frontend/assets", "dist"],
       "type": "assets"
     }
   },

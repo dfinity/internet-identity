@@ -1,7 +1,8 @@
 type UserId = nat64;
-type CredentialId = vec nat8;
+type CredentialId = blob;
 type Alias = text;
-type PublicKey = vec nat8;
+type Timestamp = nat64;
+type PublicKey = blob;
 type HeaderField = record { text; text; };
 type HttpRequest = record {
   method: text;
@@ -26,7 +27,6 @@ type StreamingStrategy = variant {
     token: Token;
   };
 };
-type Timestamp = nat64;
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -41,7 +41,7 @@ service : {
   register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   remove : (UserId, PublicKey) -> ();
-  lookup : (UserId) -> (vec record {Alias; PublicKey; opt CredentialId}) query;
+  lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
   http_request: (request: HttpRequest) -> (HttpResponse) query;
-  get_delegation: (UserId, PublicKey, Timestamp, opt vec principal) -> (SignedDelegation) query;
+  get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
 }

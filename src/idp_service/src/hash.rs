@@ -1,4 +1,5 @@
-//! Provides helper functions to calculate the representation independent hash of structured data.
+//! Provides helper functions to calculate the representation independent hash
+//! of structured data.
 use hashtree::Hash;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -33,6 +34,15 @@ pub fn hash_of_map<S: AsRef<str>>(map: HashMap<S, Value>) -> Hash {
     hasher.finalize().into()
 }
 
+pub fn hash_with_domain(sep: &[u8], bytes: &[u8]) -> Hash {
+    let mut hasher = Sha256::new();
+    let buf = [sep.len() as u8];
+    hasher.update(&buf);
+    hasher.update(&sep);
+    hasher.update(&bytes);
+    hasher.finalize().into()
+}
+
 fn hash_key_val(key: &str, val: Value<'_>) -> Vec<u8> {
     let mut key_hash = hash_string(key).to_vec();
     let mut val_hash = hash_val(val);
@@ -40,15 +50,13 @@ fn hash_key_val(key: &str, val: Value<'_>) -> Vec<u8> {
     key_hash
 }
 
-fn hash_string(value: &str) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(value.as_bytes());
-    hasher.finalize().into()
+pub fn hash_string(value: &str) -> Hash {
+    hash_bytes(value.as_bytes())
 }
 
-fn hash_bytes(value: &[u8]) -> Hash {
+pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
-    hasher.update(&value);
+    hasher.update(value.as_ref());
     hasher.finalize().into()
 }
 
