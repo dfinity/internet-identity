@@ -324,15 +324,12 @@ fn remove_signature(
 // Checks if the caller is authenticated against any of the public keys provided 
 // and traps if not.
 fn trap_if_not_authenticated(public_keys: Vec<PublicKey>) {
-    let mut authenticated = false;
     for pk in public_keys.into_iter() {
         if caller() == Principal::self_authenticating(pk) {
-            authenticated = true;
+            return;
         }
     }
-    if !authenticated {
-        ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
-    }
+    ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
 }
 
 fn main() {}
