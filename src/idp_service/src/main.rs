@@ -1,4 +1,3 @@
-use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{caller, data_certificate, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
@@ -245,7 +244,7 @@ fn seed_hash(user_id: UserId) -> Hash {
     hash::hash_string(user_id.to_string().as_str())
 }
 
-fn delegation_signature_msg(d: &Delegation) -> Hash {
+fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     use hash::Value;
 
     let mut m = HashMap::new();
@@ -274,11 +273,11 @@ fn get_signature(
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
     let certificate = data_certificate()?;
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    }));
+    });
     let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
@@ -298,11 +297,11 @@ fn get_signature(
 }
 
 fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    }));
+    });
     sigs.put(seed_hash(user_id), msg_hash);
     update_root_hash(&sigs);
 }
@@ -313,11 +312,11 @@ fn remove_signature(
     pk: PublicKey,
     expiration: Timestamp,
 ) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
-    }));
+    });
     sigs.delete(seed_hash(user_id), msg_hash);
     update_root_hash(sigs);
 }

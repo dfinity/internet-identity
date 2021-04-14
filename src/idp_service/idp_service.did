@@ -1,8 +1,8 @@
 type UserId = nat64;
-type CredentialId = vec nat8;
+type CredentialId = blob;
 type Alias = text;
 type Timestamp = nat64;
-type PublicKey = vec nat8;
+type PublicKey = blob;
 type HeaderField = record { text; text; };
 type HttpRequest = record {
   method: text;

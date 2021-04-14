@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 IDP_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
 
