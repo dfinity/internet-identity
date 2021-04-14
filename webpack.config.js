@@ -42,7 +42,7 @@ function generateWebpackConfigForCanister(name, info) {
       // to replace the extension to `.js`.
       index: path
         .join(__dirname, info.frontend.entrypoint)
-        .replace(/\.html$/, ".tsx"),
+        .replace(/\.html$/, ".ts"),
     },
     devtool: "source-map",
     optimization: {
