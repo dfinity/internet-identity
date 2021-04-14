@@ -1,6 +1,5 @@
-use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
+use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
