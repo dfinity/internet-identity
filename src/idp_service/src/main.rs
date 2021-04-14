@@ -1,6 +1,6 @@
 use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time};
+use ic_cdk::api::{data_certificate, set_certified_data, time, caller};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, query, update};
 use idp_service::signature_map::SignatureMap;
@@ -136,6 +136,10 @@ fn remove_signature(
 #[update]
 fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
     STATE.with(|s| {
+        if caller() != Principal::self_authenticating(pk.clone()) {
+            ic_cdk::trap(&format!("{} could not be authenticated against {:?}", caller(), pk));
+        }
+
         let mut m = s.map.borrow_mut();
         if m.get(&user_id).is_some() {
             panic!("this user is already registered");
@@ -154,6 +158,16 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
+            let mut authenticated = false;
+            for e in entries.iter() {
+                if caller() == Principal::self_authenticating(e.1.clone()) {
+                    authenticated = true;
+                }
+            }
+            if !authenticated {
+                ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+            }
+
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
                 if e.1 == pk {
@@ -177,6 +191,16 @@ fn remove(user_id: UserId, pk: PublicKey) {
     STATE.with(|s| {
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
+            let mut authenticated = false;
+            for e in entries.iter() {
+                if caller() == Principal::self_authenticating(e.1.clone()) {
+                    authenticated = true;
+                }
+            }
+            if !authenticated {
+                ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+            }
+
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 let (_, _, expiration, _) = entries.swap_remove(i as usize);
                 remove_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
