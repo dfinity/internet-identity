@@ -46,4 +46,4 @@ dfx deploy
 
 Then, run `npm start` to start webpack-dev-server.
 
-Unit tests can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner.
+Unit tests are tbd. They can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner. Frontend tests are not required to pass at this time.

@@ -4,8 +4,9 @@ body {
 }
 
 img {
-  max-width: 50vw;
-  max-height: 25vw;
+  min-width: 500px;
+  width: 50vw;
+  max-width: 800px;
   display: block;
   margin: auto;
 }
@@ -55,4 +56,9 @@ label {
 
 input {
   height: fit-content;
+}
+
+main {
+  max-width: 1080px;
+  margin: auto;
 }
