@@ -2,70 +2,109 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>idp_service</title>
-    <base href="/" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Identity Provider</title>
   </head>
   <body>
     <main>
-      <div class="MuiContainer-root MuiContainer-maxWidthLg">
-        <h1 class="MuiTypography-root MuiTypography-h1">IDP service</h1>
-        <form id="registerForm">
-          <h2>Register an identity</h2>
-          <label for="registerUser"
-            >User (expects a number)<input
+      <h1>Internet Computer Identity Provider</h1>
+      <div class="spacer"></div>
+      <h3>Are you an existing user?</h3>
+      <button type="button">Log In</button>
+      <div class="spacer"></div>
+      <h3>If this is your first time using the Identity Provider</h3>
+      <button type="button" id="dialogTrigger" aria-controls="loginDialog">
+        Click here to register
+      </button>
+      <dialog id="loginDialog">
+        <button type="button" aria-label="close dialog">
+          <svg
+            id="icon_close"
+            data-name="icon/close"
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+          >
+            <rect
+              id="Rectangle_91"
+              data-name="Rectangle 91"
+              width="14"
+              height="14"
+              fill="none"
+            />
+            <path
+              id="Line"
+              d="M0,0,9,9"
+              transform="translate(2.5 2.5)"
+              fill="none"
+              stroke="gray"
+              stroke-miterlimit="10"
+              stroke-width="3"
+            />
+            <path
+              id="Line-2"
+              data-name="Line"
+              d="M9,0,0,9"
+              transform="translate(2.5 2.5)"
+              fill="none"
+              stroke="gray"
+              stroke-miterlimit="10"
+              stroke-width="3"
+            />
+          </svg>
+        </button>
+        <section>
+          <h2>Existing User</h2>
+          <p>We couldn't automatically log you in.</p>
+          <p>
+            If you have authenticated using this device before, you can attempt
+            to re-authenticate by clicking Reconnect. Otherwise, click Link to
+            set this device up using an already authenticated browser
+          </p>
+          <div class="spacer"></div>
+          <div class="row">
+            <button id="toggle-reconnect" aria-controls="reconnectSection">
+              Reconnect
+            </button>
+            <button id="toggle-addDevice" aria-controls="addDeviceLinkSection">
+              Link
+            </button>
+          </div>
+        </section>
+        <section class="hidden" id="reconnectSection" aria-expanded="false">
+          <p>
+            Enter your saved User # and click this link to reauthenticate this
+            device.
+          </p>
+          <fieldset>
+            <label for="registerUserNumber">User #</label>
+            <input
               type="text"
-              name="registerUser"
-              id="registerUser"
-              required /></label
-          ><label for="registerAlias"
-            >Alias (expects a string)<input
-              type="text"
-              name="registerAlias"
-              id="registerAlias"
-              required /></label
-          ><button type="submit" id="register-identity">
-            Register Identity
-          </button>
-        </form>
-        <form id="addForm">
-          <h2>Add an identity</h2>
-          <label for="addUser"
-            >User (expects a number)<input
-              type="text"
-              name="addUser"
-              id="addUser"
-              required /></label
-          ><label for="addAlias"
-            >Alias (expects a string)<input
-              type="text"
-              name="addAlias"
-              id="addAlias"
-              required /></label
-          ><button type="submit" id="add-identity">Add Identity</button>
-        </form>
-        <form id="lookupForm">
-          <h2>Lookup Identity</h2>
-          <label for="lookupUser"
-            >User (expects a number)<input
-              type="text"
-              name="lookupUser"
-              id="lookupUser"
-              required /></label
-          ><button type="submit" id="lookup-identity">Lookup Identity</button>
-        </form>
-        <form id="removeForm">
-          <h2>Remove an Identity</h2>
-          <label for="removeUser"
-            >User (expects a number)<input
-              type="text"
-              name="removeUser"
-              id="removeUser"
-              required /></label
-          ><button type="submit" id="remove-identity">Remove Identity</button>
-        </form>
-      </div>
+              id="registerUserNumber"
+              name="registerUserNumber"
+            />
+            <button type="submit" id="reconnectTrigger">Reconnect</button>
+          </fieldset>
+        </section>
+        <section class="hidden" id="addDeviceLinkSection" aria-expanded="false">
+          <p>
+            Copy the URL below and open it in your already authenticated
+            browser. This page will automatically update when you have
+            succeeded.
+          </p>
+          <input type="text" id="addDeviceLink" readonly />
+        </section>
+      </dialog>
     </main>
     <script src="index.js"></script>
+
+    <!-- Includes Dialog Polyfill for Firefox -->
+    <script src="dialog-polyfill.js"></script>
+    <script>
+      var dialog = document.querySelector("#loginDialog");
+      dialogPolyfill.registerDialog(dialog);
+    </script>
   </body>
 </html>

@@ -42,6 +42,7 @@ function generateWebpackConfigForCanister(name, info) {
       // The frontend.entrypoint points to the HTML file for this build, so we need
       // to replace the extension to `.js`.
       index: path.join(__dirname, info.frontend.entrypoint),
+      testpage: path.join(__dirname, "src", "frontend", "src", "testpage"),
     },
     devtool: "source-map",
     optimization: {

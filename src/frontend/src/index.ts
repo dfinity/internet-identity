@@ -1,15 +1,3 @@
-import setupAddIdentityForm from "./components/setupAddIdentityForm";
-import setupLookupIdentityForm from "./components/setupLookupIdentityForm";
-import setupRegisterIdentityForm from "./components/setupRegisterIdentityForm";
+// Core IDP logic
 
-import "./styles/main.css";
-
-function init() {
-  console.log("init");
-
-  setupRegisterIdentityForm();
-  setupAddIdentityForm();
-  setupLookupIdentityForm();
-}
-
-init();
+export {};
