@@ -1,6 +1,6 @@
 use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time};
+use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -139,7 +139,7 @@ fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if m.get(&user_id).is_some() {
-            panic!("this user is already registered");
+            trap("This user is already registered");
         }
         let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
         m.insert(
@@ -168,7 +168,7 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
             entries.push((alias, pk.clone(), expiration, credential));
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
         } else {
-            panic!("this user is not registered yet");
+            trap("This user is not registered yet");
         }
     })
 }
@@ -222,7 +222,7 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
             if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
                 let signature =
                     get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
-                        .unwrap_or_else(|| panic!("no signature found"));
+                        .unwrap_or_else(|| trap("No signature found"));
                 return SignedDelegation {
                     delegation: Delegation {
                         pubkey,
@@ -233,7 +233,7 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
                 };
             }
         }
-        panic!("User ID and public key pair not found.");
+        trap("User ID and public key pair not found.");
     })
 }
 
