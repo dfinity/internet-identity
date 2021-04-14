@@ -1,8 +1,6 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data};
 use ic_cdk::export::candid::{
-    parser::{types::FuncMode, value::IDLValue},
-    types::{Compound, Field, Function, Label, Serializer, Type, TypeId},
     CandidType, Deserialize, Principal,
 };
 use ic_cdk_macros::{init, query, update};
@@ -59,33 +57,12 @@ struct HttpResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct Token {}
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize)]
 enum StreamingStrategy {
-    Callback { callback: IDLValue, token: Token },
-}
-
-impl CandidType for StreamingStrategy {
-    fn id() -> TypeId {
-        TypeId::of::<StreamingStrategy>()
-    }
-
-    fn _ty() -> Type {
-        Type::Variant(vec![])
-    }
-
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        let mut ser = serializer.serialize_variant(0)?;
-        match self {
-            StreamingStrategy::Callback { callback, token } => {
-                ser.serialize_element(callback)?;
-                ser.serialize_element(token)?;
-                Ok(())
-            }
-        }
-    }
+    Callback {
+        callback: ic_cdk::export::candid::Func,
+        token: Token,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

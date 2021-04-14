@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 certified_map = { path = "../certified_map" }
 hashtree = { path = "../hashtree" }
-ic-cdk = "0.2.4"
+ic-cdk = { path = "../../../cdk-rs/src/ic-cdk" }
 ic-cdk-macros = "0.2"
 ic-types = "0.1.1"
 serde = "1"
