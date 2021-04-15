@@ -132,13 +132,18 @@ type SignedDelegation = record {
   delegation: Delegation;
   signature: blob;
 };
+type GetDelegationResponse = variant {
+  delegation: SignedDelegation;
+  request_delegation_explicitly
+};
 
 service : {
   register : (Alias, PublicKey, opt CredentialId) -> (UserId);
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   remove : (UserId, PublicKey) -> ();
   lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
-  get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
+  get_delegation: (UserId, PublicKey) -> (GetDelegationResponse) query;
+  request_delegation : (UserId, PublicKey) -> ();
 }
 ....
 
@@ -152,17 +157,21 @@ The `register` method is used to create a new user and associate it with a first
 
 The canister creates a _fresh_ UserId and returns it.
 
+For a while after adding a key, the delegation can be fetched using `get_delegation`.
+
 WARNING: *TODO*: This method will be protected by some form of proof of work or captcha, which needs involvement from the canister.
 
 === The `add` method
 
-The `add` method is used to associate a new device with the user, and also to recreate the canister signature on the delegation.
+The `add` method is used to associate a new device with the user.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-It is valid to add a public key that has already been added. This updates the alias and the credential id, and re-creates the delegation signature (see `get_delegation`)
+It is not allowed add a public key that has already been added to this user (changing the alias is not yet supported).
 
 This may fail (with a _reject_) if the user is registering too many devices.
+
+For a while after adding a key, the delegation can be fetched using `get_delegation`.
 
 === The `remove` method
 
@@ -184,10 +193,15 @@ Fetches all data associated with a user.
 
 === The `get_delegation` query method
 
-For a certain amount of time after a call to `register` or `add`, the (first) delegation including signature can be fetched by the frontend. If the frontend no longer has the delegation (e.g. web storage cleared), it can re-create the signature using another call to `add`.
+For a certain amount of time after a call to `register`, `add` or `request_delegation`, the (first) delegation including signature can be fetched by the frontend. This method will return `request_delegation_explicitly` if the provided user id and public key make sense, but the caniser has already pruned the signature. In that case, the frontned can use `request_delegation` to create a new signature and try again.
 
 *Authorization*: Anyone can call this
 
+=== The `request_delegation` method
+
+The `request_delegation` method creates a new delegation signature to the given public key, which for a while can be fetched using `get_delegation`
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 == The backend: internals
 
