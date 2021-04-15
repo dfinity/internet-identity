@@ -188,9 +188,8 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
     })
 }
 
-#[init]
-fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+// used both in init and post_upgrade
+fn init_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
@@ -203,10 +202,17 @@ fn init() {
     });
 }
 
+#[init]
+fn init() {
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+    init_assets();
+}
+
 #[pre_upgrade]
 fn persist_data() {
     STATE.with(|s| {
-        if let Err(err) = stable_save((s.map.take(),)) {
+        let map = s.map.replace(Default::default());
+        if let Err(err) = stable_save((map,)) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
@@ -217,6 +223,7 @@ fn persist_data() {
 
 #[post_upgrade]
 fn retrieve_data() {
+    init_assets();
     match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
         Ok((map,)) => {
             STATE.with(|s| {
