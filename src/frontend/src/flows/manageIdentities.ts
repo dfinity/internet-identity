@@ -58,8 +58,15 @@ const renderIdentities = async () => {
     const [alias, publicKey] = identity;
     const identityElement = document.createElement("li");
     identityElement.innerHTML = identityListItem(alias);
+    bindRemoveListener(identityElement, publicKey);
     list.appendChild(identityElement);
   });
 
   identityList.appendChild(list);
+};
+
+const bindRemoveListener = (listItem, publicKey) => {
+  listItem.querySelector("button").onclick = () => alert(publicKey);
+
+  // idp_actor.remove(publicKey);
 };

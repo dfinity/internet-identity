@@ -14,7 +14,7 @@ export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
 
 export class IDPActor {
   actor?: _SERVICE;
-  userId?: bigint;
+  userId?: bigint = BigInt(1);
   constructor() {
     this.actor = undefined;
     const savedUserId = localStorage.getItem("userId");
@@ -63,10 +63,13 @@ export class IDPActor {
       });
   };
 
-  remove = async (userId: UserId) => {
+  remove = async (publicKey: PublicKey) => {
     const identity = await authenticate();
-    const publicKey = Array.from(identity.getPublicKey().toDer());
-    return this.actor_with_identity(identity).remove(userId, publicKey);
+    if (this.userId) {
+      return this.actor_with_identity(identity).remove(this.userId, publicKey);
+    } else {
+      throw new Error("no user was provided");
+    }
   };
 
   lookup = (userId?: UserId) => {
