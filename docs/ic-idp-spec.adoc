@@ -9,11 +9,18 @@ This document describes and specifies the IC Identity Provider from various angl
 
  * High level goals, requirements and use cases
  * Overview of the security and identity machinery, including the interplay of identities, keys, delegations etc.
- * Interface as used by client applications, i.e. the OAUTH-based spec
+ * Interface as used by client applications frontends, i.e. the OAUTH-based spec
  * The interface of the IDP _backend_, i.e. describing its contract at the Candid layer, as used by its frontend
  * Important implementation notes about the IDP backend
  * Internal implementation notes about the IDP frontend
  * Notes about deployment
+
+The IDP service consists of
+
+ * the backend, a canister on the IC. More precisely, on the NNS subnet with a _well-known_ canister id, and
+ * its frontend, which is a web application served by the backend canister.
+
+Similarly, the client applications consist of a frontend and (typically) backends. Only the frontend interacts with the IDP service directly (via the OAUTH protocol described below).
 
 == Goals, requirements and use cases
 
@@ -50,15 +57,17 @@ The User Number is the main index under which the IDP canisters stores data asso
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-When a client application wants to log in as the user, it uses a _session key_ (e.g. Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+When a client application frontend wants to log in as the user, it uses a _session key_ (e.g. Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
 The delegation chain has length two:
 
-1. The _first delegation_ delegates from the user’s main identity to the device’s public key. This delegation is created by the Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature].
+1. The _first delegation_ delegates from the user’s main identity to the device’s public key. This delegation is created by the IDP Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature].
 +
 This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
++
+Different scopes in the first delegation are a possible post-launch features.
 
-2. The _second delegation_ delegates from the device’s public key to the session key. This delegation is created by the IDP frontend as part of the OAUTH protocol, and is signed using https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#webauthn[WebAuth signature].
+2. The _second delegation_ delegates from the device’s public key to the session key. This delegation is created by the IDP frontend as part of the OAUTH protocol, and is signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#webauthn[WebAuth signature].
 +
 This delegation is scoped to the application canister whose frontend is initiating the OAUTH protocol, and has a lifetime of *TODO*.
 
@@ -67,11 +76,11 @@ This delegation is scoped to the application canister whose frontend is initiati
 
 This section describes the Identity Provider from the point of view of a client appliation frontend (a.k.a. the relaying party).
 
-The OAUTH entry point URL is
+The client application frontend creates a session key (e.g. Ed25519). It then redirects the user to the IDP Canister frontend, more concretely to the URL
 
-  https://<idp_canister_id>.ic0.app/authorize
+  https://<idp_canister_id>.ic0.app/authorize?…
 
-and the following parameters have particular relevance
+with URL parameters as specified by the OAUTH protocol. Of particular interest are the parameters
 
 * the `scope` parameter contains a space separated list of textual representations of canister ids, and indicates the set of canisters that the client application frontend would like to talk to as the user.
 +
@@ -108,7 +117,7 @@ The client application frontend needs to be able to detect when either of the tw
 
 The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication` NPM package] provides functionality for this workflow.
 
-== The backend: interface
+== The IDP Backend interface
 
 This section describes the interface that the IDP canister provides.
 
@@ -201,7 +210,7 @@ The `request_delegation` method creates a new delegation signature to the given 
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-== The backend: internals
+== The IDP backend internals
 
 This section, which is to be expanded, describes interesting design choices about the internals of the IDP Canister. In particular
 
@@ -212,7 +221,7 @@ This section, which is to be expanded, describes interesting design choices abou
 * Logic for signature/certified variable caching
 
 
-== The frontend
+== The IDP frontend
 
 The IDP frontend is the user-visible part of the Identity Provider, and where it all comes together. It communicates with
 
