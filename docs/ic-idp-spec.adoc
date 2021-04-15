@@ -294,8 +294,9 @@ TODO: Specify the link format here
 === Flow: OAUTH
 
 1. The user accesses `/authorize` with oauth parameters
-2. Now login flows as above happen, while keeping the oauth parameters around
-3. At the end of these flows, instead of showing (or redirecting to) the “logged in view”, the frontend does the following steps:
+2. (👆) Now login flows as above happen, while keeping the oauth parameters around.
+    At the end of these flows, instead of showing (or redirecting to) the “logged in view”, the frontend does the following steps:
+3. (👆) The frontend checks that the delegation in `delegation` is still valid long enough. If not, it calls `request_delegation` to fetch a new one.
 4. It creates the second delegation from the current `identity` to the public key mentioned in the `login_hint` of the OAUTH request.
 5. 👆 It signs that delegation using the current security device.
 6. It forwards the delegation chain (first and section) to the relaying party, as required by the oauth protocol
