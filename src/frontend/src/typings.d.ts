@@ -41,10 +41,9 @@ export default interface _SERVICE {
     arg_0: UserId
   ) => Promise<Array<[Alias, PublicKey, [] | [CredentialId]]>>;
   register: (
-    arg_0: UserId,
-    arg_1: Alias,
-    arg_2: PublicKey,
-    arg_3: [] | [CredentialId]
-  ) => Promise<undefined>;
+    arg_0: Alias,
+    arg_1: PublicKey,
+    arg_2: [] | [CredentialId]
+  ) => Promise<UserId>;
   remove: (arg_0: UserId, arg_1: PublicKey) => Promise<undefined>;
 }

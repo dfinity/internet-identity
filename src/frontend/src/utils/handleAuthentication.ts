@@ -3,11 +3,15 @@ import { WebAuthnIdentity } from "@dfinity/identity";
 type AuthenticationOptions = {};
 
 export const authenticate = (opts?: AuthenticationOptions) => {
-  WebAuthnIdentity.create; //?
-  return WebAuthnIdentity.create().then((identity: WebAuthnIdentity) => {
-    persistIdentity(identity);
-    return identity;
-  });
+    const stored_identity = localStorage.getItem("identity");
+    if (stored_identity === null) {
+        return WebAuthnIdentity.create().then((identity: WebAuthnIdentity) => {
+          persistIdentity(identity);
+          return identity;
+        });
+    } else {
+        return WebAuthnIdentity.fromJSON(stored_identity);
+    }
 };
 
 export const persistIdentity = (identity: WebAuthnIdentity) => {
