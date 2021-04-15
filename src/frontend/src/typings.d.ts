@@ -44,6 +44,6 @@ export default interface _SERVICE {
     arg_0: Alias,
     arg_1: PublicKey,
     arg_2: [] | [CredentialId]
-  ) => Promise<undefined>;
+  ) => Promise<UserId>;
   remove: (arg_0: UserId, arg_1: PublicKey) => Promise<undefined>;
 }
