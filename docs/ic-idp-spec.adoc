@@ -234,7 +234,7 @@ The following storage keys in `localStorage` are used by the frontend
 
 The following flows are not prescriptive of the UI, e.g. “the frontend asks the user for X” may also mean that on the previous shown page, there is already a field for X.
 
-All update calls to the IDP canister are authenticated by the Identity stored in `identity`.
+All update calls to the IDP canister are authenticated by the Identity stored in `identity`, all query calls are made anonymously.
 
 All steps with 👆 are steps where the user presses the security device.
 
