@@ -13,7 +13,6 @@ export const generateAddDeviceLink = (userId : UserId) =>
     const publicKey = blobToHex(identity.getPublicKey().toDer());
     const rawId = blobToHex(identity.rawId);
     // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
-    // const url = `https://auth0.ic.app/manage.html?device=${publicKey};${rawId}`;
-    const url = `localhost:8080/manage.html?device=${userId};${publicKey};${rawId}`;
-    return url;
+    const host = new URL(document.URL).host;
+    return `${host}/manage.html?device=${userId};${publicKey};${rawId}`
   });
