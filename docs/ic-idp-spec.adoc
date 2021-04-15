@@ -167,7 +167,7 @@ The `add` method is used to associate a new device with the user.
 
 It is not allowed add a public key that has already been added to this user (changing the alias is not yet supported).
 
-This may fail (with a _reject_) if the user is registering too many devices.
+This may fail (with a _trap_) if the user is registering too many devices.
 
 For a while after adding a key, the delegation can be fetched using `get_delegation`.
 
