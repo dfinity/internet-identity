@@ -98,6 +98,10 @@ export default function () {
           });
         } else {
           // TODO: redirect with failure message
+          const url = new URL(params.redirect_uri);
+          const search = new URLSearchParams({ error: "not authorized" });
+          url.search += "&" + search;
+          globalThis.location.assign(url.toString());
         }
       } else {
         // TODO: create or lookup identity
@@ -105,7 +109,7 @@ export default function () {
       }
     } catch (error) {
       console.error(error);
-      globalThis.alert(error.message+ ', sending you back to application');
+      globalThis.alert(error.message + ", sending you back to application");
       globalThis.location.assign(params.redirect_uri);
     }
   } else {
@@ -138,6 +142,6 @@ function checkConsent(clientId?: string) {
   return prompt(
     `do you consent to ${
       clientId || "MYSTERIOUS CANISTER"
-    } using your identity?`
-  );
+    } using your identity? [y/n]`
+  )?.match(/y/i);
 }
