@@ -12,7 +12,7 @@ img {
 }
 section {
   display: flex;
-  flex-flow: row wrap;
+  flex-direction: column;
   max-width: calc(100vw - 2rem);
   margin: auto;
   align-items: baseline;
