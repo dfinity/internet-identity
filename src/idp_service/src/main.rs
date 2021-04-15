@@ -32,6 +32,14 @@ struct SignedDelegation {
     signature: Signature,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum GetDelegationResponse {
+    #[serde(rename = "delegation")]
+    Delegation(SignedDelegation),
+    #[serde(rename = "request_delegation_explicitly")]
+    RequestDelegationExplicitly,
+}
+
 mod hash;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -131,8 +139,33 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
             prune_expired_signatures(&mut s.sigs.borrow_mut());
         } else {
-            trap("This user is not registered yet");
+            trap(&format!("User {} is not registered yet", user_id));
         }
+    })
+}
+
+#[update]
+fn request_delegation(user_id: UserId, pk: PublicKey) {
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
+        if let Some(entries) = m.get_mut(&user_id) {
+            for e in entries.iter_mut() {
+                if e.1 == pk {
+                    let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+                    e.2 = expiration;
+
+                    let mut sigs = s.sigs.borrow_mut();
+                    add_signature(&mut sigs, user_id, pk, expiration);
+                    prune_expired_signatures(&mut sigs);
+                    return;
+                }
+            }
+        }
+        trap(&format!(
+            "Unknown combination of user_id {} and public_key {}",
+            user_id,
+            hex::encode(&pk[..])
+        ));
     })
 }
 
@@ -182,22 +215,26 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 #[query]
-fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
+fn get_delegation(user_id: UserId, pubkey: PublicKey) -> GetDelegationResponse {
     STATE.with(|state| {
         let mut m = state.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
             if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
-                let signature =
-                    get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
-                        .unwrap_or_else(|| trap("No signature found"));
-                return SignedDelegation {
-                    delegation: Delegation {
-                        pubkey,
-                        expiration: *expiration,
-                        targets: None,
-                    },
-                    signature,
-                };
+                match get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration) {
+                    Some(signature) => {
+                        return GetDelegationResponse::Delegation(SignedDelegation {
+                            delegation: Delegation {
+                                pubkey,
+                                expiration: *expiration,
+                                targets: None,
+                            },
+                            signature,
+                        });
+                    }
+                    None => {
+                        return GetDelegationResponse::RequestDelegationExplicitly;
+                    }
+                }
             }
         }
         trap("User ID and public key pair not found.");
