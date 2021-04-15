@@ -303,7 +303,7 @@ TODO: Specify the link format here
 
 === Flow: Managing devices
 
-To be done: Which flows are supprot by the “logged in view” (e.g. removing keys, editing aliases)
+To be done: Which flows are supported by the “logged in view” (e.g. removing keys, editing aliases)
 
 == Deployment
 
@@ -313,4 +313,3 @@ This section needs to describe aspects like
 * integration into the network bootstrap
 * how upgrades are rolled out
 * how the IDP canister id stays predictable and well-known
-
