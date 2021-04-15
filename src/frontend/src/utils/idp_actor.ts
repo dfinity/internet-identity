@@ -34,7 +34,6 @@ export class IDPActor {
     const identity = await authenticate();
     const publicKey = Array.from(identity.getPublicKey().toDer());
     return this.actor_with_identity(identity).register(
-      userId,
       alias,
       publicKey,
       credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
