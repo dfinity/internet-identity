@@ -280,13 +280,13 @@ Note: The security device is _not_ used here!
 +
 The link format is:
 +
-  https://<idp_canister_id>.ic0.app/manage.html?device=<userId>;<publicKey>;<credentialId>
+  https://<idp_canister_id>.ic0.app/manage.html?device=<userId>;<publicKey>[;<credentialId>]
 +
 where
 +
 - `userId` is the user id, as a decimal number
 - `publicKey` is the hex-encoded DER-encoded WebAuth public key
-- `credentialId` is the hex-encoded credential id required for this key
+- `credentialId`, if present, is the hex-encoded credential id required for this key
 
 6. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
 7. The frontend asks the user for the device alias to use.
