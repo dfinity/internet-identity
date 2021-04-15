@@ -256,12 +256,12 @@ Question: Do we actually authenticate anything here? Does it even make sense to 
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with new device.
 3. The frontend asks the user for its user id, and stores that in `userid`.
-4. The frontend asks the user for the device alias to use.
-5. The frontend generates a link to be opened on another device where an existing authentication device exists.
+4. The frontend generates a link to be opened on another device where an existing authentication device exists.
 +
 TODO: Specify the link format here
-6. On other device’s frontend: Extract `userid`, `alias`, `publicKey` and `credentialid` from link
-7. On other device’s frontend: If no `identity` is present, `lookup` identities and pick suitable one.
+5. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
+6. On other device’s frontend: If no `identity` is present, `lookup` identities and pick suitable one.
+7. The frontend asks the user for the device alias to use.
 8. On other device’s frontend: Call `add()` to add new device
 9. On other device’s frontend: Tell user to go back to first computer
 10. The frontend polls `lookup` to see when it has been authorized
