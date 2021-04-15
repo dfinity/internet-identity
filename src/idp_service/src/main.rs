@@ -1,6 +1,6 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
+use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
@@ -53,6 +53,21 @@ struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
     body: Vec<u8>,
+    streaming_strategy: Option<StreamingStrategy>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Token {}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum StreamingStrategy {
+    Callback { callback: Func, token: Token },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct StreamingCallbackHttpResponse {
+    body: Vec<u8>,
+    token: Option<Token>,
 }
 
 struct State {
@@ -152,11 +167,13 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 200,
             headers: vec![],
             body: value.clone(),
+            streaming_strategy: None,
         },
         None => HttpResponse {
             status_code: 404,
             headers: vec![],
             body: format!("Asset {} not found.", asset).as_bytes().into(),
+            streaming_strategy: None,
         },
     })
 }
