@@ -110,11 +110,6 @@ fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) ->
             ));
         }
 
-        let mut m = s.map.borrow_mut();
-        if m.get(&user_id).is_some() {
-            trap("This user is already registered");
-        }
-
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
         let mut m = s.map.borrow_mut();
