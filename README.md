@@ -6,7 +6,12 @@
 
 * `dfx` version from the branch at https://github.com/dfinity/sdk/pull/1587.
 
-  One easy way to fetch it built from the nix cache is to run
+  The easiest way to run this is to just use
+  ```
+  ./dfx.sh
+  ```
+
+  One other easy way to fetch it built from the nix cache is to run
   ```
   nix-build -E '(import (builtins.fetchGit { url = "git@github.com:dfinity/sdk"; ref = "joachim/idp";}) {}).dfx.standalone' -o /tmp/idp-dfx
   ```
