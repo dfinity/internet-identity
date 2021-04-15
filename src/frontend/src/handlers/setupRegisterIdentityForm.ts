@@ -17,11 +17,16 @@ function setupRegisterIdentityForm(cb?: () => void) {
       "#registerAlias"
     ) as HTMLInputElement;
 
+    const alias = registerAlias.value;
     // Send values through actor
     idp_actor
-      .register(registerAlias.value)
-      .then((returnValue) => {
-        console.info("successfully registered identity", returnValue);
+      .register(alias)
+      .then((userId) => {
+        console.info("successfully registered identity", userId);
+
+        // Store user id and alias in local storage.
+        localStorage.setItem("userId", userId.toString());
+        localStorage.setItem("alias", alias);
 
         // Clean up
         resetForm(form);

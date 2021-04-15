@@ -1,3 +1,12 @@
+import idp_actor from "../utils/idp_actor";
+import { DelegationChain, WebAuthnIdentity } from '@dfinity/identity';
+import { getDerEncodedPublicKey } from '../utils/auth';
+import {
+  canisterId as signingCanisterId,
+} from "dfx-generated/idp_service";
+import { UserId, PublicKey } from "../typings";
+import { Principal } from "@dfinity/agent";
+
 // types
 export declare type OAuth2AccessTokenResponse = {
   access_token: string;
@@ -79,13 +88,15 @@ export default function () {
     if (identity !== null) {
       // does the user consent?
       if (checkConsent(params?.client_id)) {
-        redirectToApp(params.redirect_uri, {
-          // TODO: generate access_token
-          access_token: "",
-          token_type: "bearer",
-          expires_in: THREE_DAYS,
-          scope: params.scope,
-          state: params.state,
+        generate_access_token(WebAuthnIdentity.fromJSON(identity), params.login_hint)
+          .then((access_token: string) => {
+            redirectToApp(params.redirect_uri, {
+              access_token: access_token,
+              token_type: "bearer",
+              expires_in: THREE_DAYS,
+              scope: params.scope,
+              state: params.state,
+            });
         });
       } else {
         // TODO: redirect with failure message
@@ -101,6 +112,34 @@ export default function () {
 
 // TODO: actually write this flow
 function createOrLookupIdentity(params: OAuth2AuthorizationRequest) {}
+
+function generate_access_token(identity: WebAuthnIdentity, login_hint: string) {
+  const userId = BigInt(localStorage.getItem("userId"));
+  return idp_actor.get_delegation(userId, identity)
+    .then((master_to_device_delegation) => {
+        const sessionKey = Buffer.from(login_hint, 'hex');
+
+	const publicKey = getDerEncodedPublicKey(userId, Principal.fromText(signingCanisterId));
+
+	// TODO: create a delegation from device key (identity) to sessionKey.
+	// device_to_session_delegation = ...
+
+	// TODO: Construct Delegation
+	// (
+        //    master_to_device_delegation -> device_to_session_delegation
+	//    publicKey
+	// )
+      
+        console.log("Master to device delegation");
+        console.log(master_to_device_delegation.delegation);
+
+        // A prompt so I have time to inspect console.log
+        prompt("An unnecessary prompt so that I can inspect the console logs.");
+
+        // TODO: return the JSON encoding of the delegation chain.
+        return "test_token_123";
+    });
+}
 
 // builds query parameters in accordance with oauth response types
 // and navigates the user back to the app.
