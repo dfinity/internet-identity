@@ -6,7 +6,7 @@ export const authenticate = (opts?: AuthenticationOptions) => {
   WebAuthnIdentity.create; //?
   return WebAuthnIdentity.create().then((identity: WebAuthnIdentity) => {
     persistIdentity(identity);
-    return identity.toJSON();
+    return identity;
   });
 };
 
