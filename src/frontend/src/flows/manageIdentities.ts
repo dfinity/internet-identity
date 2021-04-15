@@ -18,15 +18,15 @@ export const initManageIdentities = () => {
   }
 };
 
-const parseNewDeviceParam = (param: string): { userId: BigInt, publicKey: DerEncodedBlob, rawId: BinaryBlob } | null => {
+const parseNewDeviceParam = (param: string): { userId: bigint, publicKey: DerEncodedBlob, rawId?: BinaryBlob } | null => {
   const segments = param.split(";");
-  if (segments.length !== 3) {
+  if (!(segments.length === 2 || segments.length === 3)) {
     // TODO: Decent error handling
     console.error("This is not a valid pasted link");
     return null
   }
   const userId = BigInt(segments[0]);
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
-  const rawId = blobFromHex(segments[2]);
+  const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
   return { userId, publicKey, rawId }
 }
