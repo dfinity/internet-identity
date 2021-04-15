@@ -68,31 +68,45 @@ function parseOauthParams(searchParams: URLSearchParams) {
   return { response_type, login_hint, redirect_uri };
 }
 
+function checkURIForHash(maybeURL: string) {
+  const url = new URL(maybeURL);
+  if (!!url.hash) {
+    throw Error("no url in hash allowed");
+  }
+}
+
 // this function will run every page load to check for oauth query parameters
 export default function () {
   const searchParams = new URLSearchParams(location.search);
   const params = getOauthParams(searchParams)!;
   // TODO: if the redirect_uri parameter has a hash, immediately reject
   if (hasOauthParams(searchParams)) {
-    //  check do we have identity?
-    const identity = localStorage.getItem("identity");
-    if (identity !== null) {
-      // does the user consent?
-      if (checkConsent(params?.client_id)) {
-        redirectToApp(params.redirect_uri, {
-          // TODO: generate access_token
-          access_token: "",
-          token_type: "bearer",
-          expires_in: THREE_DAYS,
-          scope: params.scope,
-          state: params.state,
-        });
+    try {
+      checkURIForHash(params.redirect_uri);
+      //  check do we have identity?
+      const identity = localStorage.getItem("identity");
+      if (identity !== null) {
+        // does the user consent?
+        if (checkConsent(params?.client_id)) {
+          redirectToApp(params.redirect_uri, {
+            // TODO: generate access_token
+            access_token: "",
+            token_type: "bearer",
+            expires_in: THREE_DAYS,
+            scope: params.scope,
+            state: params.state,
+          });
+        } else {
+          // TODO: redirect with failure message
+        }
       } else {
-        // TODO: redirect with failure message
+        // TODO: create or lookup identity
+        createOrLookupIdentity(params);
       }
-    } else {
-      // TODO: create or lookup identity
-      createOrLookupIdentity(params);
+    } catch (error) {
+      console.error(error);
+      globalThis.alert(error.message+ ', sending you back to application');
+      globalThis.location.assign(params.redirect_uri);
     }
   } else {
     // do nothing, this will be handled by other logic
