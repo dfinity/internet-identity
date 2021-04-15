@@ -136,7 +136,7 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
             prune_expired_signatures(&mut s.sigs.borrow_mut());
         } else {
-            trap("This user is not registered yet");
+            trap(&format!("User {} is not registered yet", user_id));
         }
     })
 }
@@ -158,7 +158,11 @@ fn request_delegation(user_id: UserId, pk: PublicKey) {
                 }
             }
         }
-        trap("Unknown combination of user_id and public_key");
+        trap(&format!(
+            "Unknown combination of user_id {} and public_key {}",
+            user_id,
+            hex::encode(&pk[..])
+        ));
     })
 }
 
