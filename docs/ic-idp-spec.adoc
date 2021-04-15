@@ -264,9 +264,9 @@ Note: The security device is _not_ used here!
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with existing device.
 3. The frontend asks the user for its user id, and stores that in `userid`.
 4. Frontend fetches list of devices.
-5. 👆 For each device, frontend tries to create a signature for a call to `add` (to refresh delegation). This will fail for all non-present devices, and succeed for the present device.
+5. 👆 For each device, frontend tries to create a signature for a call to `request_delegation`. This will fail for all non-present devices, and succeed for the present device.
 6. The found devices is stored in `identity`
-7. The `add()` request is sent.
+7. The `request_delegation()` request is sent.
 8. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
 9. The frontend shows (or redirects to) the “logged in view”
 
