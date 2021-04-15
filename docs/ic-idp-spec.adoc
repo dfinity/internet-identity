@@ -1,0 +1,112 @@
+= The IC Identity Provider Specification
+:toc2:
+:toclevel: 3
+:sectanchors:
+
+== Introduction
+
+This document describes and specifies the IC Identity Provider from various angles and at various levels of abstraction, namely:
+
+ * High level goals, requirements and usecase
+ * Overview of the security and identity machinery, including the interplay of identities, keys, delegations etc.
+ * Interface as used by client applications, i.e. the OAUTH-based spec
+ * The interface of the IDP _backend_, i.e. describing its contract at the Candid layer, as used by its frontend
+ * Important implementation notes about the IDP backend
+ * Internal implementation notes about the IDP frontend
+ * Notes about deployment
+
+== Goals, requirements and usecases
+
+The identity provider allows users to
+
+ * maintain a single identity on the internet computer
+ * log into that identity using one of a set security devices
+ * manage this set of security devices
+
+Some functional requirements are
+
+ * the identity is stable, even if the set of security devices changes
+ * no need ever to remember secret information (but possibly per-user non-secret information)
+ * the authentication device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time
+
+Some security requirements are
+
+ * a client application frontend (i.e. relaying party) can use the user’s identity only on the canisters belonging to that frontend.
+ * (many more, of course; apply common sense)
+
+
+== Identity design and data model
+
+A single canister with a well-known canister id (the _IDP canister id_) controls all user’s identities.
+
+The user’s _main identity_ on the platform is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the _IDP canister id_ and the user’s _seed_.
+
+The user’s _seed_ is a smallish natural number chosen by the canister, also called the _User Number_ or User#. The encoding as the seed is the ASCII encoding of its decimal representation.
+
+The User Number is the main index under which the IDP canisters stores data associated with the user, which is
+
+* a set of _device information_, consisting of
+- the device’s public key (DER-encoded)
+- a device _alias_, chosen by the user to recognize the device
+- an optional _credential id_, which is necessary for WebAuthN authentication
+
+When a client application wants to log in as the user, it uses a _session key_ (e.g. Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+
+The delegation chain has length two:
+
+1. The _first delegation_ delegates from the user’s main identity to the device’s public key. This delegation is created by the Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature].
++
+This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
+
+2. The _second delegation_ delegats from the device’s public key to the session key. This delegation is created by the IDP frontend as part of the OAUTH protocol, and is signed using https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#webauthn[WebAuth signature].
++
+This delegation is scoped to the application canister whose frontend is initiating the OAUTH protocol, and has a lifetime of *TODO*.
+
+
+== OAUTH protocol
+
+This section describes the Identity Provider from the point of view of a client appliation frontend (a.k.a. the relaying party).
+
+The OAUTH entry point URL is
+
+  http://<idp_cainster_id>.ic0.app/authorize
+
+and the following parameters have particular relevance
+
+* the `scope` parameter contains a space separated list of textual representations of canister ids, and indicate the set of cansters that the client appliation frontend would like to talk to as the user.
++
+WARNING: *TODO* How to restrict this sensibly, and possibly connect to the callback URL?
+
+* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key.
+
+If the Identity Provider frontend can authorize this request, the url parameters on the callback (i.e. the provided `redirect_uri`) contain in particular
+
+* the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain the following format
++
+....
+{
+  delegations: [
+    { delegation: {
+        expiration: (hex-encoded expiration date)
+        pubkey: (hex-encoded DER-encoded public key)
+        targets: (optional)
+          [ (hex-encoded binary canister id)
+            …
+          ]
+      },
+      signature: (hex-encoded signature)
+    }
+    …
+  ],
+  publicKey: (hex-encoded public key)
+}
+....
++
+WARNING: *TODO* More details on how the expiration date is encoded (big-endian? little-endian)?
++
+This structure can be converted by the client application into a CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+
+The client application frontend needs to be able to detect when either of the two delegations has expired, and re-authorize the user in that case.
+
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication` NPM package] provides functionality for this workflow.
+
