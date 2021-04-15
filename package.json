@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.8.1",
+    "@dfinity/agent": "0.8.2",
     "@testing-library/jest-dom": "^5.11.10",
     "@types/jest": "^24.9.1",
     "assert": "2.0.0",
@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@dfinity/authentication": "^0.7.1",
-    "@dfinity/identity": "^0.8.1",
+    "@dfinity/identity": "^0.8.2",
     "css-loader": "^5.2.1",
     "style-loader": "^2.0.0"
   }

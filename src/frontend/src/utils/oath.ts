@@ -1,11 +1,11 @@
 import idp_actor from "../utils/idp_actor";
-import { DelegationChain, WebAuthnIdentity } from '@dfinity/identity';
+import { DelegationChain, WebAuthnIdentity, Delegation, SignedDelegation } from '@dfinity/identity';
 import { getDerEncodedPublicKey } from '../utils/auth';
 import {
   canisterId as signingCanisterId,
 } from "dfx-generated/idp_service";
 import { UserId, PublicKey } from "../typings";
-import { Principal } from "@dfinity/agent";
+import { Principal, blobFromUint8Array, derBlobFromBlob  } from "@dfinity/agent";
 
 // types
 export declare type OAuth2AccessTokenResponse = {
@@ -116,28 +116,38 @@ function createOrLookupIdentity(params: OAuth2AuthorizationRequest) {}
 function generate_access_token(identity: WebAuthnIdentity, login_hint: string) {
   const userId = BigInt(localStorage.getItem("userId"));
   return idp_actor.get_delegation(userId, identity)
-    .then((master_to_device_delegation) => {
+    .then((res) => {
         const sessionKey = Buffer.from(login_hint, 'hex');
 
 	const publicKey = getDerEncodedPublicKey(userId, Principal.fromText(signingCanisterId));
 
-	// TODO: create a delegation from device key (identity) to sessionKey.
-	// device_to_session_delegation = ...
+	console.log(res);
+	console.log(res.delegation);
+	console.log(res.delegation.delegation.expiration);
 
-	// TODO: Construct Delegation
-	// (
-        //    master_to_device_delegation -> device_to_session_delegation
-	//    publicKey
-	// )
-      
+	const masterToDeviceDelegation = {
+          delegation: new Delegation(
+            blobFromUint8Array(Uint8Array.from(res.delegation.delegation.pubkey)),
+            BigInt(res.delegation.delegation.expiration),
+          ),
+	  signature: blobFromUint8Array(Uint8Array.from(res.delegation.signature))
+	};
+
+	// TODO: create a SignedDelegation from device key (identity) to sessionKey.
+	//       and add append it to the delegation chain.
+	// deviceToSessionDelegation = ...
+
+	const delegationChain = DelegationChain.fromDelegations(
+		[masterToDeviceDelegation],
+		derBlobFromBlob(blobFromUint8Array(Uint8Array.from(publicKey))));
+
         console.log("Master to device delegation");
-        console.log(master_to_device_delegation.delegation);
+        console.log(masterToDeviceDelegation);
 
         // A prompt so I have time to inspect console.log
         prompt("An unnecessary prompt so that I can inspect the console logs.");
 
-        // TODO: return the JSON encoding of the delegation chain.
-        return "test_token_123";
+        return JSON.stringify(delegationChain.toJSON());
     });
 }
 
