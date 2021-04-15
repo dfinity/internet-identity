@@ -17,11 +17,10 @@ export class IDPActor {
   constructor(overrideActor?: _SERVICE) {
     this.actor = overrideActor ?? baseActor;
   }
-  register = async (userId: UserId, alias: Alias, credentialId?: string) => {
+  register = async (alias: Alias, credentialId?: string) => {
     const identity = await authenticate();
     const key = Array.from(new TextEncoder().encode(identity.publicKey));
     return this.actor.register(
-      userId,
       alias,
       key,
       credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
