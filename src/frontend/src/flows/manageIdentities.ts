@@ -10,7 +10,7 @@ export const initManageIdentities = () => {
   if (newDevice !== null) {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
-      const { publicKey, rawId } = parsedParams;
+      const { userId, publicKey, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams)
       // TODO: Prompt the user for an alias and let them add the new device to their
       // existing identity
@@ -18,14 +18,15 @@ export const initManageIdentities = () => {
   }
 };
 
-const parseNewDeviceParam = (param: string): { publicKey: DerEncodedBlob, rawId: BinaryBlob } | null => {
+const parseNewDeviceParam = (param: string): { userId: BigInt, publicKey: DerEncodedBlob, rawId: BinaryBlob } | null => {
   const segments = param.split(";");
-  if (segments.length !== 2) {
+  if (segments.length !== 3) {
     // TODO: Decent error handling
     console.error("This is not a valid pasted link");
     return null
   }
-  const publicKey = derBlobFromBlob(blobFromHex(segments[0]));
-  const rawId = blobFromHex(segments[1]);
-  return { publicKey, rawId }
+  const userId = BigInt(segments[0]);
+  const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
+  const rawId = blobFromHex(segments[2]);
+  return { userId, publicKey, rawId }
 }

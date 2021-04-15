@@ -36,12 +36,19 @@ const bindListeners = () => {
     "addDeviceLinkSection"
   ) as HTMLElement;
 
+  // Inputs
+  const userIdInput = document.getElementById(
+    "registerUserNumber"
+  ) as HTMLInputElement;
+
   dialogTrigger.onclick = toggleDialog;
   closeDialog.onclick = toggleDialog;
   toggleReconnect.onclick = () => reconnectSection.classList.toggle("hidden");
   toggleAddDevice.onclick = () => {
-    //   Generate link to add a user with an authenticated browser
-    generateAddDeviceLink().then(link => {
+    // TODO: Validation logic. Does it even make sense to treat userIds as numeric values on the frontend?
+    const userId = BigInt(userIdInput.value);
+    // Generate link to add a user with an authenticated browser
+    generateAddDeviceLink(userId).then(link => {
       addDeviceLinkSection.classList.toggle("hidden");
 
       const addDeviceLink = document.getElementById(
