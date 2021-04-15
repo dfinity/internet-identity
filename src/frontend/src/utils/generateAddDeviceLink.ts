@@ -2,7 +2,7 @@ import { WebAuthnIdentity } from "@dfinity/identity";
 import { blobToHex, blobFromHex } from "@dfinity/agent";
 import { UserId } from "../typings";
 
-// Generates a link that contains the DER encoded PublicKey as well as the CredentialId
+// Generates a link that contains the User Id, the DER encoded PublicKey as well as the CredentialId
 // They are encoded as hex strings and separated by a semicolon
 export const generateAddDeviceLink = (userId : UserId) =>
 
