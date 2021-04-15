@@ -37,7 +37,6 @@ function generateWebpackConfigForCanister(name, info) {
   }
 
   return {
-    mode: "production",
     entry: {
       // The frontend.entrypoint points to the HTML file for this build, so we need
       // to replace the extension to `.js`.
@@ -47,7 +46,7 @@ function generateWebpackConfigForCanister(name, info) {
     },
     devtool: "source-map",
     optimization: {
-      minimize: true,
+      minimize: process.env.NODE_ENV === "production",
       minimizer: [new TerserPlugin()],
     },
     resolve: {

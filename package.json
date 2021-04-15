@@ -6,7 +6,7 @@
   "scripts": {
     "start": "webpack serve",
     "generate:types": "didc bind ./src/idp_service/idp_service.did -t ts > src/frontend/src/typings.d.ts",
-    "build": "webpack",
+    "build": "NODE_ENV=production webpack",
     "test": "jest"
   },
   "devDependencies": {
