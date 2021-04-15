@@ -1,6 +1,6 @@
 = The IC Identity Provider Specification
 :toc2:
-:toclevel: 3
+:toclevel: 4
 :sectanchors:
 
 == Introduction
@@ -223,7 +223,7 @@ The following flows are not prescriptive of the UI, e.g. “the frontend asks th
 
 All update calls to the IDP canister are authenticated by the Identity stored in `identity`.
 
-==== Flow: Initial Registration
+=== Flow: Initial Registration
 
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses register.
@@ -234,7 +234,7 @@ All update calls to the IDP canister are authenticated by the Identity stored in
 7. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
 8. The frontend shows (or redirects to) the “logged in view”
 
-==== Flow: Automatic relogin
+=== Flow: Automatic relogin
 
 1. The user accesses `/`
 2. The frontend notices that `userid` is present.
@@ -244,14 +244,14 @@ All update calls to the IDP canister are authenticated by the Identity stored in
 
 Question: Do we actually authenticate anything here? Does it even make sense to say “chek if any of those are present”?
 
-==== Flow: Manual relogin
+=== Flow: Manual relogin
 
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with existing device.
 3. The frontend asks the user for its user id, and stores that in `userid`.
 4. Now as in “Flow: automatic relogin”
 
-==== Flow: Manual login with new device
+=== Flow: Manual login with new device
 
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with new device.
@@ -269,7 +269,7 @@ TODO: Specify the link format here
 12. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
 13. The frontend shows (or redirects to) the “logged in view”
 
-==== Flow: OAUTH
+=== Flow: OAUTH
 
 1. The user accesses `/authorize` with oauth parameters
 2. Now login flows as above happen, while keeping the oauth parameters around
@@ -278,7 +278,7 @@ TODO: Specify the link format here
 5. It signs that delegation using the current security device.
 6. It forwards the delegation chain (first and section) to the relaying party, as required by the oauth protocol
 
-==== Flow: Managing devices
+=== Flow: Managing devices
 
 To be done: Which flows are supprot by the “logged in view” (e.g. removing keys, editing aliases)
 
