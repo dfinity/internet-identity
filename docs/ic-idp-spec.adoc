@@ -69,7 +69,7 @@ This section describes the Identity Provider from the point of view of a client 
 
 The OAUTH entry point URL is
 
-  http://<idp_canister_id>.ic0.app/authorize
+  https://<idp_canister_id>.ic0.app/authorize
 
 and the following parameters have particular relevance
 
@@ -278,7 +278,16 @@ Note: The security device is _not_ used here!
 4. 👆 Frontend asks security device for a new public key (and credential id).
 5. The frontend generates a link to be opened on another device where an existing authentication device exists.
 +
-TODO: Specify the link format here
+The link format is:
++
+  https://<idp_canister_id>.ic0.app/manage.html?device=<userId>;<publicKey>;<credentialId>
++
+where
++
+- `userId` is the user id, as a decimal number
+- `publicKey` is the hex-encoded DER-encoded WebAuth public key
+- `credentialId` is the hex-encoded credential id required for this key
+
 6. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
 7. The frontend asks the user for the device alias to use.
 8. 👆 On other device’s frontend:
