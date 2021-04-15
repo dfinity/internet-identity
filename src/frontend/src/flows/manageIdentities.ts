@@ -1,4 +1,5 @@
 import { BinaryBlob, blobFromHex, derBlobFromBlob, DerEncodedBlob } from "@dfinity/agent";
+import idp_actor from "../utils/idp_actor";
 
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
@@ -11,9 +12,12 @@ export const initManageIdentities = () => {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
       const { userId, publicKey, rawId } = parsedParams;
-      console.log("Adding new device with:", parsedParams)
+
       // TODO: Prompt the user for an alias and let them add the new device to their
       // existing identity
+      const alias = window.prompt("Gief alias:");
+      console.log("Adding new device with:", parsedParams)
+      idp_actor.add(userId, alias!!, publicKey, rawId)
     }
   }
 };
