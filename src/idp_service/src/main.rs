@@ -5,7 +5,7 @@ use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
@@ -79,6 +79,7 @@ struct StreamingCallbackHttpResponse {
 }
 
 struct State {
+    next_user_id: Cell<UserId>,
     map: RefCell<HashMap<UserId, Vec<Entry>>>,
     sigs: RefCell<SignatureMap>,
 }
@@ -86,6 +87,7 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
+            next_user_id: Cell::new(10000),
             map: RefCell::new(HashMap::default()),
             sigs: RefCell::new(SignatureMap::default()),
         }
@@ -98,14 +100,13 @@ thread_local! {
 }
 
 #[update]
-fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
+fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) -> UserId {
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if m.get(&user_id).is_some() {
-            trap("This user is already registered");
-        }
-
         prune_expired_signatures(&mut s.sigs.borrow_mut());
+
+        let mut m = s.map.borrow_mut();
+        let user_id = s.next_user_id.get();
+        s.next_user_id.replace(user_id + 1);
 
         let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
         m.insert(
@@ -113,6 +114,8 @@ fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<
             vec![(alias, pk.clone(), expiration, credential_id)],
         );
         add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+
+        user_id
     })
 }
 
@@ -262,7 +265,7 @@ fn init() {
 fn persist_data() {
     STATE.with(|s| {
         let map = s.map.replace(Default::default());
-        if let Err(err) = stable_save((map,)) {
+        if let Err(err) = stable_save((map, s.next_user_id.get())) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
@@ -274,11 +277,12 @@ fn persist_data() {
 #[post_upgrade]
 fn retrieve_data() {
     init_assets();
-    match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
-        Ok((map,)) => {
+    match stable_restore::<(HashMap<UserId, Vec<Entry>>, UserId)>() {
+        Ok((map, user_id)) => {
             STATE.with(|s| {
                 // Restore user map.
                 s.map.replace(map);
+                s.next_user_id.replace(user_id);
 
                 // We drop all the signatures on upgrade, users will
                 // re-request them if needed.

@@ -47,7 +47,7 @@ type GetDelegationResponse = variant {
 };
 
 service : {
-  register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  register : (Alias, PublicKey, opt CredentialId) -> (UserId);
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
   request_delegation : (UserId, PublicKey) -> ();
   remove : (UserId, PublicKey) -> ();
