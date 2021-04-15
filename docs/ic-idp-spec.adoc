@@ -27,7 +27,7 @@ Some functional requirements are
 
  * the identity is stable, even if the set of security devices changes
  * no need ever to remember secret information (but possibly per-user non-secret information)
- * the authentication device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time
+ * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time
 
 Some security requirements are
 
@@ -109,4 +109,185 @@ This structure can be converted by the client application into a CBOR-encoded de
 The client application frontend needs to be able to detect when either of the two delegations has expired, and re-authorize the user in that case.
 
 The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication` NPM package] provides functionality for this workflow.
+
+== The backend: interface
+
+This section describes the interface that the IDP canister provides.
+
+This interface is currently only used by its frontend, so there is a tight coupling which means that this interface may change, even in incompatible ways. This means we do not have to apply Candid best practices for backward-compatibility (such as using records for arguments and results).
+
+The summary is given by the following Candid interface (exluding the methods required for the https://www.notion.so/Design-HTTP-Requests-to-Canisters-d6bc980830a947a88bf9148a25169613[HTTP Gateway interface]):
+....
+type UserId = nat64;
+type CredentialId = blob;
+type Alias = text;
+type Timestamp = nat64;
+type PublicKey = blob;
+type Delegation = record {
+  pubkey: PublicKey;
+  expiration: Timestamp;
+  targets: opt vec principal;
+};
+type SignedDelegation = record {
+  delegation: Delegation;
+  signature: blob;
+};
+
+service : {
+  register : (Alias, PublicKey, opt CredentialId) -> (UserId);
+  add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  remove : (UserId, PublicKey) -> ();
+  lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
+  get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
+}
+....
+
+The `SignedDelegation` type is a direct translation from https://docs.dfinity.systems/public/#authentication[the IC interface spec].
+
+=== The `register` method
+
+The `register` method is used to create a new user and associate it with a first device, as in `add`.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `PublicKey`.
+
+The canister creates a _fresh_ UserId and returns it.
+
+WARNING: *TODO*: This method will be protected by some form of proof of work or captcha, which needs involvement from the canister.
+
+=== The `add` method
+
+The `add` method is used to associate a new device with the user, and also to recreate the canister signature on the delegation.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+It is valid to add a public key that has already been added. This updates the alias and the credential id, and re-creates the delegation signature (see `get_delegation`)
+
+This may fail (with a _reject_) if the user is registering too many devices.
+
+=== The `remove` method
+
+The `remove` method removes a device from the list of devices a user has.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+It is allowed to remove the key that is used to sign this request. This can be useful for a panic button functionality.
+
+It is allowed to remove the last key, to completley disable a user. The canister may forget that user completely then, assuming the user id generation algorithm prevents new users from getting the same user id.
+
+It is the responsibility of the frontend UI to protect the user from doing these things accidentialy.
+
+=== The `lookup` query method
+
+Fetches all data associated with a user.
+
+*Authorization*: Anyone can call this
+
+=== The `get_delegation` query method
+
+For a certain amount of time after a call to `register` or `add`, the (first) delegation including signature can be fetched by the frontend. If the frontend no longer has the delegation (e.g. web storage cleared), it can re-create the signature using another call to `add`.
+
+*Authorization*: Anyone can call this
+
+
+== The backend: internals
+
+This section, which is to be expanded, describes interesting design choices about the internals of the IDP Canister. In particular
+
+* Internal data model and data structures used
+
+* Approach to upgrades
+
+* Logic for signature/certified variable caching
+
+
+== The frontend
+
+The IDP frontend is the user-visible part of the Identity Provider, and where it all comes together. It communicates with
+* the user
+* the backend using the Candid interface described above
+* the security devices, using the Web Authentication API
+* its past and future self, via the browser storage
+* client application frontend, via the OAUTH protocol
+
+=== Storage used
+
+The following storage keys in `localStorage` are used by the frontend
+
+* `userid`: The user number, if known
+* `identity`: The `WebAuthenicationIdentity`, as defined in `@dfinity/identity`, of the currently used device, if authenticated
+* `delegation`: A delegation to the public key in `identity`, if already fetched
+
+=== Flows
+
+The following flows are not prescriptive of the UI, e.g. “the frontend asks the user for X” may also mean that on the previous shown page, there is already a field for X.
+
+All update calls to the IDP canister are authenticated by the Identity stored in `identity`.
+
+==== Flow: Initial Registration
+
+1. The user accesses `/`
+2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses register.
+3. The frontend asks the security device to create a new public key. It generates a `WebAuthenicationIdentity` from that, and stores it as `identity`.
+4. The frontend configures the agent to use this identity for all further calls.
+5. The frontend asks the user for the device alias to use.
+6. The frontend calls `register()`, and stores the resulting user number as `userid`.
+7. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
+8. The frontend shows (or redirects to) the “logged in view”
+
+==== Flow: Automatic relogin
+
+1. The user accesses `/`
+2. The frontend notices that `userid` is present.
+3. It uses `lookup` to download the user’s data.
+4. It goes through the list of devices listed in the data, checks if any of these are currently present, and sets `identity` accordingly
+5. The frontend shows (or redirects to) the “logged in view”
+
+Question: Do we actually authenticate anything here? Does it even make sense to say “chek if any of those are present”?
+
+==== Flow: Manual relogin
+
+1. The user accesses `/`
+2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with existing device.
+3. The frontend asks the user for its user id, and stores that in `userid`.
+4. Now as in “Flow: automatic relogin”
+
+==== Flow: Manual login with new device
+
+1. The user accesses `/`
+2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with new device.
+3. The frontend asks the user for its user id, and stores that in `userid`.
+4. The frontend asks the user for the device alias to use.
+5. The frontend generates a link to be opened on another device where an existing authentication device exists.
++
+TODO: Specify the link format here
+6. On other device’s frontend: Extract `userid`, `alias`, `publicKey` and `credentialid` from link
+7. On other device’s frontend: If no `identity` is present, `lookup` identities and pick suitable one.
+8. On other device’s frontend: Call `add()` to add new device
+9. On other device’s frontend: Tell user to go back to first computer
+10. The frontend polls `lookup` to see when it has been authorized
+11. The frontend remembers its delegation as `identity`
+12. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
+13. The frontend shows (or redirects to) the “logged in view”
+
+==== Flow: OAUTH
+
+1. The user accesses `/authorize` with oauth parameters
+2. Now login flows as above happen, while keeping the oauth parameters around
+3. At the end of these flows, instead of showing (or redirecting to) the “logged in view”, the frontend does the following steps:
+4. It creates the second delegation from the current `identity` to the public key mentioned in the `login_hint` of the OAUTH request.
+5. It signs that delegation using the current security device.
+6. It forwards the delegation chain (first and section) to the relaying party, as required by the oauth protocol
+
+==== Flow: Managing devices
+
+To be done: Which flows are supprot by the “logged in view” (e.g. removing keys, editing aliases)
+
+== Deployment
+
+This section needs to describe aspects like
+
+* why and how the frontend is bundled with and served by the canister itself.
+* integration into the network bootstrap
+* how upgrades are rolled out
+* how the IDP canister id stays predictable and well-known
 
