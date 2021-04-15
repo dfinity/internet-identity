@@ -87,8 +87,8 @@ If the Identity Provider frontend can authorize this request, the url parameters
 {
   delegations: [
     { delegation: {
-        expiration: (hex-encoded expiration date)
-        pubkey: (hex-encoded DER-encoded public key)
+        expiration: (hex-encoded big-endian expiration date)
+        pubkey: (hex-encoded DER-encoded public key of delegatee)
         targets: (optional)
           [ (hex-encoded binary canister id)
             …
@@ -98,11 +98,9 @@ If the Identity Provider frontend can authorize this request, the url parameters
     }
     …
   ],
-  publicKey: (hex-encoded public key)
+  publicKey: (hex-encoded public key that forms the user’s main identity)
 }
 ....
-+
-WARNING: *TODO* More details on how the expiration date is encoded (big-endian? little-endian)?
 +
 This structure can be converted by the client application into a CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
 
