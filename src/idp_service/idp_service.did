@@ -1,8 +1,8 @@
 type UserId = nat64;
-type CredentialId = vec nat8;
+type CredentialId = blob;
 type Alias = text;
 type Timestamp = nat64;
-type PublicKey = vec nat8;
+type PublicKey = blob;
 type HeaderField = record { text; text; };
 type HttpRequest = record {
   method: text;
@@ -14,6 +14,18 @@ type HttpResponse = record {
   status_code: nat16;
   headers: vec HeaderField;
   body: blob;
+  streaming_strategy: opt StreamingStrategy;
+};
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+type Token = record {};
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
 };
 type Delegation = record {
   pubkey: PublicKey;

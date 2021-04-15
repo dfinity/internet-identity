@@ -1,14 +1,15 @@
-use hash::hash_bytes;
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
-use ic_cdk_macros::{init, query, update};
+use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
+use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
+use ic_cdk::storage::{stable_restore, stable_save};
+use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
+const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 600_000_000_000;
 
 type UserId = u64;
 type CredentialId = Vec<u8>;
@@ -52,6 +53,21 @@ struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
     body: Vec<u8>,
+    streaming_strategy: Option<StreamingStrategy>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Token {}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum StreamingStrategy {
+    Callback { callback: Func, token: Token },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct StreamingCallbackHttpResponse {
+    body: Vec<u8>,
+    token: Option<Token>,
 }
 
 struct State {
@@ -73,73 +89,16 @@ thread_local! {
     static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
 }
 
-fn update_root_hash(m: &SignatureMap) {
-    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
-    set_certified_data(&prefixed_root_hash[..]);
-}
-
-fn get_signature(
-    sigs: &SignatureMap,
-    user_id: UserId,
-    pk: PublicKey,
-    expiration: Timestamp,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate()?;
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
-    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
-
-    #[derive(Serialize)]
-    struct Sig<'a> {
-        #[serde(with = "serde_bytes")]
-        certificate: Vec<u8>,
-        tree: HashTree<'a>,
-    }
-
-    let sig = Sig { certificate, tree };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
-}
-
-fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    sigs.put(seed_hash(user_id), msg_hash);
-    update_root_hash(&sigs);
-}
-
-fn remove_signature(
-    sigs: &mut SignatureMap,
-    user_id: UserId,
-    pk: PublicKey,
-    expiration: Timestamp,
-) {
-    let msg_hash = hash_bytes(delegation_signature_msg(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    }));
-    sigs.delete(seed_hash(user_id), msg_hash);
-    update_root_hash(sigs);
-}
-
 #[update]
 fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if m.get(&user_id).is_some() {
-            panic!("this user is already registered");
+            trap("This user is already registered");
         }
+
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
+
         let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
         m.insert(
             user_id,
@@ -161,13 +120,15 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
                     e.2 = expiration;
                     e.3 = credential;
                     add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+                    prune_expired_signatures(&mut s.sigs.borrow_mut());
                     return;
                 }
             }
             entries.push((alias, pk.clone(), expiration, credential));
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+            prune_expired_signatures(&mut s.sigs.borrow_mut());
         } else {
-            panic!("this user is not registered yet");
+            trap("This user is not registered yet");
         }
     })
 }
@@ -175,6 +136,8 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
 #[update]
 fn remove(user_id: UserId, pk: PublicKey) {
     STATE.with(|s| {
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
+
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
@@ -204,11 +167,13 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 200,
             headers: vec![],
             body: value.clone(),
+            streaming_strategy: None,
         },
         None => HttpResponse {
             status_code: 404,
             headers: vec![],
             body: format!("Asset {} not found.", asset).as_bytes().into(),
+            streaming_strategy: None,
         },
     })
 }
@@ -221,7 +186,7 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
             if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
                 let signature =
                     get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
-                        .unwrap_or_else(|| panic!("no signature found"));
+                        .unwrap_or_else(|| trap("No signature found"));
                 return SignedDelegation {
                     delegation: Delegation {
                         pubkey,
@@ -232,13 +197,12 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
                 };
             }
         }
-        panic!("User ID and public key pair not found.");
+        trap("User ID and public key pair not found.");
     })
 }
 
-#[init]
-fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+// used both in init and post_upgrade
+fn init_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
@@ -251,11 +215,51 @@ fn init() {
     });
 }
 
-fn seed_hash(user_id: UserId) -> Hash {
+#[init]
+fn init() {
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+    init_assets();
+}
+
+#[pre_upgrade]
+fn persist_data() {
+    STATE.with(|s| {
+        let map = s.map.replace(Default::default());
+        if let Err(err) = stable_save((map,)) {
+            ic_cdk::trap(&format!(
+                "An error occurred while saving data to stable memory: {}",
+                err
+            ));
+        }
+    })
+}
+
+#[post_upgrade]
+fn retrieve_data() {
+    init_assets();
+    match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
+        Ok((map,)) => {
+            STATE.with(|s| {
+                // Restore user map.
+                s.map.replace(map);
+
+                // We drop all the signatures on upgrade, users will
+                // re-request them if needed.
+                update_root_hash(&s.sigs.borrow());
+            });
+        }
+        Err(err) => ic_cdk::trap(&format!(
+            "An error occurred while retrieving data from stable memory: {}",
+            err
+        )),
+    }
+}
+
+fn hash_seed(user_id: UserId) -> Hash {
     hash::hash_string(user_id.to_string().as_str())
 }
 
-fn delegation_signature_msg(d: &Delegation) -> Hash {
+fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     use hash::Value;
 
     let mut m = HashMap::new();
@@ -270,6 +274,81 @@ fn delegation_signature_msg(d: &Delegation) -> Hash {
     }
     let map_hash = hash::hash_of_map(m);
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
+}
+
+fn update_root_hash(m: &SignatureMap) {
+    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
+    set_certified_data(&prefixed_root_hash[..]);
+}
+
+fn get_signature(
+    sigs: &SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) -> Option<Vec<u8>> {
+    let certificate = data_certificate()?;
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    });
+    let witness = sigs.witness(hash_seed(user_id), msg_hash)?;
+    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
+
+    #[derive(Serialize)]
+    struct Sig<'a> {
+        #[serde(with = "serde_bytes")]
+        certificate: Vec<u8>,
+        tree: HashTree<'a>,
+    }
+
+    let sig = Sig { certificate, tree };
+
+    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
+    cbor.self_describe().unwrap();
+    sig.serialize(&mut cbor).unwrap();
+    Some(cbor.into_inner())
+}
+
+fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    });
+    let expires_at = time() as u64 + DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS;
+    sigs.put(hash_seed(user_id), msg_hash, expires_at);
+    update_root_hash(&sigs);
+}
+
+fn remove_signature(
+    sigs: &mut SignatureMap,
+    user_id: UserId,
+    pk: PublicKey,
+    expiration: Timestamp,
+) {
+    let msg_hash = delegation_signature_msg_hash(&Delegation {
+        pubkey: pk,
+        expiration,
+        targets: None,
+    });
+    sigs.delete(hash_seed(user_id), msg_hash);
+    update_root_hash(sigs);
+}
+
+/// Removes a batch of expired signatures from the signature map.
+///
+/// This function is supposed to piggy back on update calls to
+/// amortize the cost of tree pruning.  Each operation on the signature map
+/// will prune at most MAX_SIGS_TO_PRUNE other signatures.
+fn prune_expired_signatures(sigs: &mut SignatureMap) {
+    const MAX_SIGS_TO_PRUNE: usize = 10;
+    let num_pruned = sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE);
+
+    if num_pruned > 0 {
+        update_root_hash(sigs);
+    }
 }
 
 fn main() {}

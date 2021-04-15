@@ -1,15 +1,12 @@
-import setupAddIdentityForm from "./components/setupAddIdentityForm";
-import setupLookupIdentityForm from "./components/setupLookupIdentityForm";
-import setupRegisterIdentityForm from "./components/setupRegisterIdentityForm";
+import { initExistingUser } from "./flows/existingUser";
+import { initNewUser } from "./flows/newUser";
 
 import "./styles/main.css";
 
-function init() {
-  console.log("init");
-
-  setupRegisterIdentityForm();
-  setupAddIdentityForm();
-  setupLookupIdentityForm();
-}
+const init = () => {
+  // Initialize our flows
+  initExistingUser();
+  initNewUser();
+};
 
 init();
