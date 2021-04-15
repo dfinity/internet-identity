@@ -1,4 +1,3 @@
-import setupAddIdentityForm from "./handlers/setupAddIdentityForm";
 import setupLookupIdentityForm from "./handlers/setupLookupIdentityForm";
 import setupRegisterIdentityForm from "./handlers/setupRegisterIdentityForm";
 
@@ -8,7 +7,6 @@ function init() {
   console.log("init");
 
   setupRegisterIdentityForm();
-  setupAddIdentityForm();
   setupLookupIdentityForm();
 }
 
