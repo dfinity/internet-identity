@@ -17,13 +17,7 @@
       <div class="spacer"></div>
       <h3>If this is your first time using the Identity Provider</h3>
       <form id="registerForm">
-        <input
-          type="text"
-          class="hidden"
-          name="registerUser"
-          id="registerUser"
-          readonly
-        /><label for="registerAlias"
+        <label for="registerAlias"
           >Alias (expects a string)<input
             type="text"
             name="registerAlias"
@@ -73,7 +67,15 @@
         </button>
         <section>
           <h2>Existing User</h2>
-          <p>We couldn't automatically log you in.</p>
+          <p>We couldn't automatically log you in. Enter your saved User #</p>
+          <fieldset>
+            <label for="registerUserNumber">User #</label>
+            <input
+              type="text"
+              id="registerUserNumber"
+              name="registerUserNumber"
+            />
+          </fieldset>
           <p>
             If you have authenticated using this device before, you can attempt
             to re-authenticate by clicking Reconnect. Otherwise, click Link to
@@ -91,18 +93,9 @@
         </section>
         <section class="hidden" id="reconnectSection" aria-expanded="false">
           <p>
-            Enter your saved User # and click this link to reauthenticate this
-            device.
+            Click this link to reauthenticate this device.
           </p>
-          <fieldset>
-            <label for="registerUserNumber">User #</label>
-            <input
-              type="text"
-              id="registerUserNumber"
-              name="registerUserNumber"
-            />
-            <button type="submit" id="reconnectTrigger">Reconnect</button>
-          </fieldset>
+          <button type="submit" id="reconnectTrigger">Reconnect</button>
         </section>
         <section class="hidden" id="addDeviceLinkSection" aria-expanded="false">
           <p>

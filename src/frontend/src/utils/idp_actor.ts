@@ -1,55 +1,76 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { Actor, HttpAgent, Identity } from "@dfinity/agent";
 import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
 import _SERVICE, { UserId, Alias, PublicKey, CredentialId } from "../typings";
 import { authenticate } from "./handleAuthentication";
+import { WebAuthnIdentity } from "@dfinity/identity";
 
-const agent = new HttpAgent();
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
-  agent,
+  agent: new HttpAgent(),
   canisterId: idp_canister_id,
 });
 
 export class IDPActor {
-  actor: _SERVICE;
-  constructor(overrideActor?: _SERVICE) {
-    this.actor = overrideActor ?? baseActor;
+  actor?: _SERVICE;
+  constructor() {
+    this.actor = undefined;
   }
-  register = async (userId: UserId, alias: Alias, credentialId?: string) => {
+
+  actor_with_identity = (identity: WebAuthnIdentity) => {
+      if (this.actor === undefined) {
+        const agent = new HttpAgent({identity});
+        this.actor = Actor.createActor<_SERVICE>(idp_idl, {
+          agent,
+          canisterId: idp_canister_id,
+        });
+      }
+      return this.actor;
+  }
+
+  register = async (alias: Alias, credentialId?: string) => {
+    console.log(`register(alias: ${alias}`);
     const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor.register(
-      userId,
+    const publicKey = Array.from(identity.getPublicKey().toDer());
+    return this.actor_with_identity(identity).register(
       alias,
-      key,
+      publicKey,
       credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
     );
   };
+
   add = async (userId: UserId, alias: Alias, credentialId?: string) => {
     const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor
+    const publicKey = Array.from(identity.getPublicKey().toDer());
+    return this.actor_with_identity(identity)
       .add(
         userId,
         alias,
-        key,
+        publicKey,
         credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
       )
       .then(async () => {
-        const update = await this.actor.lookup(userId);
+        const update = await this.actor_with_identity(identity).lookup(userId);
         debugger;
       });
   };
+
   remove = async (userId: UserId) => {
     const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor.remove(userId, key);
+    const publicKey = Array.from(identity.getPublicKey().toDer());
+    return this.actor_with_identity(identity).remove(userId, publicKey);
   };
+
   lookup = (userId: UserId) => {
     console.log(userId);
-    return this.actor.lookup(userId);
+    return baseActor.lookup(userId);
+  };
+
+  get_delegation = (userId: UserId, identity: WebAuthnIdentity) => {
+    const publicKey = Array.from(identity.getPublicKey().toDer());
+    console.log(`get_delegation(user_id = ${userId}, publicKey: ${publicKey}`);
+    return baseActor.get_delegation(userId, publicKey);
   };
 }
 

@@ -1,11 +1,11 @@
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
+use ic_cdk::api::{caller, data_certificate, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
@@ -30,6 +30,14 @@ struct Delegation {
 struct SignedDelegation {
     delegation: Delegation,
     signature: Signature,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum GetDelegationResponse {
+    #[serde(rename = "delegation")]
+    Delegation(SignedDelegation),
+    #[serde(rename = "request_delegation_explicitly")]
+    RequestDelegationExplicitly,
 }
 
 mod hash;
@@ -71,6 +79,7 @@ struct StreamingCallbackHttpResponse {
 }
 
 struct State {
+    next_user_id: Cell<UserId>,
     map: RefCell<HashMap<UserId, Vec<Entry>>>,
     sigs: RefCell<SignatureMap>,
 }
@@ -78,6 +87,7 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
+            next_user_id: Cell::new(10000),
             map: RefCell::new(HashMap::default()),
             sigs: RefCell::new(SignatureMap::default()),
         }
@@ -90,14 +100,21 @@ thread_local! {
 }
 
 #[update]
-fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
+fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) -> UserId {
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if m.get(&user_id).is_some() {
-            trap("This user is already registered");
+        if caller() != Principal::self_authenticating(pk.clone()) {
+            ic_cdk::trap(&format!(
+                "{} could not be authenticated against {:?}",
+                caller(),
+                pk
+            ));
         }
 
         prune_expired_signatures(&mut s.sigs.borrow_mut());
+
+        let mut m = s.map.borrow_mut();
+        let user_id = s.next_user_id.get();
+        s.next_user_id.replace(user_id + 1);
 
         let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
         m.insert(
@@ -105,6 +122,8 @@ fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<
             vec![(alias, pk.clone(), expiration, credential_id)],
         );
         add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+
+        user_id
     })
 }
 
@@ -113,6 +132,8 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
                 if e.1 == pk {
@@ -128,8 +149,33 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
             prune_expired_signatures(&mut s.sigs.borrow_mut());
         } else {
-            trap("This user is not registered yet");
+            trap(&format!("User {} is not registered yet", user_id));
         }
+    })
+}
+
+#[update]
+fn request_delegation(user_id: UserId, pk: PublicKey) {
+    STATE.with(|s| {
+        let mut m = s.map.borrow_mut();
+        if let Some(entries) = m.get_mut(&user_id) {
+            for e in entries.iter_mut() {
+                if e.1 == pk {
+                    let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+                    e.2 = expiration;
+
+                    let mut sigs = s.sigs.borrow_mut();
+                    add_signature(&mut sigs, user_id, pk, expiration);
+                    prune_expired_signatures(&mut sigs);
+                    return;
+                }
+            }
+        }
+        trap(&format!(
+            "Unknown combination of user_id {} and public_key {}",
+            user_id,
+            hex::encode(&pk[..])
+        ));
     })
 }
 
@@ -140,6 +186,8 @@ fn remove(user_id: UserId, pk: PublicKey) {
 
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 let (_, _, expiration, _) = entries.swap_remove(i as usize);
                 remove_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
@@ -179,22 +227,26 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 #[query]
-fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
+fn get_delegation(user_id: UserId, pubkey: PublicKey) -> GetDelegationResponse {
     STATE.with(|state| {
         let mut m = state.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
             if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
-                let signature =
-                    get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
-                        .unwrap_or_else(|| trap("No signature found"));
-                return SignedDelegation {
-                    delegation: Delegation {
-                        pubkey,
-                        expiration: *expiration,
-                        targets: None,
-                    },
-                    signature,
-                };
+                match get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration) {
+                    Some(signature) => {
+                        return GetDelegationResponse::Delegation(SignedDelegation {
+                            delegation: Delegation {
+                                pubkey,
+                                expiration: *expiration,
+                                targets: None,
+                            },
+                            signature,
+                        });
+                    }
+                    None => {
+                        return GetDelegationResponse::RequestDelegationExplicitly;
+                    }
+                }
             }
         }
         trap("User ID and public key pair not found.");
@@ -225,7 +277,7 @@ fn init() {
 fn persist_data() {
     STATE.with(|s| {
         let map = s.map.replace(Default::default());
-        if let Err(err) = stable_save((map,)) {
+        if let Err(err) = stable_save((map, s.next_user_id.get())) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
@@ -237,11 +289,12 @@ fn persist_data() {
 #[post_upgrade]
 fn retrieve_data() {
     init_assets();
-    match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
-        Ok((map,)) => {
+    match stable_restore::<(HashMap<UserId, Vec<Entry>>, UserId)>() {
+        Ok((map, user_id)) => {
             STATE.with(|s| {
                 // Restore user map.
                 s.map.replace(map);
+                s.next_user_id.replace(user_id);
 
                 // We drop all the signatures on upgrade, users will
                 // re-request them if needed.
@@ -349,6 +402,17 @@ fn prune_expired_signatures(sigs: &mut SignatureMap) {
     if num_pruned > 0 {
         update_root_hash(sigs);
     }
+}
+
+// Checks if the caller is authenticated against any of the public keys provided
+// and traps if not.
+fn trap_if_not_authenticated(public_keys: Vec<PublicKey>) {
+    for pk in public_keys.into_iter() {
+        if caller() == Principal::self_authenticating(pk) {
+            return;
+        }
+    }
+    ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
 }
 
 fn main() {}

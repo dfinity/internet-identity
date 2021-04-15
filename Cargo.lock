@@ -440,6 +440,7 @@ version = "0.1.0"
 dependencies = [
  "certified_map",
  "hashtree",
+ "hex",
  "hex-literal",
  "ic-cdk",
  "ic-cdk-macros",
