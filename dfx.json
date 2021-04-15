@@ -20,7 +20,6 @@
       "packtool": ""
     }
   },
-  "dfx": "0.7.0-beta.2",
   "networks": {
     "local": {
       "bind": "127.0.0.1:8000",
