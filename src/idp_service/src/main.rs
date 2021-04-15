@@ -199,7 +199,8 @@ fn init() {
 #[pre_upgrade]
 fn persist_data() {
     STATE.with(|s| {
-        if let Err(err) = stable_save((s.map.take(),)) {
+        let map = s.map.replace(Default::default());
+        if let Err(err) = stable_save((map,)) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
