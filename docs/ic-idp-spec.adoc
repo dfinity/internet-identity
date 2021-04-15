@@ -224,14 +224,16 @@ The following flows are not prescriptive of the UI, e.g. “the frontend asks th
 
 All update calls to the IDP canister are authenticated by the Identity stored in `identity`.
 
+All steps with 👆 are steps where the user presses the security device.
+
 === Flow: Initial Registration
 
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses register.
-3. The frontend asks the security device to create a new public key. It generates a `WebAuthenicationIdentity` from that, and stores it as `identity`.
+3. 👆 The frontend asks the security device to create a new public key. It generates a `WebAuthenicationIdentity` from that, and stores it as `identity`.
 4. The frontend configures the agent to use this identity for all further calls.
 5. The frontend asks the user for the device alias to use.
-6. The frontend calls `register()`, and stores the resulting user number as `userid`.
+6. 👆 The frontend calls `register()`, and stores the resulting user number as `userid`.
 7. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
 8. The frontend shows (or redirects to) the “logged in view”
 
@@ -250,7 +252,7 @@ Note: The security device is _not_ used here!
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with existing device.
 3. The frontend asks the user for its user id, and stores that in `userid`.
 4. Frontend fetches list of devices.
-5. For each device, frontend tries to create a signature for a call to `add` (to refresh delegation). This will fail for all non-present devices, and succeed for the present device.
+5. 👆 For each device, frontend tries to create a signature for a call to `add` (to refresh delegation). This will fail for all non-present devices, and succeed for the present device.
 6. The found devices is stored in `identity`
 7. The `add()` request is sent.
 8. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
@@ -261,19 +263,19 @@ Note: The security device is _not_ used here!
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses login with new device.
 3. The frontend asks the user for its user id, and stores that in `userid`.
-4. Frontend asks security device for a new publlic key (and credential id).
+4. 👆 Frontend asks security device for a new public key (and credential id).
 5. The frontend generates a link to be opened on another device where an existing authentication device exists.
 +
 TODO: Specify the link format here
 6. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
 7. The frontend asks the user for the device alias to use.
-8. On other device’s frontend:
-+ If `identity` is present, continue to use that.
+8. 👆 On other device’s frontend:
++ If `identity` is present, continue to use that to sign the `add()` call.
 + If `identity` is not present, fetch all devices (as in “Flow: Manual relogin with existing device” and try to sign call to `add()` with that.
 9. On other device’s frontend: Call `add()` to add new device
 10. On other device’s frontend: Tell user to go back to first computer
 11. The frontend polls `lookup` to see when it has been authorized
-12. Once it sees its own idenitty: Remember it as `identity`
+12. Once it sees its own identity: Remember it as `identity`
 13. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
 14. The frontend shows (or redirects to) the “logged in view”
 
@@ -283,7 +285,7 @@ TODO: Specify the link format here
 2. Now login flows as above happen, while keeping the oauth parameters around
 3. At the end of these flows, instead of showing (or redirecting to) the “logged in view”, the frontend does the following steps:
 4. It creates the second delegation from the current `identity` to the public key mentioned in the `login_hint` of the OAUTH request.
-5. It signs that delegation using the current security device.
+5. 👆 It signs that delegation using the current security device.
 6. It forwards the delegation chain (first and section) to the relaying party, as required by the oauth protocol
 
 === Flow: Managing devices
