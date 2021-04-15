@@ -13,7 +13,7 @@ img {
 section {
   display: flex;
   flex-flow: row wrap;
-  max-width: 40vw;
+  max-width: calc(100vw - 2rem);
   margin: auto;
   align-items: baseline;
 }
@@ -69,4 +69,29 @@ main {
 
 .spacer {
   margin-bottom: 4rem;
+}
+
+.flex {
+  display: flex;
+}
+.column {
+  flex-direction: column;
+}
+.row {
+  flex-direction: row;
+}
+.justify-between {
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.center {
+  justify-content: center;
+  align-items: center;
+}
+
+button[title="Remove identity"] {
+  background: none;
+  padding: 1rem;
+  width: fit-content;
 }
