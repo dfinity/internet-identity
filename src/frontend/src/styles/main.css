@@ -62,3 +62,11 @@ main {
   max-width: 1080px;
   margin: auto;
 }
+
+.hidden {
+  display: none;
+}
+
+.spacer {
+  margin-bottom: 4rem;
+}

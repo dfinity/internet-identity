@@ -1,7 +1,7 @@
 import idp_actor from "../utils/idp_actor";
 import { resetForm } from "../utils/resetForm";
 
-function setupRegisterIdentityForm() {
+function setupRegisterIdentityForm(cb?: () => void) {
   const form = document.getElementById("registerForm") as HTMLFormElement;
   const submitButton = form.querySelector(
     'button[type="submit"]'
@@ -28,6 +28,9 @@ function setupRegisterIdentityForm() {
 
         // Clean up
         resetForm(form);
+
+        // If callback, invoke
+        cb?.();
       })
       .catch((err) => {
         console.error(err);

@@ -11,14 +11,31 @@
       <h1>Internet Computer Identity Provider</h1>
       <div class="spacer"></div>
       <h3>Are you an existing user?</h3>
-      <button type="button">Log In</button>
+      <button type="button" id="dialogTrigger" aria-controls="loginDialog">
+        Log In
+      </button>
       <div class="spacer"></div>
       <h3>If this is your first time using the Identity Provider</h3>
-      <button type="button" id="dialogTrigger" aria-controls="loginDialog">
-        Click here to register
-      </button>
+      <form id="registerForm">
+        <h2>Register an identity</h2>
+        <input
+          type="text"
+          class="hidden"
+          name="registerUser"
+          id="registerUser"
+          readonly
+        /><label for="registerAlias"
+          >Alias (expects a string)<input
+            type="text"
+            name="registerAlias"
+            id="registerAlias"
+            required /></label
+        ><button type="submit" id="register-identity">
+          Click here to register
+        </button>
+      </form>
       <dialog id="loginDialog">
-        <button type="button" aria-label="close dialog">
+        <button type="button" aria-label="close dialog" id="closeDialog">
           <svg
             id="icon_close"
             data-name="icon/close"
@@ -65,10 +82,10 @@
           </p>
           <div class="spacer"></div>
           <div class="row">
-            <button id="toggle-reconnect" aria-controls="reconnectSection">
+            <button id="toggleReconnect" aria-controls="reconnectSection">
               Reconnect
             </button>
-            <button id="toggle-addDevice" aria-controls="addDeviceLinkSection">
+            <button id="toggleAddDevice" aria-controls="addDeviceLinkSection">
               Link
             </button>
           </div>

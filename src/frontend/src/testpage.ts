@@ -1,6 +1,6 @@
-import setupAddIdentityForm from "./components/setupAddIdentityForm";
-import setupLookupIdentityForm from "./components/setupLookupIdentityForm";
-import setupRegisterIdentityForm from "./components/setupRegisterIdentityForm";
+import setupAddIdentityForm from "./handlers/setupAddIdentityForm";
+import setupLookupIdentityForm from "./handlers/setupLookupIdentityForm";
+import setupRegisterIdentityForm from "./handlers/setupRegisterIdentityForm";
 
 import "./styles/main.css";
 
