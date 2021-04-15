@@ -282,8 +282,8 @@ TODO: Specify the link format here
 6. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
 7. The frontend asks the user for the device alias to use.
 8. 👆 On other device’s frontend:
-+ If `identity` is present, continue to use that to sign the `add()` call.
-+ If `identity` is not present, fetch all devices (as in “Flow: Manual relogin with existing device” and try to sign call to `add()` with that.
+- If `identity` is present, continue to use that to sign the `add()` call.
+- If `identity` is not present, fetch all devices (as in “Flow: Manual relogin with existing device” and try to sign call to `add()` with that.
 9. On other device’s frontend: Call `add()` to add new device
 10. On other device’s frontend: Tell user to go back to first computer
 11. The frontend polls `lookup` to see when it has been authorized
