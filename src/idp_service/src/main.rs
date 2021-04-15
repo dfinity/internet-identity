@@ -176,9 +176,8 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
     })
 }
 
-#[init]
-fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+// used both in init and post_upgrade
+fn init_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
@@ -189,6 +188,12 @@ fn init() {
                 .into(),
         );
     });
+}
+
+#[init]
+fn init() {
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+    init_assets();
 }
 
 #[pre_upgrade]
@@ -205,6 +210,7 @@ fn persist_data() {
 
 #[post_upgrade]
 fn retrieve_data() {
+    init_assets();
     match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
         Ok((map,)) => {
             STATE.with(|s| {
