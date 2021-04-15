@@ -18,12 +18,11 @@ export class IDPActor {
   constructor(overrideActor?: _SERVICE) {
     this.actor = overrideActor ?? baseActor;
   }
-  register = async (userId: UserId, alias: Alias, credentialId?: string) => {
-    console.log(`register(user_id = ${userId}, alias: ${alias}`);
+  register = async (alias: Alias, credentialId?: string) => {
+    console.log(`register(alias: ${alias}`);
     const identity = await authenticate();
     const publicKey = Array.from(identity.getPublicKey().toDer());
     return this.actor.register(
-      userId,
       alias,
       publicKey,
       credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []

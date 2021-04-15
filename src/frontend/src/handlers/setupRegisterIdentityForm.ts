@@ -13,16 +13,13 @@ function setupRegisterIdentityForm(cb?: () => void) {
     submitButton.setAttribute("disabled", "true");
 
     // Read values from inputs
-    const registerUser = form.querySelector(
-      "#registerUser"
-    ) as HTMLInputElement;
     const registerAlias = form.querySelector(
       "#registerAlias"
     ) as HTMLInputElement;
 
     // Send values through actor
     idp_actor
-      .register(BigInt(registerUser.value), registerAlias.value)
+      .register(registerAlias.value)
       .then((returnValue) => {
         console.info("successfully registered identity", returnValue);
 
