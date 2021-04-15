@@ -7,7 +7,7 @@
 
 This document describes and specifies the IC Identity Provider from various angles and at various levels of abstraction, namely:
 
- * High level goals, requirements and usecase
+ * High level goals, requirements and use cases
  * Overview of the security and identity machinery, including the interplay of identities, keys, delegations etc.
  * Interface as used by client applications, i.e. the OAUTH-based spec
  * The interface of the IDP _backend_, i.e. describing its contract at the Candid layer, as used by its frontend
@@ -15,12 +15,12 @@ This document describes and specifies the IC Identity Provider from various angl
  * Internal implementation notes about the IDP frontend
  * Notes about deployment
 
-== Goals, requirements and usecases
+== Goals, requirements and use cases
 
 The identity provider allows users to
 
  * maintain a single identity on the internet computer
- * log into that identity using one of a set security devices
+ * log into that identity using one out of a set of security devices
  * manage this set of security devices
 
 Some functional requirements are
@@ -58,7 +58,7 @@ The delegation chain has length two:
 +
 This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
-2. The _second delegation_ delegats from the device’s public key to the session key. This delegation is created by the IDP frontend as part of the OAUTH protocol, and is signed using https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#webauthn[WebAuth signature].
+2. The _second delegation_ delegates from the device’s public key to the session key. This delegation is created by the IDP frontend as part of the OAUTH protocol, and is signed using https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#webauthn[WebAuth signature].
 +
 This delegation is scoped to the application canister whose frontend is initiating the OAUTH protocol, and has a lifetime of *TODO*.
 
@@ -69,11 +69,11 @@ This section describes the Identity Provider from the point of view of a client 
 
 The OAUTH entry point URL is
 
-  http://<idp_cainster_id>.ic0.app/authorize
+  http://<idp_canister_id>.ic0.app/authorize
 
 and the following parameters have particular relevance
 
-* the `scope` parameter contains a space separated list of textual representations of canister ids, and indicate the set of cansters that the client appliation frontend would like to talk to as the user.
+* the `scope` parameter contains a space separated list of textual representations of canister ids, and indicates the set of canisters that the client application frontend would like to talk to as the user.
 +
 WARNING: *TODO* How to restrict this sensibly, and possibly connect to the callback URL?
 
@@ -81,7 +81,7 @@ WARNING: *TODO* How to restrict this sensibly, and possibly connect to the callb
 
 If the Identity Provider frontend can authorize this request, the url parameters on the callback (i.e. the provided `redirect_uri`) contain in particular
 
-* the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain the following format
+* the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain in the following format
 +
 ....
 {
@@ -179,9 +179,9 @@ The `remove` method removes a device from the list of devices a user has.
 
 It is allowed to remove the key that is used to sign this request. This can be useful for a panic button functionality.
 
-It is allowed to remove the last key, to completley disable a user. The canister may forget that user completely then, assuming the user id generation algorithm prevents new users from getting the same user id.
+It is allowed to remove the last key, to completely disable a user. The canister may forget that user completely then, assuming the user id generation algorithm prevents new users from getting the same user id.
 
-It is the responsibility of the frontend UI to protect the user from doing these things accidentialy.
+It is the responsibility of the frontend UI to protect the user from doing these things accidentally.
 
 === The `lookup` query method
 
