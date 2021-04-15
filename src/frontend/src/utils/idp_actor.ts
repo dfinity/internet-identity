@@ -65,14 +65,13 @@ export class IDPActor {
 
   lookup = (userId: UserId) => {
     console.log(userId);
-    const actor = baseActor;
-    return actor.lookup(userId);
+    return baseActor.lookup(userId);
   };
 
   get_delegation = (userId: UserId, identity: WebAuthnIdentity) => {
     const publicKey = Array.from(identity.getPublicKey().toDer());
     console.log(`get_delegation(user_id = ${userId}, publicKey: ${publicKey}`);
-    return this.actor_with_identity(identity).get_delegation(userId, publicKey);
+    return baseActor.get_delegation(userId, publicKey);
   };
 }
 
