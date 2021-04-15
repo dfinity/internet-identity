@@ -29,8 +29,8 @@ export class IDPActor {
       return this.actor;
   }
 
-  register = async (userId: UserId, alias: Alias, credentialId?: string) => {
-    console.log(`register(user_id = ${userId}, alias: ${alias}`);
+  register = async (alias: Alias, credentialId?: string) => {
+    console.log(`register(alias: ${alias}`);
     const identity = await authenticate();
     const publicKey = Array.from(identity.getPublicKey().toDer());
     return this.actor_with_identity(identity).register(
