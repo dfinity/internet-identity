@@ -1,5 +1,5 @@
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
+use ic_cdk::api::{caller, data_certificate, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -102,6 +102,14 @@ thread_local! {
 #[update]
 fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) -> UserId {
     STATE.with(|s| {
+        if caller() != Principal::self_authenticating(pk.clone()) {
+            ic_cdk::trap(&format!(
+                "{} could not be authenticated against {:?}",
+                caller(),
+                pk
+            ));
+        }
+
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
         let mut m = s.map.borrow_mut();
@@ -124,6 +132,8 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
                 if e.1 == pk {
@@ -176,6 +186,8 @@ fn remove(user_id: UserId, pk: PublicKey) {
 
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
+            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 let (_, _, expiration, _) = entries.swap_remove(i as usize);
                 remove_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
@@ -390,6 +402,17 @@ fn prune_expired_signatures(sigs: &mut SignatureMap) {
     if num_pruned > 0 {
         update_root_hash(sigs);
     }
+}
+
+// Checks if the caller is authenticated against any of the public keys provided
+// and traps if not.
+fn trap_if_not_authenticated(public_keys: Vec<PublicKey>) {
+    for pk in public_keys.into_iter() {
+        if caller() == Principal::self_authenticating(pk) {
+            return;
+        }
+    }
+    ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
 }
 
 fn main() {}
