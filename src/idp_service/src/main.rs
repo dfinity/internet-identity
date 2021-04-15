@@ -1,6 +1,6 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
+use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
+const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 600_000_000_000;
 
 type UserId = u64;
 type CredentialId = Vec<u8>;
@@ -52,6 +53,21 @@ struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
     body: Vec<u8>,
+    streaming_strategy: Option<StreamingStrategy>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Token {}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum StreamingStrategy {
+    Callback { callback: Func, token: Token },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct StreamingCallbackHttpResponse {
+    body: Vec<u8>,
+    token: Option<Token>,
 }
 
 struct State {
@@ -80,6 +96,9 @@ fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<
         if m.get(&user_id).is_some() {
             trap("This user is already registered");
         }
+
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
+
         let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
         m.insert(
             user_id,
@@ -101,11 +120,13 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
                     e.2 = expiration;
                     e.3 = credential;
                     add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+                    prune_expired_signatures(&mut s.sigs.borrow_mut());
                     return;
                 }
             }
             entries.push((alias, pk.clone(), expiration, credential));
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+            prune_expired_signatures(&mut s.sigs.borrow_mut());
         } else {
             trap("This user is not registered yet");
         }
@@ -115,6 +136,8 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
 #[update]
 fn remove(user_id: UserId, pk: PublicKey) {
     STATE.with(|s| {
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
+
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
@@ -144,11 +167,13 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 200,
             headers: vec![],
             body: value.clone(),
+            streaming_strategy: None,
         },
         None => HttpResponse {
             status_code: 404,
             headers: vec![],
             body: format!("Asset {} not found.", asset).as_bytes().into(),
+            streaming_strategy: None,
         },
     })
 }
@@ -176,9 +201,8 @@ fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
     })
 }
 
-#[init]
-fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+// used both in init and post_upgrade
+fn init_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
@@ -191,10 +215,17 @@ fn init() {
     });
 }
 
+#[init]
+fn init() {
+    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+    init_assets();
+}
+
 #[pre_upgrade]
 fn persist_data() {
     STATE.with(|s| {
-        if let Err(err) = stable_save((s.map.take(),)) {
+        let map = s.map.replace(Default::default());
+        if let Err(err) = stable_save((map,)) {
             ic_cdk::trap(&format!(
                 "An error occurred while saving data to stable memory: {}",
                 err
@@ -205,20 +236,16 @@ fn persist_data() {
 
 #[post_upgrade]
 fn retrieve_data() {
+    init_assets();
     match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
         Ok((map,)) => {
             STATE.with(|s| {
                 // Restore user map.
                 s.map.replace(map);
 
-                // Recompute the signatures based on the user map.
-                let mut sigs = SignatureMap::default();
-                for (user_id, entries) in s.map.borrow().iter() {
-                    for (_, pk, expiration, _) in entries.iter() {
-                        add_signature(&mut sigs, *user_id, pk.clone(), *expiration);
-                    }
-                }
-                s.sigs.replace(sigs);
+                // We drop all the signatures on upgrade, users will
+                // re-request them if needed.
+                update_root_hash(&s.sigs.borrow());
             });
         }
         Err(err) => ic_cdk::trap(&format!(
@@ -228,7 +255,7 @@ fn retrieve_data() {
     }
 }
 
-fn seed_hash(user_id: UserId) -> Hash {
+fn hash_seed(user_id: UserId) -> Hash {
     hash::hash_string(user_id.to_string().as_str())
 }
 
@@ -266,7 +293,7 @@ fn get_signature(
         expiration,
         targets: None,
     });
-    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
+    let witness = sigs.witness(hash_seed(user_id), msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
@@ -290,7 +317,8 @@ fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expira
         expiration,
         targets: None,
     });
-    sigs.put(seed_hash(user_id), msg_hash);
+    let expires_at = time() as u64 + DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS;
+    sigs.put(hash_seed(user_id), msg_hash, expires_at);
     update_root_hash(&sigs);
 }
 
@@ -305,8 +333,22 @@ fn remove_signature(
         expiration,
         targets: None,
     });
-    sigs.delete(seed_hash(user_id), msg_hash);
+    sigs.delete(hash_seed(user_id), msg_hash);
     update_root_hash(sigs);
+}
+
+/// Removes a batch of expired signatures from the signature map.
+///
+/// This function is supposed to piggy back on update calls to
+/// amortize the cost of tree pruning.  Each operation on the signature map
+/// will prune at most MAX_SIGS_TO_PRUNE other signatures.
+fn prune_expired_signatures(sigs: &mut SignatureMap) {
+    const MAX_SIGS_TO_PRUNE: usize = 10;
+    let num_pruned = sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE);
+
+    if num_pruned > 0 {
+        update_root_hash(sigs);
+    }
 }
 
 fn main() {}
