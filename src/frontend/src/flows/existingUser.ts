@@ -3,12 +3,6 @@ import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 let authenticationPollInterval;
 export const initExistingUser = () => {
   bindListeners();
-
-  //   Generate link to add a user with an authenticated browser
-  const addDeviceLink = document.getElementById(
-    "addDeviceLink"
-  ) as HTMLInputElement;
-  addDeviceLink.value = generateAddDeviceLink();
 };
 
 const toggleDialog = () => {
@@ -46,7 +40,15 @@ const bindListeners = () => {
   closeDialog.onclick = toggleDialog;
   toggleReconnect.onclick = () => reconnectSection.classList.toggle("hidden");
   toggleAddDevice.onclick = () => {
-    addDeviceLinkSection.classList.toggle("hidden");
+    //   Generate link to add a user with an authenticated browser
+    generateAddDeviceLink().then(link => {
+      addDeviceLinkSection.classList.toggle("hidden");
+
+      const addDeviceLink = document.getElementById(
+        "addDeviceLink"
+      ) as HTMLInputElement;
+      addDeviceLink.value = link;
+    });
 
     // Optional feature, not in current spec
     // authenticationPollInterval
