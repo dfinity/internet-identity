@@ -20,7 +20,7 @@ export function getDerEncodedPublicKey(userId: UserId, signingCanister: Principa
     userIdEncoded.push(userIdString.charCodeAt(x));
   }
 
-  const signingCanisterBlob = [1, 2, 3, 4];//signingCanister.toBlob();
+  const signingCanisterBlob = signingCanister.toBlob();
   const bitString = new Uint8Array([
     signingCanisterBlob.length,
     ...signingCanisterBlob,
