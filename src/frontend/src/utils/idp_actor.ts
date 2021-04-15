@@ -1,4 +1,4 @@
-import { Actor, HttpAgent, Identity } from "@dfinity/agent";
+import { Actor, BinaryBlob, DerEncodedBlob, HttpAgent } from "@dfinity/agent";
 import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
@@ -40,15 +40,14 @@ export class IDPActor {
     );
   };
 
-  add = async (userId: UserId, alias: Alias, credentialId?: string) => {
+  add = async (userId: UserId, alias: Alias, newPublicKey: DerEncodedBlob, credentialId?: BinaryBlob) => {
     const identity = await authenticate();
-    const publicKey = Array.from(identity.getPublicKey().toDer());
     return this.actor_with_identity(identity)
       .add(
         userId,
         alias,
-        publicKey,
-        credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
+        Array.from(newPublicKey),
+        credentialId ? [Array.from(credentialId)] : []
       )
       .then(async () => {
         const update = await this.actor_with_identity(identity).lookup(userId);
