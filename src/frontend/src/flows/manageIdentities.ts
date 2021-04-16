@@ -9,7 +9,6 @@ import idp_actor from "../utils/idp_actor";
 
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
-  // TODO - Lookup identities then render them based on the result.
 
   if (!idp_actor.userId) {
     // If we haven't established a userId, we need to authenticate.
