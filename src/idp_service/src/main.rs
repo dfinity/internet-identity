@@ -432,7 +432,7 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
 fn check_entry_limits(alias: &str, pk: &[u8], credential_id: Option<&CredentialId>) {
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 100;
-    const CREDENTIAL_ID_LEN_LIMIT: usize = 100;
+    const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
 
     let n = alias.len();
     if n > ALIAS_LEN_LIMIT {
