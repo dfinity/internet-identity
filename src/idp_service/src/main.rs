@@ -354,7 +354,9 @@ fn get_signature(
     pk: PublicKey,
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
-    let certificate = data_certificate()?;
+    let certificate = data_certificate().unwrap_or_else(|| {
+        trap("data certificate is only available in query calls");
+    });
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
