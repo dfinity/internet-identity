@@ -1,6 +1,7 @@
 import { initExistingUser } from "./flows/existingUser";
 import { initNewUser } from "./flows/newUser";
 import oauth from "./utils/oath";
+import "web-dialog";
 import "./styles/main.css";
 
 const init = () => {
