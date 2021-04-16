@@ -37,7 +37,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
    ```
 9. In `idp-service` idenit chat, run the development server at port 8080:
    ```
-   start
+   npm start
    ```
 
 You should be ready to rumble!
