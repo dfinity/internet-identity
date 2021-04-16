@@ -69,7 +69,6 @@ const renderIdentities = async () => {
 const bindRemoveListener = (listItem: HTMLElement, publicKey) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = () => {
-    debugger;
     // Make sure we're not removing our last identity
     const identities = document.querySelectorAll("#identityList li");
 

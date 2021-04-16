@@ -160,11 +160,10 @@ declare global {
 }
 
 const storedIdentity = localStorage.getItem("identity");
-const identity = storedIdentity ? JSON.parse(storedIdentity) : undefined;
 const savedUserId = localStorage.getItem("userId");
-const userId = savedUserId ? JSON.parse(savedUserId) : undefined;
+const userId = savedUserId ? BigInt(savedUserId) : undefined;
 const idp_actor = IDPActor.create(
-  identity && WebAuthnIdentity.fromJSON(identity),
+  storedIdentity ? WebAuthnIdentity.fromJSON(storedIdentity) : undefined,
   userId
 );
 
