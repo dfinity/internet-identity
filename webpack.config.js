@@ -35,6 +35,8 @@ function generateWebpackConfigForCanister(name, info) {
   if (typeof info.frontend !== "object") {
     return;
   }
+  const devtool =
+    process.env.NODE_ENV === "production" ? undefined : "source-map";
 
   return {
     mode: process.env.NODE_ENV === "production" ? "production" : "development",
@@ -44,7 +46,7 @@ function generateWebpackConfigForCanister(name, info) {
       index: path.join(__dirname, info.frontend.entrypoint),
       manage: path.join(__dirname, "src", "frontend", "src", "manage"),
     },
-    devtool: "source-map",
+    devtool,
     optimization: {
       minimize: process.env.NODE_ENV === "production",
       minimizer: [new TerserPlugin()],
