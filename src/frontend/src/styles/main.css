@@ -137,6 +137,11 @@ ul {
   border-radius: 8px;
 }
 
+#registerAlias {
+  max-width: 256px;
+  margin-bottom: 1rem;
+}
+
 /* large screen break */
 @media (min-width: 1200px) {
   dialog {
