@@ -41,19 +41,16 @@ const toggleDialog = () => {
     userIdInput.value = userId.toString();
     userIdSection.classList.add("hidden");
   }
-  const isOpen = dialog.open;
+  const isOpen = dialog.hasAttribute("open");
 
-  if (isOpen) dialog.close();
-  else dialog.showModal();
+  if (isOpen) dialog.removeAttribute("open");
+  else dialog.open = true;
 };
 
 const handleLoginClick = async () => {
-
   if (idp_actor.userId) {
     // Make the user reauthenticate
-    await idp_actor.reconnect().then(() =>
-      postReconnect()
-    );
+    await idp_actor.reconnect().then(() => postReconnect());
   }
 
   // Otherwise, open dialog for fallback options
@@ -61,7 +58,6 @@ const handleLoginClick = async () => {
 };
 
 const handleReconnectClick = async () => {
-
   const userIdInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -70,13 +66,11 @@ const handleReconnectClick = async () => {
   if (userId) {
     idp_actor.userId = userId;
     // Make the user reauthenticate
-    await idp_actor.reconnect().then(() =>
-      postReconnect()
-    );
+    await idp_actor.reconnect().then(() => postReconnect());
   } else {
-    console.error("Failed to login with that user #")
+    console.error("Failed to login with that user #");
   }
-}
+};
 
 function postReconnect() {
   if (window.location.href.match(/authorize/)) {
