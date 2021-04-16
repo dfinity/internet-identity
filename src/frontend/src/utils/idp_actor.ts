@@ -150,7 +150,6 @@ export class IDPActor {
   }
 
   register = async (alias: Alias) => {
-
     // user wants to register fresh, so always create new identity
     // also stores it in in the localStorage
     this._actor = undefined;
@@ -163,6 +162,8 @@ export class IDPActor {
 
     const actor = await this.getActor();
     console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
+
+    console.log(`register(alias: ${alias}, pubkey: ${this.publicKey}, credentialId: ${credentialId})`);
 
     const userId = await actor.register(
       alias,
@@ -201,8 +202,10 @@ export class IDPActor {
   requestDelegation = async (publicKey?: PublicKey) => {
     console.log(`request_delegation()`);
     const key = publicKey ?? this.publicKey;
+    console.log(`request_delegation(userId: ${this.userId}, pubkey: ${key})`);
     if (!!this.userId && !!key) {
-      return await this._actor?.request_delegation(this.userId, key);
+      const actor = await this.getActor();
+      return await actor.request_delegation(this.userId, key);
     }
     console.warn("Could not request delegation. User must authenticate first");
     return null;
@@ -212,7 +215,8 @@ export class IDPActor {
     const key = publicKey ?? this.publicKey;
     console.log(`get_delegation(pubkey: ${key})`);
     if (!!this.userId && !!key) {
-      return await this._actor?.get_delegation(this.userId, key);
+      const actor = await this.getActor();
+      return await actor.get_delegation(this.userId, key);
     }
     console.warn("Could not get delegation. User must authenticate first");
     return null;

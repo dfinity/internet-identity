@@ -1,3 +1,22 @@
+import idp_actor from "../utils/idp_actor";
+import {
+  DelegationChain,
+  WebAuthnIdentity,
+  Delegation,
+  SignedDelegation,
+  Ed25519PublicKey,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { getDerEncodedPublicKey } from "../utils/auth";
+import { canisterId as signingCanisterId } from "dfx-generated/idp_service";
+import {
+  Principal,
+  blobFromUint8Array,
+  derBlobFromBlob,
+  blobFromHex,
+  blobToHex,
+} from "@dfinity/agent";
+
 // types
 export declare type OAuth2AccessTokenResponse = {
   access_token: string;
@@ -87,14 +106,18 @@ export default function () {
       const identity = localStorage.getItem("identity");
       if (identity !== null) {
         // does the user consent?
-        if (checkConsent(params?.client_id)) {
-          redirectToApp(params.redirect_uri, {
-            // TODO: generate access_token
-            access_token: "",
-            token_type: "bearer",
-            expires_in: THREE_DAYS,
-            scope: params.scope,
-            state: params.state,
+        if (checkConsent(params?.scope)) {
+          generate_access_token(
+            WebAuthnIdentity.fromJSON(identity),
+            params.login_hint
+          ).then((access_token: string) => {
+            redirectToApp(params.redirect_uri, {
+              access_token: access_token,
+              token_type: "bearer",
+              expires_in: THREE_DAYS,
+              scope: params.scope,
+              state: params.state,
+            });
           });
         } else {
           // TODO: redirect with failure message
@@ -138,12 +161,63 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
   globalThis.location.assign(responseURL.toString());
 }
 
-function checkConsent(clientId?: string) {
+function checkConsent(scope?: string) {
   return prompt(
-    `do you consent to ${
-      clientId || "MYSTERIOUS CANISTER"
-    } using your identity? [y/n]`
+    `The following canisters are requesting access to your identity:\n\n${
+      scope.replaceAll(' ', '\n') || "UNKNOWN CANISTER"
+    }\n\nAllow? [y/n]`
   )?.match(/y/i);
+}
+
+async function generate_access_token(
+  identity: WebAuthnIdentity,
+  login_hint: string
+) {
+  const res = await idp_actor.getDelegation();
+  if (!isDelegationResponse(res)) {
+    throw Error("got bad variant?");
+  }
+
+  const { delegation } = res;
+
+  const rootToDeviceDelegation = {
+    delegation: new Delegation(
+      blobFromUint8Array(Uint8Array.from(delegation.delegation.pubkey)),
+      BigInt(delegation.delegation.expiration)
+    ),
+    signature: blobFromUint8Array(Uint8Array.from(delegation.signature)),
+  };
+
+  const sessionKey = Ed25519PublicKey.fromDer(blobFromHex(login_hint));
+
+  const userId = BigInt(localStorage.getItem("userId"));
+  const publicKey = getDerEncodedPublicKey(
+    userId,
+    Principal.fromText(signingCanisterId)
+  );
+
+  const rootToDevice = DelegationChain.fromDelegations(
+    [rootToDeviceDelegation],
+    derBlobFromBlob(blobFromUint8Array(Uint8Array.from(publicKey)))
+  );
+  const rootToSession = await DelegationChain.create(
+    identity,
+    sessionKey,
+    new Date(Date.now() + THREE_DAYS),
+    { previous: rootToDevice }
+  );
+
+  console.log("Delegation chain");
+  console.log(rootToSession);
+  const chainJson = JSON.stringify(rootToSession.toJSON());
+  console.log("Delegation chain JSON");
+  console.log(chainJson);
+
+  return new Buffer(chainJson).toString('hex');
+}
+
+function isDelegationResponse(x: any): x is { delegation: SignedDelegation } {
+  return x && x.hasOwnProperty("delegation");
 }
 
 export const redirectBackWithAuthorization = () => {
