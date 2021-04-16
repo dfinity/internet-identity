@@ -164,7 +164,7 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 function checkConsent(scope?: string) {
   return prompt(
     `The following canisters are requesting access to your identity:\n\n${
-      scope.replaceAll(' ', '\n') || "UNKNOWN CANISTER"
+      scope?.replaceAll(' ', '\n') || "UNKNOWN CANISTER"
     }\n\nAllow? [y/n]`
   )?.match(/y/i);
 }
