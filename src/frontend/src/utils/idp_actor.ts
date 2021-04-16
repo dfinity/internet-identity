@@ -4,7 +4,7 @@ import {
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
 import _SERVICE, { UserId, Alias, PublicKey } from "../typings";
-import { authenticate } from "./handleAuthentication";
+import { tryLoadIdentity, authenticate } from "./handleAuthentication";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -98,11 +98,11 @@ export class IDPActor {
   }
 
   register = async (alias: Alias) => {
-    console.log(`register(alias: ${alias}`);
 
     const credentialId = this.credentialId ?? [];
 
     const actor = await this.getActor(true);
+    console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
 
     const userId = await actor.register(
       alias,
@@ -161,12 +161,9 @@ export class IDPActor {
   };
 }
 
-const storedIdentity = localStorage.getItem("identity");
+const storedIdentity = tryLoadIdentity();
 const savedUserId = localStorage.getItem("userId");
 const userId = savedUserId ? BigInt(savedUserId) : undefined;
-const idp_actor = IDPActor.create(
-  storedIdentity ? WebAuthnIdentity.fromJSON(storedIdentity) : undefined,
-  userId
-);
+const idp_actor = IDPActor.create(storedIdentity, userId);
 
 export default idp_actor;
