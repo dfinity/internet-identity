@@ -11,6 +11,9 @@ const bindListeners = () => {
   const dialogTrigger = document.getElementById(
     "dialogTrigger"
   ) as HTMLButtonElement;
+  const reconnectTrigger = document.getElementById(
+    "reconnectTrigger"
+  ) as HTMLButtonElement;
   const closeDialog = document.getElementById(
     "closeDialog"
   ) as HTMLButtonElement;
@@ -21,6 +24,7 @@ const bindListeners = () => {
   dialogTrigger.onclick = handleLoginClick;
   closeDialog.onclick = toggleDialog;
   toggleAddDevice.onclick = handleToggleDeviceClick;
+  reconnectTrigger.onclick = handleReconnectClick;
 };
 
 const toggleDialog = () => {
@@ -42,12 +46,35 @@ const toggleDialog = () => {
 };
 
 const handleLoginClick = async () => {
-  // Attempt to delegate without prompting a signature
-  reconnectUser(false);
+
+  if (idp_actor.userId) {
+    // Make the user reauthenticate
+    await idp_actor.reconnect().then(() =>
+      window.location.assign("/manage.html")
+    );
+  }
 
   // Otherwise, open dialog for fallback options
   toggleDialog();
 };
+
+const handleReconnectClick = async () => {
+
+  const userIdInput = document.getElementById(
+    "registerUserNumber"
+  ) as HTMLInputElement;
+
+  const userId = BigInt(userIdInput.value);
+  if (userId) {
+    localStorage.setItem("userId", userId.toString())
+    idp_actor.userId = userId;
+    // Make the user reauthenticate
+    await idp_actor.reconnect().then(() =>
+      window.location.assign("/manage.html")
+    );
+  }
+  console.error("Failed to login with that user #")
+}
 
 const handleToggleDeviceClick = () => {
   // Inputs
