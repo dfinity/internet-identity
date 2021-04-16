@@ -29,14 +29,15 @@ const bindListeners = () => {
 
 const toggleDialog = () => {
   const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
-  if (idp_actor.userId && idp_actor.userId !== BigInt(1)) {
+  const userId = idp_actor.userId;
+  if (userId) {
     const userIdInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
     const userIdSection = document.getElementById(
       "userIdSection"
     ) as HTMLElement;
-    userIdInput.value = idp_actor.userId.toString();
+    userIdInput.value = userId.toString();
     userIdSection.classList.add("hidden");
   }
   const isOpen = dialog.open;
@@ -66,7 +67,6 @@ const handleReconnectClick = async () => {
 
   const userId = BigInt(userIdInput.value);
   if (userId) {
-    localStorage.setItem("userId", userId.toString())
     idp_actor.userId = userId;
     // Make the user reauthenticate
     await idp_actor.reconnect().then(() =>

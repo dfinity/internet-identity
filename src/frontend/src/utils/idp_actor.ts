@@ -23,14 +23,25 @@ export class IDPActor {
   private _chain?: DelegationChain;
 
   static create(): IDPActor {
-    const userId = localStorage.getItem("userId");
-    return new this(tryLoadIdentity(), userId ? BigInt(userId) : undefined);
+    return new this(tryLoadIdentity());
   }
 
   protected constructor(
     public storedIdentity?: WebAuthnIdentity,
-    public userId?: bigint
   ) {
+  }
+
+  public get userId(): UserId | undefined {
+    const userId = localStorage.getItem("userId");
+    return userId ? BigInt(userId) : undefined;
+  }
+
+  public set userId(userId : UserId | undefined) {
+    if (userId !== undefined) {
+      localStorage.setItem("userId", userId.toString())
+    } else {
+      localStorage.removeItem("userId")
+    }
   }
 
   public getPublicKey(): PublicKey {
@@ -158,8 +169,7 @@ export class IDPActor {
       this.getPublicKey() as PublicKey,
       credentialId
     );
-    this.userId = userId;
-    localStorage.setItem("userId", userId.toString());
+    this.userId = userId
   };
 
   add = async (userId: UserId, alias: Alias, credentialId?: string) => {
@@ -192,8 +202,9 @@ export class IDPActor {
 
   requestDelegation = async (publicKey?: PublicKey) => {
     const key = publicKey ?? this.getPublicKey();
-    if (!!this.userId && !!key) {
-      return await this._actor?.request_delegation(this.userId, key);
+    const userId = this.userId;
+    if (userId) {
+      return await this._actor?.request_delegation(userId, key);
     }
     console.warn("Could not request delegation. User must authenticate first");
     return null;
@@ -201,8 +212,9 @@ export class IDPActor {
 
   getDelegation = async (publicKey?: PublicKey) => {
     const key = publicKey ?? this.getPublicKey();
-    if (!!this.userId && !!key) {
-      return await this._actor?.get_delegation(this.userId, key);
+    const userId = this.userId;
+    if (userId) {
+      return await this._actor?.get_delegation(userId, key);
     }
     console.warn("Could not get delegation. User must authenticate first");
     return null;
