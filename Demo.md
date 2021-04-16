@@ -9,7 +9,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
    ```
    rm -rf .dfx
    ```
-3. In a checkout of `dfinity-lab/open-chat`, switch to branch `joachim/idp`.
+3. In a checkout of `dfinity-lab/open-chat`, switch to branch `joachim/idp-demo`.
    This configures the open chat frontend to use
    <http://localhost:8080/authorize.html> as the OAUTH endpoint.
 4. In a checkout of open chat, reset the dfx state:
