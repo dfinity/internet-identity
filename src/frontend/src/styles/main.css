@@ -3,6 +3,15 @@ body {
   font-size: 1.5rem;
 }
 
+input,
+button,
+p,
+div,
+section,
+span {
+  font-size: 1.2rem;
+}
+
 img {
   min-width: 500px;
   width: 50vw;
@@ -13,7 +22,7 @@ img {
 section {
   display: flex;
   flex-direction: column;
-  max-width: calc(100vw - 2rem);
+  max-width: calc(100vw - 6rem);
   margin: auto;
   align-items: baseline;
 }
@@ -44,18 +53,24 @@ form {
   flex-direction: column;
 }
 
+button {
+  padding: 1rem 2rem;
+  border-radius: 4px;
+  background: none;
+}
+
+button.primary {
+  background-color: black;
+}
+
 button[type="submit"] {
   padding: 1rem 2rem;
   margin-right: auto;
 }
 
 label {
-  flex-direction: row;
+  flex-direction: column;
   margin-bottom: 1rem;
-}
-
-input {
-  height: fit-content;
 }
 
 main {
@@ -94,4 +109,43 @@ button[title="Remove identity"] {
   background: none;
   padding: 1rem;
   width: fit-content;
+}
+
+#closeDialog {
+  margin-left: auto;
+  padding: 4px;
+  border: none;
+  position: absolute;
+  right: 1.5rem;
+  top: 1.5rem;
+}
+
+dialog {
+  max-width: calc(100vw - 2rem);
+  position: relative;
+  padding-top: 3rem;
+}
+
+ul {
+  width: 100%;
+  padding: 0;
+}
+
+#addDeviceLink {
+  width: 100%;
+  padding: 1rem 0.25rem;
+  border-radius: 8px;
+}
+
+/* large screen break */
+@media (min-width: 1200px) {
+  dialog {
+    max-width: 1080px;
+  }
+}
+/* tablet break */
+@media (min-width: 720px) {
+  label {
+    flex-direction: row;
+  }
 }

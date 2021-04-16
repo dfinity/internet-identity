@@ -145,3 +145,8 @@ function checkConsent(clientId?: string) {
     } using your identity? [y/n]`
   )?.match(/y/i);
 }
+
+export const redirectBackWithAuthorization = () => {
+  debugger;
+};
+

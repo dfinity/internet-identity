@@ -12,12 +12,13 @@ function setupRemoveIdentityForm(props) {
     e.preventDefault();
     submitButton.setAttribute("disabled", "true");
 
-    // Read values from inputs
-    const removeUser = form.querySelector("#removeUser") as HTMLInputElement;
+    const publicKey = Array.from(
+      idp_actor.storedIdentity?.getPublicKey()?.toDer() ?? []
+    );
 
     // Send values through actor
     idp_actor
-      .remove(BigInt(removeUser.value))
+      .remove(publicKey)
       .then((returnValue) => {
         console.info("successfully removed identity", returnValue);
 
@@ -29,7 +30,7 @@ function setupRemoveIdentityForm(props) {
         submitButton.removeAttribute("disabled");
       });
 
-    return false;
+    // return false;
   };
 
   form.onsubmit = handleSubmit;

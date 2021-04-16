@@ -14,6 +14,18 @@ type HttpResponse = record {
   status_code: nat16;
   headers: vec HeaderField;
   body: blob;
+  streaming_strategy: opt StreamingStrategy;
+};
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+type Token = record {};
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
 };
 type Delegation = record {
   pubkey: PublicKey;
@@ -25,11 +37,21 @@ type SignedDelegation = record {
   signature: blob;
 };
 
+type GetDelegationResponse = variant {
+  // The signed delegation was successfully retrieved.
+  delegation: SignedDelegation;
+
+  // The signature is not readily available and must be explicitly requested
+  // by calling request_delegation() method with the same arguments.
+  request_delegation_explicitly
+};
+
 service : {
-  register : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  register : (Alias, PublicKey, opt CredentialId) -> (UserId);
   add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
+  request_delegation : (UserId, PublicKey) -> ();
   remove : (UserId, PublicKey) -> ();
   lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
   http_request: (request: HttpRequest) -> (HttpResponse) query;
-  get_delegation: (UserId, PublicKey) -> (SignedDelegation) query;
+  get_delegation: (UserId, PublicKey) -> (GetDelegationResponse) query;
 }
