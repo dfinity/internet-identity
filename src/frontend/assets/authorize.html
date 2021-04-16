@@ -7,7 +7,6 @@
     <title>Identity Provider</title>
   </head>
   <body>
-    <!-- This page should be identical to index.html -->
     <main>
       <h1>Internet Computer Identity Provider</h1>
       <div class="spacer"></div>
@@ -18,17 +17,19 @@
       <div class="spacer"></div>
       <h3>If this is your first time using the Identity Provider</h3>
       <form id="registerForm">
-        <label for="registerAlias"
-          >Alias (expects a string)<input
-            type="text"
-            name="registerAlias"
-            id="registerAlias"
-            required /></label
-        ><button type="submit" id="register-identity">
+        <label for="registerAlias">What should we call this device? </label>
+        <input
+          type="text"
+          name="registerAlias"
+          id="registerAlias"
+          required
+          placeholder="device name"
+        />
+        <button type="submit" id="register-identity">
           Click here to register
         </button>
       </form>
-      <dialog id="loginDialog">
+      <web-dialog id="loginDialog">
         <button type="button" aria-label="close dialog" id="closeDialog">
           <svg
             id="icon_close"
@@ -102,15 +103,8 @@
           </p>
           <input type="text" id="addDeviceLink" readonly />
         </section>
-      </dialog>
+      </web-dialog>
     </main>
     <script src="index.js"></script>
-
-    <!-- Includes Dialog Polyfill for Firefox -->
-    <script src="dialog-polyfill.js"></script>
-    <script>
-      var dialog = document.querySelector("#loginDialog");
-      dialogPolyfill.registerDialog(dialog);
-    </script>
   </body>
 </html>
