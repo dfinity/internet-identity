@@ -101,6 +101,8 @@ thread_local! {
 
 #[update]
 fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) -> UserId {
+    check_entry_limits(alias.as_str(), pk.as_slice(), credential_id.as_ref());
+
     STATE.with(|s| {
         if caller() != Principal::self_authenticating(pk.clone()) {
             ic_cdk::trap(&format!(
@@ -129,10 +131,14 @@ fn register(alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) ->
 
 #[update]
 fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<CredentialId>) {
+    const MAX_ENTRIES_PER_USER: usize = 10;
+
+    check_entry_limits(alias.as_str(), pk.as_slice(), credential.as_ref());
+
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_id) {
-            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+            trap_if_not_authenticated(entries.iter().map(|e| &e.1));
 
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
             for e in entries.iter_mut() {
@@ -145,6 +151,14 @@ fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<Credenti
                     return;
                 }
             }
+
+            if entries.len() >= MAX_ENTRIES_PER_USER {
+                trap(&format!(
+                    "at most {} authentication information entries are allowed per user",
+                    MAX_ENTRIES_PER_USER,
+                ));
+            }
+
             entries.push((alias, pk.clone(), expiration, credential));
             add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
             prune_expired_signatures(&mut s.sigs.borrow_mut());
@@ -186,7 +200,7 @@ fn remove(user_id: UserId, pk: PublicKey) {
 
         let mut remove_user = false;
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
-            trap_if_not_authenticated(entries.iter().map(|e| e.1.clone()).collect());
+            trap_if_not_authenticated(entries.iter().map(|e| &e.1));
 
             if let Some(i) = entries.iter().position(|e| e.1 == pk) {
                 let (_, _, expiration, _) = entries.swap_remove(i as usize);
@@ -340,7 +354,9 @@ fn get_signature(
     pk: PublicKey,
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
-    let certificate = data_certificate()?;
+    let certificate = data_certificate().unwrap_or_else(|| {
+        trap("data certificate is only available in query calls");
+    });
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
@@ -406,13 +422,43 @@ fn prune_expired_signatures(sigs: &mut SignatureMap) {
 
 // Checks if the caller is authenticated against any of the public keys provided
 // and traps if not.
-fn trap_if_not_authenticated(public_keys: Vec<PublicKey>) {
-    for pk in public_keys.into_iter() {
+fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey>) {
+    for pk in public_keys {
         if caller() == Principal::self_authenticating(pk) {
             return;
         }
     }
     ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+}
+
+fn check_entry_limits(alias: &str, pk: &[u8], credential_id: Option<&CredentialId>) {
+    const ALIAS_LEN_LIMIT: usize = 64;
+    const PK_LEN_LIMIT: usize = 100;
+    const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
+
+    let n = alias.len();
+    if n > ALIAS_LEN_LIMIT {
+        trap(&format!(
+            "alias length {} exceeds the limit of {} bytes",
+            n, ALIAS_LEN_LIMIT,
+        ));
+    }
+
+    let n = pk.len();
+    if n > PK_LEN_LIMIT {
+        trap(&format!(
+            "public key length {} exceeds the limit of {} bytes",
+            n, PK_LEN_LIMIT,
+        ));
+    }
+
+    let n = credential_id.map(|bytes| bytes.len()).unwrap_or_default();
+    if n > CREDENTIAL_ID_LEN_LIMIT {
+        trap(&format!(
+            "credential id length {} exceeds the limit of {} bytes",
+            n, CREDENTIAL_ID_LEN_LIMIT,
+        ));
+    }
 }
 
 fn main() {}
