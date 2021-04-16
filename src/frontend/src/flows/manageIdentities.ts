@@ -28,15 +28,14 @@ const checkForAddUserHash = async () => {
   if (!!newDevice) {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
-      const { userId, publicKey, rawId } = parsedParams;
+      const { userId, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams);
       await idp_actor.add(
         BigInt(userId),
         prompt("What should we call this device?") ?? "anonymous device",
         rawId.toString()
       );
-
-      location.assign("/manage.html");
+      renderIdentities();
     }
   }
 };

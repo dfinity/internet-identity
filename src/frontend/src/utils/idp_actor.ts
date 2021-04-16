@@ -98,9 +98,6 @@ export class IDPActor {
   }
 
   register = async (alias: Alias) => {
-    const identity = this.storedIdentity ?? (await authenticate());
-    // need to create an actor at this stage
-
     console.log(`register(alias: ${alias}`);
 
     const credentialId = this.credentialId ?? [];
@@ -119,14 +116,12 @@ export class IDPActor {
     const identity = this.storedIdentity ?? (await authenticate());
     const publicKey = Array.from(identity.getPublicKey().toDer());
     const actor = await this.getActor();
-    await actor.add(
+    return await actor.add(
       userId,
       alias,
       publicKey,
       credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
     );
-
-    const update = await actor.lookup(userId);
   };
 
   remove = async (publicKey: PublicKey) => {
@@ -140,7 +135,7 @@ export class IDPActor {
 
   lookup = async (userId?: UserId) => {
     console.log(userId);
-    const preferredUser = userId || this.userId;
+    const preferredUser = userId ?? this.userId;
     if (preferredUser) return baseActor.lookup(preferredUser);
     else {
       throw new Error("no user was provided");
