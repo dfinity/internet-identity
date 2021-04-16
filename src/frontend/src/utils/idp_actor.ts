@@ -44,7 +44,7 @@ export class IDPActor {
     }
   }
 
-  public getPublicKey(): PublicKey {
+  public get publicKey(): PublicKey {
     if (this.storedIdentity) {
       return Array.from(this.storedIdentity.getPublicKey().toDer());
     } else {
@@ -162,11 +162,11 @@ export class IDPActor {
     const credentialId = this.getCredentialId() ?? [];
 
     const actor = await this.getActor();
-    console.log(`register(alias: ${alias}, publicKey: ${this.getPublicKey()}, credentialId: ${credentialId})`);
+    console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
 
     const userId = await actor.register(
       alias,
-      this.getPublicKey() as PublicKey,
+      this.publicKey as PublicKey,
       credentialId
     );
     this.userId = userId
@@ -201,20 +201,20 @@ export class IDPActor {
   };
 
   requestDelegation = async (publicKey?: PublicKey) => {
-    const key = publicKey ?? this.getPublicKey();
-    const userId = this.userId;
-    if (userId) {
-      return await this._actor?.request_delegation(userId, key);
+    console.log(`request_delegation()`);
+    const key = publicKey ?? this.publicKey;
+    if (!!this.userId && !!key) {
+      return await this._actor?.request_delegation(this.userId, key);
     }
     console.warn("Could not request delegation. User must authenticate first");
     return null;
   };
 
   getDelegation = async (publicKey?: PublicKey) => {
-    const key = publicKey ?? this.getPublicKey();
-    const userId = this.userId;
-    if (userId) {
-      return await this._actor?.get_delegation(userId, key);
+    const key = publicKey ?? this.publicKey;
+    console.log(`get_delegation(pubkey: ${key})`);
+    if (!!this.userId && !!key) {
+      return await this._actor?.get_delegation(this.userId, key);
     }
     console.warn("Could not get delegation. User must authenticate first");
     return null;
