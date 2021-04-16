@@ -29,7 +29,7 @@
           Click here to register
         </button>
       </form>
-      <dialog id="loginDialog">
+      <web-dialog id="loginDialog">
         <button type="button" aria-label="close dialog" id="closeDialog">
           <svg
             id="icon_close"
@@ -103,15 +103,8 @@
           </p>
           <input type="text" id="addDeviceLink" readonly />
         </section>
-      </dialog>
+      </web-dialog>
     </main>
     <script src="index.js"></script>
-
-    <!-- Includes Dialog Polyfill for Firefox -->
-    <script src="dialog-polyfill.js"></script>
-    <script>
-      var dialog = document.querySelector("#loginDialog");
-      dialogPolyfill.registerDialog(dialog);
-    </script>
   </body>
 </html>
