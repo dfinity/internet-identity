@@ -106,7 +106,7 @@ export default function () {
       const identity = localStorage.getItem("identity");
       if (identity !== null) {
         // does the user consent?
-        if (checkConsent(params?.client_id)) {
+        if (checkConsent(params?.scope)) {
           generate_access_token(
             WebAuthnIdentity.fromJSON(identity),
             params.login_hint
@@ -161,11 +161,11 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
   globalThis.location.assign(responseURL.toString());
 }
 
-function checkConsent(clientId?: string) {
+function checkConsent(scope?: string) {
   return prompt(
-    `do you consent to ${
-      clientId || "MYSTERIOUS CANISTER"
-    } using your identity? [y/n]`
+    `The following canisters are requesting access to your identity:\n\n${
+      scope.replaceAll(' ', '\n') || "UNKNOWN CANISTER"
+    }\n\nAllow? [y/n]`
   )?.match(/y/i);
 }
 
@@ -213,7 +213,6 @@ async function generate_access_token(
   console.log("Delegation chain JSON");
   console.log(chainJson);
 
-  prompt("An unnecessary prompt to have time to inspect the console logs.");
   return new Buffer(chainJson).toString('hex');
 }
 

@@ -206,7 +206,7 @@ export class IDPActor {
     const key = publicKey ?? this.publicKey;
     console.log(`request_delegation(userId: ${this.userId}, pubkey: ${key})`);
     if (!!this.userId && !!key) {
-      const actor = await this.getActor(true);
+      const actor = await this.getActor();
       return await actor.request_delegation(this.userId, key);
     }
     console.warn("Could not request delegation. User must authenticate first");
@@ -217,7 +217,7 @@ export class IDPActor {
     const key = publicKey ?? this.publicKey;
     console.log(`get_delegation(pubkey: ${key})`);
     if (!!this.userId && !!key) {
-      const actor = await this.getActor(true);
+      const actor = await this.getActor();
       return await actor.get_delegation(this.userId, key);
     }
     console.warn("Could not get delegation. User must authenticate first");
