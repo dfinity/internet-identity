@@ -70,6 +70,7 @@ export class IDPActor {
     }
 
     if (this._actor === undefined) {
+      // Create our actor with a DelegationIdentity to avoid re-prompting auth
       const sessionKey = Ed25519KeyIdentity.generate();
       const tenMinutesInMsec = 10 * 1000 * 60;
       this._chain = await DelegationChain.create(
@@ -137,7 +138,7 @@ export class IDPActor {
     }
   };
 
-  lookup = (userId?: UserId) => {
+  lookup = async (userId?: UserId) => {
     console.log(userId);
     const preferredUser = userId || this.userId;
     if (preferredUser) return baseActor.lookup(preferredUser);
@@ -146,17 +147,23 @@ export class IDPActor {
     }
   };
 
-  get_delegation = async (userId: UserId, identity: WebAuthnIdentity) => {
-    const publicKey = Array.from(identity.getPublicKey().toDer());
-    console.log(`get_delegation(user_id = ${userId}, publicKey: ${publicKey}`);
-    const actor = await this.getActor();
-    return await actor.get_delegation(userId, publicKey);
+  requestDelegation = async (publicKey?: PublicKey) => {
+    const key = publicKey ?? this.publicKey;
+    if (!!this.userId && !!key) {
+      return await this._actor?.request_delegation(this.userId, key);
+    }
+    console.warn("Could not request delegation. User must authenticate first");
+    return null;
   };
-}
-declare global {
-  interface Window {
-    idp_actor: any;
-  }
+
+  getDelegation = async (publicKey?: PublicKey) => {
+    const key = publicKey ?? this.publicKey;
+    if (!!this.userId && !!key) {
+      return await this._actor?.get_delegation(this.userId, key);
+    }
+    console.warn("Could not get delegation. User must authenticate first");
+    return null;
+  };
 }
 
 const storedIdentity = localStorage.getItem("identity");

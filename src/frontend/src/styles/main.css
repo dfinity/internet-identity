@@ -73,10 +73,6 @@ label {
   margin-bottom: 1rem;
 }
 
-input {
-  height: fit-content;
-}
-
 main {
   max-width: 1080px;
   margin: auto;
