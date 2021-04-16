@@ -40,9 +40,7 @@ export class IDPActor {
       this.publicKey = Array.from(storedIdentity.getPublicKey().toDer());
       this.credentialId = storedIdentity.rawId
         ? [
-            Array.from(
-              new TextEncoder().encode(storedIdentity.rawId.toString())
-            ),
+            Array.from(storedIdentity.rawId)
           ]
         : [];
     }
@@ -134,8 +132,8 @@ export class IDPActor {
   };
 
   lookup = async (userId?: UserId) => {
-    console.log(userId);
     const preferredUser = userId ?? this.userId;
+    console.log(`lookup(${userId})`);
     if (preferredUser) return baseActor.lookup(preferredUser);
     else {
       throw new Error("no user was provided");
@@ -143,6 +141,7 @@ export class IDPActor {
   };
 
   requestDelegation = async (publicKey?: PublicKey) => {
+    console.log(`request_delegation()`);
     const key = publicKey ?? this.publicKey;
     if (!!this.userId && !!key) {
       return await this._actor?.request_delegation(this.userId, key);
@@ -153,6 +152,7 @@ export class IDPActor {
 
   getDelegation = async (publicKey?: PublicKey) => {
     const key = publicKey ?? this.publicKey;
+    console.log(`get_delegation(pubkey: ${key})`);
     if (!!this.userId && !!key) {
       return await this._actor?.get_delegation(this.userId, key);
     }
