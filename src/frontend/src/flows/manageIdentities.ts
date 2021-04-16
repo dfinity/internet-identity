@@ -13,9 +13,11 @@ export const initManageIdentities = () => {
   if (!idp_actor.userId) {
     // If we haven't established a userId, we need to authenticate.
     location.assign(location.href.replace("manage", "index"));
+    return;
   }
 
   checkForAddUserHash();
+  displayUserId(idp_actor.userId);
   renderIdentities();
 };
 
@@ -37,6 +39,13 @@ const checkForAddUserHash = async () => {
       renderIdentities();
     }
   }
+};
+
+const displayUserId = (userId: BigInt) => {
+  const userIdElem = document.getElementById("userIdSpan") as HTMLElement;
+  userIdElem.innerHTML = userId.toString();
+  const userIdSection = document.getElementById("userIdSection") as HTMLElement;
+  userIdSection.classList.remove("hidden");
 };
 
 const parseNewDeviceParam = (
