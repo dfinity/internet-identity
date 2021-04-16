@@ -57,6 +57,7 @@ const renderIdentities = async () => {
   identities.forEach((identity) => {
     const [alias, publicKey] = identity;
     const identityElement = document.createElement("li");
+    identityElement.className = "flex row justify-between";
     identityElement.innerHTML = identityListItem(alias);
     bindRemoveListener(identityElement, publicKey);
     list.appendChild(identityElement);
@@ -65,8 +66,24 @@ const renderIdentities = async () => {
   identityList.appendChild(list);
 };
 
-const bindRemoveListener = (listItem, publicKey) => {
-  listItem.querySelector("button").onclick = () => alert(publicKey);
+const bindRemoveListener = (listItem: HTMLElement, publicKey) => {
+  const button = listItem.querySelector("button") as HTMLButtonElement;
+  button.onclick = () => {
+    debugger;
+    // Make sure we're not removing our last identity
+    const identities = document.querySelectorAll("#identityList li");
 
-  // idp_actor.remove(publicKey);
+    if (identities.length <= 1) {
+      const shouldProceed = confirm(
+        "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
+      );
+      if (!shouldProceed) {
+        return;
+      }
+    }
+    // Otherwise, remove identity
+    idp_actor.remove(publicKey).then(() => {
+      listItem.parentElement?.removeChild(listItem);
+    });
+  };
 };

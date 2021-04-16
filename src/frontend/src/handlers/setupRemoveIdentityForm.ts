@@ -16,20 +16,20 @@ function setupRemoveIdentityForm(props) {
     const removeUser = form.querySelector("#removeUser") as HTMLInputElement;
 
     // Send values through actor
-    idp_actor
-      .remove(BigInt(removeUser.value))
-      .then((returnValue) => {
-        console.info("successfully removed identity", returnValue);
+    // idp_actor
+    //   .remove(BigInt(removeUser.value))
+    //   .then((returnValue) => {
+    //     console.info("successfully removed identity", returnValue);
 
-        // Clean up
-        resetForm(form);
-      })
-      .catch((err) => {
-        console.error(err);
-        submitButton.removeAttribute("disabled");
-      });
+    //     // Clean up
+    //     resetForm(form);
+    //   })
+    //   .catch((err) => {
+    //     console.error(err);
+    //     submitButton.removeAttribute("disabled");
+    //   });
 
-    return false;
+    // return false;
   };
 
   form.onsubmit = handleSubmit;
