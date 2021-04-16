@@ -10,7 +10,7 @@ import idp_actor from "../utils/idp_actor";
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
 
-  if (!idp_actor.userId) {
+  if (idp_actor.userId === undefined) {
     // If we haven't established a userId, we need to authenticate.
     location.assign(location.href.replace("manage", "index"));
     return;
@@ -29,12 +29,13 @@ const checkForAddUserHash = async () => {
   if (!!newDevice) {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
-      const { userId, rawId } = parsedParams;
+      const { userId, publicKey, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams);
       await idp_actor.add(
         BigInt(userId),
         prompt("What should we call this device?") ?? "anonymous device",
-        rawId.toString()
+        publicKey,
+        rawId
       );
       renderIdentities();
     }
@@ -48,21 +49,18 @@ const displayUserId = (userId: BigInt) => {
   userIdSection.classList.remove("hidden");
 };
 
-const parseNewDeviceParam = (
-  param: string
-): { userId: BigInt; publicKey: DerEncodedBlob; rawId: BinaryBlob } | null => {
+const parseNewDeviceParam = (param: string): { userId: bigint, publicKey: DerEncodedBlob, rawId?: BinaryBlob } | null => {
   const segments = param.split(";");
-  if (segments.length !== 3) {
+  if (!(segments.length === 2 || segments.length === 3)) {
     // TODO: Decent error handling
     console.error("This is not a valid pasted link");
-    return null;
+    return null
   }
   const userId = BigInt(segments[0]);
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
-  const rawId = blobFromHex(segments[2]);
-  return { userId, publicKey, rawId };
-};
-
+  const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
+  return { userId, publicKey, rawId }
+}
 const renderIdentities = async () => {
   const identityList = document.getElementById("identityList") as HTMLElement;
   identityList.innerHTML = ``;

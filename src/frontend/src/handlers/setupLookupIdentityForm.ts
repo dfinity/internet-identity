@@ -17,7 +17,7 @@ function setupLookupIdentityForm() {
 
     // Send values through actor
     idp_actor
-      .lookup(BigInt(lookupUser.value))
+      .lookup()
       .then((returnValue) => {
         console.info("successfully looked up identity", returnValue);
 
