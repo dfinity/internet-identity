@@ -273,8 +273,32 @@ fn init_assets() {
         let mut a = a.borrow_mut();
 
         a.insert(
-            "/sample-asset.txt".to_string(),
-            include_str!("../../frontend/assets/sample-asset.txt")
+            "/index.html".to_string(),
+            include_str!("../../../dist/index.html")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/authorize".to_string(),
+            include_str!("../../../dist/index.html")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/index.js".to_string(),
+            include_str!("../../../dist/index.js")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/manage.html".to_string(),
+            include_str!("../../../dist/manage.html")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
+            "/manage.js".to_string(),
+            include_str!("../../../dist/manage.js")
                 .as_bytes()
                 .into(),
         );

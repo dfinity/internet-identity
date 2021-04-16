@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Compile frontend assets to dist
+echo Compiling frontend assets
+npm run build
+
 set -euo pipefail
 
 IDP_DIR="$(dirname "$0")"

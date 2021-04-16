@@ -4,30 +4,36 @@
 
 ### Software
 
-* `dfx` version from the branch at https://github.com/dfinity/sdk/pull/1587.
+- `dfx` version from the branch at https://github.com/dfinity/sdk/pull/1587.
 
   The easiest way to run this is to just use
+
   ```
   ./dfx.sh
   ```
 
   One other easy way to fetch it built from the nix cache is to run
+
   ```
   nix-build -E '(import (builtins.fetchGit { url = "git@github.com:dfinity/sdk"; ref = "joachim/idp";}) {}).dfx.standalone' -o /tmp/idp-dfx
   ```
+
   and then run it as `/tmp/idp-dfx/bin/dfx`:
+
   ```
   /tmp/idp-dfx/bin/dfx --version
   dfx 0.7.0-beta.2.idp
   ```
+
   After upgrading it may help to run
+
   ```
   /tmp/idp-dfx/bin/dfx cache delete --help
   ```
 
-* Rust version 1.50
+- Rust version 1.50
 
-* NodeJS (with npm) version TBD
+- NodeJS (with npm) version TBD
 
 ## Running Locally
 
@@ -60,7 +66,7 @@ Mocking and stubbing is recommended for Unit tests, as long as you make sure the
 The fastest workflow to get the development environment running is to deploy once with
 
 ```bash
-npm install
+npm ci
 dfx start [--clean] [--background]
 dfx deploy
 ```
