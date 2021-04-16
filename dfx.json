@@ -17,6 +17,10 @@
     "local": {
       "bind": "127.0.0.1:8000",
       "type": "ephemeral"
+    },
+    "alpha": {
+      "providers": ["https://mercury.dfinity.network"],
+      "type": "persistent"
     }
   },
   "version": 1

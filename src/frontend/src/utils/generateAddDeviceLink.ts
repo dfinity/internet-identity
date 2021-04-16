@@ -14,8 +14,8 @@ export const generateAddDeviceLink = async (userId: bigint) => {
   const rawId = blobToHex(idp_actor.storedIdentity.rawId);
 
   // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
-  // const url = `https://auth0.ic.app/manage.html?device=${publicKey};${rawId}`;
+  // const url = `https://auth0.ic.app/manage?device=${publicKey};${rawId}`;
   return encodeURI(
-    `localhost:8080/manage.html#device=${userId};${publicKey};${rawId}`
+    `${location.host}/manage#device=${userId};${publicKey};${rawId}`
   );
 };

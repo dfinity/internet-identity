@@ -52,7 +52,7 @@ struct HeaderField {
 struct HttpRequest {
     method: String,
     url: String,
-    headers: Vec<HeaderField>,
+    headers: Vec<(String, String)>,
     body: Vec<u8>,
 }
 
@@ -279,6 +279,12 @@ fn init_assets() {
                 .into(),
         );
         a.insert(
+            "/".to_string(),
+            include_str!("../../../dist/index.html")
+                .as_bytes()
+                .into(),
+        );
+        a.insert(
             "/authorize".to_string(),
             include_str!("../../../dist/index.html")
                 .as_bytes()
@@ -291,7 +297,7 @@ fn init_assets() {
                 .into(),
         );
         a.insert(
-            "/manage.html".to_string(),
+            "/manage".to_string(),
             include_str!("../../../dist/manage.html")
                 .as_bytes()
                 .into(),
