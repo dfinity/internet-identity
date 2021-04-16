@@ -1,6 +1,7 @@
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
 import { reconnectUser } from "../utils/reconnectUser";
+import oauth from "../utils/oath";
 
 export const initExistingUser = () => {
   bindListeners();
@@ -51,7 +52,7 @@ const handleLoginClick = async () => {
   if (idp_actor.userId) {
     // Make the user reauthenticate
     await idp_actor.reconnect().then(() =>
-      window.location.assign("/manage.html")
+      postReconnect()
     );
   }
 
@@ -70,10 +71,19 @@ const handleReconnectClick = async () => {
     idp_actor.userId = userId;
     // Make the user reauthenticate
     await idp_actor.reconnect().then(() =>
-      window.location.assign("/manage.html")
+      postReconnect()
     );
+  } else {
+    console.error("Failed to login with that user #")
   }
-  console.error("Failed to login with that user #")
+}
+
+function postReconnect() {
+  if (window.location.href.match(/authorize/)) {
+    oauth();
+  } else {
+    window.location.assign("/manage.html");
+  }
 }
 
 const handleToggleDeviceClick = () => {

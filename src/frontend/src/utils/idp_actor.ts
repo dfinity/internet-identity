@@ -199,9 +199,8 @@ export class IDPActor {
     }
   };
 
-  requestDelegation = async (publicKey?: PublicKey) => {
-    console.log(`request_delegation()`);
-    const key = publicKey ?? this.publicKey;
+  requestDelegation = async () => {
+    const key = this.publicKey;
     console.log(`request_delegation(userId: ${this.userId}, pubkey: ${key})`);
     if (!!this.userId && !!key) {
       const actor = await this.getActor();
@@ -211,8 +210,8 @@ export class IDPActor {
     return null;
   };
 
-  getDelegation = async (publicKey?: PublicKey) => {
-    const key = publicKey ?? this.publicKey;
+  getDelegation = async () => {
+    const key = this.publicKey;
     console.log(`get_delegation(pubkey: ${key})`);
     if (!!this.userId && !!key) {
       const actor = await this.getActor();

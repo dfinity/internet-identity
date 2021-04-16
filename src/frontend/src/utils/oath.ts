@@ -173,9 +173,14 @@ async function generate_access_token(
   identity: WebAuthnIdentity,
   login_hint: string
 ) {
-  const res = await idp_actor.getDelegation();
+  let res = await idp_actor.getDelegation();
   if (!isDelegationResponse(res)) {
-    throw Error("got bad variant?");
+    console.log("Delegation not found. Explicitly requesting it.");
+    await idp_actor.requestDelegation();
+    res = await idp_actor.getDelegation();
+    if (!isDelegationResponse(res)) {
+      throw Error("Could not fetch delegation :(");
+    }
   }
 
   const { delegation } = res;
