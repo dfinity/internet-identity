@@ -173,7 +173,7 @@ async function generate_access_token(
   identity: WebAuthnIdentity,
   login_hint: string
 ) {
-  var res = await idp_actor.getDelegation();
+  let res = await idp_actor.getDelegation();
   if (!isDelegationResponse(res)) {
     console.log("Delegation not found. Explicitly requesting it.");
     await idp_actor.requestDelegation();
@@ -182,7 +182,6 @@ async function generate_access_token(
       throw Error("Could not fetch delegation :(");
     }
   }
-  prompt("got delegation");
 
   const { delegation } = res;
 
