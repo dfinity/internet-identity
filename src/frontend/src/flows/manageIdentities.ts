@@ -10,7 +10,7 @@ import idp_actor from "../utils/idp_actor";
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
 
-  if (!idp_actor.userId) {
+  if (idp_actor.userId === undefined) {
     // If we haven't established a userId, we need to authenticate.
     location.assign(location.href.replace("manage", "index"));
   }
