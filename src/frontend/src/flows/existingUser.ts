@@ -1,16 +1,9 @@
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
+import idp_actor from "../utils/idp_actor";
+import { reconnectUser } from "../utils/reconnectUser";
 
-let authenticationPollInterval;
 export const initExistingUser = () => {
   bindListeners();
-};
-
-const toggleDialog = () => {
-  const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
-  const isOpen = dialog.open;
-
-  if (isOpen) dialog.close();
-  else dialog.showModal();
 };
 
 const bindListeners = () => {
@@ -21,57 +14,59 @@ const bindListeners = () => {
   const closeDialog = document.getElementById(
     "closeDialog"
   ) as HTMLButtonElement;
-  const toggleReconnect = document.getElementById(
-    "toggleReconnect"
-  ) as HTMLButtonElement;
   const toggleAddDevice = document.getElementById(
     "toggleAddDevice"
   ) as HTMLButtonElement;
 
-  //   Hidden sections
-  const reconnectSection = document.getElementById(
-    "reconnectSection"
-  ) as HTMLElement;
-  const addDeviceLinkSection = document.getElementById(
-    "addDeviceLinkSection"
-  ) as HTMLElement;
+  dialogTrigger.onclick = handleLoginClick;
+  closeDialog.onclick = toggleDialog;
+  toggleAddDevice.onclick = handleToggleDeviceClick;
+};
 
+const toggleDialog = () => {
+  const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
+  if (idp_actor.userId && idp_actor.userId !== BigInt(1)) {
+    const userIdInput = document.getElementById(
+      "registerUserNumber"
+    ) as HTMLInputElement;
+    const userIdSection = document.getElementById(
+      "userIdSection"
+    ) as HTMLElement;
+    userIdInput.value = idp_actor.userId.toString();
+    userIdSection.classList.add("hidden");
+  }
+  const isOpen = dialog.open;
+
+  if (isOpen) dialog.close();
+  else dialog.showModal();
+};
+
+const handleLoginClick = async () => {
+  // Attempt to delegate without prompting a signature
+  reconnectUser(false);
+
+  // Otherwise, open dialog for fallback options
+  toggleDialog();
+};
+
+const handleToggleDeviceClick = () => {
   // Inputs
   const userIdInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
+  const addDeviceLinkSection = document.getElementById(
+    "addDeviceLinkSection"
+  ) as HTMLElement;
 
-  dialogTrigger.onclick = toggleDialog;
-  closeDialog.onclick = toggleDialog;
-  toggleReconnect.onclick = () => reconnectSection.classList.toggle("hidden");
-  toggleAddDevice.onclick = () => {
-    // TODO: Validation logic. Does it even make sense to treat userIds as numeric values on the frontend?
-    const userId = BigInt(userIdInput.value);
-    // Generate link to add a user with an authenticated browser
-    generateAddDeviceLink(userId).then(link => {
-      addDeviceLinkSection.classList.toggle("hidden");
+  const userId = BigInt(userIdInput.value);
 
-      const addDeviceLink = document.getElementById(
-        "addDeviceLink"
-      ) as HTMLInputElement;
-      addDeviceLink.value = link;
-    });
+  // Generate link to add a user with an authenticated browser
+  generateAddDeviceLink(userId).then((link) => {
+    addDeviceLinkSection.classList.toggle("hidden");
 
-    // Optional feature, not in current spec
-    // authenticationPollInterval
-    //   ? clearInterval(authenticationPollInterval)
-    //   : pollForAuthentication();
-  };
-};
-
-// Allows us to automatically redirect in the original browser
-const pollForAuthentication = () => {
-  authenticationPollInterval = setInterval(() => {
-    // TODO - poll for authentication from adding in other browser
-    Promise.reject()
-      .then(() => {
-        window.location.assign("/manage.html");
-      })
-      .catch(() => {});
-  }, 5000);
+    const addDeviceLink = document.getElementById(
+      "addDeviceLink"
+    ) as HTMLInputElement;
+    addDeviceLink.value = link;
+  });
 };

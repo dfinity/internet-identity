@@ -67,6 +67,8 @@
         </button>
         <section>
           <h2>Existing User</h2>
+        </section>
+        <section id="userIdSection">
           <p>We couldn't automatically log you in. Enter your saved User #</p>
           <fieldset>
             <label for="registerUserNumber">User #</label>
@@ -76,6 +78,8 @@
               name="registerUserNumber"
             />
           </fieldset>
+        </section>
+        <section>
           <p>
             If you have authenticated using this device before, you can attempt
             to re-authenticate by clicking Reconnect. Otherwise, click Link to
@@ -83,19 +87,11 @@
           </p>
           <div class="spacer"></div>
           <div class="row">
-            <button id="toggleReconnect" aria-controls="reconnectSection">
-              Reconnect
-            </button>
+            <button id="reconnectTrigger">Reconnect</button>
             <button id="toggleAddDevice" aria-controls="addDeviceLinkSection">
               Link
             </button>
           </div>
-        </section>
-        <section class="hidden" id="reconnectSection" aria-expanded="false">
-          <p>
-            Click this link to reauthenticate this device.
-          </p>
-          <button type="submit" id="reconnectTrigger">Reconnect</button>
         </section>
         <section class="hidden" id="addDeviceLinkSection" aria-expanded="false">
           <p>
