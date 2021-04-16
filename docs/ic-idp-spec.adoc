@@ -71,6 +71,7 @@ Different scopes in the first delegation are a possible post-launch features.
 +
 This delegation is scoped to the application canister whose frontend is initiating the OAUTH protocol, and has a lifetime of *TODO*.
 
+The frontend also manages a _frontend delegation_, delegating from the  device’s public key to a session key managed by the frontend, so that the frontend can interact with the backend without having to invoke the security device for each signature.
 
 == OAUTH protocol
 
@@ -252,17 +253,19 @@ All steps with 👆 are steps where the user presses the security device.
 1. The user accesses `/`
 2. The frontend notices that no `userid` is present in local storage, and asks the user if they want to register, login with existing device, login with new security device. User presses register.
 3. 👆 The frontend asks the security device to create a new public key. It generates a `WebAuthenicationIdentity` from that, and stores it as `identity`.
-4. The frontend configures the agent to use this identity for all further calls.
-5. The frontend asks the user for the device alias to use.
-6. 👆 The frontend calls `register()`, and stores the resulting user number as `userid`.
-7. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
-8. The frontend shows (or redirects to) the “logged in view”
+4. The frontend creates a session key.
+5. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key, and stores it as `frontend_delegation`.
+6. The frontend configures the agent to use the session key for all further update calls.
+7. The frontend asks the user for the device alias to use.
+8. The frontend calls `register()`, and stores the resulting user number as `userid`.
+9. The frontend queries `get_delegation()`, and stores the resulting delegation as `delegation`.
+10. The frontend redirects to `/manage`
 
 === Flow: Automatic relogin
 
 1. The user accesses `/`
 2. The frontend notices that `userid` is present.
-3. The frontend shows (or redirects to) the “logged in view”
+3. The frontend redirects to `/manage`
 
 Note: The security device is _not_ used here!
 
@@ -299,9 +302,7 @@ where
 
 6. On other device’s frontend: Extract `userid`, `publicKey` and `credentialid` from link
 7. The frontend asks the user for the device alias to use.
-8. 👆 On other device’s frontend:
-- If `identity` is present, continue to use that to sign the `add()` call.
-- If `identity` is not present, fetch all devices (as in “Flow: Manual relogin with existing device” and try to sign call to `add()` with that.
+8. 👆 On other device’s frontend, if `identity` is not present, reconnect (as in “Flow: Manual relogin with existing device”)
 9. On other device’s frontend: Call `add()` to add new device
 10. On other device’s frontend: Tell user to go back to first computer
 11. The frontend polls `lookup` to see when it has been authorized
