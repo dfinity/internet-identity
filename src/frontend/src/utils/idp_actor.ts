@@ -3,8 +3,8 @@ import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
-import _SERVICE, { UserId, Alias, PublicKey } from "../typings";
-import { tryLoadIdentity, authenticate } from "./handleAuthentication";
+import _SERVICE, { UserId, Alias, PublicKey, CredentialId} from "../typings";
+import { tryLoadIdentity, authenticate, authenticateFresh } from "./handleAuthentication";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -22,33 +22,43 @@ export class IDPActor {
   private _actor?: ActorSubclass<_SERVICE>;
   private _chain?: DelegationChain;
 
-  publicKey?: PublicKey;
-  credentialId?: [] | [number[]];
-
   static create(
-    storedIdentity?: WebAuthnIdentity,
     userId = BigInt(1)
   ): IDPActor {
-    return new this(storedIdentity, userId);
+    return new this(tryLoadIdentity(), userId);
   }
 
   protected constructor(
     public storedIdentity?: WebAuthnIdentity,
     public userId?: bigint
   ) {
-    if (storedIdentity) {
-      this.publicKey = Array.from(storedIdentity.getPublicKey().toDer());
-      this.credentialId = storedIdentity.rawId
-        ? [
-            Array.from(
-              new TextEncoder().encode(storedIdentity.rawId.toString())
-            ),
-          ]
-        : [];
+  }
+
+  public getPublicKey() : PublicKey {
+    if (this.storedIdentity) {
+      return Array.from(this.storedIdentity.getPublicKey().toDer());
+    } else {
+      throw new Error("getPublicKey: No stored identity found");
     }
   }
 
-  async getActor(anonymousOkay = false): Promise<ActorSubclass<_SERVICE>> {
+  public getCredentialId() : [] | [CredentialId] {
+    if (this.storedIdentity) {
+      return this.storedIdentity.rawId
+        ? [
+            Array.from(
+              new TextEncoder().encode(this.storedIdentity.rawId.toString())
+            ),
+          ]
+        : [];
+    } else {
+      throw new Error("getCredentialId: No stored identity found");
+    }
+  }
+
+  // Create a actor representing the backend using the stored identity
+  // fails if is not there yet
+  async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this._chain?.delegations || []) {
       // prettier-ignore
       if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
@@ -57,16 +67,9 @@ export class IDPActor {
         }
     }
 
-    const storedIdentity = this.storedIdentity;
+    const storedIdentity = tryLoadIdentity();
     if (storedIdentity === undefined) {
-      if (anonymousOkay) {
-        return Actor.createActor<_SERVICE>(idp_idl, {
-          agent: new HttpAgent(),
-          canisterId: idp_canister_id,
-        });
-      } else {
-        throw new Error("No identity were stored, but one is needed.");
-      }
+      throw new Error("No identity were stored, but one is needed.");
     }
 
     if (this._actor === undefined) {
@@ -99,14 +102,22 @@ export class IDPActor {
 
   register = async (alias: Alias) => {
 
-    const credentialId = this.credentialId ?? [];
+    // user wants to register fresh, so always create new identity
+    // also stores it in in the localStorage
+    this._actor = undefined;
+    this._chain = undefined;
 
-    const actor = await this.getActor(true);
-    console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
+    this.storedIdentity = await authenticateFresh();
+    console.log("this.storedIdentity", this.storedIdentity);
+
+    const credentialId = this.getCredentialId() ?? [];
+
+    const actor = await this.getActor();
+    console.log(`register(alias: ${alias}, publicKey: ${this.getPublicKey()}, credentialId: ${credentialId})`);
 
     const userId = await actor.register(
       alias,
-      this.publicKey as PublicKey,
+      this.getPublicKey() as PublicKey,
       credentialId
     );
     localStorage.setItem("userId", userId.toString());
@@ -143,7 +154,7 @@ export class IDPActor {
   };
 
   requestDelegation = async (publicKey?: PublicKey) => {
-    const key = publicKey ?? this.publicKey;
+    const key = publicKey ?? this.getPublicKey();
     if (!!this.userId && !!key) {
       return await this._actor?.request_delegation(this.userId, key);
     }
@@ -152,7 +163,7 @@ export class IDPActor {
   };
 
   getDelegation = async (publicKey?: PublicKey) => {
-    const key = publicKey ?? this.publicKey;
+    const key = publicKey ?? this.getPublicKey();
     if (!!this.userId && !!key) {
       return await this._actor?.get_delegation(this.userId, key);
     }
@@ -161,9 +172,8 @@ export class IDPActor {
   };
 }
 
-const storedIdentity = tryLoadIdentity();
 const savedUserId = localStorage.getItem("userId");
 const userId = savedUserId ? BigInt(savedUserId) : undefined;
-const idp_actor = IDPActor.create(storedIdentity, userId);
+const idp_actor = IDPActor.create(userId);
 
 export default idp_actor;
