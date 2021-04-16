@@ -15,20 +15,30 @@ export const initManageIdentities = () => {
     // If we haven't established a userId, we need to authenticate.
     location.assign(location.href.replace("manage", "index"));
   }
-  // Check URL if user has pasted in an Add Identity link
 
+  checkForAddUserHash();
+  renderIdentities();
+};
+
+const checkForAddUserHash = async () => {
+  // Check URL if user has pasted in an Add Identity link
   const url = new URL(document.URL);
-  const newDevice = url.searchParams.get("device");
-  if (newDevice !== null) {
+
+  const newDevice = url.hash?.split("device=")[1];
+  if (!!newDevice) {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
       const { userId, publicKey, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams);
-      // TODO: Prompt the user for an alias and let them add the new device to their
-      // existing identity
+      await idp_actor.add(
+        BigInt(userId),
+        prompt("What should we call this device?") ?? "anonymous device",
+        rawId.toString()
+      );
+
+      location.assign("/manage.html");
     }
   }
-  renderIdentities();
 };
 
 const parseNewDeviceParam = (

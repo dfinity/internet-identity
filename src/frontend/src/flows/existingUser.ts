@@ -6,24 +6,6 @@ export const initExistingUser = () => {
   bindListeners();
 };
 
-const toggleDialog = () => {
-  const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
-  if (idp_actor.userId) {
-    const userIdInput = document.getElementById(
-      "registerUserNumber"
-    ) as HTMLInputElement;
-    const userIdSection = document.getElementById(
-      "userIdSection"
-    ) as HTMLElement;
-    userIdInput.value = idp_actor.userId.toString();
-    userIdSection.classList.add("hidden");
-  }
-  const isOpen = dialog.open;
-
-  if (isOpen) dialog.close();
-  else dialog.showModal();
-};
-
 const bindListeners = () => {
   // Buttons
   const dialogTrigger = document.getElementById(
@@ -38,7 +20,25 @@ const bindListeners = () => {
 
   dialogTrigger.onclick = handleLoginClick;
   closeDialog.onclick = toggleDialog;
-  toggleAddDevice.onclick = () => handleToggleDeviceClick;
+  toggleAddDevice.onclick = handleToggleDeviceClick;
+};
+
+const toggleDialog = () => {
+  const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
+  if (idp_actor.userId && idp_actor.userId !== BigInt(1)) {
+    const userIdInput = document.getElementById(
+      "registerUserNumber"
+    ) as HTMLInputElement;
+    const userIdSection = document.getElementById(
+      "userIdSection"
+    ) as HTMLElement;
+    userIdInput.value = idp_actor.userId.toString();
+    userIdSection.classList.add("hidden");
+  }
+  const isOpen = dialog.open;
+
+  if (isOpen) dialog.close();
+  else dialog.showModal();
 };
 
 const handleLoginClick = async () => {
@@ -58,8 +58,8 @@ const handleToggleDeviceClick = () => {
     "addDeviceLinkSection"
   ) as HTMLElement;
 
-  // TODO: Validation logic. Does it even make sense to treat userIds as numeric values on the frontend?
   const userId = BigInt(userIdInput.value);
+
   // Generate link to add a user with an authenticated browser
   generateAddDeviceLink(userId).then((link) => {
     addDeviceLinkSection.classList.toggle("hidden");

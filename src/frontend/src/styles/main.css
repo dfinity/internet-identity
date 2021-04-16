@@ -126,6 +126,17 @@ dialog {
   padding-top: 3rem;
 }
 
+ul {
+  width: 100%;
+  padding: 0;
+}
+
+#addDeviceLink {
+  width: 100%;
+  padding: 1rem 0.25rem;
+  border-radius: 8px;
+}
+
 /* large screen break */
 @media (min-width: 1200px) {
   dialog {
@@ -137,9 +148,4 @@ dialog {
   label {
     flex-direction: row;
   }
-}
-
-ul {
-  width: 100%;
-  padding: 0;
 }
