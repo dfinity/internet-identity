@@ -8,23 +8,23 @@
 This document describes and specifies the Internet Identity from various angles and at various levels of abstraction, namely:
 
  * High level goals, requirements and use cases
- * Overview of the security and identity machinery, including the interplay of identities, keys, delegations etc.
- * Interface as used by client applications frontends, i.e. the OAUTH-based spec
- * The interface of the Internet Identity Service _backend_, i.e. describing its contract at the Candid layer, as used by its frontend
+ * Overview of the security and identity machinery, including the interplay of identities, keys, and delegations
+ * Interface as used by client applications frontends, i.e., the OAUTH-based spec
+ * The interface of the Internet Identity Service _backend_, i.e., describing its contract at the Candid layer, as used by its frontend
  * Important implementation notes about the Internet Identity Service backend
  * Internal implementation notes about the Internet Identity Service frontend
  * Notes about deployment
 
 The Internet Identity Service consists of
 
- * the backend, a canister on the IC. More precisely, on the NNS subnet with a _well-known_ canister id, and
- * its frontend, which is a web application served by the backend canister.
+ * the backend, a canister on the IC. More precisely, a canister on the NNS subnet with a _well-known_ canister id, and
+ * its frontend, a web application served by the backend canister.
 
-Similarly, the client applications consist of a frontend and (typically) canister backends. Only the frontend interacts with the Interenet Identity Service directly (via the OAUTH protocol described below).
+Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Interenet Identity Service directly (via the OAUTH protocol described below).
 
 == Goals, requirements and use cases
 
-The Internet Identity allows users to
+The Internet Identity service allows users to
 
  * maintain identities on the Internet Computer
  * log into these identity using one out of a set of security devices
@@ -32,11 +32,11 @@ The Internet Identity allows users to
 
 Some functional requirements are
 
- * users have separate identities per client applications (more precisely, per client application frontend hostname)
- * these identities are stable, even if the set of security devices changes
- * the client frontends interact with any canister on the Internet Computer under the user’s identity
- * no need ever to remember secret information (but possibly per-user non-secret information)
- * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time
+ * users have separate identities per client applications (more precisely, per client application frontend "hostname")
+ * these identities are stable, i.e., do not depend on a user's security devices 
+ * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
+ * users do not need ever to remember secret information (but possibly per-user non-secret information)
+ * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity 
 
 Some security requirements are
 
@@ -56,30 +56,32 @@ Some notworthy security assumptions are:
 
 == Identity design and data model
 
-A single canister with a well-known canister id (the _Internet Identity Canister ID_, in the following `ii_canister_id`) controls all user’s identities.
+A single canister with a well-known canister id (the _Internet Identity Canister ID_, in the following `ii_canister_id`) controls all users' identities.
 
-The Internet Computer serves this frontend under the nice host name `https://identity.ic0.app`.
+The Internet Computer serves this frontend under hostname `https://identity.ic0.app`.
 
 The canister maintains a secret salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer’s source of secure randomness.
 
-A user account is identified by the _user number_, a smallish natural number chosen by the canister.
+A user account is identified by a unique _user number_, a smallish natural number chosen by the canister.
 
-A client application frontend is identified by its hostname (e.g. `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`).
+A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet 
+Computer.
 
-A user has a separate _user identity_ for each client application frontend. This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
 H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host
 ....
 where `H` is SHA-256, `·` is concatenation, `|…|` is the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname.
 
-The Internet Identity Service Backend stores the following data in the user’s account, indexed by the user number:
+The Internet Identity Service Backend stores the following data in user accounts, indexed by the respective user number:
 
 * a set of _device information_, consisting of
 - the device’s public key (DER-encoded)
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-When a client application frontend wants to log in as the user, it uses a _session key_ (e.g. Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+(Comment Jan: the following three paragraphs require more explanation)
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity. 
 
 The delegation chain consits of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
@@ -90,17 +92,18 @@ The Internet Identity Service Frontend also manages a _identity frontend delegat
 
 This section describes the Internet Identity Service from the point of view of a client appliation frontend (a.k.a. the relaying party).
 
-The client application frontend creates a session key (e.g. Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
+The client application frontend creates a session key (e.g., Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
 
   https://identity.ic0.app/authorize?…
 
 with URL parameters as specified by the OAUTH protocol. Of particular interest is the parameter
 
-* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key.
+* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key. 
+(Comment Jan: a session key is a symmetric key, thus the public key of the session key does not make sense, please clarify)
 
 * the `redirect_uri`, the hostname of which is used to identify the client application frontend’s hostname.
 
-If the Internet Identity Service Frontend can authorize this request, the url parameters on the callback (i.e. the provided `redirect_uri`) contain in particular
+If the Internet Identity Service Frontend can authorize this request, the url parameters on the callback (i.e., the provided `redirect_uri`) contain in particular
 
 * the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain in the following format
 +
