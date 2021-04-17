@@ -32,18 +32,13 @@ const aliases = Object.entries(dfxJson.canisters).reduce(
  * Generate a webpack configuration for a canister.
  */
 function generateWebpackConfigForCanister(name, info) {
-  if (typeof info.frontend !== "object") {
-    return;
-  }
   const devtool =
     process.env.NODE_ENV === "production" ? undefined : "source-map";
 
   return {
     mode: process.env.NODE_ENV === "production" ? "production" : "development",
     entry: {
-      // The frontend.entrypoint points to the HTML file for this build, so we need
-      // to replace the extension to `.js`.
-      index: path.join(__dirname, info.frontend.entrypoint),
+      index: path.join(__dirname, "src", "frontend", "src", "index"),
       manage: path.join(__dirname, "src", "frontend", "src", "manage"),
     },
     devtool,

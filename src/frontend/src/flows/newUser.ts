@@ -6,7 +6,7 @@ export const initNewUser = () => {
     if (window.location.href.match(/authorize/)) {
       oauth();
     } else {
-      window.location.assign("/manage.html");
+      window.location.assign("/manage");
     }
   });
 };
