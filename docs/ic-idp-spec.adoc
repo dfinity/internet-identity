@@ -92,14 +92,13 @@ The Internet Identity Service Frontend also manages a _identity frontend delegat
 
 This section describes the Internet Identity Service from the point of view of a client appliation frontend (a.k.a. the relaying party).
 
-The client application frontend creates a session key (e.g., Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
+The client application frontend creates a session key pair (e.g., Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
 
   https://identity.ic0.app/authorize?…
 
 with URL parameters as specified by the OAUTH protocol. Of particular interest is the parameter
 
 * the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key. 
-(Comment Jan: a session key is a symmetric key, thus the public key of the session key does not make sense, please clarify)
 
 * the `redirect_uri`, the hostname of which is used to identify the client application frontend’s hostname.
 
