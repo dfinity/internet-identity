@@ -154,7 +154,7 @@ type Timestamp = nat64;
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
-  credentialId : opt CredentialId;
+  credential_id : opt CredentialId;
 };
 
 type Delegation = record {
@@ -167,7 +167,7 @@ type SignedDelegation = record {
   signature: blob;
 };
 type GetDelegationResponse = variant {
-  chain: vec SignedDelegation;
+  signed_delegation: SignedDelegation;
   no_such_delegation;
 };
 
@@ -233,7 +233,7 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments actually fetches the delegation.
 
-Together with the `UserKey` returned by `prepare_delegation`, the result of this method matches the the content of the `accessToken` in the <<oauth,OAUTH flow>>.
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to form the `accessToken` in the <<oauth,OAUTH flow>>.
 
 *Authorization*: Anyone can call this
 
