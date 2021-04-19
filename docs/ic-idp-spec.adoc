@@ -166,12 +166,8 @@ type SignedDelegation = record {
   delegation: Delegation;
   signature: blob;
 };
-type DelegationChain = record {
-  delegations : vec SignedDelegation;
-  publicKey : UserKey;
-};
 type GetDelegationResponse = variant {
-  chain: DelegationChain;
+  chain: vec SignedDelegation;
   no_such_delegation;
 };
 
@@ -181,7 +177,7 @@ service : {
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> ();
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey);
   get_delegation: (UserNumber, FrontendHostname, SessionKey) -> (GetDelegationResponse) query;
 }
 ....
@@ -224,7 +220,11 @@ Fetches all data associated with a user.
 
 === The `prepare_delegation` method
 
-The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given user number and Client Application Frontend Hostname to the given session key. The actual delegation can be fetched using `get_delegation` immediately afterwards.
+The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given user number and Client Application Frontend Hostname to the given session key.
+
+This method returns the user’s identity that’s associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_delegation` query, we prevent attacks that trick the user into using a wrong identity.
+
+The actual delegation can be fetched using `get_delegation` immediately afterwards.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
@@ -233,7 +233,7 @@ The `prepare_delegation` method causes the Internet Identity Service backend to 
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments actually fetches the delegation.
 
-The `DelegationChain` type matches the content of the `accessToken` in the <<oauth,OAUTH flow>>.
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method matches the the content of the `accessToken` in the <<oauth,OAUTH flow>>.
 
 *Authorization*: Anyone can call this
 
