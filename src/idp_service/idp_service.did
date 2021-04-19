@@ -1,37 +1,54 @@
-type UserId = nat64;
-type CredentialId = blob;
-type Alias = text;
-type Timestamp = nat64;
+type UserNumber = nat64;
 type PublicKey = blob;
+type CredentialId = blob;
+type DeviceKey = PublicKey;
+type UserKey = PublicKey;
+type SessionKey = PublicKey;
+type FrontendHostname = text;
+type Timestamp = nat64;
+
 type HeaderField = record { text; text; };
+
 type HttpRequest = record {
   method: text;
   url: text;
   headers: vec HeaderField;
   body: blob;
 };
+
 type HttpResponse = record {
   status_code: nat16;
   headers: vec HeaderField;
   body: blob;
   streaming_strategy: opt StreamingStrategy;
 };
+
 type StreamingCallbackHttpResponse = record {
   body: blob;
   token: opt Token;
 };
+
 type Token = record {};
+
 type StreamingStrategy = variant {
   Callback: record {
     callback: func (Token) -> (StreamingCallbackHttpResponse) query;
     token: Token;
   };
 };
+
+type DeviceData = record {
+  pubkey : DeviceKey;
+  alias : text;
+  credential_id : opt CredentialId;
+};
+
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
   targets: opt vec principal;
 };
+
 type SignedDelegation = record {
   delegation: Delegation;
   signature: blob;
@@ -39,19 +56,22 @@ type SignedDelegation = record {
 
 type GetDelegationResponse = variant {
   // The signed delegation was successfully retrieved.
-  delegation: SignedDelegation;
+  signed_delegation: SignedDelegation;
 
   // The signature is not readily available and must be explicitly requested
   // by calling request_delegation() method with the same arguments.
-  request_delegation_explicitly
+  no_such_delegation
 };
 
 service : {
-  register : (Alias, PublicKey, opt CredentialId) -> (UserId);
-  add : (UserId, Alias, PublicKey, opt CredentialId) -> ();
-  request_delegation : (UserId, PublicKey) -> ();
-  remove : (UserId, PublicKey) -> ();
-  lookup : (UserId) -> (vec record {Alias; PublicKey; Timestamp; opt CredentialId}) query;
+  register : (DeviceData) -> (UserNumber);
+  add : (UserNumber, DeviceData) -> ();
+  request_delegation : (UserNumber, PublicKey) -> ();
+  remove : (UserNumber, DeviceKey) -> ();
+  lookup : (UserNumber) -> (vec DeviceData) query;
+
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey);
+  get_delegation: (UserNumber, FrontendHostname, SessionKey) -> (GetDelegationResponse) query;
+
   http_request: (request: HttpRequest) -> (HttpResponse) query;
-  get_delegation: (UserId, PublicKey) -> (GetDelegationResponse) query;
 }
