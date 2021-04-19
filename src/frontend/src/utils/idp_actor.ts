@@ -3,7 +3,7 @@ import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
-import _SERVICE, { UserId, Alias, PublicKey, CredentialId } from "../typings";
+import _SERVICE, { PublicKey, CredentialId, UserNumber } from "../typings";
 import { tryLoadIdentity, authenticate, authenticateFresh, persistIdentity } from "./handleAuthentication";
 import {
   DelegationChain,
@@ -31,12 +31,12 @@ export class IDPActor {
   ) {
   }
 
-  public get userId(): UserId | undefined {
+  public get userId(): UserNumber | undefined {
     const userId = localStorage.getItem("userId");
     return userId ? BigInt(userId) : undefined;
   }
 
-  public set userId(userId : UserId | undefined) {
+  public set userId(userId: UserNumber | undefined) {
     if (userId !== undefined) {
       localStorage.setItem("userId", userId.toString())
     } else {
@@ -113,14 +113,14 @@ export class IDPActor {
 
     const identities = await baseActor.lookup(this.userId!!)
     for (const row of identities) {
-      const [alias, publicKey, expiry, credentialId] = row;
+      const { credential_id: credentialId, pubkey } = row;
       if (credentialId.length === 0) {
         continue;
       }
 
       console.log('row', row)
       // Strip DER header
-      const strippedKey = publicKey.slice(19);
+      const strippedKey = pubkey.slice(19);
       const identity = WebAuthnIdentity.fromJSON(JSON.stringify({
         rawId: blobToHex(blobFromUint8Array(Buffer.from(credentialId[0]))),
         publicKey: blobToHex(blobFromUint8Array(Buffer.from(strippedKey)))
@@ -149,7 +149,7 @@ export class IDPActor {
     throw Error("Couldn't find a registered device match")
   }
 
-  register = async (alias: Alias) => {
+  register = async (alias: string) => {
     // user wants to register fresh, so always create new identity
     // also stores it in in the localStorage
     this._actor = undefined;
@@ -165,22 +165,22 @@ export class IDPActor {
 
     console.log(`register(alias: ${alias}, pubkey: ${this.publicKey}, credentialId: ${credentialId})`);
 
-    const userId = await actor.register(
+    const userId = await actor.register({
       alias,
-      this.publicKey as PublicKey,
-      credentialId
+      pubkey: this.publicKey as PublicKey,
+      credential_id: credentialId
+    }
     );
     this.userId = userId
   };
 
-  add = async (userId: UserId, alias: Alias, newPublicKey: DerEncodedBlob, credentialId?: BinaryBlob) => {
+  add = async (userId: UserNumber, alias: string, newPublicKey: DerEncodedBlob, credentialId?: BinaryBlob) => {
     const actor = await this.getActor();
-    return await actor.add(
-      userId,
+    return await actor.add(userId, {
       alias,
-      Array.from(newPublicKey),
-      credentialId ? [Array.from(credentialId)] : []
-    );
+      pubkey: Array.from(newPublicKey),
+      credential_id: credentialId ? [Array.from(credentialId)] : []
+    });
   };
 
   remove = async (publicKey: PublicKey) => {
