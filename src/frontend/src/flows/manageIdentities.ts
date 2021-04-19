@@ -70,11 +70,10 @@ const renderIdentities = async () => {
   const list = document.createElement("ul");
 
   identities.forEach((identity) => {
-    const [alias, publicKey] = identity;
     const identityElement = document.createElement("li");
     identityElement.className = "flex row justify-between";
-    identityElement.innerHTML = identityListItem(alias);
-    bindRemoveListener(identityElement, publicKey);
+    identityElement.innerHTML = identityListItem(identity.alias);
+    bindRemoveListener(identityElement, identity.pubkey);
     list.appendChild(identityElement);
   });
 
