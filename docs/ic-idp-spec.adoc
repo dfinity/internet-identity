@@ -69,7 +69,7 @@ Computer.
 
 A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
-H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host
+H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 ....
 where `H` is SHA-256, `·` is concatenation, `|…|` is the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname.
 
