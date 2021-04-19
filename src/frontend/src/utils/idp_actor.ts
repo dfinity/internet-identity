@@ -163,8 +163,6 @@ export class IDPActor {
     const actor = await this.getActor();
     console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
 
-    console.log(`register(alias: ${alias}, pubkey: ${this.publicKey}, credentialId: ${credentialId})`);
-
     const userId = await actor.register({
       alias,
       pubkey: this.publicKey as PublicKey,
@@ -172,6 +170,7 @@ export class IDPActor {
     }
     );
     this.userId = userId
+    return userId;
   };
 
   add = async (userId: UserNumber, alias: string, newPublicKey: DerEncodedBlob, credentialId?: BinaryBlob) => {
