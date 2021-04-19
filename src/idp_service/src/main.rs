@@ -1,12 +1,12 @@
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
-use ic_cdk::storage::{stable_restore, stable_save};
-use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk_macros::{init, post_upgrade, query, update};
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use storage::Storage;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 600_000_000_000;
@@ -22,7 +22,7 @@ type Timestamp = u64;
 type Signature = Vec<u8>;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct DeviceData {
+pub struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
@@ -50,6 +50,7 @@ enum GetDelegationResponse {
 }
 
 mod hash;
+mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HeaderField {
@@ -88,16 +89,14 @@ struct StreamingCallbackHttpResponse {
 }
 
 struct State {
-    next_user_number: Cell<UserNumber>,
-    map: RefCell<HashMap<UserNumber, Vec<DeviceData>>>,
+    storage: RefCell<Storage>,
     sigs: RefCell<SignatureMap>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            next_user_number: Cell::new(10000),
-            map: RefCell::new(HashMap::default()),
+            storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
         }
     }
@@ -121,11 +120,11 @@ fn register(device_data: DeviceData) -> UserNumber {
             ));
         }
 
-        let mut m = s.map.borrow_mut();
-        let user_number = s.next_user_number.get();
-        s.next_user_number.replace(user_number + 1);
-
-        m.insert(user_number, vec![(device_data)]);
+        let mut store = s.storage.borrow_mut();
+        let user_number = store.allocate_user_number();
+        store
+            .write_device_data(user_number, vec![device_data])
+            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
 
         user_number
     })
@@ -138,28 +137,44 @@ fn add(user_number: UserNumber, device_data: DeviceData) {
     check_entry_limits(&device_data);
 
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if let Some(entries) = m.get_mut(&user_number) {
-            trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-
-            for e in entries.iter_mut() {
-                if e.pubkey == device_data.pubkey {
-                    trap("Device already added.");
-                }
-            }
-
-            if entries.len() >= MAX_ENTRIES_PER_USER {
+        let mut entries = s
+            .storage
+            .borrow()
+            .read_device_data(user_number)
+            .unwrap_or_else(|err| {
                 trap(&format!(
-                    "at most {} authentication information entries are allowed per user",
-                    MAX_ENTRIES_PER_USER,
-                ));
-            }
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
 
-            entries.push(device_data);
-            prune_expired_signatures(&mut s.sigs.borrow_mut());
-        } else {
-            trap(&format!("User {} is not registered yet", user_number));
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        for e in entries.iter_mut() {
+            if e.pubkey == device_data.pubkey {
+                trap("Device already added.");
+            }
         }
+
+        if entries.len() >= MAX_ENTRIES_PER_USER {
+            trap(&format!(
+                "at most {} authentication information entries are allowed per user",
+                MAX_ENTRIES_PER_USER,
+            ));
+        }
+
+        entries.push(device_data);
+        s.storage
+            .borrow()
+            .write_device_data(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to write device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
     })
 }
 
@@ -168,28 +183,41 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
     STATE.with(|s| {
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
-        let mut remove_user = false;
-        if let Some(entries) = s.map.borrow_mut().get_mut(&user_number) {
-            trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        let mut entries = s
+            .storage
+            .borrow()
+            .read_device_data(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
 
-            if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
-                entries.swap_remove(i as usize);
-                remove_user = entries.is_empty();
-            }
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
+            entries.swap_remove(i as usize);
         }
-        if remove_user {
-            s.map.borrow_mut().remove(&user_number);
-        }
+
+        s.storage
+            .borrow()
+            .write_device_data(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to persist device data of user {}: {}",
+                    user_number, err
+                ))
+            });
     })
 }
 
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     STATE.with(|s| {
-        s.map
+        s.storage
             .borrow()
-            .get(&user_number)
-            .cloned()
+            .read_device_data(user_number)
             .unwrap_or_default()
     })
 }
@@ -201,23 +229,29 @@ fn prepare_delegation(
     session_key: SessionKey,
 ) -> (UserKey, Timestamp) {
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if let Some(entries) = m.get_mut(&user_number) {
-            trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        let entries = s
+            .storage
+            .borrow()
+            .read_device_data(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
 
-            check_frontend_length(&frontend);
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-            let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+        check_frontend_length(&frontend);
 
-            let seed = calculate_seed(user_number, &frontend);
-            let mut sigs = s.sigs.borrow_mut();
-            add_signature(&mut sigs, session_key, seed, expiration);
-            prune_expired_signatures(&mut sigs);
+        let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
 
-            (der_encode_canister_sig_key(seed.to_vec()), expiration)
-        } else {
-            trap(&format!("User number {} not found", user_number));
-        }
+        let seed = calculate_seed(user_number, &frontend);
+        let mut sigs = s.sigs.borrow_mut();
+        add_signature(&mut sigs, session_key, seed, expiration);
+        prune_expired_signatures(&mut sigs);
+
+        (der_encode_canister_sig_key(seed.to_vec()), expiration)
     })
 }
 
@@ -305,43 +339,25 @@ fn init_assets() {
 
 #[init]
 fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+    STATE.with(|state| {
+        state.storage.borrow().flush();
+        update_root_hash(&state.sigs.borrow());
+    });
     init_assets();
-}
-
-#[pre_upgrade]
-fn persist_data() {
-    STATE.with(|s| {
-        let map = s.map.replace(Default::default());
-        if let Err(err) = stable_save((map, s.next_user_number.get())) {
-            ic_cdk::trap(&format!(
-                "An error occurred while saving data to stable memory: {}",
-                err
-            ));
-        }
-    })
 }
 
 #[post_upgrade]
 fn retrieve_data() {
     init_assets();
-    match stable_restore::<(HashMap<UserNumber, Vec<DeviceData>>, UserNumber)>() {
-        Ok((map, user_number)) => {
-            STATE.with(|s| {
-                // Restore user map.
-                s.map.replace(map);
-                s.next_user_number.replace(user_number);
-
-                // We drop all the signatures on upgrade, users will
-                // re-request them if needed.
-                update_root_hash(&s.sigs.borrow());
-            });
+    STATE.with(|s| {
+        if let Some(storage) = Storage::from_stable_memory() {
+            s.storage.replace(storage);
         }
-        Err(err) => ic_cdk::trap(&format!(
-            "An error occurred while retrieving data from stable memory: {}",
-            err
-        )),
-    }
+
+        // We drop all the signatures on upgrade, users will
+        // re-request them if needed.
+        update_root_hash(&s.sigs.borrow());
+    });
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
