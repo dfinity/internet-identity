@@ -243,11 +243,56 @@ Together with the `UserKey` returned by `prepare_delegation`, the result of this
 
 This section, which is to be expanded, describes interesting design choices about the internals of the Internet Identity Service Canister. In particular
 
-* Internal data model and data structures used
+=== Internal data model and data structures used
 
-* Approach to upgrades
+The primary data structure used by the backend is a map from user number to the list of user devices.
+Device lists are stored directly in canister stable memory.
+The total amount of storage for is limited to 510 bytes per user.
+With the stable memory size of 4GiB we can store around 8 * 10^6 user records in a single canister.
 
-* Logic for signature/certified variable caching
+==== Stable memory layout
+
+All the integers (u64, u32, u16) are encoded in Little-Endian.
+....
+Storage ::= {
+  Header
+  UserRecords
+}
+
+Header ::= {
+  magic : u8[3] = "IIC"
+  version : u8 = 1
+  number_of_user_records : u32
+  user_number_range_lo : u64
+  user_number_range_hi : u64
+  padding : u8[488]
+}
+
+UserRecords ::= UserRecord*
+
+UserRecord ::= {
+  size : u16
+  candid_bytes: u8[510]
+}
+....
+
+User record for user number N is stored at offset `sizeof(Header) + (N - user_number_range_lo) * sizeof(UserRecord)`.
+Each record consists of a 16 bit `size` ∈ [0..510] followed by `size` bytes of Candid-serialized list of devices.
+
+....
+type UserDeviceList = vec(record {
+  pubkey : DeviceKey;
+  alias : text;
+  credential_id : opt CredentialId;
+});
+....
+
+=== Approach to upgrades
+
+We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly.
+The signature map is simply dropped on upgrade, so users will have to re-request their delegations.
+
+=== Logic for signature/certified variable caching
 
 
 == The Internet Identity Service frontend
