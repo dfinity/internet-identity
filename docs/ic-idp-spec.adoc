@@ -33,10 +33,10 @@ The Internet Identity service allows users to
 Some functional requirements are
 
  * users have separate identities per client applications (more precisely, per client application frontend "hostname")
- * these identities are stable, i.e., do not depend on a user's security devices 
+ * these identities are stable, i.e., do not depend on a user's security devices
  * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
  * users do not need ever to remember secret information (but possibly per-user non-secret information)
- * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity 
+ * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
 
 Some security requirements are
 
@@ -64,7 +64,7 @@ The canister maintains a secret salt (in the following the `salt`), a 32 byte lo
 
 A user account is identified by a unique _user number_, a smallish natural number chosen by the canister.
 
-A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet 
+A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
 Computer.
 
 A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
@@ -81,7 +81,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
 (Comment Jan: the following three paragraphs require more explanation)
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity. 
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
 The delegation chain consits of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
@@ -98,7 +98,7 @@ The client application frontend creates a session key pair (e.g., Ed25519). It t
 
 with URL parameters as specified by the OAUTH protocol. Of particular interest is the parameter
 
-* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key. 
+* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key.
 
 * the `redirect_uri`, the hostname of which is used to identify the client application frontend’s hostname.
 
@@ -149,12 +149,13 @@ type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = text;
+type Timestamp = nat64;
 
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
   credentialId : CredentialId;
-}
+};
 
 type Delegation = record {
   pubkey: SessionKey;
@@ -171,7 +172,7 @@ type DelegationChain = record {
 };
 type GetDelegationResponse = variant {
   chain: DelegationChain;
-  request_delegation_explicitly;
+  no_such_delegation;
 };
 
 service : {
