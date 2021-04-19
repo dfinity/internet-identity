@@ -237,6 +237,8 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 match key.cmp((*root).key.as_ref()) {
                     Equal => {
                         f(&mut (*root).value);
+                        let value_hash = (*root).value.root_hash();
+                        (*root).data_hash = labeled_hash((*root).key.as_ref(), &value_hash);
                         (*root).subtree_hash = Node::subtree_hash(root);
                         return;
                     }
