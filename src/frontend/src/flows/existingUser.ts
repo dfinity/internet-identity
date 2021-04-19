@@ -1,6 +1,5 @@
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
-import { reconnectUser } from "../utils/reconnectUser";
 import oauth from "../utils/oath";
 
 export const initExistingUser = () => {

@@ -3,7 +3,7 @@ import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
-import _SERVICE, { PublicKey, CredentialId, UserNumber } from "../typings";
+import _SERVICE, { PublicKey, SessionKey, CredentialId, UserNumber, FrontendHostname, Timestamp } from "../typings";
 import { tryLoadIdentity, authenticate, authenticateFresh, persistIdentity } from "./handleAuthentication";
 import {
   DelegationChain,
@@ -199,23 +199,21 @@ export class IDPActor {
     }
   };
 
-  requestDelegation = async () => {
-    const key = this.publicKey;
-    console.log(`request_delegation(userId: ${this.userId}, pubkey: ${key})`);
-    if (!!this.userId && !!key) {
+  prepareDelegation = async (hostname: FrontendHostname, sessionKey: SessionKey) => {
+    console.log(`prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`);
+    if (!!this.userId) {
       const actor = await this.getActor();
-      return await actor.request_delegation(this.userId, key);
+      return await actor.prepare_delegation(this.userId, hostname, sessionKey);
     }
-    console.warn("Could not request delegation. User must authenticate first");
+    console.warn("Could not prepare delegation. User must authenticate first");
     return null;
   };
 
-  getDelegation = async () => {
-    const key = this.publicKey;
-    console.log(`get_delegation(pubkey: ${key})`);
-    if (!!this.userId && !!key) {
+  getDelegation = async (hostname: FrontendHostname, sessionKey: SessionKey, timestamp: Timestamp) => {
+    console.log(`get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`);
+    if (!!this.userId) {
       const actor = await this.getActor();
-      return await actor.get_delegation(this.userId, key);
+      return await actor.get_delegation(this.userId, hostname, sessionKey, timestamp);
     }
     console.warn("Could not get delegation. User must authenticate first");
     return null;
