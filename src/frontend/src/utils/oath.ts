@@ -185,8 +185,16 @@ async function generate_access_token(
   }
   const { signed_delegation } = getRes;
 
+  const signed_delegation2 = {
+    delegation: new Delegation(
+      blobFromUint8Array(Uint8Array.from(signed_delegation.delegation.pubkey)),
+      BigInt(signed_delegation.delegation.expiration)
+    ),
+    signature: blobFromUint8Array(Uint8Array.from(signed_delegation.signature)),
+  };
+
   const chain = DelegationChain.fromDelegations(
-    [signed_delegation],
+    [signed_delegation2],
     derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
   );
 
