@@ -513,7 +513,7 @@ fn check_entry_limits(device_data: &DeviceData) {
 }
 
 fn check_frontend_length(frontend: &FrontendHostname) {
-    const FRONTEND_HOSTNAME_LIMIT: usize = 256;
+    const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 
     let n = frontend.len();
     if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
