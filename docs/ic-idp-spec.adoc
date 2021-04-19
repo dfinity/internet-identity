@@ -27,12 +27,12 @@ Similarly, the client applications consist of a frontend (served by a canister) 
 The Internet Identity service allows users to
 
  * maintain identities on the Internet Computer
- * log into these identity using one out of a set of security devices
+ * log into these identities using one out of a set of security devices
  * manage this set of security devices
 
 Some functional requirements are
 
- * users have separate identities per client applications (more precisely, per client application frontend "hostname")
+ * users have separate identities per client application (more precisely, per client application frontend "hostname")
  * these identities are stable, i.e., do not depend on a user's security devices
  * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
  * users do not need ever to remember secret information (but possibly per-user non-secret information)
@@ -43,7 +43,7 @@ Some security requirements are
 * The separate identities of a single user cannot be related merely based on their public key or principal ids, to impede user tracking.
 * (many more, of course; apply common sense)
 
-Some notworthy security assumptions are:
+Some noteworthy security assumptions are:
 
 * The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
 
