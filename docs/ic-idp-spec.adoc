@@ -250,7 +250,7 @@ With the stable memory size of 4GiB we can store around 8 * 10^6 user records in
 
 ==== Stable memory layout
 
-All the integers (u64, u32, u16) are encoded in Big-Endian.
+All the integers (u64, u32, u16) are encoded in Little-Endian.
 ....
 Storage ::= {
   Header
@@ -259,7 +259,7 @@ Storage ::= {
 
 Header ::= {
   magic : u8[3] = "IIC"
-  version : u8
+  version : u8 = 1
   number_of_user_records : u32
   user_number_range_lo : u64
   user_number_range_hi : u64
@@ -274,14 +274,14 @@ UserRecord ::= {
 }
 ....
 
-User record for user number N is stored at offset `sizeof(Header) + N - user_number_range_lo`.
+User record for user number N is stored at offset `sizeof(Header) + (N - user_number_range_lo) * sizeof(UserRecord)`.
 Each record consists of a 16 bit `size` ∈ [0..510] followed by `size` bytes of Candid-serialized list of devices.
 
 ....
 type UserDeviceList = vec(record {
   pubkey : DeviceKey;
   alias : text;
-  credentialId : opt CredentialId;
+  credential_id : opt CredentialId;
 });
 ....
 
