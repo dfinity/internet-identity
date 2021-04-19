@@ -381,7 +381,7 @@ This flow is the boring default
 3. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
 4. The frontend calls `prepare_delegation()` with the client application frontend hostname and client application provided session key.
 5. The frontend queries `get_delegation()` to get the delegation data
-6. It converts it into the format of the `accessToken` and redirects the user to back to the relaying party, as required by the oauth protocol
+6. It converts it into the format of the `accessToken` and redirects the user back to the relaying party, as required by the oauth protocol
 
 === Flow: Deleting devices
 
