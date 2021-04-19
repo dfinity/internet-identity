@@ -79,7 +79,10 @@ function postReconnect() {
   }
 }
 
+let loginInterval: number;
+
 const handleToggleDeviceClick = () => {
+  clearInterval(loginInterval);
   // Inputs
   const userIdInput = document.getElementById(
     "registerUserNumber"
@@ -92,11 +95,22 @@ const handleToggleDeviceClick = () => {
 
   // Generate link to add a user with an authenticated browser
   generateAddDeviceLink(userId).then((link) => {
+    idp_actor.userId = userId;
+    localStorage.setItem("userId", userId.toString());
     addDeviceLinkSection.classList.toggle("hidden");
 
     const addDeviceLink = document.getElementById(
       "addDeviceLink"
     ) as HTMLInputElement;
     addDeviceLink.value = link;
+
+    loginInterval = window.setInterval(async () => {
+      console.log("checking if authenticated");
+      try {
+        await idp_actor.reconnect().then(() => postReconnect());
+      } catch (error) {
+        console.error(error);
+      }
+    }, 2500);
   });
 };
