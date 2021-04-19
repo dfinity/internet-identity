@@ -107,11 +107,12 @@ export default function () {
       const identity = localStorage.getItem("identity");
       if (identity !== null) {
         // does the user consent?
-        if (checkConsent(params?.scope)) {
+        const hostname = new URL(params.redirect_uri).hostname as FrontendHostname;
+        if (checkConsent(hostname)) {
           generate_access_token(
             WebAuthnIdentity.fromJSON(identity),
             params.login_hint,
-            params.redirect_uri
+            hostname,
           ).then((access_token: string) => {
             redirectToApp(params.redirect_uri, {
               access_token: access_token,
@@ -166,9 +167,8 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 async function generate_access_token(
   identity: WebAuthnIdentity,
   login_hint: string,
-  redirect_uri: string,
+  hostname: FrontendHostname,
 ) {
-  const hostname = redirect_uri as FrontendHostname;
   const sessionKey = Array.from(blobFromHex(login_hint));
 
   const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
@@ -181,7 +181,7 @@ async function generate_access_token(
 
   const getRes = await idp_actor.getDelegation(hostname, sessionKey, timestamp);
   if (!isDelegationResponse(getRes)) {
-    throw Error("Could not fetch delegation :(");
+    throw Error(`Could not get delegation. Result received: ${getRes}`);
   }
   const { signed_delegation } = getRes;
 
@@ -207,11 +207,8 @@ export const redirectBackWithAuthorization = () => {
   debugger;
 };
 
-function checkConsent(scope?: string) {
+function checkConsent(hostname: FrontendHostname) {
   return prompt(
-    `The following canisters are requesting access to your identity:\n\n${
-      scope?.replaceAll(' ', '\n') || "UNKNOWN CANISTER"
-    }\n\nAllow? [y/n]`
+    `Do you want to log into ${hostname}? [y/n]`
   )?.match(/y/i);
 }
-
