@@ -174,11 +174,11 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_number) {
             trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-            if entries
+            if let Some(i) = entries
                 .iter()
                 .position(|e| e.pubkey == device_key)
-                .is_some()
             {
+                entries.swap_remove(i as usize);
                 remove_user = entries.is_empty();
             }
         }
