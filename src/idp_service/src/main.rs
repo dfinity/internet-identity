@@ -205,6 +205,8 @@ fn prepare_delegation(
         if let Some(entries) = m.get_mut(&user_number) {
             trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
+            check_frontend_length(&frontend);
+
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
 
             let seed = calculate_seed(user_number, &frontend);
@@ -226,6 +228,8 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
+    check_frontend_length(&frontend);
+
     STATE.with(|state| {
         match get_signature(
             &state.sigs.borrow(),
@@ -504,6 +508,18 @@ fn check_entry_limits(device_data: &DeviceData) {
         trap(&format!(
             "credential id length {} exceeds the limit of {} bytes",
             n, CREDENTIAL_ID_LEN_LIMIT,
+        ));
+    }
+}
+
+fn check_frontend_length(frontend: &FrontendHostname) {
+    const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+
+    let n = frontend.len();
+    if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
+        trap(&format!(
+            "frontend hostname {} exceeds the limit of {} bytes",
+            n, FRONTEND_HOSTNAME_LIMIT,
         ));
     }
 }
