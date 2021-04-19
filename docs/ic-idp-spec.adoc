@@ -154,7 +154,7 @@ type Timestamp = nat64;
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
-  credentialId : CredentialId;
+  credentialId : opt CredentialId;
 };
 
 type Delegation = record {
