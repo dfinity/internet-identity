@@ -287,7 +287,8 @@ type UserDeviceList = vec(record {
 
 === Approach to upgrades
 
-We use pre-upgrade hook to serialize the header and post-upgrade hook to deserialize it back.
+We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly.
+The signature map is simply dropped on upgrade, so users will have to re-request their delegations.
 
 === Logic for signature/certified variable caching
 
