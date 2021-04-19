@@ -328,13 +328,17 @@ The steps marked with 👆 are the steps where the user presses the security dev
 === Subflow: Login as returning user
 
 1. The frontend notices that `user_number` is present in local storage.
-2. The frontend uses `lookup` to fetch the list of devices
-3. The frontend creates a session key.
-4. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key, using any of the devices listed in the user account. It notes which device was actually used.
+2. The frontend offers the choices
+   * Welcome <user number>. Do you want to log in?
+   * Log in as a different user
+3. User wants to log in
+4. The frontend uses `lookup` to fetch the list of devices
+5. The frontend creates a session key.
+6. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key, using any of the devices listed in the user account. It notes which device was actually used.
 +
 Let `device_identity` of type `WebAuthenicationIdentity` be the identity created from that, and let `frontend_delegation` be the signed delegation.
-5. The frontend configures the agent to use the session key for all further update calls.
-6. Login complete
+7. The frontend configures the agent to use the session key for all further update calls.
+8. Login complete
 
 === Subflow: Login via initial registration
 
@@ -357,6 +361,7 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
 === Subflow: Login via existing device
 
 1. The frontend notices that no `user_number` is present in local storage.
+   (Or user said “log in as different user” in returning flow.)
 2. The frontend offers the choices
    * Create new account
    * Log into existing account with existing device
