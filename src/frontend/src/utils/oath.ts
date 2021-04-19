@@ -209,7 +209,6 @@ export const redirectBackWithAuthorization = () => {
 
 function checkConsent(hostname: FrontendHostname) {
   return prompt(
-    `${hostname} is requesting access to your identity. Allow? [y/n]`
+    `Do you want to log into ${hostname}? [y/n]`
   )?.match(/y/i);
 }
-
