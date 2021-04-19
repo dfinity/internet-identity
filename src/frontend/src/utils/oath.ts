@@ -112,7 +112,7 @@ export default function () {
           generate_access_token(
             WebAuthnIdentity.fromJSON(identity),
             params.login_hint,
-	    hostname,
+            hostname,
           ).then((access_token: string) => {
             redirectToApp(params.redirect_uri, {
               access_token: access_token,
