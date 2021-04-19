@@ -263,7 +263,7 @@ Header ::= {
   number_of_user_records : u32
   user_number_range_lo : u64
   user_number_range_hi : u64
-  padding : u8[96]
+  padding : u8[488]
 }
 
 UserRecords ::= UserRecord*
