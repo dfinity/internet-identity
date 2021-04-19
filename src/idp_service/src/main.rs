@@ -1,5 +1,5 @@
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{caller, data_certificate, set_certified_data, time, trap, id};
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk::storage::{stable_restore, stable_save};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -207,11 +207,12 @@ fn prepare_delegation(
 
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
 
+            let seed = calculate_seed(user_number, &frontend);
             let mut sigs = s.sigs.borrow_mut();
-            add_signature(&mut sigs, user_number, session_key, &frontend, expiration);
+            add_signature(&mut sigs, session_key, seed, expiration);
             prune_expired_signatures(&mut sigs);
 
-            (der_encode_canister_sig_key(calculate_seed(user_number, &frontend)), expiration)
+            (der_encode_canister_sig_key(seed.to_vec()), expiration)
         } else {
             trap(&format!("User number {} not found", user_number));
         }
@@ -228,9 +229,8 @@ fn get_delegation(
     STATE.with(|state| {
         match get_signature(
             &state.sigs.borrow(),
-            user_number,
             session_key.clone(),
-            &frontend,
+            calculate_seed(user_number, &frontend),
             expiration,
         ) {
             Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
@@ -340,49 +340,48 @@ fn retrieve_data() {
     }
 }
 
-fn calculate_seed(user_number : UserNumber, frontend: &FrontendHostname) -> Vec<u8> {
-  // for now, we use the empty blob as the salt
-  let salt : Vec<u8> = vec![];
+fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
+    // for now, we use the empty blob as the salt
+    let salt: Vec<u8> = vec![];
 
-  let mut blob: Vec<u8> = vec![];
-  blob.push(salt.len() as u8);
-  blob.extend(salt);
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend(salt);
 
-  let user_number_str = user_number.to_string();
-  let user_number_blob = user_number_str.bytes();
-  blob.push(user_number_blob.len() as u8);
-  blob.extend(user_number_blob);
+    let user_number_str = user_number.to_string();
+    let user_number_blob = user_number_str.bytes();
+    blob.push(user_number_blob.len() as u8);
+    blob.extend(user_number_blob);
 
-  blob.push(frontend.bytes().len() as u8);
-  blob.extend(frontend.bytes());
+    blob.push(frontend.bytes().len() as u8);
+    blob.extend(frontend.bytes());
 
-  hash::hash_bytes(blob).to_vec()
+    hash::hash_bytes(blob)
 }
 
-fn der_encode_canister_sig_key(seed : Vec<u8>) -> Vec<u8> {
-  let my_canister_id : Vec<u8> = id().as_ref().to_vec();
+fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
+    let my_canister_id: Vec<u8> = id().as_ref().to_vec();
 
-  let mut bitstring: Vec<u8> = vec![];
-  bitstring.push(my_canister_id.len() as u8);
-  bitstring.extend(my_canister_id);
-  bitstring.extend(seed);
+    let mut bitstring: Vec<u8> = vec![];
+    bitstring.push(my_canister_id.len() as u8);
+    bitstring.extend(my_canister_id);
+    bitstring.extend(seed);
 
-  let mut der: Vec<u8> = vec![];
-  // sequence of length 17 + the bit string length
-  der.push(0x30);
-  der.push(17 + bitstring.len() as u8);
-  der.extend(vec![
-    // sequence of length 12 for the OID
-    0x30, 0x0C,
-    // OID 1.3.6.1.4.1.56387.1.2
-    0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
-  ]);
-  // BIT string of given length
-  der.push(0x03);
-  der.push(1 + bitstring.len() as u8);
-  der.push(0x00);
-  der.extend(bitstring);
-  der
+    let mut der: Vec<u8> = vec![];
+    // sequence of length 17 + the bit string length
+    der.push(0x30);
+    der.push(17 + bitstring.len() as u8);
+    der.extend(vec![
+        // sequence of length 12 for the OID
+        0x30, 0x0C, // OID 1.3.6.1.4.1.56387.1.2
+        0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
+    ]);
+    // BIT string of given length
+    der.push(0x03);
+    der.push(1 + bitstring.len() as u8);
+    der.push(0x00);
+    der.extend(bitstring);
+    der
 }
 
 fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
@@ -409,9 +408,8 @@ fn update_root_hash(m: &SignatureMap) {
 
 fn get_signature(
     sigs: &SignatureMap,
-    user_number: UserNumber,
     pk: PublicKey,
-    frontend: &FrontendHostname,
+    seed: Hash,
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
     let certificate = data_certificate().unwrap_or_else(|| {
@@ -422,7 +420,7 @@ fn get_signature(
         expiration,
         targets: None,
     });
-    let witness = sigs.witness(hash::hash_bytes(calculate_seed(user_number, frontend)), msg_hash)?;
+    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
@@ -440,20 +438,14 @@ fn get_signature(
     Some(cbor.into_inner())
 }
 
-fn add_signature(
-    sigs: &mut SignatureMap,
-    user_number: UserNumber,
-    pk: PublicKey,
-    frontend: &FrontendHostname,
-    expiration: Timestamp,
-) {
+fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration: Timestamp) {
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
     });
     let expires_at = time() as u64 + DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS;
-    sigs.put(hash::hash_bytes(calculate_seed(user_number, frontend)), msg_hash, expires_at);
+    sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
     update_root_hash(&sigs);
 }
 
