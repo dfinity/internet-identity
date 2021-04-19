@@ -173,7 +173,7 @@ impl fmt::Display for StorageError {
                 write!(f, "failed to deserialize a Candid value: {}", err)
             }
             Self::SerializationError(err) => {
-                write!(f, "failed to a serialize Candid value: {}", err)
+                write!(f, "failed to serialize a Candid value: {}", err)
             }
             Self::EntrySizeLimitExceeded(n) => write!(
                 f,
