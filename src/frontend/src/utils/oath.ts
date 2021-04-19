@@ -7,7 +7,6 @@ import {
   Ed25519PublicKey,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
-import { getDerEncodedPublicKey } from "../utils/auth";
 import { canisterId as signingCanisterId } from "dfx-generated/idp_service";
 import {
   Principal,
@@ -25,6 +24,8 @@ export declare type OAuth2AccessTokenResponse = {
   state?: string;
   scope?: string;
 };
+import { FrontendHostname } from "../typings";
+
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
  * But, since it uses underscore keys not camelCase and it's a 'greatest common denominator' of what's really going on, it could be a bit lossy, so it's not necessarily what we want to pass around internally, it's just a standard interop/serialization format of sorts.
@@ -109,7 +110,8 @@ export default function () {
         if (checkConsent(params?.scope)) {
           generate_access_token(
             WebAuthnIdentity.fromJSON(identity),
-            params.login_hint
+            params.login_hint,
+            params.redirect_uri
           ).then((access_token: string) => {
             redirectToApp(params.redirect_uri, {
               access_token: access_token,
@@ -161,6 +163,50 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
   globalThis.location.assign(responseURL.toString());
 }
 
+async function generate_access_token(
+  identity: WebAuthnIdentity,
+  login_hint: string,
+  redirect_uri: string,
+) {
+  const hostname = redirect_uri as FrontendHostname;
+  const sessionKey = Array.from(blobFromHex(login_hint));
+
+  const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
+  if (!prepRes || prepRes.length != 2) {
+    throw new Error(`Error preparing the delegation. Result received: ${prepRes}`);
+  }
+
+  const userKey = prepRes[0];
+  const timestamp = prepRes[1];
+
+  const getRes = await idp_actor.getDelegation(hostname, sessionKey, timestamp);
+  if (!isDelegationResponse(getRes)) {
+    throw Error("Could not fetch delegation :(");
+  }
+  const { signed_delegation } = getRes;
+
+  const chain = DelegationChain.fromDelegations(
+    [signed_delegation],
+    derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
+  );
+
+  console.log("Delegation chain");
+  console.log(chain);
+  const chainJson = JSON.stringify(chain.toJSON());
+  console.log("Delegation chain JSON");
+  console.log(chainJson);
+
+  return new Buffer(chainJson).toString('hex');
+}
+
+function isDelegationResponse(x: any): x is { signed_delegation: SignedDelegation } {
+  return x && x.hasOwnProperty("signed_delegation");
+}
+
+export const redirectBackWithAuthorization = () => {
+  debugger;
+};
+
 function checkConsent(scope?: string) {
   return prompt(
     `The following canisters are requesting access to your identity:\n\n${
@@ -168,64 +214,4 @@ function checkConsent(scope?: string) {
     }\n\nAllow? [y/n]`
   )?.match(/y/i);
 }
-
-async function generate_access_token(
-  identity: WebAuthnIdentity,
-  login_hint: string
-) {
-  let res = await idp_actor.getDelegation();
-  if (!isDelegationResponse(res)) {
-    console.log("Delegation not found. Explicitly requesting it.");
-    await idp_actor.requestDelegation();
-    res = await idp_actor.getDelegation();
-    if (!isDelegationResponse(res)) {
-      throw Error("Could not fetch delegation :(");
-    }
-  }
-
-  const { delegation } = res;
-
-  const rootToDeviceDelegation = {
-    delegation: new Delegation(
-      blobFromUint8Array(Uint8Array.from(delegation.delegation.pubkey)),
-      BigInt(delegation.delegation.expiration)
-    ),
-    signature: blobFromUint8Array(Uint8Array.from(delegation.signature)),
-  };
-
-  const sessionKey = Ed25519PublicKey.fromDer(blobFromHex(login_hint));
-
-  const userId = BigInt(localStorage.getItem("userId"));
-  const publicKey = getDerEncodedPublicKey(
-    userId,
-    Principal.fromText(signingCanisterId)
-  );
-
-  const rootToDevice = DelegationChain.fromDelegations(
-    [rootToDeviceDelegation],
-    derBlobFromBlob(blobFromUint8Array(Uint8Array.from(publicKey)))
-  );
-  const rootToSession = await DelegationChain.create(
-    identity,
-    sessionKey,
-    new Date(Date.now() + THREE_DAYS),
-    { previous: rootToDevice }
-  );
-
-  console.log("Delegation chain");
-  console.log(rootToSession);
-  const chainJson = JSON.stringify(rootToSession.toJSON());
-  console.log("Delegation chain JSON");
-  console.log(chainJson);
-
-  return new Buffer(chainJson).toString('hex');
-}
-
-function isDelegationResponse(x: any): x is { delegation: SignedDelegation } {
-  return x && x.hasOwnProperty("delegation");
-}
-
-export const redirectBackWithAuthorization = () => {
-  debugger;
-};
 
