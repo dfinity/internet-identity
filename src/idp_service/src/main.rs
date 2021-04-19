@@ -91,7 +91,6 @@ struct State {
     next_user_number: Cell<UserNumber>,
     map: RefCell<HashMap<UserNumber, Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
-    delegation_expirations: RefCell<HashMap<(UserNumber, SessionKey), Timestamp>>,
 }
 
 impl Default for State {
@@ -100,7 +99,6 @@ impl Default for State {
             next_user_number: Cell::new(10000),
             map: RefCell::new(HashMap::default()),
             sigs: RefCell::new(SignatureMap::default()),
-            delegation_expirations: RefCell::new(HashMap::default()),
         }
     }
 }
@@ -174,10 +172,7 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
         if let Some(entries) = s.map.borrow_mut().get_mut(&user_number) {
             trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-            if let Some(i) = entries
-                .iter()
-                .position(|e| e.pubkey == device_key)
-            {
+            if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
                 entries.swap_remove(i as usize);
                 remove_user = entries.is_empty();
             }
@@ -204,23 +199,20 @@ fn prepare_delegation(
     user_number: UserNumber,
     _frontend: FrontendHostname,
     session_key: SessionKey,
-) -> UserKey {
+) -> (UserKey, Timestamp) {
     STATE.with(|s| {
         let mut m = s.map.borrow_mut();
         if let Some(entries) = m.get_mut(&user_number) {
             trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
             let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
-            let mut delegation_expirations = s.delegation_expirations.borrow_mut();
-            delegation_expirations.insert((user_number, session_key.clone()), expiration);
 
             let mut sigs = s.sigs.borrow_mut();
             add_signature(&mut sigs, user_number, session_key, expiration);
             prune_expired_signatures(&mut sigs);
-            // TODO: Will also need to remove entries from delegation_expirations map.
 
-            // TODO: This should be fixed to take into account the frontend hostname.
-            hash_seed(user_number).to_vec()
+            // TODO: This should be fixed to return a DER encoded key based on the correct seed.
+            (hash_seed(user_number).to_vec(), expiration)
         } else {
             trap(&format!("User number {} not found", user_number));
         }
@@ -232,24 +224,19 @@ fn get_delegation(
     user_number: UserNumber,
     _frontend: FrontendHostname,
     session_key: SessionKey,
+    expiration: Timestamp,
 ) -> GetDelegationResponse {
     STATE.with(|state| {
-        let delegation_expirations = state.delegation_expirations.borrow();
-        let expiration = match delegation_expirations.get(&(user_number, session_key.clone())) {
-            Some(expiration) => expiration,
-            None => return GetDelegationResponse::NoSuchDelegation,
-        };
-
         match get_signature(
             &state.sigs.borrow(),
             user_number,
             session_key.clone(),
-            *expiration,
+            expiration,
         ) {
             Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                 delegation: Delegation {
                     pubkey: session_key,
-                    expiration: *expiration,
+                    expiration,
                     targets: None,
                 },
                 signature,

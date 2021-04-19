@@ -69,8 +69,8 @@ service : {
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey);
-  get_delegation: (UserNumber, FrontendHostname, SessionKey) -> (GetDelegationResponse) query;
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey, Timestamp);
+  get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
   http_request: (request: HttpRequest) -> (HttpResponse) query;
 }
