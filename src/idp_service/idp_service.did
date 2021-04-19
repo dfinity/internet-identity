@@ -66,7 +66,6 @@ type GetDelegationResponse = variant {
 service : {
   register : (DeviceData) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
-  request_delegation : (UserNumber, PublicKey) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
