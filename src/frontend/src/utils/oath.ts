@@ -107,12 +107,13 @@ export default function () {
       const identity = localStorage.getItem("identity");
       if (identity !== null) {
         // does the user consent?
-        const hostname = new URL(params.redirect_uri).hostname as FrontendHostname;
+        const hostname = new URL(params.redirect_uri)
+          .hostname as FrontendHostname;
         if (checkConsent(hostname)) {
           generate_access_token(
             WebAuthnIdentity.fromJSON(identity),
             params.login_hint,
-            hostname,
+            hostname
           ).then((access_token: string) => {
             redirectToApp(params.redirect_uri, {
               access_token: access_token,
@@ -167,13 +168,15 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 async function generate_access_token(
   identity: WebAuthnIdentity,
   login_hint: string,
-  hostname: FrontendHostname,
+  hostname: FrontendHostname
 ) {
   const sessionKey = Array.from(blobFromHex(login_hint));
 
   const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
   if (!prepRes || prepRes.length != 2) {
-    throw new Error(`Error preparing the delegation. Result received: ${prepRes}`);
+    throw new Error(
+      `Error preparing the delegation. Result received: ${prepRes}`
+    );
   }
 
   const userKey = prepRes[0];
@@ -205,19 +208,15 @@ async function generate_access_token(
   console.log("Delegation chain JSON");
   console.log(chainJson);
 
-  return new Buffer(chainJson).toString('hex');
+  return new Buffer(chainJson).toString("hex");
 }
 
-function isDelegationResponse(x: any): x is { signed_delegation: CandidSignedDelegation } {
+function isDelegationResponse(
+  x: any
+): x is { signed_delegation: CandidSignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }
 
-export const redirectBackWithAuthorization = () => {
-  debugger;
-};
-
 function checkConsent(hostname: FrontendHostname) {
-  return prompt(
-    `Do you want to log into ${hostname}? [y/n]`
-  )?.match(/y/i);
+  return prompt(`Do you want to log into ${hostname}? [y/n]`)?.match(/y/i);
 }
