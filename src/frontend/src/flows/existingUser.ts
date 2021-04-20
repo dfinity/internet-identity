@@ -1,6 +1,7 @@
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
 import oauth from "../utils/oath";
+import { navigateTo } from "../utils/router";
 
 export const initExistingUser = () => {
   bindListeners();
@@ -50,10 +51,11 @@ const handleLoginClick = async () => {
   if (idp_actor.userId) {
     // Make the user reauthenticate
     await idp_actor.reconnect().then(() => postReconnect());
+  } else {
+    // Otherwise, open dialog for fallback options
+    toggleDialog();
   }
 
-  // Otherwise, open dialog for fallback options
-  toggleDialog();
 };
 
 const handleReconnectClick = async () => {
@@ -75,7 +77,7 @@ function postReconnect() {
   if (window.location.href.match(/authorize/)) {
     oauth();
   } else {
-    window.location.assign("/manage");
+    navigateTo("/manage");
   }
 }
 

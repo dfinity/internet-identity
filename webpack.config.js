@@ -39,7 +39,6 @@ function generateWebpackConfigForCanister(name, info) {
     mode: process.env.NODE_ENV === "production" ? "production" : "development",
     entry: {
       index: path.join(__dirname, "src", "frontend", "src", "index"),
-      manage: path.join(__dirname, "src", "frontend", "src", "manage"),
     },
     devtool,
     optimization: {
@@ -65,6 +64,8 @@ function generateWebpackConfigForCanister(name, info) {
       port: 8080,
       proxy: {
         "/api": "http://localhost:8000",
+        "/manage": "http://localhost:8081",
+        "/authorize": "http://localhost:8081",
       },
     },
 

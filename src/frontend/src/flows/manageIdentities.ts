@@ -6,13 +6,15 @@ import {
 } from "@dfinity/agent";
 import { identityListItem } from "../../templates/identityListItem";
 import idp_actor from "../utils/idp_actor";
+import { prompt } from "../components/prompt";
+import { navigateTo } from "../utils/router";
 
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
 
   if (idp_actor.userId === undefined) {
     // If we haven't established a userId, we need to authenticate.
-    location.assign(location.href.replace("manage", "index"));
+    navigateTo(location.href.replace("manage", "index"));
     return;
   }
 
@@ -31,12 +33,16 @@ const checkForAddUserHash = async () => {
     if (parsedParams !== null) {
       const { userId, publicKey, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams);
-      await idp_actor.add(
-        BigInt(userId),
-        prompt("What should we call this device?") ?? "anonymous device",
-        publicKey,
-        rawId
-      );
+      try {
+        const deviceName = await prompt("What should we call this device?");
+        await idp_actor.add(BigInt(userId), deviceName, publicKey, rawId);
+      } catch (error) {
+        // If anything goes wrong, or the user cancels we do _not_ want to add the device.
+        console.log(`Canceled adding the device with ${error}`);
+        // TODO: Clear the hash & Error page? Or redirect to manage?
+        return
+      }
+      // TODO: Clear the hash
       renderIdentities();
     }
   }
@@ -49,18 +55,20 @@ const displayUserId = (userId: BigInt) => {
   userIdSection.classList.remove("hidden");
 };
 
-const parseNewDeviceParam = (param: string): { userId: bigint, publicKey: DerEncodedBlob, rawId?: BinaryBlob } | null => {
+const parseNewDeviceParam = (
+  param: string
+): { userId: bigint; publicKey: DerEncodedBlob; rawId?: BinaryBlob } | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
     // TODO: Decent error handling
     console.error("This is not a valid pasted link");
-    return null
+    return null;
   }
   const userId = BigInt(segments[0]);
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
   const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
-  return { userId, publicKey, rawId }
-}
+  return { userId, publicKey, rawId };
+};
 const renderIdentities = async () => {
   const identityList = document.getElementById("identityList") as HTMLElement;
   identityList.innerHTML = ``;

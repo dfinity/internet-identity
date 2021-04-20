@@ -12,6 +12,16 @@ span {
   font-size: 1.2rem;
 }
 
+button {
+  border: 1px solid black;
+  background: transparent;
+}
+
+input {
+  padding: 0.75rem 0.5rem;
+  border-radius: 4px;
+}
+
 img {
   min-width: 500px;
   width: 50vw;
@@ -140,6 +150,24 @@ ul {
 #registerAlias {
   max-width: 256px;
   margin-bottom: 1rem;
+}
+
+.details:empty {
+  display: none;
+}
+
+#confirm button,
+#prompt button {
+  margin-right: 1rem;
+}
+
+#prompt-input {
+  margin-bottom: 1rem;
+}
+
+#logout-button {
+  display: flex;
+  margin-left: auto;
 }
 
 /* large screen break */

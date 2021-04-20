@@ -294,11 +294,7 @@ fn init_assets() {
         );
         a.insert(
             "/manage".to_string(),
-            include_str!("../../../dist/manage.html").as_bytes().into(),
-        );
-        a.insert(
-            "/manage.js".to_string(),
-            include_str!("../../../dist/manage.js").as_bytes().into(),
+            include_str!("../../../dist/index.html").as_bytes().into(),
         );
     });
 }
