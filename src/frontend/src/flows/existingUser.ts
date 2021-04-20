@@ -1,8 +1,9 @@
 import { blobFromBuffer, blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
-import idp_actor from "../utils/idp_actor";
+import idp_actor, { IDPActor } from "../utils/idp_actor";
 import oauth from "../utils/oath";
 import { navigateTo } from "../utils/router";
+import { getUserId, setUserId } from "../utils/userId";
 
 export const initExistingUser = () => {
   bindListeners();
@@ -31,7 +32,7 @@ const bindListeners = () => {
 
 const toggleDialog = () => {
   const dialog = document.getElementById("loginDialog") as HTMLDialogElement;
-  const userId = idp_actor.userId;
+  const userId = getUserId();
   if (userId) {
     const userIdInput = document.getElementById(
       "registerUserNumber"
@@ -49,14 +50,15 @@ const toggleDialog = () => {
 };
 
 const handleLoginClick = async () => {
-  if (idp_actor.userId) {
+  const userId = getUserId();
+  if (userId) {
+    // TODO: Greet returning user, or offer to login as different user
     // Make the user reauthenticate
-    await idp_actor.reconnect().then(() => postReconnect());
+    await IDPActor.reconnect(userId).then(postReconnect(userId));
   } else {
     // Otherwise, open dialog for fallback options
     toggleDialog();
   }
-
 };
 
 const handleReconnectClick = async () => {
@@ -66,17 +68,17 @@ const handleReconnectClick = async () => {
 
   const userId = BigInt(userIdInput.value);
   if (userId) {
-    idp_actor.userId = userId;
-    // Make the user reauthenticate
-    await idp_actor.reconnect().then(() => postReconnect());
+    IDPActor.reconnect(userId).then(postReconnect(userId));
   } else {
     console.error("Failed to login with that user #");
   }
 };
 
-function postReconnect() {
+const postReconnect = (userId: bigint) => (connection: IDPActor) => {
+  idp_actor.connection = connection;
+  setUserId(userId);
   if (window.location.href.match(/authorize/)) {
-    oauth();
+    oauth(userId, connection);
   } else {
     navigateTo("/manage");
   }
@@ -98,7 +100,7 @@ const handleToggleDeviceClick = () => {
 
   // Generate link to add a user with an authenticated browser
   generateAddDeviceLink(userId).then(({link, publicKey}) => {
-    idp_actor.userId = userId;
+    setUserId(userId);
     addDeviceLinkSection.classList.toggle("hidden");
 
     const addDeviceLink = document.getElementById(
@@ -109,13 +111,13 @@ const handleToggleDeviceClick = () => {
     loginInterval = window.setInterval(async () => {
       console.log("checking if authenticated");
       try {
-        let devices = await idp_actor.lookup();
+        let devices = await IDPActor.lookup(userId);
         let matchedDevice = devices.find(deviceData =>
           derBlobFromBlob(blobFromUint8Array(Buffer.from(deviceData.pubkey))).equals(publicKey)
         );
         if (matchedDevice !== undefined) {
           window.clearInterval(loginInterval)
-          idp_actor.reconnect().then(() => postReconnect())
+          IDPActor.reconnect(userId).then(postReconnect(userId))
         }
       } catch (error) {
         console.error(error);

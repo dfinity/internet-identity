@@ -1,7 +1,8 @@
-import idp_actor from "../utils/idp_actor";
+import idp_actor, { IDPActor } from "../utils/idp_actor";
 import { resetForm } from "../utils/resetForm";
+import { setUserId } from "../utils/userId";
 
-function setupRegisterIdentityForm(cb?: () => void) {
+function setupRegisterIdentityForm(cb?: (userId: bigint, connection: IDPActor) => void) {
   const form = document.getElementById("registerForm") as HTMLFormElement;
   const submitButton = form.querySelector(
     'button[type="submit"]'
@@ -18,22 +19,15 @@ function setupRegisterIdentityForm(cb?: () => void) {
     ) as HTMLInputElement;
 
     // Send values through actor
-    idp_actor
-      .register(registerAlias.value)
-      .then((returnValue) => {
-        console.info("successfully registered identity", returnValue);
-
-        // Clean up
-        resetForm(form);
-
-        // If callback, invoke
-        cb?.();
-      })
-      .catch((err) => {
-        console.error(err);
-        submitButton.removeAttribute("disabled");
-      });
-
+    IDPActor.register(registerAlias.value).then(({ connection, userId}) => {
+      resetForm(form);
+      setUserId(userId);
+      idp_actor.connection = connection;
+      cb?.(userId, connection)
+    }).catch((err) => {
+      console.error(err);
+      submitButton.removeAttribute("disabled");
+    });
     return false;
   };
 

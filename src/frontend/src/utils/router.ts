@@ -1,6 +1,8 @@
 import oauth from "../utils/oath";
 import { renderIndex } from "../pages";
 import { renderManage } from "../pages/manage";
+import { getUserId } from "./userId";
+import { IDPActor } from "./idp_actor";
 
 export const navigateTo = (route: string) => {
   if (history.length > initialHistoryLength) {
@@ -13,8 +15,14 @@ export const navigateTo = (route: string) => {
 
 const renderApp = () => {
   if (window.location.href.match(/authorize/)) {
-    oauth();
-    renderIndex();
+    const userId = getUserId();
+    if (userId === undefined) {
+      renderIndex()
+    } else {
+      IDPActor.reconnect(userId).then(connection =>
+        oauth(userId, connection)
+      )
+    }
   } else if (window.location.href.match(/manage/)) {
     renderManage();
   } else {
