@@ -1,4 +1,4 @@
-import idp_actor, { IDPActor } from "../utils/idp_actor";
+import { IDPActor } from "./idp_actor";
 import { DelegationChain, Delegation } from "@dfinity/identity";
 import {
   Principal,

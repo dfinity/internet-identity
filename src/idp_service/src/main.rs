@@ -311,10 +311,6 @@ fn init_assets() {
             "/index.js".to_string(),
             include_str!("../../../dist/index.js").as_bytes().into(),
         );
-        a.insert(
-            "/manage".to_string(),
-            include_str!("../../../dist/index.html").as_bytes().into(),
-        );
     });
 }
 

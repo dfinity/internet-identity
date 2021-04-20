@@ -22,9 +22,6 @@ import _SERVICE, {
   DeviceData,
 } from "../typings";
 import {
-  authenticateFresh,
-} from "./handleAuthentication";
-import {
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -42,7 +39,7 @@ export class IDPActor {
   protected constructor(public identity: WebAuthnIdentity, public delegationIdentity: DelegationIdentity, public actor?: ActorSubclass<_SERVICE>) { }
 
   static async register(alias: string): Promise<{ connection: IDPActor, userId: UserNumber }> {
-    const identity = await authenticateFresh();
+    const identity = await WebAuthnIdentity.create();
     const delegationIdentity = await requestFEDelegation(identity);
 
     const agent = new HttpAgent({ identity: delegationIdentity });
@@ -84,8 +81,7 @@ export class IDPActor {
     return baseActor.lookup(userId);
   };
 
-  // Create a actor representing the backend using the stored identity
-  // fails if is not there yet
+  // Create an actor representing the backend
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation().delegations || []) {
       // prettier-ignore
@@ -177,8 +173,3 @@ const requestFEDelegation = async (identity: SignIdentity): Promise<DelegationId
     chain
   );
 }
-
-// A global singleton
-const idp_actor: { connection: IDPActor | undefined } = { connection: undefined };
-
-export default idp_actor;
