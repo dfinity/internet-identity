@@ -5,10 +5,7 @@ import {
   DerEncodedBlob,
   HttpAgent,
 } from "@dfinity/agent";
-import {
-  idlFactory as idp_idl,
-  canisterId as idp_canister_id,
-} from "dfx-generated/idp_service";
+import idp_idl from "../../generated/idp_idl";
 import _SERVICE, {
   PublicKey,
   SessionKey,
@@ -16,7 +13,7 @@ import _SERVICE, {
   UserNumber,
   FrontendHostname,
   Timestamp,
-} from "../typings";
+} from "../../generated/idp_types";
 import {
   tryLoadIdentity,
   authenticateFresh,
@@ -32,9 +29,10 @@ import { Principal } from "@dfinity/agent";
 
 const hostUrl = "http://dcs-messaging-13.dfinity.systems:8080/";
 
+const canisterId: string = process.env.CANISTER_ID!;
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent: new HttpAgent({host: hostUrl}),
-  canisterId: idp_canister_id,
+  canisterId,
 });
 
 export class IDPActor {
@@ -103,7 +101,7 @@ export class IDPActor {
         sessionKey.getPublicKey(),
         new Date(Date.now() + tenMinutesInMsec),
         {
-          targets: [Principal.from(idp_canister_id)],
+          targets: [Principal.from(canisterId)],
         }
       );
 
@@ -115,7 +113,7 @@ export class IDPActor {
       const agent = new HttpAgent({ host: hostUrl, identity: delegationIdentity });
       this._actor = Actor.createActor<_SERVICE>(idp_idl, {
         agent,
-        canisterId: idp_canister_id,
+        canisterId,
       });
     }
 
@@ -152,7 +150,7 @@ export class IDPActor {
           sessionKey.getPublicKey(),
           new Date(Date.now() + tenMinutesInMsec),
           {
-            targets: [Principal.from(idp_canister_id)],
+            targets: [Principal.from(canisterId)],
           }
         );
       } catch (err) {
