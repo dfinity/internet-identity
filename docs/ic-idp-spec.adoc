@@ -171,8 +171,14 @@ type GetDelegationResponse = variant {
   no_such_delegation;
 };
 
+type ProofOfWork = record {
+  timestamp : Timestamp
+  nonce : nat64
+};
+
+
 service : {
-  register : (DeviceData) -> (UserNumber);
+  register : (DeviceData, ProofOfWork) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
@@ -188,7 +194,11 @@ The `register` method is used to create a new user. The Internet Identity Servic
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
-WARNING: *TODO*: This method will be protected by some form of proof of work or captcha, which needs involvement from the canister.
+In order to protect the Internet Computer from too many “free” update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a proof of work obliation. The `register` call can only succeed if the
+
+ * the `timestamp` in the `ProofOfWork` parameter is within 5min of the current time as seen by the Canister
+ * the calculation of `H("\10ic-proof-of-work" · timestamp · nonce · |cid| · cid )` (where `H` is the *TODO* Hash function, `·` is concatenation, `|…|` is the length of the canister id in bytes, `cid` is the canister id and numbers are encoded as 8-byte little endian values), yields a hash value where leading *TODO* bytes are `0x00`.
+ * the canister did not recently see a registration attempt with that `nonce`.
 
 === The `add` method
 
@@ -250,6 +260,8 @@ Device lists are stored directly in canister stable memory.
 The total amount of storage for is limited to 510 bytes per user.
 With the stable memory size of 4GiB we can store around 8 * 10^6 user records in a single canister.
 
+There is also a set of recently seen proof of work nonces.
+
 ==== Stable memory layout
 
 All the integers (u64, u32, u16) are encoded in Little-Endian.
@@ -286,6 +298,15 @@ type UserDeviceList = vec(record {
   credential_id : opt CredentialId;
 });
 ....
+
+==== Proof of work nonces
+
+In order to implement `register` as specified above, the Canister maintains the set of `nonce` values that were used recently (last 10 minutes) in a call to `register`. This set implemented using a priority queue.
+
+The proof of work puzzle is checked both in `canister_inspect_message` as well as in the actual `register` method call. Ideally, the `register` method never traps if `canister_inspect_message` wouldn’t trap as well, so that the canister can remember seeing a certain nonce.
+
+NOTE: Even with that provision the same nonce can be used to ingress multiple messages, as `canister_inspect_message` is always run on a slightly old state. This cannot be avoided, but at least of these calls at most can actually create a new user account.
+
 
 === Approach to upgrades
 
