@@ -1,3 +1,4 @@
+import { blobFromBuffer, blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
 import oauth from "../utils/oath";
@@ -96,9 +97,8 @@ const handleToggleDeviceClick = () => {
   const userId = BigInt(userIdInput.value);
 
   // Generate link to add a user with an authenticated browser
-  generateAddDeviceLink(userId).then((link) => {
+  generateAddDeviceLink(userId).then(({link, publicKey}) => {
     idp_actor.userId = userId;
-    localStorage.setItem("userId", userId.toString());
     addDeviceLinkSection.classList.toggle("hidden");
 
     const addDeviceLink = document.getElementById(
@@ -109,7 +109,14 @@ const handleToggleDeviceClick = () => {
     loginInterval = window.setInterval(async () => {
       console.log("checking if authenticated");
       try {
-        await idp_actor.reconnect().then(() => postReconnect());
+        let devices = await idp_actor.lookup();
+        let matchedDevice = devices.find(deviceData =>
+          derBlobFromBlob(blobFromUint8Array(Buffer.from(deviceData.pubkey))).equals(publicKey)
+        );
+        if (matchedDevice !== undefined) {
+          window.clearInterval(loginInterval)
+          idp_actor.reconnect().then(() => postReconnect())
+        }
       } catch (error) {
         console.error(error);
       }
