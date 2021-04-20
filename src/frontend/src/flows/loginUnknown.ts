@@ -23,35 +23,41 @@ const pageContent = () => html` <style>
       margin-bottom: 1rem;
     }
   </style>
-  <h1>Internet Identity</h1>
-  <div class="spacer"></div>
-  <h3>Are you an existing user?</h3>
+  <section>
+    <h1>Internet Identity</h1>
+    <div class="spacer"></div>
+    <h3>Are you an existing user?</h3>
+  </section>
   <section id="userIdSection">
     <p>Enter your saved User #</p>
     <fieldset>
       <label for="registerUserNumber">User #</label>
       <input type="text" id="registerUserNumber" name="registerUserNumber" />
     </fieldset>
+    <button type="button" id="dialogTrigger" aria-controls="loginDialog">
+      Link new Device
+    </button>
+    <button type="button" id="loginButton" aria-controls="loginDialog">
+      Login with existing Device
+    </button>
   </section>
-  <button type="button" id="dialogTrigger" aria-controls="loginDialog">
-    Link new Device
-  </button>
-  <button type="button" id="loginButton" aria-controls="loginDialog">
-    Login with existing Device
-  </button>
   <div class="spacer"></div>
-  <h3>If this is your first time using the Internet Identity</h3>
-  <form id="registerForm">
-    <label for="registerAlias">What should we call this device? </label>
-    <input
-      type="text"
-      name="registerAlias"
-      id="registerAlias"
-      required
-      placeholder="device name"
-    />
-    <button type="submit" id="register-identity">Click here to register</button>
-  </form>
+  <section>
+    <h3>If this is your first time using the Internet Identity</h3>
+    <form id="registerForm">
+      <label for="registerAlias">What should we call this device? </label>
+      <input
+        type="text"
+        name="registerAlias"
+        id="registerAlias"
+        required
+        placeholder="device name"
+      />
+      <button type="submit" id="register-identity">
+        Click here to register
+      </button>
+    </form>
+  </section>
   <web-dialog id="linkDeviceDialog">
     <button type="button" aria-label="close dialog" class="closeDialog">
       <svg

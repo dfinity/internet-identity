@@ -82,23 +82,21 @@
   background: var(--background-color);
   color: var(--text-color);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: var(--white-000);
-    --primary: var(--grey-050);
-    --background-color: #222222;
-    --secondary: #323232;
-    --accent: var(--grey-300);
-  }
-  input {
-    background-color: var(--background-color);
-    color: var(--accent);
-    border: 1px solid var(--text-color);
-  }
+
+html,
+body {
+  margin: 0;
+  width: 100vw;
 }
 
-body {
-  width: 100vw;
+header {
+  position: sticky;
+  top: 0;
+  --background-color: white;
+  background-color: var(--background-color);
+  margin-top: 0;
+  padding: 0.1rem;
+  border-bottom: 1px solid var(--text-color);
 }
 
 input,
@@ -116,9 +114,26 @@ h1 {
   font-size: 1.8rem;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
 button {
   border: 1px solid var(--text-color);
-  background: transparent;
+  --background-color: white;
+  background: var(--background-color);
+  display: flex;
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  margin-bottom: 1rem;
 }
 
 input {
@@ -133,20 +148,6 @@ img {
   max-width: 800px;
   display: block;
   margin: auto;
-}
-section {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: calc(100vw - 1rem);
-  margin: auto;
-  align-items: baseline;
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-
-section > * {
-  width: auto;
 }
 
 form,
@@ -167,7 +168,6 @@ form {
 button {
   padding: 1rem 2rem;
   border-radius: 4px;
-  background: none;
 }
 
 button.primary {
@@ -184,10 +184,6 @@ label {
   margin-bottom: 1rem;
 }
 
-main {
-  padding: 1rem;
-}
-
 main,
 section {
   margin: auto;
@@ -196,12 +192,23 @@ section {
   flex-direction: column;
 }
 
-.hidden {
-  display: none;
+section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: calc(100vw - 2rem);
+  margin: auto;
+  align-items: baseline;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  margin: 0.5rem 0;
+  padding: 1rem;
+  --background-color: white;
+  background: var(--background-color);
 }
 
-.spacer {
-  margin-bottom: 1rem;
+.hidden {
+  display: none;
 }
 
 .flex {
@@ -221,12 +228,6 @@ section {
 .center {
   justify-content: center;
   align-items: center;
-}
-
-button[title="Remove identity"] {
-  background: none;
-  padding: 1rem;
-  width: fit-content;
 }
 
 ul {
@@ -252,6 +253,7 @@ ul {
   padding: 8px;
   margin: 1rem 1rem 1rem auto;
   font-size: 0.8rem;
+  width: auto;
 }
 
 /* large screen break */
@@ -268,5 +270,25 @@ ul {
   }
   .spacer {
     margin-bottom: 4rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: var(--white-000);
+    --primary: var(--grey-050);
+    --background-color: #222222;
+    --secondary: #323232;
+    --accent: var(--grey-300);
+  }
+  input {
+    background-color: var(--background-color);
+    color: var(--accent);
+    border: 1px solid var(--text-color);
+  }
+  header,
+  section,
+  button {
+    --background-color: #222222;
   }
 }
