@@ -1,3 +1,4 @@
+import { blobFromBuffer, blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
 import oauth from "../utils/oath";
@@ -81,7 +82,10 @@ function postReconnect() {
   }
 }
 
+let loginInterval: number;
+
 const handleToggleDeviceClick = () => {
+  clearInterval(loginInterval);
   // Inputs
   const userIdInput = document.getElementById(
     "registerUserNumber"
@@ -93,12 +97,29 @@ const handleToggleDeviceClick = () => {
   const userId = BigInt(userIdInput.value);
 
   // Generate link to add a user with an authenticated browser
-  generateAddDeviceLink(userId).then((link) => {
+  generateAddDeviceLink(userId).then(({link, publicKey}) => {
+    idp_actor.userId = userId;
     addDeviceLinkSection.classList.toggle("hidden");
 
     const addDeviceLink = document.getElementById(
       "addDeviceLink"
     ) as HTMLInputElement;
     addDeviceLink.value = link;
+
+    loginInterval = window.setInterval(async () => {
+      console.log("checking if authenticated");
+      try {
+        let devices = await idp_actor.lookup();
+        let matchedDevice = devices.find(deviceData =>
+          derBlobFromBlob(blobFromUint8Array(Buffer.from(deviceData.pubkey))).equals(publicKey)
+        );
+        if (matchedDevice !== undefined) {
+          window.clearInterval(loginInterval)
+          idp_actor.reconnect().then(() => postReconnect())
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }, 2500);
   });
 };
