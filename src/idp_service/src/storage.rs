@@ -1,5 +1,8 @@
 use super::UserNumber;
-use ic_cdk::api::stable::{stable_grow, stable_read, stable_size, stable_write};
+use ic_cdk::api::{
+    stable::{stable_grow, stable_read, stable_size, stable_write},
+    trap,
+};
 use ic_cdk::export::candid;
 use std::convert::TryInto;
 use std::fmt;
@@ -10,8 +13,7 @@ const ENTRY_SIZE: u32 = 512;
 const VALUE_SIZE_LIMIT: usize = ENTRY_SIZE as usize - std::mem::size_of::<u16>();
 const WASM_PAGE_SIZE: u32 = 65536;
 
-/// Data type responsible for managing user device data in stable
-/// memory.
+/// Data type responsible for managing user data in stable memory.
 pub struct Storage<T> {
     num_users: u32,
     user_number_range: (UserNumber, UserNumber),
@@ -19,7 +21,7 @@ pub struct Storage<T> {
 }
 
 impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
-    /// Create a new empty storage that manages the data of users in
+    /// Creates a new empty storage that manages the data of users in
     /// the specified range.
     pub fn new(user_number_range: (UserNumber, UserNumber)) -> Self {
         let storage = Self {
@@ -30,7 +32,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         storage
     }
 
-    /// Initialize storage by reading stable memory.
+    /// Initializes storage by reading stable memory.
     ///
     /// Returns None if the stable memory is empty.
     ///
@@ -44,10 +46,13 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let mut buf: [u8; 24] = [0; 24];
         stable_read(0, &mut buf);
         if &buf[0..3] != b"IIC" {
-            panic!("stable memory header: invalid magic: {:?}", &buf[0..3]);
+            trap(&format!(
+                "stable memory header: invalid magic: {:?}",
+                &buf[0..3]
+            ));
         }
         if buf[3] != 1 {
-            panic!("unsupported header version: {}", buf[3]);
+            trap(&format!("unsupported header version: {}", buf[3]));
         }
         let num_users = u32::from_le_bytes(buf[4..8].try_into().unwrap());
         let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
@@ -69,12 +74,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             return None;
         }
         self.num_users += 1;
-        self.write_header();
+        self.flush();
         Some(user_number)
     }
 
-    /// Write the device data of the specified user to stable memory.
-    pub fn write_device_data(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
+    /// Writes the data of the specified user to stable memory.
+    pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
         let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
@@ -85,28 +90,29 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         }
 
         let current_size = stable_size();
-        let pages = (stable_offset + ENTRY_SIZE) / WASM_PAGE_SIZE + 1;
+        let pages = (stable_offset + ENTRY_SIZE + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         if pages > current_size {
             let pages_to_grow = pages - current_size;
             let result = stable_grow(pages - current_size);
-            assert!(
-                result.is_ok(),
-                "failed to grow stable memory by {} pages",
-                pages_to_grow
-            );
+            if !result.is_ok() {
+                trap(&format!(
+                    "failed to grow stable memory by {} pages",
+                    pages_to_grow
+                ))
+            }
         }
         stable_write(stable_offset, &(buf.len() as u16).to_le_bytes());
         stable_write(stable_offset + std::mem::size_of::<u16>() as u32, &buf);
         Ok(())
     }
 
-    /// Read the device data of the specified user from stable memory.
-    pub fn read_device_data(&self, user_number: UserNumber) -> Result<T, StorageError> {
+    /// Reads the data of the specified user from stable memory.
+    pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
         let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
         if stable_offset + ENTRY_SIZE > stable_size() * WASM_PAGE_SIZE {
-            panic!("a record for a valid user number is out of stable memory bounds");
+            trap("a record for a valid user number is out of stable memory bounds");
         }
 
         let mut buf: [u8; ENTRY_SIZE as usize] = [0; 512];
@@ -114,12 +120,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
-        assert!(
-            len <= VALUE_SIZE_LIMIT,
-            "persisted value size {} exeeds maximum size {}",
-            len,
-            VALUE_SIZE_LIMIT
-        );
+        if len > VALUE_SIZE_LIMIT {
+            trap(&format!(
+                "persisted value size {} exeeds maximum size {}",
+                len, VALUE_SIZE_LIMIT
+            ))
+        }
 
         let data: T =
             candid::de::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
@@ -129,7 +135,18 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
 
     /// Make sure all the required metadata is recorded to stable memory.
     pub fn flush(&self) {
-        self.write_header()
+        if stable_size() < 1 {
+            let result = stable_grow(1);
+            if !result.is_ok() {
+                trap("failed to grow stable memory by 1 page");
+            }
+        }
+        let mut buf: [u8; 24] = [0; 24];
+        buf[0..4].copy_from_slice(b"IIC\x01");
+        buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
+        buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());
+        buf[16..24].copy_from_slice(&self.user_number_range.1.to_le_bytes());
+        stable_write(0, &buf);
     }
 
     fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
@@ -145,19 +162,6 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             return Err(StorageError::BadUserNumber(user_number));
         }
         Ok(record_number)
-    }
-
-    fn write_header(&self) {
-        if stable_size() < 1 {
-            let result = stable_grow(1);
-            assert!(result.is_ok(), "failed to grow stable memory by 1 page");
-        }
-        let mut buf: [u8; 24] = [0; 24];
-        buf[0..4].copy_from_slice(b"IIC\x01");
-        buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
-        buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());
-        buf[16..24].copy_from_slice(&self.user_number_range.1.to_le_bytes());
-        stable_write(0, &buf);
     }
 }
 

@@ -125,7 +125,7 @@ fn register(device_data: DeviceData) -> UserNumber {
             .allocate_user_number()
             .unwrap_or_else(|| trap("failed to allocate a new user number"));
         store
-            .write_device_data(user_number, vec![device_data])
+            .write(user_number, vec![device_data])
             .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
 
         user_number
@@ -139,16 +139,12 @@ fn add(user_number: UserNumber, device_data: DeviceData) {
     check_entry_limits(&device_data);
 
     STATE.with(|s| {
-        let mut entries = s
-            .storage
-            .borrow()
-            .read_device_data(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -168,7 +164,7 @@ fn add(user_number: UserNumber, device_data: DeviceData) {
         entries.push(device_data);
         s.storage
             .borrow()
-            .write_device_data(user_number, entries)
+            .write(user_number, entries)
             .unwrap_or_else(|err| {
                 trap(&format!(
                     "failed to write device data of user {}: {}",
@@ -185,16 +181,12 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
     STATE.with(|s| {
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
-        let mut entries = s
-            .storage
-            .borrow()
-            .read_device_data(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -204,7 +196,7 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
         s.storage
             .borrow()
-            .write_device_data(user_number, entries)
+            .write(user_number, entries)
             .unwrap_or_else(|err| {
                 trap(&format!(
                     "failed to persist device data of user {}: {}",
@@ -216,12 +208,7 @@ fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
-    STATE.with(|s| {
-        s.storage
-            .borrow()
-            .read_device_data(user_number)
-            .unwrap_or_default()
-    })
+    STATE.with(|s| s.storage.borrow().read(user_number).unwrap_or_default())
 }
 
 #[update]
@@ -231,16 +218,12 @@ fn prepare_delegation(
     session_key: SessionKey,
 ) -> (UserKey, Timestamp) {
     STATE.with(|s| {
-        let entries = s
-            .storage
-            .borrow()
-            .read_device_data(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
