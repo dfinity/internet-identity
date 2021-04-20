@@ -287,6 +287,20 @@ type UserDeviceList = vec(record {
 });
 ....
 
+=== Initialization
+
+The Internet Identity canister is designed for sharded deployments.
+There can be many simulteniously installed instances of the canister code, each serving requests of a subset of users.
+As users are identified by their user number, we split the range of user numbers into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
+The assigned range is passed to the canister as an init argument, encoded in Candid:
+
+....
+type InternetIdentityInit = record {
+  // Half-closed interval of user numbers assigned to this canister, [ left_bound, right_bound )
+  assigned_user_number_range: record { nat64; nat64; };
+};
+....
+
 === Approach to upgrades
 
 We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly.
