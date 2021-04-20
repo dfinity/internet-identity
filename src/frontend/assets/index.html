@@ -7,6 +7,9 @@
     <title>Internet Identity</title>
   </head>
   <body>
+    <header>
+      <button id="logout-button">Logout</button>
+    </header>
     <main>
       <h1>Internet Identity</h1>
       <div class="spacer"></div>
@@ -103,6 +106,25 @@
           </p>
           <input type="text" id="addDeviceLink" readonly />
         </section>
+      </web-dialog>
+      <web-dialog id="prompt">
+        <form action="" id="prompt-form">
+          <p id="prompt-text"></p>
+          <input type="text" id="prompt-input" />
+          <p class="details"></p>
+          <button type="button" id="prompt-cancel">Cancel</button>
+          <button type="submit">Confirm</button>
+        </form>
+      </web-dialog>
+      <web-dialog id="confirm">
+        <form action="" id="confirm-form">
+          <p id="confirm-text"></p>
+          <p class="details"></p>
+          <div class="flex row">
+            <button type="submit">Confirm</button>
+            <button type="button" id="confirm-cancel">Cancel</button>
+          </div>
+        </form>
       </web-dialog>
     </main>
     <script src="index.js"></script>

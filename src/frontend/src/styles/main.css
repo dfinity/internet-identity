@@ -142,6 +142,20 @@ ul {
   margin-bottom: 1rem;
 }
 
+.details:empty {
+  display: none;
+}
+
+#confirm button,
+#prompt button {
+  margin-right: 1rem;
+}
+
+#prompt-input {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.2rem;
+}
+
 /* large screen break */
 @media (min-width: 1200px) {
   dialog {
