@@ -301,7 +301,7 @@ type UserDeviceList = vec(record {
 
 ==== Proof of work nonces
 
-In order to implement `register` as specified above, the Canister maintains the set of `nonce` values that were used recently (last 10 minutes) in a call to `register`. This set implemented using a priority queue.
+In order to implement `register` as specified above, the Canister maintains the set of `nonce` values that were used recently (last 10 minutes) in a call to `register`.
 
 The proof of work puzzle is checked both in `canister_inspect_message` as well as in the actual `register` method call. Ideally, the `register` method never traps if `canister_inspect_message` wouldn’t trap as well, so that the canister can remember seeing a certain nonce.
 
