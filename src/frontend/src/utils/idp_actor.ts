@@ -30,8 +30,10 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 
+const hostUrl = "http://dcs-messaging-13.dfinity.systems:8080/";
+
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
-  agent: new HttpAgent(),
+  agent: new HttpAgent({host: hostUrl}),
   canisterId: idp_canister_id,
 });
 
@@ -110,7 +112,7 @@ export class IDPActor {
         this._chain
       );
 
-      const agent = new HttpAgent({ identity: delegationIdentity });
+      const agent = new HttpAgent({ host: hostUrl, identity: delegationIdentity });
       this._actor = Actor.createActor<_SERVICE>(idp_idl, {
         agent,
         canisterId: idp_canister_id,
