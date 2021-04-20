@@ -51,10 +51,11 @@ const handleLoginClick = async () => {
   if (idp_actor.userId) {
     // Make the user reauthenticate
     await idp_actor.reconnect().then(() => postReconnect());
+  } else {
+    // Otherwise, open dialog for fallback options
+    toggleDialog();
   }
 
-  // Otherwise, open dialog for fallback options
-  toggleDialog();
 };
 
 const handleReconnectClick = async () => {
