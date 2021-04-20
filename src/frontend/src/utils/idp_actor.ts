@@ -175,9 +175,9 @@ export class IDPActor {
     const credentialId = this.getCredentialId() ?? [];
 
     const actor = await this.getActor();
-    // console.log(
-    //   `register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`
-    // );
+    console.log(
+       `register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`
+     );
 
     const userId = await actor.register({
       alias,
@@ -222,9 +222,9 @@ export class IDPActor {
     hostname: FrontendHostname,
     sessionKey: SessionKey
   ) => {
-    // console.log(
-    //   `prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`
-    // );
+    console.log(
+       `prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`
+    );
     if (!!this.userId) {
       const actor = await this.getActor();
       return await actor.prepare_delegation(this.userId, hostname, sessionKey);
@@ -238,9 +238,9 @@ export class IDPActor {
     sessionKey: SessionKey,
     timestamp: Timestamp
   ) => {
-    // console.log(
-    //   `get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
-    // );
+    console.log(
+       `get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+    );
     if (!!this.userId) {
       const actor = await this.getActor();
       return await actor.get_delegation(
