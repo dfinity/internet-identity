@@ -84,16 +84,6 @@ export class IDPActor {
     return baseActor.lookup(userId);
   };
 
-  // public get publicKey(): PublicKey {
-  //     return Array.from(this.identity.getPublicKey().toDer());
-  // }
-
-  // public getCredentialId(): [] | [CredentialId] {
-  //      this.identity.rawId
-  //       ? [Array.from(this.identity.rawId)]
-  //       : [];
-  // }
-
   // Create a actor representing the backend using the stored identity
   // fails if is not there yet
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
@@ -173,6 +163,7 @@ export class IDPActor {
 const requestFEDelegation = async (identity: SignIdentity): Promise<DelegationIdentity> => {
   const sessionKey = Ed25519KeyIdentity.generate();
   const tenMinutesInMsec = 10 * 1000 * 60;
+  // Here the security device is used. Besides creating new keys, this is the only place.
   const chain = await DelegationChain.create(
     identity,
     sessionKey.getPublicKey(),
@@ -187,7 +178,7 @@ const requestFEDelegation = async (identity: SignIdentity): Promise<DelegationId
   );
 }
 
-// Poor man's IORef
+// A global singleton
 const idp_actor: { connection: IDPActor | undefined } = { connection: undefined };
 
 export default idp_actor;
