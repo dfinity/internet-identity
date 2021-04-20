@@ -33,13 +33,16 @@ const checkForAddUserHash = async () => {
     if (parsedParams !== null) {
       const { userId, publicKey, rawId } = parsedParams;
       console.log("Adding new device with:", parsedParams);
-      let deviceName: string;
       try {
-        deviceName = await prompt("What should we call this device?");
+        const deviceName = await prompt("What should we call this device?");
+        await idp_actor.add(BigInt(userId), deviceName, publicKey, rawId);
       } catch (error) {
-        deviceName = "anonymous device";
+        // If anything goes wrong, or the user cancels we do _not_ want to add the device.
+        console.log(`Canceled adding the device with ${error}`);
+        // TODO: Clear the hash & Error page? Or redirect to manage?
+        return
       }
-      await idp_actor.add(BigInt(userId), deviceName, publicKey, rawId);
+      // TODO: Clear the hash
       renderIdentities();
     }
   }
