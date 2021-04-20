@@ -1,18 +1,10 @@
 import idp_actor from "../utils/idp_actor";
-import {
-  DelegationChain,
-  WebAuthnIdentity,
-  Delegation,
-  Ed25519PublicKey,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { canisterId as signingCanisterId } from "dfx-generated/idp_service";
+import { DelegationChain, Delegation } from "@dfinity/identity";
 import {
   Principal,
   blobFromUint8Array,
   derBlobFromBlob,
   blobFromHex,
-  blobToHex,
 } from "@dfinity/agent";
 
 // types
@@ -23,7 +15,11 @@ export declare type OAuth2AccessTokenResponse = {
   state?: string;
   scope?: string;
 };
-import { FrontendHostname, SignedDelegation as CandidSignedDelegation } from "../typings";
+import {
+  FrontendHostname,
+  GetDelegationResponse,
+  SignedDelegation as CandidSignedDelegation,
+} from "../typings";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -109,19 +105,17 @@ export default function () {
         const hostname = new URL(params.redirect_uri)
           .hostname as FrontendHostname;
         if (checkConsent(hostname)) {
-          generate_access_token(
-            WebAuthnIdentity.fromJSON(identity),
-            params.login_hint,
-            hostname
-          ).then((access_token: string) => {
-            redirectToApp(params.redirect_uri, {
-              access_token: access_token,
-              token_type: "bearer",
-              expires_in: THREE_DAYS,
-              scope: params.scope,
-              state: params.state,
-            });
-          });
+          generate_access_token(params.login_hint, hostname).then(
+            (access_token: string) => {
+              redirectToApp(params.redirect_uri, {
+                access_token: access_token,
+                token_type: "bearer",
+                expires_in: THREE_DAYS,
+                scope: params.scope,
+                state: params.state,
+              });
+            }
+          );
         } else {
           // TODO: redirect with failure message
           const url = new URL(params.redirect_uri);
@@ -165,7 +159,6 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 }
 
 async function generate_access_token(
-  identity: WebAuthnIdentity,
   login_hint: string,
   hostname: FrontendHostname
 ) {
@@ -178,10 +171,11 @@ async function generate_access_token(
     );
   }
 
-  const userKey = prepRes[0];
-  const timestamp = prepRes[1];
+  const [userKey, timestamp] = prepRes;
 
   const getRes = await idp_actor.getDelegation(hostname, sessionKey, timestamp);
+
+  // this is just so we filter out null responses
   if (!isDelegationResponse(getRes)) {
     throw Error(`Could not get delegation. Result received: ${getRes}`);
   }
@@ -201,8 +195,6 @@ async function generate_access_token(
     derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
   );
 
-  console.log("Delegation chain");
-  console.log(chain);
   const chainJson = JSON.stringify(chain.toJSON());
   console.log("Delegation chain JSON");
   console.log(chainJson);
