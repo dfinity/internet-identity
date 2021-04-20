@@ -30,7 +30,8 @@ const pageContent = () => html`<section id="intro">
         <button type="button" id="confirm-cancel">Cancel</button>
       </div>
     </form>
-  </web-dialog>`;
+  </web-dialog>
+  <div id="notification"></div>`;
 
 export const renderManage = () => {
   const container = document.getElementById("pageContent") as HTMLElement;
