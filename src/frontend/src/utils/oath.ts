@@ -3,7 +3,6 @@ import {
   DelegationChain,
   WebAuthnIdentity,
   Delegation,
-  SignedDelegation,
   Ed25519PublicKey,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
@@ -24,7 +23,7 @@ export declare type OAuth2AccessTokenResponse = {
   state?: string;
   scope?: string;
 };
-import { FrontendHostname } from "../typings";
+import { FrontendHostname, SignedDelegation as CandidSignedDelegation } from "../typings";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -188,8 +187,17 @@ async function generate_access_token(
   }
   const { signed_delegation } = getRes;
 
+  // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+  const parsed_signed_delegation = {
+    delegation: new Delegation(
+      blobFromUint8Array(Uint8Array.from(signed_delegation.delegation.pubkey)),
+      BigInt(signed_delegation.delegation.expiration)
+    ),
+    signature: blobFromUint8Array(Uint8Array.from(signed_delegation.signature)),
+  };
+
   const chain = DelegationChain.fromDelegations(
-    [signed_delegation],
+    [parsed_signed_delegation],
     derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
   );
 
@@ -204,7 +212,7 @@ async function generate_access_token(
 
 function isDelegationResponse(
   x: any
-): x is { signed_delegation: SignedDelegation } {
+): x is { signed_delegation: CandidSignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }
 
