@@ -24,7 +24,7 @@ export declare type OAuth2AccessTokenResponse = {
   state?: string;
   scope?: string;
 };
-import { FrontendHostname } from "../typings";
+import { FrontendHostname, SignedDelegation as CandidSignedDelegation } from "../typings";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -185,7 +185,8 @@ async function generate_access_token(
   }
   const { signed_delegation } = getRes;
 
-  const signed_delegation2 = {
+  // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+  const parsed_signed_delegation = {
     delegation: new Delegation(
       blobFromUint8Array(Uint8Array.from(signed_delegation.delegation.pubkey)),
       BigInt(signed_delegation.delegation.expiration)
@@ -194,7 +195,7 @@ async function generate_access_token(
   };
 
   const chain = DelegationChain.fromDelegations(
-    [signed_delegation2],
+    [parsed_signed_delegation],
     derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
   );
 
@@ -207,7 +208,7 @@ async function generate_access_token(
   return new Buffer(chainJson).toString('hex');
 }
 
-function isDelegationResponse(x: any): x is { signed_delegation: SignedDelegation } {
+function isDelegationResponse(x: any): x is { signed_delegation: CandidSignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }
 
