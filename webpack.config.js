@@ -39,7 +39,6 @@ function generateWebpackConfigForCanister(name, info) {
     mode: process.env.NODE_ENV === "production" ? "production" : "development",
     entry: {
       index: path.join(__dirname, "src", "frontend", "src", "index"),
-      manage: path.join(__dirname, "src", "frontend", "src", "manage"),
     },
     devtool,
     optimization: {

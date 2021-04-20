@@ -1,6 +1,7 @@
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import idp_actor from "../utils/idp_actor";
 import oauth from "../utils/oath";
+import { navigateTo } from "../utils/router";
 
 export const initExistingUser = () => {
   bindListeners();
@@ -75,7 +76,7 @@ function postReconnect() {
   if (window.location.href.match(/authorize/)) {
     oauth();
   } else {
-    window.location.assign("/manage");
+    navigateTo("/manage");
   }
 }
 

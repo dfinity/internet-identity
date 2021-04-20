@@ -6,14 +6,15 @@ import {
 } from "@dfinity/agent";
 import { identityListItem } from "../../templates/identityListItem";
 import idp_actor from "../utils/idp_actor";
-import { prompt } from "../utils/prompt";
+import { prompt } from "../components/prompt";
+import { navigateTo } from "../utils/router";
 
 export const initManageIdentities = () => {
   // TODO - Check alias for current identity, and populate #nameSpan
 
   if (idp_actor.userId === undefined) {
     // If we haven't established a userId, we need to authenticate.
-    location.assign(location.href.replace("manage", "index"));
+    navigateTo(location.href.replace("manage", "index"));
     return;
   }
 

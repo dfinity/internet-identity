@@ -1,4 +1,4 @@
-import { confirm } from "../utils/confirm";
+import { confirm } from "../components/confirm";
 import idp_actor from "../utils/idp_actor";
 
 export const initLogout = () => {

@@ -4,15 +4,13 @@ import oauth from "./utils/oath";
 import "web-dialog";
 import "./styles/main.css";
 import { initLogout } from "./flows/logout";
+import { renderIndex } from "./pages";
+import { renderManage } from "./pages/manage";
+import { routerInit } from "./utils/router";
 
 const init = () => {
-  if (window.location.href.match(/authorize/)) {
-    oauth();
-  }
-  // Initialize our flows
-  initExistingUser();
-  initNewUser();
   initLogout();
+  routerInit();
 };
 
 init();
