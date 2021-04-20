@@ -1,9 +1,25 @@
+import { html, render } from "lit-html";
 import { WebDialog } from "web-dialog";
+
+const dialog = (question: string, secondaryMessage?: string) => html`<web-dialog
+  id="confirm"
+>
+  <form action="" id="confirm-form">
+    <p id="confirm-text">${question}</p>
+    <p class="details">${secondaryMessage}</p>
+    <div class="flex row">
+      <button type="submit">Confirm</button>
+      <button type="button" id="confirm-cancel">Cancel</button>
+    </div>
+  </form>
+</web-dialog>`;
 
 export const confirm = (
   question: string,
   secondaryMessage?: string
 ): Promise<boolean> => {
+  const container = document.getElementById("notification") as HTMLElement;
+  render(dialog(question, secondaryMessage), container);
   const confirmDialog = document.querySelector("#confirm") as WebDialog;
   const confirmForm = document.querySelector(
     "#confirm-form"
@@ -19,10 +35,7 @@ export const confirm = (
   ) as HTMLParagraphElement;
 
   const closeConfirm = (reject?: (e: any) => void) => {
-    confirmDialog.removeAttribute("open");
-    confirmText.innerText = "";
-    details.innerText = "";
-    confirmForm.onsubmit = null;
+    container.innerHTML = "";
     reject?.(false);
   };
 
