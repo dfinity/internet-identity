@@ -1,19 +1,10 @@
 import idp_actor from "../utils/idp_actor";
-import {
-  DelegationChain,
-  WebAuthnIdentity,
-  Delegation,
-  SignedDelegation,
-  Ed25519PublicKey,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { canisterId as signingCanisterId } from "dfx-generated/idp_service";
+import { DelegationChain, Delegation } from "@dfinity/identity";
 import {
   Principal,
   blobFromUint8Array,
   derBlobFromBlob,
   blobFromHex,
-  blobToHex,
 } from "@dfinity/agent";
 
 // types
@@ -24,7 +15,11 @@ export declare type OAuth2AccessTokenResponse = {
   state?: string;
   scope?: string;
 };
-import { FrontendHostname } from "../typings";
+import {
+  FrontendHostname,
+  GetDelegationResponse,
+  SignedDelegation,
+} from "../typings";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -107,21 +102,20 @@ export default function () {
       const identity = localStorage.getItem("identity");
       if (identity !== null) {
         // does the user consent?
-        const hostname = new URL(params.redirect_uri).hostname as FrontendHostname;
+        const hostname = new URL(params.redirect_uri)
+          .hostname as FrontendHostname;
         if (checkConsent(hostname)) {
-          generate_access_token(
-            WebAuthnIdentity.fromJSON(identity),
-            params.login_hint,
-            hostname,
-          ).then((access_token: string) => {
-            redirectToApp(params.redirect_uri, {
-              access_token: access_token,
-              token_type: "bearer",
-              expires_in: THREE_DAYS,
-              scope: params.scope,
-              state: params.state,
-            });
-          });
+          generate_access_token(params.login_hint, hostname).then(
+            (access_token: string) => {
+              redirectToApp(params.redirect_uri, {
+                access_token: access_token,
+                token_type: "bearer",
+                expires_in: THREE_DAYS,
+                scope: params.scope,
+                state: params.state,
+              });
+            }
+          );
         } else {
           // TODO: redirect with failure message
           const url = new URL(params.redirect_uri);
@@ -165,41 +159,66 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 }
 
 async function generate_access_token(
-  identity: WebAuthnIdentity,
   login_hint: string,
-  hostname: FrontendHostname,
+  hostname: FrontendHostname
 ) {
   const sessionKey = Array.from(blobFromHex(login_hint));
 
   const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
   if (!prepRes || prepRes.length != 2) {
-    throw new Error(`Error preparing the delegation. Result received: ${prepRes}`);
+    throw new Error(
+      
+      
+      
+      `Error preparing the delegation. Result received: ${prepRes}`
+    
+    
+    
+    );
   }
 
-  const userKey = prepRes[0];
-  const timestamp = prepRes[1];
+  const [userKey, timestamp] = prepRes;
 
   const getRes = await idp_actor.getDelegation(hostname, sessionKey, timestamp);
+
+  // this is just so we filter out null responses
   if (!isDelegationResponse(getRes)) {
     throw Error(`Could not get delegation. Result received: ${getRes}`);
   }
   const { signed_delegation } = getRes;
-
-  const chain = DelegationChain.fromDelegations(
-    [signed_delegation],
-    derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
+  const { delegation: rawDelegation } = signed_delegation;
+  // it's kinda gross that we have to create a "new" Delegation
+  // but to keep types compatible, we must.
+  const delegation = new Delegation(
+    blobFromUint8Array(new Uint8Array(rawDelegation.pubkey)),
+    rawDelegation.expiration,
+    rawDelegation.targets.map((m: any) => Principal.from(m))
   );
 
-  console.log("Delegation chain");
-  console.log(chain);
-  const chainJson = JSON.stringify(chain.toJSON());
-  console.log("Delegation chain JSON");
-  console.log(chainJson);
+  const signatureAsBlob = blobFromUint8Array(
+    new Uint8Array(signed_delegation.signature)
+  );
+  const publicKey = derBlobFromBlob(
+    blobFromUint8Array(Uint8Array.from(userKey))
+  );
+  const chain = DelegationChain.fromDelegations(
+    [
+      {
+        delegation: delegation,
+        signature: signatureAsBlob,
+      },
+    ],
+    publicKey
+  );
 
-  return new Buffer(chainJson).toString('hex');
+  const chainJson = JSON.stringify(chain.toJSON());
+  const chainAsHex = Buffer.from(chainJson).toString("hex");
+  return chainAsHex;
 }
 
-function isDelegationResponse(x: any): x is { signed_delegation: SignedDelegation } {
+function isDelegationResponse(
+  x: any
+): x is { signed_delegation: SignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }
 
@@ -208,7 +227,5 @@ export const redirectBackWithAuthorization = () => {
 };
 
 function checkConsent(hostname: FrontendHostname) {
-  return prompt(
-    `Do you want to log into ${hostname}? [y/n]`
-  )?.match(/y/i);
+  return prompt(`Do you want to log into ${hostname}? [y/n]`)?.match(/y/i);
 }

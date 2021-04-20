@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.8.2",
+    "@dfinity/agent": "0.8.3",
     "@testing-library/jest-dom": "^5.11.10",
     "@types/jest": "^24.9.1",
     "assert": "2.0.0",
@@ -36,8 +36,8 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/authentication": "^0.7.1",
-    "@dfinity/identity": "^0.8.2",
+    "@dfinity/authentication": "0.8.3",
+    "@dfinity/identity": "0.8.3",
     "css-loader": "^5.2.1",
     "style-loader": "^2.0.0",
     "web-dialog": "^0.0.11"

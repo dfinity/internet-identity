@@ -1,10 +1,27 @@
-import { Actor, ActorSubclass, BinaryBlob, blobFromUint8Array, blobToHex, DerEncodedBlob, HttpAgent } from "@dfinity/agent";
+import {
+  Actor,
+  ActorSubclass,
+  BinaryBlob,
+  DerEncodedBlob,
+  HttpAgent,
+} from "@dfinity/agent";
 import {
   idlFactory as idp_idl,
   canisterId as idp_canister_id,
 } from "dfx-generated/idp_service";
-import _SERVICE, { PublicKey, SessionKey, CredentialId, UserNumber, FrontendHostname, Timestamp } from "../typings";
-import { tryLoadIdentity, authenticate, authenticateFresh, persistIdentity } from "./handleAuthentication";
+import _SERVICE, {
+  PublicKey,
+  SessionKey,
+  CredentialId,
+  UserNumber,
+  FrontendHostname,
+  Timestamp,
+} from "../typings";
+import {
+  tryLoadIdentity,
+  authenticateFresh,
+  persistIdentity,
+} from "./handleAuthentication";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -26,10 +43,7 @@ export class IDPActor {
     return new this(tryLoadIdentity());
   }
 
-  protected constructor(
-    public storedIdentity?: WebAuthnIdentity,
-  ) {
-  }
+  protected constructor(public storedIdentity?: WebAuthnIdentity) {}
 
   public get userId(): UserNumber | undefined {
     const userId = localStorage.getItem("userId");
@@ -38,9 +52,9 @@ export class IDPActor {
 
   public set userId(userId: UserNumber | undefined) {
     if (userId !== undefined) {
-      localStorage.setItem("userId", userId.toString())
+      localStorage.setItem("userId", userId.toString());
     } else {
-      localStorage.removeItem("userId")
+      localStorage.removeItem("userId");
     }
   }
 
@@ -111,22 +125,22 @@ export class IDPActor {
     this._actor = undefined;
     this._chain = undefined;
 
-    const identities = await baseActor.lookup(this.userId!!)
+    const identities = await baseActor.lookup(this.userId!!);
     for (const row of identities) {
       const { credential_id: credentialId, pubkey } = row;
       if (credentialId.length === 0) {
         continue;
       }
 
-      console.log('row', row)
+      console.log("row", row);
       // Strip DER header
       const strippedKey = pubkey.slice(19);
-      const identity = WebAuthnIdentity.fromJSON(JSON.stringify({
-        rawId: blobToHex(blobFromUint8Array(Buffer.from(credentialId[0]))),
-        publicKey: blobToHex(blobFromUint8Array(Buffer.from(strippedKey)))
-      }))
-
-      console.log('identity', identity)
+      const webAuthnJSON = {
+        rawId: Buffer.from(credentialId[0]).toString("hex"),
+        publicKey: Buffer.from(strippedKey).toString("hex"),
+      };
+      const identity = WebAuthnIdentity.fromJSON(JSON.stringify(webAuthnJSON));
+      console.log({ identity });
 
       const sessionKey = Ed25519KeyIdentity.generate();
       const tenMinutesInMsec = 10 * 1000 * 60;
@@ -142,12 +156,12 @@ export class IDPActor {
       } catch (err) {
         continue;
       }
-      persistIdentity(identity)
+      persistIdentity(identity);
       this.storedIdentity = identity;
-      return
+      return;
     }
-    throw Error("Couldn't find a registered device match")
-  }
+    throw Error("Couldn't find a registered device match");
+  };
 
   register = async (alias: string) => {
     // user wants to register fresh, so always create new identity
@@ -161,24 +175,30 @@ export class IDPActor {
     const credentialId = this.getCredentialId() ?? [];
 
     const actor = await this.getActor();
-    console.log(`register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`);
+    // console.log(
+    //   `register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`
+    // );
 
     const userId = await actor.register({
       alias,
       pubkey: this.publicKey as PublicKey,
-      credential_id: credentialId
-    }
-    );
-    this.userId = userId
+      credential_id: credentialId,
+    });
+    this.userId = userId;
     return userId;
   };
 
-  add = async (userId: UserNumber, alias: string, newPublicKey: DerEncodedBlob, credentialId?: BinaryBlob) => {
+  add = async (
+    userId: UserNumber,
+    alias: string,
+    newPublicKey: DerEncodedBlob,
+    credentialId?: BinaryBlob
+  ) => {
     const actor = await this.getActor();
     return await actor.add(userId, {
       alias,
       pubkey: Array.from(newPublicKey),
-      credential_id: credentialId ? [Array.from(credentialId)] : []
+      credential_id: credentialId ? [Array.from(credentialId)] : [],
     });
   };
 
@@ -198,8 +218,13 @@ export class IDPActor {
     }
   };
 
-  prepareDelegation = async (hostname: FrontendHostname, sessionKey: SessionKey) => {
-    console.log(`prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`);
+  prepareDelegation = async (
+    hostname: FrontendHostname,
+    sessionKey: SessionKey
+  ) => {
+    // console.log(
+    //   `prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`
+    // );
     if (!!this.userId) {
       const actor = await this.getActor();
       return await actor.prepare_delegation(this.userId, hostname, sessionKey);
@@ -208,11 +233,22 @@ export class IDPActor {
     return null;
   };
 
-  getDelegation = async (hostname: FrontendHostname, sessionKey: SessionKey, timestamp: Timestamp) => {
-    console.log(`get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`);
+  getDelegation = async (
+    hostname: FrontendHostname,
+    sessionKey: SessionKey,
+    timestamp: Timestamp
+  ) => {
+    // console.log(
+    //   `get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+    // );
     if (!!this.userId) {
       const actor = await this.getActor();
-      return await actor.get_delegation(this.userId, hostname, sessionKey, timestamp);
+      return await actor.get_delegation(
+        this.userId,
+        hostname,
+        sessionKey,
+        timestamp
+      );
     }
     console.warn("Could not get delegation. User must authenticate first");
     return null;
