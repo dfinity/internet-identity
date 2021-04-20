@@ -12,6 +12,11 @@ span {
   font-size: 1.2rem;
 }
 
+input {
+  padding: 0.75rem 0.5rem;
+  border-radius: 4px;
+}
+
 img {
   min-width: 500px;
   width: 50vw;
@@ -153,7 +158,6 @@ ul {
 
 #prompt-input {
   margin-bottom: 1rem;
-  padding: 0.75rem 0.2rem;
 }
 
 #logout-button {
