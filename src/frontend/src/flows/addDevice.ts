@@ -1,5 +1,6 @@
 import { BinaryBlob, blobFromHex, derBlobFromBlob, DerEncodedBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
+import { confirm } from "../components/confirm";
 import { prompt } from "../components/prompt";
 import { IDPActor } from "../utils/idp_actor";
 
@@ -33,20 +34,23 @@ const init = (userId: bigint, connection: IDPActor) => {
         if (!!parsedParams) {
             const { userId: expectedUserId, publicKey, rawId } = parsedParams;
             if (expectedUserId !== userId) {
-                // TODO: Here we're adding a device to our userId that 
-                // was supposed to be added to a different one.
-                // Display a proper error here
-                throw Error(`Tried adding a device for user ${expectedUserId}, but current user is ${userId}. Aborting`)
+                // Here we're adding a device to our userId that was supposed to be added to a different one.
+                await confirm(
+                    "Tried adding a device for the wrong user id.",
+                    `Current user is ${expectedUserId}, but current user is ${userId}. Please choose the correct user id when creating the add device link`
+                )
+                return
             }
             console.log("Adding new device with:", parsedParams);
             try {
                 const deviceName = await prompt("What should we call this device?");
                 await connection.add(userId, deviceName, publicKey, rawId);
                 const container = document.getElementById("pageContent") as HTMLElement;
+                // TODO: Clear the hash
                 render(afterAddPageContent(deviceName), container);
             } catch (error) {
                 // If anything goes wrong, or the user cancels we do _not_ want to add the device.
-                console.log(`Canceled adding the device with ${error}`);
+                await confirm("Failed to add the device.", `Canceled adding the device with ${error}`)
                 // TODO: Clear the hash & Error page? Or redirect to manage?
                 return
             }

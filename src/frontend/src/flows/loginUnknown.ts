@@ -2,9 +2,7 @@ import { blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
-import { resetForm } from "../utils/resetForm";
 import { setUserId } from "../utils/userId";
-import { afterLogin } from "./afterLogin";
 
 const pageContent = () => html`<h1>Internet Identity</h1>
         <div class="spacer"></div>
@@ -81,15 +79,28 @@ const pageContent = () => html`<h1>Internet Identity</h1>
         </web-dialog>
         <div id="notification"></div>`;
 
-export const loginUnknown = () => {
+
+export type LoginResult = {
+    tag: "ok",
+    userId: bigint,
+    connection: IDPActor
+} | {
+    tag: "err",
+    message: string,
+    detail: string,
+}
+
+export const loginUnknown = async (): Promise<LoginResult> => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(pageContent(), container);
-    initRegisterForm();
-    initLogin();
-    initLinkDevice();
+    return new Promise(resolve => {
+        initRegisterForm(resolve);
+        initLogin(resolve);
+        initLinkDevice();
+    })
 };
 
-const initRegisterForm = () => {
+const initRegisterForm = (resolve: (loginResult: LoginResult) => void) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const submitButton = form.querySelector(
         'button[type="submit"]'
@@ -107,12 +118,11 @@ const initRegisterForm = () => {
 
         // Send values through actor
         IDPActor.register(registerAlias.value).then(({ connection, userId }) => {
-            resetForm(form);
             setUserId(userId);
-            afterLogin(userId, connection)
+            resolve({ tag: "ok", userId, connection })
         }).catch((err) => {
             console.error(err);
-            submitButton.removeAttribute("disabled");
+            resolve({ tag: "err", message: "Failed to register a new Internet Identity.", detail: err.toString() })
         });
         return false;
     };
@@ -120,7 +130,7 @@ const initRegisterForm = () => {
     form.onsubmit = handleSubmit;
 }
 
-const initLogin = () => {
+const initLogin = (resolve) => {
     const userIdInput = document.getElementById(
         "registerUserNumber"
     ) as HTMLInputElement;
@@ -133,10 +143,10 @@ const initLogin = () => {
         if (userId) {
             IDPActor.reconnect(userId).then(connection => {
                 setUserId(userId);
-                afterLogin(userId, connection);
+                resolve({ tag: "ok", userId, connection });
             });
         } else {
-            console.error("Not a valid user id");
+            resolve({ tag: "err", message: "Please enter a valid userId", detail: `${userId} doesn't parse as a number` })
         }
     }
 };

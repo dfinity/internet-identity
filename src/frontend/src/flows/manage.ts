@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { identityListItem } from "../../templates/identityListItem";
+import { identityListItem } from "../components/identityListItem";
 import { IDPActor } from "../utils/idp_actor";
 
 const pageContent = () => html`<section id="intro">
@@ -44,9 +44,6 @@ export const renderManage = (userId: bigint, connection: IDPActor) => {
 export const init = async (userId, connection) => {
     // TODO - Check alias for current identity, and populate #nameSpan
     displayUserId(userId);
-
-    // TODO: If this fails display an error message and suggest 
-    // the user try again with a different user id?
     renderIdentities(connection, userId);
 };
 
