@@ -156,6 +156,11 @@ ul {
   padding: 0.75rem 0.2rem;
 }
 
+#logout-button {
+  display: flex;
+  margin-left: auto;
+}
+
 /* large screen break */
 @media (min-width: 1200px) {
   dialog {
