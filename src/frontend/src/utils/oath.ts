@@ -3,7 +3,6 @@ import {
   DelegationChain,
   WebAuthnIdentity,
   Delegation,
-  SignedDelegation,
   Ed25519PublicKey,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
