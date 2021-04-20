@@ -9,14 +9,14 @@ use std::fmt;
 use std::marker::PhantomData;
 
 const HEADER_SIZE: u32 = 512;
-const ENTRY_SIZE: u32 = 512;
-const VALUE_SIZE_LIMIT: usize = ENTRY_SIZE as usize - std::mem::size_of::<u16>();
+const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const WASM_PAGE_SIZE: u32 = 65536;
 
 /// Data type responsible for managing user data in stable memory.
 pub struct Storage<T> {
     num_users: u32,
     user_number_range: (UserNumber, UserNumber),
+    entry_size: u16,
     _marker: PhantomData<T>,
 }
 
@@ -27,6 +27,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let storage = Self {
             num_users: 0,
             user_number_range,
+            entry_size: DEFAULT_ENTRY_SIZE,
             _marker: PhantomData,
         };
         storage
@@ -43,7 +44,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             return None;
         }
 
-        let mut buf: [u8; 24] = [0; 24];
+        let mut buf: [u8; 26] = [0; 26];
         stable_read(0, &mut buf);
         if &buf[0..3] != b"IIC" {
             trap(&format!(
@@ -57,9 +58,11 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let num_users = u32::from_le_bytes(buf[4..8].try_into().unwrap());
         let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
         let id_range_hi = u64::from_le_bytes(buf[16..24].try_into().unwrap());
+        let entry_size = u16::from_le_bytes(buf[24..26].try_into().unwrap());
         Some(Self {
             num_users,
             user_number_range: (id_range_lo, id_range_hi),
+            entry_size,
             _marker: PhantomData,
         })
     }
@@ -82,15 +85,15 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
+        let stable_offset = HEADER_SIZE + record_number * self.entry_size as u32;
         let buf = candid::ser::encode_one(data).map_err(StorageError::SerializationError)?;
 
-        if buf.len() > VALUE_SIZE_LIMIT {
+        if buf.len() > self.value_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
         let current_size = stable_size();
-        let pages = (stable_offset + ENTRY_SIZE + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+        let pages = (stable_offset + self.entry_size as u32 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         if pages > current_size {
             let pages_to_grow = pages - current_size;
             let result = stable_grow(pages - current_size);
@@ -110,20 +113,21 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
-        if stable_offset + ENTRY_SIZE > stable_size() * WASM_PAGE_SIZE {
+        let stable_offset = HEADER_SIZE + record_number * self.entry_size as u32;
+        if stable_offset + self.entry_size as u32 > stable_size() * WASM_PAGE_SIZE {
             trap("a record for a valid user number is out of stable memory bounds");
         }
 
-        let mut buf: [u8; ENTRY_SIZE as usize] = [0; 512];
+        let mut buf = vec![0; self.entry_size as usize];
         stable_read(stable_offset, &mut buf);
         let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
-        if len > VALUE_SIZE_LIMIT {
+        if len > self.value_size_limit() {
             trap(&format!(
                 "persisted value size {} exeeds maximum size {}",
-                len, VALUE_SIZE_LIMIT
+                len,
+                self.value_size_limit()
             ))
         }
 
@@ -141,12 +145,17 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 trap("failed to grow stable memory by 1 page");
             }
         }
-        let mut buf: [u8; 24] = [0; 24];
+        let mut buf: [u8; 26] = [0; 26];
         buf[0..4].copy_from_slice(b"IIC\x01");
         buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
         buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());
         buf[16..24].copy_from_slice(&self.user_number_range.1.to_le_bytes());
+        buf[24..26].copy_from_slice(&self.entry_size.to_le_bytes());
         stable_write(0, &buf);
+    }
+
+    fn value_size_limit(&self) -> usize {
+        self.entry_size as usize - std::mem::size_of::<u16>()
     }
 
     fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
