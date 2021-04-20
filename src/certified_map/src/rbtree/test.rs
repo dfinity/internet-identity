@@ -204,4 +204,8 @@ fn test_nested_witness() {
         }
         other => panic!("expected a labeled tree, got {:?}", other),
     }
+
+    rb.modify(b"top", |m| m.delete(b"bottom"));
+    let ht = rb.nested_witness(&b"top"[..], |v| v.witness(&b"bottom"[..]));
+    assert_eq!(ht.reconstruct(), rb.root_hash());
 }
