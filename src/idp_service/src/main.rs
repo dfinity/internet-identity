@@ -89,7 +89,7 @@ struct StreamingCallbackHttpResponse {
 }
 
 struct State {
-    storage: RefCell<Storage>,
+    storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
 }
 
@@ -121,7 +121,9 @@ fn register(device_data: DeviceData) -> UserNumber {
         }
 
         let mut store = s.storage.borrow_mut();
-        let user_number = store.allocate_user_number();
+        let user_number = store
+            .allocate_user_number()
+            .unwrap_or_else(|| trap("failed to allocate a new user number"));
         store
             .write_device_data(user_number, vec![device_data])
             .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
@@ -350,8 +352,13 @@ fn init() {
 fn retrieve_data() {
     init_assets();
     STATE.with(|s| {
-        if let Some(storage) = Storage::from_stable_memory() {
-            s.storage.replace(storage);
+        match Storage::from_stable_memory() {
+            Some(storage) => {
+                s.storage.replace(storage);
+            }
+            None => {
+                s.storage.borrow().flush();
+            }
         }
 
         // We drop all the signatures on upgrade, users will

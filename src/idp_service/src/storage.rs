@@ -1,27 +1,31 @@
-use super::{DeviceData, UserNumber};
+use super::UserNumber;
 use ic_cdk::api::stable::{stable_grow, stable_read, stable_size, stable_write};
 use ic_cdk::export::candid;
 use std::convert::TryInto;
 use std::fmt;
+use std::marker::PhantomData;
 
 const HEADER_SIZE: u32 = 512;
 const ENTRY_SIZE: u32 = 512;
+const VALUE_SIZE_LIMIT: usize = ENTRY_SIZE as usize - std::mem::size_of::<u16>();
 const WASM_PAGE_SIZE: u32 = 65536;
 
 /// Data type responsible for managing user device data in stable
 /// memory.
-pub struct Storage {
+pub struct Storage<T> {
     num_users: u32,
     user_number_range: (UserNumber, UserNumber),
+    _marker: PhantomData<T>,
 }
 
-impl Storage {
+impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// Create a new empty storage that manages the data of users in
     /// the specified range.
     pub fn new(user_number_range: (UserNumber, UserNumber)) -> Self {
         let storage = Self {
             num_users: 0,
             user_number_range,
+            _marker: PhantomData,
         };
         storage
     }
@@ -51,29 +55,32 @@ impl Storage {
         Some(Self {
             num_users,
             user_number_range: (id_range_lo, id_range_hi),
+            _marker: PhantomData,
         })
     }
 
-    /// Allocate a fresh user number.
-    pub fn allocate_user_number(&mut self) -> UserNumber {
+    /// Allocates a fresh user number.
+    ///
+    /// Returns None if the range of user number assigned to this
+    /// storage is exhausted.
+    pub fn allocate_user_number(&mut self) -> Option<UserNumber> {
         let user_number = self.user_number_range.0 + self.num_users as u64;
+        if user_number >= self.user_number_range.1 {
+            return None;
+        }
         self.num_users += 1;
         self.write_header();
-        user_number
+        Some(user_number)
     }
 
     /// Write the device data of the specified user to stable memory.
-    pub fn write_device_data(
-        &self,
-        user_number: UserNumber,
-        data: Vec<DeviceData>,
-    ) -> Result<(), StorageError> {
+    pub fn write_device_data(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
         let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
-        let buf = candid::ser::encode_args((data,)).map_err(StorageError::SerializationError)?;
+        let buf = candid::ser::encode_one(data).map_err(StorageError::SerializationError)?;
 
-        if buf.len() > ENTRY_SIZE as usize - std::mem::size_of::<u16>() {
+        if buf.len() > VALUE_SIZE_LIMIT {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
@@ -94,10 +101,7 @@ impl Storage {
     }
 
     /// Read the device data of the specified user from stable memory.
-    pub fn read_device_data(
-        &self,
-        user_number: UserNumber,
-    ) -> Result<Vec<DeviceData>, StorageError> {
+    pub fn read_device_data(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
         let stable_offset = HEADER_SIZE + record_number * ENTRY_SIZE;
@@ -109,8 +113,16 @@ impl Storage {
         stable_read(stable_offset, &mut buf);
         let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
 
-        let (data,): (Vec<DeviceData>,) = candid::de::decode_args(&buf[2..2 + len])
-            .map_err(StorageError::DeserializationError)?;
+        // This error most likely indicates stable memory corruption.
+        assert!(
+            len <= VALUE_SIZE_LIMIT,
+            "persisted value size {} exeeds maximum size {}",
+            len,
+            VALUE_SIZE_LIMIT
+        );
+
+        let data: T =
+            candid::de::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
 
         Ok(data)
     }
