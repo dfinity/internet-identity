@@ -180,14 +180,6 @@ async function generate_access_token(
     throw Error(`Could not get delegation. Result received: ${getRes}`);
   }
   const { signed_delegation } = getRes;
-  const { delegation: rawDelegation } = signed_delegation;
-  // it's kinda gross that we have to create a "new" Delegation
-  // but to keep types compatible, we must.
-  const delegation = new Delegation(
-    blobFromUint8Array(new Uint8Array(rawDelegation.pubkey)),
-    rawDelegation.expiration,
-    rawDelegation.targets.map((m: any) => Principal.from(m))
-  );
 
   // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
   const parsed_signed_delegation = {
