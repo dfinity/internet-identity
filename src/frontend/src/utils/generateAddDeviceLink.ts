@@ -11,7 +11,7 @@ export const generateAddDeviceLink = async (userId: bigint): Promise<{ link: str
   // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
   return {
     link: encodeURI(
-      `${location.host}/manage#device=${userId};${blobToHex(publicKey)};${rawId}`
+      `${location.host}#device=${userId};${blobToHex(publicKey)};${rawId}`
     ),
     publicKey: publicKey
   };
