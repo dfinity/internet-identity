@@ -18,7 +18,7 @@ export declare type OAuth2AccessTokenResponse = {
 import {
   FrontendHostname,
   GetDelegationResponse,
-  SignedDelegation,
+  SignedDelegation as CandidSignedDelegation,
 } from "../typings";
 
 /**
@@ -167,13 +167,7 @@ async function generate_access_token(
   const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
   if (!prepRes || prepRes.length != 2) {
     throw new Error(
-      
-      
-      
       `Error preparing the delegation. Result received: ${prepRes}`
-    
-    
-    
     );
   }
 
@@ -195,36 +189,32 @@ async function generate_access_token(
     rawDelegation.targets.map((m: any) => Principal.from(m))
   );
 
-  const signatureAsBlob = blobFromUint8Array(
-    new Uint8Array(signed_delegation.signature)
-  );
-  const publicKey = derBlobFromBlob(
-    blobFromUint8Array(Uint8Array.from(userKey))
-  );
+  // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+  const parsed_signed_delegation = {
+    delegation: new Delegation(
+      blobFromUint8Array(Uint8Array.from(signed_delegation.delegation.pubkey)),
+      BigInt(signed_delegation.delegation.expiration)
+    ),
+    signature: blobFromUint8Array(Uint8Array.from(signed_delegation.signature)),
+  };
+
   const chain = DelegationChain.fromDelegations(
-    [
-      {
-        delegation: delegation,
-        signature: signatureAsBlob,
-      },
-    ],
-    publicKey
+    [parsed_signed_delegation],
+    derBlobFromBlob(blobFromUint8Array(Uint8Array.from(userKey)))
   );
 
   const chainJson = JSON.stringify(chain.toJSON());
-  const chainAsHex = Buffer.from(chainJson).toString("hex");
-  return chainAsHex;
+  console.log("Delegation chain JSON");
+  console.log(chainJson);
+
+  return new Buffer(chainJson).toString("hex");
 }
 
 function isDelegationResponse(
   x: any
-): x is { signed_delegation: SignedDelegation } {
+): x is { signed_delegation: CandidSignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }
-
-export const redirectBackWithAuthorization = () => {
-  debugger;
-};
 
 function checkConsent(hostname: FrontendHostname) {
   return prompt(`Do you want to log into ${hostname}? [y/n]`)?.match(/y/i);
