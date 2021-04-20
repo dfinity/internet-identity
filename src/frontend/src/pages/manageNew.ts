@@ -1,0 +1,98 @@
+import { render, html } from "lit-html";
+import { identityListItem } from "../../templates/identityListItem";
+import { IDPActor } from "../utils/idp_actor";
+
+const pageContent = () => html`<section id="intro">
+    <h1>Identity Management</h1>
+    <h3>Welcome <span id="nameSpan"></span></h3>
+    <p>You can view and manage your Internet Computer identities here.</p>
+  </section>
+  <section id="userIdSection" class="hidden">
+    <h3>Your user id is <span id="userIdSpan"></span></h3>
+  </section>
+  <section id="identityList"></section>
+  <web-dialog id="prompt">
+    <form action="" id="prompt-form">
+      <p id="prompt-text"></p>
+      <p class="details"></p>
+      <input type="text" id="prompt-input" />
+      <div class="flex row">
+        <button type="submit">Confirm</button>
+        <button type="button" id="prompt-cancel">Cancel</button>
+      </div>
+    </form>
+  </web-dialog>
+  <web-dialog id="confirm">
+    <form action="" id="confirm-form">
+      <p id="confirm-text"></p>
+      <p class="details"></p>
+      <div class="flex row">
+        <button type="submit">Confirm</button>
+        <button type="button" id="confirm-cancel">Cancel</button>
+      </div>
+    </form>
+  </web-dialog>
+  <div id="notification"></div>`;
+
+export const renderManage = (userId: bigint, connection: IDPActor) => {
+    const container = document.getElementById("pageContent") as HTMLElement;
+
+    render(pageContent(), container);
+    init(userId, connection);
+};
+
+export const init = async (userId, connection) => {
+    // TODO - Check alias for current identity, and populate #nameSpan
+    displayUserId(userId);
+
+    // TODO: If this fails display an error message and suggest 
+    // the user try again with a different user id?
+    renderIdentities(connection, userId);
+};
+
+const displayUserId = (userId: BigInt) => {
+    const userIdElem = document.getElementById("userIdSpan") as HTMLElement;
+    userIdElem.innerHTML = userId.toString();
+    const userIdSection = document.getElementById("userIdSection") as HTMLElement;
+    userIdSection.classList.remove("hidden");
+};
+
+const renderIdentities = async (connection, userId) => {
+    const identityList = document.getElementById("identityList") as HTMLElement;
+    identityList.innerHTML = ``;
+
+    const identities = await IDPActor.lookup(userId);
+
+    const list = document.createElement("ul");
+
+    identities.forEach((identity) => {
+        const identityElement = document.createElement("li");
+        identityElement.className = "flex row justify-between";
+        identityElement.innerHTML = identityListItem(identity.alias);
+        bindRemoveListener(userId, connection, identityElement, identity.pubkey);
+        list.appendChild(identityElement);
+    });
+
+    identityList.appendChild(list);
+};
+
+const bindRemoveListener = (userId: bigint, connection: IDPActor, listItem: HTMLElement, publicKey) => {
+    const button = listItem.querySelector("button") as HTMLButtonElement;
+    button.onclick = () => {
+        // Make sure we're not removing our last identity
+        const identities = document.querySelectorAll("#identityList li");
+
+        if (identities.length <= 1) {
+            const shouldProceed = confirm(
+                "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
+            );
+            if (!shouldProceed) {
+                return;
+            }
+        }
+        // Otherwise, remove identity
+        connection.remove(userId, publicKey).then(() => {
+            listItem.parentElement?.removeChild(listItem);
+        });
+    };
+};
