@@ -1,4 +1,4 @@
-import idp_actor from "../utils/idp_actor";
+import idp_actor, { IDPActor } from "../utils/idp_actor";
 import { DelegationChain, Delegation } from "@dfinity/identity";
 import {
   Principal,
@@ -91,38 +91,27 @@ function checkURIForHash(maybeURL: string) {
 }
 
 // this function will run every page load to check for oauth query parameters
-export default function () {
+export default function (userId: bigint, connection: IDPActor) {
   const searchParams = new URLSearchParams(location.search);
   const params = getOauthParams(searchParams)!;
   // TODO: if the redirect_uri parameter has a hash, immediately reject
   if (hasOauthParams(searchParams)) {
     try {
       checkURIForHash(params.redirect_uri);
-      //  check do we have identity?
-      const identity = localStorage.getItem("identity");
-      if (identity !== null) {
-        // does the user consent?
-        const hostname = new URL(params.redirect_uri)
-          .hostname as FrontendHostname;
-        if (checkConsent(hostname)) {
-          generate_access_token(params.login_hint, hostname).then(
-            (access_token: string) => {
-              redirectToApp(params.redirect_uri, {
-                access_token: access_token,
-                token_type: "bearer",
-                expires_in: THREE_DAYS,
-                scope: params.scope,
-                state: params.state,
-              });
-            }
-          );
-        } else {
-          // TODO: redirect with failure message
-          const url = new URL(params.redirect_uri);
-          const search = new URLSearchParams({ error: "not authorized" });
-          url.search += "&" + search;
-          globalThis.location.assign(url.toString());
-        }
+      const hostname = new URL(params.redirect_uri)
+        .hostname as FrontendHostname;
+      if (checkConsent(hostname)) {
+        generate_access_token(connection, userId, params.login_hint, hostname).then(
+          (access_token: string) => {
+            redirectToApp(params.redirect_uri, {
+              access_token: access_token,
+              token_type: "bearer",
+              expires_in: THREE_DAYS,
+              scope: params.scope,
+              state: params.state,
+            });
+          }
+        );
       } else {
         // TODO: create or lookup identity
         createOrLookupIdentity(params);
@@ -138,7 +127,7 @@ export default function () {
 }
 
 // TODO: actually write this flow
-function createOrLookupIdentity(params: OAuth2AuthorizationRequest) {}
+function createOrLookupIdentity(params: OAuth2AuthorizationRequest) { }
 
 // builds query parameters in accordance with oauth response types
 // and navigates the user back to the app.
@@ -159,12 +148,14 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 }
 
 async function generate_access_token(
+  connection: IDPActor,
+  userId: bigint,
   login_hint: string,
   hostname: FrontendHostname
 ) {
   const sessionKey = Array.from(blobFromHex(login_hint));
 
-  const prepRes = await idp_actor.prepareDelegation(hostname, sessionKey);
+  const prepRes = await connection.prepareDelegation(userId, hostname, sessionKey);
   if (!prepRes || prepRes.length != 2) {
     throw new Error(
       `Error preparing the delegation. Result received: ${prepRes}`
@@ -173,7 +164,7 @@ async function generate_access_token(
 
   const [userKey, timestamp] = prepRes;
 
-  const getRes = await idp_actor.getDelegation(hostname, sessionKey, timestamp);
+  const getRes = await connection.getDelegation(userId, hostname, sessionKey, timestamp);
 
   // this is just so we filter out null responses
   if (!isDelegationResponse(getRes)) {

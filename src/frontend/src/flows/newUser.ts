@@ -3,9 +3,9 @@ import oauth from "../utils/oath";
 import { navigateTo } from "../utils/router";
 
 export const initNewUser = () => {
-  setupRegisterIdentityForm(() => {
+  setupRegisterIdentityForm((userId, connection) => {
     if (window.location.href.match(/authorize/)) {
-      oauth();
+      oauth(userId, connection);
     } else {
       navigateTo("/manage");
     }

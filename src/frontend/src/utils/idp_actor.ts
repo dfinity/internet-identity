@@ -2,8 +2,11 @@ import {
   Actor,
   ActorSubclass,
   BinaryBlob,
+  blobFromUint8Array,
+  derBlobFromBlob,
   DerEncodedBlob,
   HttpAgent,
+  SignIdentity,
 } from "@dfinity/agent";
 import {
   idlFactory as idp_idl,
@@ -16,11 +19,10 @@ import _SERVICE, {
   UserNumber,
   FrontendHostname,
   Timestamp,
+  DeviceData,
 } from "../typings";
 import {
-  tryLoadIdentity,
   authenticateFresh,
-  persistIdentity,
 } from "./handleAuthentication";
 import {
   DelegationChain,
@@ -29,6 +31,7 @@ import {
   WebAuthnIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
+import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent: new HttpAgent(),
@@ -36,157 +39,85 @@ export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
 });
 
 export class IDPActor {
-  private _actor?: ActorSubclass<_SERVICE>;
-  private _chain?: DelegationChain;
+  protected constructor(public identity: WebAuthnIdentity, public delegationIdentity: DelegationIdentity, public actor?: ActorSubclass<_SERVICE>) { }
 
-  static create(): IDPActor {
-    return new this(tryLoadIdentity());
-  }
+  static async register(alias: string): Promise<{ connection: IDPActor, userId: UserNumber }> {
+    const identity = await authenticateFresh();
+    const delegationIdentity = await requestFEDelegation(identity);
 
-  protected constructor(public storedIdentity?: WebAuthnIdentity) {}
+    const agent = new HttpAgent({ identity: delegationIdentity });
+    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+      agent,
+      canisterId: idp_canister_id,
+    });
+    const credential_id = Array.from(identity.rawId);
+    const pubkey = Array.from(identity.getPublicKey().toDer());
+    const userId = await actor.register({ alias, pubkey, credential_id: [credential_id] });
 
-  public get userId(): UserNumber | undefined {
-    const userId = localStorage.getItem("userId");
-    return userId ? BigInt(userId) : undefined;
-  }
-
-  public set userId(userId: UserNumber | undefined) {
-    if (userId !== undefined) {
-      localStorage.setItem("userId", userId.toString());
-    } else {
-      localStorage.removeItem("userId");
+    return {
+      connection: new IDPActor(identity, delegationIdentity, actor),
+      userId
     }
   }
 
-  public get publicKey(): PublicKey {
-    if (this.storedIdentity) {
-      return Array.from(this.storedIdentity.getPublicKey().toDer());
-    } else {
-      throw new Error("getPublicKey: No stored identity found");
-    }
+  static async reconnect(userId: bigint): Promise<IDPActor> {
+    const devices = await baseActor.lookup(userId);
+
+    const multiIdent = MultiWebAuthnIdentity.fromCredentials(devices.flatMap(device =>
+      device.credential_id.map((credentialId: CredentialId) => ({
+        pubkey: derBlobFromBlob(blobFromUint8Array(Buffer.from(device.pubkey))),
+        credentialId: blobFromUint8Array(Buffer.from(credentialId))
+      }))
+    ));
+    const delegationIdentity = await requestFEDelegation(multiIdent);
+
+    const agent = new HttpAgent({ identity: delegationIdentity });
+    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+      agent,
+      canisterId: idp_canister_id,
+    });
+
+    return new IDPActor(multiIdent._actualIdentity!!, delegationIdentity, actor)
   }
 
-  public getCredentialId(): [] | [CredentialId] {
-    if (this.storedIdentity) {
-      return this.storedIdentity.rawId
-        ? [Array.from(this.storedIdentity.rawId)]
-        : [];
-    } else {
-      throw new Error("getCredentialId: No stored identity found");
-    }
-  }
+  static async lookup(userId: UserNumber): Promise<DeviceData[]> {
+    return baseActor.lookup(userId);
+  };
+
+  // public get publicKey(): PublicKey {
+  //     return Array.from(this.identity.getPublicKey().toDer());
+  // }
+
+  // public getCredentialId(): [] | [CredentialId] {
+  //      this.identity.rawId
+  //       ? [Array.from(this.identity.rawId)]
+  //       : [];
+  // }
 
   // Create a actor representing the backend using the stored identity
   // fails if is not there yet
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
-    for (const { delegation } of this._chain?.delegations || []) {
+    for (const { delegation } of this.delegationIdentity.getDelegation().delegations || []) {
       // prettier-ignore
       if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
-        this._actor = undefined;
+        this.actor = undefined;
         break;
       }
     }
 
-    const storedIdentity = tryLoadIdentity();
-    if (storedIdentity === undefined) {
-      throw new Error("No identity were stored, but one is needed.");
-    }
-
-    if (this._actor === undefined) {
+    if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
-      const sessionKey = Ed25519KeyIdentity.generate();
-      const tenMinutesInMsec = 10 * 1000 * 60;
-      this._chain = await DelegationChain.create(
-        storedIdentity,
-        sessionKey.getPublicKey(),
-        new Date(Date.now() + tenMinutesInMsec),
-        {
-          targets: [Principal.from(idp_canister_id)],
-        }
-      );
+      this.delegationIdentity = await requestFEDelegation(this.identity);
 
-      const delegationIdentity = DelegationIdentity.fromDelegation(
-        sessionKey,
-        this._chain
-      );
-
-      const agent = new HttpAgent({ identity: delegationIdentity });
-      this._actor = Actor.createActor<_SERVICE>(idp_idl, {
+      const agent = new HttpAgent({ identity: this.delegationIdentity });
+      this.actor = Actor.createActor<_SERVICE>(idp_idl, {
         agent,
         canisterId: idp_canister_id,
       });
     }
 
-    return this._actor;
+    return this.actor;
   }
-
-  reconnect = async () => {
-    localStorage.removeItem("identity");
-    this._actor = undefined;
-    this._chain = undefined;
-
-    const identities = await baseActor.lookup(this.userId!!);
-    for (const row of identities) {
-      const { credential_id: credentialId, pubkey } = row;
-      if (credentialId.length === 0) {
-        continue;
-      }
-
-      console.log("row", row);
-      // Strip DER header
-      const strippedKey = pubkey.slice(19);
-      const webAuthnJSON = {
-        rawId: Buffer.from(credentialId[0]).toString("hex"),
-        publicKey: Buffer.from(strippedKey).toString("hex"),
-      };
-      const identity = WebAuthnIdentity.fromJSON(JSON.stringify(webAuthnJSON));
-      console.log({ identity });
-
-      const sessionKey = Ed25519KeyIdentity.generate();
-      const tenMinutesInMsec = 10 * 1000 * 60;
-      try {
-        this._chain = await DelegationChain.create(
-          identity,
-          sessionKey.getPublicKey(),
-          new Date(Date.now() + tenMinutesInMsec),
-          {
-            targets: [Principal.from(idp_canister_id)],
-          }
-        );
-      } catch (err) {
-        continue;
-      }
-      persistIdentity(identity);
-      this.storedIdentity = identity;
-      return;
-    }
-    throw Error("Couldn't find a registered device match");
-  };
-
-  register = async (alias: string) => {
-    // user wants to register fresh, so always create new identity
-    // also stores it in in the localStorage
-    this._actor = undefined;
-    this._chain = undefined;
-
-    this.storedIdentity = await authenticateFresh();
-    console.log("this.storedIdentity", this.storedIdentity);
-
-    const credentialId = this.getCredentialId() ?? [];
-
-    const actor = await this.getActor();
-    console.log(
-       `register(alias: ${alias}, publicKey: ${this.publicKey}, credentialId: ${credentialId})`
-     );
-
-    const userId = await actor.register({
-      alias,
-      pubkey: this.publicKey as PublicKey,
-      credential_id: credentialId,
-    });
-    this.userId = userId;
-    return userId;
-  };
 
   add = async (
     userId: UserNumber,
@@ -202,59 +133,61 @@ export class IDPActor {
     });
   };
 
-  remove = async (publicKey: PublicKey) => {
+  remove = async (userId: UserNumber, publicKey: PublicKey) => {
     const actor = await this.getActor();
-    if (this.userId) {
-      return await actor.remove(this.userId, publicKey);
-    } else {
-      throw new Error("no user was provided");
-    }
+    await actor.remove(userId, publicKey);
   };
 
-  lookup = async () => {
-    if (this.userId) return baseActor.lookup(this.userId);
-    else {
-      throw new Error("Tried to lookup without a user present");
-    }
-  };
 
   prepareDelegation = async (
+    userId: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey
   ) => {
     console.log(
-       `prepare_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey})`
+      `prepare_delegation(user: ${userId}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
-    if (!!this.userId) {
-      const actor = await this.getActor();
-      return await actor.prepare_delegation(this.userId, hostname, sessionKey);
-    }
-    console.warn("Could not prepare delegation. User must authenticate first");
-    return null;
+    const actor = await this.getActor();
+    return await actor.prepare_delegation(userId, hostname, sessionKey);
   };
 
   getDelegation = async (
+    userId: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
   ) => {
     console.log(
-       `get_delegation(user: ${this.userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+      `get_delegation(user: ${userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );
-    if (!!this.userId) {
-      const actor = await this.getActor();
-      return await actor.get_delegation(
-        this.userId,
-        hostname,
-        sessionKey,
-        timestamp
-      );
-    }
-    console.warn("Could not get delegation. User must authenticate first");
-    return null;
+    const actor = await this.getActor();
+    return await actor.get_delegation(
+      userId,
+      hostname,
+      sessionKey,
+      timestamp
+    );
   };
 }
 
-const idp_actor = IDPActor.create();
+const requestFEDelegation = async (identity: SignIdentity): Promise<DelegationIdentity> => {
+  const sessionKey = Ed25519KeyIdentity.generate();
+  const tenMinutesInMsec = 10 * 1000 * 60;
+  const chain = await DelegationChain.create(
+    identity,
+    sessionKey.getPublicKey(),
+    new Date(Date.now() + tenMinutesInMsec),
+    {
+      targets: [Principal.from(idp_canister_id)],
+    }
+  );
+  return DelegationIdentity.fromDelegation(
+    sessionKey,
+    chain
+  );
+}
+
+// Poor man's IORef
+const idp_actor: { connection: IDPActor | undefined } = { connection: undefined };
 
 export default idp_actor;

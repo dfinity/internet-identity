@@ -5,25 +5,35 @@ import {
   DerEncodedBlob,
 } from "@dfinity/agent";
 import { identityListItem } from "../../templates/identityListItem";
-import idp_actor from "../utils/idp_actor";
+import idp_actor, { IDPActor } from "../utils/idp_actor";
 import { prompt } from "../components/prompt";
 import { navigateTo } from "../utils/router";
+import { getUserId } from "../utils/userId";
 
-export const initManageIdentities = () => {
+export const initManageIdentities = async () => {
   // TODO - Check alias for current identity, and populate #nameSpan
-
-  if (idp_actor.userId === undefined) {
+  const userId = getUserId();
+  if (userId === undefined) {
     // If we haven't established a userId, we need to authenticate.
     navigateTo(location.href.replace("manage", "index"));
-    return;
+  } else {
+    displayUserId(userId);
+
+    // TODO: If this fails display an error message and suggest 
+    // the user try again with a different user id?
+    let connection: IDPActor;
+    if (idp_actor.connection === undefined) {
+      connection = await IDPActor.reconnect(userId);
+    } else {
+      connection = idp_actor.connection
+    };
+    renderIdentities(connection, userId);
+    checkForAddUserHash(connection);
   }
 
-  checkForAddUserHash();
-  displayUserId(idp_actor.userId);
-  renderIdentities();
 };
 
-const checkForAddUserHash = async () => {
+const checkForAddUserHash = async (connection: IDPActor) => {
   // Check URL if user has pasted in an Add Identity link
   const url = new URL(document.URL);
 
@@ -32,10 +42,16 @@ const checkForAddUserHash = async () => {
     const parsedParams = parseNewDeviceParam(newDevice);
     if (parsedParams !== null) {
       const { userId, publicKey, rawId } = parsedParams;
+      if (getUserId() !== userId) {
+        // TODO: Here we're adding a device to our userId that 
+        // was supposed to be added to a different one.
+        // Display a proper error here
+        throw Error(`Tried adding a device for user ${userId}, but current user is ${getUserId()}. Aborting`)
+      }
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await prompt("What should we call this device?");
-        await idp_actor.add(BigInt(userId), deviceName, publicKey, rawId);
+        await connection.add(userId, deviceName, publicKey, rawId);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         console.log(`Canceled adding the device with ${error}`);
@@ -43,7 +59,7 @@ const checkForAddUserHash = async () => {
         return
       }
       // TODO: Clear the hash
-      renderIdentities();
+      renderIdentities(connection, userId);
     }
   }
 };
@@ -69,11 +85,11 @@ const parseNewDeviceParam = (
   const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
   return { userId, publicKey, rawId };
 };
-const renderIdentities = async () => {
+const renderIdentities = async (connection, userId) => {
   const identityList = document.getElementById("identityList") as HTMLElement;
   identityList.innerHTML = ``;
 
-  const identities = await idp_actor.lookup();
+  const identities = await IDPActor.lookup(userId);
 
   const list = document.createElement("ul");
 
@@ -81,14 +97,14 @@ const renderIdentities = async () => {
     const identityElement = document.createElement("li");
     identityElement.className = "flex row justify-between";
     identityElement.innerHTML = identityListItem(identity.alias);
-    bindRemoveListener(identityElement, identity.pubkey);
+    bindRemoveListener(userId, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
   });
 
   identityList.appendChild(list);
 };
 
-const bindRemoveListener = (listItem: HTMLElement, publicKey) => {
+const bindRemoveListener = (userId: bigint, connection: IDPActor, listItem: HTMLElement, publicKey) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = () => {
     // Make sure we're not removing our last identity
@@ -103,7 +119,7 @@ const bindRemoveListener = (listItem: HTMLElement, publicKey) => {
       }
     }
     // Otherwise, remove identity
-    idp_actor.remove(publicKey).then(() => {
+    connection.remove(userId, publicKey).then(() => {
       listItem.parentElement?.removeChild(listItem);
     });
   };
