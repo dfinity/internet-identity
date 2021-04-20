@@ -21,8 +21,7 @@
     "paths": {
       "*": ["*"],
       "dfx-generated/idp_service": [
-        "./.dfx/local/canisters/idp_service/idp_service.js",
-        "./.dfx/messaging/canisters/idp_service/idp_service.js"
+        "./src/frontend/src/declarations/idp_service.ts"
       ]
     }
   },

@@ -27,6 +27,8 @@ const aliases = Object.entries(dfxJson.canisters).reduce(
   },
   {}
 );
+const localCanisterId = require(aliases["dfx-generated/idp_service"])
+  .canisterId;
 
 /**
  * Generate a webpack configuration for a canister.
@@ -96,6 +98,9 @@ function generateWebpackConfigForCanister(name, info) {
       new webpack.ProvidePlugin({
         Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
+      }),
+      new webpack.DefinePlugin({
+        "process.env.CANISTER_ID": process.env.CANISTER_ID ?? localCanisterId,
       }),
     ],
   };

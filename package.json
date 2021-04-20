@@ -5,7 +5,8 @@
   "keywords": [],
   "scripts": {
     "start": "concurrently \"node devserver.js\" \"webpack serve\"",
-    "generate:types": "didc bind ./src/idp_service/idp_service.did -t ts > src/frontend/src/typings.d.ts",
+    "generate:types": "didc bind ./src/declarations/idp_service/idp_service.did -t ts > src/frontend/src/typings.d.ts",
+    "generate:idp": "didc bind ./src/declarations/idp_service/idp_service.did -t js > src/frontend/src/idp.ts",
     "build": "NODE_ENV=production webpack",
     "test": "jest"
   },

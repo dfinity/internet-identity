@@ -20,7 +20,7 @@ import _SERVICE, {
 import {
   tryLoadIdentity,
   authenticateFresh,
-  persistIdentity,
+  persis../declarations/typings
 } from "./handleAuthentication";
 import {
   DelegationChain,

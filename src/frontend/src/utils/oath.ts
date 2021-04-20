@@ -19,7 +19,7 @@ import {
   FrontendHostname,
   GetDelegationResponse,
   SignedDelegation as CandidSignedDelegation,
-} from "../typings";
+} from "../declarations/typings";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
