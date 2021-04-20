@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { MultiWebAuthnIdentity } from "./multiWebauthnIdentity";
 
 type AuthenticationOptions = {};
 
