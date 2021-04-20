@@ -1,15 +1,14 @@
 import oauth from "../utils/oath";
 import { renderIndex } from "../pages";
 import { renderManage } from "../pages/manage";
-import { init } from ".dfx/local/canisters/idp_service/idp_service.did";
 
 export const navigateTo = (route: string) => {
-  renderApp();
   if (history.length > initialHistoryLength) {
     history.replaceState({}, "Internet Identity", route);
   } else {
     history.pushState({}, "Internet Identity", route);
   }
+  renderApp();
 };
 
 const renderApp = () => {
