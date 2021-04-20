@@ -1,7 +1,7 @@
 const path = require("path");
 const idp_service = path.join(
   __dirname,
-  ".dfx/local/canisters/idp_service/idp_service.js"
+  ".dfx/messaging/canisters/idp_service/idp_service.js"
 );
 
 export default {
