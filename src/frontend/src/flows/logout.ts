@@ -19,5 +19,7 @@ const handleLogout = async (e) => {
       localStorage.clear();
       location.reload();
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error(error);
+  }
 };

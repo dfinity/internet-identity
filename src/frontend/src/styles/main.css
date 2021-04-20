@@ -1,6 +1,104 @@
-body {
+:root {
   font-family: sans-serif;
   font-size: 1.5rem;
+  --azureradiance-050: #ebf0fa;
+  --azureradiance-100: #c7d9f9;
+  --azureradiance-200: #a3c3f9;
+  --azureradiance-300: #80acf8;
+  --azureradiance-400: #5c96f8;
+  --azureradiance-500: #387ff7;
+  --azureradiance-600: #2b67cd;
+  --azureradiance-700: #1f4fa2;
+  --azureradiance-800: #123778;
+  --azureradiance-900: #051f4d;
+  --flamingo-050: #ffece5;
+  --flamingo-100: #fccfbf;
+  --flamingo-200: #f9b298;
+  --flamingo-300: #f79471;
+  --flamingo-400: #f4774b;
+  --flamingo-500: #f15a24;
+  --flamingo-600: #cf4c1d;
+  --flamingo-700: #ad3e16;
+  --flamingo-800: #8a2f0e;
+  --flamingo-900: #682107;
+  --grey-050: #efefef;
+  --grey-100: #d9d9da;
+  --grey-200: #c3c3c4;
+  --grey-300: #adadaf;
+  --grey-400: #979799;
+  --grey-500: #818284;
+  --grey-600: #6b6c6e;
+  --grey-700: #555659;
+  --grey-800: #3f4043;
+  --grey-900: #292a2e;
+  --meteorite-050: #f2ebfa;
+  --meteorite-100: #d0c4e2;
+  --meteorite-200: #b29dcb;
+  --meteorite-300: #9275b4;
+  --meteorite-400: #724e9c;
+  --meteorite-500: #522785;
+  --meteorite-600: #471f77;
+  --meteorite-700: #3c1669;
+  --meteorite-800: #300e5b;
+  --meteorite-900: #25054d;
+  --piction-050: #f0faff;
+  --piction-100: #c8ebf9;
+  --piction-200: #a0dbf3;
+  --piction-300: #78cbee;
+  --piction-400: #51bbe8;
+  --piction-500: #29abe2;
+  --piction-600: #1f89b8;
+  --piction-700: #15678d;
+  --piction-800: #0a4563;
+  --piction-900: #002338;
+
+  --razzmatazz-050: #f7dfe9;
+  --razzmatazz-100: #f5b8d3;
+  --razzmatazz-200: #f392bc;
+  --razzmatazz-300: #f16ba6;
+  --razzmatazz-400: #ef458f;
+  --razzmatazz-500: #ed1e79;
+  --razzmatazz-600: #cb1866;
+  --razzmatazz-700: #aa1154;
+  --razzmatazz-800: #880b41;
+  --razzmatazz-900: #66042f;
+  --seabuckhorn-050: #fff5e5;
+  --seabuckhorn-100: #fee7c3;
+  --seabuckhorn-200: #fdd9a1;
+  --seabuckhorn-300: #fdcc7f;
+  --seabuckhorn-400: #fcbe5d;
+  --seabuckhorn-500: #fbb03b;
+  --seabuckhorn-600: #d2912c;
+  --seabuckhorn-700: #a9731e;
+  --seabuckhorn-800: #80540f;
+  --seabuckhorn-900: #573500;
+  --white-000: #ffffff;
+
+  --text-color: var(--grey-900);
+  --background-color: #e5e5e5;
+  --primary: black;
+  --secondary: #cdcdcd;
+  --accent: #323232;
+  background: var(--background-color);
+  color: var(--text-color);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: var(--white-000);
+    --primary: var(--grey-050);
+    --background-color: #222222;
+    --secondary: #323232;
+    --accent: var(--grey-300);
+  }
+  input {
+    background-color: var(--background-color);
+    color: var(--accent);
+    border: 1px solid var(--text-color);
+  }
+}
+
+body {
+  width: 100vw;
 }
 
 input,
@@ -10,16 +108,23 @@ div,
 section,
 span {
   font-size: 1.2rem;
+  color: var(--text-color);
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.8rem;
 }
 
 button {
-  border: 1px solid black;
+  border: 1px solid var(--text-color);
   background: transparent;
 }
 
 input {
   padding: 0.75rem 0.5rem;
   border-radius: 4px;
+  width: 240px;
 }
 
 img {
@@ -32,30 +137,26 @@ img {
 section {
   display: flex;
   flex-direction: column;
-  max-width: calc(100vw - 6rem);
+  width: 100%;
+  max-width: calc(100vw - 1rem);
   margin: auto;
   align-items: baseline;
+  overflow: hidden;
+  margin-bottom: 1rem;
 }
 
-#clickMeBtn {
-  padding: 5px 20px;
-  margin: 10px auto;
-  float: right;
-}
-
-#greeting {
-  margin: 10px auto;
-  padding: 10px 60px;
-  border: 1px solid #222;
-}
-
-#greeting:empty {
-  display: none;
+section > * {
+  width: auto;
 }
 
 form,
 label {
   display: flex;
+}
+
+fieldset {
+  margin-bottom: 1rem;
+  max-width: calc(100vw - 1.5rem);
 }
 
 form {
@@ -70,7 +171,7 @@ button {
 }
 
 button.primary {
-  background-color: black;
+  background-color: var(--text-color);
 }
 
 button[type="submit"] {
@@ -84,8 +185,15 @@ label {
 }
 
 main {
-  max-width: 1080px;
+  padding: 1rem;
+}
+
+main,
+section {
   margin: auto;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .hidden {
@@ -93,7 +201,7 @@ main {
 }
 
 .spacer {
-  margin-bottom: 4rem;
+  margin-bottom: 1rem;
 }
 
 .flex {
@@ -121,35 +229,9 @@ button[title="Remove identity"] {
   width: fit-content;
 }
 
-#closeDialog {
-  margin-left: auto;
-  padding: 4px;
-  border: none;
-  position: absolute;
-  right: 1.5rem;
-  top: 1.5rem;
-}
-
-dialog {
-  max-width: calc(100vw - 2rem);
-  position: relative;
-  padding-top: 3rem;
-}
-
 ul {
   width: 100%;
   padding: 0;
-}
-
-#addDeviceLink {
-  width: 100%;
-  padding: 1rem 0.25rem;
-  border-radius: 8px;
-}
-
-#registerAlias {
-  max-width: 256px;
-  margin-bottom: 1rem;
 }
 
 .details:empty {
@@ -167,12 +249,15 @@ ul {
 
 #logout-button {
   display: flex;
-  margin-left: auto;
+  padding: 8px;
+  margin: 1rem 1rem 1rem auto;
+  font-size: 0.8rem;
 }
 
 /* large screen break */
 @media (min-width: 1200px) {
-  dialog {
+  dialog,
+  web-dialog {
     max-width: 1080px;
   }
 }
@@ -180,5 +265,8 @@ ul {
 @media (min-width: 720px) {
   label {
     flex-direction: row;
+  }
+  .spacer {
+    margin-bottom: 4rem;
   }
 }

@@ -1,17 +1,23 @@
 import { html, render } from "lit-html";
 import { WebDialog } from "web-dialog";
 
-const dialog = (question: string, secondaryMessage?: string) => html`<web-dialog
-  id="prompt"
->
-  <form action="" id="prompt-form">
-    <p id="prompt-text">${question}</p>
-    <p class="details">${secondaryMessage}</p>
-    <input type="text" id="prompt-input" />
-    <button type="button" id="prompt-cancel">Cancel</button>
-    <button type="submit">Confirm</button>
-  </form>
-</web-dialog>`;
+const dialog = (question: string, secondaryMessage?: string) => html`<style>
+    web-dialog,
+    web-dialog * {
+      background: var(--background-color);
+      color: var(--text-color);
+      --dialog-color: var(--text-color);
+      --dialog-bg: var(--background-color);
+    }</style
+  ><web-dialog id="prompt">
+    <form action="" id="prompt-form">
+      <p id="prompt-text">${question}</p>
+      <p class="details">${secondaryMessage}</p>
+      <input type="text" id="prompt-input" />
+      <button type="button" id="prompt-cancel">Cancel</button>
+      <button type="submit">Confirm</button>
+    </form>
+  </web-dialog>`;
 
 export const prompt = (
   question: string,

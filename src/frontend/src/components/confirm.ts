@@ -1,18 +1,24 @@
 import { html, render } from "lit-html";
 import { WebDialog } from "web-dialog";
 
-const dialog = (question: string, secondaryMessage?: string) => html`<web-dialog
-  id="confirm"
->
-  <form action="" id="confirm-form">
-    <p id="confirm-text">${question}</p>
-    <p class="details">${secondaryMessage}</p>
-    <div class="flex row">
-      <button type="submit">Confirm</button>
-      <button type="button" id="confirm-cancel">Cancel</button>
-    </div>
-  </form>
-</web-dialog>`;
+const dialog = (question: string, secondaryMessage?: string) => html`<style>
+    web-dialog,
+    web-dialog * {
+      background: var(--background-color);
+      color: var(--text-color);
+      --dialog-bg: var(--background-color);
+    }
+  </style>
+  <web-dialog id="confirm">
+    <form action="" id="confirm-form">
+      <p id="confirm-text">${question}</p>
+      <p class="details">${secondaryMessage}</p>
+      <div class="flex row">
+        <button type="submit">Confirm</button>
+        <button type="button" id="confirm-cancel">Cancel</button>
+      </div>
+    </form>
+  </web-dialog>`;
 
 export const confirm = (
   question: string,
@@ -30,12 +36,12 @@ export const confirm = (
   const confirmCancel = document.querySelector(
     "#confirm-cancel"
   ) as HTMLButtonElement;
-  const details = confirmDialog.querySelector(
+  const details = confirmDialog?.querySelector(
     ".details"
   ) as HTMLParagraphElement;
 
   const closeConfirm = (reject?: (e: any) => void) => {
-    container.innerHTML = "";
+    confirmDialog.open = false;
     reject?.(false);
   };
 
