@@ -74,3 +74,9 @@ dfx deploy
 Then, run `npm start` to start webpack-dev-server.
 
 Unit tests are tbd. They can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner. Frontend tests are not required to pass at this time.
+
+To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
+
+```
+CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
+```
