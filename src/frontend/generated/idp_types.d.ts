@@ -29,6 +29,7 @@ export interface HttpResponse {
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 };
+export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp };
 export type PublicKey = Array<number>;
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
