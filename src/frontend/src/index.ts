@@ -5,9 +5,11 @@ import { login } from "./flows/login";
 import oauth from "./utils/oauth";
 import { addDevice } from "./flows/addDevice";
 import { renderManage } from "./flows/manage";
+import { endLoader, startLoader } from "./components/loader";
 
 const init = async () => {
   initLogout();
+  startLoader();
   const { userId, connection } = await login();
   const url = new URL(document.URL);
   if (window.location.href.match(/authorize/)) {
