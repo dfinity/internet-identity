@@ -12,6 +12,7 @@ const pageContent = () => html` <style>
       position: absolute;
       right: 1.5rem;
       top: 1.5rem;
+      width: auto;
     }
     #addDeviceLink {
       width: 100%;
@@ -25,23 +26,26 @@ const pageContent = () => html` <style>
   </style>
   <section>
     <h1>Internet Identity</h1>
-    <div class="spacer"></div>
-    <h3>Are you an existing user?</h3>
   </section>
   <section id="userIdSection">
+    <h3>Are you an existing user?</h3>
     <p>Enter your saved User #</p>
-    <fieldset>
-      <label for="registerUserNumber">User #</label>
-      <input type="text" id="registerUserNumber" name="registerUserNumber" />
-    </fieldset>
-    <button type="button" id="dialogTrigger" aria-controls="loginDialog">
-      Link new Device
-    </button>
-    <button type="button" id="loginButton" aria-controls="loginDialog">
-      Login with existing Device
-    </button>
+    <label for="registerUserNumber">User #</label>
+    <input type="number" id="registerUserNumber" name="registerUserNumber" />
+    <div class="flex md-row">
+      <button
+        class="primary"
+        type="button"
+        id="loginButton"
+        aria-controls="loginDialog"
+      >
+        Login here
+      </button>
+      <button type="button" id="dialogTrigger" aria-controls="loginDialog">
+        Link a new Device
+      </button>
+    </div>
   </section>
-  <div class="spacer"></div>
   <section>
     <h3>If this is your first time using the Internet Identity</h3>
     <form id="registerForm">
@@ -53,7 +57,7 @@ const pageContent = () => html` <style>
         required
         placeholder="device name"
       />
-      <button type="submit" id="register-identity">
+      <button class="primary" type="submit" id="register-identity">
         Click here to register
       </button>
     </form>
@@ -194,6 +198,10 @@ const initLinkDevice = () => {
   const dialogTrigger = document.getElementById(
     "dialogTrigger"
   ) as HTMLButtonElement;
+  const closeDialogButton = dialog.querySelector(
+    ".closeDialog"
+  ) as HTMLButtonElement;
+  closeDialogButton.onclick = () => dialog.removeAttribute("open");
 
   dialogTrigger.onclick = () => {
     const userIdInput = document.getElementById(

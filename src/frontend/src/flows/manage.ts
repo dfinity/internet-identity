@@ -22,10 +22,15 @@ const pageContent = () => html`<style>
         stroke: var(--text-color);
       }
     }
+    #identityList {
+      max-width: 500px;
+    }
+    #identityList li {
+      border-bottom: 1px solid var(--text-color);
+    }
   </style>
   <section id="intro">
     <h1>Identity Management</h1>
-    <h3>Welcome <span id="nameSpan"></span></h3>
     <p>You can view and manage your Internet Computer identities here.</p>
   </section>
   <section id="userIdSection" class="hidden">

@@ -8,15 +8,25 @@ const dialog = (question: string, secondaryMessage?: string) => html`<style>
       color: var(--text-color);
       --dialog-bg: var(--background-color);
     }
+    #confirm-form {
+      margin-bottom: 0.5rem;
+    }
+    .row button {
+      margin-left: 0;
+    }
+    .details {
+    }
   </style>
   <web-dialog id="confirm">
     <form action="" id="confirm-form">
-      <p id="confirm-text">${question}</p>
-      <p class="details">${secondaryMessage}</p>
-      <div class="flex row">
-        <button type="submit">Confirm</button>
+      <section>
+        <p id="confirm-text">${question}</p>
+        <p class="details">${secondaryMessage}</p>
+      </section>
+      <section class="flex row">
+        <button type="submit" class="primary">Confirm</button>
         <button type="button" id="confirm-cancel">Cancel</button>
-      </div>
+      </section>
     </form>
   </web-dialog>`;
 

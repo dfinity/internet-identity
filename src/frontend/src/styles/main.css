@@ -75,7 +75,7 @@
   --white-000: #ffffff;
 
   --text-color: var(--grey-900);
-  --background-color: #e5e5e5;
+  --background-color: #fff;
   --primary: black;
   --secondary: #cdcdcd;
   --accent: #323232;
@@ -92,7 +92,6 @@ body {
 header {
   position: sticky;
   top: 0;
-  --background-color: white;
   background-color: var(--background-color);
   margin-top: 0;
   padding: 0.1rem;
@@ -109,9 +108,23 @@ span {
   color: var(--text-color);
 }
 
+input {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 4px;
+  width: 240px;
+  background-color: var(--background-color);
+}
+
 h1 {
   margin-top: 0;
   font-size: 1.8rem;
+  margin: auto;
+}
+@media (min-width: 1024px) {
+  h1 {
+    margin: inherit;
+  }
 }
 
 h1,
@@ -121,25 +134,26 @@ h4,
 h5,
 h6,
 p {
-  margin-top: 0;
-  margin-bottom: 1rem;
+  margin: 0 0 1rem;
 }
 
 button {
   border: 1px solid var(--text-color);
-  --background-color: white;
   background: var(--background-color);
   display: flex;
   width: 100%;
   text-align: center;
   justify-content: center;
   margin-bottom: 1rem;
-}
-
-input {
-  padding: 0.75rem 0.5rem;
+  padding: 1rem 2rem;
   border-radius: 4px;
-  width: 240px;
+}
+@media (min-width: 767px) {
+  button {
+    display: inline-flex;
+    width: auto;
+    margin-right: 1rem;
+  }
 }
 
 img {
@@ -165,13 +179,19 @@ form {
   flex-direction: column;
 }
 
-button {
-  padding: 1rem 2rem;
-  border-radius: 4px;
+button.primary {
+  background-color: var(--primary);
+  color: var(--background-color);
 }
 
-button.primary {
-  background-color: var(--text-color);
+button.linkStyle {
+  display: inline;
+  border: none;
+  border-bottom: 1px solid var(--text-color);
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  width: auto;
 }
 
 button[type="submit"] {
@@ -183,6 +203,11 @@ label {
   flex-direction: column;
   margin-bottom: 1rem;
 }
+@media (min-width: 720px) {
+  label {
+    flex-direction: row;
+  }
+}
 
 main,
 section {
@@ -193,18 +218,18 @@ section {
 }
 
 section {
-  display: flex;
-  flex-direction: column;
   width: 100%;
   max-width: calc(100vw - 2rem);
-  margin: auto;
   align-items: baseline;
   overflow: hidden;
   margin-bottom: 1rem;
-  margin: 0.5rem 0;
   padding: 1rem;
-  --background-color: white;
   background: var(--background-color);
+}
+@media (min-width: 1024px) {
+  section {
+    align-items: flex-start;
+  }
 }
 
 .hidden {
@@ -219,6 +244,14 @@ section {
 }
 .row {
   flex-direction: row;
+}
+@media (min-width: 767px) {
+  .md-row {
+    flex-direction: row;
+  }
+  .md-column {
+    flex-direction: column;
+  }
 }
 .justify-between {
   width: 100%;
@@ -257,19 +290,10 @@ ul {
 }
 
 /* large screen break */
-@media (min-width: 1200px) {
+@media (min-width: 1024px) {
   dialog,
   web-dialog {
     max-width: 1080px;
-  }
-}
-/* tablet break */
-@media (min-width: 720px) {
-  label {
-    flex-direction: row;
-  }
-  .spacer {
-    margin-bottom: 4rem;
   }
 }
 
@@ -282,7 +306,6 @@ ul {
     --accent: var(--grey-300);
   }
   input {
-    background-color: var(--background-color);
     color: var(--accent);
     border: 1px solid var(--text-color);
   }
