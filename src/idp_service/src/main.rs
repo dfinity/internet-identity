@@ -7,7 +7,7 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use storage::Storage;
+use storage::{Storage, EMPTY_SALT};
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 600_000_000_000;
@@ -93,7 +93,6 @@ struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
     salt_requested: RefCell<bool>,
-    salt: RefCell<Vec<u8>>,
 }
 
 impl Default for State {
@@ -102,7 +101,6 @@ impl Default for State {
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
             salt_requested: RefCell::new(false),
-            salt: RefCell::new(vec![]),
         }
     }
 }
@@ -136,22 +134,29 @@ async fn register(device_data: DeviceData) -> UserNumber {
         ));
     }
 
-    let (salt_requested, salt) =
-        STATE.with(|s| (*s.salt_requested.borrow(), s.salt.borrow().clone()));
+    let (salt_requested, salt) = STATE.with(|s| {
+        (
+            *s.salt_requested.borrow(),
+            s.storage.borrow().salt().to_vec(),
+        )
+    });
 
-    if salt.len() == 0 && !salt_requested {
+    // Request salt iff the salt is still empty, i.e. 0 and we have not requested a salt yet.
+    if salt == EMPTY_SALT && !salt_requested {
         STATE.with(|s| s.salt_requested.replace(true));
         let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
             Ok((res,)) => res,
             Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
         };
         STATE.with(|s| {
-            s.salt.replace(res);
+            let mut store = s.storage.borrow_mut();
+            store.set_salt(res);
+            store.flush();
             register_helper(s, device_data)
         })
     } else {
         STATE.with(|s| {
-            if s.salt.borrow().len() == 0 {
+            if s.storage.borrow().salt() == EMPTY_SALT {
                 trap("Salt not received yet. Try again later.");
             }
             register_helper(s, device_data)
@@ -370,14 +375,14 @@ fn retrieve_data() {
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    // Maybe check that it's really not empty and trap if yes? Shouldn't happen really...
-    let salt = STATE.with(|s| s.salt.borrow().clone());
+    // Maybe check that it's not the EMPTY_SALT and trap if yes? Shouldn't happen really...
+    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
 
     ic_cdk::println!("Salt: {:?}", salt);
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend(&salt);
+    blob.extend(salt);
 
     let user_number_str = user_number.to_string();
     let user_number_blob = user_number_str.bytes();
