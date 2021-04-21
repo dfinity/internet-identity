@@ -90,12 +90,6 @@ struct StreamingCallbackHttpResponse {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct InternetIdentityStats {
-    assigned_user_number_range: (UserNumber, UserNumber),
-    users_registered: u64,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
 struct InternetIdentityInit {
     assigned_user_number_range: (UserNumber, UserNumber),
 }
