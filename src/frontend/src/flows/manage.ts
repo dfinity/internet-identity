@@ -1,6 +1,7 @@
 import { render, html } from "lit-html";
 import { identityListItem } from "../components/identityListItem";
 import { IDPActor } from "../utils/idp_actor";
+import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
 
 const pageContent = () => html`<style>
     #userIdSection {
@@ -110,6 +111,23 @@ const bindRemoveListener = (
     // Make sure we're not removing our last identity
     const identities = document.querySelectorAll("#identityList li");
 
+    console.log(
+        "identity public key",
+        connection.identity.getPublicKey().toDer(),
+        "device public key",
+        derBlobFromBlob(blobFromUint8Array(publicKey)),
+    );
+    const sameDevice = connection.identity.getPublicKey().toDer() == derBlobFromBlob(blobFromUint8Array(publicKey));
+
+    if (sameDevice) {
+      const shouldProceed = confirm(
+        "This will remove your current device and you will be logged out"
+      );
+      if (!shouldProceed) {
+        return;
+      }
+    }
+
     if (identities.length <= 1) {
       const shouldProceed = confirm(
         "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
@@ -118,9 +136,15 @@ const bindRemoveListener = (
         return;
       }
     }
+
     // Otherwise, remove identity
     connection.remove(userId, publicKey).then(() => {
       listItem.parentElement?.removeChild(listItem);
     });
+
+    if (sameDevice) {
+      localStorage.clear();
+      location.reload();
+    }
   };
 };
