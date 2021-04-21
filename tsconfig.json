@@ -16,14 +16,7 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "baseUrl": ".",
-    "paths": {
-      "*": ["*"],
-      "dfx-generated/idp_service": [
-        "./.dfx/local/canisters/idp_service/idp_service.js"
-      ]
-    }
+    "isolatedModules": true
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
