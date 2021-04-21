@@ -4,41 +4,55 @@
 
 These instructions start from a mostly clean slate. Apply common sense when following them in your development area.
 
-1. Run `./dfx.sh cache delete`, just to be sure
-2. In a checkout of `idp-service`, `main` branch, reset the dfx state:
-   ```
-   rm -rf .dfx
-   ```
-3. In a checkout of `dfinity-lab/open-chat`, switch to branch `joachim/idp-demo`.
-   This configures the open chat frontend to use
-   <http://localhost:8080/authorize.html> as the OAUTH endpoint.
-4. In a checkout of open chat, reset the dfx state:
-   ```
-   rm -rf .dfx
-   ```
-5. In open chat, run the replica. By virtue of using `dfx.sh`, this will pull
-   in a replica with our auth changes (via https://github.com/dfinity/sdk/pull/1587)
-   ```
-   ../idp-service/dfx.sh start --background
-   ```
-6. In open chat, build and deploy:
-   ```
-   npm install
-   ../idp-service/dfx.sh deploy
-   ```
-7. Open open chat in your browser
-   ```
-   firefox "http://localhost:8000?canisterId=$(dfx canister id website)"
-   ```
-8. In `idp-service` idenit chat, build and deploy:
-   ```
-   npm install
-   ../idp-service/dfx.sh deploy
-   ```
-9. In `idp-service` idenit chat, run the development server at port 8080:
-   ```
-   npm start
-   ```
+* Build the `icx-proxy`:
+  - In a checkout of `dfinity/agent-rs`
+  - switch to branch `ericswanson/149-dns-alias-canister-id`.
+  - cargo build --release
+
+* Run `./dfx.sh cache delete`, just to be sure
+* In a checkout of `idp-service`, `main` branch, reset the dfx state:
+  ```
+  rm -rf .dfx
+  ```
+* In a checkout of `dfinity-lab/open-chat`, switch to branch `joachim/idp-demo-proxy`.
+  This configures the open chat frontend to use
+  <http://identity.localhost/authorize.html> as the OAUTH endpoint.
+* In a checkout of open chat, reset the dfx state:
+  ```
+  rm -rf .dfx
+  ```
+* In idp-service, run the replica. By virtue of using `dfx.sh`, this will pull
+  in a replica with our auth changes (via https://github.com/dfinity/sdk/pull/1587)
+  ```
+  ../idp-service/dfx.sh start
+  ```
+  Note the port when it says
+  ```
+  replica(s): http://localhost:41549/
+  ```
+
+* In open chat, build and deploy:
+  ```
+  npm install
+  ../idp-service/dfx.sh deploy
+  ```
+* In `idp-service` , build and deploy:
+  ```
+  npm ci
+  ../idp-service/dfx.sh deploy
+  ```
+  Note the canister id
+
+* In `agent-js` run
+  ```
+  sudo ./target/release/icx-proxy --address 127.0.0.1:80 --replica http://localhost:41549/ --dns-alias identity.localhost:rrkah-fqaaa-aaaaa-aaaaq-cai -v
+  ```
+  putting in the port of the replica, and the canister id of the identity server.
+
+* Open open chat in your browser
+  ```
+  google-chrome "http://$(dfx canister id website).localhost/"
+  ```
 
 You should be ready to rumble!
 
