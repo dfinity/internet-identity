@@ -1,7 +1,13 @@
 import { html, render } from "lit-html";
 import { WebDialog } from "web-dialog";
 
-const dialog = (question: string, secondaryMessage?: string) => html`<style>
+type ConfirmOptions = {
+  message: string;
+  detail?: string;
+  yesText?: string;
+  noText?: string;
+};
+const dialog = (options: ConfirmOptions) => html`<style>
     web-dialog,
     web-dialog * {
       background: var(--background-color);
@@ -14,28 +20,33 @@ const dialog = (question: string, secondaryMessage?: string) => html`<style>
     .row button {
       margin-left: 0;
     }
-    .details {
+    section {
+      width: calc(var(--dialog-width) - (2 * var(--dialog-padding)));
+    }
+    p {
+      margin: 0 0 1rem;
     }
   </style>
   <web-dialog id="confirm">
     <form action="" id="confirm-form">
       <section>
-        <p id="confirm-text">${question}</p>
-        <p class="details">${secondaryMessage}</p>
+        <p id="confirm-text">${options.message}</p>
+        <p class="details">${options.detail}</p>
       </section>
       <section class="flex row">
-        <button type="submit" class="primary">Confirm</button>
-        <button type="button" id="confirm-cancel">Cancel</button>
+        <button type="submit" class="primary">
+          ${options.yesText ?? "Confirm"}
+        </button>
+        <button type="button" id="confirm-cancel">
+          ${options.noText ?? "Cancel"}
+        </button>
       </section>
     </form>
   </web-dialog>`;
 
-export const confirm = (
-  question: string,
-  secondaryMessage?: string
-): Promise<boolean> => {
+export const confirm = (options: ConfirmOptions): Promise<boolean> => {
   const container = document.getElementById("notification") as HTMLElement;
-  render(dialog(question, secondaryMessage), container);
+  render(dialog(options), container);
   const confirmDialog = document.querySelector("#confirm") as WebDialog;
   const confirmForm = document.querySelector(
     "#confirm-form"
@@ -49,7 +60,9 @@ export const confirm = (
   const details = confirmDialog?.querySelector(
     ".details"
   ) as HTMLParagraphElement;
-
+  if (details.innerText.trim() === "show more") {
+    details.remove();
+  }
   const closeConfirm = (reject?: (e: any) => void) => {
     confirmDialog.open = false;
     reject?.(false);
@@ -57,11 +70,6 @@ export const confirm = (
 
   return new Promise((resolve, reject) => {
     // setup text
-    confirmText.innerText = question;
-    if (secondaryMessage) {
-      details.innerText = secondaryMessage;
-    }
-
     confirmForm.onsubmit = (e) => {
       e.preventDefault;
       resolve(true);

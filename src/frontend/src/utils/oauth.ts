@@ -1,7 +1,6 @@
 import { IDPActor } from "./idp_actor";
 import { DelegationChain, Delegation } from "@dfinity/identity";
 import {
-  Principal,
   blobFromUint8Array,
   derBlobFromBlob,
   blobFromHex,
@@ -17,9 +16,9 @@ export declare type OAuth2AccessTokenResponse = {
 };
 import {
   FrontendHostname,
-  GetDelegationResponse,
   SignedDelegation as CandidSignedDelegation,
 } from "../typings";
+import { confirm } from "../components/confirm";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -101,17 +100,20 @@ export default function (userId: bigint, connection: IDPActor) {
       const hostname = new URL(params.redirect_uri)
         .hostname as FrontendHostname;
       if (checkConsent(hostname)) {
-        generate_access_token(connection, userId, params.login_hint, hostname).then(
-          (access_token: string) => {
-            redirectToApp(params.redirect_uri, {
-              access_token: access_token,
-              token_type: "bearer",
-              expires_in: THREE_DAYS,
-              scope: params.scope,
-              state: params.state,
-            });
-          }
-        );
+        generate_access_token(
+          connection,
+          userId,
+          params.login_hint,
+          hostname
+        ).then((access_token: string) => {
+          redirectToApp(params.redirect_uri, {
+            access_token: access_token,
+            token_type: "bearer",
+            expires_in: THREE_DAYS,
+            scope: params.scope,
+            state: params.state,
+          });
+        });
       } else {
         // TODO: create or lookup identity
         createOrLookupIdentity(params);
@@ -127,7 +129,7 @@ export default function (userId: bigint, connection: IDPActor) {
 }
 
 // TODO: actually write this flow
-function createOrLookupIdentity(params: OAuth2AuthorizationRequest) { }
+function createOrLookupIdentity(params: OAuth2AuthorizationRequest) {}
 
 // builds query parameters in accordance with oauth response types
 // and navigates the user back to the app.
@@ -155,7 +157,11 @@ async function generate_access_token(
 ) {
   const sessionKey = Array.from(blobFromHex(login_hint));
 
-  const prepRes = await connection.prepareDelegation(userId, hostname, sessionKey);
+  const prepRes = await connection.prepareDelegation(
+    userId,
+    hostname,
+    sessionKey
+  );
   if (!prepRes || prepRes.length != 2) {
     throw new Error(
       `Error preparing the delegation. Result received: ${prepRes}`
@@ -164,7 +170,12 @@ async function generate_access_token(
 
   const [userKey, timestamp] = prepRes;
 
-  const getRes = await connection.getDelegation(userId, hostname, sessionKey, timestamp);
+  const getRes = await connection.getDelegation(
+    userId,
+    hostname,
+    sessionKey,
+    timestamp
+  );
 
   // this is just so we filter out null responses
   if (!isDelegationResponse(getRes)) {
@@ -199,6 +210,10 @@ function isDelegationResponse(
   return x && x.hasOwnProperty("signed_delegation");
 }
 
-function checkConsent(hostname: FrontendHostname) {
-  return prompt(`Do you want to log into ${hostname}? [y/n]`)?.match(/y/i);
+async function checkConsent(hostname: FrontendHostname) {
+  return await confirm({
+    message: `Do you want to log into ${hostname}?`,
+    yesText: "Yes",
+    noText: "No",
+  });
 }

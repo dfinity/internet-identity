@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { WebDialog } from "web-dialog";
 
-const dialog = (question: string, secondaryMessage?: string) => html`<style>
+const dialog = (question: string, detail?: string) => html`<style>
     web-dialog,
     web-dialog * {
       background: var(--background-color);
@@ -12,19 +12,16 @@ const dialog = (question: string, secondaryMessage?: string) => html`<style>
   ><web-dialog id="prompt">
     <form action="" id="prompt-form">
       <p id="prompt-text">${question}</p>
-      <p class="details">${secondaryMessage}</p>
+      <p class="details">${detail}</p>
       <input type="text" id="prompt-input" />
       <button type="button" id="prompt-cancel">Cancel</button>
       <button type="submit">Confirm</button>
     </form>
   </web-dialog>`;
 
-export const prompt = (
-  question: string,
-  secondaryMessage?: string
-): Promise<string> => {
+export const prompt = (question: string, detail?: string): Promise<string> => {
   const container = document.getElementById("notification") as HTMLElement;
-  render(dialog(question, secondaryMessage), container);
+  render(dialog(question, detail), container);
   const promptDialog = document.querySelector("#prompt") as WebDialog;
   const promptForm = document.querySelector("#prompt-form") as HTMLFormElement;
   const promptInput = document.querySelector(

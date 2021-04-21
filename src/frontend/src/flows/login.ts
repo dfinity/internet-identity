@@ -51,15 +51,15 @@ export const login = async (): Promise<{
         return { userId: x.userId, connection: x.connection };
       }
       case "err": {
-        await confirm(x.message, x.detail);
+        await confirm({ message: x.message, detail: x.detail });
         return login();
       }
     }
   } catch (err) {
-    await confirm(
-      "An unexpected error occured during login. Please try again",
-      err
-    );
+    await confirm({
+      message: "An unexpected error occured during login. Please try again",
+      detail: err,
+    });
     window.location.reload();
     return Promise.reject(err);
   }

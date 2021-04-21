@@ -11,11 +11,13 @@ export const initLogout = () => {
 
 const handleLogout = async (e) => {
   e.preventDefault();
-  const secondaryMessage = getUserId()
+  const detail = getUserId()
     ? `Your userId is ${getUserId()}. Please make sure you have saved this information so that you can login again. If you are ready to logout, click "Confirm".`
     : undefined;
   try {
-    if (await confirm("Are you sure you want to logout?", secondaryMessage)) {
+    if (
+      await confirm({ message: "Are you sure you want to logout?", detail })
+    ) {
       localStorage.clear();
       location.reload();
     }
