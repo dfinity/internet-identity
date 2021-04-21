@@ -111,13 +111,7 @@ const bindRemoveListener = (
     // Make sure we're not removing our last identity
     const identities = document.querySelectorAll("#identityList li");
 
-    console.log(
-        "identity public key",
-        connection.identity.getPublicKey().toDer(),
-        "device public key",
-        derBlobFromBlob(blobFromUint8Array(publicKey)),
-    );
-    const sameDevice = connection.identity.getPublicKey().toDer() == derBlobFromBlob(blobFromUint8Array(publicKey));
+    const sameDevice = connection.identity.getPublicKey().toDer().equals(derBlobFromBlob(blobFromUint8Array(publicKey)));
 
     if (sameDevice) {
       const shouldProceed = confirm(
