@@ -1,4 +1,5 @@
 use hashtree::{Hash, HashTree};
+use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -6,6 +7,7 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::future::Future;
 use storage::Storage;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
@@ -91,6 +93,8 @@ struct StreamingCallbackHttpResponse {
 struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
+    salt_requested: RefCell<bool>,
+    salt: RefCell<Vec<u8>>,
 }
 
 impl Default for State {
@@ -98,6 +102,8 @@ impl Default for State {
         Self {
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
+            salt_requested: RefCell::new(false),
+            salt: RefCell::new(vec![]),
         }
     }
 }
@@ -108,28 +114,54 @@ thread_local! {
 }
 
 #[update]
-fn register(device_data: DeviceData) -> UserNumber {
+async fn register(device_data: DeviceData) -> UserNumber {
     check_entry_limits(&device_data);
 
-    STATE.with(|s| {
-        if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
-            ic_cdk::trap(&format!(
-                "{} could not be authenticated against {:?}",
-                caller(),
-                device_data.pubkey
-            ));
+    fn register_helper<'a, 'b>(
+        s: &'a State,
+        device_data: DeviceData,
+    ) -> impl Future<Output = u64> + 'b
+    where
+        'a: 'b,
+    {
+        async move {
+            let mut salt_requested = s.salt_requested.borrow_mut();
+            // Request a salt if we haven't got one yet nor we have requested one yet.
+            if !(s.salt.borrow().len() == 0 && *salt_requested) {
+                *salt_requested = true;
+                match call(Principal::management_canister(), "raw_rand", ()).await {
+                    Ok((res,)) => {
+                        s.salt.replace(res);
+                    }
+                    Err((_, message)) => trap(&format!("failed to retrieve salt: {}", message)),
+                }
+            }
+
+            if s.salt.borrow().len() == 0 {
+                trap("Salt not received yet. Try again later.");
+            }
+
+            if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+                ic_cdk::trap(&format!(
+                    "{} could not be authenticated against {:?}",
+                    caller(),
+                    device_data.pubkey
+                ));
+            }
+
+            let mut store = s.storage.borrow_mut();
+            let user_number = store
+                .allocate_user_number()
+                .unwrap_or_else(|| trap("failed to allocate a new user number"));
+            store
+                .write(user_number, vec![device_data])
+                .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
+
+            user_number
         }
+    }
 
-        let mut store = s.storage.borrow_mut();
-        let user_number = store
-            .allocate_user_number()
-            .unwrap_or_else(|| trap("failed to allocate a new user number"));
-        store
-            .write(user_number, vec![device_data])
-            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
-
-        user_number
-    })
+    STATE.with(|s| register_helper(s, device_data)).await
 }
 
 #[update]
