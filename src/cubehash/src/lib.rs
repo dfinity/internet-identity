@@ -3,12 +3,10 @@
 //! https://github.com/floodyberry/supercop/blob/master/crypto_hash/cubehash1632/simple/cubehash.c
 use std::num::Wrapping;
 
-const CUBEHASH_INITIAL_ROUNDS: u16 = 10;
-const CUBEHASH_FINAL_ROUNDS: u16 = 10;
 const CUBEHASH_ROUNDS: u16 = 16;
 const CUBEHASH_BLOCKBYTES: u16 = 32;
 
-// CubeHash 10+16/10+32-512
+// CubeHash 160+16/32+160-512
 
 #[inline]
 fn rotate(a: Wrapping<u32>, b: usize) -> Wrapping<u32> {
@@ -77,7 +75,7 @@ impl CubeHash {
         state[1] = Wrapping(CUBEHASH_BLOCKBYTES as u32);
         state[2] = Wrapping(CUBEHASH_ROUNDS as u32);
 
-        for _i in 0..CUBEHASH_INITIAL_ROUNDS {
+        for _i in 0..10 {
             transform(&mut state);
         }
 
@@ -107,7 +105,7 @@ impl CubeHash {
         self.state[(self.pos / 4) as usize] ^= u;
         transform(&mut self.state);
         self.state[31] ^= Wrapping(1);
-        for _ in 0..CUBEHASH_FINAL_ROUNDS {
+        for _ in 0..10 {
             transform(&mut self.state);
         }
         for i in 0..self.hash_bytes as usize {
