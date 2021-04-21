@@ -32,17 +32,18 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   replica(s): http://localhost:41549/
   ```
 
-* In open chat, build and deploy:
-  ```
-  npm install
-  ../idp-service/dfx.sh deploy
-  ```
 * In `idp-service` , build and deploy:
   ```
   npm ci
   ../idp-service/dfx.sh deploy --argument '(null)'
   ```
   Note the canister id
+
+* In open chat, build and deploy:
+  ```
+  npm install
+  ../idp-service/dfx.sh deploy
+  ```
 
 * In `agent-js` run
   ```
