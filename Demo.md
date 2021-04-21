@@ -4,6 +4,7 @@
 
 These instructions start from a mostly clean slate. Apply common sense when following them in your development area.
 
+1. Delete your browser cache for `localhost:8000` and `localhost:8080`.
 1. Run `./dfx.sh cache delete`, just to be sure
 2. In a checkout of `idp-service`, `main` branch, reset the dfx state:
    ```
@@ -94,5 +95,4 @@ different devices. Ideally use two yubikeys to demo.
 
 4. Now you should be forwarded back to Open Chat.
 5. Point our your identity on Open Chat, and see that it is _still_ the same
-
 
