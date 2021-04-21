@@ -39,7 +39,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
 * In `idp-service` , build and deploy:
   ```
   npm ci
-  ../idp-service/dfx.sh deploy
+  ../idp-service/dfx.sh deploy --argument '(null)'
   ```
   Note the canister id
 
