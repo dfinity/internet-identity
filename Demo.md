@@ -51,7 +51,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   ```
   putting in the port of the replica, and the canister id of the identity server.
 
-* Open open chat in your browser
+* Open open chat in your browser, by running this in `open-chat`
   ```
   google-chrome "http://$(dfx canister id website).localhost/"
   ```
