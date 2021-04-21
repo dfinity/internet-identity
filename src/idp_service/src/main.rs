@@ -89,6 +89,17 @@ struct StreamingCallbackHttpResponse {
     token: Option<Token>,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityStats {
+    assigned_user_number_range: (UserNumber, UserNumber),
+    users_registered: u64,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityInit {
+    assigned_user_number_range: (UserNumber, UserNumber),
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
@@ -315,6 +326,17 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     })
 }
 
+#[query]
+fn stats() -> InternetIdentityStats {
+    STATE.with(|state| {
+        let storage = state.storage.borrow();
+        InternetIdentityStats {
+            assigned_user_number_range: storage.assigned_user_number_range(),
+            users_registered: storage.user_count() as u64,
+        }
+    })
+}
+
 // used both in init and post_upgrade
 fn init_assets() {
     ASSETS.with(|a| {
@@ -340,8 +362,13 @@ fn init_assets() {
 }
 
 #[init]
-fn init() {
+fn init(maybe_arg: Option<InternetIdentityInit>) {
     STATE.with(|state| {
+        if let Some(arg) = maybe_arg {
+            state
+                .storage
+                .replace(Storage::new(arg.assigned_user_number_range));
+        }
         state.storage.borrow().flush();
         update_root_hash(&state.sigs.borrow());
     });

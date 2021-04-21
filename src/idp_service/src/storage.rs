@@ -169,6 +169,14 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         stable_write(0, &buf);
     }
 
+    pub fn user_count(&self) -> usize {
+        self.num_users as usize
+    }
+
+    pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
+        self.user_number_range
+    }
+
     fn value_size_limit(&self) -> usize {
         self.entry_size as usize - std::mem::size_of::<u16>()
     }
