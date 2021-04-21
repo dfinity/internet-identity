@@ -49,6 +49,7 @@ enum GetDelegationResponse {
     NoSuchDelegation,
 }
 
+mod api;
 mod hash;
 mod storage;
 
@@ -86,6 +87,17 @@ enum StreamingStrategy {
 struct StreamingCallbackHttpResponse {
     body: Vec<u8>,
     token: Option<Token>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityStats {
+    assigned_user_number_range: (UserNumber, UserNumber),
+    users_registered: u64,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityInit {
+    assigned_user_number_range: (UserNumber, UserNumber),
 }
 
 struct State {
@@ -316,7 +328,28 @@ fn init_assets() {
 
 #[init]
 fn init() {
+    use ic_cdk::export::candid;
+    let init_arg = api::arg_data();
+
     STATE.with(|state| {
+        if init_arg.len() > 0 {
+            let maybe_arg: Option<(InternetIdentityInit,)> =
+                match candid::de::decode_args(&init_arg) {
+                    Ok(arg) => Some(arg),
+                    Err(err) => {
+                        ic_cdk::api::print(format!(
+                            "failed to parse init arg {:?}: {}",
+                            init_arg, err
+                        ));
+                        None
+                    }
+                };
+            if let Some((arg,)) = maybe_arg {
+                state
+                    .storage
+                    .replace(Storage::new(arg.assigned_user_number_range));
+            }
+        }
         state.storage.borrow().flush();
         update_root_hash(&state.sigs.borrow());
     });
