@@ -375,12 +375,14 @@ fn retrieve_data() {
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    // for now, we use the empty blob as the salt
-    let salt: Vec<u8> = vec![];
+    // Maybe check that it's really not empty and trap if yes? Shouldn't happen really...
+    let salt = STATE.with(|s| *s.salt.borrow());
+
+    ic_cdk::println!("Salt: {:?}", salt);
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend(salt);
+    blob.extend(&salt);
 
     let user_number_str = user_number.to_string();
     let user_number_blob = user_number_str.bytes();
