@@ -7,7 +7,6 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::future::Future;
 use storage::Storage;
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
@@ -115,53 +114,49 @@ thread_local! {
 
 #[update]
 async fn register(device_data: DeviceData) -> UserNumber {
+    fn register_helper(s: &State, device_data: DeviceData) -> u64 {
+        let mut store = s.storage.borrow_mut();
+        let user_number = store
+            .allocate_user_number()
+            .unwrap_or_else(|| trap("failed to allocate a new user number"));
+        store
+            .write(user_number, vec![device_data])
+            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
+
+        user_number
+    }
+
     check_entry_limits(&device_data);
 
-    fn register_helper<'a, 'b>(
-        s: &'a State,
-        device_data: DeviceData,
-    ) -> impl Future<Output = u64> + 'b
-    where
-        'a: 'b,
-    {
-        async move {
-            let mut salt_requested = s.salt_requested.borrow_mut();
-            // Request a salt if we haven't got one yet nor we have requested one yet.
-            if !(s.salt.borrow().len() == 0 && *salt_requested) {
-                *salt_requested = true;
-                match call(Principal::management_canister(), "raw_rand", ()).await {
-                    Ok((res,)) => {
-                        s.salt.replace(res);
-                    }
-                    Err((_, message)) => trap(&format!("failed to retrieve salt: {}", message)),
-                }
-            }
+    if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+        ic_cdk::trap(&format!(
+            "{} could not be authenticated against {:?}",
+            caller(),
+            device_data.pubkey
+        ));
+    }
 
+    let (salt_requested, salt) =
+        STATE.with(|s| (*s.salt_requested.borrow(), s.salt.borrow().clone()));
+
+    if salt.len() == 0 && !salt_requested {
+        STATE.with(|s| s.salt_requested.replace(true));
+        let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+            Ok((res,)) => res,
+            Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
+        };
+        STATE.with(|s| {
+            s.salt.replace(res);
+            register_helper(s, device_data)
+        })
+    } else {
+        STATE.with(|s| {
             if s.salt.borrow().len() == 0 {
                 trap("Salt not received yet. Try again later.");
             }
-
-            if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
-                ic_cdk::trap(&format!(
-                    "{} could not be authenticated against {:?}",
-                    caller(),
-                    device_data.pubkey
-                ));
-            }
-
-            let mut store = s.storage.borrow_mut();
-            let user_number = store
-                .allocate_user_number()
-                .unwrap_or_else(|| trap("failed to allocate a new user number"));
-            store
-                .write(user_number, vec![device_data])
-                .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
-
-            user_number
-        }
+            register_helper(s, device_data)
+        })
     }
-
-    STATE.with(|s| register_helper(s, device_data)).await
 }
 
 #[update]
@@ -376,7 +371,7 @@ fn retrieve_data() {
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
     // Maybe check that it's really not empty and trap if yes? Shouldn't happen really...
-    let salt = STATE.with(|s| *s.salt.borrow());
+    let salt = STATE.with(|s| s.salt.borrow().clone());
 
     ic_cdk::println!("Salt: {:?}", salt);
 
