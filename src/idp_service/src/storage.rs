@@ -40,8 +40,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         &self.salt
     }
 
-    pub fn set_salt(&mut self, salt: Vec<u8>) {
+    pub fn update_salt(&mut self, salt: Vec<u8>) {
         self.salt = salt;
+        self.flush();
     }
 
     /// Initializes storage by reading stable memory.
@@ -158,7 +159,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 trap("failed to grow stable memory by 1 page");
             }
         }
-        let mut buf: [u8; 26] = [0; 26];
+        let mut buf: [u8; 58] = [0; 58];
         buf[0..4].copy_from_slice(b"IIC\x01");
         buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
         buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());

@@ -112,18 +112,6 @@ thread_local! {
 
 #[update]
 async fn register(device_data: DeviceData) -> UserNumber {
-    fn register_helper(s: &State, device_data: DeviceData) -> u64 {
-        let mut store = s.storage.borrow_mut();
-        let user_number = store
-            .allocate_user_number()
-            .unwrap_or_else(|| trap("failed to allocate a new user number"));
-        store
-            .write(user_number, vec![device_data])
-            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
-
-        user_number
-    }
-
     check_entry_limits(&device_data);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
@@ -134,15 +122,11 @@ async fn register(device_data: DeviceData) -> UserNumber {
         ));
     }
 
-    let (salt_requested, salt) = STATE.with(|s| {
-        (
-            *s.salt_requested.borrow(),
-            s.storage.borrow().salt().to_vec(),
-        )
+    let salt_requested = STATE.with(|s| {
+            *s.salt_requested.borrow()
     });
 
-    // Request salt iff the salt is still empty, i.e. 0 and we have not requested a salt yet.
-    if salt == EMPTY_SALT && !salt_requested {
+    if !salt_requested {
         STATE.with(|s| s.salt_requested.replace(true));
         let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
             Ok((res,)) => res,
@@ -150,18 +134,27 @@ async fn register(device_data: DeviceData) -> UserNumber {
         };
         STATE.with(|s| {
             let mut store = s.storage.borrow_mut();
-            store.set_salt(res);
-            store.flush();
-            register_helper(s, device_data)
-        })
+            store.update_salt(res);
+        });
     } else {
         STATE.with(|s| {
             if s.storage.borrow().salt() == EMPTY_SALT {
                 trap("Salt not received yet. Try again later.");
             }
-            register_helper(s, device_data)
         })
     }
+
+    STATE.with(|s| {
+        let mut store = s.storage.borrow_mut();
+        let user_number = store
+            .allocate_user_number()
+            .unwrap_or_else(|| trap("failed to allocate a new user number"));
+        store
+            .write(user_number, vec![device_data])
+            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
+
+        user_number
+    })
 }
 
 #[update]
@@ -377,8 +370,6 @@ fn retrieve_data() {
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
     // Maybe check that it's not the EMPTY_SALT and trap if yes? Shouldn't happen really...
     let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
-
-    ic_cdk::println!("Salt: {:?}", salt);
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
