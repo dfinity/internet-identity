@@ -17,7 +17,7 @@ export declare type OAuth2AccessTokenResponse = {
 import {
   FrontendHostname,
   SignedDelegation as CandidSignedDelegation,
-} from "../typings";
+} from "../../generated/idp_types";
 import { confirm } from "../components/confirm";
 
 /**

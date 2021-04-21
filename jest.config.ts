@@ -1,8 +1,5 @@
 const path = require("path");
-const idp_service = path.join(
-  __dirname,
-  ".dfx/local/canisters/idp_service/idp_service.js"
-);
+const idp_service = path.join(__dirname, "src/frontend/generated/idp_idl.ts");
 
 export default {
   preset: "ts-jest",
