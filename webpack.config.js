@@ -1,32 +1,8 @@
 const path = require("path");
 const webpack = require("webpack");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
-
-// List of all aliases for canisters. This creates the module alias for
-// the `import ... from "@dfinity/ic/canisters/xyz"` where xyz is the name of a
-// canister.
-const aliases = Object.entries(dfxJson.canisters).reduce(
-  (acc, [name, _value]) => {
-    // Get the network name, or `local` by default.
-    const networkName = process.env["DFX_NETWORK"] || "local";
-    const outputRoot = path.join(
-      __dirname,
-      ".dfx",
-      networkName,
-      "canisters",
-      name
-    );
-
-    return {
-      ...acc,
-      ["dfx-generated/" + name]: path.join(outputRoot, name + ".js"),
-    };
-  },
-  {}
-);
 
 /**
  * Generate a webpack configuration for a canister.
@@ -46,7 +22,6 @@ function generateWebpackConfigForCanister(name, info) {
       minimizer: [new TerserPlugin()],
     },
     resolve: {
-      alias: aliases,
       extensions: [".js", ".ts", ".jsx", ".tsx"],
       fallback: {
         assert: require.resolve("assert/"),
@@ -96,6 +71,9 @@ function generateWebpackConfigForCanister(name, info) {
         Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
       }),
+      new webpack.EnvironmentPlugin([
+        'CANISTER_ID'
+      ])
     ],
   };
 }

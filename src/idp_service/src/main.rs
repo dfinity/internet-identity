@@ -94,6 +94,11 @@ struct InternetIdentityStats {
     users_registered: u64,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityInit {
+    assigned_user_number_range: (UserNumber, UserNumber),
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
@@ -332,8 +337,13 @@ fn init_assets() {
 }
 
 #[init]
-fn init() {
+fn init(maybe_arg: Option<InternetIdentityInit>) {
     STATE.with(|state| {
+        if let Some(arg) = maybe_arg {
+            state
+                .storage
+                .replace(Storage::new(arg.assigned_user_number_range));
+        }
         state.storage.borrow().flush();
         update_root_hash(&state.sigs.borrow());
     });
