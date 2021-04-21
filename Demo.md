@@ -21,6 +21,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   ```
   rm -rf .dfx
   ```
+  (or less expensive, `rm -f .dfx/local/canister_ids.json .dfx/local/wallets.json`)
 * In idp-service, run the replica. By virtue of using `dfx.sh`, this will pull
   in a replica with our auth changes (via https://github.com/dfinity/sdk/pull/1587)
   ```
