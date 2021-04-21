@@ -9,9 +9,9 @@ import { renderManage } from "./flows/manage";
 const init = async () => {
   initLogout();
   const { userId, connection } = await login();
-  const url = new URL(document.URL)
+  const url = new URL(document.URL);
   if (window.location.href.match(/authorize/)) {
-    oauth(userId, connection)
+    oauth(userId, connection);
   } else if (!!url.hash?.split("device=")[1]) {
     addDevice(userId, connection);
   } else {
