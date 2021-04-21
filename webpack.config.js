@@ -3,22 +3,28 @@ const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
+require("dotenv").config();
+
+const localCanister = require("./.dfx/local/canister_ids.json").idp_service
+  .local;
 
 /**
  * Generate a webpack configuration for a canister.
  */
 function generateWebpackConfigForCanister(name, info) {
-  const devtool =
-    process.env.NODE_ENV === "production" ? undefined : "source-map";
+  const isProduction = process.env.NODE_ENV === "production";
+  const devtool = isProduction ? undefined : "source-map";
+
+  process.env.CANISTER_ID = process.env.CANISTER_ID ?? localCanister;
 
   return {
-    mode: process.env.NODE_ENV === "production" ? "production" : "development",
+    mode: isProduction ? "production" : "development",
     entry: {
       index: path.join(__dirname, "src", "frontend", "src", "index"),
     },
     devtool,
     optimization: {
-      minimize: process.env.NODE_ENV === "production",
+      minimize: isProduction,
       minimizer: [new TerserPlugin()],
     },
     resolve: {
@@ -71,9 +77,7 @@ function generateWebpackConfigForCanister(name, info) {
         Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
       }),
-      new webpack.EnvironmentPlugin([
-        'CANISTER_ID'
-      ])
+      new webpack.EnvironmentPlugin(["CANISTER_ID"]),
     ],
   };
 }
