@@ -63,6 +63,11 @@ type GetDelegationResponse = variant {
   no_such_delegation
 };
 
+type InternetIdentityStats = record {
+  users_registered: nat64;
+  assigned_user_number_range: record { nat64; nat64; };
+};
+
 type InternetIdentityInit = record {
   assigned_user_number_range : record { nat64; nat64; };
 };
@@ -72,6 +77,7 @@ service : (opt InternetIdentityInit) -> {
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
+  stats : () -> (InternetIdentityStats) query;
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
