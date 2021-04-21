@@ -63,7 +63,11 @@ type GetDelegationResponse = variant {
   no_such_delegation
 };
 
-service : {
+type InternetIdentityInit = record {
+  assigned_user_number_range : record { nat64; nat64; };
+};
+
+service : (opt InternetIdentityInit) -> {
   register : (DeviceData) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
