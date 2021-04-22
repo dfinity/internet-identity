@@ -72,6 +72,11 @@ type InternetIdentityInit = record {
   assigned_user_number_range : record { nat64; nat64; };
 };
 
+type ProofOfWork = record {
+  timestamp : Timestamp;
+  nonce : nat64;
+};
+
 service : (opt InternetIdentityInit) -> {
   register : (DeviceData) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
