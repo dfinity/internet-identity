@@ -56,6 +56,10 @@ export default ({ IDL }) => {
     'status_code' : IDL.Nat16,
   });
   const UserKey = PublicKey;
+  const ProofOfWork = IDL.Record({
+    'nonce' : IDL.Nat64,
+    'timestamp' : Timestamp,
+  });
   const InternetIdentityStats = IDL.Record({
     'users_registered' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
@@ -74,7 +78,7 @@ export default ({ IDL }) => {
         [UserKey, Timestamp],
         [],
       ),
-    'register' : IDL.Func([DeviceData], [UserNumber], []),
+    'register' : IDL.Func([DeviceData, ProofOfWork], [UserNumber], []),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
   });

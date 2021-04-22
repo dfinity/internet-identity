@@ -26,6 +26,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -53,11 +54,15 @@ export class IDPActor {
     });
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
+    const pow = getProofOfWork();
+
+    console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
     const userId = await actor.register({
       alias,
       pubkey,
       credential_id: [credential_id],
-    });
+    },
+    pow);
 
     return {
       connection: new IDPActor(identity, delegationIdentity, actor),
