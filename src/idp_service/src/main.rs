@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use storage::Storage;
 
 const fn secs_to_nanos(secs: u64) -> u64 {
-    secs * 60_000_000_000
+    secs * 1_000_000_000
 }
 
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
