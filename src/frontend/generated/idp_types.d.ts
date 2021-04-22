@@ -29,6 +29,13 @@ export interface HttpResponse {
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 };
+export interface InternetIdentityInit {
+  'assigned_user_number_range' : [bigint, bigint],
+};
+export interface InternetIdentityStats {
+  'users_registered' : bigint,
+  'assigned_user_number_range' : [bigint, bigint],
+};
 export type PublicKey = Array<number>;
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
@@ -63,4 +70,5 @@ export default interface _SERVICE {
     ) => Promise<[UserKey, Timestamp]>,
   'register' : (arg_0: DeviceData) => Promise<UserNumber>,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
+  'stats' : () => Promise<InternetIdentityStats>,
 };
