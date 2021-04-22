@@ -182,6 +182,10 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
     ensure_salt_set().await;
 
     STATE.with(|s| {
+        if s.storage.borrow().salt() == EMPTY_SALT {
+            trap("Salt is not set. Try calling init_salt() to set it.");
+        }
+
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to read device data of user {}: {}",
@@ -223,6 +227,10 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     ensure_salt_set().await;
     STATE.with(|s| {
+        if s.storage.borrow().salt() == EMPTY_SALT {
+            trap("Salt is not set. Try calling init_salt() to set it.");
+        }
+
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
@@ -264,6 +272,10 @@ async fn prepare_delegation(
     ensure_salt_set().await;
 
     STATE.with(|s| {
+        if s.storage.borrow().salt() == EMPTY_SALT {
+            trap("Salt is not set. Try calling init_salt() to set it.");
+        }
+
         let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to read device data of user {}: {}",
