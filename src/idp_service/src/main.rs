@@ -183,7 +183,7 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
                 pow.timestamp, pow.nonce,
             ));
         }
-        nonce_cache.prune_expired(now - POW_NONCE_LIFETIME);
+        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
 
         let mut store = s.storage.borrow_mut();
         let user_number = store
@@ -301,7 +301,7 @@ async fn prepare_delegation(
 
         check_frontend_length(&frontend);
 
-        let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+        let expiration = (time() as u64).saturating_add(DEFAULT_EXPIRATION_PERIOD_NS);
 
         let seed = calculate_seed(user_number, &frontend);
         let mut sigs = s.sigs.borrow_mut();
@@ -543,7 +543,7 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
         expiration,
         targets: None,
     });
-    let expires_at = time() as u64 + DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS;
+    let expires_at = (time() as u64).saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
     update_root_hash(&sigs);
 }
@@ -624,13 +624,13 @@ fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
 
     const DIFFICULTY: usize = 2;
 
-    if pow.timestamp < now - POW_NONCE_LIFETIME {
+    if pow.timestamp < now.saturating_sub(POW_NONCE_LIFETIME) {
         trap(&format!(
             "proof of work timestamp {} is too old, current time: {}",
             pow.timestamp, now
         ));
     }
-    if pow.timestamp > now + POW_NONCE_LIFETIME {
+    if pow.timestamp > now.saturating_add(POW_NONCE_LIFETIME) {
         trap(&format!(
             "proof of work timestamp {} is too far in future, current time: {}",
             pow.timestamp, now
