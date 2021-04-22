@@ -8,7 +8,8 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use storage::{Storage, EMPTY_SALT};
+use std::convert::TryInto;
+use storage::{Salt, Storage};
 
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
@@ -63,7 +64,6 @@ enum GetDelegationResponse {
 }
 
 mod hash;
-mod nonce_cache;
 mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -137,7 +137,7 @@ thread_local! {
 #[update]
 async fn init_salt() {
     STATE.with(|s| {
-        if s.storage.borrow().salt() != EMPTY_SALT {
+        if s.storage.borrow().salt().is_some() {
             trap("Salt already set");
         }
     });
@@ -146,10 +146,16 @@ async fn init_salt() {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
     };
+    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+            "expected raw randomness to be of length 32, got {}",
+            res.len()
+        ));
+    });
 
     STATE.with(|s| {
         let mut store = s.storage.borrow_mut();
-        store.update_salt(res); // update_salt() traps if salt has already been set
+        store.update_salt(salt); // update_salt() traps if salt has already been set
     });
 }
 
@@ -177,7 +183,7 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
                 pow.timestamp, pow.nonce,
             ));
         }
-        nonce_cache.prune_expired(now - POW_NONCE_LIFETIME);
+        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
 
         let mut store = s.storage.borrow_mut();
         let user_number = store
@@ -295,7 +301,7 @@ async fn prepare_delegation(
 
         check_frontend_length(&frontend);
 
-        let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
+        let expiration = (time() as u64).saturating_add(DEFAULT_EXPIRATION_PERIOD_NS);
 
         let seed = calculate_seed(user_number, &frontend);
         let mut sigs = s.sigs.borrow_mut();
@@ -433,14 +439,13 @@ fn retrieve_data() {
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
-    if salt == EMPTY_SALT {
-        trap("Salt is not set. Try calling init_salt() to set it");
-    }
+    let salt = STATE
+        .with(|s| s.storage.borrow().salt().cloned())
+        .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"));
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend(salt);
+    blob.extend_from_slice(&salt);
 
     let user_number_str = user_number.to_string();
     let user_number_blob = user_number_str.bytes();
@@ -538,7 +543,7 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
         expiration,
         targets: None,
     });
-    let expires_at = time() as u64 + DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS;
+    let expires_at = (time() as u64).saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
     update_root_hash(&sigs);
 }
@@ -619,13 +624,13 @@ fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
 
     const DIFFICULTY: usize = 2;
 
-    if pow.timestamp < now - POW_NONCE_LIFETIME {
+    if pow.timestamp < now.saturating_sub(POW_NONCE_LIFETIME) {
         trap(&format!(
             "proof of work timestamp {} is too old, current time: {}",
             pow.timestamp, now
         ));
     }
-    if pow.timestamp > now + POW_NONCE_LIFETIME {
+    if pow.timestamp > now.saturating_add(POW_NONCE_LIFETIME) {
         trap(&format!(
             "proof of work timestamp {} is too far in future, current time: {}",
             pow.timestamp, now
@@ -651,13 +656,13 @@ fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
 
 // Checks if salt is empty and calls `init_salt` to set it.
 async fn ensure_salt_set() {
-    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
-    if salt == EMPTY_SALT {
+    let salt = STATE.with(|s| s.storage.borrow().salt().cloned());
+    if salt.is_none() {
         init_salt().await;
     }
 
     STATE.with(|s| {
-        if s.storage.borrow().salt() == EMPTY_SALT {
+        if s.storage.borrow().salt().is_none() {
             trap("Salt is not set. Try calling init_salt() to set it");
         }
     });
