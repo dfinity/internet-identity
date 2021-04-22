@@ -78,6 +78,7 @@ type ProofOfWork = record {
 };
 
 service : (opt InternetIdentityInit) -> {
+  init_salt: () -> ();
   register : (DeviceData, ProofOfWork) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();

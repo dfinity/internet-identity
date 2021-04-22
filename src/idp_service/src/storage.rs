@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 
 const HEADER_SIZE: u32 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
+pub const EMPTY_SALT: &'static [u8] = &[0; 32];
 const WASM_PAGE_SIZE: u32 = 65536;
 
 /// Data type responsible for managing user data in stable memory.
@@ -17,6 +18,7 @@ pub struct Storage<T> {
     num_users: u32,
     user_number_range: (UserNumber, UserNumber),
     entry_size: u16,
+    salt: Vec<u8>,
     _marker: PhantomData<T>,
 }
 
@@ -28,9 +30,22 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             num_users: 0,
             user_number_range,
             entry_size: DEFAULT_ENTRY_SIZE,
+            salt: EMPTY_SALT.to_vec(),
             _marker: PhantomData,
         };
         storage
+    }
+
+    pub fn salt(&self) -> &[u8] {
+        &self.salt
+    }
+
+    pub fn update_salt(&mut self, salt: Vec<u8>) {
+        if self.salt != EMPTY_SALT {
+            trap("Attempted to set the salt twice.");
+        }
+        self.salt = salt;
+        self.flush();
     }
 
     /// Initializes storage by reading stable memory.
@@ -44,7 +59,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             return None;
         }
 
-        let mut buf: [u8; 26] = [0; 26];
+        let mut buf: [u8; 58] = [0; 58];
         stable_read(0, &mut buf);
         if &buf[0..3] != b"IIC" {
             trap(&format!(
@@ -59,10 +74,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
         let id_range_hi = u64::from_le_bytes(buf[16..24].try_into().unwrap());
         let entry_size = u16::from_le_bytes(buf[24..26].try_into().unwrap());
+        let salt = buf[26..58].to_vec();
         Some(Self {
             num_users,
             user_number_range: (id_range_lo, id_range_hi),
             entry_size,
+            salt,
             _marker: PhantomData,
         })
     }
@@ -145,12 +162,13 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 trap("failed to grow stable memory by 1 page");
             }
         }
-        let mut buf: [u8; 26] = [0; 26];
+        let mut buf: [u8; 58] = [0; 58];
         buf[0..4].copy_from_slice(b"IIC\x01");
         buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
         buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());
         buf[16..24].copy_from_slice(&self.user_number_range.1.to_le_bytes());
         buf[24..26].copy_from_slice(&self.entry_size.to_le_bytes());
+        buf[26..58].copy_from_slice(&self.salt);
         stable_write(0, &buf);
     }
 

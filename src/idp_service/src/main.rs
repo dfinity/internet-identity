@@ -1,4 +1,5 @@
 use hashtree::{Hash, HashTree};
+use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -7,7 +8,7 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use storage::Storage;
+use storage::{Storage, EMPTY_SALT};
 
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
@@ -134,20 +135,41 @@ thread_local! {
 }
 
 #[update]
-fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
+async fn init_salt() {
+    STATE.with(|s| {
+        if s.storage.borrow().salt() != EMPTY_SALT {
+            trap("Salt already set");
+        }
+    });
+
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
+    };
+
+    STATE.with(|s| {
+        let mut store = s.storage.borrow_mut();
+        store.update_salt(res); // update_salt() traps if salt has already been set
+    });
+}
+
+#[update]
+async fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
     check_entry_limits(&device_data);
     let now = time() as u64;
     check_proof_of_work(&pow, now);
 
-    STATE.with(|s| {
-        if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
-            ic_cdk::trap(&format!(
-                "{} could not be authenticated against {:?}",
-                caller(),
-                device_data.pubkey
-            ));
-        }
+    if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+        ic_cdk::trap(&format!(
+            "{} could not be authenticated against {:?}",
+            caller(),
+            device_data.pubkey
+        ));
+    }
 
+    ensure_salt_set().await;
+
+    STATE.with(|s| {
         let mut nonce_cache = s.nonce_cache.borrow_mut();
         if nonce_cache.contains(pow.timestamp, pow.nonce) {
             trap(&format!(
@@ -172,10 +194,12 @@ fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
 }
 
 #[update]
-fn add(user_number: UserNumber, device_data: DeviceData) {
+async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
     check_entry_limits(&device_data);
+
+    ensure_salt_set().await;
 
     STATE.with(|s| {
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
@@ -216,7 +240,8 @@ fn add(user_number: UserNumber, device_data: DeviceData) {
 }
 
 #[update]
-fn remove(user_number: UserNumber, device_key: DeviceKey) {
+async fn remove(user_number: UserNumber, device_key: DeviceKey) {
+    ensure_salt_set().await;
     STATE.with(|s| {
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
@@ -251,11 +276,13 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 }
 
 #[update]
-fn prepare_delegation(
+async fn prepare_delegation(
     user_number: UserNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
 ) -> (UserKey, Timestamp) {
+    ensure_salt_set().await;
+
     STATE.with(|s| {
         let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
             trap(&format!(
@@ -406,8 +433,10 @@ fn retrieve_data() {
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    // for now, we use the empty blob as the salt
-    let salt: Vec<u8> = vec![];
+    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
+    if salt == EMPTY_SALT {
+        trap("Salt is not set. Try calling init_salt() to set it");
+    }
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
@@ -618,6 +647,20 @@ fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
     if !hash[0..DIFFICULTY].iter().all(|b| *b == 0) {
         trap("proof of work hash check failed");
     }
+}
+
+// Checks if salt is empty and calls `init_salt` to set it.
+async fn ensure_salt_set() {
+    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
+    if salt == EMPTY_SALT {
+        init_salt().await;
+    }
+
+    STATE.with(|s| {
+        if s.storage.borrow().salt() == EMPTY_SALT {
+            trap("Salt is not set. Try calling init_salt() to set it");
+        }
+    });
 }
 
 fn main() {}
