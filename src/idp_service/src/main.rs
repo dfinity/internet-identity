@@ -64,7 +64,6 @@ enum GetDelegationResponse {
 }
 
 mod hash;
-mod nonce_cache;
 mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

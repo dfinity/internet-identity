@@ -80,7 +80,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
         let id_range_hi = u64::from_le_bytes(buf[16..24].try_into().unwrap());
         let entry_size = u16::from_le_bytes(buf[24..26].try_into().unwrap());
-        let salt = buf[26..58].try_into().unwrap_or_else(|| {
+        let salt = buf[26..58].try_into().unwrap_or_else(|_| {
             trap("unreachable: failed to extract 32 byte array from 32 byte a slice")
         });
         Some(Self {
