@@ -1,5 +1,6 @@
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
+import { withLoader } from "../components/loader";
 import { IDPActor } from "../utils/idp_actor";
 import { getUserId } from "../utils/userId";
 import { LoginResult, loginUnknown } from "./loginUnknown";
@@ -90,7 +91,7 @@ const init = async (userId: bigint): Promise<LoginResult> => {
         resolve({
           tag: "ok",
           userId,
-          connection: await IDPActor.reconnect(userId),
+          connection: await withLoader(() => IDPActor.login(userId)),
         });
       } catch (err) {
         resolve({

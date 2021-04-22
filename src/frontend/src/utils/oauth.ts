@@ -19,6 +19,7 @@ import {
   SignedDelegation as CandidSignedDelegation,
 } from "../../generated/idp_types";
 import { confirm } from "../components/confirm";
+import { withLoader } from "../components/loader";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -100,12 +101,12 @@ export default async function (userId: bigint, connection: IDPActor) {
       const hostname = new URL(params.redirect_uri)
         .hostname as FrontendHostname;
       if (await checkConsent(hostname)) {
-        const accessToken = await generate_access_token(
+        const accessToken = await withLoader(() => generate_access_token(
           connection,
           userId,
           params.login_hint,
           hostname
-        )
+        ))
         redirectToApp(params.redirect_uri, {
           access_token: accessToken,
           token_type: "bearer",

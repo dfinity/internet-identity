@@ -38,3 +38,12 @@ export const endLoader = () => {
   const container = document.getElementById("loaderContainer") as HTMLElement;
   render(html``, container);
 };
+
+export const withLoader = async <A>(action: () => Promise<A>): Promise<A> => {
+  startLoader();
+  try {
+    return await action()
+  } finally {
+    endLoader()
+  }
+}

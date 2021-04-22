@@ -4,7 +4,7 @@ import { confirm } from "../components/confirm";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
 import { setUserId } from "../utils/userId";
-import getProofOfWork from "../crypto/pow";
+import { withLoader } from "../components/loader";
 
 const pageContent = () => html` <style>
     .closeDialog {
@@ -112,15 +112,15 @@ const pageContent = () => html` <style>
 
 export type LoginResult =
   | {
-      tag: "ok";
-      userId: bigint;
-      connection: IDPActor;
-    }
+    tag: "ok";
+    userId: bigint;
+    connection: IDPActor;
+  }
   | {
-      tag: "err";
-      message: string;
-      detail: string;
-    };
+    tag: "err";
+    message: string;
+    detail: string;
+  };
 
 export const loginUnknown = async (): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -148,31 +148,28 @@ const initRegisterForm = (resolve: (loginResult: LoginResult) => void) => {
       "#registerAlias"
     ) as HTMLInputElement;
 
-    // Do PoW before registering.
-    const pow = getProofOfWork();
-
     // Send values through actor
-    IDPActor.register(registerAlias.value, pow)
-      .then(({ connection, userId }) => {
-        setUserId(userId);
-        confirm({
-          message: `You're now registered as ${userId}!`,
-          detail: "Make sure to remember/write down this number, as without it you can not recover your Internet Identity",
-        }).then(_ => {
-          resolve({ tag: "ok", userId, connection });
-        }).catch(_ => {
-          resolve({ tag: "ok", userId, connection });
-        });
-      })
-      .catch((err) => {
-        console.error(err);
-        resolve({
-          tag: "err",
-          message: "Failed to register a new Internet Identity.",
-          detail: err.toString(),
-        });
-      });
-    return false;
+    withLoader(() =>
+      IDPActor.register(registerAlias.value)
+        .then(({ connection, userId }) => {
+          setUserId(userId);
+          confirm({
+            message: `You're now registered as ${userId}!`,
+            detail: "Make sure to remember/write down this number, as without it you can not recover your Internet Identity",
+          }).then(_ => {
+            resolve({ tag: "ok", userId, connection });
+          }).catch(_ => {
+            resolve({ tag: "ok", userId, connection });
+          });
+        })
+        .catch((err) => {
+          console.error(err);
+          resolve({
+            tag: "err",
+            message: "Failed to register a new Internet Identity.",
+            detail: err.toString(),
+          });
+        }));
   };
 
   form.onsubmit = handleSubmit;
@@ -189,10 +186,11 @@ const initLogin = (resolve) => {
   loginButton.onclick = () => {
     const userId = BigInt(userIdInput.value);
     if (userId) {
-      IDPActor.reconnect(userId).then((connection) => {
-        setUserId(userId);
-        resolve({ tag: "ok", userId, connection });
-      });
+      withLoader(() =>
+        IDPActor.login(userId).then((connection) => {
+          setUserId(userId);
+          resolve({ tag: "ok", userId, connection });
+        }));
     } else {
       resolve({
         tag: "err",
