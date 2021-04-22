@@ -1,4 +1,4 @@
-import CubeHash from "cubehash";
+import cubeHash from "./cubehash";
 import { Principal } from "@dfinity/agent";
 import bigUintLE from "biguintle";
 import { ProofOfWork } from "../../generated/idp_types";
@@ -11,7 +11,7 @@ const NONCE_OFFSET = DOMAIN.length + 1 /* domain + prefix */ + 8 /* timestamp le
 
 export default function(): ProofOfWork {
   console.time('PoW');
-  const timestamp = BigInt(Date.now()) * BigInt(1000); // Timestamp in ns.
+  const timestamp = BigInt(Date.now()) * BigInt(1000000); // Timestamp in ns.
   let nonce = BigInt(0);
 
   let message = Buffer.concat([
@@ -25,7 +25,7 @@ export default function(): ProofOfWork {
 
   // Keep incrementing the nonce until we find a hash that checks.
   while (true) {
-    const hash = CubeHash(512, message);
+    const hash = cubeHash(message);
     if (hashOk(hash)) {
       break;
     }
@@ -39,7 +39,6 @@ export default function(): ProofOfWork {
   }
   
   console.timeEnd('PoW');
-  console.log(`Nonce found: ${nonce}`);
   return {
     timestamp: timestamp,
     nonce: nonce
@@ -53,7 +52,7 @@ function toLeBytes(num: BigInt): Buffer {
 }
 
 // Returns true if the hash passes the set level of difficulty.
-function hashOk(hash: Buffer): boolean {
+function hashOk(hash: Uint8Array): boolean {
   for (let i = 0; i < DIFFICULTY; i++) {
     if (hash[i] != 0) {
       return false;
