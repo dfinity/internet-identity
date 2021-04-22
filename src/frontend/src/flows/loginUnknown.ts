@@ -1,5 +1,6 @@
 import { blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
+import { confirm } from "../components/confirm";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
 import { setUserId } from "../utils/userId";
@@ -150,7 +151,14 @@ const initRegisterForm = (resolve: (loginResult: LoginResult) => void) => {
     IDPActor.register(registerAlias.value)
       .then(({ connection, userId }) => {
         setUserId(userId);
-        resolve({ tag: "ok", userId, connection });
+        confirm({
+          message: `You're now registered as ${userId}!`,
+          detail: "Make sure to remember/write down this number, as without it you can not recover your Internet Identity",
+        }).then(_ => {
+          resolve({ tag: "ok", userId, connection });
+        }).catch(_ => {
+          resolve({ tag: "ok", userId, connection });
+        });
       })
       .catch((err) => {
         console.error(err);
