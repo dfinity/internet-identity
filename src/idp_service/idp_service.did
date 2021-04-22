@@ -78,12 +78,8 @@ type ProofOfWork = record {
 };
 
 service : (opt InternetIdentityInit) -> {
-<<<<<<< HEAD
   init_salt: () -> ();
-  register : (DeviceData) -> (UserNumber);
-=======
   register : (DeviceData, ProofOfWork) -> (UserNumber);
->>>>>>> main
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
