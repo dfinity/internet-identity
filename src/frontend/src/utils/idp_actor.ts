@@ -27,6 +27,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -43,10 +44,12 @@ export class IDPActor {
 
   static async register(
     alias: string,
-    pow: ProofOfWork
   ): Promise<{ connection: IDPActor; userId: UserNumber }> {
     const identity = await WebAuthnIdentity.create();
     const delegationIdentity = await requestFEDelegation(identity);
+
+    // Do PoW before registering.
+    const pow = getProofOfWork();
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -62,7 +65,7 @@ export class IDPActor {
       pubkey,
       credential_id: [credential_id],
     },
-    pow);
+      pow);
 
     return {
       connection: new IDPActor(identity, delegationIdentity, actor),

@@ -4,7 +4,6 @@ import { confirm } from "../components/confirm";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
 import { setUserId } from "../utils/userId";
-import getProofOfWork from "../crypto/pow";
 
 const pageContent = () => html` <style>
     .closeDialog {
@@ -147,9 +146,6 @@ const initRegisterForm = (resolve: (loginResult: LoginResult) => void) => {
     const registerAlias = form.querySelector(
       "#registerAlias"
     ) as HTMLInputElement;
-
-    // Do PoW before registering.
-    const pow = getProofOfWork();
 
     // Send values through actor
     IDPActor.register(registerAlias.value, pow)
