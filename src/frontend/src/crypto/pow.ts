@@ -1,7 +1,7 @@
-import { ProofOfWork } from "../typings";
 import CubeHash from "cubehash";
 import { Principal } from "@dfinity/agent";
 import bigUintLE from "biguintle";
+import { ProofOfWork } from "../../generated/idp_types";
 
 const IDP_CANISTER_ID: string = process.env.CANISTER_ID!;
 const DIFFICULTY = 2; // Number of leading bytes that must equal zero in the hash.
