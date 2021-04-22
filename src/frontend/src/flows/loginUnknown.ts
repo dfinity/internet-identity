@@ -186,10 +186,11 @@ const initLogin = (resolve) => {
   loginButton.onclick = () => {
     const userId = BigInt(userIdInput.value);
     if (userId) {
-      IDPActor.login(userId).then((connection) => {
-        setUserId(userId);
-        resolve({ tag: "ok", userId, connection });
-      });
+      withLoader(() =>
+        IDPActor.login(userId).then((connection) => {
+          setUserId(userId);
+          resolve({ tag: "ok", userId, connection });
+        }));
     } else {
       resolve({
         tag: "err",

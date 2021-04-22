@@ -17,7 +17,6 @@ import _SERVICE, {
   FrontendHostname,
   Timestamp,
   DeviceData,
-  ProofOfWork,
 } from "../../generated/idp_types";
 import {
   DelegationChain,
@@ -28,7 +27,6 @@ import {
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import getProofOfWork from "../crypto/pow";
-import { withLoader } from "../components/loader";
 
 const canisterId: string = process.env.CANISTER_ID!;
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -87,7 +85,7 @@ export class IDPActor {
         }))
       )
     );
-    const delegationIdentity = await withLoader(() => requestFEDelegation(multiIdent));
+    const delegationIdentity = await requestFEDelegation(multiIdent);
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
