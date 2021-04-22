@@ -586,7 +586,7 @@ fn check_frontend_length(frontend: &FrontendHostname) {
     }
 }
 
-// Checks is salt is empty and call init_salt to set it.
+// Checks if salt is empty and calls `init_salt` to set it.
 async fn ensure_salt_set() {
     let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
     if salt == EMPTY_SALT {
