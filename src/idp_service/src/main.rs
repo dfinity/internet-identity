@@ -319,19 +319,27 @@ fn init_assets() {
 
         a.insert(
             "/index.html".to_string(),
-            include_str!("../../../dist/index.html").as_bytes().into(),
+            include_bytes!("../../../dist/index.html").to_vec(),
         );
         a.insert(
             "/".to_string(),
-            include_str!("../../../dist/index.html").as_bytes().into(),
+            include_bytes!("../../../dist/index.html").to_vec(),
         );
         a.insert(
             "/authorize".to_string(),
-            include_str!("../../../dist/index.html").as_bytes().into(),
+            include_bytes!("../../../dist/index.html").to_vec(),
         );
         a.insert(
             "/index.js".to_string(),
-            include_str!("../../../dist/index.js").as_bytes().into(),
+            include_bytes!("../../../dist/index.js").to_vec(),
+        );
+        a.insert(
+            "/glitch-loop.webp".to_string(),
+            include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
+        );
+        a.insert(
+            "/favicon.ico".to_string(),
+            include_bytes!("../../../dist/favicon.ico").to_vec(),
         );
     });
 }
