@@ -186,7 +186,7 @@ const initLogin = (resolve) => {
   loginButton.onclick = () => {
     const userId = BigInt(userIdInput.value);
     if (userId) {
-      IDPActor.reconnect(userId).then((connection) => {
+      IDPActor.login(userId).then((connection) => {
         setUserId(userId);
         resolve({ tag: "ok", userId, connection });
       });

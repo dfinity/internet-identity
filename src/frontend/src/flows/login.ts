@@ -90,7 +90,7 @@ const init = async (userId: bigint): Promise<LoginResult> => {
         resolve({
           tag: "ok",
           userId,
-          connection: await IDPActor.reconnect(userId),
+          connection: await IDPActor.login(userId),
         });
       } catch (err) {
         resolve({

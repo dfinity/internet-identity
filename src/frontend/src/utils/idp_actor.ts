@@ -74,7 +74,7 @@ export class IDPActor {
     };
   }
 
-  static async reconnect(userId: bigint): Promise<IDPActor> {
+  static async login(userId: bigint): Promise<IDPActor> {
     const devices = await baseActor.lookup(userId);
 
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
