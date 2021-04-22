@@ -2,6 +2,7 @@ import { render, html } from "lit-html";
 import { identityListItem } from "../components/identityListItem";
 import { IDPActor } from "../utils/idp_actor";
 import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
+import { withLoader } from "../components/loader";
 
 const pageContent = () => html`<style>
     #userIdSection {
@@ -107,7 +108,7 @@ const bindRemoveListener = (
   publicKey
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
-  button.onclick = () => {
+  button.onclick = async () => {
     // Make sure we're not removing our last identity
     const identities = document.querySelectorAll("#identityList li");
 
@@ -132,9 +133,11 @@ const bindRemoveListener = (
     }
 
     // Otherwise, remove identity
-    connection.remove(userId, publicKey).then(() => {
-      listItem.parentElement?.removeChild(listItem);
-    });
+    await withLoader(() =>
+      connection.remove(userId, publicKey).then(() => {
+        listItem.parentElement?.removeChild(listItem);
+      })
+    );
 
     if (sameDevice) {
       localStorage.clear();

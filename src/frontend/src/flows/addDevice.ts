@@ -6,6 +6,7 @@ import {
 } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
+import { withLoader } from "../components/loader";
 import { prompt } from "../components/prompt";
 import { IDPActor } from "../utils/idp_actor";
 
@@ -52,7 +53,7 @@ const init = (userId: bigint, connection: IDPActor) => {
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await prompt("What should we call this device?");
-        await connection.add(userId, deviceName, publicKey, rawId);
+        await withLoader(() => connection.add(userId, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
         render(afterAddPageContent(deviceName), container);
