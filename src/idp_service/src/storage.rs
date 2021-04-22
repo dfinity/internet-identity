@@ -41,6 +41,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     }
 
     pub fn update_salt(&mut self, salt: Vec<u8>) {
+        if self.salt != EMPTY_SALT {
+            trap("Attempted to set the salt twice.");
+        }
         self.salt = salt;
         self.flush();
     }

@@ -73,6 +73,7 @@ type InternetIdentityInit = record {
 };
 
 service : (opt InternetIdentityInit) -> {
+  init_salt: () -> ();
   register : (DeviceData) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();

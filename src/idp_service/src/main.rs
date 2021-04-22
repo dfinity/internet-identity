@@ -103,7 +103,6 @@ struct InternetIdentityInit {
 struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
-    salt_requested: RefCell<bool>,
 }
 
 impl Default for State {
@@ -111,7 +110,6 @@ impl Default for State {
         Self {
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
-            salt_requested: RefCell::new(false),
         }
     }
 }
@@ -119,6 +117,29 @@ impl Default for State {
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
+}
+
+#[update]
+async fn init_salt() {
+    STATE.with(|s| {
+        if s.storage.borrow().salt() != EMPTY_SALT {
+            trap("Salt already set");
+        }
+    });
+
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
+    };
+
+    STATE.with(|s| {
+        let mut store = s.storage.borrow_mut();
+        if store.salt() == EMPTY_SALT {
+            store.update_salt(res);
+        } else {
+            trap("Salt already set");
+        }
+    });
 }
 
 #[update]
@@ -133,30 +154,14 @@ async fn register(device_data: DeviceData) -> UserNumber {
         ));
     }
 
-    let salt_requested = STATE.with(|s| {
-            *s.salt_requested.borrow()
-    });
-
-    if !salt_requested {
-        STATE.with(|s| s.salt_requested.replace(true));
-        let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-            Ok((res,)) => res,
-            Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
-        };
-        STATE.with(|s| {
-            let mut store = s.storage.borrow_mut();
-            store.update_salt(res);
-        });
-    } else {
-        STATE.with(|s| {
-            if s.storage.borrow().salt() == EMPTY_SALT {
-                trap("Salt not received yet. Try again later.");
-            }
-        })
-    }
+    ensure_salt_set().await;
 
     STATE.with(|s| {
         let mut store = s.storage.borrow_mut();
+        if store.salt() == EMPTY_SALT {
+            trap("Salt is not set. Try calling init_salt() to set it.");
+        }
+
         let user_number = store
             .allocate_user_number()
             .unwrap_or_else(|| trap("failed to allocate a new user number"));
@@ -169,10 +174,12 @@ async fn register(device_data: DeviceData) -> UserNumber {
 }
 
 #[update]
-fn add(user_number: UserNumber, device_data: DeviceData) {
+async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
     check_entry_limits(&device_data);
+
+    ensure_salt_set().await;
 
     STATE.with(|s| {
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
@@ -213,7 +220,8 @@ fn add(user_number: UserNumber, device_data: DeviceData) {
 }
 
 #[update]
-fn remove(user_number: UserNumber, device_key: DeviceKey) {
+async fn remove(user_number: UserNumber, device_key: DeviceKey) {
+    ensure_salt_set().await;
     STATE.with(|s| {
         prune_expired_signatures(&mut s.sigs.borrow_mut());
 
@@ -248,11 +256,13 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 }
 
 #[update]
-fn prepare_delegation(
+async fn prepare_delegation(
     user_number: UserNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
 ) -> (UserKey, Timestamp) {
+    ensure_salt_set().await;
+
     STATE.with(|s| {
         let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
             trap(&format!(
@@ -395,8 +405,10 @@ fn retrieve_data() {
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    // Maybe check that it's not the EMPTY_SALT and trap if yes? Shouldn't happen really...
     let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
+    if salt == EMPTY_SALT {
+        trap("Salt is not set. Try calling init_salt() to set it");
+    }
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
@@ -571,6 +583,14 @@ fn check_frontend_length(frontend: &FrontendHostname) {
             "frontend hostname {} exceeds the limit of {} bytes",
             n, FRONTEND_HOSTNAME_LIMIT,
         ));
+    }
+}
+
+// Checks is salt is empty and call init_salt to set it.
+async fn ensure_salt_set() {
+    let salt = STATE.with(|s| s.storage.borrow().salt().to_vec());
+    if salt == EMPTY_SALT {
+        init_salt().await;
     }
 }
 
