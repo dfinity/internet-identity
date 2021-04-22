@@ -10,15 +10,17 @@ use std::marker::PhantomData;
 
 const HEADER_SIZE: u32 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
-pub const EMPTY_SALT: &'static [u8] = &[0; 32];
+const EMPTY_SALT: [u8; 32] = [0; 32];
 const WASM_PAGE_SIZE: u32 = 65536;
+
+pub type Salt = [u8; 32];
 
 /// Data type responsible for managing user data in stable memory.
 pub struct Storage<T> {
     num_users: u32,
     user_number_range: (UserNumber, UserNumber),
     entry_size: u16,
-    salt: Vec<u8>,
+    salt: Salt,
     _marker: PhantomData<T>,
 }
 
@@ -30,18 +32,22 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             num_users: 0,
             user_number_range,
             entry_size: DEFAULT_ENTRY_SIZE,
-            salt: EMPTY_SALT.to_vec(),
+            salt: EMPTY_SALT,
             _marker: PhantomData,
         };
         storage
     }
 
-    pub fn salt(&self) -> &[u8] {
-        &self.salt
+    pub fn salt(&self) -> Option<&Salt> {
+        if self.salt == EMPTY_SALT {
+            None
+        } else {
+            Some(&self.salt)
+        }
     }
 
-    pub fn update_salt(&mut self, salt: Vec<u8>) {
-        if self.salt != EMPTY_SALT {
+    pub fn update_salt(&mut self, salt: Salt) {
+        if self.salt().is_some() {
             trap("Attempted to set the salt twice.");
         }
         self.salt = salt;
@@ -74,7 +80,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
         let id_range_hi = u64::from_le_bytes(buf[16..24].try_into().unwrap());
         let entry_size = u16::from_le_bytes(buf[24..26].try_into().unwrap());
-        let salt = buf[26..58].to_vec();
+        let salt = buf[26..58].try_into().unwrap_or_else(|| {
+            trap("unreachable: failed to extract 32 byte array from 32 byte a slice")
+        });
         Some(Self {
             num_users,
             user_number_range: (id_range_lo, id_range_hi),
