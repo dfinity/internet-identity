@@ -134,11 +134,7 @@ async fn init_salt() {
 
     STATE.with(|s| {
         let mut store = s.storage.borrow_mut();
-        if store.salt() == EMPTY_SALT {
-            store.update_salt(res);
-        } else {
-            trap("Salt already set");
-        }
+        store.update_salt(res); // update_salt() traps if salt has already been set
     });
 }
 
