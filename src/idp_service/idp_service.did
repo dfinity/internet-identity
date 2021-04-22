@@ -72,9 +72,18 @@ type InternetIdentityInit = record {
   assigned_user_number_range : record { nat64; nat64; };
 };
 
+type ProofOfWork = record {
+  timestamp : Timestamp;
+  nonce : nat64;
+};
+
 service : (opt InternetIdentityInit) -> {
+<<<<<<< HEAD
   init_salt: () -> ();
   register : (DeviceData) -> (UserNumber);
+=======
+  register : (DeviceData, ProofOfWork) -> (UserNumber);
+>>>>>>> main
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

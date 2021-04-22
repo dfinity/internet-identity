@@ -90,7 +90,7 @@ function checkURIForHash(maybeURL: string) {
 }
 
 // this function will run every page load to check for oauth query parameters
-export default function (userId: bigint, connection: IDPActor) {
+export default async function (userId: bigint, connection: IDPActor) {
   const searchParams = new URLSearchParams(location.search);
   const params = getOauthParams(searchParams)!;
   // TODO: if the redirect_uri parameter has a hash, immediately reject
@@ -99,20 +99,19 @@ export default function (userId: bigint, connection: IDPActor) {
       checkURIForHash(params.redirect_uri);
       const hostname = new URL(params.redirect_uri)
         .hostname as FrontendHostname;
-      if (checkConsent(hostname)) {
-        generate_access_token(
+      if (await checkConsent(hostname)) {
+        const accessToken = await generate_access_token(
           connection,
           userId,
           params.login_hint,
           hostname
-        ).then((access_token: string) => {
-          redirectToApp(params.redirect_uri, {
-            access_token: access_token,
-            token_type: "bearer",
-            expires_in: THREE_DAYS,
-            scope: params.scope,
-            state: params.state,
-          });
+        )
+        redirectToApp(params.redirect_uri, {
+          access_token: accessToken,
+          token_type: "bearer",
+          expires_in: THREE_DAYS,
+          scope: params.scope,
+          state: params.state,
         });
       } else {
         // TODO: create or lookup identity
