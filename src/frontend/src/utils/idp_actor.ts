@@ -17,6 +17,7 @@ import _SERVICE, {
   FrontendHostname,
   Timestamp,
   DeviceData,
+  ProofOfWork,
 } from "../../generated/idp_types";
 import {
   DelegationChain,
@@ -26,7 +27,6 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -42,7 +42,8 @@ export class IDPActor {
   ) {}
 
   static async register(
-    alias: string
+    alias: string,
+    pow: ProofOfWork
   ): Promise<{ connection: IDPActor; userId: UserNumber }> {
     const identity = await WebAuthnIdentity.create();
     const delegationIdentity = await requestFEDelegation(identity);
@@ -54,7 +55,6 @@ export class IDPActor {
     });
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
-    const pow = getProofOfWork();
 
     console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
     const userId = await actor.register({
