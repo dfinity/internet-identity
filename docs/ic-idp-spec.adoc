@@ -481,8 +481,10 @@ In a checkout of this repository, run:
 [source,bash]
 ----
 npm install
-dfx build idp_service
+dfx build --network messaging idp_service
 ----
+
+Note: This prepares the wasm module for installation on `messaging` testnet. If we want to deploy to beta, then we need to add a profile for it and use that instead.
 
 Make note of the hash of wasm module:
 [source,bash]
