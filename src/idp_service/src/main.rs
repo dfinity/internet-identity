@@ -2,14 +2,20 @@ use hashtree::{Hash, HashTree};
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use idp_service::nonce_cache::NonceCache;
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use storage::Storage;
 
+const fn secs_to_nanos(secs: u64) -> u64 {
+    secs * 60_000_000_000
+}
+
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
-const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 600_000_000_000;
+const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
+const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 
 type UserNumber = u64;
 type CredentialId = Vec<u8>;
@@ -26,6 +32,12 @@ pub struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct ProofOfWork {
+    timestamp: Timestamp,
+    nonce: u64,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -50,6 +62,7 @@ enum GetDelegationResponse {
 }
 
 mod hash;
+mod nonce_cache;
 mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -100,6 +113,7 @@ struct InternetIdentityInit {
 }
 
 struct State {
+    nonce_cache: RefCell<NonceCache>,
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
 }
@@ -107,6 +121,7 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
+            nonce_cache: RefCell::new(NonceCache::default()),
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
         }
@@ -119,8 +134,10 @@ thread_local! {
 }
 
 #[update]
-fn register(device_data: DeviceData) -> UserNumber {
+fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
     check_entry_limits(&device_data);
+    let now = time() as u64;
+    check_proof_of_work(&pow, now);
 
     STATE.with(|s| {
         if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
@@ -131,6 +148,15 @@ fn register(device_data: DeviceData) -> UserNumber {
             ));
         }
 
+        let mut nonce_cache = s.nonce_cache.borrow_mut();
+        if nonce_cache.contains(pow.timestamp, pow.nonce) {
+            trap(&format!(
+                "the combination of timestamp {} and nonce {} has already been used",
+                pow.timestamp, pow.nonce,
+            ));
+        }
+        nonce_cache.prune_expired(now - POW_NONCE_LIFETIME);
+
         let mut store = s.storage.borrow_mut();
         let user_number = store
             .allocate_user_number()
@@ -138,6 +164,8 @@ fn register(device_data: DeviceData) -> UserNumber {
         store
             .write(user_number, vec![device_data])
             .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
+
+        nonce_cache.add(pow.timestamp, pow.nonce);
 
         user_number
     })
@@ -554,6 +582,41 @@ fn check_frontend_length(frontend: &FrontendHostname) {
             "frontend hostname {} exceeds the limit of {} bytes",
             n, FRONTEND_HOSTNAME_LIMIT,
         ));
+    }
+}
+
+fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
+    use cubehash::CubeHash;
+
+    const DIFFICULTY: usize = 2;
+
+    if pow.timestamp < now - POW_NONCE_LIFETIME {
+        trap(&format!(
+            "proof of work timestamp {} is too old, current time: {}",
+            pow.timestamp, now
+        ));
+    }
+    if pow.timestamp > now + POW_NONCE_LIFETIME {
+        trap(&format!(
+            "proof of work timestamp {} is too far in future, current time: {}",
+            pow.timestamp, now
+        ));
+    }
+
+    let mut hasher = CubeHash::new();
+    let domain = b"ic-proof-of-work";
+    hasher.update(&[domain.len() as u8]);
+    hasher.update(&domain[..]);
+    hasher.update(&pow.timestamp.to_le_bytes());
+    hasher.update(&pow.nonce.to_le_bytes());
+
+    let id = ic_cdk::api::id();
+    hasher.update(&[id.as_slice().len() as u8]);
+    hasher.update(id.as_slice());
+
+    let hash = hasher.finalize();
+    if !hash[0..DIFFICULTY].iter().all(|b| *b == 0) {
+        trap("proof of work hash check failed");
     }
 }
 

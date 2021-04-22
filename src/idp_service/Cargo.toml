@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 certified_map = { path = "../certified_map" }
+cubehash = { path = "../cubehash" }
 hashtree = { path = "../hashtree" }
 hex = "0.4"
 ic-cdk = "0.2.4"
