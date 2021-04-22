@@ -446,6 +446,7 @@ name = "idp_service"
 version = "0.1.0"
 dependencies = [
  "certified_map",
+ "cubehash",
  "hashtree",
  "hex",
  "hex-literal",
