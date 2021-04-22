@@ -54,7 +54,7 @@ const init = (userId: bigint, connection: IDPActor) => {
         const deviceName = await prompt("What should we call this device?");
         await connection.add(userId, deviceName, publicKey, rawId);
         const container = document.getElementById("pageContent") as HTMLElement;
-        // TODO: Clear the hash
+        clearHash();
         render(afterAddPageContent(deviceName), container);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
@@ -62,7 +62,7 @@ const init = (userId: bigint, connection: IDPActor) => {
           message: "Failed to add the device.",
           detail: `Canceled adding the device with ${error}`,
         });
-        // TODO: Clear the hash & Error page? Or redirect to manage?
+        clearHash();
         return;
       }
     }
@@ -83,3 +83,11 @@ const parseNewDeviceParam = (
   const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
   return { userId, publicKey, rawId };
 };
+
+const clearHash = () => {
+  history.pushState(
+    "",
+    document.title,
+    window.location.pathname + window.location.search
+  );
+}
