@@ -197,7 +197,7 @@ The `register` method is used to create a new user. The Internet Identity Servic
 In order to protect the Internet Computer from too many “free” update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a proof of work obligation. The `register` call can only succeed if
 
  * the `timestamp` in the `ProofOfWork` parameter is within 5min of the current time as seen by the Canister
- * the calculation of `H("\10ic-proof-of-work" · timestamp · nonce · |cid| · cid )` (where `H` is the https://cubehash.cr.yp.to/[CubeHash160+16/32+160-256] function, `·` is concatenation, `|…|` is the length of the canister id in bytes, `cid` is the canister id and numbers are encoded as 8-byte little endian values), yields a hash value where leading 2 bytes are `0x00`.
+ * the calculation of `H("\10ic-proof-of-work" · timestamp · nonce · |cid| · cid )` (where `H` is the https://cubehash.cr.yp.to/[CubeHash160+16/32+160-256] function, `·` is concatenation, `|…|` is a single byte encoding the length of the raw canister id in bytes, `cid` is the canister id and numbers are encoded as 8-byte little endian values), yields a hash value where leading 2 bytes are `0x00`.
  * the canister did not recently see a registration attempt with that `nonce`.
 
 === The `add` method
