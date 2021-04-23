@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
 import ClipboardJS from "clipboard";
+import { checkmarkIcon } from "../components/icons";
 
 const pageContent = (link: string) => html`
   <style>
@@ -29,5 +30,8 @@ export const displayAddDeviceLink = (link: string) => {
 
 const init = () => {
   const linkCopy = document.getElementById("linkCopy") as HTMLButtonElement;
-  new ClipboardJS(linkCopy)
+  new ClipboardJS(linkCopy).on('success', () => {
+    const linkCopy = document.getElementById("linkCopy") as HTMLButtonElement;
+    render(checkmarkIcon, linkCopy)
+  })
 };

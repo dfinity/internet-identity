@@ -164,12 +164,6 @@ button {
   line-height: 1.25rem;
   letter-spacing: 0.005em;
 }
-@media (min-width: 767px) {
-  button {
-    display: inline-flex;
-    width: auto;
-  }
-}
 
 img {
   min-width: 500px;

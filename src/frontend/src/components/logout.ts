@@ -1,6 +1,6 @@
 import { html } from "lit-html";
 import { clearHash } from "../flows/addDevice";
-import { logoutIcon } from "./icons/logout";
+import { logoutIcon } from "./icons";
 
 export const logoutSection = () => html`<style>
     #logoutIcon {
