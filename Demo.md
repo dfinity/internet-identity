@@ -7,7 +7,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
 * Delete your browser cache for `identity.localhost`
 * Build the `icx-proxy`:
   - In a checkout of `dfinity/agent-rs`
-  - switch to branch `ericswanson/149-dns-alias-canister-id`.
+  - switch to branch `next`.
   - cargo build --release
 
 * Run `./dfx.sh cache delete`, just to be sure
@@ -111,4 +111,3 @@ different devices. Ideally use two yubikeys to demo.
 
 4. Now you should be forwarded back to Open Chat.
 5. Point our your identity on Open Chat, and see that it is _still_ the same
-
