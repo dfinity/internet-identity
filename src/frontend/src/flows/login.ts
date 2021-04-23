@@ -9,10 +9,12 @@ const pageContent = (userId: bigint) => html`
   <div class="container">
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
-    <input value="${userId}" readonly>
+    <div class="userIdBox">${userId}</div>
     <button type="button" id="login" class="primary">Login</button>
-    <hr>
-    <button type="button" class="linkStyle" id="loginDifferent">Logout</button>
+    <div class="logoutBox">
+      <hr>
+      <button type="button" class="linkStyle" id="loginDifferent">Logout</button>
+    </div>
 </div>
 `;
 
