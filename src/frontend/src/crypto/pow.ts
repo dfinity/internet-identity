@@ -1,7 +1,3 @@
-// run this with
-// npx ts-node pow.ts 000400000000000001 0
-// (parameters are canister id and timestamp)
-
 import cubeHash from "./cubehash";
 import { Principal } from "@dfinity/agent";
 import bigUintLE from "biguintle";
