@@ -11,13 +11,17 @@ import { prompt } from "../components/prompt";
 import { IDPActor } from "../utils/idp_actor";
 
 const pageContent = (userId: bigint) => html`
-  <h1>Adding a new device to your Internet Identity: ${userId}</h1>
-  <p>
-    Warning about not clicking this button unless this link _really_ came from
-    yourself
-  </p>
-  <button type="button" id="addDevice">Add new device</button>
-  <div id="notification"></div>
+  <div class="container">
+    <h1>Welcome back!</h1>
+    <label>User ID:</label>
+    <div class="userIdBox">${userId}</div>
+    <p class="warningBox">
+      Warning: Do not click this button unless this link really came from you.
+    </p>
+    <button type="button" class="primary" id="addDevice">Yes, link new device</button>
+    <button type="button" id="cancelAdd">Cancel</button>
+    <div id="notification"></div>
+  </div>
 `;
 
 const afterAddPageContent = (alias: string) => html`
@@ -35,6 +39,13 @@ const init = (userId: bigint, connection: IDPActor) => {
   const addDeviceButton = document.querySelector(
     "#addDevice"
   ) as HTMLButtonElement;
+  const cancelAdd = document.querySelector(
+    "#cancelAdd"
+  ) as HTMLButtonElement;
+  cancelAdd.onclick = () => {
+    clearHash();
+    window.location.reload()
+  }
   addDeviceButton.onclick = async (ev) => {
     // Check URL if user has pasted in an Add Identity link
     const url = new URL(document.URL);

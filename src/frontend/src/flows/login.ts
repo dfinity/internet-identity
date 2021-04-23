@@ -6,36 +6,14 @@ import { getUserId } from "../utils/userId";
 import { LoginResult, loginUnknown } from "./loginUnknown";
 
 const pageContent = (userId: bigint) => html`
-  <style>
-    #login {
-      margin-bottom: 3rem;
-      font-size: 1.25rem;
-    }
-    p,
-    span,
-    button {
-      font-size: 0.85rem;
-      margin: auto;
-    }
-    @media (min-width: 1024px) {
-      p,
-      span,
-      button {
-        font-size: 0.85rem;
-        margin: initial;
-      }
-    }
-  </style>
-  <section>
-    <h1>Welcome back, user #${userId}</h1>
+  <div class="container">
+    <h1>Welcome back!</h1>
+    <p>Login to manage your Internet Identity.</p>
+    <input value="${userId}" readonly>
     <button type="button" id="login" class="primary">Login</button>
-    <p>
-      <span>Or, </span
-      ><button type="button" class="linkStyle" id="loginDifferent">
-        sign in with a different identity
-      </button>
-    </p>
-  </section>
+    <hr>
+    <button type="button" class="linkStyle" id="loginDifferent">Logout</button>
+</div>
 `;
 
 // We retry logging in until we get a succesful user id connection pair

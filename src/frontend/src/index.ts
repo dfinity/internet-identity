@@ -5,9 +5,13 @@ import { login } from "./flows/login";
 import oauth from "./utils/oauth";
 import { addDevice } from "./flows/addDevice";
 import { renderManage } from "./flows/manage";
+import "clipboard";
+import { IDPActor } from "./utils/idp_actor";
 
 const init = async () => {
-  initLogout();
+  // initLogout();
+  addDevice(BigInt(9999), undefined as unknown as IDPActor)
+
   const { userId, connection } = await login();
   const url = new URL(document.URL);
   if (window.location.href.match(/authorize/)) {
