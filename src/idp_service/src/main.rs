@@ -520,6 +520,17 @@ fn get_signature(
         targets: None,
     });
     let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
+
+    let witness_hash = witness.reconstruct();
+    let root_hash = sigs.root_hash();
+    if witness_hash != root_hash {
+        trap(&format!(
+            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
+            hex::encode(&witness_hash),
+            hex::encode(&root_hash)
+        ));
+    }
+
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
