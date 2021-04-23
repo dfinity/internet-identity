@@ -129,6 +129,13 @@ input {
   letter-spacing: 0.005em;
 }
 
+input.errored {
+  border: double 2px var(--flamingo-500); 
+}
+input.errored::placeholder {
+  color: var(--flamingo-500);
+}
+
 h1 {
   margin-top: 0;
   font-size: 1.8rem;
@@ -312,7 +319,7 @@ ul {
   }
 }
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
   :root {
     --text-color: var(--white-000);
     --primary: var(--grey-050);
@@ -329,7 +336,7 @@ ul {
   button {
     --background-color: #222222;
   }
-}
+} */
 
 .container {
   padding: 3.5rem 2.5rem 2rem 2.5rem;

@@ -25,11 +25,16 @@ const pageContent = () => html`
   );
 }
 
-#newUser {
-  font-size: 0.875rem;
+#registerSection {
   margin-top: 4rem;
 }
-#newUser button {
+
+.textLink {
+  margin-bottom: 0.3rem;
+  font-size: 0.875rem;
+}
+.textLink button {
+  cursor: pointer;
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
@@ -41,10 +46,11 @@ const pageContent = () => html`
     <p>Using your saved User ID you can login or link a new device</p>
     <input type="text" id="registerUserNumber" placeholder="Enter User ID">
     <button type="button" id="loginButton" class="primary">Login</button>
-    <p>First time using this device?</p>
-    <button type="button" id="dialogTrigger">Link this device</button>
-    <div id="newUser">
+    <div class="textLink" id="registerSection">
       New user? <button id="registerButton" class="linkStyle">Get User ID</button>
+    </div>
+    <div class="textLink">
+      Already registered <button id="addNewDeviceButton" class="linkStyle">but using a new Device?</button>
     </div>
   </div>`;
 
@@ -111,11 +117,11 @@ const initLogin = (resolve) => {
 };
 
 const initLinkDevice = () => {
-  const dialogTrigger = document.getElementById(
-    "dialogTrigger"
+  const addNewDeviceButton = document.getElementById(
+    "addNewDeviceButton"
   ) as HTMLButtonElement;
 
-  dialogTrigger.onclick = async () => {
+  addNewDeviceButton.onclick = async () => {
     const userIdInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
@@ -144,8 +150,8 @@ const initLinkDevice = () => {
         }
       }, 2500);
     } else {
-      // TODO: Display an error next to the UserID input?
-      console.error("Not a valid user id");
+      userIdInput.classList.toggle("errored", true);
+      userIdInput.placeholder = "Please enter your User ID first"
     }
   };
 };
