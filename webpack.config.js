@@ -5,8 +5,14 @@ const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
-const localCanister = require("./.dfx/local/canister_ids.json").idp_service
-  .local;
+let localCanister
+
+try {
+  localCanister = require("./.dfx/local/canister_ids.json").idp_service
+  .local
+} catch {
+
+};
 
 /**
  * Generate a webpack configuration for a canister.
