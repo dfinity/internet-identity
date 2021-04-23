@@ -13,7 +13,7 @@ const pageContent = (link: string) => html`
   </style>
   <div class="container">
     <h1>New device</h1>
-    <p>Copy the URL below and open it in your already authenticated browswer. This page will automatically update when you have succeeded.</p>
+    <p>Copy the URL below and open it in your already authenticated browser. This page will automatically update when you have succeeded.</p>
     <label>URL</label>
     <div class="linkBox">
       <input id="linkText" value="${link}" readonly>
