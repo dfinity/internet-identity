@@ -29,7 +29,8 @@ const pageContent = () => html`
   font-size: 0.875rem;
   margin-top: 4rem;
 }
-#newUser a {
+#newUser button {
+  font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
   color: black;
@@ -43,7 +44,7 @@ const pageContent = () => html`
     <p>First time using this device?</p>
     <button type="button" id="dialogTrigger">Link this device</button>
     <div id="newUser">
-      New user? <button id="registerButton" class="linkStyle">Get Identity</button>
+      New user? <button id="registerButton" class="linkStyle">Get User ID</button>
     </div>
   </div>`;
 
