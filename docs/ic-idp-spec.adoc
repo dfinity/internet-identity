@@ -520,6 +520,61 @@ This flow is the boring default
 This section needs to describe aspects like
 
 * why and how the frontend is bundled with and served by the canister itself.
-* integration into the network bootstrap
-* how upgrades are rolled out
 * how the Internet Identity Service canister id stays predictable and well-known
+
+=== Integration with bootstrap of NNS
+
+The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
+
+=== Initial installation
+
+In a checkout of this repository, run:
+[source,bash]
+----
+npm install
+dfx build --network messaging idp_service
+----
+
+Note: This prepares the wasm module for installation on `messaging` testnet. If we want to deploy to beta, then we need to add a profile for it and use that instead.
+
+Make note of the hash of wasm module:
+[source,bash]
+----
+shasum -a 256 target/wasm32-unknown-unknown/release/idp_service.wasm
+----
+
+Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
+
+Alternatively, you can build it from source. In a checkout of `dfinity`, run:
+[source,bash]
+----
+cd rs
+nix-shell
+cargo build --bin ic-admin
+----
+
+Next, you will need `didc` to be able to produce the binary encoded Candid argument needed for installation. Either download it from https://github.com/dfinity/candid/releases/[the latest candid release] or build it from source.
+
+The canister accepts a range of user ids that it's responsible for in `canister_init`. Currently, we only use one canister, so we don't really need to set a range. However, we still need to pass in some value to satisfy the interface. Run the following to get a file with the binary encoded value needed:
+[source,bash]
+----
+didc encode '(null)' | xxd -r -p > arg.in
+----
+
+Submit the proposal to install the canister on `messaging`:
+[source,bash]
+----
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm --arg arg.in
+----
+
+The above will need to be adjusted to submit a proposal on the beta network (specifically the NNS url and we need to use a real neuron ID as the proposer instead of the test-neuron-proposer).
+
+You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging's dashboard] to confirm the hash of the wasm installed on the canister matches the one you took note of in the previous steps.
+
+=== Upgrades of the canister
+
+Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin`. Run:
+[source,bash]
+----
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx      6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
+----
