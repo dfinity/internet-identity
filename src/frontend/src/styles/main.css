@@ -1,6 +1,8 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap");
+
 :root {
-  font-family: sans-serif;
-  font-size: 1.5rem;
+  font-family: "Montserrat", sans-serif;
+  font-size: 16px;
   --azureradiance-050: #ebf0fa;
   --azureradiance-100: #c7d9f9;
   --azureradiance-200: #a3c3f9;
@@ -81,6 +83,7 @@
   --accent: #323232;
   background: var(--background-color);
   color: var(--text-color);
+  box-sizing: border-box;
 }
 
 html,
@@ -98,9 +101,15 @@ header {
   border-bottom: 1px solid var(--text-color);
 }
 
+p {
+  line-height: 22px;
+  color: var(--grey-700);
+  font-size: 1rem;
+  margin: 1rem 0;
+}
+
 input,
 button,
-p,
 div,
 section,
 span {
@@ -110,10 +119,14 @@ span {
 
 input {
   margin-bottom: 1rem;
-  padding: 0.75rem 0.5rem;
+  padding: 0.4rem 1rem;
   border-radius: 4px;
-  width: 240px;
+  border: 2px var(--grey-100) solid;
+  width: auto;
   background-color: var(--background-color);
+
+  line-height: 1.25rem;
+  letter-spacing: 0.005em;
 }
 
 h1 {
@@ -138,22 +151,18 @@ p {
 }
 
 button {
-  border: 1px solid var(--text-color);
+  border: 1px solid var(--grey-200);
   background: var(--background-color);
   display: flex;
   width: 100%;
   text-align: center;
   justify-content: center;
   margin-bottom: 1rem;
-  padding: 1rem 2rem;
+  padding: 0.6rem 1rem;
   border-radius: 4px;
-}
-@media (min-width: 767px) {
-  button {
-    display: inline-flex;
-    width: auto;
-    margin-right: 1rem;
-  }
+
+  line-height: 1.25rem;
+  letter-spacing: 0.005em;
 }
 
 img {
@@ -182,13 +191,12 @@ form {
 button.primary {
   background-color: var(--primary);
   color: var(--background-color);
+  border: none;
 }
 
 button.linkStyle {
   display: inline;
   border: none;
-  border-bottom: 1px solid var(--text-color);
-  border-radius: 0;
   padding: 0;
   margin: 0;
   width: auto;
@@ -200,6 +208,7 @@ button[type="submit"] {
 }
 
 label {
+  font-size: 0.875rem;
   flex-direction: column;
   margin-bottom: 1rem;
 }
@@ -209,11 +218,16 @@ label {
   }
 }
 
+main {
+  height: 80vh;
+}
+
 main,
 section {
   margin: auto;
   display: flex;
   justify-content: center;
+  align-items: center;
   flex-direction: column;
 }
 
@@ -245,6 +259,7 @@ section {
 .row {
   flex-direction: row;
 }
+
 @media (min-width: 767px) {
   .md-row {
     flex-direction: row;
@@ -315,3 +330,38 @@ ul {
     --background-color: #222222;
   }
 }
+
+.container {
+  padding: 3.5rem 2.5rem 2rem 2.5rem;
+  max-width: 365px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    border: 2px var(--grey-100) solid;
+    border-radius: 4px;
+  }
+}
+
+.userIdBox {
+    background-color: var(--grey-100);
+    padding: 1rem 0rem;
+    text-align: center;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.warningBox {
+  border: 1px var(--grey-200) solid;
+  border-radius: 4px;
+  padding: 1rem 2rem;
+}
+
+hr {
+  margin-bottom: 1rem;
+  width: 100%;
+  border-top: 1px solid var(--grey-400);
+}
+

@@ -1,13 +1,14 @@
 import "web-dialog";
 import "./styles/main.css";
-import { initLogout } from "./flows/logout";
 import { login } from "./flows/login";
 import oauth from "./utils/oauth";
 import { addDevice } from "./flows/addDevice";
 import { renderManage } from "./flows/manage";
+import "clipboard";
 
 const init = async () => {
-  initLogout();
+  // initLogout();
+
   const { userId, connection } = await login();
   const url = new URL(document.URL);
   if (window.location.href.match(/authorize/)) {

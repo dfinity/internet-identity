@@ -7,22 +7,23 @@ import {
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
-import { prompt } from "../components/prompt";
+import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
+import { pickDeviceAlias } from "./addDevicePickAlias";
+import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
 const pageContent = (userId: bigint) => html`
-  <h1>Adding a new device to your Internet Identity: ${userId}</h1>
-  <p>
-    Warning about not clicking this button unless this link _really_ came from
-    yourself
-  </p>
-  <button type="button" id="addDevice">Add new device</button>
-  <div id="notification"></div>
-`;
-
-const afterAddPageContent = (alias: string) => html`
-  <p>You've successfully added ${alias} as a new Device.</p>
-  <p>You can now close this window and return to your other device.</p>
+  <div class="container">
+    <h1>New device</h1>
+    <label>User ID:</label>
+    <div class="userIdBox">${userId}</div>
+    <p class="warningBox">
+      Warning: Do not click this button unless this link really came from you.
+    </p>
+    <button type="button" class="primary" id="addDevice">Yes, link new device</button>
+    <button type="button" id="cancelAdd">Cancel</button>
+    ${logoutSection()}
+  </div>
 `;
 
 export const addDevice = (userId: bigint, connection: IDPActor) => {
@@ -32,9 +33,17 @@ export const addDevice = (userId: bigint, connection: IDPActor) => {
 };
 
 const init = (userId: bigint, connection: IDPActor) => {
+  initLogout();
   const addDeviceButton = document.querySelector(
     "#addDevice"
   ) as HTMLButtonElement;
+  const cancelAdd = document.querySelector(
+    "#cancelAdd"
+  ) as HTMLButtonElement;
+  cancelAdd.onclick = () => {
+    clearHash();
+    window.location.reload()
+  }
   addDeviceButton.onclick = async (ev) => {
     // Check URL if user has pasted in an Add Identity link
     const url = new URL(document.URL);
@@ -52,11 +61,11 @@ const init = (userId: bigint, connection: IDPActor) => {
       }
       console.log("Adding new device with:", parsedParams);
       try {
-        const deviceName = await prompt("What should we call this device?");
+        const deviceName = await pickDeviceAlias();
         await withLoader(() => connection.add(userId, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
-        render(afterAddPageContent(deviceName), container);
+        successfullyAddedDevice(deviceName);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await confirm({
@@ -85,7 +94,7 @@ const parseNewDeviceParam = (
   return { userId, publicKey, rawId };
 };
 
-const clearHash = () => {
+export const clearHash = () => {
   history.pushState(
     "",
     document.title,
