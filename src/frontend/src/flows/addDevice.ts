@@ -9,6 +9,7 @@ import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
 import { IDPActor } from "../utils/idp_actor";
 import { pickDeviceAlias } from "./addDevicePickAlias";
+import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
 const pageContent = (userId: bigint) => html`
   <div class="container">
@@ -22,11 +23,6 @@ const pageContent = (userId: bigint) => html`
     <button type="button" id="cancelAdd">Cancel</button>
     <div id="notification"></div>
   </div>
-`;
-
-const afterAddPageContent = (alias: string) => html`
-  <p>You've successfully added ${alias} as a new Device.</p>
-  <p>You can now close this window and return to your other device.</p>
 `;
 
 export const addDevice = (userId: bigint, connection: IDPActor) => {
@@ -67,7 +63,7 @@ const init = (userId: bigint, connection: IDPActor) => {
         await withLoader(() => connection.add(userId, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
-        render(afterAddPageContent(deviceName), container);
+        successfullyAddedDevice(deviceName);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await confirm({
