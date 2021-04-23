@@ -7,8 +7,8 @@ import {
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
-import { prompt } from "../components/prompt";
 import { IDPActor } from "../utils/idp_actor";
+import { pickDeviceAlias } from "./addDevicePickAlias";
 
 const pageContent = (userId: bigint) => html`
   <div class="container">
@@ -63,7 +63,7 @@ const init = (userId: bigint, connection: IDPActor) => {
       }
       console.log("Adding new device with:", parsedParams);
       try {
-        const deviceName = await prompt("What should we call this device?");
+        const deviceName = await pickDeviceAlias();
         await withLoader(() => connection.add(userId, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
@@ -96,7 +96,7 @@ const parseNewDeviceParam = (
   return { userId, publicKey, rawId };
 };
 
-const clearHash = () => {
+export const clearHash = () => {
   history.pushState(
     "",
     document.title,
