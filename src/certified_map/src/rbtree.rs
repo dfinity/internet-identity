@@ -92,11 +92,8 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
     }
 
     unsafe fn data_hash(n: *mut Self) -> Hash {
-        if n.is_null() {
-            Empty.reconstruct()
-        } else {
-            labeled_hash((*n).key.as_ref(), &(*n).value.root_hash())
-        }
+        debug_assert!(!n.is_null());
+        labeled_hash((*n).key.as_ref(), &(*n).value.root_hash())
     }
 
     unsafe fn left_hash_tree<'a>(n: *mut Self) -> HashTree<'a> {
