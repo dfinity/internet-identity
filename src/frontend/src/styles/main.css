@@ -129,6 +129,13 @@ input {
   letter-spacing: 0.005em;
 }
 
+input.errored {
+  border: double 2px var(--flamingo-500); 
+}
+input.errored::placeholder {
+  color: var(--flamingo-500);
+}
+
 h1 {
   margin-top: 0;
   font-size: 1.8rem;
