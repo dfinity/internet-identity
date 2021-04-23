@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import { initLogout, logoutSection } from "../components/logout";
 
 const pageContent = (alias) => html`
   <div class="container">
@@ -8,10 +9,12 @@ const pageContent = (alias) => html`
     <div class="userIdBox">
       ${alias}
     </div>
+    ${logoutSection()}
   </div>
   `;
 
 export const successfullyAddedDevice = async (alias: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(alias), container);
+  initLogout();
 }

@@ -7,13 +7,14 @@ import {
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
+import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
 const pageContent = (userId: bigint) => html`
   <div class="container">
-    <h1>Welcome back!</h1>
+    <h1>New device</h1>
     <label>User ID:</label>
     <div class="userIdBox">${userId}</div>
     <p class="warningBox">
@@ -21,7 +22,7 @@ const pageContent = (userId: bigint) => html`
     </p>
     <button type="button" class="primary" id="addDevice">Yes, link new device</button>
     <button type="button" id="cancelAdd">Cancel</button>
-    <div id="notification"></div>
+    ${logoutSection()}
   </div>
 `;
 
@@ -32,6 +33,7 @@ export const addDevice = (userId: bigint, connection: IDPActor) => {
 };
 
 const init = (userId: bigint, connection: IDPActor) => {
+  initLogout();
   const addDeviceButton = document.querySelector(
     "#addDevice"
   ) as HTMLButtonElement;

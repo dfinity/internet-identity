@@ -365,13 +365,6 @@ ul {
   padding: 1rem 2rem;
 }
 
-.logoutBox {
-  margin-top: 3rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
 hr {
   margin-bottom: 1rem;
   width: 100%;

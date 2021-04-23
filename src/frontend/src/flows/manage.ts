@@ -3,6 +3,7 @@ import { identityListItem } from "../components/identityListItem";
 import { IDPActor } from "../utils/idp_actor";
 import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
 import { withLoader } from "../components/loader";
+import { initLogout, logoutSection } from "../components/logout";
 
 const pageContent = () => html`<style>
     #userIdSection {
@@ -40,6 +41,7 @@ const pageContent = () => html`<style>
       <h3>Your user id is <span id="userIdSpan"></span></h3>
     </section>
     <section id="identityList"></section>
+    ${logoutSection()}
   </div>
   <web-dialog id="prompt">
     <form action="" id="prompt-form">
@@ -61,8 +63,7 @@ const pageContent = () => html`<style>
         <button type="button" id="confirm-cancel">Cancel</button>
       </div>
     </form>
-  </web-dialog>
-  <div id="notification"></div>`;
+  </web-dialog>`;
 
 export const renderManage = (userId: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -74,6 +75,7 @@ export const renderManage = (userId: bigint, connection: IDPActor) => {
 export const init = async (userId, connection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   displayUserId(userId);
+  initLogout();
   renderIdentities(connection, userId);
 };
 

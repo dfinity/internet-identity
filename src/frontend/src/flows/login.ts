@@ -1,6 +1,7 @@
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
+import { logoutSection, initLogout } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { getUserId } from "../utils/userId";
 import { LoginResult, loginUnknown } from "./loginUnknown";
@@ -11,10 +12,9 @@ const pageContent = (userId: bigint) => html`
     <p>Login to manage your Internet Identity.</p>
     <div class="userIdBox">${userId}</div>
     <button type="button" id="login" class="primary">Login</button>
-    <div class="logoutBox">
-      <hr>
-      <button type="button" class="linkStyle" id="loginDifferent">Logout</button>
-    </div>
+    <p style="text-align: center;">Or</p>
+    <button type="button" id="loginDifferent">Use different identity</button>
+    ${logoutSection()}
 </div>
 `;
 
@@ -59,6 +59,7 @@ const tryLogin = async (): Promise<LoginResult> => {
 
 const init = async (userId: bigint): Promise<LoginResult> => {
   return new Promise((resolve) => {
+    initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
     const loginDifferentButton = document.querySelector(
       "#loginDifferent"
