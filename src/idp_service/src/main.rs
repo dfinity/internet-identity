@@ -525,7 +525,7 @@ fn get_signature(
     let root_hash = sigs.root_hash();
     if witness_hash != root_hash {
         trap(&format!(
-            "signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
+            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
             hex::encode(&witness_hash),
             hex::encode(&root_hash)
         ));
