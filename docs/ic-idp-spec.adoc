@@ -178,6 +178,7 @@ type ProofOfWork = record {
 
 
 service : {
+  init_salt : () -> ();
   register : (DeviceData, ProofOfWork) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
@@ -187,6 +188,8 @@ service : {
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 }
 ....
+
+The `init_salt` method is mostly internal, see <<salt>>.
 
 === The `register` method
 
@@ -253,6 +256,34 @@ Together with the `UserKey` returned by `prepare_delegation`, the result of this
 
 This section, which is to be expanded, describes interesting design choices about the internals of the Internet Identity Service Canister. In particular
 
+[#salt]
+=== The salt
+
+The `salt` used to blind the hashes that form the `seed` of the Canister Signature “public keys” is obtained via a call to `aaaaa-aa.raw_rand()`. The resulting 32 byte sequence is used as-is.
+
+Since this cannot be done during `canister_init` (no calls from canister init), the randomness is fetched by someone triggering the `init_salt()` method explicitly, or just any other update call. More concretely:
+
+* Anyone can invoke `init_salt()`
+* `init_salt()` traps if  `salt != EMPTY_SALT`
+* Else, `init_salt()` calls `aaaaa-aa.raw_rand()`. When that comes back successfully, and _still_ `salt == EMPTY_SALT`, it sets the salt. Else, it traps (so that even if it is run multiple times concurrently, only the first to write the salt has an effect).
+* _all_ other update methods, at the beginning, if `salt == EMPTY_SALT`, they await `self.init_salt()`, ignoring the result (even if it is an error). Then they check if we still have `salt == EMPTY_SALT` and trap if that is the case.
+
+=== Why we do not use `canister_inspect_message`
+
+The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see https://docs.dfinity.systems/public/#system-api-inspect-message[the interface spec]). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
+
+It seems that this implies that we should use `canister_inspect_message` to reject messages that would, for example, not pass authentication.
+
+But upon closer inspection (heh), this is not actually useful.
+
+ * One justification for this mechanism would be if we expect a high number of accidentally invalid calls. But we have no reason to expect them at the moment.
+
+ * Another is to protect against a malicious actor. But that is only useful if the malicious actor doesn’t have an equally effective attack vector anyways, and in our case they do: If they want to flood the NNS with calls, they can use calls that do authenticate (e.g. keeping removing and adding devices, or preparing delegations); these calls would pass message inspection.
+
+On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular it increases the risk that some engineer might wrongly assume that the authentication checkin `canister_inspect_message` is sufficient and will not do it again the actual method, which could lead to a serious bug.
+
+Therefore the Internet Identity Canister intentionally does not implement `canister_inspect_message`.
+
 === Internal data model and data structures used
 
 The primary data structure used by the backend is a map from user number to the list of user devices.
@@ -277,7 +308,9 @@ Header ::= {
   number_of_user_records : u32
   user_number_range_lo : u64
   user_number_range_hi : u64
-  padding : u8[488]
+  entry_size: u16
+  salt: u8[32]
+  padding : u8[454]
 }
 
 UserRecords ::= UserRecord*
