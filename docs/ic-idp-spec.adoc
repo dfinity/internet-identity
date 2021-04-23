@@ -17,10 +17,11 @@ This document describes and specifies the Internet Identity from various angles 
 
 The Internet Identity Service consists of
 
- * the backend, a canister on the IC. More precisely, a canister on the NNS subnet with a _well-known_ canister id, and
- * its frontend, a web application served by the backend canister.
+ * an index canister, orchestrating and scaling out the set of backend canisters
+ * one or more backend canisters
+ * the frontend, a web application served by an otherwise stateless canister with a _well-known_ canister id, and
 
-Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Interenet Identity Service directly (via the OAUTH protocol described below).
+Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the client application frontend interacts with the Internet Identity Service directly (via the OAUTH protocol described below).
 
 == Goals, requirements and use cases
 
@@ -56,16 +57,16 @@ Some noteworthy security assumptions are:
 
 == Identity design and data model
 
-A single canister with a well-known canister id (the _Internet Identity Canister ID_, in the following `ii_canister_id`) controls all users' identities.
+The Internet Computer serves the frontend under hostname `https://identity.ic0.app`.
 
-The Internet Computer serves this frontend under hostname `https://identity.ic0.app`.
-
-The canister maintains a secret salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer’s source of secure randomness.
+Each backend canister exclusively controls the identies of a set of users.
 
 A user account is identified by a unique _user number_, a smallish natural number chosen by the canister.
 
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
 Computer.
+
+A backend canister maintains a secret salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer’s source of secure randomness.
 
 A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
@@ -73,19 +74,18 @@ H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_
 ....
 where `H` is SHA-256, `·` is concatenation, `|…|` is the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname.
 
-The Internet Identity Service Backend stores the following data in user accounts, indexed by the respective user number:
+A Internet Identity Service backend canister stores the following data in user accounts, indexed by the respective user number:
 
 * a set of _device information_, consisting of
 - the device’s public key (DER-encoded)
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-(Comment Jan: the following three paragraphs require more explanation)
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s identity.
 
-The delegation chain consits of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
+This delegation chain consists of one delegation, called the _client delegation_. It delegates from the user’s identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service backend canister responsible for this user, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
-The Internet Identity Service Frontend also manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
+The Internet Identity Service Frontend, while a user is logged in, manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
 [#oauth]
 == OAUTH protocol
@@ -133,6 +133,57 @@ The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/autheticatio
 
 The client application frontend should support delegation chains of lenght more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
+== The Internet Identity Service index canister
+
+This section describes the interface and behaviour provided by the index canister
+
+....
+
+type UserNumber = nat64;
+// half-closed interval, inclusive lower, exclusive upper bound
+type UserNumberRange = record { UserNumber; UserNumber };
+
+type BackendInfo = record {
+  canister_id : principal;
+  range : UserNumber;
+}
+
+service : {
+  act : () -> ();
+  backends : () -> (vec BackendInfo) query;
+}
+....
+
+As state (backed by stable memory to be upgrade safe), the index canister maintains a list of `BackendInfo`, ordered by their user number. This data also includes, for each canister, the hash of the wasm module installed there.
+
+The index canister also has, as static data, the wasm module of the backend canister.
+
+TODO: Insights/logging (e.g. installation/upgrade failures, ongoing processes).
+
+=== The `act` method
+
+This method, which is executed regularly, lets the index canister perform its work.
+
+NOTE: TODO how often this `act` method needs to be called, and whether we need to restrict access, and to whom. Alternatively, https://github.com/dfinity-lab/ic-ref/issues/245[Heartbeat messages] can be used once available.
+
+* The index canister checks if the last canister is more than 50% full (using `stats`), and if so, creates and installs a new canister.
++
+The new canister is assigned the next range, as obvious.
++
+Because of the asynchronous nature of canister installation, it must set a flag to not do this multiple times in parallel. The canister must be written defensively to clear this flag if installation fails (e.g. `ic0.call_on_cleanup`)
++
+Once `install_call` comes back, it can include the canister in the respond to `backends()`.
+
+* For each canister with a wasm module hash that does not match the hash of the wasm module, an upgrade (without stopping) is performed.
++
+Like above, this needs to be guarded with a flag “in process” and defensive handling of failures.
+
+The upgrade procedure for the whole system is to upgrade the index canister with the new backend canister module, and then let the index canister upgrade all backend canisters.
+
+=== The `backends` query method
+
+This query method returns information about successfully installed canisters.
+
 == The Internet Identity Service Backend interface
 
 This section describes the interface that the backend canister provides.
@@ -155,6 +206,10 @@ type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
   credential_id : opt CredentialId;
+};
+type RegisterResponse = variant {
+  success: UserNumber;
+  canister_full;
 };
 
 type Delegation = record {
@@ -179,7 +234,7 @@ type ProofOfWork = record {
 
 service : {
   init_salt : () -> ();
-  register : (DeviceData, ProofOfWork) -> (UserNumber);
+  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
