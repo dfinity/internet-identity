@@ -576,5 +576,5 @@ You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging
 Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin`. Run:
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx      6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
 ----
