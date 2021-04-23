@@ -72,10 +72,6 @@ pub struct Node<K, V> {
     right: *mut Node<K, V>,
     color: Color,
 
-    /// Hash of the data hash subtree.  It depends only on the key and
-    /// value and doesn't have to be recomputed on rotations.
-    data_hash: Hash,
-
     /// Hash of the full hash tree built from this node and its
     /// children. It needs to be recomputed after every rotation.
     subtree_hash: Hash,
@@ -91,9 +87,13 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
             left: Node::null(),
             right: Node::null(),
             color: Color::Red,
-            subtree_hash: data_hash.clone(),
-            data_hash,
+            subtree_hash: data_hash,
         }))
+    }
+
+    unsafe fn data_hash(n: *mut Self) -> Hash {
+        debug_assert!(!n.is_null());
+        labeled_hash((*n).key.as_ref(), &(*n).value.root_hash())
     }
 
     unsafe fn left_hash_tree<'a>(n: *mut Self) -> HashTree<'a> {
@@ -175,7 +175,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
             return Empty.reconstruct();
         }
 
-        let h = &(*n).data_hash;
+        let h = Node::data_hash(n);
 
         match ((*n).left.is_null(), (*n).right.is_null()) {
             (true, true) => h.clone(),
@@ -237,8 +237,6 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 match key.cmp((*root).key.as_ref()) {
                     Equal => {
                         f(&mut (*root).value);
-                        let value_hash = (*root).value.root_hash();
-                        (*root).data_hash = labeled_hash((*root).key.as_ref(), &value_hash);
                         (*root).subtree_hash = Node::subtree_hash(root);
                         return;
                     }
@@ -336,7 +334,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 Less => three_way_fork(
                     Node::left_hash_tree(n),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     go((*n).right, lo),
                 ),
                 Greater => three_way_fork(
@@ -365,7 +363,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 Greater => three_way_fork(
                     go((*n).left, hi),
-                    Pruned((*n).data_hash),
+                    Pruned(Node::data_hash(n)),
                     Node::right_hash_tree(n),
                 ),
                 Less => three_way_fork(
@@ -407,12 +405,12 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 (Less, Greater) => three_way_fork(
                     go((*n).left, lo, hi),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     Node::right_hash_tree(n),
                 ),
                 (Greater, Less) => three_way_fork(
                     Node::left_hash_tree(n),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     go((*n).right, lo, hi),
                 ),
                 _ => Pruned((*n).subtree_hash.clone()),
@@ -500,7 +498,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     let subtree = go((*n).left, key, f)?;
                     Some(three_way_fork(
                         subtree,
-                        Pruned((*n).data_hash.clone()),
+                        Pruned(Node::data_hash(n)),
                         Node::right_hash_tree(n),
                     ))
                 }
@@ -508,7 +506,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     let subtree = go((*n).right, key, f)?;
                     Some(three_way_fork(
                         Node::left_hash_tree(n),
-                        Pruned((*n).data_hash.clone()),
+                        Pruned(Node::data_hash(n)),
                         subtree,
                     ))
                 }
@@ -529,9 +527,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
 
             match k.as_ref().cmp((*h).key.as_ref()) {
                 Equal => {
-                    let value_hash = v.root_hash();
                     (*h).value = v;
-                    (*h).data_hash = labeled_hash(k.as_ref(), &value_hash);
                     (*h).subtree_hash = Node::subtree_hash(h);
                 }
                 Less => {
