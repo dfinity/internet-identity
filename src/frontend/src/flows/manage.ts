@@ -31,14 +31,16 @@ const pageContent = () => html`<style>
       border-bottom: 1px solid var(--text-color);
     }
   </style>
-  <section id="intro">
-    <h1>Identity Management</h1>
-    <p>You can view and manage your Internet Computer identities here.</p>
-  </section>
-  <section id="userIdSection" class="hidden">
-    <h3>Your user id is <span id="userIdSpan"></span></h3>
-  </section>
-  <section id="identityList"></section>
+  <div class="container">
+    <section id="intro">
+      <h1>Identity Management</h1>
+      <p>You can view and manage your Internet Computer identities here.</p>
+    </section>
+    <section id="userIdSection" class="hidden">
+      <h3>Your user id is <span id="userIdSpan"></span></h3>
+    </section>
+    <section id="identityList"></section>
+  </div>
   <web-dialog id="prompt">
     <form action="" id="prompt-form">
       <p id="prompt-text"></p>
