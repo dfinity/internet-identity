@@ -340,12 +340,17 @@ ul {
 }
 
 .container {
-  border: 2px var(--grey-100) solid;
-  border-radius: 4px;
   padding: 3.5rem 2.5rem 2rem 2.5rem;
   max-width: 365px;
   display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    border: 2px var(--grey-100) solid;
+    border-radius: 4px;
+  }
 }
 
 .userIdBox {
