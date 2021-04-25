@@ -13,7 +13,6 @@ This document describes and specifies the Internet Identity from various angles 
  * The interface of the Internet Identity Service _backend_, i.e., describing its contract at the Candid layer, as used by its frontend
  * Important implementation notes about the Internet Identity Service backend
  * Internal implementation notes about the Internet Identity Service frontend
- * Notes about deployment
 
 The Internet Identity Service consists of
 
@@ -158,7 +157,7 @@ As state (backed by stable memory to be upgrade safe), the index canister mainta
 
 The index canister also has, as static data, the wasm module of the backend canister.
 
-TODO: Insights/logging (e.g. installation/upgrade failures, ongoing processes).
+TODO: Insights/logging (e.g. recording installation/upgrade failures, insightes into ongoing processes).
 
 === The `act` method
 
@@ -166,15 +165,19 @@ This method, which is executed regularly, lets the index canister perform its wo
 
 NOTE: TODO how often this `act` method needs to be called, and whether we need to restrict access, and to whom. Alternatively, https://github.com/dfinity-lab/ic-ref/issues/245[Heartbeat messages] can be used once available.
 
-* The index canister checks if the last canister is more than 50% full (using `stats`), and if so, creates and installs a new canister.
+* The index canister checks if the last canister is more than 50% full (using `stats`), and if so, creates and installs a new backend canister.
 +
-The new canister is assigned the next range, as obvious.
+The controller of the backend canister is the index canister.+
 +
-Because of the asynchronous nature of canister installation, it must set a flag to not do this multiple times in parallel. The canister must be written defensively to clear this flag if installation fails (e.g. `ic0.call_on_cleanup`)
+NOTE: Once and if the System supports https://github.com/dfinity-lab/ic-ref/issues/314[multiple controllers], the NNS governance canister will be set as an additional controler, to allow emergency interventions (e.g. stopping, upgrading) via NNS proposals.
 +
-Once `install_call` comes back, it can include the canister in the respond to `backends()`.
+The new canister is assigned the next range of user numbers.
++
+Because of the asynchronous nature of canister installation, it must set a flag to not do this multiple times in parallel. The canister must be written defensively to clear this flag if installation fails (e.g. `ic0.call_on_cleanup`) and thus retry.
++
+Once `install_code` comes back successfully, it can include the canister in the response to `backends()`.
 
-* For each canister with a wasm module hash that does not match the hash of the wasm module, an upgrade (without stopping) is performed.
+* For each canister with a wasm module hash that does not match the hash of the wasm module, an upgrade (without stopping, since backend canisters do not perform calls) is performed.
 +
 Like above, this needs to be guarded with a flag “in process” and defensive handling of failures.
 
@@ -257,6 +260,8 @@ In order to protect the Internet Computer from too many “free” update calls,
  * the `timestamp` in the `ProofOfWork` parameter is within 5min of the current time as seen by the Canister
  * the calculation of `H("\10ic-proof-of-work" · timestamp · nonce · |cid| · cid )` (where `H` is the https://cubehash.cr.yp.to/[CubeHash160+16/32+160-256] function, `·` is concatenation, `|…|` is a single byte encoding the length of the raw canister id in bytes, `cid` is the canister id and numbers are encoded as 8-byte little endian values), yields a hash value where leading 2 bytes are `0x00`.
  * the canister did not recently see a registration attempt with that `nonce`.
+
+If this backend canister is full, it replies with `canister_full`.
 
 === The `add` method
 
@@ -397,10 +402,7 @@ NOTE: Even with that provision the same nonce can be used to ingress multiple me
 
 === Initialization
 
-The Internet Identity canister is designed for sharded deployments.
-There can be many simulteniously installed instances of the canister code, each serving requests of a subset of users.
-As users are identified by their user number, we split the range of user numbers into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
-The assigned range is passed to the canister as an init argument, encoded in Candid:
+Each backend canister owns a range of user number. This range is set, by the index canister, during code installation, using the following Candid-encoded init argument:
 
 ....
 type InternetIdentityInit = record {
@@ -439,6 +441,7 @@ The following flows are not prescriptive of the UI, e.g. “the frontend asks th
 The possible login sub flows are shared among entry points `/` and `/autorized`, and are thus described separately. At the end of a succesful login subflow:
 
 * The frontend knows the `user_number` (also stored in local storage).
+* The frontend knows the current list of backend canisters, and thus which canister the user’s record is on.
 * the frontend has a temporary session key
 * the frontend has a `device_identity` for the present security device
 * the frontend has a `frontend_delegation` from the security device to the session key
@@ -454,13 +457,14 @@ The steps marked with 👆 are the steps where the user presses the security dev
    * Welcome <user number>. Do you want to log in?
    * Log in as a different user
 3. User wants to log in
-4. The frontend uses `lookup` to fetch the list of devices
-5. The frontend creates a session key.
-6. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key, using any of the devices listed in the user account. It notes which device was actually used.
-+
+4. The frontend queries `backends()` on the index canister to obtain the mapping from user numbers to backend canisters.
+5. The frontend uses `lookup()` on the backend canister to fetch the list of devices
+6. The frontend creates a session key.
+7. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key, using any of the devices listed in the user account. It notes which device was actually used.
+8
 Let `device_identity` of type `WebAuthenicationIdentity` be the identity created from that, and let `frontend_delegation` be the signed delegation.
-7. The frontend configures the agent to use the session key for all further update calls.
-8. Login complete
+8. The frontend configures the agent to use the session key for all further update calls.
+9. Login complete
 
 === Subflow: Login via initial registration
 
@@ -475,10 +479,18 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
 6. 👆 The frontend creates a delegation from the security device key to the session key, and signs it with the security key. Let `frontend_delegation` be that signed delegation.
 7. The frontend configures the agent to use the session key for all further update calls.
 8. The frontend asks the user for a device alias.
-9. The frontend calls `register()`, and obtains the `user_number`.
-10. It stores the `user_number` in local storage.
-11. The frontend insistently tells the user to write down this number.
-12. Login complete
+9. The frontend queries `backends()` on the index canister to obtain the mapping from user numbers to backend canisters.
+10. The frontend uses `stats()` on the second-to last canister in the list, to see if that canister is full.
++
+--
+* If it is not full: The frontend calls `register()` on the second-to-last canister, and obtains the `user_number`. If `register()` fails with `canister_init` (rare race conditions with the previous check), continue with next bullet point.
+
+* If it is full: The frontend calls `register()` on the last canister, and obtains the `user_number`. If `register()` fails with `canister_init` (failure of the index canister to scale out), show an error message
+--
+11. The frontend calls `register()`, and obtains the `user_number`.
+12. It stores the `user_number` in local storage.
+13. The frontend insistently tells the user to write down this number.
+14. Login complete
 
 === Subflow: Login via existing device
 
@@ -572,14 +584,15 @@ This flow is the boring default
 
 == Deployment
 
-This section needs to describe aspects like
-
-* why and how the frontend is bundled with and served by the canister itself.
-* how the Internet Identity Service canister id stays predictable and well-known
-
 === Integration with bootstrap of NNS
 
-The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
+A Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal, and still get a reliable canister id.
+
+This prepared canister is used for the stateless canister serving the Internet Identity frontend.
+
+The index canister is created via proposal to the NNS; then its canister id becomes known and can be embedded in the frontend. The backend canisters are created by the index canister.
+
+CAUTION: TODO The following instructions have not been updated with regard to scaling.
 
 === Initial installation
 
