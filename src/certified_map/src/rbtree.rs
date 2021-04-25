@@ -231,20 +231,31 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
     }
 
     pub fn modify(&mut self, key: &[u8], f: impl FnOnce(&mut V)) {
-        unsafe {
-            let mut root = self.root;
-            while !root.is_null() {
-                match key.cmp((*root).key.as_ref()) {
-                    Equal => {
-                        f(&mut (*root).value);
-                        (*root).subtree_hash = Node::subtree_hash(root);
-                        return;
-                    }
-                    Less => root = (*root).left,
-                    Greater => root = (*root).right,
+        unsafe fn go<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+            k: &[u8],
+            f: impl FnOnce(&mut V),
+        ) {
+            if h.is_null() {
+                return;
+            }
+
+            match k.as_ref().cmp((*h).key.as_ref()) {
+                Equal => {
+                    f(&mut (*h).value);
+                    (*h).subtree_hash = Node::subtree_hash(h);
+                }
+                Less => {
+                    go((*h).left, k, f);
+                    (*h).subtree_hash = Node::subtree_hash(h);
+                }
+                Greater => {
+                    go((*h).right, k, f);
+                    (*h).subtree_hash = Node::subtree_hash(h);
                 }
             }
         }
+        unsafe { go(self.root, key, f) }
     }
 
     fn range_witness<'a>(
@@ -544,11 +555,14 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
         unsafe {
             let mut root = go(self.root, key, value);
             (*root).color = Color::Black;
+
+            #[cfg(test)]
             debug_assert!(
                 is_balanced(root),
                 "the tree is not balanced:\n{:?}",
                 DebugView(root)
             );
+
             self.root = root;
         }
     }
@@ -635,6 +649,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     (*h).subtree_hash = Node::subtree_hash(h);
                 } else {
                     (*h).right = go((*h).right, key);
+                    (*h).subtree_hash = Node::subtree_hash(h);
                 }
             }
             balance(h)
@@ -651,11 +666,14 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
             if !self.root.is_null() {
                 (*self.root).color = Color::Black;
             }
+
+            #[cfg(test)]
             debug_assert!(
                 is_balanced(self.root),
                 "unbalanced map: {:?}",
                 DebugView(self.root)
             );
+
             debug_assert!(self.get(key).is_none());
         }
     }
@@ -742,6 +760,7 @@ unsafe fn flip_colors<K, V>(h: *mut Node<K, V>) {
     (*(*h).right).color = (*(*h).right).color.flip();
 }
 
+#[cfg(test)]
 unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
     unsafe fn go<K, V>(node: *mut Node<K, V>, mut num_black: usize) -> bool {
         if node.is_null() {
@@ -750,6 +769,9 @@ unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
         if !is_red(node) {
             debug_assert!(num_black > 0);
             num_black -= 1;
+        } else {
+            assert!(!is_red((*node).left));
+            assert!(!is_red((*node).right));
         }
         go((*node).left, num_black) && go((*node).right, num_black)
     }

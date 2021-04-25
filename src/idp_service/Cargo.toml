@@ -19,3 +19,4 @@ sha2 = "0.9.1"
 
 [dev-dependencies]
 hex-literal = "0.2.1"
+rand = "0.8.3"
