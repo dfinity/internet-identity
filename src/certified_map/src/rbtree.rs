@@ -1,12 +1,12 @@
-#[cfg(test)]
-mod test;
-
 use hashtree::{
     fork, fork_hash, labeled, labeled_hash, leaf_hash, Hash,
     HashTree::{self, Empty, Leaf, Pruned},
 };
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::fmt;
+
+#[cfg(test)]
+pub(crate) mod debug_alloc;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Color {
@@ -81,14 +81,19 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
     fn new(key: K, value: V) -> *mut Self {
         let value_hash = value.root_hash();
         let data_hash = labeled_hash(key.as_ref(), &value_hash);
-        Box::into_raw(Box::new(Self {
+        let node = Box::into_raw(Box::new(Self {
             key,
             value,
             left: Node::null(),
             right: Node::null(),
             color: Color::Red,
             subtree_hash: data_hash,
-        }))
+        }));
+
+        #[cfg(test)]
+        debug_alloc::mark_pointer_allocated(node);
+
+        node
     }
 
     unsafe fn data_hash(n: *mut Self) -> Hash {
@@ -168,6 +173,9 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
         Self::delete((*n).left);
         Self::delete((*n).right);
         let _ = Box::from_raw(n);
+
+        #[cfg(test)]
+        debug_alloc::mark_pointer_deleted(n);
     }
 
     unsafe fn subtree_hash(n: *mut Self) -> Hash {
@@ -562,6 +570,8 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 "the tree is not balanced:\n{:?}",
                 DebugView(root)
             );
+            #[cfg(test)]
+            debug_assert!(!has_dangling_pointers(root));
 
             self.root = root;
         }
@@ -787,6 +797,17 @@ unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
     go(root, num_black)
 }
 
+#[cfg(test)]
+unsafe fn has_dangling_pointers<K, V>(root: *mut Node<K, V>) -> bool {
+    if root.is_null() {
+        return false;
+    }
+
+    !debug_alloc::is_live(root)
+        || has_dangling_pointers((*root).left)
+        || has_dangling_pointers((*root).right)
+}
+
 struct DebugView<K, V>(*const Node<K, V>);
 
 impl<K: AsRef<[u8]>, V> fmt::Debug for DebugView<K, V> {
@@ -814,3 +835,6 @@ impl<K: AsRef<[u8]>, V> fmt::Debug for DebugView<K, V> {
         unsafe { go(f, self.0, 0) }
     }
 }
+
+#[cfg(test)]
+mod test;
