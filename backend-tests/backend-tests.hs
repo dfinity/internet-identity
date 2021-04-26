@@ -407,7 +407,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     _ <- callIDP cid webauthID #register (device1, powAt cid 1)
     callIDPReject cid dummyUserId #register (device1, powAt cid 1)
   , withoutUpgrade $ idpTest "get delegation without authorization" $ \cid -> do
-    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK)
