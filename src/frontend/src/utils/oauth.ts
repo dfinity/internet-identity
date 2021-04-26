@@ -91,7 +91,7 @@ function checkURIForHash(maybeURL: string) {
 }
 
 // this function will run every page load to check for oauth query parameters
-export default async function (userId: bigint, connection: IDPActor) {
+export default async function (userNumber: bigint, connection: IDPActor) {
   const searchParams = new URLSearchParams(location.search);
   const params = getOauthParams(searchParams)!;
   // TODO: if the redirect_uri parameter has a hash, immediately reject
@@ -103,7 +103,7 @@ export default async function (userId: bigint, connection: IDPActor) {
       if (await checkConsent(hostname)) {
         const accessToken = await withLoader(() => generate_access_token(
           connection,
-          userId,
+          userNumber,
           params.login_hint,
           hostname
         ))
@@ -151,14 +151,14 @@ function redirectToApp(redirectURI: string, params: OAuth2AccessTokenResponse) {
 
 async function generate_access_token(
   connection: IDPActor,
-  userId: bigint,
+  userNumber: bigint,
   login_hint: string,
   hostname: FrontendHostname
 ) {
   const sessionKey = Array.from(blobFromHex(login_hint));
 
   const prepRes = await connection.prepareDelegation(
-    userId,
+    userNumber,
     hostname,
     sessionKey
   );
@@ -171,7 +171,7 @@ async function generate_access_token(
   const [userKey, timestamp] = prepRes;
 
   const getRes = await connection.getDelegation(
-    userId,
+    userNumber,
     hostname,
     sessionKey,
     timestamp

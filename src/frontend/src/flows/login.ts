@@ -3,14 +3,14 @@ import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
-import { getUserId } from "../utils/userId";
+import { getUserNumber } from "../utils/userNumber";
 import { LoginResult, loginUnknown } from "./loginUnknown";
 
-const pageContent = (userId: bigint) => html`
+const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
-    <div class="userIdBox">${userId}</div>
+    <div class="userNumberBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">Use different identity</button>
@@ -18,10 +18,10 @@ const pageContent = (userId: bigint) => html`
 </div>
 `;
 
-// We retry logging in until we get a succesful user id connection pair
+// We retry logging in until we get a succesful user number connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (): Promise<{
-  userId: bigint;
+  userNumber: bigint;
   connection: IDPActor;
 }> => {
   try {
@@ -29,7 +29,7 @@ export const login = async (): Promise<{
 
     switch (x.tag) {
       case "ok": {
-        return { userId: x.userId, connection: x.connection };
+        return { userNumber: x.userNumber, connection: x.connection };
       }
       case "err": {
         await confirm({ message: x.message, detail: x.detail });
@@ -47,17 +47,17 @@ export const login = async (): Promise<{
 };
 
 const tryLogin = async (): Promise<LoginResult> => {
-  const userId = getUserId();
-  if (userId === undefined) {
+  const userNumber = getUserNumber();
+  if (userNumber === undefined) {
     return loginUnknown();
   } else {
     const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(userId), container);
-    return init(userId);
+    render(pageContent(userNumber), container);
+    return init(userNumber);
   }
 };
 
-const init = async (userId: bigint): Promise<LoginResult> => {
+const init = async (userNumber: bigint): Promise<LoginResult> => {
   return new Promise((resolve) => {
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
@@ -71,13 +71,13 @@ const init = async (userId: bigint): Promise<LoginResult> => {
       try {
         resolve({
           tag: "ok",
-          userId,
-          connection: await withLoader(() => IDPActor.login(userId)),
+          userNumber,
+          connection: await withLoader(() => IDPActor.login(userNumber)),
         });
       } catch (err) {
         resolve({
           tag: "err",
-          message: `Failed to login as ${userId}`,
+          message: `Failed to login as ${userNumber}`,
           detail: err.toString(),
         });
       }

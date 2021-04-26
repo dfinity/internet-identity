@@ -6,7 +6,7 @@ import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 
 const pageContent = () => html`<style>
-    #userIdSection {
+    #userNumberSection {
       padding-top: 0;
       padding-bottom: 0;
     }
@@ -37,8 +37,8 @@ const pageContent = () => html`<style>
       <h1>Identity Management</h1>
       <p>You can view and manage your Internet Computer identities here.</p>
     </section>
-    <section id="userIdSection" class="hidden">
-      <h3>Your user id is <span id="userIdSpan"></span></h3>
+    <section id="userNumberSection" class="hidden">
+      <h3>Your User Number is <span id="userNumberSpan"></span></h3>
     </section>
     <section id="identityList"></section>
     ${logoutSection()}
@@ -65,32 +65,32 @@ const pageContent = () => html`<style>
     </form>
   </web-dialog>`;
 
-export const renderManage = (userId: bigint, connection: IDPActor) => {
+export const renderManage = (userNumber: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
   render(pageContent(), container);
-  init(userId, connection);
+  init(userNumber, connection);
 };
 
-export const init = async (userId, connection) => {
+export const init = async (userNumber, connection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
-  displayUserId(userId);
+  displayUserNumber(userNumber);
   initLogout();
-  renderIdentities(connection, userId);
+  renderIdentities(connection, userNumber);
 };
 
-const displayUserId = (userId: BigInt) => {
-  const userIdElem = document.getElementById("userIdSpan") as HTMLElement;
-  userIdElem.innerHTML = userId.toString();
-  const userIdSection = document.getElementById("userIdSection") as HTMLElement;
-  userIdSection.classList.remove("hidden");
+const displayUserNumber = (userNumber: BigInt) => {
+  const userNumberElem = document.getElementById("userNumberSpan") as HTMLElement;
+  userNumberElem.innerHTML = userNumber.toString();
+  const userNumberSection = document.getElementById("userNumberSection") as HTMLElement;
+  userNumberSection.classList.remove("hidden");
 };
 
-const renderIdentities = async (connection, userId) => {
+const renderIdentities = async (connection, userNumber) => {
   const identityList = document.getElementById("identityList") as HTMLElement;
   identityList.innerHTML = ``;
 
-  const identities = await IDPActor.lookup(userId);
+  const identities = await IDPActor.lookup(userNumber);
 
   const list = document.createElement("ul");
 
@@ -98,7 +98,7 @@ const renderIdentities = async (connection, userId) => {
     const identityElement = document.createElement("li");
     identityElement.className = "flex row justify-between";
     identityElement.innerHTML = identityListItem(identity.alias);
-    bindRemoveListener(userId, connection, identityElement, identity.pubkey);
+    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
   });
 
@@ -106,7 +106,7 @@ const renderIdentities = async (connection, userId) => {
 };
 
 const bindRemoveListener = (
-  userId: bigint,
+  userNumber: bigint,
   connection: IDPActor,
   listItem: HTMLElement,
   publicKey
@@ -138,7 +138,7 @@ const bindRemoveListener = (
 
     // Otherwise, remove identity
     await withLoader(() =>
-      connection.remove(userId, publicKey).then(() => {
+      connection.remove(userNumber, publicKey).then(() => {
         listItem.parentElement?.removeChild(listItem);
       })
     );

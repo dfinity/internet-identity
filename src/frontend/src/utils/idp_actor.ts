@@ -43,7 +43,7 @@ export class IDPActor {
 
   static async register(
     alias: string,
-  ): Promise<{ connection: IDPActor; userId: UserNumber }> {
+  ): Promise<{ connection: IDPActor; userNumber: UserNumber }> {
     const identity = await WebAuthnIdentity.create();
     const delegationIdentity = await requestFEDelegation(identity);
 
@@ -59,7 +59,7 @@ export class IDPActor {
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
     console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
-    const userId = await actor.register({
+    const userNumber = await actor.register({
       alias,
       pubkey,
       credential_id: [credential_id],
@@ -68,12 +68,12 @@ export class IDPActor {
 
     return {
       connection: new IDPActor(identity, delegationIdentity, actor),
-      userId,
+      userNumber,
     };
   }
 
-  static async login(userId: bigint): Promise<IDPActor> {
-    const devices = await baseActor.lookup(userId);
+  static async login(userNumber: bigint): Promise<IDPActor> {
+    const devices = await baseActor.lookup(userNumber);
 
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
@@ -100,8 +100,8 @@ export class IDPActor {
     );
   }
 
-  static async lookup(userId: UserNumber): Promise<DeviceData[]> {
-    return baseActor.lookup(userId);
+  static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
+    return baseActor.lookup(userNumber);
   }
 
   // Create an actor representing the backend
@@ -130,47 +130,47 @@ export class IDPActor {
   }
 
   add = async (
-    userId: UserNumber,
+    userNumber: UserNumber,
     alias: string,
     newPublicKey: DerEncodedBlob,
     credentialId?: BinaryBlob
   ) => {
     const actor = await this.getActor();
-    return await actor.add(userId, {
+    return await actor.add(userNumber, {
       alias,
       pubkey: Array.from(newPublicKey),
       credential_id: credentialId ? [Array.from(credentialId)] : [],
     });
   };
 
-  remove = async (userId: UserNumber, publicKey: PublicKey) => {
+  remove = async (userNumber: UserNumber, publicKey: PublicKey) => {
     const actor = await this.getActor();
-    await actor.remove(userId, publicKey);
+    await actor.remove(userNumber, publicKey);
   };
 
   prepareDelegation = async (
-    userId: UserNumber,
+    userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey
   ) => {
     console.log(
-      `prepare_delegation(user: ${userId}, hostname: ${hostname}, session_key: ${sessionKey})`
+      `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
-    return await actor.prepare_delegation(userId, hostname, sessionKey);
+    return await actor.prepare_delegation(userNumber, hostname, sessionKey);
   };
 
   getDelegation = async (
-    userId: UserNumber,
+    userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
   ) => {
     console.log(
-      `get_delegation(user: ${userId}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+      `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );
     const actor = await this.getActor();
-    return await actor.get_delegation(userId, hostname, sessionKey, timestamp);
+    return await actor.get_delegation(userNumber, hostname, sessionKey, timestamp);
   };
 }
 
