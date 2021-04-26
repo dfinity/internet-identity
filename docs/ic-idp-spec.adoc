@@ -9,7 +9,7 @@ This document describes and specifies the Internet Identity from various angles 
 
  * High level goals, requirements and use cases
  * Overview of the security and identity machinery, including the interplay of identities, keys, and delegations
- * Interface as used by client applications frontends, i.e., the OAUTH-based spec
+ * Interface as used by client applications frontends, i.e., our <<client-auth-protocol,client authentication protocol>>
  * The interface of the Internet Identity Service _backend_, i.e., describing its contract at the Candid layer, as used by its frontend
  * Important implementation notes about the Internet Identity Service backend
  * Internal implementation notes about the Internet Identity Service frontend
@@ -20,7 +20,7 @@ The Internet Identity Service consists of
  * the backend, a canister on the IC. More precisely, a canister on the NNS subnet with a _well-known_ canister id, and
  * its frontend, a web application served by the backend canister.
 
-Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Interenet Identity Service directly (via the OAUTH protocol described below).
+Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Interenet Identity Service directly (via the <<client-auth-protocol,client authentication protocol>> described below).
 
 == Goals, requirements and use cases
 
@@ -80,58 +80,80 @@ The Internet Identity Service Backend stores the following data in user accounts
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-(Comment Jan: the following three paragraphs require more explanation)
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
 The delegation chain consits of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
 The Internet Identity Service Frontend also manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
-[#oauth]
-== OAUTH protocol
+[#client-auth-protocol]
+== Client authentication protocol
 
-This section describes the Internet Identity Service from the point of view of a client appliation frontend (a.k.a. the relaying party).
+This section describes the Internet Identity Service from the point of view of a client appliation frontend.
 
-The client application frontend creates a session key pair (e.g., Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
-
-  https://identity.ic0.app/authorize?…
-
-with URL parameters as specified by the OAUTH protocol. Of particular interest is the parameter
-
-* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key.
-
-* the `redirect_uri`, the hostname of which is used to identify the client application frontend’s hostname.
-
-If the Internet Identity Service Frontend can authorize this request, the url parameters on the callback (i.e., the provided `redirect_uri`) contain in particular
-
-* the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain in the following format
+1. The client application frontend creates a session key pair (e.g., Ed25519).
+2. It installs a `message` event handler on its own `window`.
+3. It loads the url `https://identity.ic0.app/#authorize` in an `<iframe>` or separate tab. Let `identityWindow` be the `Window` object returned from this.
 +
-....
-{
-  delegations: [
-    { delegation: {
-        expiration: (hex-encoded big-endian expiration date)
-        pubkey: (hex-encoded DER-encoded public key of delegatee)
-        targets: (optional)
-          [ (hex-encoded binary canister id)
-            …
-          ]
-      },
-      signature: (hex-encoded signature)
-    }
-    …
-  ],
-  publicKey: (hex-encoded public key underlying the user identity))
-}
-....
+If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per https://www.w3.org/TR/webauthn-2/#sctn-iframe-guidance[the Web Authentication recommendation].
+4. It invokes
 +
-This structure can be converted by the client application into a CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+--
+ identityWindow.postMessage(msg, "https://identity.ic0.app")
+
+where `msg` is a value with of type
+
+ interface InternetIdentityAuthRequest {
+   message: "authorize-client";
+   sessionPublicKey: ArrayBuffer;
+   maxTimetoLive: bigint;
+ }
+
+where
+
+* the `publicKey` contains the public key of the session key pair.
+* the `maxTimetoLive` indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+--
+5. Now it expects a message back, with data `event`.
+6. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
+7. The `event.data` value is is a JS object with the following type:
++
+ interface InternetIdentityAuthResponse {
+   message: "authorize-client-success";
+   delegations: [{
+     delegation: {
+       pubkey: ArrayBuffer;
+       expiration: bigint;
+       targets?: Principal[];
+     };
+     signature: BinaryBlob;
+   }];
+   userPublicKey: ArrayBuffer;
+ }
++
+where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+8. It could also receive a failure message of the following type
++
+ interface InternetIdentityAuthResponse {
+   message: "authorize-client-failure";
+   text: string;
+ }
++
 
 The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
-The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication` NPM package] provides functionality for this workflow.
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/auth-client`] and
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication`] NPM packages provide helpful functionality here.
 
-The client application frontend should support delegation chains of lenght more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
+The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
+
+[IMPORTANT]
+--
+The Internet Identity frontend will use `event.origin` as the “Frontend URL” to base the user identity on. This includes protocol, full hostname and port. This means
+
+* Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
+* The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
+--
 
 == The Internet Identity Service Backend interface
 
@@ -248,7 +270,7 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
-Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to form the `accessToken` in the <<oauth,OAUTH flow>>.
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client applicaition as per the <<client-auth-protocol,client authentication protocol>>.
 
 *Authorization*: Anyone can call this
 
@@ -491,14 +513,18 @@ This flow is the boring default
 +
 (This could include a button to go to the management screen, or maybe this _is_ the management screen with a info box.)
 
-=== Flow: OAUTH
+=== Flow: authenticating client applications
 
-1. The user accesses `/authorize` with oauth parameters
+1. The user accesses `/#authorize`
 2. 👆 The appropriate login subflow happens
-3. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
-4. The frontend calls `prepare_delegation()` with the client application frontend hostname and client application provided session key.
-5. The frontend queries `get_delegation()` to get the delegation data
-6. It converts it into the format of the `accessToken` and redirects the user back to the relaying party, as required by the oauth protocol
+3. The frontend listens to a `message` event (as per https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage[`postMessage` API])
+4. The `event.data` should be a message as per our <<client-auth-protocol>>.
+5. The `event.origin` is used as the Application Frontned’s hostname
+6. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
+7. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
+8. The frontend queries `get_delegation()` to get the delegation data
+9. It posts that data to the client application, using `event.source.postMessage` and the types specified in <<client-auth-protocol>>.
+10. It shows a message indicating that the login is complete.
 
 === Flow: Deleting devices
 
