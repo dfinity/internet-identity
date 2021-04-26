@@ -66,11 +66,7 @@ enum GetDelegationResponse {
 mod hash;
 mod storage;
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct HeaderField {
-    key: String,
-    value: String,
-}
+type HeaderField = (String, String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HttpRequest {
@@ -131,7 +127,7 @@ impl Default for State {
 
 thread_local! {
     static STATE: State = State::default();
-    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
+    static ASSETS: RefCell<HashMap<String, (Vec<HeaderField>, Vec<u8>)>> = RefCell::new(HashMap::default());
 }
 
 #[update]
@@ -347,9 +343,9 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let asset = parts[0].to_string();
 
     ASSETS.with(|a| match a.borrow().get(&asset) {
-        Some(value) => HttpResponse {
+        Some((headers, value)) => HttpResponse {
             status_code: 200,
-            headers: vec![],
+            headers: headers.clone(),
             body: value.clone(),
             streaming_strategy: None,
         },
@@ -380,27 +376,33 @@ fn init_assets() {
 
         a.insert(
             "/index.html".to_string(),
-            include_bytes!("../../../dist/index.html").to_vec(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
         );
         a.insert(
             "/".to_string(),
-            include_bytes!("../../../dist/index.html").to_vec(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
         );
         a.insert(
             "/authorize".to_string(),
-            include_bytes!("../../../dist/index.html").to_vec(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
         );
         a.insert(
             "/index.js".to_string(),
-            include_bytes!("../../../dist/index.js").to_vec(),
+            (
+                vec![("Content-Encoding".to_string(), "gzip".to_string())],
+                include_bytes!("../../../dist/index.js.gz").to_vec(),
+            ),
         );
         a.insert(
             "/glitch-loop.webp".to_string(),
-            include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
+            (
+                vec![],
+                include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
+            ),
         );
         a.insert(
             "/favicon.ico".to_string(),
-            include_bytes!("../../../dist/favicon.ico").to_vec(),
+            (vec![], include_bytes!("../../../dist/favicon.ico").to_vec()),
         );
     });
 }
