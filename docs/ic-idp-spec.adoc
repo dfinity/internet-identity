@@ -155,7 +155,7 @@ service : {
 
 As state (backed by stable memory to be upgrade safe), the index canister maintains a list of `BackendInfo`, ordered by their user number range. This data also includes, for each canister, the hash of the wasm module installed there.
 
-The index canister also has, as static data, the wasm module of the backend canister.
+The index canister also has, as static data, the latest backend caniser wasm module.
 
 TODO: Insights/logging (e.g. recording installation/upgrade failures, insightes into ongoing processes).
 
