@@ -17,7 +17,7 @@ test('Register new identity and login with it', async () => {
 test('Log in to OpenChat with OAUTH after registration', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
         await driver.get(OPEN_CHAT_URL);
-        await driver.findElement(By.xpath("//button[string()='Sign-in']")).click();
+        await driver.wait(until.elementLocated(By.xpath("//button[string()='Sign-in']")), 3_000).click();
 
         let userNumber = await registerNewIdentity(driver);
         await driver.findElement(By.xpath("//button[text()='Yes']")).click();
@@ -45,7 +45,7 @@ async function run_in_browser_with_virtual_authenticator(test) {
 };
 
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
-    await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
+    await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
     let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 50_000);
     let userId = await driver.findElement(By.className("userNumberBox")).getText();
