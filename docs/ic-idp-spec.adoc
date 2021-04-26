@@ -41,11 +41,14 @@ Some functional requirements are
 Some security requirements are
 
 * The separate identities of a single user cannot be related merely based on their public key or principal ids, to impede user tracking.
+* The security of the identities does not depend on the privacy of data stored on canisters, or transmitted to and from canisters. In particular, the delegations handed out by the backend canister must not be sensitive information.
 * (many more, of course; apply common sense)
 
 Some noteworthy security assumptions are:
 
 * The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
++
+NOTE: Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation.
 
 * The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
@@ -53,6 +56,7 @@ Some noteworthy security assumptions are:
 +
 (This assumption is only used relied on for the privacy aspect.)
 
+* The data included in a redirect from the Internet Identity Service frontend to an client application backend can be considered confidential.
 
 == Identity design and data model
 
