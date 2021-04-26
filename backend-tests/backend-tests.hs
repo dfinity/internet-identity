@@ -325,9 +325,9 @@ lookupIs cid user_number ds = do
 addTS :: (a, b, c) -> d -> (a, b, c, d)
 addTS (a,b,c) ts = (a,b,c,ts)
 
-getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> (Word64, T.Text, Blob) -> Word64 -> M ()
-getAndValidate cid sessionPK userPK delegationArgs ts = do
-  sd <- queryIDP cid dummyUserId #get_delegation (addTS delegationArgs ts) >>= \case
+getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> EntityId -> (Word64, T.Text, Blob) -> Word64 -> M ()
+getAndValidate cid sessionPK userPK webauthID delegationArgs ts = do
+  sd <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") sd -> return sd
     V.IsJust (V.Label :: Label "no_such_delegation") () ->
         liftIO $ assertFailure "Got unexpected no_such_delegation"
@@ -341,9 +341,9 @@ getAndValidate cid sessionPK userPK delegationArgs ts = do
     Left err -> liftIO $ assertFailure $ T.unpack err
     Right () -> return ()
 
-getButNotThere :: HasCallStack => Blob -> (Word64, T.Text, Blob) -> Word64 -> M ()
-getButNotThere cid delegationArgs ts = do
-  queryIDP cid dummyUserId #get_delegation (addTS delegationArgs ts) >>= \case
+getButNotThere :: HasCallStack => Blob -> EntityId -> (Word64, T.Text, Blob) -> Word64 -> M ()
+getButNotThere cid webauthID delegationArgs ts = do
+  queryIDP cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") _ ->
         liftIO $ assertFailure "Unexpected delegation"
     V.IsJust (V.Label :: Label "no_such_delegation") () -> return ()
@@ -416,7 +416,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         doUpgrade cid
         -- after upgrade, no signature is available
         V.IsJust (V.Label :: Label "no_such_delegation") ()
-          <- queryIDP cid dummyUserId #get_delegation (addTS delegationArgs ts)
+          <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts)
         -- so request it again
         (userPK', ts') <- callIDP cid webauthID #prepare_delegation delegationArgs
         lift $ userPK' @?= userPK
@@ -424,7 +424,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       else return ts
 
     V.IsJust (V.Label :: Label "signed_delegation") sd
-      <- queryIDP cid dummyUserId #get_delegation (addTS delegationArgs ts)
+      <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts)
     let delegation = sd .! #delegation
     let sig = sd .! #signature
     lift $ delegation .! #pubkey @?= sessionPK
@@ -452,25 +452,25 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let delegationArgs = (user_number, "front.end.com", sessionPK)
     -- request a few delegations
     (userPK, ts1) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
 
     (userPK, ts2) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK delegationArgs ts1
-    getAndValidate cid sessionPK userPK delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
 
     when should_upgrade $ do
       doUpgrade cid
 
     (userPK, ts3) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK delegationArgs ts2
-    getAndValidate cid sessionPK userPK delegationArgs ts3
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
 
     (userPK, ts4) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK delegationArgs ts2
-    getAndValidate cid sessionPK userPK delegationArgs ts3
-    getAndValidate cid sessionPK userPK delegationArgs ts4
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withoutUpgrade $ idpTest "get multiple delegations and expire" $ \cid -> do
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
@@ -480,25 +480,25 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let delegationArgs = (user_number, "front.end.com", sessionPK)
     -- request a few delegations
     (userPK, ts1) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
 
     setCanisterTimeTo cid (7*60*1000_000_000)
     (userPK, ts2) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK delegationArgs ts1
-    getAndValidate cid sessionPK userPK delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
 
     setCanisterTimeTo cid (14*60*1000_000_000)
     (userPK, ts3) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getButNotThere cid delegationArgs ts1
-    getAndValidate cid sessionPK userPK delegationArgs ts2
-    getAndValidate cid sessionPK userPK delegationArgs ts3
+    getButNotThere cid webauthID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
 
     setCanisterTimeTo cid (21*60*1000_000_000)
     (userPK, ts4) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    getButNotThere cid delegationArgs ts1
-    getButNotThere cid delegationArgs ts2
-    getAndValidate cid sessionPK userPK delegationArgs ts3
-    getAndValidate cid sessionPK userPK delegationArgs ts4
+    getButNotThere cid webauthID delegationArgs ts1
+    getButNotThere cid webauthID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
+    getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withUpgrade $ \should_upgrade -> idpTest "user identities differ" $ \cid -> do
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
