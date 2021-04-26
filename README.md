@@ -81,3 +81,26 @@ To customize your canister ID for deployment or particular local development, cr
 ```
 CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
+
+### Contributing to the backend
+
+The Internet Identity backend is a Wasm canister implemented in Rust and built from the `idp_service` cargo package (`src/idp_service`).
+Some canister functionality lives in separate libraries that can also be built to native code to simplify testing, e.g., `src/certified_map`, `src/hashtree`, `src/cubehash`, etc.
+
+Run the following command in the root of the repository to execute the test suites of all the libraries:
+
+```bash
+cargo test
+```
+
+The backed canister is also used to serve the frontend assets.
+This creates a dependency between the frontend and the backend.
+So running the usual `cargo build --target wasm32-unknown-unknow -p idp_service` might not work or include an outdated version of the frontend.
+
+Use the following command to build the backend canister Wasm file instead:
+
+```bash
+dfx build idp_service
+```
+
+The Wasm file will be located at `target/wasm32-unknown-unknown/release/idp_service.wasm`.

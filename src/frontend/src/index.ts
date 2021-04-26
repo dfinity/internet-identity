@@ -9,14 +9,14 @@ import "clipboard";
 const init = async () => {
   // initLogout();
 
-  const { userId, connection } = await login();
+  const { userNumber, connection } = await login();
   const url = new URL(document.URL);
   if (window.location.href.match(/authorize/)) {
-    oauth(userId, connection);
+    oauth(userNumber, connection);
   } else if (!!url.hash?.split("device=")[1]) {
-    addDevice(userId, connection);
+    addDevice(userNumber, connection);
   } else {
-    renderManage(userId, connection);
+    renderManage(userNumber, connection);
   }
 };
 

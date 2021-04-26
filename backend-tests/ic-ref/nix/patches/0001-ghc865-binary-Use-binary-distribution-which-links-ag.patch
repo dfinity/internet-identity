@@ -1,0 +1,80 @@
+From 35192bf8c4151c57aa6d37064ffeeee5510ce397 Mon Sep 17 00:00:00 2001
+From: Joe Hermaszewski <git@monoid.al>
+Date: Sun, 8 Nov 2020 23:51:44 +0800
+Subject: [PATCH 1/2] ghc865-binary: Use binary distribution which links
+ against ncurses6 for x86_64-linux
+
+Ben Gamari's patch from #85924.
+
+Fixes #85924, allowing one to bootstrap GHC in `pkgsMusl`
+
+`nix-build -A pkgsMusl.haskellPackages.hello` succeeds with this patch.
+
+(cherry picked from commit 15b3bc33064eeb0cba743cad585c829b6694669c)
+---
+ .../compilers/ghc/8.6.5-binary.nix            | 23 ++++++++++++++-----
+ 1 file changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/pkgs/development/compilers/ghc/8.6.5-binary.nix b/pkgs/development/compilers/ghc/8.6.5-binary.nix
+index 41af279e83f..9234e3b1457 100644
+--- a/pkgs/development/compilers/ghc/8.6.5-binary.nix
++++ b/pkgs/development/compilers/ghc/8.6.5-binary.nix
+@@ -1,6 +1,6 @@
+ { stdenv
+ , fetchurl, perl, gcc
+-, ncurses5, gmp, glibc, libiconv
++, ncurses5, ncurses6, gmp, glibc, libiconv
+ , llvmPackages
+ }:
+ 
+@@ -10,8 +10,12 @@ assert stdenv.targetPlatform == stdenv.hostPlatform;
+ let
+   useLLVM = !stdenv.targetPlatform.isx86;
+ 
++  useNcurses6 = stdenv.hostPlatform.system == "x86_64-linux";
++
++  ourNcurses = if useNcurses6 then ncurses6 else ncurses5;
++
+   libPath = stdenv.lib.makeLibraryPath ([
+-    ncurses5 gmp
++    ourNcurses gmp
+   ] ++ stdenv.lib.optional (stdenv.hostPlatform.isDarwin) libiconv);
+ 
+   libEnvVar = stdenv.lib.optionalString stdenv.hostPlatform.isDarwin "DY"
+@@ -34,12 +38,16 @@ stdenv.mkDerivation rec {
+   # https://downloads.haskell.org/~ghc/8.6.5/
+   src = fetchurl ({
+     i686-linux = {
++      # Don't use the Fedora27 build (as below) because there isn't one!
+       url = "http://haskell.org/ghc/dist/${version}/ghc-${version}-i386-deb9-linux.tar.xz";
+       sha256 = "1p2h29qghql19ajk755xa0yxkn85slbds8m9n5196ris743vkp8w";
+     };
+     x86_64-linux = {
+-      url = "http://haskell.org/ghc/dist/${version}/ghc-${version}-x86_64-deb9-linux.tar.xz";
+-      sha256 = "1pqlx6rdjs2110g0y1i9f8x18lmdizibjqd15f5xahcz39hgaxdw";
++      # This is the Fedora build because it links against ncurses6 where the
++      # deb9 one links against ncurses5, see here
++      # https://github.com/NixOS/nixpkgs/issues/85924 for a discussion
++      url = "http://haskell.org/ghc/dist/${version}/ghc-${version}-x86_64-fedora27-linux.tar.xz";
++      sha256 = "18dlqm5d028fqh6ghzn7pgjspr5smw030jjzl3kq6q1kmwzbay6g";
+     };
+     aarch64-linux = {
+       url = "http://haskell.org/ghc/dist/${version}/ghc-${version}-aarch64-ubuntu18.04-linux.tar.xz";
+@@ -88,9 +96,12 @@ stdenv.mkDerivation rec {
+     '' +
+     # Rename needed libraries and binaries, fix interpreter
+     stdenv.lib.optionalString stdenv.isLinux ''
+-      find . -type f -perm -0100 -exec patchelf \
++      find . -type f -perm -0100 \
++          -exec patchelf \
+           --replace-needed libncurses${stdenv.lib.optionalString stdenv.is64bit "w"}.so.5 libncurses.so \
+-          --replace-needed libtinfo.so libtinfo.so.5 \
++          ${ # This isn't required for x86_64-linux where we use ncurses6
++             stdenv.lib.optionalString (!useNcurses6) "--replace-needed libtinfo.so libtinfo.so.5"
++           } \
+           --interpreter ${glibcDynLinker} {} \;
+ 
+       sed -i "s|/usr/bin/perl|perl\x00        |" ghc-${version}/ghc/stage2/build/tmp/ghc-stage2
+-- 
+2.29.2
+

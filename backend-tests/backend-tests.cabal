@@ -1,0 +1,136 @@
+cabal-version:       2.2
+name:                backend-tests
+version:             0.0.1
+author:              Joachim Breitner
+build-type:          Simple
+extra-source-files:  ic.did ic-ref/impl/ic.did ic-ref/impl/cbits/*.h
+
+flag release
+  default: False
+  description: Release build, warnings are errors
+
+executable backend-tests
+  main-is:             backend-tests.hs
+  default-language:    Haskell2010
+
+  ghc-options:         -threaded -with-rtsopts -N
+  ghc-options:         -rtsopts
+  ghc-options:         -Wall -Wno-name-shadowing
+  if flag(release)
+    ghc-options:       -Werror
+  hs-source-dirs:      .
+  hs-source-dirs:      ic-ref/impl/src
+
+  build-depends: aeson
+  build-depends: asn1-encoding
+  build-depends: asn1-types
+  build-depends: atomic-write
+  build-depends: base32
+  build-depends: base >=4.12 && <5
+  build-depends: base64-bytestring >= 1.1
+  build-depends: binary
+  build-depends: bindings-DSL
+  build-depends: bytestring
+  build-depends: candid
+  build-depends: cborg
+  build-depends: cereal
+  build-depends: containers
+  build-depends: crc
+  build-depends: cryptonite
+  build-depends: data-default-class
+  build-depends: directory
+  build-depends: ed25519
+  build-depends: filepath
+  build-depends: hashable
+  build-depends: hex-text
+  build-depends: leb128-cereal
+  build-depends: memory
+  build-depends: MonadRandom
+  build-depends: mtl
+  build-depends: optparse-applicative
+  build-depends: parallel
+  build-depends: prettyprinter
+  build-depends: primitive
+  build-depends: process
+  build-depends: random >= 1.2
+  build-depends: row-types
+  build-depends: serialise
+  build-depends: split
+  build-depends: splitmix
+  build-depends: tasty
+  build-depends: tasty-ant-xml
+  build-depends: tasty-html
+  build-depends: tasty-hunit
+  build-depends: tasty-rerun
+  build-depends: template-haskell
+  build-depends: text
+  build-depends: time
+  build-depends: transformers
+  build-depends: unordered-containers
+  build-depends: utf8-string
+  build-depends: vector
+  build-depends: winter
+  build-depends: zlib
+  c-sources: ic-ref/impl/cbits/aes.c
+  c-sources: ic-ref/impl/cbits/big_384_58.c
+  c-sources: ic-ref/impl/cbits/bls_BLS12381.c
+  c-sources: ic-ref/impl/cbits/ecp2_BLS12381.c
+  c-sources: ic-ref/impl/cbits/ecp_BLS12381.c
+  c-sources: ic-ref/impl/cbits/fp12_BLS12381.c
+  c-sources: ic-ref/impl/cbits/fp2_BLS12381.c
+  c-sources: ic-ref/impl/cbits/fp4_BLS12381.c
+  c-sources: ic-ref/impl/cbits/fp_BLS12381.c
+  c-sources: ic-ref/impl/cbits/gcm.c
+  c-sources: ic-ref/impl/cbits/hash.c
+  c-sources: ic-ref/impl/cbits/hmac.c
+  c-sources: ic-ref/impl/cbits/newhope.c
+  c-sources: ic-ref/impl/cbits/oct.c
+  c-sources: ic-ref/impl/cbits/pair_BLS12381.c
+  c-sources: ic-ref/impl/cbits/randapi.c
+  c-sources: ic-ref/impl/cbits/rand.c
+  c-sources: ic-ref/impl/cbits/rom_curve_BLS12381.c
+  c-sources: ic-ref/impl/cbits/rom_field_BLS12381.c
+  c-sources: ic-ref/impl/cbits/share.c
+  include-dirs: ic-ref/impl/cbits
+  other-modules: IC.Canister
+  other-modules: IC.Canister.Imp
+  other-modules: IC.Canister.Snapshot
+  other-modules: IC.CBOR.Parser
+  other-modules: IC.CBOR.Patterns
+  other-modules: IC.Certificate
+  other-modules: IC.Certificate.CBOR
+  other-modules: IC.Certificate.Validate
+  other-modules: IC.Certificate.Value
+  other-modules: IC.Constants
+  other-modules: IC.Crypto
+  other-modules: IC.Crypto.BLS
+  other-modules: IC.Crypto.CanisterSig
+  other-modules: IC.Crypto.DER
+  other-modules: IC.Crypto.DER_BLS
+  other-modules: IC.Crypto.DER.Decode
+  other-modules: IC.Crypto.ECDSA
+  other-modules: IC.Crypto.Ed25519
+  other-modules: IC.Crypto.Secp256k1
+  other-modules: IC.Crypto.WebAuthn
+  other-modules: IC.Hash
+  other-modules: IC.HashTree
+  other-modules: IC.HashTree.CBOR
+  other-modules: IC.HTTP.CBOR
+  other-modules: IC.HTTP.GenR
+  other-modules: IC.HTTP.GenR.Parse
+  other-modules: IC.HTTP.RequestId
+  other-modules: IC.Id.Forms
+  other-modules: IC.Id.Fresh
+  other-modules: IC.Management
+  other-modules: IC.Purify
+  other-modules: IC.Ref
+  other-modules: IC.Serialise
+  other-modules: IC.StateFile
+  other-modules: IC.Types
+  other-modules: IC.Utils
+  other-modules: IC.Version
+  other-modules: IC.Wasm.Imports
+  other-modules: IC.Wasm.Winter
+  other-modules: IC.Wasm.WinterMemory
+  other-modules: IC.Wasm.Winter.Persist
+  other-modules: SourceId

@@ -1,9 +1,8 @@
 import { html, render } from "lit-html";
-import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
 import { IDPActor } from "../utils/idp_actor";
-import { setUserId } from "../utils/userId";
-import { displayUserId } from "./displayUserId";
+import { setUserNumber } from "../utils/userNumber";
+import { displayUserNumber } from "./displayUserNumber";
 import { LoginResult } from "./loginUnknown";
 
 const pageContent = html`
@@ -40,10 +39,10 @@ const init = (): Promise<LoginResult | null> => new Promise(resolve => {
     ) as HTMLInputElement;
 
     // Send values through actor
-    const { userId, connection } = await withLoader(async () => IDPActor.register(registerAlias.value));
+    const { userNumber, connection } = await withLoader(async () => IDPActor.register(registerAlias.value));
       // TODO: Display error here
-    setUserId(userId);
-    await displayUserId(userId)
-    resolve({ tag: "ok", connection, userId })
+    setUserNumber(userNumber);
+    await displayUserNumber(userNumber)
+    resolve({ tag: "ok", connection, userNumber })
   };
 })
