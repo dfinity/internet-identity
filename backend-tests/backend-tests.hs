@@ -417,6 +417,12 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device1, device2]
 
+  , withUpgrade $ \should_upgrade -> idpTest "register and add with wrong user" $ \cid -> do
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
+    when should_upgrade $ doUpgrade cid
+    callIDPReject cid webauth2ID #add (user_number, device2)
+    lookupIs cid user_number [device1]
+
   , withUpgrade $ \should_upgrade -> idpTest "get delegation and validate" $ \cid -> do
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
 
