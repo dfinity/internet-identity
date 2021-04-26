@@ -584,7 +584,6 @@ This flow is the boring default
 
 == Deployment
 
-=== Integration with bootstrap of NNS
 
 A Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal, and still get a reliable canister id.
 
