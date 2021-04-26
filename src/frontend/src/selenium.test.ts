@@ -45,7 +45,7 @@ async function run_in_browser_with_virtual_authenticator(test) {
 };
 
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
-    await driver.findElement(By.id('registerButton')).click();
+    await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
     let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 50_000);
     let userId = await driver.findElement(By.className("userNumberBox")).getText();
