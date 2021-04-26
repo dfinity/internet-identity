@@ -15,7 +15,7 @@ We do not use the `.cabal` file there, but have our own in
 Setup
 -----
 
- * Install ghc-8.4 and `cabal` (e.g. using https://www.haskell.org/ghcup/)
+ * Install ghc-8.8.4 and `cabal` (e.g. using https://www.haskell.org/ghcup/)
  * Run `cabal build`
 
 Running
