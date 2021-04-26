@@ -1,0 +1,11 @@
+# We work with a safelist here, so block everything that's not permitted, and add packages
+# that are.
+**
+
+!lib/**
+!types/**/*.d.ts
+!package.json
+!README.md
+
+# The following line further removes all test files (which matches .js and .d.ts).
+lib/**/*.test.*
