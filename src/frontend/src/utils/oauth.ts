@@ -18,8 +18,8 @@ import {
   FrontendHostname,
   SignedDelegation as CandidSignedDelegation,
 } from "../../generated/idp_types";
-import { confirm } from "../components/confirm";
 import { withLoader } from "../components/loader";
+import { confirmRedirect } from "../flows/confirmRedirect";
 
 /**
  * This should be compatible with OAuth 2.0 Authorization Request.
@@ -100,7 +100,7 @@ export default async function (userNumber: bigint, connection: IDPActor) {
       checkURIForHash(params.redirect_uri);
       const hostname = new URL(params.redirect_uri)
         .hostname as FrontendHostname;
-      if (await checkConsent(hostname)) {
+      if (await confirmRedirect(hostname)) {
         const accessToken = await withLoader(() => generate_access_token(
           connection,
           userNumber,
@@ -208,12 +208,4 @@ function isDelegationResponse(
   x: any
 ): x is { signed_delegation: CandidSignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
-}
-
-async function checkConsent(hostname: FrontendHostname) {
-  return await confirm({
-    message: `Do you want to log into ${hostname}?`,
-    yesText: "Yes",
-    noText: "No",
-  });
 }
