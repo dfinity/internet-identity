@@ -66,11 +66,7 @@ enum GetDelegationResponse {
 mod hash;
 mod storage;
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct HeaderField {
-    key: String,
-    value: String,
-}
+type HeaderField = (String, String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HttpRequest {
@@ -393,10 +389,7 @@ fn init_assets() {
         a.insert(
             "/index.js".to_string(),
             (
-                vec![HeaderField {
-                    key: "Content-Encoding".to_string(),
-                    value: "gzip".to_string(),
-                }],
+                vec![("Content-Encoding".to_string(), "gzip".to_string())],
                 include_bytes!("../../../dist/index.js.gz").to_vec(),
             ),
         );
