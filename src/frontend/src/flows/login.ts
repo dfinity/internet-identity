@@ -13,8 +13,8 @@ const pageContent = (userNumber: bigint) => html`
     <div class="userNumberBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
-    <button type="button" id="loginDifferent">Use different identity</button>
-    ${logoutSection()}
+    <button type="button" id="loginDifferent">Use a different user number</button>
+    ${logoutSection("Forget my user number")}
 </div>
 `;
 
