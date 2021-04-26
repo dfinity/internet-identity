@@ -38,7 +38,7 @@ const pageContent = () => html`<style>
       <p>You can view and manage your Internet Computer identities here.</p>
     </section>
     <section id="userIdSection" class="hidden">
-      <h3>Your user id is <span id="userIdSpan"></span></h3>
+      <h3>Your User Number is <span id="userIdSpan"></span></h3>
     </section>
     <section id="identityList"></section>
     ${logoutSection()}

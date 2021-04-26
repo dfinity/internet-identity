@@ -43,11 +43,11 @@ const pageContent = () => html`
   </style>
   <div class="container">
     <h2 id="loginWelcome">Welcome to<br>Internet Identity!</h2>
-    <p>Using your saved User ID you can login or link a new device</p>
-    <input type="text" id="registerUserNumber" placeholder="Enter User ID">
+    <p>Using your saved User Number you can login or link a new device</p>
+    <input type="text" id="registerUserNumber" placeholder="Enter User Number">
     <button type="button" id="loginButton" class="primary">Login</button>
     <div class="textLink" id="registerSection">
-      New user? <button id="registerButton" class="linkStyle">Get User ID</button>
+      New user? <button id="registerButton" class="linkStyle">Get User Number</button>
     </div>
     <div class="textLink">
       Already registered <button id="addNewDeviceButton" class="linkStyle">but using a new Device?</button>
@@ -151,7 +151,7 @@ const initLinkDevice = () => {
       }, 2500);
     } else {
       userIdInput.classList.toggle("errored", true);
-      userIdInput.placeholder = "Please enter your User ID first"
+      userIdInput.placeholder = "Please enter your User Number first"
     }
   };
 };

@@ -15,8 +15,8 @@ import { successfullyAddedDevice } from "./successfulDeviceAddition";
 const pageContent = (userId: bigint) => html`
   <div class="container">
     <h1>New device</h1>
-    <label>User ID:</label>
-    <div class="userIdBox">${userId}</div>
+    <label>User Number:</label>
+    <div class="userNumberBox">${userId}</div>
     <p class="warningBox">
       Warning: Do not click this button unless this link really came from you.
     </p>
@@ -54,8 +54,8 @@ const init = (userId: bigint, connection: IDPActor) => {
       if (expectedUserId !== userId) {
         // Here we're adding a device to our userId that was supposed to be added to a different one.
         await confirm({
-          message: "Tried adding a device for the wrong user id.",
-          detail: `Current user is ${expectedUserId}, but current user is ${userId}. Please choose the correct user id when creating the add device link`,
+          message: "Tried adding a device for the wrong user number.",
+          detail: `Current user is ${expectedUserId}, but current user is ${userId}. Please choose the correct user number when creating the add device link`,
         });
         return;
       }

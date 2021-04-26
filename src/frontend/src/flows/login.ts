@@ -10,7 +10,7 @@ const pageContent = (userId: bigint) => html`
   <div class="container">
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
-    <div class="userIdBox">${userId}</div>
+    <div class="userNumberBox">${userId}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">Use different identity</button>
@@ -18,7 +18,7 @@ const pageContent = (userId: bigint) => html`
 </div>
 `;
 
-// We retry logging in until we get a succesful user id connection pair
+// We retry logging in until we get a succesful user number connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (): Promise<{
   userId: bigint;

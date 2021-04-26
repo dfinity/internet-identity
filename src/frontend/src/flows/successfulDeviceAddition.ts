@@ -6,7 +6,7 @@ const pageContent = (alias) => html`
     <h1>Success!</h1>
     <p>You’ve successfully added a new device. You can close this window and return to your other device.</p>
     <label>Device name:</label>
-    <div class="userIdBox">
+    <div class="userNumberBox">
       ${alias}
     </div>
     ${logoutSection()}
