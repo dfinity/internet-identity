@@ -38,6 +38,8 @@ export interface InternetIdentityStats {
 };
 export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp };
 export type PublicKey = Array<number>;
+export type RegisterResponse = { 'canister_full' : null } |
+  { 'registered' : { 'user_number' : UserNumber } };
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
   'signature' : Array<number>,
@@ -63,13 +65,16 @@ export default interface _SERVICE {
       arg_3: Timestamp,
     ) => Promise<GetDelegationResponse>,
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
+  'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
   'prepare_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
       arg_2: SessionKey,
     ) => Promise<[UserKey, Timestamp]>,
-  'register' : (arg_0: DeviceData, arg_1: ProofOfWork) => Promise<UserNumber>,
+  'register' : (arg_0: DeviceData, arg_1: ProofOfWork) => Promise<
+      RegisterResponse
+    >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
 };

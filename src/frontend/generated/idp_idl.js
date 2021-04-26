@@ -60,6 +60,10 @@ export default ({ IDL }) => {
     'nonce' : IDL.Nat64,
     'timestamp' : Timestamp,
   });
+  const RegisterResponse = IDL.Variant({
+    'canister_full' : IDL.Null,
+    'registered' : IDL.Record({ 'user_number' : UserNumber }),
+  });
   const InternetIdentityStats = IDL.Record({
     'users_registered' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
@@ -72,13 +76,14 @@ export default ({ IDL }) => {
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
+    'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey],
         [UserKey, Timestamp],
         [],
       ),
-    'register' : IDL.Func([DeviceData, ProofOfWork], [UserNumber], []),
+    'register' : IDL.Func([DeviceData, ProofOfWork], [RegisterResponse], []),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
   });

@@ -59,17 +59,26 @@ export class IDPActor {
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
     console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
-    const userNumber = await actor.register({
+    const registerResponse = await actor.register({
       alias,
       pubkey,
       credential_id: [credential_id],
     },
       pow);
 
-    return {
-      connection: new IDPActor(identity, delegationIdentity, actor),
-      userNumber,
-    };
+    if (registerResponse.hasOwnProperty('canister_full')) {
+      throw Error('failed to register a user because the backend canister has no space left');
+    } else if (registerResponse.hasOwnProperty('registered')) {
+      let userNumber = registerResponse['registered'].user_number;
+      console.log(`registered user number ${userNumber}`);
+      return {
+        connection: new IDPActor(identity, delegationIdentity, actor),
+        userNumber,
+      };
+    } else {
+      console.error('unexpected register response', registerResponse);
+      throw Error('unexpected register response');
+    }
   }
 
   static async login(userNumber: bigint): Promise<IDPActor> {

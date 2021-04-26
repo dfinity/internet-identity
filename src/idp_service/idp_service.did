@@ -43,6 +43,13 @@ type DeviceData = record {
   credential_id : opt CredentialId;
 };
 
+type RegisterResponse = variant {
+  // A new user was successfully registered.
+  registered: record { user_number: UserNumber; };
+  // No more registrations are possible in this instance of the II service caniser.
+  canister_full;
+};
+
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -79,7 +86,7 @@ type ProofOfWork = record {
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
-  register : (DeviceData, ProofOfWork) -> (UserNumber);
+  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
