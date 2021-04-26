@@ -180,6 +180,7 @@ fn map_model_test() {
             assert_eq!(hm.get(k), rb.get(k));
         }
     }
+    assert_eq!(super::debug_alloc::count_allocated_pointers(), 0);
 }
 
 #[test]
