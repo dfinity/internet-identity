@@ -5,7 +5,7 @@ const pageContent = (hostName) => html`
   <div class="container">
     <h1>Confirm Login</h1>
     <p>Proceed to login in to:</p>
-    <div class="userNumberBox">${hostName}</div>
+    <div class="highlightBox">${hostName}</div>
     <button id="confirmRedirect" class="primary">Yes</button>
     <button id="cancelRedirect">No</button>
   </div>

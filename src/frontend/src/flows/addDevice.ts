@@ -16,7 +16,7 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>New device</h1>
     <label>User Number:</label>
-    <div class="userNumberBox">${userNumber}</div>
+    <div class="highlightBox">${userNumber}</div>
     <p class="warningBox">
       Warning: Do not click this button unless this link really came from you.
     </p>
