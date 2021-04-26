@@ -246,6 +246,18 @@ queryIDP cid user_id l x = do
       Left err -> lift $ assertFailure err
       Right y -> return y
 
+queryIDPReject :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IDPInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> M ()
+queryIDPReject cid user_id l x = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected _ -> return ()
+    Replied _ -> lift $ assertFailure "queryIDPReject: Unexpected reply"
+
 callIDP :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -402,6 +414,28 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     when should_upgrade $ doUpgrade cid
     callIDPReject cid webauth2ID #add (user_number, device2)
     lookupIs cid user_number [device1]
+
+  , withUpgrade $ \should_upgrade -> idpTest "get delegation without authorization" $ \cid -> do
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
+
+    let sessionSK = createSecretKeyEd25519 "hohoho"
+    let sessionPK = toPublicKey sessionSK
+    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    -- prepare delegation
+    (userPK, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
+    ts <- if should_upgrade
+      then do
+        doUpgrade cid
+        -- after upgrade, no signature is available
+        V.IsJust (V.Label :: Label "no_such_delegation") ()
+          <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts)
+        -- so request it again
+        (userPK', ts') <- callIDP cid webauthID #prepare_delegation delegationArgs
+        lift $ userPK' @?= userPK
+        return ts'
+      else return ts
+
+    queryIDPReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
 
   , withUpgrade $ \should_upgrade -> idpTest "get delegation and validate" $ \cid -> do
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
