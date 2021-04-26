@@ -1,7 +1,9 @@
+import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { withLoader } from "../components/loader";
 import { IDPActor } from "../utils/idp_actor";
 import { setUserNumber } from "../utils/userNumber";
+import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
 import { LoginResult } from "./loginUnknown";
 
@@ -38,11 +40,17 @@ const init = (): Promise<LoginResult | null> => new Promise(resolve => {
       "#registerAlias"
     ) as HTMLInputElement;
 
-    // Send values through actor
-    const { userNumber, connection } = await withLoader(async () => IDPActor.register(registerAlias.value));
-      // TODO: Display error here
-    setUserNumber(userNumber);
-    await displayUserNumber(userNumber)
-    resolve({ tag: "ok", connection, userNumber })
+    const identity = await WebAuthnIdentity.create();
+    if (await confirmRegister()) {
+      // Send values through actor
+      const { userNumber, connection } = await withLoader(
+        async () => IDPActor.register(identity, registerAlias.value)
+      );
+      setUserNumber(userNumber);
+      await displayUserNumber(userNumber)
+      resolve({ tag: "ok", connection, userNumber })
+    } else {
+      resolve(null)
+    }
   };
 })
