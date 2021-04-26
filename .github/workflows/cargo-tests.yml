@@ -29,6 +29,18 @@ jobs:
         run: |
           rustup update ${{ matrix.rust }} --no-self-update
           rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install DFX
+        run: |
+          export DFX_VERSION=${{ matrix.dfx }}
+          echo Install DFX Version: $DFX_VERSION
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+
+      - name: Build canister (to build frontend)
+        run: |
+           dfx build
 
       - name: Run Tests
         shell: bash
