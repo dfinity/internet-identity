@@ -258,6 +258,18 @@ queryIDP cid user_id l x = do
       Left err -> lift $ assertFailure err
       Right y -> return y
 
+queryIDPReject :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IDPInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> M ()
+queryIDPReject cid user_id l x = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected _ -> return ()
+    Replied _ -> lift $ assertFailure "queryIDPReject: Unexpected reply"
+
 callIDP :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -394,6 +406,14 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ idpTest "register with repeated pow fails" $ \cid -> do
     _ <- callIDP cid webauthID #register (device1, powAt cid 1)
     callIDPReject cid dummyUserId #register (device1, powAt cid 1)
+  , withoutUpgrade $ idpTest "get delegation without authorization" $ \cid -> do
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
+    let sessionSK = createSecretKeyEd25519 "hohoho"
+    let sessionPK = toPublicKey sessionSK
+    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    (_, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
+    queryIDPReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+
   , withUpgrade $ \should_upgrade -> idpTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
     when should_upgrade $ doUpgrade cid

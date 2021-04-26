@@ -6,7 +6,7 @@ const pageContent = (userNumber) => html`
     <p>You're now registered. Keep your User Number safe. It is your responsibility.</p>
     <p>Memorize this number. Save a backup in multiple places. Without it, you can not recover your internet identity.</p>
     <label>User Number:</label>
-    <div class="userNumberBox">
+    <div class="highlightBox">
       ${userNumber}
     </div>
     <button id="displayUserContinue" class="primary">Continue</button>

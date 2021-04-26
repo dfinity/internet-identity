@@ -330,6 +330,15 @@ fn get_delegation(
     check_frontend_length(&frontend);
 
     STATE.with(|state| {
+        let entries = state.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
         match get_signature(
             &state.sigs.borrow(),
             session_key.clone(),
