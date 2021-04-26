@@ -250,7 +250,7 @@ For a certain amount of time after a call to `prepare_delegation`, a query call 
 
 Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to form the `accessToken` in the <<oauth,OAUTH flow>>.
 
-*Authorization*: Anyone can call this
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 == The Internet Identity Service backend internals
 
