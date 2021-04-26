@@ -38,8 +38,10 @@ jobs:
           export DFX_VERSION=${{ matrix.dfx }}
           echo Install DFX Version: $DFX_VERSION
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo "$HOME/bin" >> $GITHUB_PATH
 
       - run: npm ci
       - run: dfx start --background
       - run: dfx deploy --argument '(null)'
       - run: npm test
+      - run: dfx stop
