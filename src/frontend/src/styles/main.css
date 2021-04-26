@@ -353,12 +353,13 @@ ul {
   }
 }
 
-.userNumberBox {
+.highlightBox {
     background-color: var(--grey-100);
     padding: 1rem 0rem;
     text-align: center;
     border-radius: 4px;
     margin-bottom: 1rem;
+    overflow-wrap: break-word;
 }
 
 .warningBox {

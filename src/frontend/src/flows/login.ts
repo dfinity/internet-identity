@@ -10,7 +10,7 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
-    <div class="userNumberBox">${userNumber}</div>
+    <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">Use a different user number</button>
