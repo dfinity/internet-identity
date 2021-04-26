@@ -1,4 +1,4 @@
-import { blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
+import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
@@ -6,65 +6,74 @@ import { setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
+import { WebAuthnIdentity } from "@dfinity/identity";
+import { PublicKey } from "../../generated/idp_types";
 
-const pageContent = () => html`
-  <style>
-#registerUserNumber:focus {
-  box-sizing: border-box;
-  border: double 2px transparent;
-  border-radius: 4px;
-  border-image-slice: 1;
-  outline: none;
-  border-image-source: linear-gradient(
-    270.05deg,
-    #29abe2 10.78%,
-    #522785 22.2%,
-    #ed1e79 42.46%,
-    #f15a24 59.41%,
-    #fbb03b 77.09%
-  );
-}
+const pageContent = () => html` <style>
+    #registerUserNumber:focus {
+      box-sizing: border-box;
+      border: double 2px transparent;
+      border-radius: 4px;
+      border-image-slice: 1;
+      outline: none;
+      border-image-source: linear-gradient(
+        270.05deg,
+        #29abe2 10.78%,
+        #522785 22.2%,
+        #ed1e79 42.46%,
+        #f15a24 59.41%,
+        #fbb03b 77.09%
+      );
+    }
 
-#registerSection {
-  margin-top: 4rem;
-}
+    #registerSection {
+      margin-top: 4rem;
+    }
 
-.textLink {
-  margin-bottom: 0.3rem;
-  font-size: 0.875rem;
-}
-.textLink button {
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-decoration: none;
-  color: black;
-}
+    .textLink {
+      margin-bottom: 0.3rem;
+      font-size: 0.875rem;
+    }
+    .textLink button {
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: black;
+    }
   </style>
   <div class="container">
-    <h2 id="loginWelcome">Welcome to<br>Internet Identity!</h2>
+    <h2 id="loginWelcome">Welcome to<br />Internet Identity!</h2>
     <p>Using your saved User Number you can login or link a new device</p>
-    <input type="text" id="registerUserNumber" placeholder="Enter User Number">
+    <input
+      type="text"
+      id="registerUserNumber"
+      placeholder="Enter User Number"
+    />
     <button type="button" id="loginButton" class="primary">Login</button>
     <div class="textLink" id="registerSection">
-      New user? <button id="registerButton" class="linkStyle">Get User Number</button>
+      New user?
+      <button id="registerButton" class="linkStyle">Get User Number</button>
     </div>
     <div class="textLink">
-      Already registered <button id="addNewDeviceButton" class="linkStyle">but using a new Device?</button>
+      Already registered
+      <button id="addNewDeviceButton" class="linkStyle">
+        but using a new Device?
+      </button>
     </div>
   </div>`;
 
 export type LoginResult =
   | {
-    tag: "ok";
-    userNumber: bigint;
-    connection: IDPActor;
-  }
+      tag: "ok";
+      userNumber: bigint;
+      connection: IDPActor;
+    }
   | {
-    tag: "err";
-    message: string;
-    detail: string;
-  };
+      tag: "err";
+      message: string;
+      detail: string;
+    };
 
 export const loginUnknown = async (): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -83,12 +92,12 @@ const initRegister = (resolve) => {
   registerButton.onclick = async () => {
     const res = await register();
     if (res === null) {
-      window.location.reload()
+      window.location.reload();
     } else {
-      resolve(res)
+      resolve(res);
     }
-  }
-}
+  };
+};
 
 const initLogin = (resolve) => {
   const userNumberInput = document.getElementById(
@@ -105,7 +114,8 @@ const initLogin = (resolve) => {
         IDPActor.login(userNumber).then((connection) => {
           setUserNumber(userNumber);
           resolve({ tag: "ok", userNumber, connection });
-        }));
+        })
+      );
     } else {
       resolve({
         tag: "err",
@@ -129,7 +139,16 @@ const initLinkDevice = () => {
 
     const userNumber = BigInt(userNumberInput.value);
     if (userNumber) {
-      const { link, publicKey } = await generateAddDeviceLink(userNumber);
+      const identity = await WebAuthnIdentity.create();
+      const publicKey = identity.getPublicKey().toDer();
+      const rawId = blobToHex(identity.rawId);
+
+      // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
+
+      const link = encodeURI(
+        `${location.host}#device=${userNumber};${blobToHex(publicKey)};${rawId}`
+      );
+
       displayAddDeviceLink(link);
       loginInterval = window.setInterval(async () => {
         console.log("checking if authenticated");
@@ -151,7 +170,7 @@ const initLinkDevice = () => {
       }, 2500);
     } else {
       userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your User Number first"
+      userNumberInput.placeholder = "Please enter your User Number first";
     }
   };
 };
