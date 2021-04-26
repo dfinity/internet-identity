@@ -384,6 +384,14 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ idpTest "register with repeated pow fails" $ \cid -> do
     _ <- callIDP cid webauthID #register (device1, powAt cid 1)
     callIDPReject cid dummyUserId #register (device1, powAt cid 1)
+  , withoutUpgrade $ idpTest "get delegation without authorization" $ \cid -> do
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
+    let sessionSK = createSecretKeyEd25519 "hohoho"
+    let sessionPK = toPublicKey sessionSK
+    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    (_, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
+    queryIDPReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+
   , withUpgrade $ \should_upgrade -> idpTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
     when should_upgrade $ doUpgrade cid
@@ -408,34 +416,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIDP cid webauthID #add (user_number, device2)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device1, device2]
-
-  , withUpgrade $ \should_upgrade -> idpTest "register and add with wrong user" $ \cid -> do
-    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
-    when should_upgrade $ doUpgrade cid
-    callIDPReject cid webauth2ID #add (user_number, device2)
-    lookupIs cid user_number [device1]
-
-  , withUpgrade $ \should_upgrade -> idpTest "get delegation without authorization" $ \cid -> do
-    user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
-    -- prepare delegation
-    (userPK, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
-    ts <- if should_upgrade
-      then do
-        doUpgrade cid
-        -- after upgrade, no signature is available
-        V.IsJust (V.Label :: Label "no_such_delegation") ()
-          <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts)
-        -- so request it again
-        (userPK', ts') <- callIDP cid webauthID #prepare_delegation delegationArgs
-        lift $ userPK' @?= userPK
-        return ts'
-      else return ts
-
-    queryIDPReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
 
   , withUpgrade $ \should_upgrade -> idpTest "get delegation and validate" $ \cid -> do
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0)
