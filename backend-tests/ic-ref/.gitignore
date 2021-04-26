@@ -1,0 +1,10 @@
+# IDEs
+.vscode/
+.idea/
+
+# Build and Test Output
+result*
+spec/index.html
+spec/*.png
+spec/.asciidoctor/
+impl/.tasty-rerun-log
