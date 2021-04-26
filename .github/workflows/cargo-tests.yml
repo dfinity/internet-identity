@@ -1,4 +1,4 @@
-name: Tests
+name: Cargo tests
 
 on:
   push:
@@ -36,6 +36,7 @@ jobs:
           mkdir dist
           touch dist/index.html
           touch dist/index.js
+          touch dist/index.js.gz
           touch dist/glitch-loop.webp
           touch dist/favicon.ico
 
