@@ -100,8 +100,7 @@ So running the usual `cargo build --target wasm32-unknown-unknow -p idp_service`
 Use the following command to build the backend canister Wasm file instead:
 
 ```bash
-npm install
-src/idp_service/build.sh
+dfx build idp_service
 ```
 
 The Wasm file will be located at `target/wasm32-unknown-unknown/release/idp_service.wasm`.
