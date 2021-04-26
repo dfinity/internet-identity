@@ -46,7 +46,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   ../idp-service/dfx.sh deploy
   ```
 
-* In `agent-js` run
+* In `agent-rs` run
   ```
   sudo ./target/release/icx-proxy --address 127.0.0.1:80 --replica http://localhost:41549/ --dns-alias identity.localhost:rrkah-fqaaa-aaaaa-aaaaq-cai -v
   ```

@@ -2,6 +2,7 @@ const path = require("path");
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
+const CompressionPlugin = require("compression-webpack-plugin");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
@@ -84,6 +85,9 @@ function generateWebpackConfigForCanister(name, info) {
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin(["CANISTER_ID"]),
+      new CompressionPlugin({
+        test: /\.js(\?.*)?$/i,
+      }),
     ],
   };
 }
