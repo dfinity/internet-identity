@@ -16,6 +16,7 @@
     "@types/jest": "^24.9.1",
     "assert": "2.0.0",
     "buffer": "6.0.3",
+    "compression-webpack-plugin": "^7.1.2",
     "concurrently": "^6.0.2",
     "copy-webpack-plugin": "^8.1.1",
     "css-loader": "^5.2.1",
