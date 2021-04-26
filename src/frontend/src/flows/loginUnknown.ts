@@ -2,7 +2,7 @@ import { blobFromUint8Array, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
-import { setUserId } from "../utils/userId";
+import { setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
@@ -57,7 +57,7 @@ const pageContent = () => html`
 export type LoginResult =
   | {
     tag: "ok";
-    userId: bigint;
+    userNumber: bigint;
     connection: IDPActor;
   }
   | {
@@ -91,7 +91,7 @@ const initRegister = (resolve) => {
 }
 
 const initLogin = (resolve) => {
-  const userIdInput = document.getElementById(
+  const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
   const loginButton = document.getElementById(
@@ -99,18 +99,18 @@ const initLogin = (resolve) => {
   ) as HTMLButtonElement;
 
   loginButton.onclick = () => {
-    const userId = BigInt(userIdInput.value);
-    if (userId) {
+    const userNumber = BigInt(userNumberInput.value);
+    if (userNumber) {
       withLoader(() =>
-        IDPActor.login(userId).then((connection) => {
-          setUserId(userId);
-          resolve({ tag: "ok", userId, connection });
+        IDPActor.login(userNumber).then((connection) => {
+          setUserNumber(userNumber);
+          resolve({ tag: "ok", userNumber, connection });
         }));
     } else {
       resolve({
         tag: "err",
-        message: "Please enter a valid userId",
-        detail: `${userId} doesn't parse as a number`,
+        message: "Please enter a valid User Number",
+        detail: `${userNumber} doesn't parse as a number`,
       });
     }
   };
@@ -122,19 +122,19 @@ const initLinkDevice = () => {
   ) as HTMLButtonElement;
 
   addNewDeviceButton.onclick = async () => {
-    const userIdInput = document.getElementById(
+    const userNumberInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
     let loginInterval: number;
 
-    const userId = BigInt(userIdInput.value);
-    if (userId) {
-      const { link, publicKey } = await generateAddDeviceLink(userId);
+    const userNumber = BigInt(userNumberInput.value);
+    if (userNumber) {
+      const { link, publicKey } = await generateAddDeviceLink(userNumber);
       displayAddDeviceLink(link);
       loginInterval = window.setInterval(async () => {
         console.log("checking if authenticated");
         try {
-          let devices = await IDPActor.lookup(userId);
+          let devices = await IDPActor.lookup(userNumber);
           let matchedDevice = devices.find((deviceData) =>
             derBlobFromBlob(
               blobFromUint8Array(Buffer.from(deviceData.pubkey))
@@ -142,7 +142,7 @@ const initLinkDevice = () => {
           );
           if (matchedDevice !== undefined) {
             window.clearInterval(loginInterval);
-            setUserId(userId);
+            setUserNumber(userNumber);
             window.location.reload();
           }
         } catch (error) {
@@ -150,8 +150,8 @@ const initLinkDevice = () => {
         }
       }, 2500);
     } else {
-      userIdInput.classList.toggle("errored", true);
-      userIdInput.placeholder = "Please enter your User Number first"
+      userNumberInput.classList.toggle("errored", true);
+      userNumberInput.placeholder = "Please enter your User Number first"
     }
   };
 };
