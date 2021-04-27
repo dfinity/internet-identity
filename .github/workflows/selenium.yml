@@ -60,10 +60,10 @@ jobs:
       - run: dfx start --background
 
       - name: Deploy Internet Identity
-        run: dfx deploy --argument '(null)'
+        run: dfx deploy --no-wallet --argument '(null)'
 
       - name: Deploy whoami canister
-        run: cd demos/whoami && dfx deploy
+        run: cd demos/whoami && dfx deploy --no-wallet
 
       - run: npm test
       - run: dfx stop
