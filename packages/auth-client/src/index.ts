@@ -82,7 +82,7 @@ export class AuthClient {
   public static async create(options: AuthClientOptions = {}): Promise<AuthClient> {
     const storage = options.storage ?? new LocalStorage('ic-');
 
-    let key = null;
+    let key : (null | SignIdentity) = null ;
     if (options.identity) {
       key = options.identity;
     } else {
@@ -98,7 +98,7 @@ export class AuthClient {
     }
 
     let identity = new AnonymousIdentity();
-    let chain = null;
+    let chain : (null | DelegationChain) = null;
 
     if (key) {
       try {

@@ -19,7 +19,5 @@
   },
   "include": ["types/*", "src/**/*"],
   "references": [
-    { "path": "../agent" },
-    { "path": "../identity" }
   ]
 }
