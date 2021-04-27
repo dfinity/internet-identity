@@ -42,7 +42,7 @@ To run the idp_service canisters, proceed as follows after cloning the repositor
 ```bash
 npm install
 dfx start [--clean] [--background]
-dfx deploy --argument '(null)'
+dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then the canister can be used as
@@ -68,7 +68,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-dfx deploy --argument '(null)'
+dfx deploy --no-wallet --argument '(null)'
 
 ```
 

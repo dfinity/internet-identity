@@ -58,6 +58,6 @@ jobs:
 
       - run: npm ci
       - run: dfx start --background
-      - run: dfx deploy --argument '(null)'
+      - run: dfx deploy --no-wallet --argument '(null)'
       - run: npm test
       - run: dfx stop
