@@ -1,5 +1,6 @@
 import { render, html } from "lit-html";
 import { confirm } from "../components/confirm";
+import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
@@ -8,6 +9,7 @@ import { LoginResult, loginUnknown } from "./loginUnknown";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
+    ${icLogo}
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
     <div class="highlightBox">${userNumber}</div>
