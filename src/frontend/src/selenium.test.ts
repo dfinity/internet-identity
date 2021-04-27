@@ -4,7 +4,8 @@ import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
 
 const IDP_SERVICE_URL = 'http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
-const OPEN_CHAT_URL = 'http://renrk-eyaaa-aaaaa-aaada-cai.localhost/';
+const IDP_AUTH_URL = 'http://localhost:8000/authorize?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
+const DEMO_APP_URL = 'http://localhost:8080/';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
 
@@ -28,7 +29,7 @@ test('Screenshot: Main page', async () => {
         await driver.get(IDP_SERVICE_URL);
         let userNumber = await registerNewIdentity(driver);
         // wait for device list to load
-        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)));
+        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
 
         // replace the user number for a reproducible screenshot
         let h3 = await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
@@ -48,20 +49,23 @@ test('Register new identity and login with it', async () => {
     })
 }, 300_000);
 
-test('Log in to OpenChat with OAUTH after registration', async () => {
+test('Log into client application, after registration', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(OPEN_CHAT_URL);
-        await driver.wait(until.elementLocated(By.xpath("//button[string()='Sign-in']")), 3_000).click();
+        await driver.get(DEMO_APP_URL);
+        await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('idpUrl')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('idpUrl')).sendKeys(IDP_AUTH_URL);
+        await driver.findElement(By.id('signinBtn')).click();
 
         let userNumber = await registerNewIdentity(driver);
         await driver.findElement(By.xpath("//button[text()='Yes']")).click();
 
-        await driver.wait(until.urlIs(OPEN_CHAT_URL));
-        let openChatUsername = "OpenChatter" + userNumber;
-        await driver.wait(until.elementLocated(By.xpath('//*[@placeholder="Enter username"]')), 3_000).sendKeys(openChatUsername, Key.RETURN);
-        await driver.wait(until.elementLocated(By.xpath("//h6[text()[contains(.,'"+openChatUsername+"')]]")), 20_000);
+        // check that we are indeed being redirected back
+        let principal = await driver.wait(until.elementLocated(By.id('principal')), 5_000).getText();
+        expect(principal).not.toBe('2vxsx-fae');
+        // TODO: Use a whoami service to check that loggin in works
     })
-}, 300_000);
+}, 30_000);
 
 async function run_in_browser_with_virtual_authenticator(test) {
     const driver = new Builder().forBrowser('chrome')
@@ -73,18 +77,25 @@ async function run_in_browser_with_virtual_authenticator(test) {
         const session = await driver.getSession();
         await addVirtualAuthenticator(driver.getExecutor(), session.getId());
         await test(driver);
+    } catch (e) {
+        console.log(await driver.getPageSource());
+        throw e;
     } finally {
         await driver.quit();
     }
 };
 
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
-    await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
+    await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
-    let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 50_000);
-    let userId = await driver.findElement(By.className("userNumberBox")).getText();
+    // TODO: More reliable recognize this view
+    await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
+    await driver.findElement(By.id('registerButton')).click();
+
+    let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 10_000);
+    let userId = await driver.findElement(By.className("highlightBox")).getText();
     await continueButton.click();
-    return userId.replace("User ID:\n", "");
+    return userId;
 }
 
 async function logout(driver: ThenableWebDriver) {
