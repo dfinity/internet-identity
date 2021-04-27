@@ -3,8 +3,14 @@ import { Executor, Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
 
-const IDP_SERVICE_URL = 'http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
-const IDP_AUTH_URL = 'http://localhost:8000/authorize?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
+// Read canister ids from the corresponding dfx files.
+// This assumes that they have been successfully dfx-deployed
+import canister_ids from '../../../.dfx/local/canister_ids.json';
+const IDENTITY_CANISTER = canister_ids.idp_service.local;
+
+const REPLICA_URL = 'http://localhost:8000';
+const IDP_SERVICE_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`
+const IDP_AUTH_URL = `http://localhost:8000/authorize?canisterId=${IDENTITY_CANISTER}`
 const DEMO_APP_URL = 'http://localhost:8080/';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
