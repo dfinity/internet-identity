@@ -105,7 +105,7 @@ test('Log into client application, after registration', async () => {
         await driver.findElement(By.id('canisterId')).sendKeys(WHOAMI_CANISTER);
         await driver.findElement(By.id('whoamiBtn')).click();
         let whoamiResponseElem = await driver.findElement(By.id('whoamiResponse'));
-        await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 2_000);
+        await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
         let principal2 = await whoamiResponseElem.getText();
         expect(principal2).toBe(principal);
 
