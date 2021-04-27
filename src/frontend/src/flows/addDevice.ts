@@ -65,7 +65,7 @@ const init = (userNumber: bigint, connection: IDPActor) => {
         await withLoader(() => connection.add(userNumber, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
-        successfullyAddedDevice(deviceName);
+        successfullyAddedDevice(deviceName, userNumber, connection);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await confirm({
