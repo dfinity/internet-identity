@@ -25,10 +25,10 @@ test('Screenshots', async () => {
 
         await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
         // TODO: More reliable recognize this view
-        await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
+        await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
         await screenshot('02-register-confirm', driver);
 
-        await driver.findElement(By.id('registerButton')).click();
+        await driver.findElement(By.id('confirmRegisterButton')).click();
         let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
         let userNumberElem = await driver.findElement(By.className("highlightBox"));
         let userNumber = await userNumberElem.getText();
