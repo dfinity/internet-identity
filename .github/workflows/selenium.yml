@@ -58,6 +58,12 @@ jobs:
 
       - run: npm ci
       - run: dfx start --background
-      - run: dfx deploy --argument '(null)'
+
+      - name: Deploy Internet Identity
+        run: dfx deploy --argument '(null)'
+
+      - name: Deploy whoami canister
+        run: cd demos/whoami && dfx deploy
+
       - run: npm test
       - run: dfx stop

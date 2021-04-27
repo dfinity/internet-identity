@@ -3,9 +3,15 @@ import { Executor, Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
 
+// All canister ids here are the result of the deployment order
+// in .github/workflows/selenium.yml
+// A bit crude, works for now, can be refine at some point.
+
+const REPLICA_URL = 'http://localhost:8000';
 const IDP_SERVICE_URL = 'http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
 const IDP_AUTH_URL = 'http://localhost:8000/authorize?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
 const DEMO_APP_URL = 'http://localhost:8080/';
+const WHOAMI_CANISTER = 'qoctq-giaaa-aaaaa-aaaea-cai';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
 
@@ -87,8 +93,22 @@ test('Log into client application, after registration', async () => {
 
         // check that we are indeed being redirected back
         let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
+        // do we no longer believe to be anonymous?
         expect(principal).not.toBe('2vxsx-fae');
-        // TODO: Use a whoami service to check that loggin in works
+
+        // we can invoke the whoami service?
+        await driver.findElement(By.id('hostUrl')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('hostUrl')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('hostUrl')).sendKeys(REPLICA_URL);
+        await driver.findElement(By.id('canisterId')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('canisterId')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('canisterId')).sendKeys(WHOAMI_CANISTER);
+        await driver.findElement(By.id('whoamiBtn')).click();
+        let whoamiResponseElem = await driver.findElement(By.id('whoamiResponse'));
+        await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 2_000);
+        let principal2 = await whoamiResponseElem.getText();
+        expect(principal2).toBe(principal);
+
     })
 }, 30_000);
 
