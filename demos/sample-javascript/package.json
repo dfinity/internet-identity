@@ -5,6 +5,7 @@
     "@dfinity/agent": "^0.8.3",
     "@dfinity/authentication": "^0.8.3",
     "@dfinity/identity": "^0.8.3",
+    "@dfinity/auth-client": "file:../../packages/auth-client",
     "assert": "^2.0.0",
     "buffer": "^6.0.3",
     "events": "^3.2.0",
