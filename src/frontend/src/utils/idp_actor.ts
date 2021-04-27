@@ -29,6 +29,7 @@ import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
+const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent: new HttpAgent({}),
   canisterId,
@@ -48,7 +49,8 @@ export class IDPActor {
     const delegationIdentity = await requestFEDelegation(identity);
 
     // Do PoW before registering.
-    const pow = getProofOfWork();
+    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {

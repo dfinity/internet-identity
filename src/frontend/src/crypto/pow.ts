@@ -1,26 +1,32 @@
 import cubeHash from "./cubehash";
 import { Principal } from "@dfinity/agent";
 import bigUintLE from "biguintle";
-import { ProofOfWork } from "../../generated/idp_types";
+import { ProofOfWork, Timestamp } from "../../generated/idp_types";
 
-const IDP_CANISTER_ID: string = process.env.CANISTER_ID!;
 const DIFFICULTY = 2; // Number of leading bytes that must equal zero in the hash.
 const DOMAIN = "ic-proof-of-work";
-const CANISTER_ID_BLOB = Principal.from(IDP_CANISTER_ID).toBlob();
 const NONCE_OFFSET = DOMAIN.length + 1 /* domain + prefix */ + 8 /* timestamp length */;
 
-export default function(): ProofOfWork {
+/**
+ * Compute a ProofOfWork (PoW).
+ * 
+ * @param timestamp The timestamp at which the PoW is valid.
+ * @param canisterId The principal of the IDP canister to be included in the signature.
+ * @returns 
+ */
+export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWork {
   console.time('PoW');
-  const timestamp = BigInt(Date.now()) * BigInt(1000000); // Timestamp in ns.
-  let nonce = BigInt(0);
+  // Start from a random nonce.
+  let nonce = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 
+  const canisterIdBlob = canisterId.toBlob();
   let message = Buffer.concat([
-      new Buffer([DOMAIN.length]),
+      Buffer.from([DOMAIN.length]),
       Buffer.from(DOMAIN),
       toLeBytes(timestamp),
       toLeBytes(nonce),
-      new Buffer([CANISTER_ID_BLOB.length]),
-      CANISTER_ID_BLOB
+      Buffer.from([canisterIdBlob.length]),
+      canisterIdBlob
   ]);
 
   // Keep incrementing the nonce until we find a hash that checks.
