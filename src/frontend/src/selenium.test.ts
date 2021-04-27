@@ -37,6 +37,27 @@ test('Screenshots', async () => {
         let h3 = await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
         await driver.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
         await screenshot('04-main', driver);
+
+        await driver.findElement(By.id('logoutButton')).click();
+        await driver.wait(until.elementLocated(By.id('registerButton')), 3_000);
+        // should be at welcome again, no point taking screenshot
+
+        await driver.findElement(By.id('registerUserNumber'), 3_000).sendKeys(userNumber);
+        await driver.findElement(By.id('loginButton')).click();
+        // wait for device list to load
+        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
+        // should be logged in again, no point taking screenshot
+
+        await driver.get(IDP_SERVICE_URL);
+        let userNumber2 = await driver.findElement(By.className("highlightBox")).getText();
+        expect(userNumber2).toBe(userNumber);
+        await screenshot('05-welcome-back', driver);
+
+        await driver.findElement(By.id('login')).click();
+        // wait for device list to load
+        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
+        // should be logged in again, no point taking screenshot
+
     })
 }, 300_000);
 
