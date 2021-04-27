@@ -11,7 +11,7 @@ const REPLICA_URL = 'http://localhost:8000';
 const IDP_SERVICE_URL = 'http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
 const IDP_AUTH_URL = 'http://localhost:8000/authorize?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
 const DEMO_APP_URL = 'http://localhost:8080/';
-const WHOAMI_CANISTER = 'qoctq-giaaa-aaaaa-aaaea-cai';
+const WHOAMI_CANISTER = 'r7inp-6aaaa-aaaaa-aaabq-cai';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
 
