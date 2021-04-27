@@ -106,13 +106,13 @@ where `msg` is a value with of type
  interface InternetIdentityAuthRequest {
    kind: "authorize-client";
    sessionPublicKey: ArrayBuffer;
-   maxTimetoLive: bigint;
+   maxTimetoLive?: bigint;
  }
 
 where
 
 * the `publicKey` contains the public key of the session key pair.
-* the `maxTimetoLive` indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+* the `maxTimetoLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
 --
 5. Now it expects a message back, with data `event`.
 6. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -206,7 +206,7 @@ service : {
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimetoLive : nat64) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimetoLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 }
 ....
@@ -259,7 +259,7 @@ The `prepare_delegation` method causes the Internet Identity Service backend to 
 
 This method returns the user’s identity that’s associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_delegation` query, we prevent attacks that trick the user into using a wrong identity.
 
-The expiration timestamp is determined by the backend, but no more than  `maxTimetoLive` nanoseconds in the future.
+The expiration timestamp is determined by the backend, but no more than `maxTimetoLive` (if present) nanoseconds in the future.
 
 The method returns the expiration timestamp of the delegation. This is returned purely so that the client can feed it back to the backend in `get_delegation`.
 
