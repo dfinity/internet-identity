@@ -49,7 +49,10 @@ test('Screenshots', async () => {
         // should be logged in again, no point taking screenshot
 
         await driver.get(IDP_SERVICE_URL);
-        let userNumber2 = await driver.findElement(By.className("highlightBox")).getText();
+        let userNumberElem2 = await driver.findElement(By.className("highlightBox"));
+        let userNumber2 = await userNumberElem2.getText();
+        // replace the user number for a reproducible screenshot
+        await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem2, '12345');
         expect(userNumber2).toBe(userNumber);
         await screenshot('05-welcome-back', driver);
 
