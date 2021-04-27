@@ -29,6 +29,7 @@ const init = async () => {
 
   if (location.hash.substring(1).startsWith("access_token")) {
     await authClient.handleRedirectCallback();
+    principalEl.innerText = await authClient.getIdentity().getPrincipal();
   }
 };
 
