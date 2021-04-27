@@ -63,6 +63,16 @@ enum GetDelegationResponse {
     NoSuchDelegation,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum RegisterResponse {
+    #[serde(rename = "registered")]
+    Registered {
+        user_number: UserNumber,
+    },
+    #[serde(rename = "canister_full")]
+    CanisterFull,
+}
+
 mod hash;
 mod storage;
 
@@ -156,7 +166,7 @@ async fn init_salt() {
 }
 
 #[update]
-async fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
+async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse {
     check_entry_limits(&device_data);
     let now = time() as u64;
     check_proof_of_work(&pow, now);
@@ -182,16 +192,18 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> UserNumber {
         nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
 
         let mut store = s.storage.borrow_mut();
-        let user_number = store
-            .allocate_user_number()
-            .unwrap_or_else(|| trap("failed to allocate a new user number"));
-        store
-            .write(user_number, vec![device_data])
-            .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
-
-        nonce_cache.add(pow.timestamp, pow.nonce);
-
-        user_number
+        match store.allocate_user_number() {
+            Some(user_number) => {
+                store
+                    .write(user_number, vec![device_data])
+                    .unwrap_or_else(|err| {
+                        trap(&format!("failed to store user device data: {}", err))
+                    });
+                nonce_cache.add(pow.timestamp, pow.nonce);
+                RegisterResponse::Registered { user_number }
+            }
+            None => RegisterResponse::CanisterFull,
+        }
     })
 }
 

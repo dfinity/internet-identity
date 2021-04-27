@@ -29,6 +29,7 @@ import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
+const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent: new HttpAgent({}),
   canisterId,
@@ -48,7 +49,8 @@ export class IDPActor {
     const delegationIdentity = await requestFEDelegation(identity);
 
     // Do PoW before registering.
-    const pow = getProofOfWork();
+    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -59,16 +61,25 @@ export class IDPActor {
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
     console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
-    const userNumber = await actor.register({
+    const registerResponse = await actor.register({
       alias,
       pubkey,
       credential_id: [credential_id],
     }, pow);
 
-    return {
-      connection: new IDPActor(identity, delegationIdentity, actor),
-      userNumber,
-    };
+    if (registerResponse.hasOwnProperty('canister_full')) {
+      throw Error('failed to register a user because the backend canister has no space left');
+    } else if (registerResponse.hasOwnProperty('registered')) {
+      let userNumber = registerResponse['registered'].user_number;
+      console.log(`registered user number ${userNumber}`);
+      return {
+        connection: new IDPActor(identity, delegationIdentity, actor),
+        userNumber,
+      };
+    } else {
+      console.error('unexpected register response', registerResponse);
+      throw Error('unexpected register response');
+    }
   }
 
   static async login(userNumber: bigint): Promise<IDPActor> {
