@@ -8,12 +8,14 @@
     "generate:types": "didc bind ./src/idp_service/idp_service.did -t ts > src/frontend/generated/idp_types.d.ts",
     "generate:js": "didc bind ./src/idp_service/idp_service.did -t js > src/frontend/generated/idp_idl.js",
     "build": "NODE_ENV=production webpack",
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint --cache --cache-location node_modules/.cache/eslint '**/*.ts*'"
   },
   "devDependencies": {
     "@dfinity/agent": "0.8.3",
     "@testing-library/jest-dom": "^5.11.10",
     "@types/jest": "^24.9.1",
+    "@typescript-eslint/eslint-plugin": "^4.22.0",
     "assert": "2.0.0",
     "buffer": "6.0.3",
     "compression-webpack-plugin": "^7.1.2",
@@ -21,6 +23,8 @@
     "copy-webpack-plugin": "^8.1.1",
     "css-loader": "^5.2.1",
     "dotenv": "^8.2.0",
+    "eslint": "^7.25.0",
+    "eslint-plugin-jsdoc": "^32.3.2",
     "events": "3.3.0",
     "express": "^4.17.1",
     "file-loader": "^6.2.0",
