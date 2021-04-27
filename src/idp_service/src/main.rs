@@ -3,6 +3,7 @@ use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use idp_service::metrics_encoder::MetricsEncoder;
 use idp_service::nonce_cache::NonceCache;
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
@@ -66,9 +67,7 @@ enum GetDelegationResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum RegisterResponse {
     #[serde(rename = "registered")]
-    Registered {
-        user_number: UserNumber,
-    },
+    Registered { user_number: UserNumber },
     #[serde(rename = "canister_full")]
     CanisterFull,
 }
@@ -330,12 +329,16 @@ fn get_delegation(
     check_frontend_length(&frontend);
 
     STATE.with(|state| {
-        let entries = state.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
+        let entries = state
+            .storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -358,25 +361,66 @@ fn get_delegation(
     })
 }
 
+fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
+    STATE.with(|s| {
+        w.encode_counter(
+            "internet_identity_user_count",
+            s.storage.borrow().user_count() as f64,
+            "Number of users registered in this canister.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_signature_count",
+            s.sigs.borrow().len() as f64,
+            "Number of active signatures issued by this canister.",
+        )?;
+        Ok(())
+    })
+}
+
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split("?").collect();
-    let asset = parts[0].to_string();
-
-    ASSETS.with(|a| match a.borrow().get(&asset) {
-        Some((headers, value)) => HttpResponse {
-            status_code: 200,
-            headers: headers.clone(),
-            body: value.clone(),
-            streaming_strategy: None,
-        },
-        None => HttpResponse {
-            status_code: 404,
-            headers: vec![],
-            body: format!("Asset {} not found.", asset).as_bytes().into(),
-            streaming_strategy: None,
-        },
-    })
+    match parts[0] {
+        "/metrics" => {
+            let mut writer = MetricsEncoder::new(vec![]);
+            match encode_metrics(&mut writer) {
+                Ok(()) => {
+                    let body = writer.into_inner();
+                    HttpResponse {
+                        status_code: 200,
+                        headers: vec![
+                            ("Content-Type".to_string(), "text/plain".to_string()),
+                            ("Content-Length".to_string(), body.len().to_string()),
+                        ],
+                        body,
+                        streaming_strategy: None,
+                    }
+                }
+                Err(err) => HttpResponse {
+                    status_code: 500,
+                    headers: vec![],
+                    body: format!("Failed to encode metrics: {}", err).into_bytes(),
+                    streaming_strategy: None,
+                },
+            }
+        }
+        probably_an_asset => ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
+            Some((headers, value)) => HttpResponse {
+                status_code: 200,
+                headers: headers.clone(),
+                body: value.clone(),
+                streaming_strategy: None,
+            },
+            None => HttpResponse {
+                status_code: 404,
+                headers: vec![],
+                body: format!("Asset {} not found.", probably_an_asset)
+                    .as_bytes()
+                    .into(),
+                streaming_strategy: None,
+            },
+        }),
+    }
 }
 
 #[query]
