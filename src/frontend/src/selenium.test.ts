@@ -1,4 +1,4 @@
-import { Builder, By, until, ThenableWebDriver, Key} from 'selenium-webdriver';
+import { Builder, By, until, ThenableWebDriver, Key, logging} from 'selenium-webdriver';
 import { Executor, Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
@@ -117,14 +117,17 @@ test('Log into client application, after registration', async () => {
 async function run_in_browser_with_virtual_authenticator(test) {
     const driver = new Builder().forBrowser('chrome')
         .setChromeOptions(new ChromeOptions()
-        .headless() // hides the click show: uncomment to watch it
-        .windowSize({width: 1024, height: 768}))
+          .headless() // hides the click show: uncomment to watch it
+          .windowSize({width: 1024, height: 768})
+        )
+        .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
         .build();
     try {
         const session = await driver.getSession();
         await addVirtualAuthenticator(driver.getExecutor(), session.getId());
         await test(driver);
     } catch (e) {
+        console.log(await driver.manage().logs().get('browser'));
         console.log(await driver.getPageSource());
         throw e;
     } finally {

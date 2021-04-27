@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  cargo-tests:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
