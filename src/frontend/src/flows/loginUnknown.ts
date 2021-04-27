@@ -1,13 +1,11 @@
 import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
-import { generateAddDeviceLink } from "../utils/generateAddDeviceLink";
 import { IDPActor } from "../utils/idp_actor";
 import { setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { PublicKey } from "../../generated/idp_types";
 import { icLogo } from "../components/icons";
 
 const pageContent = () => html` <style>
