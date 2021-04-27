@@ -90,7 +90,7 @@ test('Log into client application, after registration', async () => {
         expect(principal).not.toBe('2vxsx-fae');
         // TODO: Use a whoami service to check that loggin in works
     })
-}, 30_000);
+}, 300_000);
 
 async function run_in_browser_with_virtual_authenticator(test) {
     const driver = new Builder().forBrowser('chrome')
