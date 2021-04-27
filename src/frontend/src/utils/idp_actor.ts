@@ -42,9 +42,9 @@ export class IDPActor {
   ) {}
 
   static async register(
+    identity: WebAuthnIdentity,
     alias: string,
   ): Promise<{ connection: IDPActor; userNumber: UserNumber }> {
-    const identity = await WebAuthnIdentity.create();
     const delegationIdentity = await requestFEDelegation(identity);
 
     // Do PoW before registering.
@@ -63,8 +63,7 @@ export class IDPActor {
       alias,
       pubkey,
       credential_id: [credential_id],
-    },
-      pow);
+    }, pow);
 
     return {
       connection: new IDPActor(identity, delegationIdentity, actor),

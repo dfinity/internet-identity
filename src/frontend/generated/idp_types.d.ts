@@ -63,6 +63,7 @@ export default interface _SERVICE {
       arg_3: Timestamp,
     ) => Promise<GetDelegationResponse>,
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
+  'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
   'prepare_delegation' : (
       arg_0: UserNumber,

@@ -6,14 +6,11 @@ const CompressionPlugin = require("compression-webpack-plugin");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
-let localCanister
+let localCanister;
 
 try {
-  localCanister = require("./.dfx/local/canister_ids.json").idp_service
-  .local
-} catch {
-
-};
+  localCanister = require("./.dfx/local/canister_ids.json").idp_service.local;
+} catch {}
 
 /**
  * Generate a webpack configuration for a canister.
@@ -54,6 +51,7 @@ function generateWebpackConfigForCanister(name, info) {
         "/api": "http://localhost:8000",
         "/authorize": "http://localhost:8081",
       },
+      allowedHosts: [".localhost", ".local", ".ngrok.io"],
     },
 
     // Depending in the language or framework you are using for

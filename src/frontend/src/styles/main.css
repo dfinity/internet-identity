@@ -341,6 +341,7 @@ ul {
 .container {
   padding: 3.5rem 2.5rem 2rem 2.5rem;
   max-width: 365px;
+  min-width: 300px;
   display: flex;
   flex-direction: column;
 }
@@ -352,12 +353,13 @@ ul {
   }
 }
 
-.userNumberBox {
+.highlightBox {
     background-color: var(--grey-100);
     padding: 1rem 0rem;
     text-align: center;
     border-radius: 4px;
     margin-bottom: 1rem;
+    overflow-wrap: break-word;
 }
 
 .warningBox {

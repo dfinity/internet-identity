@@ -10,12 +10,14 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Welcome back!</h1>
     <p>Login to manage your Internet Identity.</p>
-    <div class="userNumberBox">${userNumber}</div>
+    <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
-    <button type="button" id="loginDifferent">Use a different user number</button>
+    <button type="button" id="loginDifferent">
+      Use a different user number
+    </button>
     ${logoutSection("Forget my user number")}
-</div>
+  </div>
 `;
 
 // We retry logging in until we get a succesful user number connection pair
@@ -68,11 +70,12 @@ const init = async (userNumber: bigint): Promise<LoginResult> => {
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
+      const result = await withLoader(() => IDPActor.login(userNumber));
       try {
         resolve({
           tag: "ok",
           userNumber,
-          connection: await withLoader(() => IDPActor.login(userNumber)),
+          connection: result,
         });
       } catch (err) {
         resolve({
