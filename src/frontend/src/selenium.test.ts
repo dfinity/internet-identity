@@ -23,7 +23,7 @@ test('Screenshots', async () => {
         await screenshot('02-register-confirm', driver);
 
         await driver.findElement(By.id('registerButton')).click();
-        let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 10_000);
+        let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
         let userNumberElem = await driver.findElement(By.className("highlightBox"));
         let userNumber = await userNumberElem.getText();
         // replace the user number for a reproducible screenshot
@@ -117,7 +117,7 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
     await driver.findElement(By.id('registerButton')).click();
 
-    let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 10_000);
+    let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
     let userNumber = await driver.findElement(By.className("highlightBox")).getText();
     await continueButton.click();
     return userNumber;
