@@ -167,7 +167,7 @@ export class IDPActor {
       `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
-    return await actor.prepare_delegation(userNumber, hostname, sessionKey);
+    return await actor.prepare_delegation(userNumber, hostname, sessionKey, []);
   };
 
   getDelegation = async (

@@ -71,6 +71,7 @@ export default interface _SERVICE {
       arg_0: UserNumber,
       arg_1: FrontendHostname,
       arg_2: SessionKey,
+      arg_3: [] | [bigint],
     ) => Promise<[UserKey, Timestamp]>,
   'register' : (arg_0: DeviceData, arg_1: ProofOfWork) => Promise<
       RegisterResponse
