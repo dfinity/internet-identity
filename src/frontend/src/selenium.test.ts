@@ -1,9 +1,43 @@
 import { Builder, By, until, ThenableWebDriver, Key} from 'selenium-webdriver';
 import { Executor, Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
+import { writeFile } from 'fs/promises';
 
 const IDP_SERVICE_URL = 'http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai';
 const OPEN_CHAT_URL = 'http://renrk-eyaaa-aaaaa-aaada-cai.localhost/';
+
+const DEVICE_NAME1 = 'Virtual WebAuthn device';
+
+test('Screenshot: Welcome page', async () => {
+    await run_in_browser_with_virtual_authenticator(async (driver) => {
+        await driver.get(IDP_SERVICE_URL);
+        await screenshot('welcome', driver);
+    })
+}, 300_000);
+
+test('Screenshot: Register page', async () => {
+    await run_in_browser_with_virtual_authenticator(async (driver) => {
+        await driver.get(IDP_SERVICE_URL);
+        await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
+        await screenshot('register', driver);
+    })
+}, 300_000);
+
+test('Screenshot: Main page', async () => {
+    await run_in_browser_with_virtual_authenticator(async (driver) => {
+        await driver.get(IDP_SERVICE_URL);
+        let userNumber = await registerNewIdentity(driver);
+        // wait for device list to load
+        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)));
+
+        // replace the user number for a reproducible screenshot
+        let h3 = await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
+        await driver.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
+
+        await screenshot('main', driver);
+
+    })
+}, 300_000);
 
 test('Register new identity and login with it', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
@@ -72,4 +106,11 @@ async function addVirtualAuthenticator(executor: Executor, sessionId: string) {
     cmd.setParameter('isUserConsenting', true);
     cmd.setParameter('sessionId', sessionId);
     await executor.execute(cmd);
+}
+
+async function screenshot(name : string, driver: ThenableWebDriver) {
+    let image = await driver.takeScreenshot();
+    // writing to a subdirectory has the nice property that it fails if
+    // this is run in the wrong directory
+    await writeFile(`screenshots/${name}.png`, image, 'base64');
 }

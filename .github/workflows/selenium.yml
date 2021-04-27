@@ -45,7 +45,5 @@ jobs:
       - run: npm ci
       - run: dfx start --background
       - run: dfx deploy --argument '(null)'
-      # only run one; we are testing the CI setup still, not the actual code,
-      # let alone open chat
-      - run: npm test -- -t Register
+      - run: npm test
       - run: dfx stop
