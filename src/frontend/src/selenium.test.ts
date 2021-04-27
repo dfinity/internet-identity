@@ -9,36 +9,37 @@ const DEMO_APP_URL = 'http://localhost:8080/';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
 
-test('Screenshot: Welcome page', async () => {
+test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
         await driver.get(IDP_SERVICE_URL);
-        await screenshot('welcome', driver);
-    })
-}, 300_000);
+        await screenshot('00-welcome', driver);
 
-test('Screenshot: Register page', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(IDP_SERVICE_URL);
         await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
-        await screenshot('register', driver);
-    })
-}, 300_000);
+        await screenshot('01-register', driver);
 
-test('Screenshot: Main page', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(IDP_SERVICE_URL);
-        let userNumber = await registerNewIdentity(driver);
+        await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
+        // TODO: More reliable recognize this view
+        await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
+        await screenshot('02-register-confirm', driver);
+
+        await driver.findElement(By.id('registerButton')).click();
+        let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 10_000);
+        let userNumberElem = await driver.findElement(By.className("highlightBox"));
+        let userNumber = await userNumberElem.getText();
+        // replace the user number for a reproducible screenshot
+        await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+        await screenshot('03-register-user-number', driver);
+
+        await continueButton.click();
         // wait for device list to load
         await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
-
         // replace the user number for a reproducible screenshot
         let h3 = await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
         await driver.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
-
-        await screenshot('main', driver);
-
+        await screenshot('04-main', driver);
     })
 }, 300_000);
+
 
 test('Register new identity and login with it', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
@@ -93,9 +94,9 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.findElement(By.id('registerButton')).click();
 
     let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 10_000);
-    let userId = await driver.findElement(By.className("highlightBox")).getText();
+    let userNumber = await driver.findElement(By.className("highlightBox")).getText();
     await continueButton.click();
-    return userId;
+    return userNumber;
 }
 
 async function logout(driver: ThenableWebDriver) {

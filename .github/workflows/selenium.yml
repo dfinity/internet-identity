@@ -45,14 +45,14 @@ jobs:
       - name: Build auth-client
         run: |
           cd packages/auth-client
-          npm install # TODO: use npm ci
-          npm build
+          npm ci
+          npm run build
 
       - name: Run demo app
         run: |
           cd demos/sample-javascript/
-          npm install # TODO: use npm ci
-          npm build
+          npm ci
+          npm run build
           npm run develop --no-live-reload --no-devtool &
           sleep 10 # crude
 
