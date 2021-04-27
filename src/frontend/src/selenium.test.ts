@@ -83,7 +83,7 @@ test('Log into client application, after registration', async () => {
         await driver.findElement(By.xpath("//button[text()='Yes']")).click();
 
         // check that we are indeed being redirected back
-        let principal = await driver.wait(until.elementLocated(By.id('principal')), 5_000).getText();
+        let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
         expect(principal).not.toBe('2vxsx-fae');
         // TODO: Use a whoami service to check that loggin in works
     })
