@@ -16,7 +16,7 @@ const pageContent = (userNumber: bigint) => html`
     <button type="button" id="loginDifferent">
       Use a different user number
     </button>
-    ${logoutSection("Forget my user number")}
+    ${logoutSection("Clear user number from browser")}
   </div>
 `;
 

@@ -2,8 +2,8 @@ import { html, render } from "lit-html";
 
 const pageContent = html`
   <div class="container">
-    <h1>Finish registration</h1>
-    <p>Now confirm your security device one more time to register.</p>
+    <h1>Confirm registration</h1>
+    <p>Please confirm your security device one more time to register.</p>
     <button type="button" class="primary" id="registerButton">Register</button>
     <button type="button" id="cancelButton">Cancel</button>
   </div>

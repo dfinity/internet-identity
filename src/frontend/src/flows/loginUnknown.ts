@@ -43,8 +43,8 @@ const pageContent = () => html` <style>
     }
   </style>
   <div class="container">
-    <h2 id="loginWelcome">Welcome to<br />Internet Identity!</h2>
-    <p>Using your saved User Number you can login or link a new device</p>
+    <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
+    <p>Provide your user number to login with Internet Identity.</p>
     <input
       type="text"
       id="registerUserNumber"
@@ -53,12 +53,12 @@ const pageContent = () => html` <style>
     <button type="button" id="loginButton" class="primary">Login</button>
     <div class="textLink" id="registerSection">
       New user?
-      <button id="registerButton" class="linkStyle">Get User Number</button>
+      <button id="registerButton" class="linkStyle">Register with Internet Identity.</button>
     </div>
     <div class="textLink">
       Already registered
       <button id="addNewDeviceButton" class="linkStyle">
-        but using a new Device?
+        but using a new device?
       </button>
     </div>
   </div>`;
