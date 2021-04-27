@@ -79,7 +79,7 @@ export default ({ IDL }) => {
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
-        [UserNumber, FrontendHostname, SessionKey],
+        [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
         [],
       ),
