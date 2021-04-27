@@ -87,6 +87,14 @@ impl SignatureMap {
         num_pruned
     }
 
+    pub fn len(&self) -> usize {
+        self.expiration_queue.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.expiration_queue.is_empty()
+    }
+
     pub fn root_hash(&self) -> Hash {
         self.certified_map.root_hash()
     }
