@@ -111,12 +111,12 @@ where `msg` is a value with of type
 
 where
 
-* the `publicKey` contains the public key of the session key pair.
+* the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimetoLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
 --
 5. Now it expects a message back, with data `event`.
 6. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
-7. The `event.data` value is is a JS object with the following type:
+7. The `event.data` value is a JS object with the following type:
 +
  interface InternetIdentityAuthResponse {
    kind: "authorize-client-success";
