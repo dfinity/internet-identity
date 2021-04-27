@@ -2,7 +2,7 @@ import { html } from "lit-html";
 import { clearHash } from "../flows/addDevice";
 import { logoutIcon } from "./icons";
 
-export const logoutSection = () => html`<style>
+export const logoutSection = (alternativeLabel?: string) => html`<style>
     #logoutIcon {
         position: relative;
         top: 6px;
@@ -14,7 +14,7 @@ export const logoutSection = () => html`<style>
   <div id="logoutBox">
     <hr>
     <button type="button" class="linkStyle" id="logoutButton">
-      ${logoutIcon} Logout
+      ${logoutIcon} ${alternativeLabel !== undefined ? alternativeLabel : "Logout" }
     </button>
   </div>`;
 

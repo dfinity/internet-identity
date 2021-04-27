@@ -48,7 +48,7 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
     let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 50_000);
-    let userId = await driver.findElement(By.className("userIdBox")).getText();
+    let userId = await driver.findElement(By.className("userNumberBox")).getText();
     await continueButton.click();
     return userId.replace("User ID:\n", "");
 }
@@ -58,9 +58,9 @@ async function logout(driver: ThenableWebDriver) {
 }
 
 async function login(userNumber: string, driver: ThenableWebDriver) {
-    await driver.findElement(By.xpath('//*[@placeholder="Enter User ID"]')).sendKeys(userNumber, Key.RETURN);
+    await driver.findElement(By.id('registerUserNumber')).sendKeys(userNumber, Key.RETURN);
     await driver.findElement(By.id('loginButton')).click();
-    await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your user id is "+userNumber+"']")), 15_000);
+    await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
 }
 
 async function addVirtualAuthenticator(executor: Executor, sessionId: string) {

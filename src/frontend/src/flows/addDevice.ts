@@ -12,11 +12,11 @@ import { IDPActor } from "../utils/idp_actor";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
-const pageContent = (userId: bigint) => html`
+const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>New device</h1>
-    <label>User ID:</label>
-    <div class="userIdBox">${userId}</div>
+    <label>User Number:</label>
+    <div class="userNumberBox">${userNumber}</div>
     <p class="warningBox">
       Warning: Do not click this button unless this link really came from you.
     </p>
@@ -26,13 +26,13 @@ const pageContent = (userId: bigint) => html`
   </div>
 `;
 
-export const addDevice = (userId: bigint, connection: IDPActor) => {
+export const addDevice = (userNumber: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userId), container);
-  init(userId, connection);
+  render(pageContent(userNumber), container);
+  init(userNumber, connection);
 };
 
-const init = (userId: bigint, connection: IDPActor) => {
+const init = (userNumber: bigint, connection: IDPActor) => {
   initLogout();
   const addDeviceButton = document.querySelector(
     "#addDevice"
@@ -50,19 +50,19 @@ const init = (userId: bigint, connection: IDPActor) => {
     const parsedParams = parseNewDeviceParam(url.hash?.split("device=")[1]);
 
     if (!!parsedParams) {
-      const { userId: expectedUserId, publicKey, rawId } = parsedParams;
-      if (expectedUserId !== userId) {
-        // Here we're adding a device to our userId that was supposed to be added to a different one.
+      const { userNumber: expectedUserNumber, publicKey, rawId } = parsedParams;
+      if (expectedUserNumber !== userNumber) {
+        // Here we're adding a device to our userNumber that was supposed to be added to a different one.
         await confirm({
-          message: "Tried adding a device for the wrong user id.",
-          detail: `Current user is ${expectedUserId}, but current user is ${userId}. Please choose the correct user id when creating the add device link`,
+          message: "Tried adding a device for the wrong user number.",
+          detail: `Expected user is ${expectedUserNumber}, but current user is ${userNumber}. Please choose the correct user number when creating the add device link`,
         });
         return;
       }
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await pickDeviceAlias();
-        await withLoader(() => connection.add(userId, deviceName, publicKey, rawId));
+        await withLoader(() => connection.add(userNumber, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
         successfullyAddedDevice(deviceName);
@@ -81,17 +81,17 @@ const init = (userId: bigint, connection: IDPActor) => {
 
 const parseNewDeviceParam = (
   param: string
-): { userId: bigint; publicKey: DerEncodedBlob; rawId?: BinaryBlob } | null => {
+): { userNumber: bigint; publicKey: DerEncodedBlob; rawId?: BinaryBlob } | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
     // TODO: Decent error handling
     console.error("This is not a valid pasted link");
     return null;
   }
-  const userId = BigInt(segments[0]);
+  const userNumber = BigInt(segments[0]);
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
   const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
-  return { userId, publicKey, rawId };
+  return { userNumber, publicKey, rawId };
 };
 
 export const clearHash = () => {

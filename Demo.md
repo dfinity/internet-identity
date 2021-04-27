@@ -46,7 +46,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   ../idp-service/dfx.sh deploy
   ```
 
-* In `agent-js` run
+* In `agent-rs` run
   ```
   sudo ./target/release/icx-proxy --address 127.0.0.1:80 --replica http://localhost:41549/ --dns-alias identity.localhost:rrkah-fqaaa-aaaaa-aaaaq-cai -v
   ```
@@ -69,7 +69,7 @@ Showing registration.
 
    * tapping your yubikey to create an identity
    * tapping it again to register
-   * observe your User Id
+   * observe your User Number
 
 4. Now you should be forwarded back to Open Chat.
 5. Point our your identity on Open Chat (TODO: Where? Didn't check)
@@ -84,7 +84,7 @@ Clear all browser state, or maybe use a different browser (e.g. Firefox vs. Chro
 2. Now you are at the IPD frontend. Click login with existing device.
 3. Follow the instructions:
 
-   * enter your User id
+   * enter your User Number
    * tap your yubikey to confirm its use
 
 4. Now you should be forwarded back to Open Chat.
@@ -102,7 +102,7 @@ different devices. Ideally use two yubikeys to demo.
 2. Now you are at the IPD frontend. Click login with new device
 3. Follow the instructions:
 
-   * enter your User id
+   * enter your User Number
    * get the link
    * copy’n’paste that link in the other browser
    * there you are still logged in. you have to confirm that you want

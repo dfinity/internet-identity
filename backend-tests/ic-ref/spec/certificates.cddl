@@ -1,0 +1,31 @@
+certificate = tagged<{
+  tree : hash-tree
+  signature : signature
+  ? delegation : delegation
+}>
+
+hash-tree =
+  tree-empty /
+  tree-fork /
+  tree-labeled /
+  tree-leaf /
+  tree-pruned
+
+; Trees are represented as CBOR arrays instead of records with textual field
+; labels, for conciseness
+tree-empty   = [ 0 ]
+tree-fork    = [ 1 hash-tree hash-tree ]
+tree-labeled = [ 2 bytes hash-tree ]
+tree-leaf    = [ 3 bytes ]
+tree-pruned  = [ 4 hash ]
+
+delegation = {
+  subnet_id : bytes
+  certificate: bytes
+}
+
+tagged<t> = #6.55799(t) ; the CBOR tag
+
+hash = bytes
+pubkey = bytes
+signature = bytes
