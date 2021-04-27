@@ -40,6 +40,7 @@ const pageContent = () => html`<style>
     <section id="userNumberSection" class="hidden">
       <h3>Your User Number is <span id="userNumberSpan"></span></h3>
     </section>
+    <label>Your registered devices:</label>
     <section id="identityList"></section>
     ${logoutSection()}
   </div>
