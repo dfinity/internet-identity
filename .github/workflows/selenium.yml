@@ -42,6 +42,20 @@ jobs:
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
+      - name: Build auth-client
+        run: |
+          cd packages/auth-client
+          npm ci
+          npm build
+
+      - name: Run demo app
+        run: |
+          cd demos/sample-javascript/
+          npm ci
+          npm build
+          npm run develop --no-live-reload --no-devtool &
+          sleep 10 # crude
+
       - run: npm ci
       - run: dfx start --background
       - run: dfx deploy --argument '(null)'
