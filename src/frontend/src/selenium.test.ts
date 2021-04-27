@@ -110,7 +110,7 @@ test('Log into client application, after registration', async () => {
         expect(principal2).toBe(principal);
 
     })
-}, 30_000);
+}, 300_000);
 
 async function run_in_browser_with_virtual_authenticator(test) {
     const driver = new Builder().forBrowser('chrome')
