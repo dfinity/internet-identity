@@ -8,6 +8,7 @@ import { register } from "./register";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { PublicKey } from "../../generated/idp_types";
+import { icLogo } from "../components/icons";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -43,6 +44,7 @@ const pageContent = () => html` <style>
     }
   </style>
   <div class="container">
+    ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>Provide your user number to login with Internet Identity.</p>
     <input
