@@ -383,10 +383,10 @@ assertVariant label var = case V.view label var of
   Just _ -> return ()
   Nothing -> liftIO $ assertFailure $ printf "expected variant %s, got: %s" (show label) (show var)
 
-mustGetUserNumber :: HasCallStack => RegisterResponse -> Word64
+mustGetUserNumber :: HasCallStack => RegisterResponse -> M Word64
 mustGetUserNumber response = case V.view #registered response of
-  Just r -> r .! #user_number
-  Nothing -> error $ "expected to get 'registered' response, got " ++ show response
+  Just r -> return (r .! #user_number)
+  Nothing -> liftIO $ assertFailure $ "expected to get 'registered' response, got " ++ show response
 
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
@@ -407,7 +407,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     _ <- callIDP cid webauthID #register (device1, powAt cid 1)
     callIDPReject cid dummyUserId #register (device1, powAt cid 1)
   , withoutUpgrade $ idpTest "get delegation without authorization" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK)
@@ -421,32 +421,32 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid 123 []
 
   , withUpgrade $ \should_upgrade -> idpTest "register and lookup" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     assertStats cid 1
     when should_upgrade $ doUpgrade cid
     assertStats cid 1
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> idpTest "register and lookup (with credential id)" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauth2ID #register (device2, powAt cid 0)
+    user_number <- callIDP cid webauth2ID #register (device2, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device2]
 
   , withUpgrade $ \should_upgrade -> idpTest "register add lookup" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callIDP cid webauthID #add (user_number, device2)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device1, device2]
 
   , withUpgrade $ \should_upgrade -> idpTest "register and add with wrong user" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callIDPReject cid webauth2ID #add (user_number, device2)
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> idpTest "get delegation and validate" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -477,7 +477,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> idpTest "get delegation with wrong user" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
 
@@ -487,7 +487,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIDPReject cid webauth2ID #prepare_delegation delegationArgs
 
   , withUpgrade $ \should_upgrade -> idpTest "get multiple delegations and validate" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -515,7 +515,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withoutUpgrade $ idpTest "get multiple delegations and expire" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -543,7 +543,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withUpgrade $ \should_upgrade -> idpTest "user identities differ" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -560,7 +560,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       lift $ assertFailure "User identities coincide for different frontends"
 
   , withUpgrade $ \should_upgrade -> idpTest "remove()" $ \cid -> do
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     lookupIs cid user_number [device1]
     callIDP cid webauthID #add (user_number, device2)
     lookupIs cid user_number [device1, device2]
@@ -572,7 +572,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIDP cid webauth2ID #remove (user_number, webauth2PK)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number []
-    user_number2 <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 1)
+    user_number2 <- callIDP cid webauthID #register (device1, powAt cid 1) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     when (user_number == user_number2) $
       lift $ assertFailure "User number re-used"
@@ -583,10 +583,10 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range .! #_1_ @?= 103
 
     assertStats cid 0
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     liftIO $ user_number @?= 100
     assertStats cid 1
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 1)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 1) >>= mustGetUserNumber
     liftIO $ user_number @?= 101
     assertStats cid 2
 
@@ -595,7 +595,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range .! #_0_ @?= 100
     lift $ s .! #assigned_user_number_range .! #_1_ @?= 103
 
-    user_number <- mustGetUserNumber <$> callIDP cid webauthID #register (device1, powAt cid 0)
+    user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     liftIO $ user_number @?= 102
     assertStats cid 3
     callIDPReject cid webauthID #register (device1, powAt cid 0)
