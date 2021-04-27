@@ -1,0 +1,63 @@
+name: Selenium and npm tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        rust: [ '1.51.0' ]
+        os: [ ubuntu-latest ]
+        dfx: [ '0.7.0-beta.4' ]
+
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
+
+      - name: Install Rust
+        run: |
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      # This step hangs on Github actions on Darwin for some reason, that
+      # is why we run this only on Linux for now
+      - name: Install DFX
+        run: |
+          export DFX_VERSION=${{ matrix.dfx }}
+          echo Install DFX Version: $DFX_VERSION
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Build auth-client
+        run: |
+          cd packages/auth-client
+          npm ci
+          npm run build
+
+      - name: Run demo app
+        run: |
+          cd demos/sample-javascript/
+          npm ci
+          npm run build
+          npm run develop --no-live-reload --no-devtool &
+          sleep 10 # crude
+
+      - run: npm ci
+      - run: dfx start --background
+      - run: dfx deploy --argument '(null)'
+      - run: npm test
+      - run: dfx stop
