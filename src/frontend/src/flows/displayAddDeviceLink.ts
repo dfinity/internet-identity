@@ -9,6 +9,10 @@ const pageContent = (link: string) => html`
       }
       #linkText {
           margin-right: 1rem;
+          width: 80%;
+      }
+      #linkCopy {
+        width: 20%;
       }
   </style>
   <div class="container">
