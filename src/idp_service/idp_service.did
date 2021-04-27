@@ -65,8 +65,7 @@ type GetDelegationResponse = variant {
   // The signed delegation was successfully retrieved.
   signed_delegation: SignedDelegation;
 
-  // The signature is not readily available and must be explicitly requested
-  // by calling request_delegation() method with the same arguments.
+  // The signature is not ready. Maybe retry by calling `prepare_delegation`
   no_such_delegation
 };
 
@@ -92,7 +91,7 @@ service : (opt InternetIdentityInit) -> {
   lookup : (UserNumber) -> (vec DeviceData) query;
   stats : () -> (InternetIdentityStats) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
   http_request: (request: HttpRequest) -> (HttpResponse) query;

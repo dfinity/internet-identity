@@ -16,7 +16,10 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
+// 30 mins
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * 60 * 1_000_000_000_000;
+// 8 days
+const MAX_EXPIRATION_PERIOD_NS: u64 = 8 * 24 * 60 * 60 * 1_000_000_000_000;
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 
@@ -293,6 +296,7 @@ async fn prepare_delegation(
     user_number: UserNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
+    max_time_to_live : Option<u64>
 ) -> (UserKey, Timestamp) {
     ensure_salt_set().await;
 
@@ -308,7 +312,8 @@ async fn prepare_delegation(
 
         check_frontend_length(&frontend);
 
-        let expiration = (time() as u64).saturating_add(DEFAULT_EXPIRATION_PERIOD_NS);
+        let delta = u64::min(max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS), MAX_EXPIRATION_PERIOD_NS);
+        let expiration = (time() as u64).saturating_add(delta);
 
         let seed = calculate_seed(user_number, &frontend);
         let mut sigs = s.sigs.borrow_mut();

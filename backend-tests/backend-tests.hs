@@ -110,7 +110,7 @@ service : {
   lookup : (UserNumber) -> (vec DeviceData) query;
   stats : () -> (InternetIdentityStats) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 }
   |]
@@ -346,10 +346,10 @@ lookupIs cid user_number ds = do
   r <- queryIDP cid dummyUserId #lookup user_number
   liftIO $ r @?= V.fromList ds
 
-addTS :: (a, b, c) -> d -> (a, b, c, d)
-addTS (a,b,c) ts = (a,b,c,ts)
+addTS :: (a, b, c, d) -> e -> (a, b, c, e)
+addTS (a,b,c, _) ts = (a,b,c,ts)
 
-getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> EntityId -> (Word64, T.Text, Blob) -> Word64 -> M ()
+getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
 getAndValidate cid sessionPK userPK webauthID delegationArgs ts = do
   sd <- queryIDP cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") sd -> return sd
@@ -365,7 +365,7 @@ getAndValidate cid sessionPK userPK webauthID delegationArgs ts = do
     Left err -> liftIO $ assertFailure $ T.unpack err
     Right () -> return ()
 
-getButNotThere :: HasCallStack => Blob -> EntityId -> (Word64, T.Text, Blob) -> Word64 -> M ()
+getButNotThere :: HasCallStack => Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
 getButNotThere cid webauthID delegationArgs ts = do
   queryIDP cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") _ ->
@@ -410,7 +410,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     user_number <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     (_, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
     queryIDPReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
 
@@ -450,7 +450,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- prepare delegation
     (userPK, ts) <- callIDP cid webauthID #prepare_delegation delegationArgs
     ts <- if should_upgrade
@@ -483,7 +483,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     callIDPReject cid webauth2ID #prepare_delegation delegationArgs
 
   , withUpgrade $ \should_upgrade -> idpTest "get multiple delegations and validate" $ \cid -> do
@@ -491,7 +491,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- request a few delegations
     (userPK, ts1) <- callIDP cid webauthID #prepare_delegation delegationArgs
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
@@ -519,7 +519,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK)
+    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- request a few delegations
     (userPK, ts1) <- callIDP cid webauthID #prepare_delegation delegationArgs
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
@@ -547,13 +547,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
-    let delegationArgs1 = (user_number, "front.end.com", sessionPK)
+    let delegationArgs1 = (user_number, "front.end.com", sessionPK, Nothing)
     (user1PK, _exp) <- callIDP cid webauthID #prepare_delegation delegationArgs1
 
     when should_upgrade $ do
       doUpgrade cid
 
-    let delegationArgs2 = (user_number, "other-front.end.com", sessionPK)
+    let delegationArgs2 = (user_number, "other-front.end.com", sessionPK, Nothing)
     (user2PK, _exp) <- callIDP cid webauthID #prepare_delegation delegationArgs2
 
     when (user1PK == user2PK) $
