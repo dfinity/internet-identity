@@ -17,11 +17,19 @@ pub type Salt = [u8; 32];
 
 /// Data type responsible for managing user data in stable memory.
 pub struct Storage<T> {
-    num_users: u32,
-    user_number_range: (UserNumber, UserNumber),
-    entry_size: u16,
-    salt: Salt,
+    header: Header,
     _marker: PhantomData<T>,
+}
+
+#[repr(packed)]
+struct Header {
+    magic: [u8; 3],
+    version: u8,
+    num_users: u32,
+    id_range_lo: u64,
+    id_range_hi: u64,
+    entry_size: u16,
+    salt: [u8; 32],
 }
 
 impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
@@ -29,20 +37,25 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// the specified range.
     pub fn new(user_number_range: (UserNumber, UserNumber)) -> Self {
         let storage = Self {
-            num_users: 0,
-            user_number_range,
-            entry_size: DEFAULT_ENTRY_SIZE,
-            salt: EMPTY_SALT,
+            header: Header {
+                magic: b"IIC".clone(),
+                version: 1,
+                num_users: 0,
+                id_range_lo: user_number_range.0,
+                id_range_hi: user_number_range.1,
+                entry_size: DEFAULT_ENTRY_SIZE,
+                salt: EMPTY_SALT,
+            },
             _marker: PhantomData,
         };
         storage
     }
 
     pub fn salt(&self) -> Option<&Salt> {
-        if self.salt == EMPTY_SALT {
+        if self.header.salt == EMPTY_SALT {
             None
         } else {
-            Some(&self.salt)
+            Some(&self.header.salt)
         }
     }
 
@@ -50,7 +63,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         if self.salt().is_some() {
             trap("Attempted to set the salt twice.");
         }
-        self.salt = salt;
+        self.header.salt = salt;
         self.flush();
     }
 
@@ -65,29 +78,28 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             return None;
         }
 
-        let mut buf: [u8; 58] = [0; 58];
-        stable_read(0, &mut buf);
-        if &buf[0..3] != b"IIC" {
+        let mut header: Header = unsafe { std::mem::zeroed() };
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(
+                &mut header as *mut _ as *mut u8,
+                std::mem::size_of::<Header>(),
+            );
+            stable_read(0, slice);
+        }
+
+        if &header.magic != b"IIC" {
             trap(&format!(
                 "stable memory header: invalid magic: {:?}",
-                &buf[0..3]
+                &header.magic,
             ));
         }
-        if buf[3] != 1 {
-            trap(&format!("unsupported header version: {}", buf[3]));
+        if header.version != 1 {
+            trap(&format!("unsupported header version: {}", header.version));
         }
-        let num_users = u32::from_le_bytes(buf[4..8].try_into().unwrap());
-        let id_range_lo = u64::from_le_bytes(buf[8..16].try_into().unwrap());
-        let id_range_hi = u64::from_le_bytes(buf[16..24].try_into().unwrap());
-        let entry_size = u16::from_le_bytes(buf[24..26].try_into().unwrap());
-        let salt = buf[26..58].try_into().unwrap_or_else(|_| {
-            trap("unreachable: failed to extract 32 byte array from 32 byte a slice")
-        });
+
         Some(Self {
-            num_users,
-            user_number_range: (id_range_lo, id_range_hi),
-            entry_size,
-            salt,
+            header,
             _marker: PhantomData,
         })
     }
@@ -97,11 +109,11 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// Returns None if the range of user number assigned to this
     /// storage is exhausted.
     pub fn allocate_user_number(&mut self) -> Option<UserNumber> {
-        let user_number = self.user_number_range.0 + self.num_users as u64;
-        if user_number >= self.user_number_range.1 {
+        let user_number = self.header.id_range_lo + self.header.num_users as u64;
+        if user_number >= self.header.id_range_hi {
             return None;
         }
-        self.num_users += 1;
+        self.header.num_users += 1;
         self.flush();
         Some(user_number)
     }
@@ -110,7 +122,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.entry_size as u32;
+        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
         let buf = candid::ser::encode_one(data).map_err(StorageError::SerializationError)?;
 
         if buf.len() > self.value_size_limit() {
@@ -118,7 +130,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         }
 
         let current_size = stable_size();
-        let pages = (stable_offset + self.entry_size as u32 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+        let pages =
+            (stable_offset + self.header.entry_size as u32 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         if pages > current_size {
             let pages_to_grow = pages - current_size;
             let result = stable_grow(pages - current_size);
@@ -138,12 +151,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.entry_size as u32;
-        if stable_offset + self.entry_size as u32 > stable_size() * WASM_PAGE_SIZE {
+        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
+        if stable_offset + self.header.entry_size as u32 > stable_size() * WASM_PAGE_SIZE {
             trap("a record for a valid user number is out of stable memory bounds");
         }
 
-        let mut buf = vec![0; self.entry_size as usize];
+        let mut buf = vec![0; self.header.entry_size as usize];
         stable_read(stable_offset, &mut buf);
         let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
 
@@ -170,38 +183,37 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 trap("failed to grow stable memory by 1 page");
             }
         }
-        let mut buf: [u8; 58] = [0; 58];
-        buf[0..4].copy_from_slice(b"IIC\x01");
-        buf[4..8].copy_from_slice(&self.num_users.to_le_bytes());
-        buf[8..16].copy_from_slice(&self.user_number_range.0.to_le_bytes());
-        buf[16..24].copy_from_slice(&self.user_number_range.1.to_le_bytes());
-        buf[24..26].copy_from_slice(&self.entry_size.to_le_bytes());
-        buf[26..58].copy_from_slice(&self.salt);
-        stable_write(0, &buf);
+        unsafe {
+            let slice = std::slice::from_raw_parts(
+                &self.header as *const _ as *const u8,
+                std::mem::size_of::<Header>(),
+            );
+            stable_write(0, &slice);
+        }
     }
 
     pub fn user_count(&self) -> usize {
-        self.num_users as usize
+        self.header.num_users as usize
     }
 
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
-        self.user_number_range
+        (self.header.id_range_lo, self.header.id_range_hi)
     }
 
     fn value_size_limit(&self) -> usize {
-        self.entry_size as usize - std::mem::size_of::<u16>()
+        self.header.entry_size as usize - std::mem::size_of::<u16>()
     }
 
     fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
-        if user_number < self.user_number_range.0 || user_number >= self.user_number_range.1 {
+        if user_number < self.header.id_range_lo || user_number >= self.header.id_range_hi {
             return Err(StorageError::UserNumberOutOfRange {
                 user_number,
-                range: self.user_number_range,
+                range: self.assigned_user_number_range(),
             });
         }
 
-        let record_number = (user_number - self.user_number_range.0) as u32;
-        if record_number >= self.num_users {
+        let record_number = (user_number - self.header.id_range_lo) as u32;
+        if record_number >= self.header.num_users {
             return Err(StorageError::BadUserNumber(user_number));
         }
         Ok(record_number)
