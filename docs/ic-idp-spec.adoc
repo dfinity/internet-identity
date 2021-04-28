@@ -96,7 +96,18 @@ This section describes the Internet Identity Service from the point of view of a
 3. It loads the url `https://identity.ic0.app/#authorize` in an `<iframe>` or separate tab. Let `identityWindow` be the `Window` object returned from this.
 +
 If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per https://www.w3.org/TR/webauthn-2/#sctn-iframe-guidance[the Web Authentication recommendation].
-4. It invokes
+4. In the `identityWindow`, the user logs in, and the `identityWindow` invokes
++
+--
+ window.opener.postMessage(msg, "*")
+
+where `msg` is
+
+  interface InternetIdentityReady {
+    kind: "authorize-ready"
+  }
+--
+5. The client application, after receiving the `InternetIdentityReady`, invokes
 +
 --
  identityWindow.postMessage(msg, "https://identity.ic0.app")
@@ -105,7 +116,7 @@ where `msg` is a value with of type
 
  interface InternetIdentityAuthRequest {
    kind: "authorize-client";
-   sessionPublicKey: ArrayBuffer;
+   sessionPublicKey: Blob;
    maxTimetoLive?: bigint;
  }
 
@@ -114,25 +125,25 @@ where
 * the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimetoLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
 --
-5. Now it expects a message back, with data `event`.
-6. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
-7. The `event.data` value is a JS object with the following type:
+6. Now it expects a message back, with data `event`.
+7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
+8. The `event.data` value is a JS object with the following type:
 +
  interface InternetIdentityAuthResponse {
    kind: "authorize-client-success";
    delegations: [{
      delegation: {
-       pubkey: ArrayBuffer;
+       pubkey: Blob;
        expiration: bigint;
        targets?: Principal[];
      };
-     signature: BinaryBlob;
+     signature: Blob;
    }];
-   userPublicKey: ArrayBuffer;
+   userPublicKey: Blob;
  }
 +
 where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
-8. It could also receive a failure message of the following type
+9. It could also receive a failure message of the following type
 +
  interface InternetIdentityAuthResponse {
    kind: "authorize-client-failure";
