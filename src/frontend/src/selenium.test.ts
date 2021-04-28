@@ -191,12 +191,11 @@ async function nowOnAddDeviceSuccess(driver: ThenableWebDriver) {
 // View: Authorize application
 
 async function nowOnAuthApp(driver: ThenableWebDriver) {
-    // TODO: Set button id?
-    await driver.wait(until.elementLocated(By.xpath("//button[text()='Yes']")), 10_000);
+    await driver.wait(until.elementLocated(By.id('confirmRedirect')), 10_000);
 }
 
 async function onAuthAppConfirm(driver: ThenableWebDriver) {
-    await driver.findElement(By.xpath("//button[text()='Yes']")).click();
+    await driver.findElement(By.id('confirmRedirect')).click();
 }
 
 
@@ -269,7 +268,6 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await nowOnRegisterConfirm(driver);
     await onRegisterConfirmConfirm(driver);
     const userNumber = await nowOnRegisterShowNumber(driver);
-    await onRegisterShowNumberFixup(driver);
     await onRegisterShowNumberContinue(driver);
     return userNumber;
 }
