@@ -145,9 +145,10 @@ const initLinkDevice = () => {
 
       // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
 
-      const link = encodeURI(
-        `${location.host}#device=${userNumber};${blobToHex(publicKey)};${rawId}`
-      );
+      let url = new URL(location.toString());
+      url.pathname = '/';
+      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
+      const link = encodeURI(url.toString());
 
       displayAddDeviceLink(link);
       loginInterval = window.setInterval(async () => {
