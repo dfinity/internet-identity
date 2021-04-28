@@ -144,9 +144,9 @@ const initLinkDevice = () => {
       const rawId = blobToHex(identity.rawId);
 
       // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
-
+      const protocol = /localhost/.test(location.host) ? "http" : "https";
       const link = encodeURI(
-        `${location.host}#device=${userNumber};${blobToHex(publicKey)};${rawId}`
+        `${protocol}://${location.host}#device=${userNumber};${blobToHex(publicKey)};${rawId}`
       );
 
       displayAddDeviceLink(link);
