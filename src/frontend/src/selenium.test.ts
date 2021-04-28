@@ -96,7 +96,8 @@ async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {
 // View: _Register Show Number
 
 async function on_RegisterShowNumber(driver: ThenableWebDriver) : Promise<string> {
-  await driver.wait(until.elementLocated(By.id('displayUser_Continue')), 15_000);
+  // here Proof of work happens, so extra long wait time
+  await driver.wait(until.elementLocated(By.id('displayUser_Continue')), 30_000);
   return await driver.findElement(By.className("highlightBox")).getText();
 }
 
