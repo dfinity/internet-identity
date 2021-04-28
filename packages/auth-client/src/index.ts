@@ -135,6 +135,8 @@ export class AuthClient {
     private _idpWindow?: Window,
     // A controller used to remove the event listener in the login flow.
     private _abortController?: AbortController,
+    // @ts-ignore (typescript doesn't know the Timeout type)
+    private _pingInterval?: Timeout,
   ) {}
 
   public getIdentity(): Identity {
@@ -184,7 +186,10 @@ export class AuthClient {
 
       switch (message.kind) {
         case "authorize-ready":
-          // IDP is ready. Send a message to request authorization.
+          // IDP is ready. Pinging is no longer needed.
+          clearInterval(this._pingInterval);
+
+          // Send a message to request authorization.
           this._idpWindow?.postMessage({
             kind: "authorize-client",
             sessionPublicKey: this._key?.getPublicKey().toDer(),
@@ -235,6 +240,22 @@ export class AuthClient {
     if (w) {
       this._idpWindow = w;
     }
+
+    // Periodically send pings to the IDP. When the IDP receives the ping
+    // it can communicate to us securely that it is fully loaded, the user
+    // has logged in, and it is ready to receive authentication requests.
+    if (this._pingInterval) {
+      clearInterval(this._pingInterval);
+    }
+
+    this._pingInterval = setInterval( () => {
+      if (this._idpWindow && !this._idpWindow.closed) {
+        console.log("Sending authorize-ping.")
+        this._idpWindow.postMessage({ kind: "authorize-ping" }, identityProviderUrl.origin)
+      } else {
+        clearInterval(this._pingInterval)
+      }
+    }, 500);
   }
 
   public async logout(options: { returnTo?: string } = {}): Promise<void> {
