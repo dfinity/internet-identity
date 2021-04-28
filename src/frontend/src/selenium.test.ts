@@ -191,11 +191,12 @@ async function nowOnAddDeviceSuccess(driver: ThenableWebDriver) {
 // View: Authorize application
 
 async function nowOnAuthApp(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('confirmRedirect')), 10_000);
+    // TODO: Set button id?
+    await driver.wait(until.elementLocated(By.xpath("//button[text()='Yes']")), 10_000);
 }
 
 async function onAuthAppConfirm(driver: ThenableWebDriver) {
-    await driver.findElement(By.id('confirmRedirect')).click();
+    await driver.findElement(By.xpath("//button[text()='Yes']")).click();
 }
 
 
