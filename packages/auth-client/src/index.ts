@@ -178,7 +178,8 @@ export class AuthClient {
 
   public async login(
     options: { identityProvider?: string; maxTimeToLive?: BigInt } = {},
-    callback
+    onSuccess,
+    onError
   ): Promise<void> {
     let key = this._key;
     if (!key) {
@@ -204,6 +205,14 @@ export class AuthClient {
       console.log(`Received ${message.kind} message.`)
 
       switch (message.kind) {
+        case "authorize-ready":
+          // IDP is ready. Send a message to request authorization.
+          identityWindow?.postMessage({
+            kind: "authorize-client",
+            sessionPublicKey: this._key?.getPublicKey().toDer(),
+            maxTimeToLive: options.maxTimeToLive
+          }, identityProviderUrl.origin);
+          break;
         case "authorize-client-success":
           // Create delegation chain and store it.
           const delegationChain = DelegationChain.fromDelegations(
@@ -231,15 +240,12 @@ export class AuthClient {
 
           identityWindow?.close();
           // TODO: remove listener.
-          callback();
+          onSuccess();
           break;
-        case "authorize-ready":
-          // IDP is ready. Send a message to request authorization.
-          identityWindow?.postMessage({
-            kind: "authorize-client",
-            sessionPublicKey: this._key?.getPublicKey().toDer(),
-            maxTimeToLive: options.maxTimeToLive
-          }, identityProviderUrl.origin);
+        case "authorize-client-failure":
+          identityWindow?.close();
+          // TODO: remove listener.
+          onError(message.text);
           break;
         default:
           console.log(`Unknown message of kind ${message.kind}`)

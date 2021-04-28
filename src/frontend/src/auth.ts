@@ -3,7 +3,13 @@ import { FrontendHostname, PublicKey, SignedDelegation, UserNumber } from "../ge
 import { confirmRedirect } from "./flows/confirmRedirect";
 import { IDPActor } from "./utils/idp_actor";
 
-interface InternetIdentityAuthResponse {
+interface AuthRequest {
+    kind: "authorize-client";
+    sessionPublicKey: Uint8Array;
+    maxTimetoLive?: BigInt;
+}
+
+interface AuthResponseSuccess {
     kind: "authorize-client-success";
     delegations: [{
       delegation: {
@@ -16,10 +22,9 @@ interface InternetIdentityAuthResponse {
     userPublicKey: ArrayBuffer;
 }
 
-interface InternetIdentityAuthRequest {
-    kind: "authorize-client";
-    sessionPublicKey: Uint8Array;
-    maxTimetoLive?: BigInt;
+interface AuthResponseFailure {
+    kind: "authorize-client-failure";
+    text: string;
 }
 
 // A message to signal that the IDP is ready to receive authorization requests.
@@ -52,11 +57,14 @@ export default async function setup(userNumber: UserNumber, connection: IDPActor
 async function handleAuthRequest(
     connection: IDPActor,
     userNumber: UserNumber,
-    request: InternetIdentityAuthRequest,
-    hostname: FrontendHostname): Promise<InternetIdentityAuthResponse> {
+    request: AuthRequest,
+    hostname: FrontendHostname): Promise<AuthResponseSuccess | AuthResponseFailure> {
 
   if (!await confirmRedirect(hostname)) {
-    // TODO: Return an error here.
+    return {
+        kind: "authorize-client-failure",
+        text: `User did not grant access to ${hostname}.`
+    };
   }
 
   const sessionKey = Array.from(blobFromUint8Array(request.sessionPublicKey));

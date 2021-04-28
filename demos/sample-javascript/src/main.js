@@ -22,6 +22,8 @@ const init = async () => {
       identityProvider: idpUrlEl.value,
     }, async function() {
       principalEl.innerText = await authClient.getIdentity().getPrincipal();
+    }, function(error) {
+      alert(error);
     });
   };
 
