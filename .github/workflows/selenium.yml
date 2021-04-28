@@ -59,7 +59,7 @@ jobs:
       - run: npm ci
       - run: dfx start --background
       - run: dfx deploy --no-wallet --argument '(null)'
-      - run: rm -f screenshots/*.png
+      - run: rm -v -f screenshots/*.png
       - run: npm test
       - run: dfx stop
 
