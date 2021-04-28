@@ -96,13 +96,12 @@ async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {
 // View: _Register Show Number
 
 async function on_RegisterShowNumber(driver: ThenableWebDriver) : Promise<string> {
-  // here Proof of work happens, so extra long wait time
-  await driver.wait(until.elementLocated(By.id('displayUser_Continue')), 30_000);
+  await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
   return await driver.findElement(By.className("highlightBox")).getText();
 }
 
 async function on_RegisterShowNumber_Continue(driver: ThenableWebDriver) {
-  await driver.findElement(By.id('displayUser_Continue')).click();
+  await driver.findElement(By.id('displayUserContinue')).click();
 }
 
 async function on_RegisterShowNumber_Fixup(driver: ThenableWebDriver) {
@@ -172,7 +171,7 @@ async function on_AddDeviceConfirm_Fixup(driver : ThenableWebDriver) {
 // View: Add device alias
 
 async function on_AddDeviceAlias(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('deviceAlias_Continue')), 3_000);
+    await driver.wait(until.elementLocated(By.id('deviceAliasContinue')), 3_000);
 }
 
 async function on_AddDeviceAlias_Type(alias : string, driver: ThenableWebDriver) {
@@ -180,7 +179,7 @@ async function on_AddDeviceAlias_Type(alias : string, driver: ThenableWebDriver)
 }
 
 async function on_AddDeviceAlias_Continue(driver: ThenableWebDriver) {
-    await driver.findElement(By.id('deviceAlias_Continue')).click();
+    await driver.findElement(By.id('deviceAliasContinue')).click();
 }
 
 // View: Add device success
