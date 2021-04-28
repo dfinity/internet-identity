@@ -24,6 +24,10 @@ import { writeFile } from 'fs/promises';
 
  - Setup helpers (getting web driver, waiting for fonts to be loaded)
 
+ - Combined flows
+   Sequences of assertions and actions used in multiple tests to model
+   higher-level concept
+
  - The actual tests
 */
 
@@ -184,6 +188,17 @@ async function nowOnAddDeviceSuccess(driver: ThenableWebDriver) {
     await driver.wait(until.elementLocated(By.id('manageDevicesButton')), 10_000);
 }
 
+// View: Authorize application
+
+async function nowOnAuthApp(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('confirmRedirect')), 10_000);
+}
+
+async function onAuthAppConfirm(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('confirmRedirect')).click();
+}
+
+
 /*
 ## Setup helpers
 */
@@ -240,10 +255,64 @@ async function run_in_browser_with_virtual_authenticator(test) {
     }
 };
 
+/*
+## Combined flows
+*/
+
+async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
+    await driver.get(IDP_SERVICE_URL);
+    await nowOnWelcome(driver);
+    await onWelcomeRegister(driver);
+    await nowOnRegister(driver);
+    await onRegisterTypeAliasEnter(DEVICE_NAME1, driver);
+    await nowOnRegisterConfirm(driver);
+    await onRegisterConfirmConfirm(driver);
+    const userNumber = await nowOnRegisterShowNumber(driver);
+    await onRegisterShowNumberFixup(driver);
+    await onRegisterShowNumberContinue(driver);
+    return userNumber;
+}
+
+async function login(userNumber: string, driver: ThenableWebDriver) {
+    await nowOnWelcome(driver);
+    await onWelcomeTypeUserNumber(userNumber, driver);
+    await onWelcomeLogin(driver);
+    await nowOnMain(DEVICE_NAME1, driver);
+}
+
+
 
 /*
 ## The actual tests
 */
+test('Register new identity and login with it', async () => {
+    await run_in_browser_with_virtual_authenticator(async (driver) => {
+        await driver.get(IDP_SERVICE_URL);
+        let userNumber = await registerNewIdentity(driver);
+        await nowOnMain(DEVICE_NAME1, driver);
+        await await onMainLogout(driver);
+        await login(userNumber, driver);
+    })
+}, 300_000);
+
+test('Log into client application, after registration', async () => {
+    await run_in_browser_with_virtual_authenticator(async (driver) => {
+        await driver.get(DEMO_APP_URL);
+        await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('idpUrl')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('idpUrl')).sendKeys(IDP_AUTH_URL);
+        await driver.findElement(By.id('signinBtn')).click();
+
+        let userNumber = await registerNewIdentity(driver);
+        await nowOnAuthApp(driver);
+        await onAuthAppConfirm(driver);
+
+        // check that we are indeed being redirected back
+        let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
+        expect(principal).not.toBe('2vxsx-fae');
+        // TODO: Use a whoami service to check that loggin in works
+    })
+}, 300_000);
 
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
@@ -322,53 +391,4 @@ test('Screenshots', async () => {
     })
 }, 300_000);
 
-
-test('Register new identity and login with it', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(IDP_SERVICE_URL);
-        let userNumber = await registerNewIdentity(driver);
-        await logout(driver);
-        await login(userNumber, driver);
-    })
-}, 300_000);
-
-test('Log into client application, after registration', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(DEMO_APP_URL);
-        await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
-        await driver.findElement(By.id('idpUrl')).sendKeys(Key.DELETE);
-        await driver.findElement(By.id('idpUrl')).sendKeys(IDP_AUTH_URL);
-        await driver.findElement(By.id('signinBtn')).click();
-
-        let userNumber = await registerNewIdentity(driver);
-        await driver.findElement(By.xpath("//button[text()='Yes']")).click();
-
-        // check that we are indeed being redirected back
-        let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
-        expect(principal).not.toBe('2vxsx-fae');
-        // TODO: Use a whoami service to check that loggin in works
-    })
-}, 300_000);
-
-async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
-    await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
-    await driver.findElement(By.id('registerAlias')).sendKeys(DEVICE_NAME1, Key.RETURN);
-    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
-    await driver.findElement(By.id('confirmRegisterButton')).click();
-
-    let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
-    let userNumber = await driver.findElement(By.className("highlightBox")).getText();
-    await continueButton.click();
-    return userNumber;
-}
-
-async function logout(driver: ThenableWebDriver) {
-    await driver.findElement(By.id('logoutButton')).click();
-}
-
-async function login(userNumber: string, driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 5_000).sendKeys(userNumber, Key.RETURN);
-    await driver.findElement(By.id('loginButton')).click();
-    await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
-}
 
