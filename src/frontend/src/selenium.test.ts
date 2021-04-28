@@ -18,6 +18,7 @@ const DEVICE_NAME1 = 'Virtual WebAuthn device';
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
         await driver.get(IDP_SERVICE_URL);
+        await wait_for_fonts(driver);
         await screenshot('00-welcome', driver);
 
         await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
@@ -25,10 +26,10 @@ test('Screenshots', async () => {
 
         await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
         // TODO: More reliable recognize this view
-        await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
+        await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
         await screenshot('02-register-confirm', driver);
 
-        await driver.findElement(By.id('registerButton')).click();
+        await driver.findElement(By.id('confirmRegisterButton')).click();
         let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
         let userNumberElem = await driver.findElement(By.className("highlightBox"));
         let userNumber = await userNumberElem.getText();
@@ -122,9 +123,8 @@ async function run_in_browser_with_virtual_authenticator(test) {
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
-    // TODO: More reliable recognize this view
-    await driver.wait(until.elementLocated(By.xpath("//p[text()='Now confirm your security device one more time to register.']")), 5_000);
-    await driver.findElement(By.id('registerButton')).click();
+    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
+    await driver.findElement(By.id('confirmRegisterButton')).click();
 
     let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
     let userNumber = await driver.findElement(By.className("highlightBox")).getText();
@@ -158,4 +158,11 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
     // writing to a subdirectory has the nice property that it fails if
     // this is run in the wrong directory
     await writeFile(`screenshots/${name}.png`, image, 'base64');
+}
+
+// Inspired by https://stackoverflow.com/a/66919695/946226
+async function wait_for_fonts(driver : ThenableWebDriver) {
+    while (await driver.executeScript("return document.fonts.status;") == "loading") {
+      driver.sleep(500);
+    }
 }

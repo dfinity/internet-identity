@@ -374,3 +374,8 @@ hr {
   border-top: 1px solid var(--grey-400);
 }
 
+#icLogo {
+  width: 80%;
+  align-self: center;
+  margin-top: -3rem;
+}
