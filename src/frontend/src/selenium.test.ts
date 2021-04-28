@@ -18,6 +18,7 @@ const DEVICE_NAME1 = 'Virtual WebAuthn device';
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
         await driver.get(IDP_SERVICE_URL);
+        await wait_for_fonts(driver);
         await screenshot('00-welcome', driver);
 
         await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
@@ -157,4 +158,11 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
     // writing to a subdirectory has the nice property that it fails if
     // this is run in the wrong directory
     await writeFile(`screenshots/${name}.png`, image, 'base64');
+}
+
+// Inspired by https://stackoverflow.com/a/66919695/946226
+async function wait_for_fonts(driver : ThenableWebDriver) {
+    while (await driver.executeScript("return document.fonts.status;") == "loading") {
+      driver.sleep(500);
+    }
 }
