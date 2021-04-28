@@ -40,9 +40,7 @@ import { writeFile } from 'fs/promises';
 import canister_ids from '../../../.dfx/local/canister_ids.json';
 const IDENTITY_CANISTER = canister_ids.idp_service.local;
 
-const REPLICA_URL = 'http://localhost:8000';
-const IDP_SERVICE_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`
-const IDP_AUTH_URL = `http://localhost:8000/authorize?canisterId=${IDENTITY_CANISTER}`
+const IDP_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`
 const DEMO_APP_URL = 'http://localhost:8080/';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
@@ -86,7 +84,7 @@ async function on_Register_TypeAliasEnter(alias : string, driver: ThenableWebDri
 // View: _Register confirmation
 
 async function on_RegisterConfirm(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
+    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 10_000);
 }
 
 async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {
@@ -233,25 +231,33 @@ async function wait_for_fonts(driver : ThenableWebDriver) {
 }
 
 async function run_in_browser_with_virtual_authenticator(test) {
+    await run_in_browser_with_virtual_authenticator_common(true, test)
+}
+
+async function run_in_nested_browser_with_virtual_authenticator(test) {
+    await run_in_browser_with_virtual_authenticator_common(false, test)
+}
+
+async function run_in_browser_with_virtual_authenticator_common(outer, test) {
     const driver = new Builder().forBrowser('chrome')
         .setChromeOptions(new ChromeOptions()
-          .headless() // hides the click show: uncomment to watch it
-          .windowSize({width: 1024, height: 768})
+          // .headless() // hides the click show: uncomment to watch it
+          // .windowSize({width: 1024, height: 768})
         )
         .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
         .build();
     try {
-        const session = await driver.getSession();
-        await addVirtualAuthenticator(driver.getExecutor(), session.getId());
+        await addVirtualAuthenticator(driver.getExecutor(), (await driver.getSession()).getId());
         await test(driver);
     } catch (e) {
         console.log(await driver.manage().logs().get('browser'));
         console.log(await driver.getPageSource());
         throw e;
     } finally {
-        // don’t quit, it seems to take down all of chrome, not just the current session
-        // await driver.quit();
-        await driver.close();
+        // only close outer session
+        if (outer) {
+           await driver.quit();
+        }
     }
 };
 
@@ -285,7 +291,7 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
 */
 test('_Register new identity and login with it', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(IDP_SERVICE_URL);
+        await driver.get(IDP_URL);
         let userNumber = await registerNewIdentity(driver);
         await on_Main(DEVICE_NAME1, driver);
         await await on_Main_Logout(driver);
@@ -298,15 +304,33 @@ test('Log into client application, after registration', async () => {
         await driver.get(DEMO_APP_URL);
         await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
         await driver.findElement(By.id('idpUrl')).sendKeys(Key.DELETE);
-        await driver.findElement(By.id('idpUrl')).sendKeys(IDP_AUTH_URL);
+        await driver.findElement(By.id('idpUrl')).sendKeys(IDP_URL);
         await driver.findElement(By.id('signinBtn')).click();
+
+        // there should be one new window now
+        let handles = await driver.getAllWindowHandles();
+        expect(handles.length).toBe(2);
+        await driver.switchTo().window(handles[1])
+
+        // enable virtual authenticator here
+        await addVirtualAuthenticator(driver.getExecutor(), (await driver.getSession()).getId());
 
         let userNumber = await registerNewIdentity(driver);
         await on_AuthApp(driver);
         await on_AuthApp_Confirm(driver);
 
+        // wait for window to close
+        await driver.wait(async (driver) => {
+          return (await driver.getAllWindowHandles()).length == 1
+        }, 5_000);
+
+        handles = await driver.getAllWindowHandles();
+        expect(handles.length).toBe(1);
+        await driver.switchTo().window(handles[0]);
+
         // check that we are indeed being redirected back to demo app
         let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
+        // and that we see a non-anonymous principal
         expect(principal).not.toBe('2vxsx-fae');
         // TODO: Use a whoami service to check that logging in works
     })
@@ -314,13 +338,13 @@ test('Log into client application, after registration', async () => {
 
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
-        await driver.get(IDP_SERVICE_URL);
+        await driver.get(IDP_URL);
         await wait_for_fonts(driver);
 
-	await on_Welcome(driver);
+        await on_Welcome(driver);
         await screenshot('00-welcome', driver);
-	await on_Welcome_Register(driver);
-	await on_Register(driver);
+        await on_Welcome_Register(driver);
+        await on_Register(driver);
         await screenshot('01-register', driver);
         await on_Register_TypeAliasEnter(DEVICE_NAME1, driver);
         await on_RegisterConfirm(driver);
@@ -339,7 +363,7 @@ test('Screenshots', async () => {
         await on_Welcome_Login(driver);
         await on_Main(DEVICE_NAME1, driver);
 
-        await driver.get(IDP_SERVICE_URL);
+        await driver.get(IDP_URL);
         const userNumber2 = await on_WelcomeBack(driver);
         expect(userNumber2).toBe(userNumber);
         await on_WelcomeBack_Fixup(driver);
@@ -348,9 +372,9 @@ test('Screenshots', async () => {
         await on_Main(DEVICE_NAME1, driver);
 
         // Now the link device flow, using a second browser
-        await run_in_browser_with_virtual_authenticator (async (driver2) => {
-            await driver2.get(IDP_SERVICE_URL);
-	    await on_Welcome(driver2);
+        await run_in_nested_browser_with_virtual_authenticator (async (driver2) => {
+            await driver2.get(IDP_URL);
+            await on_Welcome(driver2);
             await on_Welcome_TypeUserNumber(userNumber, driver2);
             await on_Welcome_AddDevice(driver2);
             const link = await on_AddDevice(driver2);
