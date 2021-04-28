@@ -241,8 +241,8 @@ async function run_in_nested_browser_with_virtual_authenticator(test) {
 async function run_in_browser_with_virtual_authenticator_common(outer, test) {
     const driver = new Builder().forBrowser('chrome')
         .setChromeOptions(new ChromeOptions()
-          // .headless() // hides the click show: uncomment to watch it
-          // .windowSize({width: 1024, height: 768})
+          .headless() // hides the click show: uncomment to watch it
+          .windowSize({width: 1024, height: 768})
         )
         .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
         .build();
