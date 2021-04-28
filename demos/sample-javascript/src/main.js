@@ -18,8 +18,10 @@ const init = async () => {
 
   // Redirect to the identity provider
   signInBtn.onclick = async () => {
-    authClient.loginWithRedirect({
+    authClient.login({
       identityProvider: idpUrlEl.value,
+    }, async function() {
+      principalEl.innerText = await authClient.getIdentity().getPrincipal();
     });
   };
 

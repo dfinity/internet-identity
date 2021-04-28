@@ -1,14 +1,16 @@
-import { AnonymousIdentity, Identity, Principal, SignIdentity } from '@dfinity/agent';
+import { AnonymousIdentity, blobFromUint8Array, derBlobFromBlob, Identity, Principal, SignIdentity } from '@dfinity/agent';
 import {
   createAuthenticationRequestUrl,
   createDelegationChainFromAccessToken,
   getAccessTokenFromWindow,
   isDelegationValid,
 } from '@dfinity/authentication';
-import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity';
+import { Delegation, DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity';
 
 const KEY_LOCALSTORAGE_KEY = 'identity';
 const KEY_LOCALSTORAGE_DELEGATION = 'delegation';
+const IDENTITY_PROVIDER_DEFAULT = "https://identity.ic0.app";
+const IDENTITY_PROVIDER_ENDPOINT = "#authorize";
 
 /**
  * List of options for creating an {@link AuthClient}.
@@ -139,6 +141,7 @@ export class AuthClient {
     return !this.getIdentity().getPrincipal().isAnonymous() && this._chain !== null;
   }
 
+  // TODO: deprecate/delete this?
   public async handleRedirectCallback(): Promise<Identity | null> {
     const maybeToken = getAccessTokenFromWindow();
     if (!maybeToken) {
@@ -173,6 +176,81 @@ export class AuthClient {
     }
   }
 
+  public async login(
+    options: { identityProvider?: string; maxTimeToLive?: BigInt } = {},
+    callback
+  ): Promise<void> {
+    let key = this._key;
+    if (!key) {
+      // Create a new key (whether or not one was in storage).
+      key = Ed25519KeyIdentity.generate();
+      this._key = key;
+      await this._storage.set(KEY_LOCALSTORAGE_KEY, JSON.stringify(key));
+    }
+
+    // Create the URL of the IDP. (e.g. https://XXXX/#authorize)
+    let identityProviderUrl = new URL(options.identityProvider || IDENTITY_PROVIDER_DEFAULT);
+    // Set the correct hash if it isn't already set.
+    identityProviderUrl.hash = IDENTITY_PROVIDER_ENDPOINT;
+
+    // Add an event listener to handle responses.
+    window.addEventListener("message", async (event) => {
+      if (event.origin !== identityProviderUrl.origin) {
+        console.log(`Received an event from origin ${event.origin} but expected ${identityProviderUrl.origin}`);
+        return;
+      }
+
+      const message = event.data;
+      console.log(`Received ${message.kind} message.`)
+
+      switch (message.kind) {
+        case "authorize-client-success":
+          // Create delegation chain and store it.
+          const delegationChain = DelegationChain.fromDelegations(
+            [
+              {
+                delegation: new Delegation(
+                  event.data.delegations[0].delegation.pubkey,
+                  event.data.delegations[0].delegation.expiration
+                ),
+                signature: event.data.delegations[0].signature
+              }
+            ],
+            derBlobFromBlob(blobFromUint8Array(Uint8Array.from(event.data.userPublicKey)))
+          );
+
+          const key = this._key;
+          if (!key) {
+            console.log("No key found");
+            return;
+          }
+
+          this._chain = delegationChain;
+          await this._storage.set(KEY_LOCALSTORAGE_DELEGATION, JSON.stringify(this._chain.toJSON()));
+          this._identity = DelegationIdentity.fromDelegation(key, this._chain);
+
+          identityWindow?.close();
+          // TODO: remove listener.
+          callback();
+          break;
+        case "authorize-ready":
+          // IDP is ready. Send a message to request authorization.
+          identityWindow?.postMessage({
+            kind: "authorize-client",
+            sessionPublicKey: this._key?.getPublicKey().toDer(),
+            maxTimeToLive: options.maxTimeToLive
+          }, identityProviderUrl.origin);
+          break;
+        default:
+          console.log(`Unknown message of kind ${message.kind}`)
+      }
+    });
+
+    // Open a new window with the IDP provider.
+    const identityWindow = window.open(identityProviderUrl.toString(), "idpWindow");
+  }
+
+  // TODO: Should this be deleted/deprecated?
   public async loginWithRedirect(
     options: { redirectUri?: string; scope?: Principal[]; identityProvider?: string } = {},
   ): Promise<void> {
