@@ -14,6 +14,7 @@ const IDP_AUTH_URL = `http://localhost:8000/authorize?canisterId=${IDENTITY_CANI
 const DEMO_APP_URL = 'http://localhost:8080/';
 
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
+const DEVICE_NAME2 = 'Other WebAuthn device';
 
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
@@ -25,7 +26,6 @@ test('Screenshots', async () => {
         await screenshot('01-register', driver);
 
         await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
-        // TODO: More reliable recognize this view
         await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
         await screenshot('02-register-confirm', driver);
 
@@ -68,6 +68,63 @@ test('Screenshots', async () => {
         await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
         // should be logged in again, no point taking screenshot
 
+
+        // Now the link device flow, using a second browser
+        await run_in_browser_with_virtual_authenticator (async (driver2) => {
+            await driver2.get(IDP_SERVICE_URL);
+
+            await driver2.wait(until.elementLocated(By.id('registerUserNumber')), 3_000).sendKeys(userNumber);
+            await driver2.findElement(By.id('addNewDeviceButton')).click();
+
+            let linkElem = await driver2.wait(until.elementLocated(By.id("linkText")), 3_000);
+            let link = await linkElem.getAttribute('value');
+            await driver2.executeScript("arguments[0].value = arguments[1];",linkElem, '(link removed from screenshot)');
+            await screenshot('06-new-device', driver2);
+            console.log('The add device link is', link);
+
+            // Log in with previous browser again
+            await driver.get('about:blank');
+            await driver.get(link);
+            await wait_for_fonts(driver);
+
+            // Welcome back flow
+            await driver.wait(until.elementLocated(By.id('login')));
+            let userNumberElem = await driver.findElement(By.className("highlightBox"));
+            await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            await screenshot('07-new-device-login', driver);
+
+            await driver.findElement(By.id('login')).click();
+
+            await driver.wait(until.elementLocated(By.id('addDevice')));
+            userNumberElem = await driver.findElement(By.className("highlightBox"));
+            await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            await screenshot('08-new-device-confirm', driver);
+
+
+            await driver.findElement(By.id('addDevice')).click();
+            await driver.wait(until.elementLocated(By.id('deviceAliasContinue')));
+            await screenshot('09-new-device-alias', driver);
+
+            await driver.findElement(By.id('deviceAlias')).sendKeys(DEVICE_NAME2, Key.RETURN);
+            await driver.findElement(By.id('deviceAliasContinue')).click();
+            await driver.sleep(5000);
+            await screenshot('10-new-device-done', driver);
+
+            // other browser redirects to welcome back view
+            await driver2.wait(until.elementLocated(By.id('login')));
+            userNumberElem = await driver2.findElement(By.className("highlightBox"));
+            await driver2.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            await screenshot('11-new-device-login', driver2);
+
+            // we login
+            await driver2.findElement(By.id('login')).click();
+
+            // and now we see the new device
+            await driver2.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME2}']`)), 3_000);
+            let h3 = await driver2.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
+            await driver2.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
+            await screenshot('12-new-device-listed', driver2);
+        })
     })
 }, 300_000);
 
@@ -116,13 +173,15 @@ async function run_in_browser_with_virtual_authenticator(test) {
         console.log(await driver.getPageSource());
         throw e;
     } finally {
-        await driver.quit();
+        // don’t quit, it seems to take down all of chrome, not just the current session
+        // await driver.quit();
+        await driver.close();
     }
 };
 
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
-    await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
+    await driver.findElement(By.id('registerAlias')).sendKeys(DEVICE_NAME1, Key.RETURN);
     await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
     await driver.findElement(By.id('confirmRegisterButton')).click();
 
@@ -137,7 +196,7 @@ async function logout(driver: ThenableWebDriver) {
 }
 
 async function login(userNumber: string, driver: ThenableWebDriver) {
-    await driver.findElement(By.id('registerUserNumber')).sendKeys(userNumber, Key.RETURN);
+    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 5_000).sendKeys(userNumber, Key.RETURN);
     await driver.findElement(By.id('loginButton')).click();
     await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
 }
@@ -162,7 +221,11 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
 async function wait_for_fonts(driver : ThenableWebDriver) {
-    while (await driver.executeScript("return document.fonts.status;") == "loading") {
-      driver.sleep(500);
+  for(var i = 0; i <= 10; i++) {
+    if (await driver.executeScript("return document.fonts.status;") == "loaded") {
+      return
     }
+    driver.sleep(200);
+  };
+  console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
 }
