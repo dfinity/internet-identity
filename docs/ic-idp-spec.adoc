@@ -99,7 +99,7 @@ If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per ht
 4. In the `identityWindow`, the user logs in, and the `identityWindow` invokes
 +
 --
- identityWindow.postMessage(msg, window.opener)
+ window.opener.postMessage(msg, "*")
 
 where `msg` is
 
