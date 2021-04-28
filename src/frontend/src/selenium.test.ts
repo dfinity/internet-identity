@@ -307,10 +307,10 @@ test('Log into client application, after registration', async () => {
         await nowOnAuthApp(driver);
         await onAuthAppConfirm(driver);
 
-        // check that we are indeed being redirected back
+        // check that we are indeed being redirected back to demo app
         let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
         expect(principal).not.toBe('2vxsx-fae');
-        // TODO: Use a whoami service to check that loggin in works
+        // TODO: Use a whoami service to check that logging in works
     })
 }, 300_000);
 

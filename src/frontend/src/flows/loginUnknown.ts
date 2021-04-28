@@ -146,7 +146,8 @@ const initLinkDevice = () => {
       // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
 
       let url = new URL(location.toString());
-      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`
+      url.pathname = '/';
+      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
       const link = encodeURI(url.toString());
 
       displayAddDeviceLink(link);
