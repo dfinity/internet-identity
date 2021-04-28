@@ -59,5 +59,14 @@ jobs:
       - run: npm ci
       - run: dfx start --background
       - run: dfx deploy --no-wallet --argument '(null)'
+      - run: rm -f screenshots/*.png
       - run: npm test
       - run: dfx stop
+
+      - name: Commit screenshots
+        uses: EndBug/add-and-commit@v7.2.0
+        if: ${{ github.event_name == 'pull_request' }}
+        add: screenshots
+        author_name: Screenshot Committer
+        author_email: '<nobody@example.com>'
+        message: 'Updating selenium screenshots'
