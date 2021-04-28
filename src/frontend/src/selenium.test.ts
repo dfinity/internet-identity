@@ -191,7 +191,7 @@ async function nowOnAddDeviceSuccess(driver: ThenableWebDriver) {
 // View: Authorize application
 
 async function nowOnAuthApp(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('confirmRedirect')), 10_000);
+    await driver.wait(until.elementLocated(By.id('confirmRedirect')), 5_000);
 }
 
 async function onAuthAppConfirm(driver: ThenableWebDriver) {
@@ -260,7 +260,6 @@ async function run_in_browser_with_virtual_authenticator(test) {
 */
 
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
-    await driver.get(IDP_SERVICE_URL);
     await nowOnWelcome(driver);
     await onWelcomeRegister(driver);
     await nowOnRegister(driver);
