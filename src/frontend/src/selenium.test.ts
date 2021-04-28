@@ -3,6 +3,34 @@ import { Executor, Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
 
+/*
+## Structure of this file
+
+ - Constants
+
+ - Assertions and actions, grouped by View
+
+   - nowOnX() assertions:
+     These wait for a characteristic element of view `X`
+     Some return useful data from view `X`
+
+   - onXY() actions:
+     These should be run on `X`, and they perform the action `Y`
+     Most actions will go to a different view, but not all of them.
+
+   - onXFixup() actions:
+     These should be run on view `X`, and they replace variable data
+     (mostly usernames) with fixed data for screenshots
+
+ - Setup helpers (getting web driver, waiting for fonts to be loaded)
+
+ - The actual tests
+*/
+
+/*
+## Constants
+*/
+
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids from '../../../.dfx/local/canister_ids.json';
@@ -16,71 +44,156 @@ const DEMO_APP_URL = 'http://localhost:8080/';
 const DEVICE_NAME1 = 'Virtual WebAuthn device';
 const DEVICE_NAME2 = 'Other WebAuthn device';
 
+/*
+## Per-view helpers
+*/
+
+// View: Welcome
+
+async function nowOnWelcome(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 3_000);
+}
+
+async function onWelcomeTypeUserNumber(user_number: string, driver: ThenableWebDriver) {
+    await driver.findElement(By.id('registerUserNumber'), 3_000).sendKeys(user_number);
+}
+
+async function onWelcomeLogin(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('loginButton')).click();
+}
+
+async function onWelcomeRegister(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('registerButton')).click();
+}
+
+async function onWelcomeAddDevice(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('addNewDeviceButton')).click();
+}
+
+// View: Register
+
+async function nowOnRegister(driver: ThenableWebDriver) {
+}
+
+async function onRegisterTypeAliasEnter(alias : string, driver: ThenableWebDriver) {
+    await driver.findElement(By.id('registerAlias')).sendKeys(alias, Key.RETURN);
+}
+
+// View: Register confirmation
+
+async function nowOnRegisterConfirm(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
+}
+
+async function onRegisterConfirmConfirm(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('confirmRegisterButton')).click();
+}
+
+// View: Register Show Number
+
+async function nowOnRegisterShowNumber(driver: ThenableWebDriver) : Promise<string> {
+  await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
+  return await driver.findElement(By.className("highlightBox")).getText();
+}
+
+async function onRegisterShowNumberContinue(driver: ThenableWebDriver) {
+  await driver.findElement(By.id('displayUserContinue')).click();
+}
+
+async function onRegisterShowNumberFixup(driver: ThenableWebDriver) {
+  const elem = await driver.findElement(By.className("highlightBox"));
+  await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
+}
+
+// View: Main view
+
+async function nowOnMain(device_name : string, driver : ThenableWebDriver) {
+    // wait for device list to load
+    await driver.wait(until.elementLocated(By.xpath(`//span[string()='${device_name}']`)), 3_000);
+}
+
+async function onMainLogout(driver : ThenableWebDriver) {
+    await driver.findElement(By.id('logoutButton')).click();
+}
+
+async function onMainFixup(driver : ThenableWebDriver) {
+    // replace the user number for a reproducible screenshot
+    let elem = await driver.findElement(By.id('userNumberSpan'));
+    await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
+}
+
+// View: Welcome back
+
+async function nowOnWelcomeBack(driver: ThenableWebDriver) : Promise<string> {
+  await driver.wait(until.elementLocated(By.id('loginDifferent')), 15_000);
+  return await driver.findElement(By.className("highlightBox")).getText();
+}
+
+async function onWelcomeBackFixup(driver: ThenableWebDriver) {
+  const elem = await driver.findElement(By.className("highlightBox"));
+  await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
+}
+
+async function onWelcomeBackLogin(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('login')).click();
+}
+
+// View: Add device
+
+async function nowOnAddDevice(driver: ThenableWebDriver): Promise<string> {
+  return await driver.wait(until.elementLocated(By.id("linkText")), 3_000).getAttribute('value');
+}
+
+async function onAddDeviceFixup(driver : ThenableWebDriver) {
+  const elem = await driver.wait(until.elementLocated(By.id("linkText")), 3_000);
+  await driver.executeScript("arguments[0].value = arguments[1];", elem, '(link removed from screenshot)');
+}
+
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
         await driver.get(IDP_SERVICE_URL);
         await wait_for_fonts(driver);
+
+	await nowOnWelcome(driver);
         await screenshot('00-welcome', driver);
-
-        await driver.wait(until.elementLocated(By.id('registerButton')), 3_000).click();
+	await onWelcomeRegister(driver);
+	await nowOnRegister(driver);
         await screenshot('01-register', driver);
-
-        await driver.findElement(By.id('registerAlias')).sendKeys('Virtual WebAuthn device', Key.RETURN);
-        await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 5_000);
+        await onRegisterTypeAliasEnter(DEVICE_NAME1, driver);
+        await nowOnRegisterConfirm(driver);
         await screenshot('02-register-confirm', driver);
-
-        await driver.findElement(By.id('confirmRegisterButton')).click();
-        let continueButton = await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
-        let userNumberElem = await driver.findElement(By.className("highlightBox"));
-        let userNumber = await userNumberElem.getText();
-        // replace the user number for a reproducible screenshot
-        await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+        await onRegisterConfirmConfirm(driver);
+        const userNumber = await nowOnRegisterShowNumber(driver);
+        await onRegisterShowNumberFixup(driver);
         await screenshot('03-register-user-number', driver);
-
-        await continueButton.click();
-        // wait for device list to load
-        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
-        // replace the user number for a reproducible screenshot
-        let h3 = await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
-        await driver.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
+        await onRegisterShowNumberContinue(driver);
+        await nowOnMain(DEVICE_NAME1, driver);
+        await onMainFixup(driver);
         await screenshot('04-main', driver);
-
-        await driver.findElement(By.id('logoutButton')).click();
-        await driver.wait(until.elementLocated(By.id('registerButton')), 3_000);
-        // should be at welcome again, no point taking screenshot
-
-        await driver.findElement(By.id('registerUserNumber'), 3_000).sendKeys(userNumber);
-        await driver.findElement(By.id('loginButton')).click();
-        // wait for device list to load
-        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
-        // should be logged in again, no point taking screenshot
+        await onMainLogout(driver);
+        await nowOnWelcome(driver); // no point taking screenshot
+        await onWelcomeTypeUserNumber(userNumber, driver);
+        await onWelcomeLogin(driver);
+        await nowOnMain(DEVICE_NAME1, driver);
 
         await driver.get(IDP_SERVICE_URL);
-        let userNumberElem2 = await driver.findElement(By.className("highlightBox"));
-        let userNumber2 = await userNumberElem2.getText();
-        // replace the user number for a reproducible screenshot
-        await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem2, '12345');
+        const userNumber2 = await nowOnWelcomeBack(driver);
         expect(userNumber2).toBe(userNumber);
+        await onWelcomeBackFixup(driver);
         await screenshot('05-welcome-back', driver);
-
-        await driver.findElement(By.id('login')).click();
-        // wait for device list to load
-        await driver.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME1}']`)), 3_000);
-        // should be logged in again, no point taking screenshot
-
+        await onWelcomeBackLogin(driver);
+        await nowOnMain(DEVICE_NAME1, driver);
 
         // Now the link device flow, using a second browser
         await run_in_browser_with_virtual_authenticator (async (driver2) => {
             await driver2.get(IDP_SERVICE_URL);
-
-            await driver2.wait(until.elementLocated(By.id('registerUserNumber')), 3_000).sendKeys(userNumber);
-            await driver2.findElement(By.id('addNewDeviceButton')).click();
-
-            let linkElem = await driver2.wait(until.elementLocated(By.id("linkText")), 3_000);
-            let link = await linkElem.getAttribute('value');
-            await driver2.executeScript("arguments[0].value = arguments[1];",linkElem, '(link removed from screenshot)');
-            await screenshot('06-new-device', driver2);
+	    await nowOnWelcome(driver2);
+            await onWelcomeTypeUserNumber(userNumber, driver2);
+            await onWelcomeAddDevice(driver2);
+            const link = await nowOnAddDevice(driver2);
             console.log('The add device link is', link);
+            await onAddDeviceFixup(driver2);
+            await screenshot('06-new-device', driver2);
 
             // Log in with previous browser again
             await driver.get('about:blank');
@@ -88,15 +201,13 @@ test('Screenshots', async () => {
             await wait_for_fonts(driver);
 
             // Welcome back flow
-            await driver.wait(until.elementLocated(By.id('login')));
-            let userNumberElem = await driver.findElement(By.className("highlightBox"));
-            await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            await nowOnWelcomeBack(driver);
+            await onWelcomeBackFixup(driver);
             await screenshot('07-new-device-login', driver);
-
-            await driver.findElement(By.id('login')).click();
+            await onWelcomeBackLogin(driver);
 
             await driver.wait(until.elementLocated(By.id('addDevice')));
-            userNumberElem = await driver.findElement(By.className("highlightBox"));
+            let userNumberElem = await driver.findElement(By.className("highlightBox"));
             await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
             await screenshot('08-new-device-confirm', driver);
 
