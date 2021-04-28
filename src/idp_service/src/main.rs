@@ -10,7 +10,7 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use storage::{Salt, Storage};
+use storage::{Salt, Storage, MAX_ENTRIES_PER_USER};
 
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
@@ -201,6 +201,9 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
                     .unwrap_or_else(|err| {
                         trap(&format!("failed to store user device data: {}", err))
                     });
+                store.inc_entry_count(1);
+                store.flush();
+
                 nonce_cache.add(pow.timestamp, pow.nonce);
                 RegisterResponse::Registered { user_number }
             }
@@ -211,8 +214,6 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
 
 #[update]
 async fn add(user_number: UserNumber, device_data: DeviceData) {
-    const MAX_ENTRIES_PER_USER: usize = 10;
-
     check_entry_limits(&device_data);
 
     ensure_salt_set().await;
@@ -241,15 +242,19 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         }
 
         entries.push(device_data);
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to write device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+
+        let mut storage = s.storage.borrow_mut();
+        storage.dec_entry_count(entries.len() - 1);
+        storage.inc_entry_count(entries.len());
+
+        storage.write(user_number, entries).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        storage.flush();
 
         prune_expired_signatures(&mut s.sigs.borrow_mut());
     })
@@ -296,7 +301,7 @@ async fn prepare_delegation(
     user_number: UserNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
-    max_time_to_live : Option<u64>
+    max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
     ensure_salt_set().await;
 
@@ -312,7 +317,10 @@ async fn prepare_delegation(
 
         check_frontend_length(&frontend);
 
-        let delta = u64::min(max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS), MAX_EXPIRATION_PERIOD_NS);
+        let delta = u64::min(
+            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+            MAX_EXPIRATION_PERIOD_NS,
+        );
         let expiration = (time() as u64).saturating_add(delta);
 
         let seed = calculate_seed(user_number, &frontend);
@@ -377,6 +385,18 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_signature_count",
             s.sigs.borrow().len() as f64,
             "Number of active signatures issued by this canister.",
+        )?;
+        let device_count: u64 = s.storage.borrow().entry_count_stats().iter().sum();
+        w.encode_histogram(
+            "internet_identity_devices_per_user_count",
+            s.storage
+                .borrow()
+                .entry_count_stats()
+                .iter()
+                .enumerate()
+                .map(|(n, c)| (n as f64, *c as f64)),
+            device_count as f64,
+            "Number of devices added per user.",
         )?;
         Ok(())
     })

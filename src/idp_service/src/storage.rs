@@ -13,7 +13,10 @@ const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const WASM_PAGE_SIZE: u32 = 65536;
 
+pub const MAX_ENTRIES_PER_USER: usize = 10;
+
 pub type Salt = [u8; 32];
+pub type CountStats = [u64; MAX_ENTRIES_PER_USER + 1];
 
 /// Data type responsible for managing user data in stable memory.
 pub struct Storage<T> {
@@ -29,7 +32,10 @@ struct Header {
     id_range_lo: u64,
     id_range_hi: u64,
     entry_size: u16,
-    salt: [u8; 32],
+    salt: Salt,
+    /// extra padding to make entry stats aligned to 64 bits
+    _padding: [u8; 2],
+    entry_count_stats: CountStats,
 }
 
 impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
@@ -45,6 +51,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 id_range_hi: user_number_range.1,
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
+                _padding: [0; 2],
+                entry_count_stats: CountStats::default(),
             },
             _marker: PhantomData,
         };
@@ -173,6 +181,32 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             candid::de::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
 
         Ok(data)
+    }
+
+    fn check_entry_count_range(count: usize) {
+        if count > MAX_ENTRIES_PER_USER {
+            trap(&format!(
+                "requested to update stats for count {} which is \
+                 higher than the max allowed count {}",
+                count, MAX_ENTRIES_PER_USER
+            ));
+        }
+    }
+
+    pub fn inc_entry_count(&mut self, count: usize) {
+        Self::check_entry_count_range(count);
+        self.header.entry_count_stats[count] =
+            self.header.entry_count_stats[count].saturating_add(1);
+    }
+
+    pub fn dec_entry_count(&mut self, count: usize) {
+        Self::check_entry_count_range(count);
+        self.header.entry_count_stats[count] =
+            self.header.entry_count_stats[count].saturating_sub(1);
+    }
+
+    pub fn entry_count_stats(&self) -> CountStats {
+        unsafe { self.header.entry_count_stats.clone() }
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
