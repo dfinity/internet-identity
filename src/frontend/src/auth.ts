@@ -43,14 +43,15 @@ export default async function setup(userNumber: UserNumber, connection: IDPActor
     if (message.kind === "authorize-client") {
       console.log("Handling authorize-client request.");
       const response = await handleAuthRequest(connection, userNumber, message, event.origin);
-      window.opener.postMessage(response, event.origin);
-    } else if (message.kind === "authorize-ping") {
-      // Send a message to indicate we're ready.
-      window.opener.postMessage(READY_MESSAGE, event.origin);
+
+      (event.source as WindowProxy).postMessage(response, event.origin);
     } else {
       console.log(`Message of unknown kind received: ${message}`)
     }
   });
+
+  // Send a message to indicate we're ready.
+  window.opener.postMessage(READY_MESSAGE, "*"); // TODO: fix the origin
 }
 
 async function handleAuthRequest(
