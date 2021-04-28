@@ -192,17 +192,20 @@ export class AuthClient {
           }, identityProviderUrl.origin);
           break;
         case "authorize-client-success":
-          // Create delegation chain and store it.
+          // Create the delegation chain and store it.
+          const delegations = message.delegations.map(signedDelegation => {
+            return {
+              delegation: new Delegation(
+                signedDelegation.delegation.pubkey,
+                signedDelegation.delegation.expiration,
+                signedDelegation.delegation.targets
+              ),
+              signature: signedDelegation.signature
+            };
+          });
+
           const delegationChain = DelegationChain.fromDelegations(
-            [
-              {
-                delegation: new Delegation(
-                  event.data.delegations[0].delegation.pubkey,
-                  event.data.delegations[0].delegation.expiration
-                ),
-                signature: event.data.delegations[0].signature
-              }
-            ],
+            delegations,
             derBlobFromBlob(blobFromUint8Array(Uint8Array.from(event.data.userPublicKey)))
           );
 
