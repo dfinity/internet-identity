@@ -322,7 +322,7 @@ test('Log into client application, after registration', async () => {
         // wait for window to close
         await driver.wait(async (driver) => {
           return (await driver.getAllWindowHandles()).length == 1
-        }, 5_000);
+        }, 10_000);
 
         handles = await driver.getAllWindowHandles();
         expect(handles.length).toBe(1);
