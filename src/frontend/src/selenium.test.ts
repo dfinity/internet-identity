@@ -125,13 +125,13 @@ async function onMainFixup(driver : ThenableWebDriver) {
 // View: Welcome back
 
 async function nowOnWelcomeBack(driver: ThenableWebDriver) : Promise<string> {
-  await driver.wait(until.elementLocated(By.id('loginDifferent')), 15_000);
-  return await driver.findElement(By.className("highlightBox")).getText();
+    await driver.wait(until.elementLocated(By.id('loginDifferent')), 15_000);
+    return await driver.findElement(By.className("highlightBox")).getText();
 }
 
 async function onWelcomeBackFixup(driver: ThenableWebDriver) {
-  const elem = await driver.findElement(By.className("highlightBox"));
-  await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
+    const elem = await driver.findElement(By.className("highlightBox"));
+    await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
 }
 
 async function onWelcomeBackLogin(driver: ThenableWebDriver) {
@@ -141,13 +141,109 @@ async function onWelcomeBackLogin(driver: ThenableWebDriver) {
 // View: Add device
 
 async function nowOnAddDevice(driver: ThenableWebDriver): Promise<string> {
-  return await driver.wait(until.elementLocated(By.id("linkText")), 3_000).getAttribute('value');
+    return await driver.wait(until.elementLocated(By.id("linkText")), 3_000).getAttribute('value');
 }
 
 async function onAddDeviceFixup(driver : ThenableWebDriver) {
-  const elem = await driver.wait(until.elementLocated(By.id("linkText")), 3_000);
-  await driver.executeScript("arguments[0].value = arguments[1];", elem, '(link removed from screenshot)');
+    const elem = await driver.wait(until.elementLocated(By.id("linkText")), 3_000);
+    await driver.executeScript("arguments[0].value = arguments[1];", elem, '(link removed from screenshot)');
 }
+
+// View: Add device confirm
+
+async function nowOnAddDeviceConfirm(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('addDevice')), 3_000);
+}
+
+async function onAddDeviceConfirmConfirm(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('addDevice')).click();
+}
+
+async function onAddDeviceConfirmFixup(driver : ThenableWebDriver) {
+    const userNumberElem = await driver.findElement(By.className("highlightBox"));
+    await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+}
+
+// View: Add device alias
+
+async function nowOnAddDeviceAlias(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('deviceAliasContinue')), 3_000);
+}
+
+async function onAddDeviceAliasType(alias : string, driver: ThenableWebDriver) {
+    await driver.findElement(By.id('deviceAlias')).sendKeys(alias);
+}
+
+async function onAddDeviceAliasContinue(driver: ThenableWebDriver) {
+    await driver.findElement(By.id('deviceAliasContinue')).click();
+}
+
+// View: Add device success
+
+async function nowOnAddDeviceSuccess(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('manageDevicesButton')), 10_000);
+}
+
+/*
+## Setup helpers
+*/
+
+async function addVirtualAuthenticator(executor: Executor, sessionId: string) {
+    executor.defineCommand("AddVirtualAuthenticator", "POST", "/session/:sessionId/webauthn/authenticator");
+    const cmd = new Command('AddVirtualAuthenticator');
+    cmd.setParameter('protocol', 'ctap2');
+    cmd.setParameter('transport', 'usb');
+    cmd.setParameter('hasResidentKey', true);
+    cmd.setParameter('isUserConsenting', true);
+    cmd.setParameter('sessionId', sessionId);
+    await executor.execute(cmd);
+}
+
+async function screenshot(name : string, driver: ThenableWebDriver) {
+    let image = await driver.takeScreenshot();
+    // writing to a subdirectory has the nice property that it fails if
+    // this is run in the wrong directory
+    await writeFile(`screenshots/${name}.png`, image, 'base64');
+}
+
+// Inspired by https://stackoverflow.com/a/66919695/946226
+async function wait_for_fonts(driver : ThenableWebDriver) {
+  for(var i = 0; i <= 10; i++) {
+    if (await driver.executeScript("return document.fonts.status;") == "loaded") {
+      return
+    }
+    driver.sleep(200);
+  };
+  console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
+}
+
+async function run_in_browser_with_virtual_authenticator(test) {
+    const driver = new Builder().forBrowser('chrome')
+        .setChromeOptions(new ChromeOptions()
+          .headless() // hides the click show: uncomment to watch it
+          .windowSize({width: 1024, height: 768})
+        )
+        .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
+        .build();
+    try {
+        const session = await driver.getSession();
+        await addVirtualAuthenticator(driver.getExecutor(), session.getId());
+        await test(driver);
+    } catch (e) {
+        console.log(await driver.manage().logs().get('browser'));
+        console.log(await driver.getPageSource());
+        throw e;
+    } finally {
+        // don’t quit, it seems to take down all of chrome, not just the current session
+        // await driver.quit();
+        await driver.close();
+    }
+};
+
+
+/*
+## The actual tests
+*/
 
 test('Screenshots', async () => {
     await run_in_browser_with_virtual_authenticator(async (driver) => {
@@ -199,41 +295,28 @@ test('Screenshots', async () => {
             await driver.get('about:blank');
             await driver.get(link);
             await wait_for_fonts(driver);
-
-            // Welcome back flow
             await nowOnWelcomeBack(driver);
             await onWelcomeBackFixup(driver);
             await screenshot('07-new-device-login', driver);
             await onWelcomeBackLogin(driver);
-
-            await driver.wait(until.elementLocated(By.id('addDevice')));
-            let userNumberElem = await driver.findElement(By.className("highlightBox"));
-            await driver.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            await nowOnAddDeviceConfirm(driver);
+            await onAddDeviceConfirmFixup(driver);
             await screenshot('08-new-device-confirm', driver);
-
-
-            await driver.findElement(By.id('addDevice')).click();
-            await driver.wait(until.elementLocated(By.id('deviceAliasContinue')));
+            await onAddDeviceConfirmConfirm(driver);
+            await nowOnAddDeviceAlias(driver);
             await screenshot('09-new-device-alias', driver);
-
-            await driver.findElement(By.id('deviceAlias')).sendKeys(DEVICE_NAME2, Key.RETURN);
-            await driver.findElement(By.id('deviceAliasContinue')).click();
-            await driver.sleep(5000);
+            await onAddDeviceAliasType(DEVICE_NAME2, driver);
+            await onAddDeviceAliasContinue(driver);
+            await nowOnAddDeviceSuccess(driver);
             await screenshot('10-new-device-done', driver);
 
-            // other browser redirects to welcome back view
-            await driver2.wait(until.elementLocated(By.id('login')));
-            userNumberElem = await driver2.findElement(By.className("highlightBox"));
-            await driver2.executeScript("arguments[0].innerText = arguments[1];", userNumberElem, '12345');
+            // Back to other browser, should be a welcome view now
+            await nowOnWelcomeBack(driver2);
+            await onWelcomeBackFixup(driver2);
             await screenshot('11-new-device-login', driver2);
-
-            // we login
-            await driver2.findElement(By.id('login')).click();
-
-            // and now we see the new device
-            await driver2.wait(until.elementLocated(By.xpath(`//span[string()='${DEVICE_NAME2}']`)), 3_000);
-            let h3 = await driver2.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
-            await driver2.executeScript("arguments[0].innerText = arguments[1];", h3, 'Your User Number is 12345');
+            await onWelcomeBackLogin(driver2);
+            await nowOnMain(DEVICE_NAME2, driver2);
+            await onMainFixup(driver2);
             await screenshot('12-new-device-listed', driver2);
         })
     })
@@ -267,29 +350,6 @@ test('Log into client application, after registration', async () => {
     })
 }, 300_000);
 
-async function run_in_browser_with_virtual_authenticator(test) {
-    const driver = new Builder().forBrowser('chrome')
-        .setChromeOptions(new ChromeOptions()
-          .headless() // hides the click show: uncomment to watch it
-          .windowSize({width: 1024, height: 768})
-        )
-        .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
-        .build();
-    try {
-        const session = await driver.getSession();
-        await addVirtualAuthenticator(driver.getExecutor(), session.getId());
-        await test(driver);
-    } catch (e) {
-        console.log(await driver.manage().logs().get('browser'));
-        console.log(await driver.getPageSource());
-        throw e;
-    } finally {
-        // don’t quit, it seems to take down all of chrome, not just the current session
-        // await driver.quit();
-        await driver.close();
-    }
-};
-
 async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
     await driver.wait(until.elementLocated(By.id('registerButton')), 5_000).click();
     await driver.findElement(By.id('registerAlias')).sendKeys(DEVICE_NAME1, Key.RETURN);
@@ -312,31 +372,3 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
     await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
 }
 
-async function addVirtualAuthenticator(executor: Executor, sessionId: string) {
-    executor.defineCommand("AddVirtualAuthenticator", "POST", "/session/:sessionId/webauthn/authenticator");
-    const cmd = new Command('AddVirtualAuthenticator');
-    cmd.setParameter('protocol', 'ctap2');
-    cmd.setParameter('transport', 'usb');
-    cmd.setParameter('hasResidentKey', true);
-    cmd.setParameter('isUserConsenting', true);
-    cmd.setParameter('sessionId', sessionId);
-    await executor.execute(cmd);
-}
-
-async function screenshot(name : string, driver: ThenableWebDriver) {
-    let image = await driver.takeScreenshot();
-    // writing to a subdirectory has the nice property that it fails if
-    // this is run in the wrong directory
-    await writeFile(`screenshots/${name}.png`, image, 'base64');
-}
-
-// Inspired by https://stackoverflow.com/a/66919695/946226
-async function wait_for_fonts(driver : ThenableWebDriver) {
-  for(var i = 0; i <= 10; i++) {
-    if (await driver.executeScript("return document.fonts.status;") == "loaded") {
-      return
-    }
-    driver.sleep(200);
-  };
-  console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
-}
