@@ -29,6 +29,7 @@ const init = async () => {
 
   signOutBtn.onclick = async () => {
     authClient.logout();
+    principalEl.innerText = await authClient.getIdentity().getPrincipal();
   };
 
   if (location.hash.substring(1).startsWith("access_token")) {

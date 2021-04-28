@@ -131,6 +131,10 @@ export class AuthClient {
     private _key: SignIdentity | null,
     private _chain: DelegationChain | null,
     private _storage: AuthClientStorage,
+    // A handle on the IdP window.
+    private _idpWindow?: Window,
+    // A controller used to remove the event listener in the login flow.
+    private _abortController?: AbortController,
   ) {}
 
   public getIdentity(): Identity {
@@ -139,41 +143,6 @@ export class AuthClient {
 
   public async isAuthenticated(): Promise<boolean> {
     return !this.getIdentity().getPrincipal().isAnonymous() && this._chain !== null;
-  }
-
-  // TODO: deprecate/delete this?
-  public async handleRedirectCallback(): Promise<Identity | null> {
-    const maybeToken = getAccessTokenFromWindow();
-    if (!maybeToken) {
-      return null;
-    }
-    const key = this._key;
-    if (!key) {
-      return null;
-    }
-
-    this._chain = createDelegationChainFromAccessToken(maybeToken);
-    await this._storage.set(KEY_LOCALSTORAGE_DELEGATION, JSON.stringify(this._chain.toJSON()));
-    this._identity = DelegationIdentity.fromDelegation(key, this._chain);
-
-    return this._identity;
-  }
-
-  public async logout(options: { returnTo?: string } = {}): Promise<void> {
-    _deleteStorage(this._storage);
-
-    // Reset this auth client to a non-authenticated state.
-    this._identity = new AnonymousIdentity();
-    this._key = null;
-    this._chain = null;
-
-    if (options.returnTo) {
-      try {
-        window.history.pushState({}, '', options.returnTo);
-      } catch (e) {
-        window.location.href = options.returnTo;
-      }
-    }
   }
 
   public async login(
@@ -194,7 +163,16 @@ export class AuthClient {
     // Set the correct hash if it isn't already set.
     identityProviderUrl.hash = IDENTITY_PROVIDER_ENDPOINT;
 
+    // If `login` has been called previously, then close/remove any previous windows
+    // and event listeners.
+    this._idpWindow?.close();
+    this._abortController?.abort();
+
     // Add an event listener to handle responses.
+    // The event listener is associated with a controller that signals the listener
+    // to remove itself as soon as authentication is complete.
+    this._abortController = new AbortController();
+    // @ts-ignore (typescript doesn't understand adding an event listener with a signal).
     window.addEventListener("message", async (event) => {
       if (event.origin !== identityProviderUrl.origin) {
         console.log(`Received an event from origin ${event.origin} but expected ${identityProviderUrl.origin}`);
@@ -207,7 +185,7 @@ export class AuthClient {
       switch (message.kind) {
         case "authorize-ready":
           // IDP is ready. Send a message to request authorization.
-          identityWindow?.postMessage({
+          this._idpWindow?.postMessage({
             kind: "authorize-client",
             sessionPublicKey: this._key?.getPublicKey().toDer(),
             maxTimeToLive: options.maxTimeToLive
@@ -238,43 +216,41 @@ export class AuthClient {
           await this._storage.set(KEY_LOCALSTORAGE_DELEGATION, JSON.stringify(this._chain.toJSON()));
           this._identity = DelegationIdentity.fromDelegation(key, this._chain);
 
-          identityWindow?.close();
-          // TODO: remove listener.
+          this._idpWindow?.close();
           onSuccess();
+          this._abortController?.abort(); // Send the abort signal to remove event listener.
           break;
         case "authorize-client-failure":
-          identityWindow?.close();
-          // TODO: remove listener.
+          this._idpWindow?.close();
           onError(message.text);
+          this._abortController?.abort(); // Send the abort signal to remove event listener.
           break;
         default:
           console.log(`Unknown message of kind ${message.kind}`)
       }
-    });
+    }, { signal: this._abortController.signal });
 
     // Open a new window with the IDP provider.
-    const identityWindow = window.open(identityProviderUrl.toString(), "idpWindow");
+    const w = window.open(identityProviderUrl.toString(), "idpWindow");
+    if (w) {
+      this._idpWindow = w;
+    }
   }
 
-  // TODO: Should this be deleted/deprecated?
-  public async loginWithRedirect(
-    options: { redirectUri?: string; scope?: Principal[]; identityProvider?: string } = {},
-  ): Promise<void> {
-    let key = this._key;
-    if (!key) {
-      // Create a new key (whether or not one was in storage).
-      key = Ed25519KeyIdentity.generate();
-      this._key = key;
-      await this._storage.set(KEY_LOCALSTORAGE_KEY, JSON.stringify(key));
+  public async logout(options: { returnTo?: string } = {}): Promise<void> {
+    _deleteStorage(this._storage);
+
+    // Reset this auth client to a non-authenticated state.
+    this._identity = new AnonymousIdentity();
+    this._key = null;
+    this._chain = null;
+
+    if (options.returnTo) {
+      try {
+        window.history.pushState({}, '', options.returnTo);
+      } catch (e) {
+        window.location.href = options.returnTo;
+      }
     }
-
-    const url = createAuthenticationRequestUrl({
-      publicKey: key.getPublicKey(),
-      scope: options.scope || [],
-      redirectUri: options.redirectUri || window.location.origin,
-      identityProvider: options.identityProvider,
-    });
-
-    window.location.href = url.toString();
   }
 }
