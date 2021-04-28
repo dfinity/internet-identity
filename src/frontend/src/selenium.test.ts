@@ -196,7 +196,7 @@ async function logout(driver: ThenableWebDriver) {
 }
 
 async function login(userNumber: string, driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 3_000).sendKeys(userNumber, Key.RETURN);
+    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 5_000).sendKeys(userNumber, Key.RETURN);
     await driver.findElement(By.id('loginButton')).click();
     await driver.wait(until.elementLocated(By.xpath("//h3[string()='Your User Number is "+userNumber+"']")), 15_000);
 }
