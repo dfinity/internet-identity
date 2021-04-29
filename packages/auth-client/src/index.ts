@@ -1,8 +1,5 @@
-import { AnonymousIdentity, blobFromUint8Array, derBlobFromBlob, Identity, Principal, SignIdentity } from '@dfinity/agent';
+import { AnonymousIdentity, blobFromUint8Array, derBlobFromBlob, Identity, SignIdentity } from '@dfinity/agent';
 import {
-  createAuthenticationRequestUrl,
-  createDelegationChainFromAccessToken,
-  getAccessTokenFromWindow,
   isDelegationValid,
 } from '@dfinity/authentication';
 import { Delegation, DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity';
@@ -159,7 +156,7 @@ export class AuthClient {
     }
 
     // Create the URL of the IDP. (e.g. https://XXXX/#authorize)
-    let identityProviderUrl = new URL(options.identityProvider || IDENTITY_PROVIDER_DEFAULT);
+    const identityProviderUrl = new URL(options.identityProvider || IDENTITY_PROVIDER_DEFAULT);
     // Set the correct hash if it isn't already set.
     identityProviderUrl.hash = IDENTITY_PROVIDER_ENDPOINT;
 
@@ -191,7 +188,7 @@ export class AuthClient {
             maxTimeToLive: options.maxTimeToLive
           }, identityProviderUrl.origin);
           break;
-        case "authorize-client-success":
+        case "authorize-client-success": {
           // Create the delegation chain and store it.
           const delegations = message.delegations.map(signedDelegation => {
             return {
@@ -223,6 +220,7 @@ export class AuthClient {
           onSuccess();
           this._abortController?.abort(); // Send the abort signal to remove event listener.
           break;
+        }
         case "authorize-client-failure":
           this._idpWindow?.close();
           onError(message.text);
