@@ -72,7 +72,7 @@ async function on_Welcome_AddDevice(driver: ThenableWebDriver) {
     await driver.findElement(By.id('addNewDeviceButton')).click();
 }
 
-// View: _Register
+// View: Register
 
 async function on_Register(driver: ThenableWebDriver) {
 }
@@ -81,7 +81,7 @@ async function on_Register_TypeAliasEnter(alias : string, driver: ThenableWebDri
     await driver.findElement(By.id('registerAlias')).sendKeys(alias, Key.RETURN);
 }
 
-// View: _Register confirmation
+// View: Register confirmation
 
 async function on_RegisterConfirm(driver: ThenableWebDriver) {
     await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 15_000);
@@ -91,7 +91,7 @@ async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {
     await driver.findElement(By.id('confirmRegisterButton')).click();
 }
 
-// View: _Register Show Number
+// View: Register Show Number
 
 async function on_RegisterShowNumber(driver: ThenableWebDriver) : Promise<string> {
   await driver.wait(until.elementLocated(By.id('displayUserContinue')), 15_000);
