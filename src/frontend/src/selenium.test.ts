@@ -147,9 +147,17 @@ async function on_AddDeviceUserNumber(driver: ThenableWebDriver): Promise<string
 
 async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_number?: string) {
     if (user_number) {
+        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(Key.DELETE);
         await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(user_number);
     }
     await driver.findElement(By.id('addDeviceUserNumberContinue')).click()
+}
+
+async function on_AddDeviceUserNumber_Fixup(driver : ThenableWebDriver) {
+    // replace the user number for a reproducible screenshot
+    let elem = await driver.findElement(By.id('addDeviceUserNumber'));
+    await driver.executeScript("arguments[0].value = arguments[1];", elem, '12345');
 }
 
 // View: Add device
@@ -390,11 +398,13 @@ test('Screenshots', async () => {
             await on_Welcome_TypeUserNumber(userNumber, driver2);
             await on_Welcome_AddDevice(driver2);
             const carriedUserNumber = await on_AddDeviceUserNumber(driver2);
-            await on_AddDeviceUserNumber_Continue(driver2);
+            await on_AddDeviceUserNumber_Fixup(driver2);
+            await screenshot('06-new-device-user-number', driver2);
+            await on_AddDeviceUserNumber_Continue(driver2, userNumber);
             const link = await on_AddDevice(driver2);
             console.log('The add device link is', link);
             await on_AddDevice_Fixup(driver2);
-            await screenshot('06-new-device', driver2);
+            await screenshot('07-new-device', driver2);
 
             // Log in with previous browser again
             await driver.get('about:blank');
@@ -402,27 +412,27 @@ test('Screenshots', async () => {
             await wait_for_fonts(driver);
             await on_WelcomeBack(driver);
             await on_WelcomeBack_Fixup(driver);
-            await screenshot('07-new-device-login', driver);
+            await screenshot('08-new-device-login', driver);
             await on_WelcomeBack_Login(driver);
             await on_AddDeviceConfirm(driver);
             await on_AddDeviceConfirm_Fixup(driver);
-            await screenshot('08-new-device-confirm', driver);
+            await screenshot('09-new-device-confirm', driver);
             await on_AddDeviceConfirm_Confirm(driver);
             await on_AddDeviceAlias(driver);
-            await screenshot('09-new-device-alias', driver);
+            await screenshot('10-new-device-alias', driver);
             await on_AddDeviceAlias_Type(DEVICE_NAME2, driver);
             await on_AddDeviceAlias_Continue(driver);
             await on_AddDeviceSuccess(driver);
-            await screenshot('10-new-device-done', driver);
+            await screenshot('11-new-device-done', driver);
 
             // Back to other browser, should be a welcome view now
             await on_WelcomeBack(driver2);
             await on_WelcomeBack_Fixup(driver2);
-            await screenshot('11-new-device-login', driver2);
+            await screenshot('12-new-device-login', driver2);
             await on_WelcomeBack_Login(driver2);
             await on_Main(DEVICE_NAME2, driver2);
             await on_Main_Fixup(driver2);
-            await screenshot('12-new-device-listed', driver2);
+            await screenshot('13-new-device-listed', driver2);
         })
     })
 }, 300_000);
