@@ -9,7 +9,8 @@ import { addDeviceUserNumber } from "./addDeviceUserNumber";
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
-      border: double 2px transparent;
+      border-style: double;
+      border-width: 2px;
       border-radius: 4px;
       border-image-slice: 1;
       outline: none;
