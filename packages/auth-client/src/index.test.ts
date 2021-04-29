@@ -14,12 +14,12 @@ describe('Auth Client', () => {
       return idpWindow;
     });
 
-		// Empty our events before each test case
-		events = [];
-		global.addEventListener = jest.fn((event, callback) => {
+    // Empty our events before each test case
+    events = [];
+    global.addEventListener = jest.fn((event, callback) => {
       events[event] = callback;
     });
-	});
+  });
 
   it('should initialize with an AnonymousIdentity', async () => {
     const test = await AuthClient.create();
