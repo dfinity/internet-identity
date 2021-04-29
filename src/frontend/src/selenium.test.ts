@@ -142,6 +142,18 @@ async function on_WelcomeBack_Login(driver: ThenableWebDriver) {
     await driver.findElement(By.id('login')).click();
 }
 
+// View: Add device user number
+async function on_AddDeviceUserNumber(driver: ThenableWebDriver): Promise<string> {
+    return await driver.wait(until.elementLocated(By.id("addDeviceUserNumber")), 3_000).getAttribute('value');
+}
+
+async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_number?: string) {
+    if (user_number) {
+        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(user_number);
+    }
+    await driver.findElement(By.id('addDeviceUserNumberContinue')).click()
+}
+
 // View: Add device
 
 async function on_AddDevice(driver: ThenableWebDriver): Promise<string> {
@@ -353,6 +365,8 @@ test('Screenshots', async () => {
 	    await on_Welcome(driver2);
             await on_Welcome_TypeUserNumber(userNumber, driver2);
             await on_Welcome_AddDevice(driver2);
+            const carriedUserNumber = await on_AddDeviceUserNumber(driver2);
+            await on_AddDeviceUserNumber_Continue(driver2);
             const link = await on_AddDevice(driver2);
             console.log('The add device link is', link);
             await on_AddDevice_Fixup(driver2);
