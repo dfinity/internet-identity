@@ -67,4 +67,5 @@ jobs:
       - name: Run Tests
         shell: bash
         run: |
-          $HOME/bin/backend-tests --wasm target/wasm32-unknown-unknown/release/idp_service.wasm\
+          cd backend-tests
+          $HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/idp_service.wasm\

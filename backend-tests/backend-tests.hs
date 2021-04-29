@@ -209,14 +209,14 @@ submitAndRun r = do
 
 submitQuery :: QueryRequest -> M CallResponse
 submitQuery r = do
-    t <- lift getTimestamp
+    t <- getTimestamp
     QueryResponse r <- handleQuery t r
     return r
-  where
-    getTimestamp :: IO Timestamp
-    getTimestamp = do
-        t <- getPOSIXTime
-        return $ Timestamp $ round (t * 1000_000_000)
+
+getTimestamp :: M Timestamp
+getTimestamp = lift $ do
+    t <- getPOSIXTime
+    return $ Timestamp $ round (t * 1000_000_000)
 
 mkRequestId :: IO RequestID
 mkRequestId = BS.toLazyByteString . BS.word64BE <$> randomIO
@@ -607,33 +607,74 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range .! #_1_ @?= 100
     response <- callIDP cid webauthID #register (device1, powAt cid 0)
     assertVariant #canister_full response
-  ]
-  where
-    idpTestWithInit name init act = testCase name $ do
-      wasm <- BS.readFile wasm_file
-      ic <- initialIC
-      flip evalStateT ic $ do
-        r <- callManagement controllerId #create_canister (#settings .== Nothing)
-        let Candid.Principal cid = r .! #canister_id
-        callManagement controllerId #install_code $ empty
-          .+ #mode .== V.IsJust #install ()
-          .+ #canister_id .== Candid.Principal cid
-          .+ #wasm_module .== wasm
-          .+ #arg .== Candid.encode (toInitCandid init)
-        act cid
 
-    idpTest name act = testCase name $ do
-      wasm <- BS.readFile wasm_file
+  , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
+    -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence
+    t <- getTimestamp
+    -- Need a fixed id for this to work
+    let cid = fromPrincipal "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    createEmptyCanister (EntityId cid) controllerId t
+    -- Load a backup. This backup is taking from the messaging subnet installation
+    -- on 2021-04-29
+    stable_memory <- lift $ BS.readFile "test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.bin"
+    -- Upload a dummy module that populates the stable memory
+    upload_wasm <- lift $ BS.readFile "stable-memory-setter.wasm"
+    callManagement controllerId #install_code $ empty
+      .+ #mode .== V.IsJust #install ()
+      .+ #canister_id .== Candid.Principal cid
+      .+ #wasm_module .== upload_wasm
+      .+ #arg .== stable_memory
+    doUpgrade cid
+
+    when should_upgrade $ doUpgrade cid
+    s <- queryIDP cid dummyUserId #stats ()
+    lift $ s .! #users_registered @?= 31
+    lift $ s .! #assigned_user_number_range .! #_0_ @?= 10_000
+    lift $ s .! #assigned_user_number_range .! #_1_ @?= 8_000_000_000
+    lookupIs cid 9_999 []
+    lookupIs cid 10_000 [#alias .== "Desktop" .+ #credential_id .== Just "c\184\175\179\134\221u}\250[\169U\v\202f\147g\ETBvo9[\175\173\144R\163\132\237\196F\177\DC2(\188\185\203hI\128\187Z\129'\v1\212\185V\ETB\135)m@ M1\233l\ESC8kI\132" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \238o!-\ESC\148\252\192\DC4\240P\176\135\240j\211AW\255S\193\153\129\227\151hB\177dK\n\FS\"X \rk\197\238\a{\210\&0\v<\134\223\135\170_\223\144\210V\208\DC3\RS\251\228D$3\r\232\176\EOTq"]
+    lookupIs cid 10_002 [#alias .== "andrew-mbp" .+ #credential_id .== Just "\SOH\191#%\217u\247\178L-K\182\254\249J.m\187\179_I\ACK\137\244`\163o\SI\150qz\197Hz\214\&8\153\239\213\159\208\RS\243\138\171\138\"\139\173\170\ESC\148\205\129\149ri\\Dn,7\151\146\175\DEL" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X rMm*\229BDe\SOH4\228u\170\206\216\216-ER\v\166r\217\137,\141\227M*@\230\243\"X \225\248\159\191\242\224Z>\241\163\\\GS\155\178\222\139^\136V\253q\v\SUBSJ\bA\131\\\183\147\170",#alias .== "andrew phone chrome" .+ #credential_id .== Just ",\235x\NUL\a\140`~\148\248\233C/\177\205\158\ETX0\129\167" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \140\169\203@\ETX\CAN\ETB,\177\153\179\223/|`\US\STX\252r\190s(.\188\136\171\SI\181V*\174@\"X \245<\174AbV\225\234\ENQ\146\247\129\245\ACK\200\205\217\250g\219\179)\197\252\164i\172kXh\180\205"]
+    lookupIs cid 10_029 [#alias .== "Pixel" .+ #credential_id .== Just "\SOH\146\238\160b\223\132\205\231b\239\243F\170\163\167\251D\241\170\EM\216\136\174@r\149\183|LuKu[+{\144\217\ETBL\f\244\GS>\179\146\143\RS\179\DLE\227\179\164\188\NULDQy\223\SI\132\183\248\177\219" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \200B>\DEL\GS\248\220\145\245\153\221\&6\131\243uAQCAd>\145k\nw\233\&5\218\SUB~_\244\"X O]7\167=n\ESC\SUB\198\235\208\215s\158\191Gz\143\136\237i\146\203\&6\182\196\129\239\238\SOH\180b"]
+    -- This user record has been created manullay with dfx and our test
+    -- webauthPK has been added, so that we can actually log into this now
+    let dfxPK =  "0*0\ENQ\ACK\ETX+ep\ETX!\NUL\241\186;\128\206$\243\130\250\&2\253\a#<\235\142\&0]W\218\254j\211\209\192\SO@\DC3\NAKi&1"
+    lookupIs cid 10_030 [#alias .== "dfx" .+ #credential_id .== Nothing .+ #pubkey .== dfxPK,#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauthPK]
+    callIDP cid webauthID #remove (10_030, dfxPK)
+    lookupIs cid 10_030 [#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauthPK]
+    let delegationArgs = (10_030, "example.com", "dummykey", Nothing)
+    (userPK,_) <- callIDP cid webauthID #prepare_delegation delegationArgs
+    -- Check that we get the same user key; this proves that the salt was
+    -- recovered from the backup
+    lift $ userPK @?= "0<0\x0c\&\x06\&\x0a\&+\x06\&\x01\&\x04\&\x01\&\x83\&\xb8\&C\x01\&\x02\&\x03\&,\x00\&\x0a\&\x00\&\x00\&\x00\&\x00\&\x00\&\x00\&\x00\&\x07\&\x01\&\x01\&:\x89\&&\x91\&M\xd1\&\xc8\&6\xec\&g\xba\&f\xac\&d%\xc2\&\x1d\&\xff\&\xd3\&\xca\&\x5c\&Yh\x85\&_\x87\&x\x0a\&\x1e\&\xc5\&y\x85\&"
+  ]
+
+
+  where
+    withIC act = do
       ic <- initialIC
-      flip evalStateT ic $ do
-        r <- callManagement controllerId #create_canister (#settings .== Nothing)
-        let Candid.Principal cid = r .! #canister_id
-        callManagement controllerId #install_code $ empty
-          .+ #mode .== V.IsJust #install ()
-          .+ #canister_id .== Candid.Principal cid
-          .+ #wasm_module .== wasm
-          .+ #arg .== Candid.encode (Nothing :: Maybe InitCandid) -- default value
-        act cid
+      evalStateT act ic
+
+    idpTestWithInit name init act = testCase name $ withIC $ do
+      wasm <- lift $ BS.readFile wasm_file
+      r <- callManagement controllerId #create_canister (#settings .== Nothing)
+      let Candid.Principal cid = r .! #canister_id
+      callManagement controllerId #install_code $ empty
+        .+ #mode .== V.IsJust #install ()
+        .+ #canister_id .== Candid.Principal cid
+        .+ #wasm_module .== wasm
+        .+ #arg .== Candid.encode (toInitCandid init)
+      act cid
+
+    idpTest name act = testCase name $ withIC $ do
+      wasm <- lift $ BS.readFile wasm_file
+      r <- callManagement controllerId #create_canister (#settings .== Nothing)
+      let Candid.Principal cid = r .! #canister_id
+      callManagement controllerId #install_code $ empty
+        .+ #mode .== V.IsJust #install ()
+        .+ #canister_id .== Candid.Principal cid
+        .+ #wasm_module .== wasm
+        .+ #arg .== Candid.encode (Nothing :: Maybe InitCandid) -- default value
+      act cid
 
     withUpgrade act = ([act False], [act True])
     withoutUpgrade act = ([act], [])
@@ -653,8 +694,31 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #wasm_module .== wasm
         .+ #arg .== Candid.encode ()
 
+
+-- Convenience copy from IC.Ref; maybe worth exposing there
+createEmptyCanister :: CanisterId -> EntityId -> Timestamp -> M ()
+createEmptyCanister cid controller time = modify $ \ic ->
+    ic { canisters = M.insert cid can (canisters ic) }
+  where
+    can = CanState
+      { content = Nothing
+      , run_status = IsRunning
+      , controller = controller
+      , memory_allocation = 0
+      , compute_allocation = 0
+      , freezing_threshold = 2592000
+      , time = time
+      , cycle_balance = 0
+      , certified_data = ""
+      }
+
+
 asHex :: Blob -> String
 asHex = T.unpack . H.encodeHex . BS.toStrict
+
+fromPrincipal :: T.Text -> Blob
+fromPrincipal s = cid
+  where Right (Candid.Principal cid) = Candid.parsePrincipal s
 
 -- Configuration: The Wasm file to test
 newtype WasmOption = WasmOption String
