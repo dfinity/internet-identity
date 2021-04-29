@@ -28,12 +28,12 @@ const pageContent = () => html` <style>
     }
 
     .textLink {
-      margin-bottom: 0.3rem;
-      font-size: 0.875rem;
+      margin-bottom: 0.7rem;
+      font-size: 0.95rem;
     }
     .textLink button {
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       font-weight: 600;
       text-decoration: none;
       color: black;
