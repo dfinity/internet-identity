@@ -1,11 +1,8 @@
-import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { IDPActor } from "../utils/idp_actor";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
-import { displayAddDeviceLink } from "./displayAddDeviceLink";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 
@@ -132,47 +129,12 @@ const initLinkDevice = () => {
     "addNewDeviceButton"
   ) as HTMLButtonElement;
 
-  addNewDeviceButton.onclick = async () => {
+  addNewDeviceButton.onclick = () => {
     const userNumberInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
-    let loginInterval: number;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    if (userNumber !== null) {
-      const identity = await WebAuthnIdentity.create();
-      const publicKey = identity.getPublicKey().toDer();
-      const rawId = blobToHex(identity.rawId);
-
-      // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
-
-      let url = new URL(location.toString());
-      url.pathname = '/';
-      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
-      const link = encodeURI(url.toString());
-
-      displayAddDeviceLink(link);
-      loginInterval = window.setInterval(async () => {
-        console.log("checking if authenticated");
-        try {
-          let devices = await IDPActor.lookup(userNumber);
-          let matchedDevice = devices.find((deviceData) =>
-            derBlobFromBlob(
-              blobFromUint8Array(Buffer.from(deviceData.pubkey))
-            ).equals(publicKey)
-          );
-          if (matchedDevice !== undefined) {
-            window.clearInterval(loginInterval);
-            setUserNumber(userNumber);
-            window.location.reload();
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }, 2500);
-    } else {
-      userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your User Number first";
-    }
+    addDeviceUserNumber(userNumber)
   };
 };
