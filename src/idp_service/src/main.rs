@@ -7,6 +7,7 @@ use idp_service::metrics_encoder::MetricsEncoder;
 use idp_service::nonce_cache::NonceCache;
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
+use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -26,14 +27,14 @@ const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 
 type UserNumber = u64;
-type CredentialId = Vec<u8>;
-type PublicKey = Vec<u8>;
+type CredentialId = ByteBuf;
+type PublicKey = ByteBuf;
 type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = String;
 type Timestamp = u64;
-type Signature = Vec<u8>;
+type Signature = ByteBuf;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceData {
@@ -87,14 +88,14 @@ struct HttpRequest {
     method: String,
     url: String,
     headers: Vec<(String, String)>,
-    body: Vec<u8>,
+    body: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
-    body: Vec<u8>,
+    body: ByteBuf,
     streaming_strategy: Option<StreamingStrategy>,
 }
 
@@ -108,7 +109,7 @@ enum StreamingStrategy {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct StreamingCallbackHttpResponse {
-    body: Vec<u8>,
+    body: ByteBuf,
     token: Option<Token>,
 }
 
@@ -298,7 +299,7 @@ async fn prepare_delegation(
     user_number: UserNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
-    max_time_to_live : Option<u64>
+    max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
     ensure_salt_set().await;
 
@@ -314,7 +315,10 @@ async fn prepare_delegation(
 
         check_frontend_length(&frontend);
 
-        let delta = u64::min(max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS), MAX_EXPIRATION_PERIOD_NS);
+        let delta = u64::min(
+            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+            MAX_EXPIRATION_PERIOD_NS,
+        );
         let expiration = (time() as u64).saturating_add(delta);
 
         let seed = calculate_seed(user_number, &frontend);
@@ -322,7 +326,10 @@ async fn prepare_delegation(
         add_signature(&mut sigs, session_key, seed, expiration);
         prune_expired_signatures(&mut sigs);
 
-        (der_encode_canister_sig_key(seed.to_vec()), expiration)
+        (
+            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+            expiration,
+        )
     })
 }
 
@@ -361,7 +368,7 @@ fn get_delegation(
                     expiration,
                     targets: None,
                 },
-                signature,
+                signature: ByteBuf::from(signature),
             }),
             None => GetDelegationResponse::NoSuchDelegation,
         }
@@ -399,14 +406,14 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                             ("Content-Type".to_string(), "text/plain".to_string()),
                             ("Content-Length".to_string(), body.len().to_string()),
                         ],
-                        body,
+                        body: ByteBuf::from(body),
                         streaming_strategy: None,
                     }
                 }
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: vec![],
-                    body: format!("Failed to encode metrics: {}", err).into_bytes(),
+                    body: ByteBuf::from(format!("Failed to encode metrics: {}", err)),
                     streaming_strategy: None,
                 },
             }
@@ -415,15 +422,13 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             Some((headers, value)) => HttpResponse {
                 status_code: 200,
                 headers: headers.clone(),
-                body: value.clone(),
+                body: ByteBuf::from(value.clone()),
                 streaming_strategy: None,
             },
             None => HttpResponse {
                 status_code: 404,
                 headers: vec![],
-                body: format!("Asset {} not found.", probably_an_asset)
-                    .as_bytes()
-                    .into(),
+                body: ByteBuf::from(format!("Asset {} not found.", probably_an_asset)),
                 streaming_strategy: None,
             },
         }),
@@ -609,12 +614,14 @@ fn get_signature(
 
     #[derive(Serialize)]
     struct Sig<'a> {
-        #[serde(with = "serde_bytes")]
-        certificate: Vec<u8>,
+        certificate: ByteBuf,
         tree: HashTree<'a>,
     }
 
-    let sig = Sig { certificate, tree };
+    let sig = Sig {
+        certificate: ByteBuf::from(certificate),
+        tree,
+    };
 
     let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
     cbor.self_describe().unwrap();
