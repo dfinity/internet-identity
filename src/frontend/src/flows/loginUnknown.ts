@@ -1,12 +1,13 @@
 import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { IDPActor } from "../utils/idp_actor";
-import { setUserNumber } from "../utils/userNumber";
+import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { icLogo } from "../components/icons";
+import { addDeviceUserNumber } from "./addDeviceUserNumber";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -111,8 +112,8 @@ const initLogin = (resolve, reject) => {
   ) as HTMLButtonElement;
 
   loginButton.onclick = () => {
-    const userNumber = BigInt(userNumberInput.value);
-    if (userNumber) {
+    const userNumber = parseUserNumber(userNumberInput.value);
+    if (userNumber !== null) {
       withLoader(() =>
         IDPActor.login(userNumber).then((connection) => {
           setUserNumber(userNumber);
@@ -142,8 +143,8 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
     let loginInterval: number;
 
-    const userNumber = BigInt(userNumberInput.value);
-    if (userNumber) {
+    const userNumber = parseUserNumber(userNumberInput.value);
+    if (userNumber !== null) {
       const identity = await WebAuthnIdentity.create();
       const publicKey = identity.getPublicKey().toDer();
       const rawId = blobToHex(identity.rawId);
