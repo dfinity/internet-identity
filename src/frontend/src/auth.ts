@@ -14,13 +14,13 @@ interface AuthResponseSuccess {
     kind: "authorize-client-success";
     delegations: {
       delegation: {
-        pubkey: Blob;
+        pubkey: Uint8Array;
         expiration: BigInt;
         targets?: Principal[];
       };
-      signature: Blob;
+      signature: Uint8Array;
     }[];
-    userPublicKey: Blob;
+    userPublicKey: Uint8Array;
 }
 
 interface AuthResponseFailure {
@@ -37,7 +37,7 @@ const READY_MESSAGE = {
 
 /**
  * Setup an event listener to listen to authorize requests from the client.
- * 
+ *
  * This method expects to be called after the login flow.
  */
 export default async function setup(userNumber: UserNumber, connection: IDPActor) {
@@ -104,11 +104,11 @@ async function handleAuthRequest(
     // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
     const parsed_signed_delegation = {
         delegation: {
-            pubkey: new Blob([Uint8Array.from(signed_delegation.delegation.pubkey)]),
+            pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
             expiration: BigInt(signed_delegation.delegation.expiration),
             targets: undefined,
         },
-        signature: new Blob([Uint8Array.from(signed_delegation.signature)]),
+        signature: Uint8Array.from(signed_delegation.signature),
     };
 
     return {
@@ -116,7 +116,7 @@ async function handleAuthRequest(
         delegations: [
             parsed_signed_delegation
         ],
-        userPublicKey: new Blob([Uint8Array.from(userKey)]),
+        userPublicKey: Uint8Array.from(userKey),
     };
   });
 }
