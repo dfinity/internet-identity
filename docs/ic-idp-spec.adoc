@@ -628,3 +628,16 @@ Similar to the steps during initial installation. The main difference is that yo
 ----
 ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
 ----
+
+=== Disaster recovery
+
+If the Internet Computer goes down and has to be re-boot-strapped, or else the backend canister is lost, we can recover as long as
+ * we get the same canister id and
+ * we have a copy of the stable memory (`/var/lib/dfinity-node/ic_state/tip/canister_states/00000000000000070101/stable_memory.bin`)
+
+We can then install a temporary upload canister that does nothing but set the stable memory to that binary (something like `backend-tests/stable-memory-setter.wat`, but extended to allow the upload in chunks, if it is larger than 2Mb), and upgrade from that.
+
+The backend tests have a test that exercises this. See `backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md` for notes about that test.
+
+
+
