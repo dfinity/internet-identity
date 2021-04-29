@@ -26,7 +26,7 @@ export const register = async (): Promise<LoginResult | null> => {
 };
 
 const init = (): Promise<LoginResult | null> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
       "registerCancel"
@@ -43,17 +43,29 @@ const init = (): Promise<LoginResult | null> =>
         "#registerAlias"
       ) as HTMLInputElement;
 
-      const identity = await WebAuthnIdentity.create();
-      if (await confirmRegister()) {
-        // Send values through actor
-        const { userNumber, connection } = await withLoader(async () =>
-          IDPActor.register(identity, registerAlias.value)
-        );
-        setUserNumber(userNumber);
-        await displayUserNumber(userNumber);
-        resolve({ tag: "ok", connection, userNumber });
-      } else {
-        resolve(null);
+      try {
+        const identity = await WebAuthnIdentity.create().catch(err => {
+          resolve({
+            tag: "err",
+            message: "Failed to access your security device",
+            detail: err.toString()
+          });
+          // We can never get here, but TS doesn't understand that
+          return 0 as any
+        });
+        if (await confirmRegister()) {
+          // Send values through actor
+          const { userNumber, connection } = await withLoader(async () =>
+            IDPActor.register(identity, registerAlias.value)
+          );
+          setUserNumber(userNumber);
+          await displayUserNumber(userNumber);
+          resolve({ tag: "ok", connection, userNumber });
+        } else {
+          resolve(null);
+        }
+      } catch (err) {
+        reject(err)
       }
     };
   });

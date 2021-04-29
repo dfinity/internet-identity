@@ -76,28 +76,31 @@ export type LoginResult =
 export const loginUnknown = async (): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return new Promise((resolve) => {
-    initLogin(resolve);
+  return new Promise((resolve, reject) => {
+    initLogin(resolve, reject);
     initLinkDevice();
-    initRegister(resolve);
+    initRegister(resolve, reject);
   });
 };
 
-const initRegister = (resolve) => {
+const initRegister = (resolve, reject) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
-  registerButton.onclick = async () => {
-    const res = await register();
-    if (res === null) {
-      window.location.reload();
-    } else {
-      resolve(res);
-    }
+  registerButton.onclick = () => {
+    register()
+      .then(res => {
+        if (res === null) {
+          window.location.reload();
+        } else {
+          resolve(res);
+        }
+      })
+      .catch(reject)
   };
 };
 
-const initLogin = (resolve) => {
+const initLogin = (resolve, reject) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -113,7 +116,9 @@ const initLogin = (resolve) => {
           setUserNumber(userNumber);
           resolve({ tag: "ok", userNumber, connection });
         })
-      );
+      ).catch(err => {
+        reject(err)
+      });
     } else {
       resolve({
         tag: "err",
