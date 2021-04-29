@@ -13,7 +13,7 @@ const pageContent = html`
       The Internet Identity is the identity provider for the Internet Computer: A single service to log into many applications on the Internet Computer.
     </p>
     <p>
-      The Internet Identity works without passwords! Instead, you log in with your fingerprint, your face or with a dedicated security tokens. You can add multiple devices and use the Internet Identity with any of them.
+      The Internet Identity works without passwords! Instead, you log in with your fingerprint, your face or with dedicated security tokens. You can add multiple devices and use the Internet Identity with any of them.
     </p>
     <p>
       The Internet Identity protects your privacy. You will be someone else to each application that you log into.
