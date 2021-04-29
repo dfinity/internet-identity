@@ -1,17 +1,16 @@
-import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { IDPActor } from "../utils/idp_actor";
-import { setUserNumber } from "../utils/userNumber";
+import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
-import { displayAddDeviceLink } from "./displayAddDeviceLink";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { icLogo } from "../components/icons";
+import { addDeviceUserNumber } from "./addDeviceUserNumber";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
-      border: double 2px transparent;
+      border-style: double;
+      border-width: 2px;
       border-radius: 4px;
       border-image-slice: 1;
       outline: none;
@@ -30,12 +29,13 @@ const pageContent = () => html` <style>
     }
 
     .textLink {
-      margin-bottom: 0.3rem;
-      font-size: 0.875rem;
+      margin-bottom: 0.7rem;
+      font-size: 0.95rem;
+      white-space: nowrap;
     }
     .textLink button {
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       font-weight: 600;
       text-decoration: none;
       color: black;
@@ -78,28 +78,31 @@ export type LoginResult =
 export const loginUnknown = async (): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return new Promise((resolve) => {
-    initLogin(resolve);
+  return new Promise((resolve, reject) => {
+    initLogin(resolve, reject);
     initLinkDevice();
-    initRegister(resolve);
+    initRegister(resolve, reject);
   });
 };
 
-const initRegister = (resolve) => {
+const initRegister = (resolve, reject) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
-  registerButton.onclick = async () => {
-    const res = await register();
-    if (res === null) {
-      window.location.reload();
-    } else {
-      resolve(res);
-    }
+  registerButton.onclick = () => {
+    register()
+      .then(res => {
+        if (res === null) {
+          window.location.reload();
+        } else {
+          resolve(res);
+        }
+      })
+      .catch(reject)
   };
 };
 
-const initLogin = (resolve) => {
+const initLogin = (resolve, reject) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -108,14 +111,16 @@ const initLogin = (resolve) => {
   ) as HTMLButtonElement;
 
   loginButton.onclick = () => {
-    const userNumber = BigInt(userNumberInput.value);
-    if (userNumber) {
+    const userNumber = parseUserNumber(userNumberInput.value);
+    if (userNumber !== null) {
       withLoader(() =>
         IDPActor.login(userNumber).then((connection) => {
           setUserNumber(userNumber);
           resolve({ tag: "ok", userNumber, connection });
         })
-      );
+      ).catch(err => {
+        reject(err)
+      });
     } else {
       resolve({
         tag: "err",
@@ -131,47 +136,12 @@ const initLinkDevice = () => {
     "addNewDeviceButton"
   ) as HTMLButtonElement;
 
-  addNewDeviceButton.onclick = async () => {
+  addNewDeviceButton.onclick = () => {
     const userNumberInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
-    let loginInterval: number;
 
-    const userNumber = BigInt(userNumberInput.value);
-    if (userNumber) {
-      const identity = await WebAuthnIdentity.create();
-      const publicKey = identity.getPublicKey().toDer();
-      const rawId = blobToHex(identity.rawId);
-
-      // TODO: Maybe we should add a checksum here, to make sure the user didn't copy a cropped link
-
-      let url = new URL(location.toString());
-      url.pathname = '/';
-      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
-      const link = encodeURI(url.toString());
-
-      displayAddDeviceLink(link);
-      loginInterval = window.setInterval(async () => {
-        console.log("checking if authenticated");
-        try {
-          let devices = await IDPActor.lookup(userNumber);
-          let matchedDevice = devices.find((deviceData) =>
-            derBlobFromBlob(
-              blobFromUint8Array(Buffer.from(deviceData.pubkey))
-            ).equals(publicKey)
-          );
-          if (matchedDevice !== undefined) {
-            window.clearInterval(loginInterval);
-            setUserNumber(userNumber);
-            window.location.reload();
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }, 2500);
-    } else {
-      userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your User Number first";
-    }
+    const userNumber = parseUserNumber(userNumberInput.value);
+    addDeviceUserNumber(userNumber)
   };
 };

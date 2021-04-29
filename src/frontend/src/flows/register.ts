@@ -1,11 +1,15 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { withLoader } from "../components/loader";
-import { IDPActor } from "../utils/idp_actor";
+import { IDPActor, canisterIdPrincipal } from "../utils/idp_actor";
 import { setUserNumber } from "../utils/userNumber";
 import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
 import { LoginResult } from "./loginUnknown";
+import getProofOfWork from "../crypto/pow";
+import { nextTick } from "process";
+import { icLogo } from "../components/icons";
+
 
 const pageContent = html`
   <div class="container">
@@ -19,14 +23,26 @@ const pageContent = html`
   </div>
 `;
 
+const constructingContent = html`
+  <div class="container">
+  <h1>Constructing your Internet Identity</h1>
+  ${icLogo}
+  </div>
+`;
+
 export const register = async (): Promise<LoginResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init();
 };
 
+const renderConstructing = () => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(constructingContent, container);
+}
+
 const init = (): Promise<LoginResult | null> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
       "registerCancel"
@@ -42,18 +58,41 @@ const init = (): Promise<LoginResult | null> =>
       const registerAlias = form.querySelector(
         "#registerAlias"
       ) as HTMLInputElement;
+      const alias = registerAlias.value;
+      renderConstructing();
+      await tick();
 
-      const identity = await WebAuthnIdentity.create();
-      if (await confirmRegister()) {
-        // Send values through actor
-        const { userNumber, connection } = await withLoader(async () =>
-          IDPActor.register(identity, registerAlias.value)
-        );
-        setUserNumber(userNumber);
-        await displayUserNumber(userNumber);
-        resolve({ tag: "ok", connection, userNumber });
-      } else {
-        resolve(null);
+      try {
+        const pendingIdentity = WebAuthnIdentity.create().catch(err => {
+          resolve({
+            tag: "err",
+            message: "Failed to access your security device",
+            detail: err.toString()
+          });
+          // We can never get here, but TS doesn't understand that
+          return 0 as any
+        });
+        await tick();
+        // Do PoW before registering.
+        const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+        const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+        const identity = await pendingIdentity;
+        if (await confirmRegister()) {
+          // Send values through actor
+          const { userNumber, connection } = await withLoader(async () =>
+            IDPActor.register(identity, alias, pow)
+          );
+          setUserNumber(userNumber);
+          await displayUserNumber(userNumber);
+          resolve({ tag: "ok", connection, userNumber });
+        } else {
+          resolve(null);
+        }
+      } catch (err) {
+        reject(err)
       }
     };
   });
+
+const tick = (): Promise<void> =>
+  new Promise(resolve => nextTick(resolve));
