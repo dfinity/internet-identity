@@ -19,7 +19,7 @@ const pageContent = html`
       The Internet Identity protects your privacy. You will be someone else to each application that you log into.
     </p>
     <p>
-      Learn more with the <a href="todo">the Internet Identity introduction</a>, and if you want to use the Internet Identity in your application, head for the <a href="todo">Developer documentation</a>.
+      Learn more with the <a href="todo">Internet Identity introduction</a>, and if you want to use the Internet Identity in your application, head for the <a href="todo">Developer documentation</a>.
     </p>
   </div>
   `;
