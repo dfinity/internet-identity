@@ -440,6 +440,7 @@ test('Screenshots', async () => {
             await screenshot('13-new-device-listed', driver2);
         })
 
+        await driver.get("about:blank");
         await driver.get(IDP_URL + "#about");
         await wait_for_fonts(driver);
 	await on_About(driver);
