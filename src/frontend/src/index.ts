@@ -5,8 +5,14 @@ import oauth from "./utils/oauth";
 import auth from "./auth";
 import { addDevice } from "./flows/addDevice";
 import { renderManage } from "./flows/manage";
+import { compatibilityNotice } from "./flows/compatibilityNotice";
 
 const init = async () => {
+
+  if (!window.PublicKeyCredential) {
+    return compatibilityNotice()
+  }
+
   const { userNumber, connection } = await login();
   const url = new URL(document.URL);
   if (url.hash == "#authorize") {
