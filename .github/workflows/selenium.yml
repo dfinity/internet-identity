@@ -15,7 +15,8 @@ jobs:
         os: [ ubuntu-latest ]
         dfx: [ '0.7.0-beta.4' ]
         ghc: [ '8.8.4' ]
-        start-flag: [ '', '--emulator' ]
+        #start-flag: [ '', '--emulator' ]
+        start-flag: [ '--emulator' ]
 
 
     steps:
