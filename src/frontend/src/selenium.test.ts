@@ -375,7 +375,6 @@ test('Log into client application, after registration', async () => {
         expect(principal2).toBe(principal);
 
     })
-    })
 }, 300_000);
 
 test('Screenshots', async () => {
