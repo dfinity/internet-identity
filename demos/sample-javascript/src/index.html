@@ -1,0 +1,29 @@
+<html>
+<body>
+<div>
+    <h1>Identity</h1>
+    <h2>Sign In</h2>
+    <div>
+        <label for="idpUrl" style="display: inline-block; width: 120px">Identity Provider: </label>
+        <input type="text" id="idpUrl" value="https://auth.ic0.app/authorize">
+    </div>
+    <button id="signinBtn">Sign In</button>
+    <button id="signoutBtn">Sign Out</button>
+    <h2>Principal:</h2>
+    <div id="principal"></div>
+</div>
+
+<div>
+    <h1>Contact the IC</h1>
+    <label for="hostUrl" style="display: inline-block; width: 120px">Replica URL: </label>
+    <input type="text" id="hostUrl" value="https://gw.dfinity.network/">
+    <br />
+    <label for="canisterId" style="display: inline-block; width: 120px">Canister ID: </label>
+    <input type="text" id="canisterId" value="4k2wq-cqaaa-aaaab-qac7q-cai">
+</div>
+<div>
+    <button id="whoamiBtn">Who Am I?</button>
+    <div id="whoamiResponse"></div>
+</div>
+</body>
+</html>

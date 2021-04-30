@@ -13,6 +13,8 @@
 # frontend code
 node_modules/
 dist/
+.env
+lib
 
 # Cargo build output
 target/

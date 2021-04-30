@@ -1,0 +1,24 @@
+name: "generate antora tree"
+on:
+  # although we only upload when the branch is public we run this on all
+  # branches to hopefully see if ./spec/gen-antora.sh breaks
+  push:
+jobs:
+  antora:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # so that we can use git describe later on
+    - name: Generate files
+      run: |
+        ./spec/gen-antora.sh _out
+        git describe --tags >> _out/git-describe.txt
+    - name: Upload files
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      if: github.ref == 'refs/heads/public'
+      with:
+        single_commit: yes
+        branch: public-antora
+        folder: _out/
+

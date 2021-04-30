@@ -1,22 +1,53 @@
 use hashtree::{Hash, HashTree};
-use ic_cdk::api::{data_certificate, set_certified_data, time, trap};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
-use ic_cdk::storage::{stable_restore, stable_save};
-use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk::api::call::call;
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
+use ic_cdk_macros::{init, post_upgrade, query, update};
+use idp_service::metrics_encoder::MetricsEncoder;
+use idp_service::nonce_cache::NonceCache;
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
+use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::TryInto;
+use storage::{Salt, Storage};
 
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 31_536_000_000_000_000;
+const fn secs_to_nanos(secs: u64) -> u64 {
+    secs * 1_000_000_000
+}
 
-type UserId = u64;
-type CredentialId = Vec<u8>;
-type PublicKey = Vec<u8>;
-type Alias = String;
-type Entry = (Alias, PublicKey, Timestamp, Option<CredentialId>);
+// 30 mins
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
+// 8 days
+const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
+// 10 mins
+const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
+// 5 mins
+const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
+
+type UserNumber = u64;
+type CredentialId = ByteBuf;
+type PublicKey = ByteBuf;
+type DeviceKey = PublicKey;
+type UserKey = PublicKey;
+type SessionKey = PublicKey;
+type FrontendHostname = String;
 type Timestamp = u64;
-type Signature = Vec<u8>;
+type Signature = ByteBuf;
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct DeviceData {
+    pubkey: DeviceKey,
+    alias: String,
+    credential_id: Option<CredentialId>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct ProofOfWork {
+    timestamp: Timestamp,
+    nonce: u64,
+}
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct Delegation {
@@ -31,38 +62,79 @@ struct SignedDelegation {
     signature: Signature,
 }
 
-mod hash;
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum GetDelegationResponse {
+    #[serde(rename = "signed_delegation")]
+    SignedDelegation(SignedDelegation),
+    #[serde(rename = "no_such_delegation")]
+    NoSuchDelegation,
+}
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct HeaderField {
-    key: String,
-    value: String,
+enum RegisterResponse {
+    #[serde(rename = "registered")]
+    Registered { user_number: UserNumber },
+    #[serde(rename = "canister_full")]
+    CanisterFull,
 }
+
+mod hash;
+mod storage;
+
+type HeaderField = (String, String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HttpRequest {
     method: String,
     url: String,
-    headers: Vec<HeaderField>,
-    body: Vec<u8>,
+    headers: Vec<(String, String)>,
+    body: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
-    body: Vec<u8>,
+    body: ByteBuf,
+    streaming_strategy: Option<StreamingStrategy>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Token {}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum StreamingStrategy {
+    Callback { callback: Func, token: Token },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct StreamingCallbackHttpResponse {
+    body: ByteBuf,
+    token: Option<Token>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityStats {
+    assigned_user_number_range: (UserNumber, UserNumber),
+    users_registered: u64,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct InternetIdentityInit {
+    assigned_user_number_range: (UserNumber, UserNumber),
 }
 
 struct State {
-    map: RefCell<HashMap<UserId, Vec<Entry>>>,
+    nonce_cache: RefCell<NonceCache>,
+    storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            map: RefCell::new(HashMap::default()),
+            nonce_cache: RefCell::new(NonceCache::default()),
+            storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
         }
     }
@@ -70,166 +142,424 @@ impl Default for State {
 
 thread_local! {
     static STATE: State = State::default();
-    static ASSETS: RefCell<HashMap<String, Vec<u8>>> = RefCell::new(HashMap::default());
+    static ASSETS: RefCell<HashMap<String, (Vec<HeaderField>, Vec<u8>)>> = RefCell::new(HashMap::default());
 }
 
 #[update]
-fn register(user_id: UserId, alias: Alias, pk: PublicKey, credential_id: Option<CredentialId>) {
+async fn init_salt() {
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if m.get(&user_id).is_some() {
-            trap("This user is already registered");
+        if s.storage.borrow().salt().is_some() {
+            trap("Salt already set");
         }
-        let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
-        m.insert(
-            user_id,
-            vec![(alias, pk.clone(), expiration, credential_id)],
-        );
-        add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
+    });
+
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
+    };
+    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+            "expected raw randomness to be of length 32, got {}",
+            res.len()
+        ));
+    });
+
+    STATE.with(|s| {
+        let mut store = s.storage.borrow_mut();
+        store.update_salt(salt); // update_salt() traps if salt has already been set
+    });
+}
+
+#[update]
+async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse {
+    check_entry_limits(&device_data);
+    let now = time() as u64;
+    check_proof_of_work(&pow, now);
+
+    if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+        ic_cdk::trap(&format!(
+            "{} could not be authenticated against {:?}",
+            caller(),
+            device_data.pubkey
+        ));
+    }
+
+    ensure_salt_set().await;
+
+    STATE.with(|s| {
+        let mut nonce_cache = s.nonce_cache.borrow_mut();
+        if nonce_cache.contains(pow.timestamp, pow.nonce) {
+            trap(&format!(
+                "the combination of timestamp {} and nonce {} has already been used",
+                pow.timestamp, pow.nonce,
+            ));
+        }
+        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
+
+        let mut store = s.storage.borrow_mut();
+        match store.allocate_user_number() {
+            Some(user_number) => {
+                store
+                    .write(user_number, vec![device_data])
+                    .unwrap_or_else(|err| {
+                        trap(&format!("failed to store user device data: {}", err))
+                    });
+                nonce_cache.add(pow.timestamp, pow.nonce);
+                RegisterResponse::Registered { user_number }
+            }
+            None => RegisterResponse::CanisterFull,
+        }
     })
 }
 
 #[update]
-fn add(user_id: UserId, alias: Alias, pk: PublicKey, credential: Option<CredentialId>) {
+async fn add(user_number: UserNumber, device_data: DeviceData) {
+    const MAX_ENTRIES_PER_USER: usize = 10;
+
+    check_entry_limits(&device_data);
+
+    ensure_salt_set().await;
+
     STATE.with(|s| {
-        let mut m = s.map.borrow_mut();
-        if let Some(entries) = m.get_mut(&user_id) {
-            let expiration = time() as u64 + DEFAULT_EXPIRATION_PERIOD_NS;
-            for e in entries.iter_mut() {
-                if e.1 == pk {
-                    e.0 = alias;
-                    e.2 = expiration;
-                    e.3 = credential;
-                    add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
-                    return;
-                }
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        for e in entries.iter_mut() {
+            if e.pubkey == device_data.pubkey {
+                trap("Device already added.");
             }
-            entries.push((alias, pk.clone(), expiration, credential));
-            add_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
-        } else {
-            trap("This user is not registered yet");
         }
+
+        if entries.len() >= MAX_ENTRIES_PER_USER {
+            trap(&format!(
+                "at most {} authentication information entries are allowed per user",
+                MAX_ENTRIES_PER_USER,
+            ));
+        }
+
+        entries.push(device_data);
+        s.storage
+            .borrow()
+            .write(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to write device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
     })
 }
 
 #[update]
-fn remove(user_id: UserId, pk: PublicKey) {
+async fn remove(user_number: UserNumber, device_key: DeviceKey) {
+    ensure_salt_set().await;
     STATE.with(|s| {
-        let mut remove_user = false;
-        if let Some(entries) = s.map.borrow_mut().get_mut(&user_id) {
-            if let Some(i) = entries.iter().position(|e| e.1 == pk) {
-                let (_, _, expiration, _) = entries.swap_remove(i as usize);
-                remove_signature(&mut s.sigs.borrow_mut(), user_id, pk, expiration);
-                remove_user = entries.is_empty();
-            }
+        prune_expired_signatures(&mut s.sigs.borrow_mut());
+
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
+            entries.swap_remove(i as usize);
         }
-        if remove_user {
-            s.map.borrow_mut().remove(&user_id);
-        }
+
+        s.storage
+            .borrow()
+            .write(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to persist device data of user {}: {}",
+                    user_number, err
+                ))
+            });
     })
 }
 
 #[query]
-fn lookup(user_id: UserId) -> Vec<Entry> {
-    STATE.with(|s| s.map.borrow().get(&user_id).cloned().unwrap_or_default())
+fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
+    STATE.with(|s| s.storage.borrow().read(user_number).unwrap_or_default())
+}
+
+#[update]
+async fn prepare_delegation(
+    user_number: UserNumber,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    max_time_to_live: Option<u64>,
+) -> (UserKey, Timestamp) {
+    ensure_salt_set().await;
+
+    STATE.with(|s| {
+        let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        check_frontend_length(&frontend);
+
+        let delta = u64::min(
+            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+            MAX_EXPIRATION_PERIOD_NS,
+        );
+        let expiration = (time() as u64).saturating_add(delta);
+
+        let seed = calculate_seed(user_number, &frontend);
+        let mut sigs = s.sigs.borrow_mut();
+        add_signature(&mut sigs, session_key, seed, expiration);
+        prune_expired_signatures(&mut sigs);
+
+        (
+            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+            expiration,
+        )
+    })
+}
+
+#[query]
+fn get_delegation(
+    user_number: UserNumber,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> GetDelegationResponse {
+    check_frontend_length(&frontend);
+
+    STATE.with(|state| {
+        let entries = state
+            .storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        match get_signature(
+            &state.sigs.borrow(),
+            session_key.clone(),
+            calculate_seed(user_number, &frontend),
+            expiration,
+        ) {
+            Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+                delegation: Delegation {
+                    pubkey: session_key,
+                    expiration,
+                    targets: None,
+                },
+                signature: ByteBuf::from(signature),
+            }),
+            None => GetDelegationResponse::NoSuchDelegation,
+        }
+    })
+}
+
+fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
+    STATE.with(|s| {
+        w.encode_counter(
+            "internet_identity_user_count",
+            s.storage.borrow().user_count() as f64,
+            "Number of users registered in this canister.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_signature_count",
+            s.sigs.borrow().len() as f64,
+            "Number of active signatures issued by this canister.",
+        )?;
+        Ok(())
+    })
 }
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split("?").collect();
-    let asset = parts[0].to_string();
-
-    ASSETS.with(|a| match a.borrow().get(&asset) {
-        Some(value) => HttpResponse {
-            status_code: 200,
-            headers: vec![],
-            body: value.clone(),
-        },
-        None => HttpResponse {
-            status_code: 404,
-            headers: vec![],
-            body: format!("Asset {} not found.", asset).as_bytes().into(),
-        },
-    })
+    match parts[0] {
+        "/metrics" => {
+            let mut writer = MetricsEncoder::new(vec![]);
+            match encode_metrics(&mut writer) {
+                Ok(()) => {
+                    let body = writer.into_inner();
+                    HttpResponse {
+                        status_code: 200,
+                        headers: vec![
+                            ("Content-Type".to_string(), "text/plain".to_string()),
+                            ("Content-Length".to_string(), body.len().to_string()),
+                        ],
+                        body: ByteBuf::from(body),
+                        streaming_strategy: None,
+                    }
+                }
+                Err(err) => HttpResponse {
+                    status_code: 500,
+                    headers: vec![],
+                    body: ByteBuf::from(format!("Failed to encode metrics: {}", err)),
+                    streaming_strategy: None,
+                },
+            }
+        }
+        probably_an_asset => ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
+            Some((headers, value)) => HttpResponse {
+                status_code: 200,
+                headers: headers.clone(),
+                body: ByteBuf::from(value.clone()),
+                streaming_strategy: None,
+            },
+            None => HttpResponse {
+                status_code: 404,
+                headers: vec![],
+                body: ByteBuf::from(format!("Asset {} not found.", probably_an_asset)),
+                streaming_strategy: None,
+            },
+        }),
+    }
 }
 
 #[query]
-fn get_delegation(user_id: UserId, pubkey: PublicKey) -> SignedDelegation {
+fn stats() -> InternetIdentityStats {
     STATE.with(|state| {
-        let mut m = state.map.borrow_mut();
-        if let Some(entries) = m.get_mut(&user_id) {
-            if let Some((_, _, expiration, _)) = entries.iter().find(|e| e.1 == pubkey) {
-                let signature =
-                    get_signature(&state.sigs.borrow(), user_id, pubkey.clone(), *expiration)
-                        .unwrap_or_else(|| trap("No signature found"));
-                return SignedDelegation {
-                    delegation: Delegation {
-                        pubkey,
-                        expiration: *expiration,
-                        targets: None,
-                    },
-                    signature,
-                };
-            }
+        let storage = state.storage.borrow();
+        InternetIdentityStats {
+            assigned_user_number_range: storage.assigned_user_number_range(),
+            users_registered: storage.user_count() as u64,
         }
-        trap("User ID and public key pair not found.");
     })
 }
 
-#[init]
-fn init() {
-    STATE.with(|state| update_root_hash(&state.sigs.borrow()));
+// used both in init and post_upgrade
+fn init_assets() {
     ASSETS.with(|a| {
         let mut a = a.borrow_mut();
 
         a.insert(
-            "/sample-asset.txt".to_string(),
-            include_str!("../../frontend/assets/sample-asset.txt")
-                .as_bytes()
-                .into(),
+            "/index.html".to_string(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
+        );
+        a.insert(
+            "/".to_string(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
+        );
+        a.insert(
+            "/authorize".to_string(),
+            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
+        );
+        a.insert(
+            "/index.js".to_string(),
+            (
+                vec![("Content-Encoding".to_string(), "gzip".to_string())],
+                include_bytes!("../../../dist/index.js.gz").to_vec(),
+            ),
+        );
+        a.insert(
+            "/glitch-loop.webp".to_string(),
+            (
+                vec![],
+                include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
+            ),
+        );
+        a.insert(
+            "/favicon.ico".to_string(),
+            (vec![], include_bytes!("../../../dist/favicon.ico").to_vec()),
         );
     });
 }
 
-#[pre_upgrade]
-fn persist_data() {
-    STATE.with(|s| {
-        if let Err(err) = stable_save((s.map.take(),)) {
-            ic_cdk::trap(&format!(
-                "An error occurred while saving data to stable memory: {}",
-                err
-            ));
+#[init]
+fn init(maybe_arg: Option<InternetIdentityInit>) {
+    STATE.with(|state| {
+        if let Some(arg) = maybe_arg {
+            state
+                .storage
+                .replace(Storage::new(arg.assigned_user_number_range));
         }
-    })
+        state.storage.borrow().flush();
+        update_root_hash(&state.sigs.borrow());
+    });
+    init_assets();
 }
 
 #[post_upgrade]
 fn retrieve_data() {
-    match stable_restore::<(HashMap<UserId, Vec<Entry>>,)>() {
-        Ok((map,)) => {
-            STATE.with(|s| {
-                // Restore user map.
-                s.map.replace(map);
-
-                // Recompute the signatures based on the user map.
-                let mut sigs = SignatureMap::default();
-                for (user_id, entries) in s.map.borrow().iter() {
-                    for (_, pk, expiration, _) in entries.iter() {
-                        add_signature(&mut sigs, *user_id, pk.clone(), *expiration);
-                    }
-                }
-                s.sigs.replace(sigs);
-            });
+    init_assets();
+    STATE.with(|s| {
+        match Storage::from_stable_memory() {
+            Some(storage) => {
+                s.storage.replace(storage);
+            }
+            None => {
+                s.storage.borrow().flush();
+            }
         }
-        Err(err) => ic_cdk::trap(&format!(
-            "An error occurred while retrieving data from stable memory: {}",
-            err
-        )),
-    }
+
+        // We drop all the signatures on upgrade, users will
+        // re-request them if needed.
+        update_root_hash(&s.sigs.borrow());
+    });
 }
 
-fn seed_hash(user_id: UserId) -> Hash {
-    hash::hash_string(user_id.to_string().as_str())
+fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
+    let salt = STATE
+        .with(|s| s.storage.borrow().salt().cloned())
+        .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"));
+
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    let user_number_str = user_number.to_string();
+    let user_number_blob = user_number_str.bytes();
+    blob.push(user_number_blob.len() as u8);
+    blob.extend(user_number_blob);
+
+    blob.push(frontend.bytes().len() as u8);
+    blob.extend(frontend.bytes());
+
+    hash::hash_bytes(blob)
+}
+
+fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
+    let my_canister_id: Vec<u8> = id().as_ref().to_vec();
+
+    let mut bitstring: Vec<u8> = vec![];
+    bitstring.push(my_canister_id.len() as u8);
+    bitstring.extend(my_canister_id);
+    bitstring.extend(seed);
+
+    let mut der: Vec<u8> = vec![];
+    // sequence of length 17 + the bit string length
+    der.push(0x30);
+    der.push(17 + bitstring.len() as u8);
+    der.extend(vec![
+        // sequence of length 12 for the OID
+        0x30, 0x0C, // OID 1.3.6.1.4.1.56387.1.2
+        0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
+    ]);
+    // BIT string of given length
+    der.push(0x03);
+    der.push(1 + bitstring.len() as u8);
+    der.push(0x00);
+    der.extend(bitstring);
+    der
 }
 
 fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
@@ -256,27 +586,42 @@ fn update_root_hash(m: &SignatureMap) {
 
 fn get_signature(
     sigs: &SignatureMap,
-    user_id: UserId,
     pk: PublicKey,
+    seed: Hash,
     expiration: Timestamp,
 ) -> Option<Vec<u8>> {
-    let certificate = data_certificate()?;
+    let certificate = data_certificate().unwrap_or_else(|| {
+        trap("data certificate is only available in query calls");
+    });
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
     });
-    let witness = sigs.witness(seed_hash(user_id), msg_hash)?;
+    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
+
+    let witness_hash = witness.reconstruct();
+    let root_hash = sigs.root_hash();
+    if witness_hash != root_hash {
+        trap(&format!(
+            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
+            hex::encode(&witness_hash),
+            hex::encode(&root_hash)
+        ));
+    }
+
     let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
 
     #[derive(Serialize)]
     struct Sig<'a> {
-        #[serde(with = "serde_bytes")]
-        certificate: Vec<u8>,
+        certificate: ByteBuf,
         tree: HashTree<'a>,
     }
 
-    let sig = Sig { certificate, tree };
+    let sig = Sig {
+        certificate: ByteBuf::from(certificate),
+        tree,
+    };
 
     let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
     cbor.self_describe().unwrap();
@@ -284,29 +629,135 @@ fn get_signature(
     Some(cbor.into_inner())
 }
 
-fn add_signature(sigs: &mut SignatureMap, user_id: UserId, pk: PublicKey, expiration: Timestamp) {
+fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration: Timestamp) {
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
     });
-    sigs.put(seed_hash(user_id), msg_hash);
+    let expires_at = (time() as u64).saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
+    sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
     update_root_hash(&sigs);
 }
 
-fn remove_signature(
-    sigs: &mut SignatureMap,
-    user_id: UserId,
-    pk: PublicKey,
-    expiration: Timestamp,
-) {
-    let msg_hash = delegation_signature_msg_hash(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
+/// Removes a batch of expired signatures from the signature map.
+///
+/// This function is supposed to piggy back on update calls to
+/// amortize the cost of tree pruning.  Each operation on the signature map
+/// will prune at most MAX_SIGS_TO_PRUNE other signatures.
+fn prune_expired_signatures(sigs: &mut SignatureMap) {
+    const MAX_SIGS_TO_PRUNE: usize = 10;
+    let num_pruned = sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE);
+
+    if num_pruned > 0 {
+        update_root_hash(sigs);
+    }
+}
+
+// Checks if the caller is authenticated against any of the public keys provided
+// and traps if not.
+fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey>) {
+    for pk in public_keys {
+        if caller() == Principal::self_authenticating(pk) {
+            return;
+        }
+    }
+    ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+}
+
+fn check_entry_limits(device_data: &DeviceData) {
+    const ALIAS_LEN_LIMIT: usize = 64;
+    const PK_LEN_LIMIT: usize = 100;
+    const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
+
+    let n = device_data.alias.len();
+    if n > ALIAS_LEN_LIMIT {
+        trap(&format!(
+            "alias length {} exceeds the limit of {} bytes",
+            n, ALIAS_LEN_LIMIT,
+        ));
+    }
+
+    let n = device_data.pubkey.len();
+    if n > PK_LEN_LIMIT {
+        trap(&format!(
+            "public key length {} exceeds the limit of {} bytes",
+            n, PK_LEN_LIMIT,
+        ));
+    }
+
+    let n = device_data
+        .credential_id
+        .as_ref()
+        .map(|bytes| bytes.len())
+        .unwrap_or_default();
+    if n > CREDENTIAL_ID_LEN_LIMIT {
+        trap(&format!(
+            "credential id length {} exceeds the limit of {} bytes",
+            n, CREDENTIAL_ID_LEN_LIMIT,
+        ));
+    }
+}
+
+fn check_frontend_length(frontend: &FrontendHostname) {
+    const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+
+    let n = frontend.len();
+    if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
+        trap(&format!(
+            "frontend hostname {} exceeds the limit of {} bytes",
+            n, FRONTEND_HOSTNAME_LIMIT,
+        ));
+    }
+}
+
+fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
+    use cubehash::CubeHash;
+
+    const DIFFICULTY: usize = 2;
+
+    if pow.timestamp < now.saturating_sub(POW_NONCE_LIFETIME) {
+        trap(&format!(
+            "proof of work timestamp {} is too old, current time: {}",
+            pow.timestamp, now
+        ));
+    }
+    if pow.timestamp > now.saturating_add(POW_NONCE_LIFETIME) {
+        trap(&format!(
+            "proof of work timestamp {} is too far in future, current time: {}",
+            pow.timestamp, now
+        ));
+    }
+
+    let mut hasher = CubeHash::new();
+    let domain = b"ic-proof-of-work";
+    hasher.update(&[domain.len() as u8]);
+    hasher.update(&domain[..]);
+    hasher.update(&pow.timestamp.to_le_bytes());
+    hasher.update(&pow.nonce.to_le_bytes());
+
+    let id = ic_cdk::api::id();
+    hasher.update(&[id.as_slice().len() as u8]);
+    hasher.update(id.as_slice());
+
+    let hash = hasher.finalize();
+    if !hash[0..DIFFICULTY].iter().all(|b| *b == 0) {
+        trap("proof of work hash check failed");
+    }
+}
+
+// Checks if salt is empty and calls `init_salt` to set it.
+async fn ensure_salt_set() {
+    let salt = STATE.with(|s| s.storage.borrow().salt().cloned());
+    if salt.is_none() {
+        init_salt().await;
+    }
+
+    STATE.with(|s| {
+        if s.storage.borrow().salt().is_none() {
+            trap("Salt is not set. Try calling init_salt() to set it");
+        }
     });
-    sigs.delete(seed_hash(user_id), msg_hash);
-    update_root_hash(sigs);
 }
 
 fn main() {}
