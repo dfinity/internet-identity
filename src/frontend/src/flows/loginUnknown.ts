@@ -5,6 +5,7 @@ import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
+import { aboutLink } from "../components/aboutLink";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -60,7 +61,8 @@ const pageContent = () => html` <style>
         but using a new device?
       </button>
     </div>
-  </div>`;
+  </div>
+  ${aboutLink}`;
 
 export type LoginResult =
   | {

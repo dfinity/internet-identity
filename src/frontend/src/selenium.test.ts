@@ -216,6 +216,11 @@ async function on_AuthApp_Confirm(driver: ThenableWebDriver) {
     await driver.findElement(By.id('confirmRedirect')).click();
 }
 
+// View: About
+
+async function on_About(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('about')), 3_000);
+}
 
 /*
 ## Setup helpers
@@ -434,6 +439,12 @@ test('Screenshots', async () => {
             await on_Main_Fixup(driver2);
             await screenshot('13-new-device-listed', driver2);
         })
+
+        await driver.get("about:blank");
+        await driver.get(IDP_URL + "#about");
+        await wait_for_fonts(driver);
+	await on_About(driver);
+        await screenshot('14-about', driver);
     })
 }, 300_000);
 

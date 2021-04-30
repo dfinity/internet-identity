@@ -210,11 +210,6 @@ button.linkStyle {
   width: auto;
 }
 
-button[type="submit"] {
-  padding: 1rem 2rem;
-  margin-right: auto;
-}
-
 label {
   font-size: 0.875rem;
   flex-direction: column;
@@ -379,4 +374,11 @@ hr {
   width: 80%;
   align-self: center;
   margin-top: -3rem;
+}
+
+#aboutLink {
+  text-decoration: none;
+  color: var(--grey-600);
+  margin-top: 1rem;
+  font-size: 0.875rem;
 }

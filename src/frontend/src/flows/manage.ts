@@ -4,6 +4,7 @@ import { IDPActor } from "../utils/idp_actor";
 import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
+import { aboutLink } from "../components/aboutLink";
 
 const pageContent = () => html`<style>
     #userNumberSection {
@@ -44,6 +45,7 @@ const pageContent = () => html`<style>
     <section id="identityList"></section>
     ${logoutSection()}
   </div>
+  ${aboutLink}
   <web-dialog id="prompt">
     <form action="" id="prompt-form">
       <p id="prompt-text"></p>
