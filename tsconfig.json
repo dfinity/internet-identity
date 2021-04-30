@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
-    "lib": ["ES2019", "DOM"],
+    "lib": ["ES2019", "DOM", "esnext"],
     "module": "commonjs",
     "strict": true,
     "target": "es2018",
@@ -16,14 +16,7 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "baseUrl": ".",
-    "paths": {
-      "*": ["*"],
-      "dfx-generated/idp_service": [
-        "./.dfx/local/canisters/idp_service/idp_service.js"
-      ]
-    }
+    "isolatedModules": true
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

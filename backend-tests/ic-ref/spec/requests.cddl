@@ -1,0 +1,96 @@
+; The "root type" of the CDDL file is a hack: We want to define multiple
+; types in one file (to shared common definitions), but CDDL requires a single
+; root type. So we just list the types defined here. This is a common CDDL idiom.
+start =
+  call-request /
+  read-state-request /
+  query-request /
+  read-state-response /
+  query-response
+
+; common wrappers
+
+tagged<t> = #6.55799(t) ; the CBOR tag
+
+envelope<t> = tagged<{
+  content: t
+  ? sender_pubkey: pubkey
+  ? sender_delegation: [*4 signed-delegation]
+  ? sender_sig: signature
+}>
+
+
+; A request as submitted to /api/v2/.../call
+call-request = envelope<call-request-content>
+call-request-content = {
+  request_type: "call"
+  ? nonce : bytes
+  ingress_expiry : timestamp
+  sender : principal
+  canister_id : principal
+  method_name : text
+  arg : bytes
+}
+
+; A request as submitted to /api/v2/.../read_state
+read-state-request = envelope<read-state-content>
+read-state-content = {
+  request_type: "read_state"
+  ? nonce : bytes
+  ingress_expiry : timestamp
+  sender : principal
+  paths: [* state-path]
+}
+
+state-path = [* path-label]
+path-label = bytes
+
+; The response, as returned from /api/v2/.../read_state
+read-state-response = tagged<{
+  certificate: bytes
+}>
+
+; A request as submitted to /api/v2/.../query
+query-request = envelope<query-content>
+query-content = {
+  request_type: "query"
+  ? nonce : bytes
+  ingress_expiry : timestamp
+  sender : principal
+  canister_id : principal
+  method_name : text
+  arg : bytes
+}
+
+; The response, as returned from /api/v2/.../query
+query-response = tagged<{
+  status: "replied"
+  reply: call-reply
+  //
+  status: "rejected"
+  reject_code: unsigned
+  reject_message: text
+}>
+
+call-reply = {
+  arg : bytes
+}
+
+; subnet delegations
+
+signed-delegation = {
+  delegation: {
+    pubkey: bytes
+    expiration: timestamp
+    ? targets: [* principal]
+  }
+  signature: bytes
+}
+
+; some common data types
+
+principal = bytes .size (0..29)
+
+pubkey = bytes
+signature = bytes
+timestamp = unsigned

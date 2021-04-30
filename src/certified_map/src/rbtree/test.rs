@@ -180,6 +180,7 @@ fn map_model_test() {
             assert_eq!(hm.get(k), rb.get(k));
         }
     }
+    assert_eq!(super::debug_alloc::count_allocated_pointers(), 0);
 }
 
 #[test]
@@ -204,4 +205,8 @@ fn test_nested_witness() {
         }
         other => panic!("expected a labeled tree, got {:?}", other),
     }
+
+    rb.modify(b"top", |m| m.delete(b"bottom"));
+    let ht = rb.nested_witness(&b"top"[..], |v| v.witness(&b"bottom"[..]));
+    assert_eq!(ht.reconstruct(), rb.root_hash());
 }

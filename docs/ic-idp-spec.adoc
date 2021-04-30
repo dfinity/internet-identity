@@ -9,7 +9,7 @@ This document describes and specifies the Internet Identity from various angles 
 
  * High level goals, requirements and use cases
  * Overview of the security and identity machinery, including the interplay of identities, keys, and delegations
- * Interface as used by client applications frontends, i.e., the OAUTH-based spec
+ * Interface as used by client applications frontends, i.e., our <<client-auth-protocol,client authentication protocol>>
  * The interface of the Internet Identity Service _backend_, i.e., describing its contract at the Candid layer, as used by its frontend
  * Important implementation notes about the Internet Identity Service backend
  * Internal implementation notes about the Internet Identity Service frontend
@@ -20,15 +20,15 @@ The Internet Identity Service consists of
  * one or more backend canisters
  * the frontend, a web application served by an otherwise stateless canister with a _well-known_ canister id
 
-Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the client application frontend interacts with the Internet Identity Service directly (via the OAUTH protocol described below).
+Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the clinet application frontend interacts with the Internet Identity Service directly (via the <<client-auth-protocol,client authentication protocol>> described below).
 
 == Goals, requirements and use cases
 
 The Internet Identity service allows users to
 
  * maintain identities on the Internet Computer
- * log into these identities using one out of a set of security devices
- * manage this set of security devices
+ * log in with these identities using one out of a set of security devices
+ * manage their set of security devices
 
 Some functional requirements are
 
@@ -36,23 +36,26 @@ Some functional requirements are
  * these identities are stable, i.e., do not depend on a user's security devices
  * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
  * users do not need ever to remember secret information (but possibly per-user non-secret information)
- * the security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
+ * a security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
 
 Some security requirements are
 
 * The separate identities of a single user cannot be related merely based on their public key or principal ids, to impede user tracking.
+* The security of the identities does not depend on the privacy of data stored on canisters, or transmitted to and from canisters. In particular, the delegations handed out by the backend canister must not be sensitive information.
 * (many more, of course; apply common sense)
 
 Some noteworthy security assumptions are:
 
 * The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
++
+NOTE: Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation.
 
 * The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
-* The Internet Identity Service backend can keep a secret.
-+
-(This assumption is only used relied on for the privacy aspect.)
+* The data included in a redirect from the Internet Identity Service frontend to a client application backend can be considered confidential.
 
+* For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties). 
++
 
 == Identity design and data model
 
@@ -67,11 +70,16 @@ Computer.
 
 A backend canister maintains a secret salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer’s source of secure randomness.
 
-A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] that is derived from a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] of the form
 ....
-H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
+user_id = SHA-224(|backend_canister_id| · backend_canister_id · seed) · 0x02` (29 bytes)
 ....
-where `H` is SHA-256, `·` is concatenation, `|…|` is the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname.
+
+that is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `backend_canister_id` and a seed of the form
+....
+seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
+....
+where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname (at most 255 bytes).
 
 A Internet Identity Service backend canister stores the following data in user accounts, indexed by the respective user number:
 
@@ -80,57 +88,91 @@ A Internet Identity Service backend canister stores the following data in user a
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the OAUTH protocol (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s identity.
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
-This delegation chain consists of one delegation, called the _client delegation_. It delegates from the user’s identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service backend canister responsible for this user, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
+The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service backend canister responsible for this user, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
 
 The Internet Identity Service Frontend, while a user is logged in, manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
-[#oauth]
-== OAUTH protocol
+[#client-auth-protocol]
+== Client authentication protocol
 
-This section describes the Internet Identity Service from the point of view of a client appliation frontend (a.k.a. the relaying party).
+This section describes the Internet Identity Service from the point of view of a client application frontend.
 
-The client application frontend creates a session key pair (e.g., Ed25519). It then redirects the user to the Internet Identity Service Canister frontend, more concretely to the URL
-
-  https://identity.ic0.app/authorize?…
-
-with URL parameters as specified by the OAUTH protocol. Of particular interest is the parameter
-
-* the `login_hint` parameter contains the public key of the session key created by the client application frontend, as a hex-encoded DER key.
-
-* the `redirect_uri`, the hostname of which is used to identify the client application frontend’s hostname.
-
-If the Internet Identity Service Frontend can authorize this request, the url parameters on the callback (i.e., the provided `redirect_uri`) contain in particular
-
-* the `accessToken`, which is the hex-encoding of a JSON encoding of the delegation chain in the following format
+1. The client application frontend creates a session key pair (e.g., Ed25519).
+2. It installs a `message` event handler on its own `window`.
+3. It loads the url `https://identity.ic0.app/#authorize` in an `<iframe>` or separate tab. Let `identityWindow` be the `Window` object returned from this.
 +
-....
-{
-  delegations: [
-    { delegation: {
-        expiration: (hex-encoded big-endian expiration date)
-        pubkey: (hex-encoded DER-encoded public key of delegatee)
-        targets: (optional)
-          [ (hex-encoded binary canister id)
-            …
-          ]
-      },
-      signature: (hex-encoded signature)
-    }
-    …
-  ],
-  publicKey: (hex-encoded public key underlying the user identity))
-}
-....
+If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per https://www.w3.org/TR/webauthn-2/#sctn-iframe-guidance[the Web Authentication recommendation].
+4. In the `identityWindow`, the user logs in, and the `identityWindow` invokes
 +
-This structure can be converted by the client application into a CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+--
+ window.opener.postMessage(msg, "*")
+
+where `msg` is
+
+  interface InternetIdentityReady {
+    kind: "authorize-ready"
+  }
+--
+5. The client application, after receiving the `InternetIdentityReady`, invokes
++
+--
+ identityWindow.postMessage(msg, "https://identity.ic0.app")
+
+where `msg` is a value with of type
+
+ interface InternetIdentityAuthRequest {
+   kind: "authorize-client";
+   sessionPublicKey: Uint8Array;
+   maxTimetoLive?: bigint;
+ }
+
+where
+
+* the `sessionPublicKey` contains the public key of the session key pair.
+* the `maxTimetoLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+--
+6. Now it expects a message back, with data `event`.
+7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
+8. The `event.data` value is a JS object with the following type:
++
+ interface InternetIdentityAuthResponse {
+   kind: "authorize-client-success";
+   delegations: [{
+     delegation: {
+       pubkey: Uint8Array;
+       expiration: bigint;
+       targets?: Principal[];
+     };
+     signature: Uint8Array;
+   }];
+   userPublicKey: Uint8Array;
+ }
++
+where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+9. It could also receive a failure message of the following type
++
+ interface InternetIdentityAuthResponse {
+   kind: "authorize-client-failure";
+   text: string;
+ }
++
 
 The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
-The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication` NPM package] provides functionality for this workflow.
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/auth-client`] and
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication`] NPM packages provide helpful functionality here.
 
-The client application frontend should support delegation chains of lenght more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
+The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
+
+[IMPORTANT]
+--
+The Internet Identity frontend will use `event.origin` as the “Frontend URL” to base the user identity on. This includes protocol, full hostname and port. This means
+
+* Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
+* The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
+--
 
 == The Internet Identity Service index canister
 
@@ -220,10 +262,12 @@ type Delegation = record {
   expiration: Timestamp;
   targets: opt vec principal;
 };
+
 type SignedDelegation = record {
   delegation: Delegation;
   signature: blob;
 };
+
 type GetDelegationResponse = variant {
   signed_delegation: SignedDelegation;
   no_such_delegation;
@@ -234,7 +278,6 @@ type ProofOfWork = record {
   nonce : nat64
 };
 
-
 service : {
   init_salt : () -> ();
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
@@ -242,7 +285,7 @@ service : {
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimetoLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 }
 ....
@@ -297,6 +340,8 @@ The `prepare_delegation` method causes the Internet Identity Service backend to 
 
 This method returns the user’s identity that’s associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_delegation` query, we prevent attacks that trick the user into using a wrong identity.
 
+The expiration timestamp is determined by the backend, but no more than `maxTimetoLive` (if present) nanoseconds in the future.
+
 The method returns the expiration timestamp of the delegation. This is returned purely so that the client can feed it back to the backend in `get_delegation`.
 
 The actual delegation can be fetched using `get_delegation` immediately afterwards.
@@ -308,9 +353,9 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
-Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to form the `accessToken` in the <<oauth,OAUTH flow>>.
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client applicaition as per the <<client-auth-protocol,client authentication protocol>>.
 
-*Authorization*: Anyone can call this
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 == The Internet Identity Service backend internals
 
@@ -340,7 +385,7 @@ But upon closer inspection (heh), this is not actually useful.
 
  * Another is to protect against a malicious actor. But that is only useful if the malicious actor doesn’t have an equally effective attack vector anyways, and in our case they do: If they want to flood the NNS with calls, they can use calls that do authenticate (e.g. keeping removing and adding devices, or preparing delegations); these calls would pass message inspection.
 
-On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular it increases the risk that some engineer might wrongly assume that the authentication checkin `canister_inspect_message` is sufficient and will not do it again the actual method, which could lead to a serious bug.
+On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular it increases the risk that some engineer might wrongly assume that the authentication check in `canister_inspect_message` is sufficient and will not do it again in the actual method, which could lead to a serious bug.
 
 Therefore the Internet Identity Canister intentionally does not implement `canister_inspect_message`.
 
@@ -438,7 +483,7 @@ user number, if known under the key `user_number`.
 
 The following flows are not prescriptive of the UI, e.g. “the frontend asks the user for X” may also mean that on the previous shown page, there is already a field for X.
 
-The possible login sub flows are shared among entry points `/` and `/autorized`, and are thus described separately. At the end of a succesful login subflow:
+The possible login subflows are shared among entry points `/` and `/authorized`, and are thus described separately. At the end of a succesful login subflow:
 
 * The frontend knows the `user_number` (also stored in local storage).
 * The frontend knows the current list of backend canisters, and thus which canister the user’s record is on.
@@ -558,14 +603,18 @@ This flow is the boring default
 +
 (This could include a button to go to the management screen, or maybe this _is_ the management screen with a info box.)
 
-=== Flow: OAUTH
+=== Flow: authenticating client applications
 
-1. The user accesses `/authorize` with oauth parameters
+1. The user accesses `/#authorize`
 2. 👆 The appropriate login subflow happens
-3. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
-4. The frontend calls `prepare_delegation()` with the client application frontend hostname and client application provided session key.
-5. The frontend queries `get_delegation()` to get the delegation data
-6. It converts it into the format of the `accessToken` and redirects the user back to the relaying party, as required by the oauth protocol
+3. The frontend listens to a `message` event (as per https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage[`postMessage` API])
+4. The `event.data` should be a message as per our <<client-auth-protocol>>.
+5. The `event.origin` is used as the Application Frontned’s hostname
+6. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
+7. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
+8. The frontend queries `get_delegation()` to get the delegation data
+9. It posts that data to the client application, using `event.source.postMessage` and the types specified in <<client-auth-protocol>>.
+10. It shows a message indicating that the login is complete.
 
 === Flow: Deleting devices
 
@@ -643,5 +692,18 @@ You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging
 Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin`. Run:
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx      6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
 ----
+
+=== Disaster recovery
+
+If the Internet Computer goes down and has to be re-boot-strapped, or else the backend canister is lost, we can recover as long as
+ * we get the same canister id and
+ * we have a copy of the stable memory (`/var/lib/dfinity-node/ic_state/tip/canister_states/00000000000000070101/stable_memory.bin`)
+
+We can then install a temporary upload canister that does nothing but set the stable memory to that binary (something like `backend-tests/stable-memory-setter.wat`, but extended to allow the upload in chunks, if it is larger than 2Mb), and upgrade from that.
+
+The backend tests have a test that exercises this. See `backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md` for notes about that test.
+
+
+

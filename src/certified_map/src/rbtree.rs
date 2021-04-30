@@ -1,12 +1,12 @@
-#[cfg(test)]
-mod test;
-
 use hashtree::{
     fork, fork_hash, labeled, labeled_hash, leaf_hash, Hash,
     HashTree::{self, Empty, Leaf, Pruned},
 };
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::fmt;
+
+#[cfg(test)]
+pub(crate) mod debug_alloc;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Color {
@@ -72,10 +72,6 @@ pub struct Node<K, V> {
     right: *mut Node<K, V>,
     color: Color,
 
-    /// Hash of the data hash subtree.  It depends only on the key and
-    /// value and doesn't have to be recomputed on rotations.
-    data_hash: Hash,
-
     /// Hash of the full hash tree built from this node and its
     /// children. It needs to be recomputed after every rotation.
     subtree_hash: Hash,
@@ -85,15 +81,24 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
     fn new(key: K, value: V) -> *mut Self {
         let value_hash = value.root_hash();
         let data_hash = labeled_hash(key.as_ref(), &value_hash);
-        Box::into_raw(Box::new(Self {
+        let node = Box::into_raw(Box::new(Self {
             key,
             value,
             left: Node::null(),
             right: Node::null(),
             color: Color::Red,
-            subtree_hash: data_hash.clone(),
-            data_hash,
-        }))
+            subtree_hash: data_hash,
+        }));
+
+        #[cfg(test)]
+        debug_alloc::mark_pointer_allocated(node);
+
+        node
+    }
+
+    unsafe fn data_hash(n: *mut Self) -> Hash {
+        debug_assert!(!n.is_null());
+        labeled_hash((*n).key.as_ref(), &(*n).value.root_hash())
     }
 
     unsafe fn left_hash_tree<'a>(n: *mut Self) -> HashTree<'a> {
@@ -168,6 +173,9 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
         Self::delete((*n).left);
         Self::delete((*n).right);
         let _ = Box::from_raw(n);
+
+        #[cfg(test)]
+        debug_alloc::mark_pointer_deleted(n);
     }
 
     unsafe fn subtree_hash(n: *mut Self) -> Hash {
@@ -175,7 +183,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> Node<K, V> {
             return Empty.reconstruct();
         }
 
-        let h = &(*n).data_hash;
+        let h = Node::data_hash(n);
 
         match ((*n).left.is_null(), (*n).right.is_null()) {
             (true, true) => h.clone(),
@@ -231,20 +239,31 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
     }
 
     pub fn modify(&mut self, key: &[u8], f: impl FnOnce(&mut V)) {
-        unsafe {
-            let mut root = self.root;
-            while !root.is_null() {
-                match key.cmp((*root).key.as_ref()) {
-                    Equal => {
-                        f(&mut (*root).value);
-                        (*root).subtree_hash = Node::subtree_hash(root);
-                        return;
-                    }
-                    Less => root = (*root).left,
-                    Greater => root = (*root).right,
+        unsafe fn go<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static>(
+            mut h: *mut Node<K, V>,
+            k: &[u8],
+            f: impl FnOnce(&mut V),
+        ) {
+            if h.is_null() {
+                return;
+            }
+
+            match k.as_ref().cmp((*h).key.as_ref()) {
+                Equal => {
+                    f(&mut (*h).value);
+                    (*h).subtree_hash = Node::subtree_hash(h);
+                }
+                Less => {
+                    go((*h).left, k, f);
+                    (*h).subtree_hash = Node::subtree_hash(h);
+                }
+                Greater => {
+                    go((*h).right, k, f);
+                    (*h).subtree_hash = Node::subtree_hash(h);
                 }
             }
         }
+        unsafe { go(self.root, key, f) }
     }
 
     fn range_witness<'a>(
@@ -334,7 +353,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 Less => three_way_fork(
                     Node::left_hash_tree(n),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     go((*n).right, lo),
                 ),
                 Greater => three_way_fork(
@@ -363,7 +382,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 Greater => three_way_fork(
                     go((*n).left, hi),
-                    Pruned((*n).data_hash),
+                    Pruned(Node::data_hash(n)),
                     Node::right_hash_tree(n),
                 ),
                 Less => three_way_fork(
@@ -405,12 +424,12 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                 ),
                 (Less, Greater) => three_way_fork(
                     go((*n).left, lo, hi),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     Node::right_hash_tree(n),
                 ),
                 (Greater, Less) => three_way_fork(
                     Node::left_hash_tree(n),
-                    Pruned((*n).data_hash.clone()),
+                    Pruned(Node::data_hash(n)),
                     go((*n).right, lo, hi),
                 ),
                 _ => Pruned((*n).subtree_hash.clone()),
@@ -498,7 +517,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     let subtree = go((*n).left, key, f)?;
                     Some(three_way_fork(
                         subtree,
-                        Pruned((*n).data_hash.clone()),
+                        Pruned(Node::data_hash(n)),
                         Node::right_hash_tree(n),
                     ))
                 }
@@ -506,7 +525,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     let subtree = go((*n).right, key, f)?;
                     Some(three_way_fork(
                         Node::left_hash_tree(n),
-                        Pruned((*n).data_hash.clone()),
+                        Pruned(Node::data_hash(n)),
                         subtree,
                     ))
                 }
@@ -527,9 +546,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
 
             match k.as_ref().cmp((*h).key.as_ref()) {
                 Equal => {
-                    let value_hash = v.root_hash();
                     (*h).value = v;
-                    (*h).data_hash = labeled_hash(k.as_ref(), &value_hash);
                     (*h).subtree_hash = Node::subtree_hash(h);
                 }
                 Less => {
@@ -546,11 +563,16 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
         unsafe {
             let mut root = go(self.root, key, value);
             (*root).color = Color::Black;
+
+            #[cfg(test)]
             debug_assert!(
                 is_balanced(root),
                 "the tree is not balanced:\n{:?}",
                 DebugView(root)
             );
+            #[cfg(test)]
+            debug_assert!(!has_dangling_pointers(root));
+
             self.root = root;
         }
     }
@@ -637,6 +659,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
                     (*h).subtree_hash = Node::subtree_hash(h);
                 } else {
                     (*h).right = go((*h).right, key);
+                    (*h).subtree_hash = Node::subtree_hash(h);
                 }
             }
             balance(h)
@@ -653,11 +676,14 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> RbTree<K, V> {
             if !self.root.is_null() {
                 (*self.root).color = Color::Black;
             }
+
+            #[cfg(test)]
             debug_assert!(
                 is_balanced(self.root),
                 "unbalanced map: {:?}",
                 DebugView(self.root)
             );
+
             debug_assert!(self.get(key).is_none());
         }
     }
@@ -744,6 +770,7 @@ unsafe fn flip_colors<K, V>(h: *mut Node<K, V>) {
     (*(*h).right).color = (*(*h).right).color.flip();
 }
 
+#[cfg(test)]
 unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
     unsafe fn go<K, V>(node: *mut Node<K, V>, mut num_black: usize) -> bool {
         if node.is_null() {
@@ -752,6 +779,9 @@ unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
         if !is_red(node) {
             debug_assert!(num_black > 0);
             num_black -= 1;
+        } else {
+            assert!(!is_red((*node).left));
+            assert!(!is_red((*node).right));
         }
         go((*node).left, num_black) && go((*node).right, num_black)
     }
@@ -765,6 +795,17 @@ unsafe fn is_balanced<K, V>(root: *mut Node<K, V>) -> bool {
         x = (*x).left;
     }
     go(root, num_black)
+}
+
+#[cfg(test)]
+unsafe fn has_dangling_pointers<K, V>(root: *mut Node<K, V>) -> bool {
+    if root.is_null() {
+        return false;
+    }
+
+    !debug_alloc::is_live(root)
+        || has_dangling_pointers((*root).left)
+        || has_dangling_pointers((*root).right)
 }
 
 struct DebugView<K, V>(*const Node<K, V>);
@@ -794,3 +835,6 @@ impl<K: AsRef<[u8]>, V> fmt::Debug for DebugView<K, V> {
         unsafe { go(f, self.0, 0) }
     }
 }
+
+#[cfg(test)]
+mod test;

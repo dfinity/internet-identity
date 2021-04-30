@@ -1,57 +1,199 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
 import {
-  idlFactory as idp_idl,
-  canisterId as idp_canister_id,
-} from "dfx-generated/idp_service";
-import _SERVICE, { UserId, Alias, PublicKey, CredentialId } from "../typings";
-import { authenticate } from "./handleAuthentication";
+  Actor,
+  ActorSubclass,
+  BinaryBlob,
+  blobFromUint8Array,
+  derBlobFromBlob,
+  DerEncodedBlob,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
+import idp_idl from "../../generated/idp_idl";
+import _SERVICE, {
+  PublicKey,
+  SessionKey,
+  CredentialId,
+  UserNumber,
+  FrontendHostname,
+  Timestamp,
+  DeviceData,
+  ProofOfWork,
+} from "../../generated/idp_types";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  Ed25519KeyIdentity,
+  WebAuthnIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/agent";
+import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 
-const agent = new HttpAgent();
+const canisterId: string = process.env.CANISTER_ID!;
+export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
-  agent,
-  canisterId: idp_canister_id,
+  agent: new HttpAgent({}),
+  canisterId,
 });
 
 export class IDPActor {
-  actor: _SERVICE;
-  constructor(overrideActor?: _SERVICE) {
-    this.actor = overrideActor ?? baseActor;
-  }
-  register = async (userId: UserId, alias: Alias, credentialId?: string) => {
-    const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor.register(
-      userId,
+  protected constructor(
+    public identity: WebAuthnIdentity,
+    public delegationIdentity: DelegationIdentity,
+    public actor?: ActorSubclass<_SERVICE>
+  ) {}
+
+  static async register(
+    identity: WebAuthnIdentity,
+    alias: string,
+    pow: ProofOfWork
+  ): Promise<{ connection: IDPActor; userNumber: UserNumber }> {
+    const delegationIdentity = await requestFEDelegation(identity);
+
+    const agent = new HttpAgent({ identity: delegationIdentity });
+    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+      agent,
+      canisterId: canisterId,
+    });
+    const credential_id = Array.from(identity.rawId);
+    const pubkey = Array.from(identity.getPublicKey().toDer());
+
+    console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
+    const registerResponse = await actor.register({
       alias,
-      key,
-      credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
-    );
-  };
-  add = async (userId: UserId, alias: Alias, credentialId?: string) => {
-    const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor
-      .add(
-        userId,
-        alias,
-        key,
-        credentialId ? [Array.from(new TextEncoder().encode(credentialId))] : []
+      pubkey,
+      credential_id: [credential_id],
+    }, pow);
+
+    if (registerResponse.hasOwnProperty('canister_full')) {
+      throw Error('failed to register a user because the backend canister has no space left');
+    } else if (registerResponse.hasOwnProperty('registered')) {
+      let userNumber = registerResponse['registered'].user_number;
+      console.log(`registered user number ${userNumber}`);
+      return {
+        connection: new IDPActor(identity, delegationIdentity, actor),
+        userNumber,
+      };
+    } else {
+      console.error('unexpected register response', registerResponse);
+      throw Error('unexpected register response');
+    }
+  }
+
+  static async login(userNumber: bigint): Promise<IDPActor> {
+    const devices = await baseActor.lookup(userNumber);
+
+    const multiIdent = MultiWebAuthnIdentity.fromCredentials(
+      devices.flatMap((device) =>
+        device.credential_id.map((credentialId: CredentialId) => ({
+          pubkey: derBlobFromBlob(
+            blobFromUint8Array(Buffer.from(device.pubkey))
+          ),
+          credentialId: blobFromUint8Array(Buffer.from(credentialId)),
+        }))
       )
-      .then(async () => {
-        const update = await this.actor.lookup(userId);
-        debugger;
+    );
+    const delegationIdentity = await requestFEDelegation(multiIdent);
+
+    const agent = new HttpAgent({ identity: delegationIdentity });
+    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+      agent,
+      canisterId: canisterId,
+    });
+
+    return new IDPActor(
+      multiIdent._actualIdentity!!,
+      delegationIdentity,
+      actor
+    );
+  }
+
+  static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
+    return baseActor.lookup(userNumber);
+  }
+
+  // Create an actor representing the backend
+  async getActor(): Promise<ActorSubclass<_SERVICE>> {
+    for (const { delegation } of this.delegationIdentity.getDelegation()
+      .delegations || []) {
+      // prettier-ignore
+      if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
+        this.actor = undefined;
+        break;
+      }
+    }
+
+    if (this.actor === undefined) {
+      // Create our actor with a DelegationIdentity to avoid re-prompting auth
+      this.delegationIdentity = await requestFEDelegation(this.identity);
+
+      const agent = new HttpAgent({ identity: this.delegationIdentity });
+      this.actor = Actor.createActor<_SERVICE>(idp_idl, {
+        agent,
+        canisterId,
       });
+    }
+
+    return this.actor;
+  }
+
+  add = async (
+    userNumber: UserNumber,
+    alias: string,
+    newPublicKey: DerEncodedBlob,
+    credentialId?: BinaryBlob
+  ) => {
+    const actor = await this.getActor();
+    return await actor.add(userNumber, {
+      alias,
+      pubkey: Array.from(newPublicKey),
+      credential_id: credentialId ? [Array.from(credentialId)] : [],
+    });
   };
-  remove = async (userId: UserId) => {
-    const identity = await authenticate();
-    const key = Array.from(new TextEncoder().encode(identity.publicKey));
-    return this.actor.remove(userId, key);
+
+  remove = async (userNumber: UserNumber, publicKey: PublicKey) => {
+    const actor = await this.getActor();
+    await actor.remove(userNumber, publicKey);
   };
-  lookup = (userId: UserId) => {
-    console.log(userId);
-    return this.actor.lookup(userId);
+
+  prepareDelegation = async (
+    userNumber: UserNumber,
+    hostname: FrontendHostname,
+    sessionKey: SessionKey
+  ) => {
+    console.log(
+      `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
+    );
+    const actor = await this.getActor();
+    return await actor.prepare_delegation(userNumber, hostname, sessionKey, []);
+  };
+
+  getDelegation = async (
+    userNumber: UserNumber,
+    hostname: FrontendHostname,
+    sessionKey: SessionKey,
+    timestamp: Timestamp
+  ) => {
+    console.log(
+      `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+    );
+    const actor = await this.getActor();
+    return await actor.get_delegation(userNumber, hostname, sessionKey, timestamp);
   };
 }
 
-const idp_actor = new IDPActor();
-export default idp_actor;
+const requestFEDelegation = async (
+  identity: SignIdentity
+): Promise<DelegationIdentity> => {
+  const sessionKey = Ed25519KeyIdentity.generate();
+  const tenMinutesInMsec = 10 * 1000 * 60;
+  // Here the security device is used. Besides creating new keys, this is the only place.
+  const chain = await DelegationChain.create(
+    identity,
+    sessionKey.getPublicKey(),
+    new Date(Date.now() + tenMinutesInMsec),
+    {
+      targets: [Principal.from(canisterId)],
+    }
+  );
+  return DelegationIdentity.fromDelegation(sessionKey, chain);
+};

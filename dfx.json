@@ -4,15 +4,8 @@
       "type": "custom",
       "candid": "src/idp_service/idp_service.did",
       "wasm": "target/wasm32-unknown-unknown/release/idp_service.wasm",
-      "build": "src/idp_service/build.sh"
-    },
-    "frontend": {
-      "dependencies": ["idp_service"],
-      "frontend": {
-        "entrypoint": "src/frontend/src/index.ts"
-      },
-      "source": ["src/frontend/assets", "dist"],
-      "type": "assets"
+      "build": "src/idp_service/build.sh",
+      "source": ["dist"]
     }
   },
   "defaults": {
@@ -20,11 +13,18 @@
       "packtool": ""
     }
   },
-  "dfx": "0.7.0-beta.2",
   "networks": {
     "local": {
       "bind": "127.0.0.1:8000",
       "type": "ephemeral"
+    },
+    "alpha": {
+      "providers": ["https://mercury.dfinity.network"],
+      "type": "persistent"
+    },
+    "messaging": {
+      "providers": ["http://10.12.36.13:8080"],
+      "type": "persistent"
     }
   },
   "version": 1

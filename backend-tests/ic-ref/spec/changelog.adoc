@@ -1,0 +1,279 @@
+[#changelog]
+== Changelog
+
+[#0_17_0]
+=== 0.17.0 (2021-04-22)
+
+* Spec: Canister Signatures are introduced
+* Spec clarification: the signature in the WebAuthn scheme is prefixed by the CBOR self-identifying tag
+* Spec: Cycle-depleted canisters are forcibly uninstalled
+* Spec: Canister settings in `create_canister` and `update_settings`. `install_code` no longer takes allocation settings.
+* Spec: A freezing threshold can be configured via the canister settings
+
+[#0_16_1]
+=== 0.16.1 (2021-04-14)
+
+* Spec: The cleanup callback is introduced
+
+[#0_16_0]
+=== 0.16.0 (2021-03-25)
+
+* Spec: New http v2 API that allows for stateless boundary nodes
+
+[#0_15_6]
+=== 0.15.6 (2021-03-25)
+
+* Spec: The system may impose limits on the number of globals and functions
+* Spec: No ingress messages towards empty canisters are accepted
+* Spec: No ingress messages towards `raw_rand` and `deposit_cycles` are accepted
+* Spec: A memory allocation of `0` means “best effort”
+
+[#0_15_5]
+=== 0.15.5 (2021-03-11)
+
+* Spec: deposit_cycles(): any caller allowed
+
+[#0_15_4]
+=== 0.15.4 (2021-03-04)
+
+* Spec: Ingress message filtering
+* Spec: Add ECDSA signatures on curve secp256k1
+* Spec: Clarify that the `ic0.data_certificate_present` system function may be
+  called in all contexts.
+
+[#0_15_3]
+=== 0.15.3 (2021-02-26)
+
+* Spec: Expose module hash and controller via `read_state`
+
+[#0_15_2]
+=== 0.15.2 (2021-02-09)
+
+* The document is renamed to “Internet Computer Interface Spec”
+
+[#0_15_0]
+=== 0.15.0 (2020-12-17)
+
+* Spec: Support for raw Ed25519 keys is removed
+
+[#0_14_1]
+=== 0.14.1 (2020-12-08)
+
+* Spec: The default `memory_allocation` becomes unspecified
+
+[#0_14_0]
+=== 0.14.0 (2020-11-18)
+
+* Support for funds is scaled back to only support cycles
+* The `ic0.msg_cycles_accept` system call now returns the actually accepted
+  cycles
+* The `provisional_` management calls are introduced
+
+[#0_13_2]
+=== 0.13.2 (2020-11-12)
+
+* Spec: The `ic0.canister_status` system call
+
+[#0_13_1]
+=== 0.13.1 (2020-11-06)
+
+* Spec: Delegation between user public keys
+
+[#0_13_0]
+=== 0.13.0 (2020-10-19)
+
+* Spec: Certification (also removes “request-status” request)
+
+[#0_12_2]
+=== 0.12.2 (2020-10-23)
+
+* Spec: User authentication method based on WebAuthn is introduced
+* Spec: User authentication can use ECDSA
+* Spec: Public keys are DER-encoded
+
+[#0_12_1]
+=== 0.12.1 (2020-10-16)
+
+* Spec: Return more information in the `canister_status` management call
+
+[#0_12_0]
+=== 0.12.0 (2020-10-13)
+
+* Spec: Anonymous requests must have the sender field set
+
+[#0_11_1]
+=== 0.11.1 (2020-10-01)
+
+* Spec: The `deposit_funds` call
+* ic-ref(-test): Implement and test the above changes
+
+[#0_11_0]
+=== 0.11.0 (2020-09-23)
+
+* Spec: Inter-canister calls are now performed using a builder-like API
+* Spec: Support for funds (balances and transfers)
+
+[#v0_10_3]
+=== 0.10.3 (2020-09-21)
+
+* Spec: The anonymous user is introduced
+
+[#v0_10_2]
+=== 0.10.2 (2020-09-08)
+
+* ic-ref(-test): Bugfix: A query response should _not_ include a `time` field
+
+[#v0_10_1]
+=== 0.10.1 (2020-09-01)
+
+* Forward-port changes from 0.9.3
+
+[#v0_10_0]
+=== 0.10.0 (2020-08-06)
+
+* Spec: Users can set/update a memory allocation when installing/upgrading a canister.
+* Spec: The `expiry` field is added to requests
+* ic-ref(-test): Implement and test the above changes, as far as possible
+
+[#v0_9_3]
+=== 0.9.3 (2020-09-01)
+
+* Spec: The management canister supports the `raw_rand` method
+* ic-ref(-test): Implement and test the above changes
+
+[#v0_9_2]
+=== 0.9.2 (2020-08-05)
+
+* Spec: Canister controllers can stop/start canisters and can query their status.
+* Spec: Canister controllers can delete canisters
+* ic-ref(-test): Implement and test the above changes
+* ic-ref: refactorings
+
+[#v0_9_1]
+=== 0.9.1 (2020-07-20)
+
+* Forward-port changes from 0.8.2
+
+[#v0_9_0]
+=== 0.9.0 (2020-07-15)
+
+* Spec: Introduction of a domain separator (again)
+* Spec: The calculation of “derived ids” has changed
+* Spec: The self-authenticating and derived id forms use a truncated hash
+* Spec: The textual representation of principals has changed
+* ic-ref(-test): Implement the above changes
+* ic-ref-test: Also send read requests with nonces
+
+[#v0_8_2]
+=== 0.8.2 (2020-07-17)
+
+* ic-ref-test: Also send read requests with nonces
+* Spec: Installing code via `reinstall` works also on the empty canister
+* ic-ref(-test): Implement and test the above changes
+
+[#v0_8_1]
+=== 0.8.1 (2020-07-10)
+
+* Reflect refined process in README and intro.
+* Spec: `ic0.time` added
+* ic-ref(-test): Implement and test `ic0.time`
+
+[#v0_8_0]
+=== 0.8.0 (2020-06-23)
+
+* Spec: Revert the introduction of a domain separator
+* ic-ref(-test): Implement and test the above changes
+
+[#v0_6_2]
+=== 0.6.2 (2020-06-23)
+
+* Spec: Fix meaning-changing typos in `ic.did`
+* ic-ref-test: Be more liberal about the precise reject code in some cases.
+
+[#v0_6_0]
+=== 0.6.0 (2020-06-08)
+
+* Spec: Make all canister ids system-chosen
+* Spec: HTTP requests for management features are removed
+* ic-ref(-test): Implement and test the above changes
+
+[#v0_4_0]
+=== 0.4.0 (2020-05-25)
+
+* Spec (editorial): the term “principal” is now used for the _id_ of a canister or
+  user, not the canister or user itself
+* Spec: The signature of a request needs to be calculated using a domain separator
+* Spec: Describe the `controller` attribute, add a request to change it
+* Spec: The IC management canister is introduced
+* ic-ref(-test): Implement and test the above changes
+
+[#v0_2_16]
+=== 0.2.16 (2020-05-29)
+
+* More tests about calls from query methods
+
+[#v0_2_14]
+=== 0.2.14 (2020-05-14)
+
+* Spec: Bugfix: Mode should be `reinstall`, not `replace`
+* ic-ref-test: A few more tests, refactorings
+
+[#v0_2_12]
+=== 0.2.12 (2020-05-06)
+
+* ic-ref-test: Remove code to work around lack of creater canister.
+* ic-ref-test: Stricter tests for bad signatures
+* ic-ref: Also accept CBOR maps of indeterminate length
+
+[#v0_2_10]
+=== 0.2.10 (2020-04-29)
+
+* ic-ref: Bind to 127.0.0.1 instead of 0.0.0.0
+* ic-ref: Set content-type even for error responses
+* ic-ref-test: Tests related to query calls
+* ic-ref-test: Test “reply after trap in prior callback”
+
+[#v0_2_8]
+=== 0.2.8 (2020-04-23)
+
+* Spec: Include section with CDDL description
+* ic-ref-test: Block less tests on `create_canister` support
+
+[#v0_2_6]
+=== 0.2.6 (2020-04-01)
+
+* ic-ref-run: Accept any canister id in `install` commands
+* ic-ref-test: More defensive printing of HTTP bodies
+
+[#v0_2_4]
+=== 0.2.4 (2020-03-23)
+
+* simplify versioning (only three components), skip 0.2.2 to avoid confusion with 0.2.0.2
+* spec: Clarification: `reply` field is always present
+* spec: General cleanup based on front-to-back reading
+* ic-ref(-test): Enforce signature checking
+* ic-ref(-test): Desired canister ids must be derived from sender
+* ic-ref(-test): Require the 55799 semantic CBOR tag, as specified
+* ic-ref: Ignore duplicate requests
+* ic-ref-test: Run more tests independent of each other (try `-j 8`)
+* ic-ref-test: Submit requests with nonces
+* ic-ref-test: Test various trap conditions in reply and reject callbacks.
+* ic-ref-test: Test that `ic0.debug_print` with invalid bounds does _not_ trap
+* ic-ref-test: Allow unspecified fields to appear in the status response
+* ic-ref-test: Canister upgrade tests
+
+[#v0_2_0_2]
+=== 0.2.0.2 (2020-03-19)
+
+* ic-ref: Return status 202, empty body, on `submit`, to match spec
+* ic-ref: Allow update or inter-canister calls to query methods
+* ic-ref: Trap upon calls from queries
+* ic-ref-test: If the IC does not claim to be spec compliant, always succeed
+  (but still report errors)
+* ic-ref-test: Support --html reports
+* ic-ref-test: Use the “Universal Canister” to drive tests; more tests.
+
+[#v0_2_0_0]
+=== 0.2.0.0 (2020-03-11)
+
+* This is the first release. Subsequent releases will include a changelog.

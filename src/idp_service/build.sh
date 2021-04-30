@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
+
+# Compile frontend assets to dist
+echo Compiling frontend assets
+npm run build
 
 IDP_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
