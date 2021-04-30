@@ -55,7 +55,6 @@ NOTE: Just for background: At launch this means we will rely on the trustworthin
 * The data included in a redirect from the Internet Identity Service frontend to a client application backend can be considered confidential.
 
 * For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties). 
-+
 
 == Identity design and data model
 
