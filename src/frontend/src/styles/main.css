@@ -202,16 +202,12 @@ button.primary {
 }
 
 button.linkStyle {
+  cursor: pointer;
   display: inline;
   border: none;
   padding: 0;
   margin: 0;
   width: auto;
-}
-
-button[type="submit"] {
-  padding: 1rem 2rem;
-  margin-right: auto;
 }
 
 label {
@@ -374,3 +370,15 @@ hr {
   border-top: 1px solid var(--grey-400);
 }
 
+#icLogo {
+  width: 80%;
+  align-self: center;
+  margin-top: -3rem;
+}
+
+#aboutLink {
+  text-decoration: none;
+  color: var(--grey-600);
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}

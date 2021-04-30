@@ -25,6 +25,7 @@ executable backend-tests
   build-depends: asn1-encoding
   build-depends: asn1-types
   build-depends: atomic-write
+  build-depends: attoparsec
   build-depends: base32
   build-depends: base >=4.12 && <5
   build-depends: base64-bytestring >= 1.1
@@ -133,4 +134,5 @@ executable backend-tests
   other-modules: IC.Wasm.Winter
   other-modules: IC.Wasm.WinterMemory
   other-modules: IC.Wasm.Winter.Persist
+  other-modules: Prometheus
   other-modules: SourceId

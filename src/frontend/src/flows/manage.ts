@@ -4,6 +4,7 @@ import { IDPActor } from "../utils/idp_actor";
 import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
+import { aboutLink } from "../components/aboutLink";
 
 const pageContent = () => html`<style>
     #userNumberSection {
@@ -35,14 +36,16 @@ const pageContent = () => html`<style>
   <div class="container">
     <section id="intro">
       <h1>Identity Management</h1>
-      <p>You can view and manage your Internet Computer identities here.</p>
+      <p>You can view and manage your Internet identity and your registered devices here.</p>
     </section>
     <section id="userNumberSection" class="hidden">
       <h3>Your User Number is <span id="userNumberSpan"></span></h3>
     </section>
+    <label>Your registered devices:</label>
     <section id="identityList"></section>
     ${logoutSection()}
   </div>
+  ${aboutLink}
   <web-dialog id="prompt">
     <form action="" id="prompt-form">
       <p id="prompt-text"></p>

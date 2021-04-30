@@ -20,7 +20,7 @@ const pageContent = (userNumber: bigint) => html`
     <p class="warningBox">
       Warning: Do not click this button unless this link really came from you.
     </p>
-    <button type="button" class="primary" id="addDevice">Yes, link new device</button>
+    <button type="button" class="primary" id="addDevice">Yes, add new device</button>
     <button type="button" id="cancelAdd">Cancel</button>
     ${logoutSection()}
   </div>
@@ -65,7 +65,7 @@ const init = (userNumber: bigint, connection: IDPActor) => {
         await withLoader(() => connection.add(userNumber, deviceName, publicKey, rawId));
         const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
-        successfullyAddedDevice(deviceName);
+        successfullyAddedDevice(deviceName, userNumber, connection);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await confirm({

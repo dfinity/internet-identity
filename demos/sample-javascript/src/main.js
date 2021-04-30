@@ -18,13 +18,18 @@ const init = async () => {
 
   // Redirect to the identity provider
   signInBtn.onclick = async () => {
-    authClient.loginWithRedirect({
+    authClient.login({
       identityProvider: idpUrlEl.value,
+    }, async function() {
+      principalEl.innerText = await authClient.getIdentity().getPrincipal();
+    }, function(error) {
+      alert(error);
     });
   };
 
   signOutBtn.onclick = async () => {
     authClient.logout();
+    principalEl.innerText = await authClient.getIdentity().getPrincipal();
   };
 
   if (location.hash.substring(1).startsWith("access_token")) {

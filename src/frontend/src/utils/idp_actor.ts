@@ -17,6 +17,8 @@ import _SERVICE, {
   FrontendHostname,
   Timestamp,
   DeviceData,
+  ProofOfWork,
+  RegisterResponse,
 } from "../../generated/idp_types";
 import {
   DelegationChain,
@@ -26,14 +28,23 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import getProofOfWork from "../crypto/pow";
 
 const canisterId: string = process.env.CANISTER_ID!;
-const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
+export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   agent: new HttpAgent({}),
   canisterId,
 });
+
+export type ApiResult = LoginResult | RegisterResult
+export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError
+export type RegisterResult = LoginSuccess | AuthFail | ApiError | RegisterNoSpace
+
+type LoginSuccess = { kind: "loginSuccess", connection: IDPActor, userNumber: bigint }
+type UnknownUser = { kind: "unknownUser", userNumber: bigint }
+type AuthFail = { kind: "authFail", error: Error }
+type ApiError = { kind: "apiError", error: Error }
+type RegisterNoSpace = { kind: "registerNoSpace" }
 
 export class IDPActor {
   protected constructor(
@@ -45,12 +56,15 @@ export class IDPActor {
   static async register(
     identity: WebAuthnIdentity,
     alias: string,
-  ): Promise<{ connection: IDPActor; userNumber: UserNumber }> {
-    const delegationIdentity = await requestFEDelegation(identity);
+    pow: ProofOfWork
+  ): Promise<RegisterResult> {
 
-    // Do PoW before registering.
-    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+    let delegationIdentity: DelegationIdentity;
+    try {
+      delegationIdentity = await requestFEDelegation(identity);
+    } catch (error) {
+      return { kind: "authFail", error }
+    }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -61,18 +75,24 @@ export class IDPActor {
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
     console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
-    const registerResponse = await actor.register({
-      alias,
-      pubkey,
-      credential_id: [credential_id],
-    }, pow);
-
+    let registerResponse: RegisterResponse;
+    try {
+      registerResponse = await actor.register({
+        alias,
+        pubkey,
+        credential_id: [credential_id],
+      }, pow);  
+    } catch (error) {
+      return { kind: "apiError", error }
+    }
+    
     if (registerResponse.hasOwnProperty('canister_full')) {
-      throw Error('failed to register a user because the backend canister has no space left');
+      return { kind: "registerNoSpace"}
     } else if (registerResponse.hasOwnProperty('registered')) {
       let userNumber = registerResponse['registered'].user_number;
       console.log(`registered user number ${userNumber}`);
       return {
+        kind: "loginSuccess",
         connection: new IDPActor(identity, delegationIdentity, actor),
         userNumber,
       };
@@ -82,8 +102,20 @@ export class IDPActor {
     }
   }
 
-  static async login(userNumber: bigint): Promise<IDPActor> {
-    const devices = await baseActor.lookup(userNumber);
+  static async login(userNumber: bigint): Promise<LoginResult> {
+    let devices: DeviceData[];
+    try {
+      devices = await baseActor.lookup(userNumber);
+    } catch (e) {
+      return {
+        kind: "apiError",
+        error: e
+      }
+    }
+    
+    if (devices.length === 0) {
+      return { kind: "unknownUser", userNumber }
+    }
 
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
@@ -95,7 +127,12 @@ export class IDPActor {
         }))
       )
     );
-    const delegationIdentity = await requestFEDelegation(multiIdent);
+    let delegationIdentity: DelegationIdentity;
+    try {
+      delegationIdentity = await requestFEDelegation(multiIdent);
+    } catch (e) {
+      return { kind: "authFail", error: e }
+    }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -103,11 +140,15 @@ export class IDPActor {
       canisterId: canisterId,
     });
 
-    return new IDPActor(
-      multiIdent._actualIdentity!!,
-      delegationIdentity,
-      actor
-    );
+    return { 
+      kind: "loginSuccess",
+      userNumber,
+      connection: new IDPActor(
+        multiIdent._actualIdentity!!,
+        delegationIdentity,
+        actor
+      )
+    };
   }
 
   static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
