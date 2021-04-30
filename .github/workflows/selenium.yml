@@ -62,6 +62,7 @@ jobs:
           cabal-version: "3.2"
 
       - name: Build ic-ref (and override cache)
+        if: ${{ matrix.start-flag == '--emulator'}}
         run: |
           cd backend-tests
           cabal update
