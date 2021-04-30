@@ -20,7 +20,7 @@ const pageContent = (userNumber: bigint) => html`
     <p class="warningBox">
       Warning: Do not click this button unless this link really came from you.
     </p>
-    <button type="button" class="primary" id="addDevice">Yes, link new device</button>
+    <button type="button" class="primary" id="addDevice">Yes, add new device</button>
     <button type="button" id="cancelAdd">Cancel</button>
     ${logoutSection()}
   </div>
