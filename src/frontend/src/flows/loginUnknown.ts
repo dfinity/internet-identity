@@ -6,8 +6,9 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
+import { bannerFromIntent, UserIntent } from "../utils/userIntent";
 
-const pageContent = () => html` <style>
+const pageContent = (userIntent: string) => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
       border-style: double;
@@ -44,7 +45,7 @@ const pageContent = () => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your user number to login with Internet Identity.</p>
+    <p>Provide your user number to login and ${userIntent}.</p>
     <input
       type="text"
       id="registerUserNumber"
@@ -76,9 +77,10 @@ export type LoginResult =
     detail: string;
   };
 
-export const loginUnknown = async (): Promise<LoginResult> => {
+export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult> => {
+  
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
+  render(pageContent(bannerFromIntent(userIntent)), container);
   return new Promise((resolve, reject) => {
     initLogin(resolve);
     initLinkDevice();
