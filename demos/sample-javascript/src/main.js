@@ -20,22 +20,16 @@ const init = async () => {
   signInBtn.onclick = async () => {
     authClient.login({
       identityProvider: idpUrlEl.value,
-    }, async function() {
-      principalEl.innerText = await authClient.getIdentity().getPrincipal();
-    }, function(error) {
-      alert(error);
+      onSuccess: async () => {
+        console.log("asdf");
+        principalEl.innerText = await authClient.getIdentity().getPrincipal();
+      },
     });
   };
 
   signOutBtn.onclick = async () => {
     authClient.logout();
-    principalEl.innerText = await authClient.getIdentity().getPrincipal();
   };
-
-  if (location.hash.substring(1).startsWith("access_token")) {
-    await authClient.handleRedirectCallback();
-    principalEl.innerText = await authClient.getIdentity().getPrincipal();
-  }
 };
 
 init();
