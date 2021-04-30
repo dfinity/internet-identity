@@ -5,7 +5,7 @@ import { clearHash } from "./addDevice";
 const pageContent = () => html`
 <div class="container">
     <h1>New Device</h1>
-    <p>What identity would you like to give this device?</p>
+    <p>What alias would you like to give the new device?</p>
     <input id="deviceAlias" placeholder="Device alias">
     <button id="deviceAliasContinue" class="primary">Link Device</button>
     <button id="deviceAliasCancel">Cancel</button>

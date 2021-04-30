@@ -35,7 +35,7 @@ const pageContent = () => html`<style>
   <div class="container">
     <section id="intro">
       <h1>Identity Management</h1>
-      <p>You can view and manage your Internet Computer identities here.</p>
+      <p>You can view and manage your Internet identity and your registered devices here.</p>
     </section>
     <section id="userNumberSection" class="hidden">
       <h3>Your User Number is <span id="userNumberSpan"></span></h3>
