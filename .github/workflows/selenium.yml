@@ -14,6 +14,7 @@ jobs:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
         dfx: [ '0.7.0-beta.4' ]
+        ghc: [ '8.4.4' ]
         start-flag: [ '', '--emulator' ]
 
 
@@ -42,6 +43,30 @@ jobs:
           echo Install DFX Version: $DFX_VERSION
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
+
+      - run: dfx cache install
+
+      - name: Cache ~/.cabal/store
+        if: ${{ matrix.start-flag == '--emulator'}}
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cabal/store
+          key: cabal-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
+          restore-keys: cabal-selenium-${{ runner.os }}-${{ matrix.ghc }}-
+
+      - uses: actions/setup-haskell@v1.1.3
+        if: ${{ matrix.start-flag == '--emulator'}}
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: "3.2"
+
+      - name: Build ic-ref (and override cache)
+        run: |
+          cd backend-tests
+          cabal update
+          cabal install -w ghc-${{ matrix.ghc }} --overwrite-policy=always  --installdir=$(dfx cache show)
+
 
       - name: Build auth-client
         run: |
