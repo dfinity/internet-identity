@@ -42,6 +42,7 @@ const IDENTITY_CANISTER = canister_ids1.idp_service.local;
 import canister_ids2 from '../../../demos/whoami/.dfx/local/canister_ids.json';
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
+const REPLICA_URL = 'http://localhost:8000';
 const IDP_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`
 const DEMO_APP_URL = 'http://localhost:8080/';
 
