@@ -209,11 +209,6 @@ button.linkStyle {
   width: auto;
 }
 
-button[type="submit"] {
-  padding: 1rem 2rem;
-  margin-right: auto;
-}
-
 label {
   font-size: 0.875rem;
   flex-direction: column;
