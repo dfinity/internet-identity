@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IDPActor } from "../utils/idp_actor";
+import { IDPActor, ApiResult } from "../utils/idp_actor";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
@@ -66,21 +66,21 @@ const pageContent = () => html` <style>
 
 export type LoginResult =
   | {
-      tag: "ok";
-      userNumber: bigint;
-      connection: IDPActor;
-    }
+    tag: "ok";
+    userNumber: bigint;
+    connection: IDPActor;
+  }
   | {
-      tag: "err";
-      message: string;
-      detail: string;
-    };
+    tag: "err";
+    message: string;
+    detail: string;
+  };
 
 export const loginUnknown = async (): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return new Promise((resolve, reject) => {
-    initLogin(resolve, reject);
+    initLogin(resolve);
     initLinkDevice();
     initRegister(resolve, reject);
   });
@@ -103,7 +103,7 @@ const initRegister = (resolve, reject) => {
   };
 };
 
-const initLogin = (resolve, reject) => {
+const initLogin = (resolve) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -111,25 +111,21 @@ const initLogin = (resolve, reject) => {
     "loginButton"
   ) as HTMLButtonElement;
 
-  loginButton.onclick = () => {
+  loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
-    if (userNumber !== null) {
-      withLoader(() =>
-        IDPActor.login(userNumber).then((connection) => {
-          setUserNumber(userNumber);
-          resolve({ tag: "ok", userNumber, connection });
-        })
-      ).catch(err => {
-        reject(err)
-      });
-    } else {
-      resolve({
+    if (userNumber === null) {
+      return resolve({
         tag: "err",
         message: "Please enter a valid User Number",
         detail: `${userNumber} doesn't parse as a number`,
       });
     }
-  };
+    const result = await withLoader(() => IDPActor.login(userNumber));
+    if (result.kind === "loginSuccess") {
+      setUserNumber(userNumber);
+    }
+    resolve(apiResultToLoginResult(result));
+  }
 };
 
 const initLinkDevice = () => {
@@ -146,3 +142,43 @@ const initLinkDevice = () => {
     addDeviceUserNumber(userNumber)
   };
 };
+
+export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
+  switch (result.kind) {
+    case "loginSuccess": {
+      return {
+        tag: "ok",
+        userNumber: result.userNumber,
+        connection: result.connection,
+      };
+    };
+    case "authFail": {
+      return {
+        tag: "err",
+        message: "Failed to authenticate",
+        detail: result.error.message
+      };
+    };
+    case "unknownUser": {
+      return {
+        tag: "err",
+        message: `Failed to find an identity for the user number ${result.userNumber}`,
+        detail: ""
+      };
+    };
+    case "apiError": {
+      return {
+        tag: "err",
+        message: "Failed to call the Internet Identity service",
+        detail: result.error.message
+      };
+    };
+    case "registerNoSpace": {
+      return {
+        tag: "err",
+        message: "Failed to register with Internet Identity, because there is no space left",
+        detail: ""
+      }
+    }
+  }
+}

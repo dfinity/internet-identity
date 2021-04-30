@@ -6,7 +6,7 @@ import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { getUserNumber } from "../utils/userNumber";
-import { LoginResult, loginUnknown } from "./loginUnknown";
+import { apiResultToLoginResult, LoginResult, loginUnknown } from "./loginUnknown";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
@@ -74,19 +74,7 @@ const init = async (userNumber: bigint): Promise<LoginResult> => {
       ev.preventDefault();
       ev.stopPropagation();
       const result = await withLoader(() => IDPActor.login(userNumber));
-      try {
-        resolve({
-          tag: "ok",
-          userNumber,
-          connection: result,
-        });
-      } catch (err) {
-        resolve({
-          tag: "err",
-          message: `Failed to login as ${userNumber}`,
-          detail: err.toString(),
-        });
-      }
+      resolve(apiResultToLoginResult(result));
     };
 
     loginDifferentButton.onclick = async (ev) => {
