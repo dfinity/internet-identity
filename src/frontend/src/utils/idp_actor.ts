@@ -131,7 +131,6 @@ export class IDPActor {
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
     } catch (e) {
-      console.log("authFail", e)
       return { kind: "authFail", error: e }
     }
 
