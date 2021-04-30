@@ -18,9 +18,6 @@ const pageContent = html`
     <p>
       Internet Identity works without passwords! You log in with your fingerprint, your face, or with dedicated security tokens. You can add multiple devices and security tokens and use your identities with any of them.
     </p>
-    <p>
-      Learn more with the <a href="todo">Internet Identity introduction</a>, and if you want to use the Internet Identity in your application, head for the <a href="todo">Developer documentation</a>.
-    </p>
   </div>
   `;
 
