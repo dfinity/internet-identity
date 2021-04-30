@@ -126,7 +126,7 @@ where `msg` is a value with of type
 
  interface InternetIdentityAuthRequest {
    kind: "authorize-client";
-   sessionPublicKey: Blob;
+   sessionPublicKey: Uint8Array;
    maxTimetoLive?: bigint;
  }
 
@@ -143,13 +143,13 @@ where
    kind: "authorize-client-success";
    delegations: [{
      delegation: {
-       pubkey: Blob;
+       pubkey: Uint8Array;
        expiration: bigint;
        targets?: Principal[];
      };
-     signature: Blob;
+     signature: Uint8Array;
    }];
-   userPublicKey: Blob;
+   userPublicKey: Uint8Array;
  }
 +
 where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
