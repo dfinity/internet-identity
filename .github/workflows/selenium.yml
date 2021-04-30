@@ -64,7 +64,7 @@ jobs:
       - name: Build ic-ref (and override cache)
         if: ${{ matrix.start-flag == '--emulator'}}
         run: |
-          cd backend-tests
+          cd backend-tests/ic-ref/impl
           cabal update
           cabal install ic-ref -w ghc-${{ matrix.ghc }} --overwrite-policy=always  --installdir=$(dfx cache show)
 
