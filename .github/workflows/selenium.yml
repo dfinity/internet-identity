@@ -14,6 +14,7 @@ jobs:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
         dfx: [ '0.7.0-beta.4' ]
+        start-flag: [ '', '--emulator' ]
 
 
     steps:
@@ -57,7 +58,7 @@ jobs:
           sleep 10 # crude
 
       - run: npm ci
-      - run: dfx start --background
+      - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: Deploy Internet Identity
         run: dfx deploy --no-wallet --argument '(null)'
@@ -71,7 +72,7 @@ jobs:
 
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
         with:
           add: screenshots
           author_name: Screenshot Committer
