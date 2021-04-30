@@ -35,7 +35,6 @@ const pageContent = () => html` <style>
       white-space: nowrap;
     }
     .textLink button {
-      cursor: pointer;
       font-size: 0.95rem;
       font-weight: 600;
       text-decoration: none;

@@ -202,6 +202,7 @@ button.primary {
 }
 
 button.linkStyle {
+  cursor: pointer;
   display: inline;
   border: none;
   padding: 0;
