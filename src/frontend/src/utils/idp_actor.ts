@@ -35,6 +35,13 @@ export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   canisterId,
 });
 
+export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError
+
+type LoginSuccess = { kind: "success", connection: IDPActor }
+type UnknownUser = { kind: "unknownUser" }
+type AuthFail = { kind: "authFail", error: Error }
+type ApiError = { kind: "apiError", error: Error }
+
 export class IDPActor {
   protected constructor(
     public identity: WebAuthnIdentity,
@@ -79,8 +86,20 @@ export class IDPActor {
     }
   }
 
-  static async login(userNumber: bigint): Promise<IDPActor> {
-    const devices = await baseActor.lookup(userNumber);
+  static async login(userNumber: bigint): Promise<LoginResult> {
+    let devices: DeviceData[];
+    try {
+      devices = await baseActor.lookup(userNumber);
+    } catch (e) {
+      return {
+        kind: "apiError",
+        error: e
+      }
+    }
+    
+    if (devices.length === 0) {
+      return { kind: "unknownUser" }
+    }
 
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
@@ -92,7 +111,13 @@ export class IDPActor {
         }))
       )
     );
-    const delegationIdentity = await requestFEDelegation(multiIdent);
+    let delegationIdentity: DelegationIdentity;
+    try {
+      delegationIdentity = await requestFEDelegation(multiIdent);
+    } catch (e) {
+      console.log("authFail", e)
+      return { kind: "authFail", error: e }
+    }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
     const actor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -100,11 +125,14 @@ export class IDPActor {
       canisterId: canisterId,
     });
 
-    return new IDPActor(
-      multiIdent._actualIdentity!!,
-      delegationIdentity,
-      actor
-    );
+    return { 
+      kind: "success", 
+      connection: new IDPActor(
+        multiIdent._actualIdentity!!,
+        delegationIdentity,
+        actor
+      )
+    };
   }
 
   static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
