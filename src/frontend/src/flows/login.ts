@@ -74,7 +74,7 @@ const init = async (userNumber: bigint): Promise<LoginResult> => {
       ev.preventDefault();
       ev.stopPropagation();
       const result = await withLoader(() => IDPActor.login(userNumber));
-      resolve(apiResultToLoginResult(userNumber, result));
+      resolve(apiResultToLoginResult(result));
     };
 
     loginDifferentButton.onclick = async (ev) => {

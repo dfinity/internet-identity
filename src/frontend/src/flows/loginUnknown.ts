@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IDPActor, LoginResult as ApiResult } from "../utils/idp_actor";
+import { IDPActor, ApiResult } from "../utils/idp_actor";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
@@ -121,10 +121,10 @@ const initLogin = (resolve) => {
       });
     }
     const result = await withLoader(() => IDPActor.login(userNumber));
-    if (result.kind === "success") {
+    if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
-    resolve(apiResultToLoginResult(userNumber, result));
+    resolve(apiResultToLoginResult(result));
   }
 };
 
@@ -143,12 +143,12 @@ const initLinkDevice = () => {
   };
 };
 
-export const apiResultToLoginResult = (userNumber: bigint, result: ApiResult): LoginResult => {
+export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
   switch (result.kind) {
-    case "success": {
+    case "loginSuccess": {
       return {
         tag: "ok",
-        userNumber,
+        userNumber: result.userNumber,
         connection: result.connection,
       };
     };
@@ -162,7 +162,7 @@ export const apiResultToLoginResult = (userNumber: bigint, result: ApiResult): L
     case "unknownUser": {
       return {
         tag: "err",
-        message: `Failed to find an identity for the user number ${userNumber}`,
+        message: `Failed to find an identity for the user number ${result.userNumber}`,
         detail: ""
       };
     };
@@ -173,5 +173,12 @@ export const apiResultToLoginResult = (userNumber: bigint, result: ApiResult): L
         detail: result.error.message
       };
     };
+    case "registerNoSpace": {
+      return {
+        tag: "err",
+        message: "Failed to register with Internet Identity, because there is no space left",
+        detail: ""
+      }
+    }
   }
 }
