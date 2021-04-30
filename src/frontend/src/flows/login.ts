@@ -1,4 +1,5 @@
 import { render, html } from "lit-html";
+import { aboutLink } from "../components/aboutLink";
 import { confirm } from "../components/confirm";
 import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
@@ -20,7 +21,7 @@ const pageContent = (userNumber: bigint) => html`
     </button>
     ${logoutSection("Clear user number from browser")}
   </div>
-`;
+  ${aboutLink}`;
 
 // We retry logging in until we get a succesful user number connection pair
 // If we encounter an unexpected error we reload to be safe

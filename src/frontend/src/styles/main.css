@@ -379,3 +379,10 @@ hr {
   align-self: center;
   margin-top: -3rem;
 }
+
+#aboutLink {
+  text-decoration: none;
+  color: var(--grey-600);
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
