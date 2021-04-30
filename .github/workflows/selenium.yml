@@ -11,10 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: [ '1.51.0' ]
-        os: [ ubuntu-latest ]
-        dfx: [ '0.7.0-beta.4' ]
-
+        rust: ["1.51.0"]
+        os: [ubuntu-latest]
+        dfx: ["0.7.0-beta.4"]
 
     steps:
       - uses: actions/checkout@v2
@@ -42,12 +41,6 @@ jobs:
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Build auth-client
-        run: |
-          cd packages/auth-client
-          npm ci
-          npm run build
-
       - name: Run demo app
         run: |
           cd demos/sample-javascript/
@@ -69,8 +62,8 @@ jobs:
         with:
           add: screenshots
           author_name: Screenshot Committer
-          author_email: '<nobody@example.com>'
-          message: 'Updating selenium screenshots'
+          author_email: "<nobody@example.com>"
+          message: "Updating selenium screenshots"
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
-          pull_strategy: 'NO-PULL'
+          pull_strategy: "NO-PULL"
