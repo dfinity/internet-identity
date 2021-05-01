@@ -7,7 +7,7 @@ import { IDPActor } from "./utils/idp_actor";
 interface AuthRequest {
     kind: "authorize-client";
     sessionPublicKey: Uint8Array;
-    maxTimetoLive?: BigInt;
+    maxTimeToLive?: BigInt;
 }
 
 interface AuthResponseSuccess {
