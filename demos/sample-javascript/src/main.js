@@ -28,6 +28,7 @@ const init = async () => {
 
   signOutBtn.onclick = async () => {
     authClient.logout();
+    principalEl.innerText = await authClient.getIdentity().getPrincipal();
   };
 };
 
