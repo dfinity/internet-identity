@@ -11,9 +11,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: ["1.51.0"]
-        os: [ubuntu-latest]
-        dfx: ["0.7.0-beta.4"]
+        rust: [ '1.51.0' ]
+        os: [ ubuntu-latest ]
+        dfx: [ '0.7.0-beta.5' ]
+        start-flag: [ '', '--emulator' ]
 
     steps:
       - uses: actions/checkout@v2
@@ -50,15 +51,21 @@ jobs:
           sleep 10 # crude
 
       - run: npm ci
-      - run: dfx start --background
-      - run: dfx deploy --no-wallet --argument '(null)'
+      - run: dfx start ${{ matrix.start-flag }} --background
+
+      - name: Deploy Internet Identity
+        run: dfx deploy --no-wallet --argument '(null)'
+
+      - name: Deploy whoami canister
+        run: cd demos/whoami && dfx deploy --no-wallet
+
       - run: rm -v -f screenshots/*.png
       - run: npm test -- --verbose
       - run: dfx stop
 
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
         with:
           add: screenshots
           author_name: Screenshot Committer
