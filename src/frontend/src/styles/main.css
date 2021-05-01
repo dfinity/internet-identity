@@ -395,10 +395,6 @@ hr {
   font-size: 0.875rem;
 }
 
-#deviceList {
-  overflow-y: auto;
-}
-
 .deviceItem {
   display: flex;
   width: 100%;
