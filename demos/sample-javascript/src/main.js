@@ -21,7 +21,6 @@ const init = async () => {
     authClient.login({
       identityProvider: idpUrlEl.value,
       onSuccess: async () => {
-        console.log("asdf");
         principalEl.innerText = await authClient.getIdentity().getPrincipal();
       },
     });
