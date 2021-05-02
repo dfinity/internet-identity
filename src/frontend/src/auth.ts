@@ -125,25 +125,20 @@ const retryGetDelegation = async (
   timestamp: bigint,
   maxRetries: number = 5,
 ): Promise<SignedDelegation> => {
-  let lastErr = new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
   for (let i = 0; i < maxRetries; i++) {
-    try {
-      // Linear backoff
-      await new Promise(resolve => { setInterval(resolve, 1000 * i) });
-      const res = await connection.getDelegation(
-        userNumber,
-        hostname,
-        sessionKey,
-        timestamp
-      );
-      if (isDelegationResponse(res)) {
-        return res.signed_delegation
-      }
-    } catch (err) {
-      lastErr = err;
+    // Linear backoff
+    await new Promise(resolve => { setInterval(resolve, 1000 * i) });
+    const res = await connection.getDelegation(
+      userNumber,
+      hostname,
+      sessionKey,
+      timestamp
+    );
+    if (isDelegationResponse(res)) {
+      return res.signed_delegation
     }
   };
-  throw lastErr;
+  throw new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
 };
 
 function isDelegationResponse(
