@@ -109,7 +109,8 @@ const parseNewDeviceParam = (
 
 export const clearHash = () => {
   history.pushState(
-    "",
+    // Preserve the #authorize hash if it's present.
+    /authorize/.test(window.location.hash) ? "authorize" : "",
     document.title,
     window.location.pathname + window.location.search
   );
