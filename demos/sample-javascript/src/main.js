@@ -40,7 +40,7 @@ whoamiBtn.addEventListener("click", async () => {
   // or already authenticated agent, or parsing the redirect from window.location.
   const idlFactory = ({ IDL }) =>
     IDL.Service({
-      whoami: IDL.Func([], [IDL.Principal], ["query"]),
+      whoami: IDL.Func([], [IDL.Principal]),
     });
 
   const canisterId = Principal.fromText(canisterIdEl.value);
