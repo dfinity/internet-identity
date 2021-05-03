@@ -221,20 +221,31 @@ label {
   }
 }
 
+main::before {
+  content: '';
+  display: block;
+  flex-grow: 1;
+  height: 24px;
+}
+
 main {
-  height: 80vh;
-}
-
-main,
-section {
-  margin: auto;
+  height: 100vh;
   display: flex;
-  justify-content: center;
-  align-items: center;
   flex-direction: column;
+  align-items: center;
+}
+
+main::after {
+  content: '';
+  display: block;
+  flex-grow: 2;
+  height: 24px;
 }
 
 section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
   max-width: calc(100vw - 2rem);
   align-items: baseline;
@@ -338,11 +349,12 @@ ul {
   padding: 3.5rem 2.5rem 2rem 2.5rem;
   max-width: 365px;
   min-width: 300px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 512px) {
   .container {
     border: 2px var(--grey-100) solid;
     border-radius: 4px;
@@ -381,4 +393,28 @@ hr {
   color: var(--grey-600);
   margin-top: 1rem;
   font-size: 0.875rem;
+}
+
+.deviceItem {
+  display: flex;
+  width: 100%;
+}
+.deviceItemAlias {
+  border: 1px solid var(--grey-200);
+  border-radius: 2px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  margin-right: 0.5rem;
+  padding-left: 1rem;
+}
+.deviceItemRemove {
+  border-radius: 2px;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

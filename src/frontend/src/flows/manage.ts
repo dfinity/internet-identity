@@ -1,48 +1,26 @@
 import { render, html } from "lit-html";
-import { identityListItem } from "../components/identityListItem";
 import { IDPActor } from "../utils/idp_actor";
 import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
+import { DeviceData } from "../../generated/idp_types";
+import { closeIcon } from "../components/icons";
 
 const pageContent = () => html`<style>
-    #userNumberSection {
-      padding-top: 0;
-      padding-bottom: 0;
-    }
-    button[title="Remove identity"] {
-      position: relative;
-      padding: 0.25rem;
-      height: 1rem;
-      width: 1rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    }
-    @media (prefers-color-scheme: dark) {
-      path {
-        stroke: var(--text-color);
-      }
-    }
-    #identityList {
-      max-width: 500px;
-    }
-    #identityList li {
-      border-bottom: 1px solid var(--text-color);
-    }
+  #deviceLabel {
+    margin-top: 1rem;
+    margin-bottom: 0;
+    font-size: 1rem;
+    font-weight: 500;
+  }
   </style>
   <div class="container">
-    <section id="intro">
-      <h1>Identity Management</h1>
-      <p>You can view and manage your Internet identity and your registered devices here.</p>
-    </section>
-    <section id="userNumberSection" class="hidden">
-      <h3>Your User Number is <span id="userNumberSpan"></span></h3>
-    </section>
-    <label>Your registered devices:</label>
-    <section id="identityList"></section>
+    <h1>Identity Management</h1>
+    <p>You can view and manage your Internet identity and your registered devices here.</p>
+    <h3>Your User Number is <span id="userNumberSpan"></span></h3>
+    <label id="deviceLabel">Registered devices:</label>
+    <div id="deviceList"></div>
     ${logoutSection()}
   </div>
   ${aboutLink}
@@ -68,6 +46,15 @@ const pageContent = () => html`<style>
     </form>
   </web-dialog>`;
 
+const deviceListItem = (alias) => html`
+<div class="deviceItem">
+  <div class="deviceItemAlias">${alias}</div>
+  <button type="button" class="deviceItemRemove">
+    ${closeIcon}
+  </button>
+</div>
+`;
+
 export const renderManage = (userNumber: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -85,13 +72,11 @@ export const init = async (userNumber, connection) => {
 const displayUserNumber = (userNumber: BigInt) => {
   const userNumberElem = document.getElementById("userNumberSpan") as HTMLElement;
   userNumberElem.innerHTML = userNumber.toString();
-  const userNumberSection = document.getElementById("userNumberSection") as HTMLElement;
-  userNumberSection.classList.remove("hidden");
 };
 
 const renderIdentities = async (connection, userNumber) => {
-  const identityList = document.getElementById("identityList") as HTMLElement;
-  identityList.innerHTML = ``;
+  const deviceList = document.getElementById("deviceList") as HTMLElement;
+  deviceList.innerHTML = ``;
 
   const identities = await IDPActor.lookup(userNumber);
 
@@ -100,12 +85,12 @@ const renderIdentities = async (connection, userNumber) => {
   identities.forEach((identity) => {
     const identityElement = document.createElement("li");
     identityElement.className = "flex row justify-between";
-    identityElement.innerHTML = identityListItem(identity.alias);
+    render(deviceListItem(identity.alias), identityElement);
     bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
   });
 
-  identityList.appendChild(list);
+  deviceList.appendChild(list);
 };
 
 const bindRemoveListener = (

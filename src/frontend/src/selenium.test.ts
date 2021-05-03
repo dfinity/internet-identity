@@ -114,7 +114,7 @@ async function on_RegisterShowNumber_Fixup(driver: ThenableWebDriver) {
 
 async function on_Main(device_name : string, driver : ThenableWebDriver) {
     // wait for device list to load
-    await driver.wait(until.elementLocated(By.xpath(`//span[string()='${device_name}']`)), 3_000);
+    await driver.wait(until.elementLocated(By.xpath(`//div[string()='${device_name}']`)), 3_000);
 }
 
 async function on_Main_Logout(driver : ThenableWebDriver) {
