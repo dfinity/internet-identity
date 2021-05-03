@@ -6,6 +6,7 @@ import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
 import { DeviceData } from "../../generated/idp_types";
 import { closeIcon } from "../components/icons";
+import { displayError } from "../components/displayError";
 
 const pageContent = () => html`<style>
   #deviceLabel {
@@ -78,7 +79,18 @@ const renderIdentities = async (connection, userNumber) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
-  const identities = await IDPActor.lookup(userNumber);
+  let identities: DeviceData[];
+  try {
+    identities = await IDPActor.lookup(userNumber);
+  } catch (err) {
+    await displayError({
+      title: "Failed to list your devices",
+      message: "An unexpected error occured when displaying your devices. Please try again",
+      detail: err.toString(),
+      primaryButton: "Try again"
+    });
+    return renderManage(userNumber, connection)
+  }
 
   const list = document.createElement("ul");
 
@@ -125,15 +137,25 @@ const bindRemoveListener = (
     }
 
     // Otherwise, remove identity
-    await withLoader(() =>
-      connection.remove(userNumber, publicKey).then(() => {
-        listItem.parentElement?.removeChild(listItem);
-      })
-    );
+    try {
+      await withLoader(() =>
+        connection.remove(userNumber, publicKey).then(() => {
+          listItem.parentElement?.removeChild(listItem);
+        })
+      );
 
-    if (sameDevice) {
-      localStorage.clear();
-      location.reload();
+      if (sameDevice) {
+        localStorage.clear();
+        location.reload();
+      }
+    } catch (err) {
+      await displayError({
+        title: "Failed to remove the device",
+        message: "An unexpected error occured when trying to remove the device. Please try again",
+        detail: err.toString(),
+        primaryButton: "Back to Manage"
+      });
+      renderManage(userNumber, connection)
     }
   };
 };
