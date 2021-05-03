@@ -123,7 +123,7 @@ async function on_Main_Logout(driver : ThenableWebDriver) {
 
 async function on_Main_Fixup(driver : ThenableWebDriver) {
     // replace the user number for a reproducible screenshot
-    let elem = await driver.findElement(By.id('userNumberSpan'));
+    let elem = await driver.findElement(By.className('highlightBox'));
     await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
 }
 
