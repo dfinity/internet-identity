@@ -15,7 +15,7 @@ const pageContent = html`
   <div class="container">
     <h1>Register your new Internet Identity</h1>
     <form id="registerForm">
-      <p>What should we call this device?</p>
+      <p>Please provide a name for your device.</p>
       <input id="registerAlias" placeholder="Device name" />
       <button type="submit" class="primary">Register</button>
       <button id="registerCancel" type="button">Cancel</button>

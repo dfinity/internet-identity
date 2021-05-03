@@ -20,7 +20,7 @@ const pageContent = (userNumber: bigint) => html`
     <label>User Number:</label>
     <div class="highlightBox">${userNumber}</div>
     <p class="warningBox">
-      Warning: Do not click this button unless this link really came from you.
+      Warning: Click the button below only if you have transferred the link from your other device.
     </p>
     <button type="button" class="primary" id="addDevice">Yes, add new device</button>
     <button type="button" id="cancelAdd">Cancel</button>
