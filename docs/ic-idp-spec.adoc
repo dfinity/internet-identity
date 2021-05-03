@@ -631,6 +631,7 @@ ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-chan
 === Disaster recovery
 
 If the Internet Computer goes down and has to be re-boot-strapped, or else the backend canister is lost, we can recover as long as
+
  * we get the same canister id and
  * we have a copy of the stable memory (`/var/lib/dfinity-node/ic_state/tip/canister_states/00000000000000070101/stable_memory.bin`)
 
