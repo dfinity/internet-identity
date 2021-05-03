@@ -9,6 +9,7 @@ import { displayError } from "../components/displayError";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
+import { parseUserNumber } from "../utils/userNumber";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { login } from "./login";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
@@ -57,9 +58,9 @@ const init = (userNumber: bigint, connection: IDPActor) => {
         await displayError({
           title: "Wrong user number",
           message: `We're expecting to add a device to the user number ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct user number when creating the add device link, or log in with the expected user number.`,
-          primaryButton: "Try again"
+          primaryButton: "Back to Login"
         });
-        return;
+        window.location.reload();
       }
       console.log("Adding new device with:", parsedParams);
       try {
@@ -76,9 +77,16 @@ const init = (userNumber: bigint, connection: IDPActor) => {
           detail: error.toString(),
           primaryButton: "Back to Login"
         });
-        clearHash();
         window.location.reload();
       }
+    } else {
+      await displayError({
+        title: "Not a valid link",
+        message: "We failed to recognize your add device link. Please make sure you copy the entire link, and only use links you created yourself.",
+        primaryButton: "Back to Login"
+      });
+      clearHash();
+      window.location.reload();
     }
   };
 };
@@ -88,11 +96,12 @@ const parseNewDeviceParam = (
 ): { userNumber: bigint; publicKey: DerEncodedBlob; rawId?: BinaryBlob } | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
-    // TODO: Decent error handling
-    console.error("This is not a valid pasted link");
     return null;
   }
-  const userNumber = BigInt(segments[0]);
+  const userNumber = parseUserNumber(segments[0]);
+  if (userNumber === null) {
+    return null;
+  }
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
   const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
   return { userNumber, publicKey, rawId };
