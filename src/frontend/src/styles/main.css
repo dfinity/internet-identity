@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 
 :root {
   font-family: "Montserrat", sans-serif;
@@ -142,9 +142,10 @@ button.linkStyle {
 }
 
 label {
-  font-size: 0.875rem;
+  font-size: 1rem;
+  font-weight: 500;
   flex-direction: column;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 main::before {
@@ -194,11 +195,13 @@ main::after {
 
 .highlightBox {
     background-color: var(--grey-100);
-    padding: 1rem 0rem;
+    padding: 0.7rem 0rem;
     text-align: center;
     border-radius: 4px;
     margin-bottom: 1rem;
     overflow-wrap: break-word;
+    font-size: 1.5rem;
+    font-weight: 500;
 }
 
 .warningBox {

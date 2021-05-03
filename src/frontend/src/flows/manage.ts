@@ -8,19 +8,18 @@ import { DeviceData } from "../../generated/idp_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 
-const pageContent = () => html`<style>
+const pageContent = (userNumber: bigint) => html`<style>
   #deviceLabel {
     margin-top: 1rem;
     margin-bottom: 0;
-    font-size: 1rem;
-    font-weight: 500;
   }
   </style>
   <div class="container">
     <h1>Identity Management</h1>
     <p>You can view and manage your Internet identity and your registered devices here.</p>
-    <h3>Your User Number is <span id="userNumberSpan"></span></h3>
-    <label id="deviceLabel">Registered devices:</label>
+    <label>User Number</label>
+    <div class="highlightBox">${userNumber}</div>
+    <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
     ${logoutSection()}
   </div>
@@ -36,20 +35,14 @@ const deviceListItem = (alias: string) => html`
 export const renderManage = (userNumber: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  render(pageContent(), container);
+  render(pageContent(userNumber), container);
   init(userNumber, connection);
 };
 
 export const init = async (userNumber, connection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
-  displayUserNumber(userNumber);
   initLogout();
   renderIdentities(connection, userNumber);
-};
-
-const displayUserNumber = (userNumber: BigInt) => {
-  const userNumberElem = document.getElementById("userNumberSpan") as HTMLElement;
-  userNumberElem.innerHTML = userNumber.toString();
 };
 
 const renderIdentities = async (connection, userNumber) => {
