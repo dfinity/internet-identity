@@ -5,11 +5,12 @@ import {
   DerEncodedBlob,
 } from "@dfinity/agent";
 import { render, html } from "lit-html";
-import { confirm } from "../components/confirm";
+import { displayError } from "../components/displayError";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { pickDeviceAlias } from "./addDevicePickAlias";
+import { login } from "./login";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
 const pageContent = (userNumber: bigint) => html`
@@ -53,9 +54,10 @@ const init = (userNumber: bigint, connection: IDPActor) => {
       const { userNumber: expectedUserNumber, publicKey, rawId } = parsedParams;
       if (expectedUserNumber !== userNumber) {
         // Here we're adding a device to our userNumber that was supposed to be added to a different one.
-        await confirm({
-          message: "Tried adding a device for the wrong user number.",
-          detail: `Expected user is ${expectedUserNumber}, but current user is ${userNumber}. Please choose the correct user number when creating the add device link`,
+        await displayError({
+          title: "Wrong user number",
+          message: `We're expecting to add a device to the user number ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct user number when creating the add device link, or log in with the expected user number.`,
+          primaryButton: "Try again"
         });
         return;
       }
@@ -68,12 +70,14 @@ const init = (userNumber: bigint, connection: IDPActor) => {
         successfullyAddedDevice(deviceName, userNumber, connection);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
-        await confirm({
-          message: "Failed to add the device.",
-          detail: `Canceled adding the device with ${error}`,
+        await displayError({
+          title: "Failed to add the device",
+          message: "Something went wrong when adding the new device. Please try again",
+          detail: error.toString(),
+          primaryButton: "Back to Login"
         });
         clearHash();
-        return;
+        window.location.reload();
       }
     }
   };

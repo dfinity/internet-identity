@@ -1,6 +1,6 @@
 import { render, html } from "lit-html";
 import { aboutLink } from "../components/aboutLink";
-import { confirm } from "../components/confirm";
+import { displayError } from "../components/displayError";
 import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
@@ -38,14 +38,16 @@ export const login = async (userIntent: UserIntent): Promise<{
         return { userNumber: x.userNumber, connection: x.connection };
       }
       case "err": {
-        await confirm({ message: x.message, detail: x.detail });
+        await displayError({ ...x, primaryButton: "Try again" });
         return login(userIntent);
       }
     }
   } catch (err) {
-    await confirm({
+    await displayError({
+      title: "Something went wrong",
       message: "An unexpected error occured during login. Please try again",
       detail: err,
+      primaryButton: "Try again"
     });
     window.location.reload();
     return Promise.reject(err);
