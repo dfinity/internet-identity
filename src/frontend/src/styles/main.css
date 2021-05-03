@@ -318,14 +318,6 @@ ul {
   width: auto;
 }
 
-/* large screen break */
-@media (min-width: 1024px) {
-  dialog,
-  web-dialog {
-    max-width: 1080px;
-  }
-}
-
 /* @media (prefers-color-scheme: dark) {
   :root {
     --text-color: var(--white-000);

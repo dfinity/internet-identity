@@ -24,28 +24,7 @@ const pageContent = () => html`<style>
     <div id="deviceList"></div>
     ${logoutSection()}
   </div>
-  ${aboutLink}
-  <web-dialog id="prompt">
-    <form action="" id="prompt-form">
-      <p id="prompt-text"></p>
-      <p class="details"></p>
-      <input type="text" id="prompt-input" />
-      <div class="flex row">
-        <button type="submit">Confirm</button>
-        <button type="button" id="prompt-cancel">Cancel</button>
-      </div>
-    </form>
-  </web-dialog>
-  <web-dialog id="confirm">
-    <form action="" id="confirm-form">
-      <p id="confirm-text"></p>
-      <p class="details"></p>
-      <div class="flex row">
-        <button type="submit">Confirm</button>
-        <button type="button" id="confirm-cancel">Cancel</button>
-      </div>
-    </form>
-  </web-dialog>`;
+  ${aboutLink}`;
 
 const deviceListItem = (alias) => html`
 <div class="deviceItem">
