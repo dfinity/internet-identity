@@ -21,7 +21,6 @@ const init = async () => {
     authClient.login({
       identityProvider: idpUrlEl.value,
       onSuccess: async () => {
-        console.log("asdf");
         principalEl.innerText = await authClient.getIdentity().getPrincipal();
       },
     });
@@ -41,7 +40,7 @@ whoamiBtn.addEventListener("click", async () => {
   // or already authenticated agent, or parsing the redirect from window.location.
   const idlFactory = ({ IDL }) =>
     IDL.Service({
-      whoami: IDL.Func([], [IDL.Principal], []),
+      whoami: IDL.Func([], [IDL.Principal], ["query"]),
     });
 
   const canisterId = Principal.fromText(canisterIdEl.value);

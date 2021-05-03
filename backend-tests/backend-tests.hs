@@ -17,6 +17,7 @@ module Main where
 import Options.Applicative hiding (empty)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Text.Hex as H
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
@@ -51,7 +52,7 @@ import IC.Id.Forms hiding (Blob)
 import IC.HTTP.GenR
 import IC.HTTP.RequestId
 
-
+import Prometheus hiding (Timestamp)
 
 -- copied from ./src/idp_service/idp_service.did,
 -- and then modified to replace vec nat8 with blob
@@ -103,6 +104,35 @@ type ProofOfWork = record {
   nonce : nat64;
 };
 
+type HeaderField = record { text; text; };
+
+type HttpRequest = record {
+  method: text;
+  url: text;
+  headers: vec HeaderField;
+  body: blob;
+};
+
+type HttpResponse = record {
+  status_code: nat16;
+  headers: vec HeaderField;
+  body: blob;
+  streaming_strategy: opt StreamingStrategy;
+};
+
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+
+type Token = record {};
+
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
+};
 service : {
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
@@ -112,6 +142,8 @@ service : {
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
+
+  http_request: (request: HttpRequest) -> (HttpResponse) query;
 }
   |]
 
@@ -168,9 +200,28 @@ type ProofOfWork = [Candid.candidType|record {
   nonce : nat64;
 }|]
 
+type HttpRequest = [Candid.candidType|record {
+  method : text;
+  url : text;
+  headers : vec record { text; text; };
+  body : blob;
+}|]
+
+type HttpResponse = [Candid.candidType|record {
+  status_code : nat16;
+  headers : vec record { text; text; };
+  body : blob;
+  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: record {}; }) query; }; };
+}|]
+
 mkPOW :: Word64 -> Word64 -> ProofOfWork
 mkPOW t n = #timestamp .== t .+ #nonce .== n
 
+httpGet :: String -> HttpRequest
+httpGet url = #method .== T.pack "GET"
+  .+ #url .== T.pack url
+  .+ #headers .== V.empty
+  .+ #body .== ""
 
 type Hash = Blob
 
@@ -387,6 +438,24 @@ mustGetUserNumber :: HasCallStack => RegisterResponse -> M Word64
 mustGetUserNumber response = case V.view #registered response of
   Just r -> return (r .! #user_number)
   Nothing -> liftIO $ assertFailure $ "expected to get 'registered' response, got " ++ show response
+
+mustParseMetrics :: HasCallStack => HttpResponse -> M MetricsRepository
+mustParseMetrics resp =
+  case parseMetricsFromText bodyText of
+    Left err -> liftIO $ assertFailure $ printf "failed to parse metrics from text, error: %s, input: %s" err bodyText
+    Right metrics -> return metrics
+  where
+    bodyText = T.decodeUtf8 $ BS.toStrict $ resp .! #body
+
+assertMetric :: HasCallStack => MetricsRepository -> MetricName -> MetricValue -> M ()
+assertMetric repo name expectedValue =
+  case lookupMetric repo name of
+    Left err ->
+      liftIO $ assertFailure $ printf "failed to lookup metric %s: %s, repository: %s" name err (show repo)
+    Right (actualValue, _) ->
+      if expectedValue /= actualValue
+      then liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
+      else return ()
 
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
@@ -607,6 +676,26 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range .! #_1_ @?= 100
     response <- callIDP cid webauthID #register (device1, powAt cid 0)
     assertVariant #canister_full response
+
+  , withUpgrade $ \should_upgrade -> idpTest "metrics endpoint" $ \cid -> do
+    _ <- callIDP cid webauth2ID #register (device2, powAt cid 1) >>= mustGetUserNumber
+    metrics <- callIDP cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
+
+    assertMetric metrics "internet_identity_user_count" 1.0
+    assertMetric metrics "internet_identity_signature_count" 0.0
+
+    when should_upgrade $ doUpgrade cid
+
+    userNumber <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    let sessionSK = createSecretKeyEd25519 "hohoho"
+    let sessionPK = toPublicKey sessionSK
+    let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
+    _ <- callIDP cid webauthID #prepare_delegation delegationArgs
+
+    metrics <- callIDP cid webauthID #http_request (httpGet "/metrics") >>= mustParseMetrics
+
+    assertMetric metrics "internet_identity_user_count" 2.0
+    assertMetric metrics "internet_identity_signature_count" 1.0
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence
