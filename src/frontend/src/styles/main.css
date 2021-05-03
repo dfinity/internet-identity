@@ -3,26 +3,7 @@
 :root {
   font-family: "Montserrat", sans-serif;
   font-size: 16px;
-  --azureradiance-050: #ebf0fa;
-  --azureradiance-100: #c7d9f9;
-  --azureradiance-200: #a3c3f9;
-  --azureradiance-300: #80acf8;
-  --azureradiance-400: #5c96f8;
-  --azureradiance-500: #387ff7;
-  --azureradiance-600: #2b67cd;
-  --azureradiance-700: #1f4fa2;
-  --azureradiance-800: #123778;
-  --azureradiance-900: #051f4d;
-  --flamingo-050: #ffece5;
-  --flamingo-100: #fccfbf;
-  --flamingo-200: #f9b298;
-  --flamingo-300: #f79471;
-  --flamingo-400: #f4774b;
   --flamingo-500: #f15a24;
-  --flamingo-600: #cf4c1d;
-  --flamingo-700: #ad3e16;
-  --flamingo-800: #8a2f0e;
-  --flamingo-900: #682107;
   --grey-050: #efefef;
   --grey-100: #d9d9da;
   --grey-200: #c3c3c4;
@@ -33,48 +14,6 @@
   --grey-700: #555659;
   --grey-800: #3f4043;
   --grey-900: #292a2e;
-  --meteorite-050: #f2ebfa;
-  --meteorite-100: #d0c4e2;
-  --meteorite-200: #b29dcb;
-  --meteorite-300: #9275b4;
-  --meteorite-400: #724e9c;
-  --meteorite-500: #522785;
-  --meteorite-600: #471f77;
-  --meteorite-700: #3c1669;
-  --meteorite-800: #300e5b;
-  --meteorite-900: #25054d;
-  --piction-050: #f0faff;
-  --piction-100: #c8ebf9;
-  --piction-200: #a0dbf3;
-  --piction-300: #78cbee;
-  --piction-400: #51bbe8;
-  --piction-500: #29abe2;
-  --piction-600: #1f89b8;
-  --piction-700: #15678d;
-  --piction-800: #0a4563;
-  --piction-900: #002338;
-
-  --razzmatazz-050: #f7dfe9;
-  --razzmatazz-100: #f5b8d3;
-  --razzmatazz-200: #f392bc;
-  --razzmatazz-300: #f16ba6;
-  --razzmatazz-400: #ef458f;
-  --razzmatazz-500: #ed1e79;
-  --razzmatazz-600: #cb1866;
-  --razzmatazz-700: #aa1154;
-  --razzmatazz-800: #880b41;
-  --razzmatazz-900: #66042f;
-  --seabuckhorn-050: #fff5e5;
-  --seabuckhorn-100: #fee7c3;
-  --seabuckhorn-200: #fdd9a1;
-  --seabuckhorn-300: #fdcc7f;
-  --seabuckhorn-400: #fcbe5d;
-  --seabuckhorn-500: #fbb03b;
-  --seabuckhorn-600: #d2912c;
-  --seabuckhorn-700: #a9731e;
-  --seabuckhorn-800: #80540f;
-  --seabuckhorn-900: #573500;
-  --white-000: #ffffff;
 
   --text-color: var(--grey-900);
   --background-color: #fff;
@@ -90,15 +29,6 @@ html,
 body {
   margin: 0;
   width: 100vw;
-}
-
-header {
-  position: sticky;
-  top: 0;
-  background-color: var(--background-color);
-  margin-top: 0;
-  padding: 0.1rem;
-  border-bottom: 1px solid var(--text-color);
 }
 
 p {
@@ -185,11 +115,6 @@ label {
   display: flex;
 }
 
-fieldset {
-  margin-bottom: 1rem;
-  max-width: calc(100vw - 1.5rem);
-}
-
 form {
   margin-bottom: 2rem;
   flex-direction: column;
@@ -215,11 +140,6 @@ label {
   flex-direction: column;
   margin-bottom: 1rem;
 }
-@media (min-width: 720px) {
-  label {
-    flex-direction: row;
-  }
-}
 
 main::before {
   content: '';
@@ -242,72 +162,9 @@ main::after {
   height: 24px;
 }
 
-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-width: calc(100vw - 2rem);
-  align-items: baseline;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: var(--background-color);
-}
-@media (min-width: 1024px) {
-  section {
-    align-items: flex-start;
-  }
-}
-
-.hidden {
-  display: none;
-}
-
-.flex {
-  display: flex;
-}
-.column {
-  flex-direction: column;
-}
-.row {
-  flex-direction: row;
-}
-
-@media (min-width: 767px) {
-  .md-row {
-    flex-direction: row;
-  }
-  .md-column {
-    flex-direction: column;
-  }
-}
-.justify-between {
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-.center {
-  justify-content: center;
-  align-items: center;
-}
-
 ul {
   width: 100%;
   padding: 0;
-}
-
-.details:empty {
-  display: none;
-}
-
-#confirm button,
-#prompt button {
-  margin-right: 1rem;
-}
-
-#prompt-input {
-  margin-bottom: 1rem;
 }
 
 #logout-button {
@@ -317,25 +174,6 @@ ul {
   font-size: 0.8rem;
   width: auto;
 }
-
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: var(--white-000);
-    --primary: var(--grey-050);
-    --background-color: #222222;
-    --secondary: #323232;
-    --accent: var(--grey-300);
-  }
-  input {
-    color: var(--accent);
-    border: 1px solid var(--text-color);
-  }
-  header,
-  section,
-  button {
-    --background-color: #222222;
-  }
-} */
 
 .container {
   padding: 3.5rem 2.5rem 2rem 2.5rem;

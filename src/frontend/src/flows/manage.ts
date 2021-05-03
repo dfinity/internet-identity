@@ -75,7 +75,6 @@ const renderIdentities = async (connection, userNumber) => {
 
   identities.forEach((identity) => {
     const identityElement = document.createElement("li");
-    identityElement.className = "flex row justify-between";
     render(deviceListItem(identity.alias), identityElement);
     bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
