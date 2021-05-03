@@ -8,6 +8,9 @@ const loader = () => html`<style>
       width: 100vw;
       height: 100vh;
       background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     #loader img {
       width: auto;
@@ -25,7 +28,7 @@ const loader = () => html`<style>
       }
     }
   </style>
-  <picture id="loader" class="flex center">
+  <picture id="loader">
     <img src="/glitch-loop.webp" alt="loading" />
   </picture>`;
 

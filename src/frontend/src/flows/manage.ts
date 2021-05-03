@@ -6,85 +6,67 @@ import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
 import { DeviceData } from "../../generated/idp_types";
 import { closeIcon } from "../components/icons";
+import { displayError } from "../components/displayError";
 
-const pageContent = () => html`<style>
+const pageContent = (userNumber: bigint) => html`<style>
   #deviceLabel {
     margin-top: 1rem;
     margin-bottom: 0;
-    font-size: 1rem;
-    font-weight: 500;
   }
   </style>
   <div class="container">
     <h1>Identity Management</h1>
     <p>You can view and manage your Internet identity and your registered devices here.</p>
-    <h3>Your User Number is <span id="userNumberSpan"></span></h3>
-    <label id="deviceLabel">Registered devices:</label>
+    <label>User Number</label>
+    <div class="highlightBox">${userNumber}</div>
+    <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
     ${logoutSection()}
   </div>
-  ${aboutLink}
-  <web-dialog id="prompt">
-    <form action="" id="prompt-form">
-      <p id="prompt-text"></p>
-      <p class="details"></p>
-      <input type="text" id="prompt-input" />
-      <div class="flex row">
-        <button type="submit">Confirm</button>
-        <button type="button" id="prompt-cancel">Cancel</button>
-      </div>
-    </form>
-  </web-dialog>
-  <web-dialog id="confirm">
-    <form action="" id="confirm-form">
-      <p id="confirm-text"></p>
-      <p class="details"></p>
-      <div class="flex row">
-        <button type="submit">Confirm</button>
-        <button type="button" id="confirm-cancel">Cancel</button>
-      </div>
-    </form>
-  </web-dialog>`;
+  ${aboutLink}`;
 
-const deviceListItem = (alias) => html`
-<div class="deviceItem">
+const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
   <button type="button" class="deviceItemRemove">
     ${closeIcon}
   </button>
-</div>
 `;
 
 export const renderManage = (userNumber: bigint, connection: IDPActor) => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  render(pageContent(), container);
+  render(pageContent(userNumber), container);
   init(userNumber, connection);
 };
 
 export const init = async (userNumber, connection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
-  displayUserNumber(userNumber);
   initLogout();
   renderIdentities(connection, userNumber);
-};
-
-const displayUserNumber = (userNumber: BigInt) => {
-  const userNumberElem = document.getElementById("userNumberSpan") as HTMLElement;
-  userNumberElem.innerHTML = userNumber.toString();
 };
 
 const renderIdentities = async (connection, userNumber) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
-  const identities = await IDPActor.lookup(userNumber);
+  let identities: DeviceData[];
+  try {
+    identities = await IDPActor.lookup(userNumber);
+  } catch (err) {
+    await displayError({
+      title: "Failed to list your devices",
+      message: "An unexpected error occured when displaying your devices. Please try again",
+      detail: err.toString(),
+      primaryButton: "Try again"
+    });
+    return renderManage(userNumber, connection)
+  }
 
   const list = document.createElement("ul");
 
   identities.forEach((identity) => {
     const identityElement = document.createElement("li");
-    identityElement.className = "flex row justify-between";
+    identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
     bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
@@ -125,15 +107,25 @@ const bindRemoveListener = (
     }
 
     // Otherwise, remove identity
-    await withLoader(() =>
-      connection.remove(userNumber, publicKey).then(() => {
-        listItem.parentElement?.removeChild(listItem);
-      })
-    );
+    try {
+      await withLoader(() =>
+        connection.remove(userNumber, publicKey).then(() => {
+          listItem.parentElement?.removeChild(listItem);
+        })
+      );
 
-    if (sameDevice) {
-      localStorage.clear();
-      location.reload();
+      if (sameDevice) {
+        localStorage.clear();
+        location.reload();
+      }
+    } catch (err) {
+      await displayError({
+        title: "Failed to remove the device",
+        message: "An unexpected error occured when trying to remove the device. Please try again",
+        detail: err.toString(),
+        primaryButton: "Back to Manage"
+      });
+      renderManage(userNumber, connection)
     }
   };
 };

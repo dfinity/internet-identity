@@ -1,4 +1,3 @@
-import "web-dialog";
 import "./styles/main.css";
 import { login } from "./flows/login";
 import oauth from "./utils/oauth";
