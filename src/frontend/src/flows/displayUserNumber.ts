@@ -3,8 +3,7 @@ import { html, render } from "lit-html";
 const pageContent = (userNumber) => html`
   <div class="container">
     <h1>Congratulations!</h1>
-    <p>You are now registered. Please remember and write down your user number.</p>
-    <p>You will need it to use your Internet Identity or register additional devices.</p>
+    <p>Please record your user number. You will need it later to use your Internet Identity or to register additional devices.</p>
     <label>User Number:</label>
     <div class="highlightBox">
       ${userNumber}
