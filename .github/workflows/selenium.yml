@@ -16,7 +16,6 @@ jobs:
         dfx: [ '0.7.0-beta.5' ]
         start-flag: [ '', '--emulator' ]
 
-
     steps:
       - uses: actions/checkout@v2
 
@@ -42,14 +41,6 @@ jobs:
           echo Install DFX Version: $DFX_VERSION
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
-
-      - run: dfx cache install
-
-      - name: Build auth-client
-        run: |
-          cd packages/auth-client
-          npm ci
-          npm run build
 
       - name: Run demo app
         run: |
@@ -78,8 +69,8 @@ jobs:
         with:
           add: screenshots
           author_name: Screenshot Committer
-          author_email: '<nobody@example.com>'
-          message: 'Updating selenium screenshots'
+          author_email: "<nobody@example.com>"
+          message: "Updating selenium screenshots"
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
-          pull_strategy: 'NO-PULL'
+          pull_strategy: "NO-PULL"
