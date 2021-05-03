@@ -20,7 +20,7 @@ export const intentFromUrl = (url: URL): UserIntent => {
 
 export const bannerFromIntent = (intent: UserIntent): string => {
     switch (intent.kind) {
-      case "addDevice": return "add a new device to your Internet Identity"
+      case "addDevice": return "add your new device to your Internet Identity"
       case "auth": return "authenticate using your Internet Identity"
       case "oauth": return "authenticate using your Internet Identity"
       case "manage": return "manage your Internet Identity"

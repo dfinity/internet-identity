@@ -6,7 +6,7 @@ import { renderManage } from "./manage";
 const pageContent = (alias) => html`
   <div class="container">
     <h1>Success!</h1>
-    <p>You’ve successfully added a new device. You can close this window and return to your other device.</p>
+    <p>You have successfully added your new device.</p>
     <label>Device name:</label>
     <div class="highlightBox">
       ${alias}
