@@ -26,13 +26,11 @@ const pageContent = () => html`<style>
   </div>
   ${aboutLink}`;
 
-const deviceListItem = (alias) => html`
-<div class="deviceItem">
+const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
   <button type="button" class="deviceItemRemove">
     ${closeIcon}
   </button>
-</div>
 `;
 
 export const renderManage = (userNumber: bigint, connection: IDPActor) => {
@@ -75,6 +73,7 @@ const renderIdentities = async (connection, userNumber) => {
 
   identities.forEach((identity) => {
     const identityElement = document.createElement("li");
+    identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
     bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
     list.appendChild(identityElement);
