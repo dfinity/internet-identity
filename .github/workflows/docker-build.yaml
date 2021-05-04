@@ -1,0 +1,18 @@
+name: Docker build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  docker-build:
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build --output out .
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v2
+        with:
+          name: Backend wasm module
+          path: out/idp_service.wasm
