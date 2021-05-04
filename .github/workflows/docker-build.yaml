@@ -12,8 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: docker build -t idp-service --output out .
-      - run: docker create --name idp-service idp-service
-      - run: docker cp idp-service:/idp-service.wasm .
+      - run: docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v2
         with:
