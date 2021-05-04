@@ -617,6 +617,7 @@ fn update_root_hash(a: &AssetHashes, m: &SignatureMap) {
     use hashtree::{fork_hash, labeled_hash};
 
     let prefixed_root_hash = fork_hash(
+        // NB: Labels added in lexicographic order
         &labeled_hash(LABEL_ASSETS, &a.root_hash()),
         &labeled_hash(LABEL_SIG, &m.root_hash()),
     );
