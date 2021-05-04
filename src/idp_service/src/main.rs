@@ -460,10 +460,6 @@ fn init_assets() {
             (vec![], include_bytes!("../../../dist/index.html").to_vec()),
         );
         a.insert(
-            "/authorize".to_string(),
-            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
-        );
-        a.insert(
             "/index.js".to_string(),
             (
                 vec![("Content-Encoding".to_string(), "gzip".to_string())],
