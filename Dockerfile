@@ -6,7 +6,7 @@
 
 FROM ubuntu:20.10 AS build-state
 
-ARG rust_version=1.45.2
+ARG rust_version=1.51.0
 ENV NODE_VERSION=14.15.4
 
 ENV TZ=UTC
