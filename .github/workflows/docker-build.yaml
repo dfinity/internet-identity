@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build --output out .
+      - run: docker build -t idp-service --output out .
+      - run: docker create --name idp-service idp-service
+      - run: docker cp idp-service:/idp-service.wasm .
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v2
         with:
           name: Backend wasm module
-          path: out/idp_service.wasm
+          path: idp_service.wasm

@@ -52,7 +52,5 @@ RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release
 RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm -o /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm
-RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm
-
-FROM scratch AS export-stage
-COPY --from=build-stage /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm /
+RUN cp /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm .
+RUN sha256sum idp_service.wasm
