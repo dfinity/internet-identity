@@ -9,7 +9,7 @@ import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
-
+import { createCredentialsOptions } from "../utils/createCredentialsOptions";
 
 const pageContent = html`
   <div class="container">
@@ -25,8 +25,8 @@ const pageContent = html`
 
 const constructingContent = html`
   <div class="container">
-  <h1>Constructing your Internet Identity</h1>
-  ${icLogo}
+    <h1>Constructing your Internet Identity</h1>
+    ${icLogo}
   </div>
 `;
 
@@ -39,7 +39,7 @@ export const register = async (): Promise<LoginResult | null> => {
 const renderConstructing = () => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(constructingContent, container);
-}
+};
 
 const init = (): Promise<LoginResult | null> =>
   new Promise((resolve, reject) => {
@@ -63,10 +63,12 @@ const init = (): Promise<LoginResult | null> =>
       await tick();
 
       try {
-        const pendingIdentity = WebAuthnIdentity.create().catch(error => {
-          resolve(apiResultToLoginResult({kind: "authFail", error}));
+        const pendingIdentity = WebAuthnIdentity.create(
+          createCredentialsOptions({ name: alias })
+        ).catch((error) => {
+          resolve(apiResultToLoginResult({ kind: "authFail", error }));
           // We can never get here, but TS doesn't understand that
-          return 0 as any
+          return 0 as any;
         });
         await tick();
         // Do PoW before registering.
@@ -87,10 +89,9 @@ const init = (): Promise<LoginResult | null> =>
           resolve(null);
         }
       } catch (err) {
-        reject(err)
+        reject(err);
       }
     };
   });
 
-const tick = (): Promise<void> =>
-  new Promise(resolve => nextTick(resolve));
+const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));

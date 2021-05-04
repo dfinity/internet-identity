@@ -36,15 +36,23 @@ export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
   canisterId,
 });
 
-export type ApiResult = LoginResult | RegisterResult
-export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError
-export type RegisterResult = LoginSuccess | AuthFail | ApiError | RegisterNoSpace
+export type ApiResult = LoginResult | RegisterResult;
+export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError;
+export type RegisterResult =
+  | LoginSuccess
+  | AuthFail
+  | ApiError
+  | RegisterNoSpace;
 
-type LoginSuccess = { kind: "loginSuccess", connection: IDPActor, userNumber: bigint }
-type UnknownUser = { kind: "unknownUser", userNumber: bigint }
-type AuthFail = { kind: "authFail", error: Error }
-type ApiError = { kind: "apiError", error: Error }
-type RegisterNoSpace = { kind: "registerNoSpace" }
+type LoginSuccess = {
+  kind: "loginSuccess";
+  connection: IDPActor;
+  userNumber: bigint;
+};
+type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
+type AuthFail = { kind: "authFail"; error: Error };
+type ApiError = { kind: "apiError"; error: Error };
+type RegisterNoSpace = { kind: "registerNoSpace" };
 
 export class IDPActor {
   protected constructor(
@@ -58,12 +66,11 @@ export class IDPActor {
     alias: string,
     pow: ProofOfWork
   ): Promise<RegisterResult> {
-
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);
     } catch (error) {
-      return { kind: "authFail", error }
+      return { kind: "authFail", error };
     }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
@@ -74,22 +81,27 @@ export class IDPActor {
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
-    console.log(`register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`);
+    console.log(
+      `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`
+    );
     let registerResponse: RegisterResponse;
     try {
-      registerResponse = await actor.register({
-        alias,
-        pubkey,
-        credential_id: [credential_id],
-      }, pow);  
+      registerResponse = await actor.register(
+        {
+          alias,
+          pubkey,
+          credential_id: [credential_id],
+        },
+        pow
+      );
     } catch (error) {
-      return { kind: "apiError", error }
+      return { kind: "apiError", error };
     }
-    
-    if (registerResponse.hasOwnProperty('canister_full')) {
-      return { kind: "registerNoSpace"}
-    } else if (registerResponse.hasOwnProperty('registered')) {
-      let userNumber = registerResponse['registered'].user_number;
+
+    if (registerResponse.hasOwnProperty("canister_full")) {
+      return { kind: "registerNoSpace" };
+    } else if (registerResponse.hasOwnProperty("registered")) {
+      let userNumber = registerResponse["registered"].user_number;
       console.log(`registered user number ${userNumber}`);
       return {
         kind: "loginSuccess",
@@ -97,8 +109,8 @@ export class IDPActor {
         userNumber,
       };
     } else {
-      console.error('unexpected register response', registerResponse);
-      throw Error('unexpected register response');
+      console.error("unexpected register response", registerResponse);
+      throw Error("unexpected register response");
     }
   }
 
@@ -109,12 +121,12 @@ export class IDPActor {
     } catch (e) {
       return {
         kind: "apiError",
-        error: e
-      }
+        error: e,
+      };
     }
-    
+
     if (devices.length === 0) {
-      return { kind: "unknownUser", userNumber }
+      return { kind: "unknownUser", userNumber };
     }
 
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
@@ -131,7 +143,7 @@ export class IDPActor {
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
     } catch (e) {
-      return { kind: "authFail", error: e }
+      return { kind: "authFail", error: e };
     }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
@@ -140,14 +152,14 @@ export class IDPActor {
       canisterId: canisterId,
     });
 
-    return { 
+    return {
       kind: "loginSuccess",
       userNumber,
       connection: new IDPActor(
         multiIdent._actualIdentity!!,
         delegationIdentity,
         actor
-      )
+      ),
     };
   }
 
@@ -221,7 +233,12 @@ export class IDPActor {
       `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );
     const actor = await this.getActor();
-    return await actor.get_delegation(userNumber, hostname, sessionKey, timestamp);
+    return await actor.get_delegation(
+      userNumber,
+      hostname,
+      sessionKey,
+      timestamp
+    );
   };
 }
 
