@@ -11,10 +11,10 @@ can validate that we really deploy what we claim to deploy.
 We try to achieve some level of reproducibility using a Dockerized build
 environment. The following steps _should_ build the official Wasm image
 
-    docker build -t idp-service --output out .
-    docker run --rm --entrypoint cat idp-service /idp_service.wasm
+    docker build -t idp-service .
+    docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
 
-The resulting `idp-service.wasm` is ready for deployment as
+The resulting `idp_service.wasm` is ready for deployment as
 `rdmx6-jaaaa-aaaaa-aaadq-cai`, which is the reserved principal for this service.
 
 Our CI also performs these steps; you can compare the SHA256 with the output there, or download the artifact there.
