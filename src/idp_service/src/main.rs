@@ -1,3 +1,4 @@
+use certified_map::{AsHashTree, RbTree};
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
@@ -25,6 +26,9 @@ const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
 // 5 mins
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
+
+const LABEL_ASSETS: &[u8] = b"http_assets";
+const LABEL_SIG: &[u8] = b"sig";
 
 type UserNumber = u64;
 type CredentialId = ByteBuf;
@@ -124,10 +128,13 @@ struct InternetIdentityInit {
     assigned_user_number_range: (UserNumber, UserNumber),
 }
 
+type AssetHashes = RbTree<&'static str, Hash>;
+
 struct State {
     nonce_cache: RefCell<NonceCache>,
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
+    asset_hashes: RefCell<AssetHashes>,
 }
 
 impl Default for State {
@@ -136,6 +143,7 @@ impl Default for State {
             nonce_cache: RefCell::new(NonceCache::default()),
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
+            asset_hashes: RefCell::new(AssetHashes::default()),
         }
     }
 }
@@ -254,7 +262,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
                 ))
             });
 
-        prune_expired_signatures(&mut s.sigs.borrow_mut());
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
 }
 
@@ -262,7 +270,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     ensure_salt_set().await;
     STATE.with(|s| {
-        prune_expired_signatures(&mut s.sigs.borrow_mut());
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
 
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
             trap(&format!(
@@ -324,7 +332,8 @@ async fn prepare_delegation(
         let seed = calculate_seed(user_number, &frontend);
         let mut sigs = s.sigs.borrow_mut();
         add_signature(&mut sigs, session_key, seed, expiration);
-        prune_expired_signatures(&mut sigs);
+        update_root_hash(&s.asset_hashes.borrow(), &sigs);
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut sigs);
 
         (
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
@@ -357,6 +366,7 @@ fn get_delegation(
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         match get_signature(
+            &state.asset_hashes.borrow(),
             &state.sigs.borrow(),
             session_key.clone(),
             calculate_seed(user_number, &frontend),
@@ -418,20 +428,35 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                 },
             }
         }
-        probably_an_asset => ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
-            Some((headers, value)) => HttpResponse {
-                status_code: 200,
-                headers: headers.clone(),
-                body: ByteBuf::from(value.clone()),
-                streaming_strategy: None,
-            },
-            None => HttpResponse {
-                status_code: 404,
-                headers: vec![],
-                body: ByteBuf::from(format!("Asset {} not found.", probably_an_asset)),
-                streaming_strategy: None,
-            },
-        }),
+        probably_an_asset => {
+            let certificate_header = STATE.with(|s| {
+                make_asset_certificate_header(
+                    &s.asset_hashes.borrow(),
+                    &s.sigs.borrow(),
+                    probably_an_asset,
+                )
+            });
+
+            ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
+                Some((headers, value)) => {
+                    let mut headers = headers.clone();
+                    headers.push(certificate_header);
+
+                    HttpResponse {
+                        status_code: 200,
+                        headers,
+                        body: ByteBuf::from(value.clone()),
+                        streaming_strategy: None,
+                    }
+                }
+                None => HttpResponse {
+                    status_code: 404,
+                    headers: vec![certificate_header],
+                    body: ByteBuf::from(format!("Asset {} not found.", probably_an_asset)),
+                    streaming_strategy: None,
+                },
+            })
+        }
     }
 }
 
@@ -448,40 +473,49 @@ fn stats() -> InternetIdentityStats {
 
 // used both in init and post_upgrade
 fn init_assets() {
-    ASSETS.with(|a| {
-        let mut a = a.borrow_mut();
+    STATE.with(|s| {
+        let mut asset_hashes = s.asset_hashes.borrow_mut();
 
-        a.insert(
-            "/index.html".to_string(),
-            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
-        );
-        a.insert(
-            "/".to_string(),
-            (vec![], include_bytes!("../../../dist/index.html").to_vec()),
-        );
-        a.insert(
-            "/index.js".to_string(),
-            (
+        ASSETS.with(|a| {
+            let mut assets = a.borrow_mut();
+
+            let mut add_asset = |name, headers, bytes| {
+                asset_hashes.insert(name, hash::hash_bytes(&bytes));
+                assets.insert(name.to_string(), (headers, bytes));
+            };
+
+            add_asset(
+                "/index.html",
+                vec![],
+                include_bytes!("../../../dist/index.html").to_vec(),
+            );
+            add_asset(
+                "/",
+                vec![],
+                include_bytes!("../../../dist/index.html").to_vec(),
+            );
+            add_asset(
+                "/index.js",
                 vec![("Content-Encoding".to_string(), "gzip".to_string())],
                 include_bytes!("../../../dist/index.js.gz").to_vec(),
-            ),
-        );
-        a.insert(
-            "/glitch-loop.webp".to_string(),
-            (
+            );
+            add_asset(
+                "/glitch-loop.webp",
                 vec![],
                 include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
-            ),
-        );
-        a.insert(
-            "/favicon.ico".to_string(),
-            (vec![], include_bytes!("../../../dist/favicon.ico").to_vec()),
-        );
+            );
+            add_asset(
+                "/favicon.ico",
+                vec![],
+                include_bytes!("../../../dist/favicon.ico").to_vec(),
+            );
+        });
     });
 }
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
+    init_assets();
     STATE.with(|state| {
         if let Some(arg) = maybe_arg {
             state
@@ -489,9 +523,8 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
                 .replace(Storage::new(arg.assigned_user_number_range));
         }
         state.storage.borrow().flush();
-        update_root_hash(&state.sigs.borrow());
+        update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
     });
-    init_assets();
 }
 
 #[post_upgrade]
@@ -509,7 +542,7 @@ fn retrieve_data() {
 
         // We drop all the signatures on upgrade, users will
         // re-request them if needed.
-        update_root_hash(&s.sigs.borrow());
+        update_root_hash(&s.asset_hashes.borrow(), &s.sigs.borrow());
     });
 }
 
@@ -575,12 +608,19 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
-fn update_root_hash(m: &SignatureMap) {
-    let prefixed_root_hash = hashtree::labeled_hash(b"sig", &m.root_hash());
+fn update_root_hash(a: &AssetHashes, m: &SignatureMap) {
+    use hashtree::{fork_hash, labeled_hash};
+
+    let prefixed_root_hash = fork_hash(
+        // NB: Labels added in lexicographic order
+        &labeled_hash(LABEL_ASSETS, &a.root_hash()),
+        &labeled_hash(LABEL_SIG, &m.root_hash()),
+    );
     set_certified_data(&prefixed_root_hash[..]);
 }
 
 fn get_signature(
+    asset_hashes: &AssetHashes,
     sigs: &SignatureMap,
     pk: PublicKey,
     seed: Hash,
@@ -606,7 +646,13 @@ fn get_signature(
         ));
     }
 
-    let tree = HashTree::Labeled(&b"sig"[..], Box::new(witness));
+    let tree = hashtree::fork(
+        HashTree::Pruned(hashtree::labeled_hash(
+            LABEL_ASSETS,
+            &asset_hashes.root_hash(),
+        )),
+        hashtree::labeled(&LABEL_SIG[..], witness),
+    );
 
     #[derive(Serialize)]
     struct Sig<'a> {
@@ -633,7 +679,33 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
     });
     let expires_at = (time() as u64).saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
-    update_root_hash(&sigs);
+}
+
+fn make_asset_certificate_header(
+    asset_hashes: &AssetHashes,
+    sigs: &SignatureMap,
+    asset_name: &str,
+) -> (String, String) {
+    let certificate = data_certificate().unwrap_or_else(|| {
+        trap("data certificate is only available in query calls");
+    });
+    let witness = asset_hashes.witness(asset_name.as_bytes());
+    let tree = hashtree::fork(
+        hashtree::labeled(LABEL_ASSETS, witness),
+        HashTree::Pruned(hashtree::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+    );
+    let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
+    serializer.self_describe().unwrap();
+    tree.serialize(&mut serializer)
+        .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {}", e)));
+    (
+        "IC-Certificate".to_string(),
+        format!(
+            "certificate=:{}:, tree=:{}:",
+            base64::encode(&certificate),
+            base64::encode(&serializer.into_inner())
+        ),
+    )
 }
 
 /// Removes a batch of expired signatures from the signature map.
@@ -641,12 +713,12 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
 /// This function is supposed to piggy back on update calls to
 /// amortize the cost of tree pruning.  Each operation on the signature map
 /// will prune at most MAX_SIGS_TO_PRUNE other signatures.
-fn prune_expired_signatures(sigs: &mut SignatureMap) {
+fn prune_expired_signatures(asset_hashes: &AssetHashes, sigs: &mut SignatureMap) {
     const MAX_SIGS_TO_PRUNE: usize = 10;
     let num_pruned = sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE);
 
     if num_pruned > 0 {
-        update_root_hash(sigs);
+        update_root_hash(asset_hashes, sigs);
     }
 }
 

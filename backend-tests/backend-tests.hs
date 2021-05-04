@@ -22,13 +22,18 @@ import qualified Text.Hex as H
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.Vector as V
+import qualified Data.ByteString.Base64.Lazy as Base64
 import Control.Monad.Trans
 import Control.Monad.Trans.State
+import Codec.CBOR.Term
+import Codec.CBOR.Read
 import Data.Proxy
+import Data.Bifunctor
 import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
+import Text.Regex.TDFA ((=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -47,10 +52,16 @@ import qualified Data.Row.Variants as V
 import IC.Types
 import IC.Ref
 import IC.Management
+import IC.Hash
 import IC.Crypto
 import IC.Id.Forms hiding (Blob)
 import IC.HTTP.GenR
 import IC.HTTP.RequestId
+import IC.Certificate hiding (Delegation)
+import IC.Certificate.CBOR
+import IC.Certificate.Validate
+import IC.HashTree hiding (Blob, Hash, Label)
+import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
@@ -457,6 +468,58 @@ assertMetric repo name expectedValue =
       then liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
       else return ()
 
+validateHttpResponse :: HasCallStack => Blob -> String -> HttpResponse -> M ()
+validateHttpResponse cid asset resp = do
+  h <- case [ t .! #_1_ | t <- V.toList (resp .! #headers), t .! #_0_ == "IC-Certificate"] of
+    [] -> lift $ assertFailure "IC-Certificate header not found"
+    [h] -> return $ BS.fromStrict $ T.encodeUtf8  h
+    _ -> lift $ assertFailure "IC-Certificate header duplicated???"
+  case h =~~ ("^certificate=:([^:]*):, tree=:([^:]*):$" :: BS.ByteString) :: Maybe (BS.ByteString, BS.ByteString, BS.ByteString, [BS.ByteString]) of
+    Just (_, _, _, [cert64, tree64]) -> do
+      certBlob <- assertRightS $ Base64.decode cert64
+      cert <- assertRightT $ decodeCert certBlob
+      root_key <- gets $ toPublicKey . secretRootKey
+      assertRightT $ validateCertificate root_key cert
+      -- TODO: validateCertificate should probablay check wellFormed too
+      assertRightS $ wellFormed (cert_tree cert)
+
+      treeBlob <- assertRightS $ Base64.decode tree64
+      tree <- assertRightT $ decodeTree treeBlob
+      assertRightS $ wellFormed tree
+
+      liftIO $ lookupPath (cert_tree cert) ["canister", cid, "certified_data"]
+          @?= Found (reconstruct tree)
+      let uri = BS.fromStrict (T.encodeUtf8 (T.pack asset))
+
+      case resp .! #status_code of
+        200 -> liftIO $ lookupPath tree ["http_assets", uri] @?= Found (sha256 (resp .! #body))
+        404 -> liftIO $ lookupPath tree ["http_assets", uri] @?= Absent
+        c -> liftIO $ assertFailure $ "Unexpected status code " <> show c
+
+    _ -> lift $ assertFailure $ "Could not parse header: " <> show h
+
+assertRightS :: MonadIO m  => Either String a -> m a
+assertRightS (Left e) = liftIO $ assertFailure e
+assertRightS (Right x) = pure x
+
+assertRightT :: MonadIO m  => Either T.Text a -> m a
+assertRightT (Left e) = liftIO $ assertFailure (T.unpack e)
+assertRightT (Right x) = pure x
+
+decodeTree :: BS.ByteString -> Either T.Text HashTree
+decodeTree s =
+    first (\(DeserialiseFailure _ s) -> "CBOR decoding failure: " <> T.pack s)
+        (deserialiseFromBytes decodeTerm s)
+    >>= begin
+  where
+    begin (leftOver, _)
+      | not (BS.null leftOver) = Left $ "Left-over bytes: " <> T.pack (shorten 20 (show leftOver))
+    begin (_, TTagged 55799 t) = parseHashTree t
+    begin _ = Left "Expected CBOR request to begin with tag 55799"
+
+
+
+
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ idpTest "installs" $ \ _cid ->
@@ -696,6 +759,14 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     assertMetric metrics "internet_identity_user_count" 2.0
     assertMetric metrics "internet_identity_signature_count" 1.0
+
+  , withUpgrade $ \should_upgrade -> testGroup "HTTP Assets"
+    [ idpTest asset $ \cid -> do
+      when should_upgrade $ doUpgrade cid
+      r <- queryIDP cid dummyUserId #http_request (httpGet asset)
+      validateHttpResponse cid asset r
+    | asset <- words "/ /index.html /index.js /glitch-loop.webp /favicon.ico /does-not-exist"
+    ]
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence

@@ -249,7 +249,7 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
 async function wait_for_fonts(driver : ThenableWebDriver) {
-  for(var i = 0; i <= 10; i++) {
+  for(var i = 0; i <= 50; i++) {
     if (await driver.executeScript("return document.fonts.status;") == "loaded") {
       return
     }
