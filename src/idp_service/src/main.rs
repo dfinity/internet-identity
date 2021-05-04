@@ -495,11 +495,6 @@ fn init_assets() {
                 include_bytes!("../../../dist/index.html").to_vec(),
             );
             add_asset(
-                "/authorize",
-                vec![],
-                include_bytes!("../../../dist/index.html").to_vec(),
-            );
-            add_asset(
                 "/index.js",
                 vec![("Content-Encoding".to_string(), "gzip".to_string())],
                 include_bytes!("../../../dist/index.js.gz").to_vec(),
