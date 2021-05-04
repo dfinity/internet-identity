@@ -53,8 +53,9 @@ COPY . .
 
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
+RUN npm version
 RUN npm ci
-RUN npm build
+RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release
 RUN ic-cdk-optimizer target/wasm32-unknown-unknown/release/idp_service.wasm target/wasm32-unknown-unknown/release/idp_service.wasm
 RUN sha256sum target/wasm32-unknown-unknown/release/idp_service.wasm
