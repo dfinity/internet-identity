@@ -19,7 +19,7 @@ If it's alright with you I'd also like to record our session, as I'd rather focu
 
 I'll share two Url's with you. One for Open Chat, and one for the identity service:
 - https://identity.messaging.dfinity.network
-- https://<open-chat-url>.messaging.dfinity.network
+- https://3cwd2-fiaaa-aaaaa-qaava-cai.messaging.dfinity.network
 
 ## The tasks:
 - 1. Login to Open Chat on your Phone
