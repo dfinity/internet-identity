@@ -13,11 +13,11 @@ ENV TZ=UTC
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     apt -yq update && \
-    apt -yqq install --no-install-recommends curl \
+    apt -yqq install --no-install-recommends curl ca-certificates \
         build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake
 
 # Install node
-RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
+RUN curl --fail -sSf https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
 ENV NVM_DIR=/root/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
 RUN . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
@@ -48,7 +48,6 @@ ENV CARGO_HOME=/cargo \
 COPY . .
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
-RUN node --version
 RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release
