@@ -2,20 +2,29 @@
 #
 # docker build --output out .
 #
-# and fine the .wasmfile in out/
+# and find the .wasmfile in out/
 
 FROM ubuntu:20.10 AS build-state
 
 ARG rust_version=1.45.2
-ARG sdk_version=0.7.0-beta.5
-
+ENV NODE_VERSION=14.15.4
 
 ENV TZ=UTC
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     apt -yq update && \
-    apt -yqq install --no-install-recommends curl npm \
+    apt -yqq install --no-install-recommends curl \
         build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake
+
+# Install node
+RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
+ENV NVM_DIR=/root/.nvm
+RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
+RUN . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
+RUN . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
+ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
+RUN node --version
+RUN npm --version
 
 # Install Rust and Cargo in /opt
 ENV RUSTUP_HOME=/opt/rustup \
@@ -26,10 +35,6 @@ RUN curl --fail https://sh.rustup.rs -sSf \
         | sh -s -- -y --default-toolchain ${rust_version}-x86_64-unknown-linux-gnu --no-modify-path && \
     rustup default ${rust_version}-x86_64-unknown-linux-gnu && \
     rustup target add wasm32-unknown-unknown
-
-RUN curl --fail -L \
-    "https://download.dfinity.systems/sdk/dfx/${sdk_version}/x86_64-linux/dfx-${sdk_version}.tar.gz" \
-    -o /tmp/dfx.tar.gz && tar -xzf /tmp/dfx.tar.gz -C /usr/bin && chmod +x /usr/bin/dfx
 
 # Install IC CDK optimizer
 RUN curl --fail -sL https://download.dfinity.systems/cdk-rs/5807d2f7b523f630eddd69acd4b245a8b129eff9/ic-cdk-optimizer-linux-amd64.gz -o /opt/cargo/bin/ic-cdk-optimizer.gz && \
