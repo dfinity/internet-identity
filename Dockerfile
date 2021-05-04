@@ -4,7 +4,7 @@
 #
 # and fine the .wasmfile in out/
 
-FROM ubuntu:20.04 AS build-state
+FROM ubuntu:20.10 AS build-state
 
 ARG rust_version=1.45.2
 ARG sdk_version=0.7.0-beta.5
@@ -22,7 +22,6 @@ ENV RUSTUP_HOME=/opt/rustup \
     CARGO_HOME=/opt/cargo \
     PATH=/opt/cargo/bin:$PATH
 
-
 RUN curl --fail https://sh.rustup.rs -sSf \
         | sh -s -- -y --default-toolchain ${rust_version}-x86_64-unknown-linux-gnu --no-modify-path && \
     rustup default ${rust_version}-x86_64-unknown-linux-gnu && \
@@ -37,23 +36,14 @@ RUN curl --fail -sL https://download.dfinity.systems/cdk-rs/5807d2f7b523f630eddd
     gunzip /opt/cargo/bin/ic-cdk-optimizer.gz && \
     chmod 0755 /opt/cargo/bin/ic-cdk-optimizer
 
-# dumb-init takes care to properly handle and forward signals as they are received (e.g. Ctrl+C or SIGSEGV)
-# ENTRYPOINT with dumb-init is set further down in the Dockerfile
-RUN curl --fail -L -o /usr/bin/dumb-init \
-        https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_x86_64 && \
-    chmod +x /usr/bin/dumb-init
-
 ENV CARGO_HOME=/cargo \
     CARGO_TARGET_DIR=/cargo_target \
     PATH=/cargo/bin:$PATH
 
-RUN pwd; find
-
 COPY . .
 
-
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
-RUN npm version
+RUN node --version
 RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release
