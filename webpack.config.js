@@ -28,9 +28,7 @@ function generateWebpackConfigForCanister(name, info) {
     },
     devtool,
     optimization: {
-      minimize: false,
-      // minimize: isProduction,
-      // minimizer: [new TerserPlugin()],
+      minimize: isProduction,
     },
     resolve: {
       extensions: [".js", ".ts", ".jsx", ".tsx"],
