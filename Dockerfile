@@ -36,21 +36,19 @@ RUN curl --fail https://sh.rustup.rs -sSf \
     rustup default ${rust_version}-x86_64-unknown-linux-gnu && \
     rustup target add wasm32-unknown-unknown
 
-# Install IC CDK optimizer
-RUN curl --fail -sL https://download.dfinity.systems/cdk-rs/5807d2f7b523f630eddd69acd4b245a8b129eff9/ic-cdk-optimizer-linux-amd64.gz -o /opt/cargo/bin/ic-cdk-optimizer.gz && \
-    gunzip /opt/cargo/bin/ic-cdk-optimizer.gz && \
-    chmod 0755 /opt/cargo/bin/ic-cdk-optimizer
-
 ENV CARGO_HOME=/cargo \
     CARGO_TARGET_DIR=/cargo_target \
     PATH=/cargo/bin:$PATH
+
+# Install IC CDK optimizer
+RUN cargo install ic-cdk-optimizer
 
 COPY . .
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
 RUN npm ci
 RUN npm run build
-RUN cargo build --target wasm32-unknown-unknown --release
+RUN cargo build --target wasm32-unknown-unknown --release -j1
 RUN sha256sum dist/*
 RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm -o /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm
 RUN cp /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm .
