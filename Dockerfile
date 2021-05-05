@@ -4,7 +4,7 @@
 #
 # and find the .wasmfile in out/
 
-FROM ubuntu:20.10 AS build-state
+FROM ubuntu:20.10
 
 ARG rust_version=1.51.0
 ENV NODE_VERSION=14.15.4
