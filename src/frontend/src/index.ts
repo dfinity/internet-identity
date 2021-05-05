@@ -1,6 +1,5 @@
 import "./styles/main.css";
 import { login } from "./flows/login";
-import oauth from "./utils/oauth";
 import auth from "./auth";
 import { addDevice } from "./flows/addDevice";
 import { renderManage } from "./flows/manage";
@@ -24,9 +23,6 @@ const init = async () => {
   switch (userIntent.kind) {
     case "auth": {
       return auth(userNumber, connection);
-    }
-    case "oauth": {
-      return oauth(userNumber, connection);
     }
     case "addDevice": {
       return addDevice(userNumber, connection);
