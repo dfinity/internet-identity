@@ -4,7 +4,7 @@
 
 ### Software
 
-- `dfx` version 0.7.0-beta.5
+- `dfx` version 0.7.0-beta.6
 
 - Rust version 1.51
 
