@@ -17,17 +17,23 @@ module Main where
 import Options.Applicative hiding (empty)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Text.Hex as H
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.Vector as V
+import qualified Data.ByteString.Base64.Lazy as Base64
 import Control.Monad.Trans
 import Control.Monad.Trans.State
+import Codec.CBOR.Term
+import Codec.CBOR.Read
 import Data.Proxy
+import Data.Bifunctor
 import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
+import Text.Regex.TDFA ((=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -46,12 +52,18 @@ import qualified Data.Row.Variants as V
 import IC.Types
 import IC.Ref
 import IC.Management
+import IC.Hash
 import IC.Crypto
 import IC.Id.Forms hiding (Blob)
 import IC.HTTP.GenR
 import IC.HTTP.RequestId
+import IC.Certificate hiding (Delegation)
+import IC.Certificate.CBOR
+import IC.Certificate.Validate
+import IC.HashTree hiding (Blob, Hash, Label)
+import IC.HashTree.CBOR
 
-
+import Prometheus hiding (Timestamp)
 
 -- copied from ./src/idp_service/idp_service.did,
 -- and then modified to replace vec nat8 with blob
@@ -103,6 +115,35 @@ type ProofOfWork = record {
   nonce : nat64;
 };
 
+type HeaderField = record { text; text; };
+
+type HttpRequest = record {
+  method: text;
+  url: text;
+  headers: vec HeaderField;
+  body: blob;
+};
+
+type HttpResponse = record {
+  status_code: nat16;
+  headers: vec HeaderField;
+  body: blob;
+  streaming_strategy: opt StreamingStrategy;
+};
+
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+
+type Token = record {};
+
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
+};
 service : {
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
@@ -112,6 +153,8 @@ service : {
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
+
+  http_request: (request: HttpRequest) -> (HttpResponse) query;
 }
   |]
 
@@ -168,9 +211,28 @@ type ProofOfWork = [Candid.candidType|record {
   nonce : nat64;
 }|]
 
+type HttpRequest = [Candid.candidType|record {
+  method : text;
+  url : text;
+  headers : vec record { text; text; };
+  body : blob;
+}|]
+
+type HttpResponse = [Candid.candidType|record {
+  status_code : nat16;
+  headers : vec record { text; text; };
+  body : blob;
+  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: record {}; }) query; }; };
+}|]
+
 mkPOW :: Word64 -> Word64 -> ProofOfWork
 mkPOW t n = #timestamp .== t .+ #nonce .== n
 
+httpGet :: String -> HttpRequest
+httpGet url = #method .== T.pack "GET"
+  .+ #url .== T.pack url
+  .+ #headers .== V.empty
+  .+ #body .== ""
 
 type Hash = Blob
 
@@ -387,6 +449,76 @@ mustGetUserNumber :: HasCallStack => RegisterResponse -> M Word64
 mustGetUserNumber response = case V.view #registered response of
   Just r -> return (r .! #user_number)
   Nothing -> liftIO $ assertFailure $ "expected to get 'registered' response, got " ++ show response
+
+mustParseMetrics :: HasCallStack => HttpResponse -> M MetricsRepository
+mustParseMetrics resp =
+  case parseMetricsFromText bodyText of
+    Left err -> liftIO $ assertFailure $ printf "failed to parse metrics from text, error: %s, input: %s" err bodyText
+    Right metrics -> return metrics
+  where
+    bodyText = T.decodeUtf8 $ BS.toStrict $ resp .! #body
+
+assertMetric :: HasCallStack => MetricsRepository -> MetricName -> MetricValue -> M ()
+assertMetric repo name expectedValue =
+  case lookupMetric repo name of
+    Left err ->
+      liftIO $ assertFailure $ printf "failed to lookup metric %s: %s, repository: %s" name err (show repo)
+    Right (actualValue, _) ->
+      if expectedValue /= actualValue
+      then liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
+      else return ()
+
+validateHttpResponse :: HasCallStack => Blob -> String -> HttpResponse -> M ()
+validateHttpResponse cid asset resp = do
+  h <- case [ t .! #_1_ | t <- V.toList (resp .! #headers), t .! #_0_ == "IC-Certificate"] of
+    [] -> lift $ assertFailure "IC-Certificate header not found"
+    [h] -> return $ BS.fromStrict $ T.encodeUtf8  h
+    _ -> lift $ assertFailure "IC-Certificate header duplicated???"
+  case h =~~ ("^certificate=:([^:]*):, tree=:([^:]*):$" :: BS.ByteString) :: Maybe (BS.ByteString, BS.ByteString, BS.ByteString, [BS.ByteString]) of
+    Just (_, _, _, [cert64, tree64]) -> do
+      certBlob <- assertRightS $ Base64.decode cert64
+      cert <- assertRightT $ decodeCert certBlob
+      root_key <- gets $ toPublicKey . secretRootKey
+      assertRightT $ validateCertificate root_key cert
+      -- TODO: validateCertificate should probablay check wellFormed too
+      assertRightS $ wellFormed (cert_tree cert)
+
+      treeBlob <- assertRightS $ Base64.decode tree64
+      tree <- assertRightT $ decodeTree treeBlob
+      assertRightS $ wellFormed tree
+
+      liftIO $ lookupPath (cert_tree cert) ["canister", cid, "certified_data"]
+          @?= Found (reconstruct tree)
+      let uri = BS.fromStrict (T.encodeUtf8 (T.pack asset))
+
+      case resp .! #status_code of
+        200 -> liftIO $ lookupPath tree ["http_assets", uri] @?= Found (sha256 (resp .! #body))
+        404 -> liftIO $ lookupPath tree ["http_assets", uri] @?= Absent
+        c -> liftIO $ assertFailure $ "Unexpected status code " <> show c
+
+    _ -> lift $ assertFailure $ "Could not parse header: " <> show h
+
+assertRightS :: MonadIO m  => Either String a -> m a
+assertRightS (Left e) = liftIO $ assertFailure e
+assertRightS (Right x) = pure x
+
+assertRightT :: MonadIO m  => Either T.Text a -> m a
+assertRightT (Left e) = liftIO $ assertFailure (T.unpack e)
+assertRightT (Right x) = pure x
+
+decodeTree :: BS.ByteString -> Either T.Text HashTree
+decodeTree s =
+    first (\(DeserialiseFailure _ s) -> "CBOR decoding failure: " <> T.pack s)
+        (deserialiseFromBytes decodeTerm s)
+    >>= begin
+  where
+    begin (leftOver, _)
+      | not (BS.null leftOver) = Left $ "Left-over bytes: " <> T.pack (shorten 20 (show leftOver))
+    begin (_, TTagged 55799 t) = parseHashTree t
+    begin _ = Left "Expected CBOR request to begin with tag 55799"
+
+
+
 
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
@@ -607,6 +739,34 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range .! #_1_ @?= 100
     response <- callIDP cid webauthID #register (device1, powAt cid 0)
     assertVariant #canister_full response
+
+  , withUpgrade $ \should_upgrade -> idpTest "metrics endpoint" $ \cid -> do
+    _ <- callIDP cid webauth2ID #register (device2, powAt cid 1) >>= mustGetUserNumber
+    metrics <- callIDP cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
+
+    assertMetric metrics "internet_identity_user_count" 1.0
+    assertMetric metrics "internet_identity_signature_count" 0.0
+
+    when should_upgrade $ doUpgrade cid
+
+    userNumber <- callIDP cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    let sessionSK = createSecretKeyEd25519 "hohoho"
+    let sessionPK = toPublicKey sessionSK
+    let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
+    _ <- callIDP cid webauthID #prepare_delegation delegationArgs
+
+    metrics <- callIDP cid webauthID #http_request (httpGet "/metrics") >>= mustParseMetrics
+
+    assertMetric metrics "internet_identity_user_count" 2.0
+    assertMetric metrics "internet_identity_signature_count" 1.0
+
+  , withUpgrade $ \should_upgrade -> testGroup "HTTP Assets"
+    [ idpTest asset $ \cid -> do
+      when should_upgrade $ doUpgrade cid
+      r <- queryIDP cid dummyUserId #http_request (httpGet asset)
+      validateHttpResponse cid asset r
+    | asset <- words "/ /index.html /index.js /glitch-loop.webp /favicon.ico /does-not-exist"
+    ]
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence

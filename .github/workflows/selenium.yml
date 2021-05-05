@@ -13,8 +13,8 @@ jobs:
       matrix:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
-        dfx: [ '0.7.0-beta.4' ]
-
+        dfx: [ '0.7.0-beta.5' ]
+        start-flag: [ '', '--emulator' ]
 
     steps:
       - uses: actions/checkout@v2
@@ -42,12 +42,6 @@ jobs:
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Build auth-client
-        run: |
-          cd packages/auth-client
-          npm ci
-          npm run build
-
       - name: Run demo app
         run: |
           cd demos/sample-javascript/
@@ -57,20 +51,26 @@ jobs:
           sleep 10 # crude
 
       - run: npm ci
-      - run: dfx start --background
-      - run: dfx deploy --no-wallet --argument '(null)'
+      - run: dfx start ${{ matrix.start-flag }} --background
+
+      - name: Deploy Internet Identity
+        run: dfx deploy --no-wallet --argument '(null)'
+
+      - name: Deploy whoami canister
+        run: cd demos/whoami && dfx deploy --no-wallet
+
       - run: rm -v -f screenshots/*.png
       - run: npm test -- --verbose
       - run: dfx stop
 
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
         with:
           add: screenshots
           author_name: Screenshot Committer
-          author_email: '<nobody@example.com>'
-          message: 'Updating selenium screenshots'
+          author_email: "<nobody@example.com>"
+          message: "Updating selenium screenshots"
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
-          pull_strategy: 'NO-PULL'
+          pull_strategy: "NO-PULL"

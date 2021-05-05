@@ -5,7 +5,7 @@ import { IDPActor, canisterIdPrincipal } from "../utils/idp_actor";
 import { setUserNumber } from "../utils/userNumber";
 import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
-import { LoginResult } from "./loginUnknown";
+import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
@@ -15,7 +15,7 @@ const pageContent = html`
   <div class="container">
     <h1>Register your new Internet Identity</h1>
     <form id="registerForm">
-      <p>What should we call this device?</p>
+      <p>Please provide a name for your device.</p>
       <input id="registerAlias" placeholder="Device name" />
       <button type="submit" class="primary">Register</button>
       <button id="registerCancel" type="button">Cancel</button>
@@ -63,12 +63,8 @@ const init = (): Promise<LoginResult | null> =>
       await tick();
 
       try {
-        const pendingIdentity = WebAuthnIdentity.create().catch(err => {
-          resolve({
-            tag: "err",
-            message: "Failed to access your security device",
-            detail: err.toString()
-          });
+        const pendingIdentity = WebAuthnIdentity.create().catch(error => {
+          resolve(apiResultToLoginResult({kind: "authFail", error}));
           // We can never get here, but TS doesn't understand that
           return 0 as any
         });
@@ -79,12 +75,14 @@ const init = (): Promise<LoginResult | null> =>
         const identity = await pendingIdentity;
         if (await confirmRegister()) {
           // Send values through actor
-          const { userNumber, connection } = await withLoader(async () =>
+          const result = await withLoader(async () =>
             IDPActor.register(identity, alias, pow)
           );
-          setUserNumber(userNumber);
-          await displayUserNumber(userNumber);
-          resolve({ tag: "ok", connection, userNumber });
+          if (result.kind === "loginSuccess") {
+            setUserNumber(result.userNumber);
+            await displayUserNumber(result.userNumber);
+          }
+          resolve(apiResultToLoginResult(result));
         } else {
           resolve(null);
         }

@@ -1,12 +1,14 @@
 import { render, html } from "lit-html";
-import { IDPActor } from "../utils/idp_actor";
+import { IDPActor, ApiResult } from "../utils/idp_actor";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
+import { aboutLink } from "../components/aboutLink";
+import { bannerFromIntent, UserIntent } from "../utils/userIntent";
 
-const pageContent = () => html` <style>
+const pageContent = (userIntent: string) => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
       border-style: double;
@@ -43,7 +45,7 @@ const pageContent = () => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your user number to login with Internet Identity.</p>
+    <p>Provide your user number to login and ${userIntent}.</p>
     <input
       type="text"
       id="registerUserNumber"
@@ -60,25 +62,28 @@ const pageContent = () => html` <style>
         but using a new device?
       </button>
     </div>
-  </div>`;
+  </div>
+  ${aboutLink}`;
 
 export type LoginResult =
   | {
-      tag: "ok";
-      userNumber: bigint;
-      connection: IDPActor;
-    }
+    tag: "ok",
+    userNumber: bigint,
+    connection: IDPActor,
+  }
   | {
-      tag: "err";
-      message: string;
-      detail: string;
-    };
+    tag: "err",
+    title: string,
+    message: string,
+    detail?: string,
+  };
 
-export const loginUnknown = async (): Promise<LoginResult> => {
+export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult> => {
+  
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
+  render(pageContent(bannerFromIntent(userIntent)), container);
   return new Promise((resolve, reject) => {
-    initLogin(resolve, reject);
+    initLogin(resolve);
     initLinkDevice();
     initRegister(resolve, reject);
   });
@@ -101,7 +106,7 @@ const initRegister = (resolve, reject) => {
   };
 };
 
-const initLogin = (resolve, reject) => {
+const initLogin = (resolve) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -109,25 +114,21 @@ const initLogin = (resolve, reject) => {
     "loginButton"
   ) as HTMLButtonElement;
 
-  loginButton.onclick = () => {
+  loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
-    if (userNumber !== null) {
-      withLoader(() =>
-        IDPActor.login(userNumber).then((connection) => {
-          setUserNumber(userNumber);
-          resolve({ tag: "ok", userNumber, connection });
-        })
-      ).catch(err => {
-        reject(err)
-      });
-    } else {
-      resolve({
+    if (userNumber === null) {
+      return resolve({
         tag: "err",
         message: "Please enter a valid User Number",
         detail: `${userNumber} doesn't parse as a number`,
       });
     }
-  };
+    const result = await withLoader(() => IDPActor.login(userNumber));
+    if (result.kind === "loginSuccess") {
+      setUserNumber(userNumber);
+    }
+    resolve(apiResultToLoginResult(result));
+  }
 };
 
 const initLinkDevice = () => {
@@ -144,3 +145,46 @@ const initLinkDevice = () => {
     addDeviceUserNumber(userNumber)
   };
 };
+
+export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
+  switch (result.kind) {
+    case "loginSuccess": {
+      return {
+        tag: "ok",
+        userNumber: result.userNumber,
+        connection: result.connection,
+      };
+    };
+    case "authFail": {
+      return {
+        tag: "err",
+        title: "Failed to authenticate",
+        message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
+        detail: result.error.message
+      };
+    };
+    case "unknownUser": {
+      return {
+        tag: "err",
+        title: "Unknown user",
+        message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
+        detail: ""
+      };
+    };
+    case "apiError": {
+      return {
+        tag: "err",
+        title: "We couldn't reach Internet Identity",
+        message: "We failed to call the Internet Identity service, please try again.",
+        detail: result.error.message
+      };
+    };
+    case "registerNoSpace": {
+      return {
+        tag: "err",
+        title: "Failed to register",
+        message: "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+      }
+    }
+  }
+}

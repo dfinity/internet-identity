@@ -3,8 +3,8 @@ import { html, render } from "lit-html";
 const pageContent = html`
   <div class="container">
     <h1>Confirm registration</h1>
-    <p>Please confirm your security device one more time to register.</p>
-    <button type="button" class="primary" id="confirmRegisterButton">Register</button>
+    <p>Please confirm your registration.</p>
+    <button type="button" class="primary" id="confirmRegisterButton">Confirm</button>
     <button type="button" id="cancelButton">Cancel</button>
   </div>
   `;
