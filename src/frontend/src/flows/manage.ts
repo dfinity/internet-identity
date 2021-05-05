@@ -68,7 +68,8 @@ const renderIdentities = async (connection, userNumber) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
-    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
+    const isOnlyDevice = identities.length < 2;
+    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey, isOnlyDevice);
     list.appendChild(identityElement);
   });
 
@@ -79,13 +80,11 @@ const bindRemoveListener = (
   userNumber: bigint,
   connection: IDPActor,
   listItem: HTMLElement,
-  publicKey
+  publicKey,
+  isOnlyDevice: boolean
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    // Make sure we're not removing our last identity
-    const identities = document.querySelectorAll("#identityList li");
-
     const sameDevice = connection.identity.getPublicKey().toDer().equals(derBlobFromBlob(blobFromUint8Array(publicKey)));
 
     if (sameDevice) {
@@ -97,7 +96,7 @@ const bindRemoveListener = (
       }
     }
 
-    if (identities.length <= 1) {
+    if (isOnlyDevice) {
       const shouldProceed = confirm(
         "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
       );
