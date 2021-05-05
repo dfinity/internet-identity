@@ -68,7 +68,7 @@ const renderIdentities = async (connection, userNumber) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
-    const isOnlyDevice = identities.length === 0;
+    const isOnlyDevice = identities.length < 2;
     bindRemoveListener(userNumber, connection, identityElement, identity.pubkey, isOnlyDevice);
     list.appendChild(identityElement);
   });
