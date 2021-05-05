@@ -25,6 +25,11 @@ I'll share two Url's with you. One for Open Chat, and one for the identity servi
 - https://identity.messaging.dfinity.network
 - https://3cwd2-fiaaa-aaaaa-qaava-cai.messaging.dfinity.network
 
+I'll also share our WIP user-facing documentation, that you can refer to if you get stuck.
+- https://docs.google.com/document/d/1iX0hIneiMGxS7uNwfK8UzuvbkhRBzXUrzhH-caKaFGU/edit
+
+Don't worry, I'll also help and stop should you stray too far from the intended path.
+
 ## The tasks:
 - 1. Login to Open Chat on your Phone
   - a) Go to the Open Chat URL and sign up
