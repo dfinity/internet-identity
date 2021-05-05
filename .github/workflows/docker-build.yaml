@@ -12,10 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: docker build -t idp-service .
-      - run: docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
-      - run: sha256sum idp_service.wasm
-      - name: 'Upload Artifact'
+      - run: mkdir out/
+      - run: docker run --rm --entrypoint cat idp-service /idp_service.wasm > out/idp_service.wasm
+      - run: docker run --rm --entrypoint tar idp-service -c -f - dist| tar -C out -x
+      - run: sha256sum out/idp_service.wasm
+      - name: 'Upload Artifacts'
         uses: actions/upload-artifact@v2
         with:
           name: Backend wasm module
-          path: idp_service.wasm
+          path: out
