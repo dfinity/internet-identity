@@ -575,16 +575,16 @@ This section needs to describe aspects like
 
 The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
 
-=== Initial installation
+=== Initial installation (should happen only once)
 
 In a checkout of this repository, run:
 [source,bash]
 ----
 npm install
-dfx build --network messaging idp_service
+dfx build --network mainnet idp_service
 ----
 
-Note: This prepares the wasm module for installation on `messaging` testnet. If we want to deploy to beta, then we need to add a profile for it and use that instead.
+Note: This prepares the wasm module for installation on `mainnet`. If we want to deploy to testnet, then you can use `messaging` or add a new profile for the testnet in dfx.json.
 
 Make note of the hash of wasm module:
 [source,bash]
@@ -610,7 +610,24 @@ The canister accepts a range of user ids that it's responsible for in `canister_
 didc encode '(null)' | xxd -r -p > arg.in
 ----
 
-Submit the proposal to install the canister on `messaging`:
+==== Submitting proposal and voting on mainnet
+
+You will need to ask someone who has authorization to submit the proposal. Then you will need to ping @trusted-neurons slack alias to get enough votes for it. The command will look like:
+[source,bash]
+----
+ic-admin \
+    -s "${PROPOSER_KEY_FILE}" \
+    --nns-url "${child_nns_url}" \
+    propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
+    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --mode install \
+    --wasm-module-path <path_to_wasm> \
+    --arg <init_arg_file>
+----
+
+==== Submitting proposal on testnets
+
+Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
 [source,bash]
 ----
 ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm --arg arg.in
@@ -622,7 +639,27 @@ You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging
 
 === Upgrades of the canister
 
-Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin`. Run:
+Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin` and we don't need any arguments in this case.
+
+==== On Mainnet
+
+You will still need to get someone with authorization to submit the proposal and get enough votes for it (ping @trusted-neurons on slack). The command will look like:
+
+[source,bash]
+----
+ic-admin \
+    -s "${PROPOSER_KEY_FILE}" \
+    --nns-url "${child_nns_url}" \
+    propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
+    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --mode upgrade \ 
+    --wasm-module-path <path_to_wasm>
+----
+
+==== On testnets
+
+Once you've built the binary, you can then run (for `messaging`):
+
 [source,bash]
 ----
 ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm

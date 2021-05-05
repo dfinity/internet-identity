@@ -1,8 +1,6 @@
 {
   "idp_service": {
-    "messaging": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-  },
-  "idp_service": {
+    "messaging": "rdmx6-jaaaa-aaaaa-aaadq-cai",
     "mainnet": "rdmx6-jaaaa-aaaaa-aaadq-cai"
   }
 }
