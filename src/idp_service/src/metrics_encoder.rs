@@ -1,20 +1,24 @@
 use std::io;
 
-/// MetricsEncoder provides methods to encode metrics in a text format
+/// `MetricsEncoder` provides methods to encode metrics in a text format
 /// that can be understood by Prometheus.
+///
+/// Metrics are encoded with the block time included, to allow Prometheus
+/// to discard out-of-order samples collected from replicas that are behind.
 ///
 /// See [Exposition Formats][1] for an informal specification of the text format.
 ///
-/// [1] https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md
+/// [1]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md
 pub struct MetricsEncoder<W: io::Write> {
     writer: W,
+    now_millis: i64,
 }
 
 impl<W: io::Write> MetricsEncoder<W> {
-    /// Constructs a new encoder dumping text into the specified
-    /// writer.
-    pub fn new(writer: W) -> Self {
-        Self { writer }
+    /// Constructs a new encoder dumping metrics with the given timestamp into
+    /// the specified writer.
+    pub fn new(writer: W, now_millis: i64) -> Self {
+        Self { writer, now_millis }
     }
 
     /// Returns the internal buffer that was used to record the
@@ -50,21 +54,28 @@ impl<W: io::Write> MetricsEncoder<W> {
             total += v;
             if bucket == std::f64::INFINITY {
                 saw_infinity = true;
-                writeln!(self.writer, "{}_bucket{{le=\"+Inf\"}} {}", name, total)?;
+                writeln!(
+                    self.writer,
+                    "{}_bucket{{le=\"+Inf\"}} {} {}",
+                    name, total, self.now_millis
+                )?;
             } else {
                 writeln!(
                     self.writer,
-                    "{}_bucket{{le=\"{}\"}} {}",
-                    name, bucket, total
+                    "{}_bucket{{le=\"{}\"}} {} {}",
+                    name, bucket, total, self.now_millis
                 )?;
             }
         }
         if !saw_infinity {
-            writeln!(self.writer, "{}_bucket{{le=\"+Inf\"}} {}", name, total)?;
+            writeln!(
+                self.writer,
+                "{}_bucket{{le=\"+Inf\"}} {} {}",
+                name, total, self.now_millis
+            )?;
         }
-        writeln!(self.writer, "{}_sum {}", name, sum)?;
-        writeln!(self.writer, "{}_count {}", name, total)?;
-        writeln!(self.writer)
+        writeln!(self.writer, "{}_sum {} {}", name, sum, self.now_millis)?;
+        writeln!(self.writer, "{}_count {} {}", name, total, self.now_millis)
     }
 
     pub fn encode_single_value(
@@ -75,8 +86,7 @@ impl<W: io::Write> MetricsEncoder<W> {
         help: &str,
     ) -> io::Result<()> {
         self.encode_header(name, help, typ)?;
-        writeln!(self.writer, "{} {}", name, value)?;
-        writeln!(self.writer)
+        writeln!(self.writer, "{} {} {}", name, value, self.now_millis)
     }
 
     /// Encodes the metadata and the value of a counter.

@@ -387,7 +387,7 @@ fn get_delegation(
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     STATE.with(|s| {
-        w.encode_counter(
+        w.encode_gauge(
             "internet_identity_user_count",
             s.storage.borrow().user_count() as f64,
             "Number of users registered in this canister.",
@@ -406,14 +406,17 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split("?").collect();
     match parts[0] {
         "/metrics" => {
-            let mut writer = MetricsEncoder::new(vec![]);
+            let mut writer = MetricsEncoder::new(vec![], time() / 1_000_000);
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
                     HttpResponse {
                         status_code: 200,
                         headers: vec![
-                            ("Content-Type".to_string(), "text/plain".to_string()),
+                            (
+                                "Content-Type".to_string(),
+                                "text/plain; version=0.0.4".to_string(),
+                            ),
                             ("Content-Length".to_string(), body.len().to_string()),
                         ],
                         body: ByteBuf::from(body),
