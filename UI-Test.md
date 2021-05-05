@@ -15,16 +15,20 @@ I'll ask you to try and use our UI as you usually would with one key difference.
 Please externalize your thought process as much as possible.
 If you're reading parts of the UI, read them out loud, try to tell me what you're thinking about and what you're doing at every step.
 
+Once we reach the part where you use your laptop I'd also like you to share your screen.
+(Or we can start sharing right now, so we can stay in the flow)
+
 If it's alright with you I'd also like to record our session, as I'd rather focus on following what you're doing over frantically taking notes.
 
 I'll share two Url's with you. One for Open Chat, and one for the identity service:
+
 - https://identity.messaging.dfinity.network
 - https://3cwd2-fiaaa-aaaaa-qaava-cai.messaging.dfinity.network
 
 ## The tasks:
 - 1. Login to Open Chat on your Phone
   - a) Go to the Open Chat URL and sign up
-  - b) Register with Internet Identity
+  - b) Register with Internet Identity naming your device "Phone"
   - c) Pick an Account name for Open Chat
 - 2. Logout and back into Open Chat
   - a) Go to the Open Chat URL and log yourself out (help them here,
@@ -35,7 +39,7 @@ I'll share two Url's with you. One for Open Chat, and one for the identity servi
   - a) Try to login to Open Chat with your existing account (Stop
     people if they try to register again, if they don't realize they
     need to add a new device help them)
-  - b) Add your YubiKey as a new device to your Internet Identity
+  - b) Add your YubiKey as a new device to your Internet Identity naming it "YubiKey"
   - c) Login to Open Chat with your YubiKey
   - d) Verify your Open Chat acount name is the same
 - 4. Disabling your YubiKey as a means of logging in
