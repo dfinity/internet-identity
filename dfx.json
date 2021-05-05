@@ -27,7 +27,7 @@
       "type": "persistent"
     },
     "mainnet": {
-      "providers": ["https://boundary.ic0.app'"],
+      "providers": ["https://boundary.ic0.app"],
       "type": "persistent"
     }
   },
