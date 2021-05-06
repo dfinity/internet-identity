@@ -20,10 +20,9 @@ const init = async () => {
   signInBtn.onclick = async () => {
     authClient.login({
       identityProvider: idpUrlEl.value,
-    }, async function() {
-      principalEl.innerText = await authClient.getIdentity().getPrincipal();
-    }, function(error) {
-      alert(error);
+      onSuccess: async () => {
+        principalEl.innerText = await authClient.getIdentity().getPrincipal();
+      },
     });
   };
 
@@ -31,11 +30,6 @@ const init = async () => {
     authClient.logout();
     principalEl.innerText = await authClient.getIdentity().getPrincipal();
   };
-
-  if (location.hash.substring(1).startsWith("access_token")) {
-    await authClient.handleRedirectCallback();
-    principalEl.innerText = await authClient.getIdentity().getPrincipal();
-  }
 };
 
 init();
@@ -47,7 +41,7 @@ whoamiBtn.addEventListener("click", async () => {
   // or already authenticated agent, or parsing the redirect from window.location.
   const idlFactory = ({ IDL }) =>
     IDL.Service({
-      whoami: IDL.Func([], [IDL.Principal], []),
+      whoami: IDL.Func([], [IDL.Principal], ['query']),
     });
 
   const canisterId = Principal.fromText(canisterIdEl.value);

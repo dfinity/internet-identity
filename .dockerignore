@@ -1,0 +1,11 @@
+.git
+.github
+backend-tests
+node_modules
+demos
+docs
+dist
+screenshots
+target
+.dfx
+out

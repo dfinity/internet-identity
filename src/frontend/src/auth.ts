@@ -1,5 +1,5 @@
 import { BinaryBlob, blobFromUint8Array, Principal } from "@dfinity/agent";
-import { FrontendHostname, PublicKey, SignedDelegation, UserNumber } from "../generated/idp_types";
+import { FrontendHostname, GetDelegationResponse, PublicKey, SignedDelegation, UserNumber } from "../generated/idp_types";
 import { withLoader } from "./components/loader";
 import { confirmRedirect } from "./flows/confirmRedirect";
 import { IDPActor } from "./utils/idp_actor";
@@ -7,7 +7,7 @@ import { IDPActor } from "./utils/idp_actor";
 interface AuthRequest {
     kind: "authorize-client";
     sessionPublicKey: Uint8Array;
-    maxTimetoLive?: BigInt;
+    maxTimeToLive?: BigInt;
 }
 
 interface AuthResponseSuccess {
@@ -88,18 +88,14 @@ async function handleAuthRequest(
 
     const [userKey, timestamp] = prepRes;
 
-    const getRes = await connection.getDelegation(
-        userNumber,
-        hostname,
-        sessionKey,
-        timestamp
+    // TODO: Signal failure to retrieve the delegation. Error page, or maybe redirect back with error?
+    const signed_delegation = await retryGetDelegation(
+      connection,
+      userNumber,
+      hostname,
+      sessionKey,
+      timestamp
     );
-
-    // this is just so we filter out null responses
-    if (!isDelegationResponse(getRes)) {
-        throw Error(`Could not get delegation. Result received: ${getRes}`);
-    }
-    const { signed_delegation } = getRes;
 
     // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
     const parsed_signed_delegation = {
@@ -121,8 +117,32 @@ async function handleAuthRequest(
   });
 }
 
+const retryGetDelegation = async (
+  connection: IDPActor,
+  userNumber: bigint,
+  hostname: string,
+  sessionKey: PublicKey,
+  timestamp: bigint,
+  maxRetries: number = 5,
+): Promise<SignedDelegation> => {
+  for (let i = 0; i < maxRetries; i++) {
+    // Linear backoff
+    await new Promise(resolve => { setInterval(resolve, 1000 * i) });
+    const res = await connection.getDelegation(
+      userNumber,
+      hostname,
+      sessionKey,
+      timestamp
+    );
+    if (isDelegationResponse(res)) {
+      return res.signed_delegation
+    }
+  };
+  throw new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
+};
+
 function isDelegationResponse(
-  x: any
+  x: GetDelegationResponse
 ): x is { signed_delegation: SignedDelegation } {
   return x && x.hasOwnProperty("signed_delegation");
 }

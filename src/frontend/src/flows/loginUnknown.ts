@@ -67,14 +67,15 @@ const pageContent = (userIntent: string) => html` <style>
 
 export type LoginResult =
   | {
-    tag: "ok";
-    userNumber: bigint;
-    connection: IDPActor;
+    tag: "ok",
+    userNumber: bigint,
+    connection: IDPActor,
   }
   | {
-    tag: "err";
-    message: string;
-    detail: string;
+    tag: "err",
+    title: string,
+    message: string,
+    detail?: string,
   };
 
 export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult> => {
@@ -157,29 +158,32 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
     case "authFail": {
       return {
         tag: "err",
-        message: "Failed to authenticate",
+        title: "Failed to authenticate",
+        message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
         detail: result.error.message
       };
     };
     case "unknownUser": {
       return {
         tag: "err",
-        message: `Failed to find an identity for the user number ${result.userNumber}`,
+        title: "Unknown user",
+        message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
         detail: ""
       };
     };
     case "apiError": {
       return {
         tag: "err",
-        message: "Failed to call the Internet Identity service",
+        title: "We couldn't reach Internet Identity",
+        message: "We failed to call the Internet Identity service, please try again.",
         detail: result.error.message
       };
     };
     case "registerNoSpace": {
       return {
         tag: "err",
-        message: "Failed to register with Internet Identity, because there is no space left",
-        detail: ""
+        title: "Failed to register",
+        message: "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
       }
     }
   }

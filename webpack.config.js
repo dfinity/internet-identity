@@ -19,7 +19,7 @@ function generateWebpackConfigForCanister(name, info) {
   const isProduction = process.env.NODE_ENV === "production";
   const devtool = isProduction ? undefined : "source-map";
 
-  process.env.CANISTER_ID = process.env.CANISTER_ID ?? localCanister;
+  process.env.CANISTER_ID = process.env.CANISTER_ID || localCanister;
 
   return {
     mode: isProduction ? "production" : "development",
@@ -29,7 +29,6 @@ function generateWebpackConfigForCanister(name, info) {
     devtool,
     optimization: {
       minimize: isProduction,
-      minimizer: [new TerserPlugin()],
     },
     resolve: {
       extensions: [".js", ".ts", ".jsx", ".tsx"],
