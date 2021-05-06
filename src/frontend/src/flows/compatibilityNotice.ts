@@ -20,8 +20,10 @@ const pageContent = html`
     </ul>
     <h3>For Mobile</h3>
     <ul>
-    <li>Safari 14.4 or newer (iOS)</li>
     <li>Chrome (Android)</li>
+    <li>Safari 14.4 or newer (iOS)</li>
+    <li>Firefox latest (iOS)</li>
+    <li>Chrome latest (iOS)</li>
     </ul>
   </div>
   `;
