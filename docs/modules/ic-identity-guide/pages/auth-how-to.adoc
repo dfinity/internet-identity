@@ -48,7 +48,7 @@ From there, you can only remove devices. To add another method of authentication
 
 The workflow for adding a device can vary depending on what device profiles you’ve already added to your identity. For example, if you first authorized your computer to create your User Number, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you want to add by using a device that is already authorized.
  
-EXAMPLE: Register your phone as an additional authentication method.
+To register your phone as an additional authentication method:
 Note that you can also set up your initial Internet identity on your phone.
 
 . Open the Internet Identity service in your phone’s browser. 
