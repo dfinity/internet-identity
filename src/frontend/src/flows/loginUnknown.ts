@@ -46,15 +46,19 @@ const pageContent = (userIntent: string) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>Provide your user number to login and ${userIntent}.</p>
-    <input
-      type="text"
-      id="registerUserNumber"
-      placeholder="Enter User Number"
-    />
-    <button type="button" id="loginButton" class="primary">Login</button>
+    <form id="loginForm">
+      <input
+        type="text"
+        id="registerUserNumber"
+        placeholder="Enter User Number"
+      />
+      <button type="submit" id="loginButton" class="primary">Login</button>
+    </form>
     <div class="textLink" id="registerSection">
       New user?
-      <button id="registerButton" class="linkStyle">Register with Internet Identity.</button>
+      <button id="registerButton" class="linkStyle">
+        Register with Internet Identity.
+      </button>
     </div>
     <div class="textLink">
       Already registered
@@ -67,21 +71,28 @@ const pageContent = (userIntent: string) => html` <style>
 
 export type LoginResult =
   | {
-    tag: "ok",
-    userNumber: bigint,
-    connection: IDPActor,
-  }
+      tag: "ok";
+      userNumber: bigint;
+      connection: IDPActor;
+    }
   | {
-    tag: "err",
-    title: string,
-    message: string,
-    detail?: string,
-  };
+      tag: "err";
+      title: string;
+      message: string;
+      detail?: string;
+    };
 
-export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult> => {
-  
+export const loginUnknown = async (
+  userIntent: UserIntent
+): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(bannerFromIntent(userIntent)), container);
+  // Focus the User Number Input after render
+  setTimeout(() => {
+    (document.querySelector("#registerUserNumber") as
+      | HTMLInputElement
+      | undefined)?.focus();
+  }, 100);
   return new Promise((resolve, reject) => {
     initLogin(resolve);
     initLinkDevice();
@@ -90,19 +101,19 @@ export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult>
 };
 
 const initRegister = (resolve, reject) => {
-  const registerButton = document.getElementById(
-    "registerButton"
-  ) as HTMLButtonElement;
-  registerButton.onclick = () => {
+  const loginForm = document.getElementById("loginForm") as HTMLFormElement;
+  loginForm.onsubmit = (e) => {
+    e.preventDefault();
     register()
-      .then(res => {
+      .then((res) => {
         if (res === null) {
           window.location.reload();
         } else {
           resolve(res);
         }
       })
-      .catch(reject)
+      .catch(reject);
+    return false;
   };
 };
 
@@ -128,7 +139,7 @@ const initLogin = (resolve) => {
       setUserNumber(userNumber);
     }
     resolve(apiResultToLoginResult(result));
-  }
+  };
 };
 
 const initLinkDevice = () => {
@@ -142,7 +153,7 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    addDeviceUserNumber(userNumber)
+    addDeviceUserNumber(userNumber);
   };
 };
 
@@ -154,37 +165,40 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         userNumber: result.userNumber,
         connection: result.connection,
       };
-    };
+    }
     case "authFail": {
       return {
         tag: "err",
         title: "Failed to authenticate",
-        message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
-        detail: result.error.message
+        message:
+          "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
+        detail: result.error.message,
       };
-    };
+    }
     case "unknownUser": {
       return {
         tag: "err",
         title: "Unknown user",
         message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
-        detail: ""
+        detail: "",
       };
-    };
+    }
     case "apiError": {
       return {
         tag: "err",
         title: "We couldn't reach Internet Identity",
-        message: "We failed to call the Internet Identity service, please try again.",
-        detail: result.error.message
+        message:
+          "We failed to call the Internet Identity service, please try again.",
+        detail: result.error.message,
       };
-    };
+    }
     case "registerNoSpace": {
       return {
         tag: "err",
         title: "Failed to register",
-        message: "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
-      }
+        message:
+          "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+      };
     }
   }
-}
+};
