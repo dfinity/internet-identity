@@ -28,7 +28,7 @@ const constructingContent = html`
     ${icLogo}
     <p>
       This can take longer on some devices. Please wait and do not refresh the
-      page
+      page.
     </p>
   </div>
 `;
