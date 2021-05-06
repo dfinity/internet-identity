@@ -12,7 +12,6 @@
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint '**/*.ts*'"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.8.6",
     "@testing-library/jest-dom": "^5.11.10",
     "@types/jest": "^24.9.1",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
@@ -47,8 +46,9 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/authentication": "0.8.3",
-    "@dfinity/identity": "0.8.3",
+    "@dfinity/agent": "0.8.8",
+    "@dfinity/authentication": "0.8.8",
+    "@dfinity/identity": "0.8.8",
     "biguintle": "^1.0.3",
     "clipboard": "^2.0.8",
     "kjua": "^0.9.0",
