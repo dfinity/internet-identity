@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import { nextTick } from "process";
 import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { renderManage } from "./manage";
@@ -8,22 +9,31 @@ const pageContent = (alias) => html`
     <h1>Success!</h1>
     <p>You have successfully added your new device.</p>
     <label>Device name:</label>
-    <div class="highlightBox">
-      ${alias}
-    </div>
+    <div class="highlightBox">${alias}</div>
     <button id="manageDevicesButton" class="primary">Manage devices</button>
     ${logoutSection()}
   </div>
-  `;
+`;
 
-export const successfullyAddedDevice = async (alias: string, userNumber: bigint, connection: IDPActor): Promise<void> => {
+export const successfullyAddedDevice = async (
+  alias: string,
+  userNumber: bigint,
+  connection: IDPActor
+): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(alias), container);
+  await nextTick(() => {
+    (document.getElementById("manageDevicesButton") as
+      | HTMLButtonElement
+      | undefined)?.focus();
+  });
   initLogout();
   init(userNumber, connection);
-}
+};
 
 const init = async (userNumber: bigint, connection: IDPActor) => {
-  const manageDevicesButton = document.getElementById("manageDevicesButton") as HTMLButtonElement;
-  manageDevicesButton.onclick = () => renderManage(userNumber, connection)
-}
+  const manageDevicesButton = document.getElementById(
+    "manageDevicesButton"
+  ) as HTMLButtonElement;
+  manageDevicesButton.onclick = () => renderManage(userNumber, connection);
+};
