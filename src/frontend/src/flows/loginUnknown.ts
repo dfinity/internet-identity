@@ -103,9 +103,10 @@ export const loginUnknown = async (
 };
 
 const initRegister = (resolve, reject) => {
-  const loginForm = document.getElementById("loginForm") as HTMLFormElement;
-  loginForm.onsubmit = (e) => {
-    e.preventDefault();
+  const registerButton = document.getElementById(
+    "registerButton"
+  ) as HTMLButtonElement;
+  registerButton.onclick = () => {
     register()
       .then((res) => {
         if (res === null) {
@@ -115,7 +116,6 @@ const initRegister = (resolve, reject) => {
         }
       })
       .catch(reject);
-    return false;
   };
 };
 
@@ -123,11 +123,9 @@ const initLogin = (resolve) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
-  const loginButton = document.getElementById(
-    "loginButton"
-  ) as HTMLButtonElement;
+  const loginForm = document.getElementById("loginForm") as HTMLFormElement;
 
-  loginButton.onclick = async () => {
+  loginForm.onsubmit = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber === null) {
       return resolve({
