@@ -11,7 +11,7 @@ const pageContent = html`
     <h1>About the Internet Identity</h1>
     <p>
       Internet Identity is the identity provider for the Internet Computer: A
-      single service to log into many apps on the Internet Computer.
+      single service to log into apps on the Internet Computer.
     </p>
     <p>
       Internet Identity protects your privacy. It will create a different
