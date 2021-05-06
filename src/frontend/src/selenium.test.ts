@@ -87,7 +87,7 @@ async function on_Register_TypeAliasEnter(alias : string, driver: ThenableWebDri
 // View: Register confirmation
 
 async function on_RegisterConfirm(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 15_000);
+    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 25_000);
 }
 
 async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {

@@ -1,10 +1,29 @@
 # idp_service
 
-## Requirements
+See `./docs/ic-idp-spec.adoc` for a details specification and technical
+documentation.
 
-### Software
+## Official build
 
-- `dfx` version 0.7.0-beta.5
+The official build should ideally be reproducible, so that independent parties
+can validate that we really deploy what we claim to deploy.
+
+We try to achieve some level of reproducibility using a Dockerized build
+environment. The following steps _should_ build the official Wasm image
+
+    docker build -t idp-service .
+    docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
+
+The resulting `idp_service.wasm` is ready for deployment as
+`rdmx6-jaaaa-aaaaa-aaadq-cai`, which is the reserved principal for this service.
+
+Our CI also performs these steps; you can compare the SHA256 with the output there, or download the artifact there.
+
+
+
+## Software versions
+
+- `dfx` version 0.7.0-beta.6
 
 - Rust version 1.51
 
