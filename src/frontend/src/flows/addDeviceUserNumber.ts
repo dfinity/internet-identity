@@ -22,10 +22,19 @@ export const addDeviceUserNumber = async (userNumber: bigint | null): Promise<vo
 
 const init = () => {
     const addDeviceUserNumberContinue = document.getElementById("addDeviceUserNumberContinue") as HTMLButtonElement;
+    const userNumberInput = document.getElementById(
+        "addDeviceUserNumber"
+    ) as HTMLInputElement;
+
+    userNumberInput.onkeypress = (e) => {
+        // submit if user hits enter
+        if (e.key === "Enter") {
+            e.preventDefault();
+            addDeviceUserNumberContinue.click();
+        }
+    }
+
     addDeviceUserNumberContinue.onclick = async () => {
-        const userNumberInput = document.getElementById(
-            "addDeviceUserNumber"
-        ) as HTMLInputElement;
         let loginInterval: number;
 
         const userNumber = parseUserNumber(userNumberInput.value);
