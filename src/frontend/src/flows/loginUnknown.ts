@@ -114,6 +114,14 @@ const initLogin = (resolve) => {
     "loginButton"
   ) as HTMLButtonElement;
 
+  userNumberInput.onkeypress = (e)=>{
+    // submit if user hits enter
+    if(e.key === "Enter"){
+        e.preventDefault();
+        loginButton.click();
+    }
+}
+
   loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber === null) {
