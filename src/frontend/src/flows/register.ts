@@ -27,8 +27,7 @@ const constructingContent = html`
     <h1>Constructing your Internet Identity</h1>
     ${icLogo}
     <p>
-      This can take longer on some devices. Please wait and do not refresh the
-      page.
+      This may take a while. Please wait and do not refresh the page.
     </p>
   </div>
 `;
