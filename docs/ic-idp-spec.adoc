@@ -577,19 +577,19 @@ The Internet Identity canister is created as an empty canister (i.e. no wasm mod
 
 === Initial installation (should happen only once)
 
-In a checkout of this repository, run:
+In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-npm install
-dfx build --network mainnet idp_service
+docker build -t idp-service .
+docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
 ----
 
-Note: This prepares the wasm module for installation on `mainnet`. If we want to deploy to testnet, then you can use `messaging` or add a new profile for the testnet in dfx.json.
+The resulting `idp_service.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
 
 Make note of the hash of wasm module:
 [source,bash]
 ----
-shasum -a 256 target/wasm32-unknown-unknown/release/idp_service.wasm
+shasum -a 256 idp_service.wasm
 ----
 
 Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
