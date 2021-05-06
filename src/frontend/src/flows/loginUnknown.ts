@@ -7,6 +7,7 @@ import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
 import { bannerFromIntent, UserIntent } from "../utils/userIntent";
+import { nextTick } from "process";
 
 const pageContent = (userIntent: string) => html` <style>
     #registerUserNumber:focus {
@@ -88,11 +89,12 @@ export const loginUnknown = async (
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(bannerFromIntent(userIntent)), container);
   // Focus the User Number Input after render
-  setTimeout(() => {
+  await nextTick(() => {
     (document.querySelector("#registerUserNumber") as
       | HTMLInputElement
       | undefined)?.focus();
-  }, 100);
+  });
+
   return new Promise((resolve, reject) => {
     initLogin(resolve);
     initLinkDevice();
