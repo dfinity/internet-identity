@@ -10,7 +10,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   - switch to branch `next`.
   - cargo build --release
 
-* Run `./dfx.sh cache delete`, just to be sure
+* Make sure you have dfx version `0.7.0-beta.6`
 * In a checkout of `idp-service`, `main` branch, reset the dfx state:
   ```
   rm -rf .dfx
@@ -23,10 +23,9 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   rm -rf .dfx
   ```
   (or less expensive, `rm -f .dfx/local/canister_ids.json .dfx/local/wallets.json`)
-* In idp-service, run the replica. By virtue of using `dfx.sh`, this will pull
-  in a replica with our auth changes (via https://github.com/dfinity/sdk/pull/1587)
+* In idp-service, run the replica.
   ```
-  ../idp-service/dfx.sh start
+  dfx start
   ```
   Note the port when it says
   ```
@@ -36,14 +35,14 @@ These instructions start from a mostly clean slate. Apply common sense when foll
 * In `idp-service` , build and deploy:
   ```
   npm ci
-  ../idp-service/dfx.sh deploy --argument '(null)'
+  dfx deploy --argument '(null)'
   ```
   Note the canister id
 
 * In open chat, build and deploy:
   ```
   npm install
-  ../idp-service/dfx.sh deploy
+  dfx deploy
   ```
 
 * In `agent-rs` run

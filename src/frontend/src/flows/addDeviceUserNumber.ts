@@ -10,7 +10,6 @@ const pageContent = (userNumber: bigint | null) => html`
     <h1>New device</h1>
     <p>Please provide your user number.</p>
     <input type="text" id="addDeviceUserNumber" placeholder="Enter User Number" value=${userNumber ?? ""} />
-    <p>After clicking Continue you will be asked to use your security device.</p>
     <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
 </div>
   `;

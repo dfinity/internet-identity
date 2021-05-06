@@ -1,37 +1,31 @@
 # idp_service
 
-## Requirements
+See `./docs/ic-idp-spec.adoc` for a details specification and technical
+documentation.
 
-### Software
+## Official build
 
-- `dfx` version from the branch at https://github.com/dfinity/sdk/pull/1587.
+The official build should ideally be reproducible, so that independent parties
+can validate that we really deploy what we claim to deploy.
 
-  The easiest way to run this is to just use
+We try to achieve some level of reproducibility using a Dockerized build
+environment. The following steps _should_ build the official Wasm image
 
-  ```
-  ./dfx.sh
-  ```
+    docker build -t idp-service .
+    docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
 
-  One other easy way to fetch it built from the nix cache is to run
+The resulting `idp_service.wasm` is ready for deployment as
+`rdmx6-jaaaa-aaaaa-aaadq-cai`, which is the reserved principal for this service.
 
-  ```
-  nix-build -E '(import (builtins.fetchGit { url = "git@github.com:dfinity/sdk"; ref = "joachim/idp";}) {}).dfx.standalone' -o /tmp/idp-dfx
-  ```
+Our CI also performs these steps; you can compare the SHA256 with the output there, or download the artifact there.
 
-  and then run it as `/tmp/idp-dfx/bin/dfx`:
 
-  ```
-  /tmp/idp-dfx/bin/dfx --version
-  dfx 0.7.0-beta.2.idp
-  ```
 
-  After upgrading it may help to run
+## Software versions
 
-  ```
-  /tmp/idp-dfx/bin/dfx cache delete --help
-  ```
+- `dfx` version 0.7.0-beta.6
 
-- Rust version 1.50
+- Rust version 1.51
 
 - NodeJS (with npm) version TBD
 

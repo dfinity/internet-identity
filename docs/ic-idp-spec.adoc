@@ -126,13 +126,13 @@ where `msg` is a value with of type
  interface InternetIdentityAuthRequest {
    kind: "authorize-client";
    sessionPublicKey: Uint8Array;
-   maxTimetoLive?: bigint;
+   maxTimeToLive?: bigint;
  }
 
 where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
-* the `maxTimetoLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+* the `maxTimeToLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
 --
 6. Now it expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -227,7 +227,7 @@ service : {
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimetoLive : opt nat64) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 }
 ....
@@ -280,7 +280,7 @@ The `prepare_delegation` method causes the Internet Identity Service backend to 
 
 This method returns the user’s identity that’s associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_delegation` query, we prevent attacks that trick the user into using a wrong identity.
 
-The expiration timestamp is determined by the backend, but no more than `maxTimetoLive` (if present) nanoseconds in the future.
+The expiration timestamp is determined by the backend, but no more than `maxTimeToLive` (if present) nanoseconds in the future.
 
 The method returns the expiration timestamp of the delegation. This is returned purely so that the client can feed it back to the backend in `get_delegation`.
 
@@ -575,21 +575,21 @@ This section needs to describe aspects like
 
 The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
 
-=== Initial installation
+=== Initial installation (should happen only once)
 
-In a checkout of this repository, run:
+In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-npm install
-dfx build --network messaging idp_service
+docker build -t idp-service .
+docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
 ----
 
-Note: This prepares the wasm module for installation on `messaging` testnet. If we want to deploy to beta, then we need to add a profile for it and use that instead.
+The resulting `idp_service.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
 
 Make note of the hash of wasm module:
 [source,bash]
 ----
-shasum -a 256 target/wasm32-unknown-unknown/release/idp_service.wasm
+shasum -a 256 idp_service.wasm
 ----
 
 Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
@@ -610,7 +610,24 @@ The canister accepts a range of user ids that it's responsible for in `canister_
 didc encode '(null)' | xxd -r -p > arg.in
 ----
 
-Submit the proposal to install the canister on `messaging`:
+==== Submitting proposal and voting on mainnet
+
+You will need to ask someone who has authorization to submit the proposal. Then you will need to ping @trusted-neurons slack alias to get enough votes for it. The command will look like:
+[source,bash]
+----
+ic-admin \
+    -s "${PROPOSER_KEY_FILE}" \
+    --nns-url "${child_nns_url}" \
+    propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
+    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --mode install \
+    --wasm-module-path <path_to_wasm> \
+    --arg <init_arg_file>
+----
+
+==== Submitting proposal on testnets
+
+Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
 [source,bash]
 ----
 ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm --arg arg.in
@@ -622,7 +639,27 @@ You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging
 
 === Upgrades of the canister
 
-Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin`. Run:
+Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin` and we don't need any arguments in this case.
+
+==== On Mainnet
+
+You will still need to get someone with authorization to submit the proposal and get enough votes for it (ping @trusted-neurons on slack). The command will look like:
+
+[source,bash]
+----
+ic-admin \
+    -s "${PROPOSER_KEY_FILE}" \
+    --nns-url "${child_nns_url}" \
+    propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
+    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --mode upgrade \ 
+    --wasm-module-path <path_to_wasm>
+----
+
+==== On testnets
+
+Once you've built the binary, you can then run (for `messaging`):
+
 [source,bash]
 ----
 ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
@@ -631,6 +668,7 @@ ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-chan
 === Disaster recovery
 
 If the Internet Computer goes down and has to be re-boot-strapped, or else the backend canister is lost, we can recover as long as
+
  * we get the same canister id and
  * we have a copy of the stable memory (`/var/lib/dfinity-node/ic_state/tip/canister_states/00000000000000070101/stable_memory.bin`)
 

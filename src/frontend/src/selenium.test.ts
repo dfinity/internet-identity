@@ -37,9 +37,12 @@ import { writeFile } from 'fs/promises';
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
-import canister_ids from '../../../.dfx/local/canister_ids.json';
-const IDENTITY_CANISTER = canister_ids.idp_service.local;
+import canister_ids1 from '../../../.dfx/local/canister_ids.json';
+const IDENTITY_CANISTER = canister_ids1.idp_service.local;
+import canister_ids2 from '../../../demos/whoami/.dfx/local/canister_ids.json';
+const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
+const REPLICA_URL = 'http://localhost:8000';
 const IDP_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`
 const DEMO_APP_URL = 'http://localhost:8080/';
 
@@ -84,7 +87,7 @@ async function on_Register_TypeAliasEnter(alias : string, driver: ThenableWebDri
 // View: Register confirmation
 
 async function on_RegisterConfirm(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 15_000);
+    await driver.wait(until.elementLocated(By.id('confirmRegisterButton')), 25_000);
 }
 
 async function on_RegisterConfirm_Confirm(driver: ThenableWebDriver) {
@@ -111,7 +114,7 @@ async function on_RegisterShowNumber_Fixup(driver: ThenableWebDriver) {
 
 async function on_Main(device_name : string, driver : ThenableWebDriver) {
     // wait for device list to load
-    await driver.wait(until.elementLocated(By.xpath(`//span[string()='${device_name}']`)), 3_000);
+    await driver.wait(until.elementLocated(By.xpath(`//div[string()='${device_name}']`)), 3_000);
 }
 
 async function on_Main_Logout(driver : ThenableWebDriver) {
@@ -120,7 +123,7 @@ async function on_Main_Logout(driver : ThenableWebDriver) {
 
 async function on_Main_Fixup(driver : ThenableWebDriver) {
     // replace the user number for a reproducible screenshot
-    let elem = await driver.findElement(By.id('userNumberSpan'));
+    let elem = await driver.findElement(By.className('highlightBox'));
     await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
 }
 
@@ -246,7 +249,7 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
 async function wait_for_fonts(driver : ThenableWebDriver) {
-  for(var i = 0; i <= 10; i++) {
+  for(var i = 0; i <= 50; i++) {
     if (await driver.executeScript("return document.fonts.status;") == "loaded") {
       return
     }
@@ -357,7 +360,20 @@ test('Log into client application, after registration', async () => {
         let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
         // and that we see a non-anonymous principal
         expect(principal).not.toBe('2vxsx-fae');
-        // TODO: Use a whoami service to check that logging in works
+
+        // we can invoke the whoami service?
+        await driver.findElement(By.id('hostUrl')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('hostUrl')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('hostUrl')).sendKeys(REPLICA_URL);
+        await driver.findElement(By.id('canisterId')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('canisterId')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('canisterId')).sendKeys(WHOAMI_CANISTER);
+        await driver.findElement(By.id('whoamiBtn')).click();
+        let whoamiResponseElem = await driver.findElement(By.id('whoamiResponse'));
+        await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
+        let principal2 = await whoamiResponseElem.getText();
+        expect(principal2).toBe(principal);
+
     })
 }, 300_000);
 
@@ -438,6 +454,7 @@ test('Screenshots', async () => {
             await on_Main(DEVICE_NAME2, driver2);
             await on_Main_Fixup(driver2);
             await screenshot('13-new-device-listed', driver2);
+
         })
 
         await driver.get("about:blank");
