@@ -42,14 +42,13 @@ If you lose your User Number and are logged out on all devices, you cannot log i
 . Click *Continue*. 
 +
 On the next screen, you will see your User Number and your registered authentication devices. 
-From there, you can only remove devices. To add another method of authentication, you must  access the Internet Identity service from the device you want to add. 
+From there, you can only remove devices. To add another method of authentication, you must access the Internet Identity service from the device you want to add. 
 
 == Add a device 
 
-The workflow for adding a device can vary depending on what device profiles you’ve already added to your identity. For example, if you first authorized your computer to create your User Number, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you want to add by using a device that is already authorized.
+The workflow for adding a device can vary depending on what devices you’ve already added to your identity. For example, if you first authorized your computer to create your User Number, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you want to add by using a device that is already authorized.
  
 To register your phone as an additional authentication method:
-Note that you can also set up your initial Internet identity on your phone.
 
 . Open the Internet Identity service in your phone’s browser. 
 
@@ -75,4 +74,4 @@ After you’ve unlocked your phone, you will be provided with a URL and a QR cod
 If you’re sure that the link you pasted in the browser came from you, click *Yes, link new device*.
 . Give the device profile a name and click *Link Device*.
 +
-Your phone will be redirected to the login page, and you can now use it with your user number to log in.
+Your phone will be redirected to the login page, and you can now use it with your User Number to log in.
