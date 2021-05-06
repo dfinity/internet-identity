@@ -56,7 +56,7 @@ export const displayAddDeviceLink = async (link: string) => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(link), container);
   await nextTick(() => {
-    (document.getElementById("showURL") as
+    (document.getElementById("linkCopy") as
       | HTMLButtonElement
       | undefined)?.focus();
   });
