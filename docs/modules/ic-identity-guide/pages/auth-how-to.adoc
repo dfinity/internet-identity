@@ -22,9 +22,9 @@ To create an Internet Identity as a first-time user:
 
 . Enter a name for the device profile you’re using to create your Internet identity. For example: iPhone, or YubiKey. 
 
-. Choose to authenticate using either a security key, or with an authentication method of the device you are using, if that option is available. 
+. Choose to register using either a dedicated security key, or with an authentication method of the device you are using, if that option is available. 
 +
-For example, if your device has biometrics enabled, you might see the option to use those as your authentication method. You can also use the password that unlocks your computer or a pin that unlocks your phone, depending on the device you’re using.
+For example, if your device has biometrics enabled to unlock it, you might see the option to use those as your authentication method. You can also use the password that unlocks your computer or a pin that unlocks your phone, depending on the device you’re using.
 +
 
 NOTE: As a best practice, use a dedicated security key. You can then add another authentication device if you prefer to use one, such as your phone, and store the key in a safe place in the event that you are unable to to use your preferred device.  
@@ -39,7 +39,7 @@ When you have registered your device, you’ll receive a *User Number*.
 This number is unique, but it is not a secret, so you should save the number in multiple places. 
 Your browser will remember your user number, but you will need it if you log in on a different computer, or if you clear your browser state. 
 If you lose your User Number and are logged out on all devices, you cannot log in to the Identity service to manage your devices, or access any of your applications.
-. Click Continue. 
+. Click *Continue*. 
 +
 On the next screen, you will see your User Number and your registered authentication devices. 
 From there, you can only remove devices. To add another method of authentication, you must  access the Internet Identity service from the device you want to add. 
@@ -48,7 +48,7 @@ From there, you can only remove devices. To add another method of authentication
 
 The workflow for adding a device can vary depending on what device profiles you’ve already added to your identity. For example, if you first authorized your computer to create your User Number, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you’re adding, using a device that is already authorized.
  
-EXAMPLE: Register your phone as an additional authentication method
+EXAMPLE: Register your phone as an additional authentication method.
 Note that you can also set up your initial Internet identity on your phone.
 
 . Open the Internet Identity service in your phone’s browser. 
@@ -64,7 +64,7 @@ Note that you can also set up your initial Internet identity on your phone.
 You will be asked to unlock the device. 
 +
 
-NOTE: To use the screen lock option, you have to have screen lock activated on your phone. To unlock your phone, either use biometric authentication or a pin number. 
+NOTE: To use the screen lock option, you have to have screen lock activated on your phone. 
 
 . Authorize your phone.
 +
@@ -72,7 +72,7 @@ After you’ve unlocked your phone, you will be provided with a URL and a QR cod
 . Enter your User Number and click *Login*.
 . Link your phone to your identity. 
 +
-If you’re sure that the link you pasted in the browser came from you, click Yes, link new device.
-. Give the device profile a name and click Link Device.
+If you’re sure that the link you pasted in the browser came from you, click *Yes, link new device*.
+. Give the device profile a name and click *Link Device*.
 +
-Your phone will be redirected to the login page, and you can now use it to log in.
+Your phone will be redirected to the login page, and you can now use it with your user number to log in.
