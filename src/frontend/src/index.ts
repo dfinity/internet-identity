@@ -13,10 +13,27 @@ const init = async () => {
     return aboutView()
   }
 
-  if (!window.PublicKeyCredential) {
-    return compatibilityNotice()
+  if (window.PublicKeyCredential) {
+    const isIos = navigator.userAgent.match(/(iPhone|iPod|iPad)/);
+    const isAndroid = navigator.userAgent.match(/Android/);
+    if(isIos || isAndroid){ 
+      try {
+        const available = PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (available) {
+          // Proceed
+        } else {
+          return compatibilityNotice();
+        }
+      } catch (error) {
+        return compatibilityNotice(); 
+      }
+    } else {
+      // proceed
+    }
+  } else {
+    return compatibilityNotice();
   }
-
+    
   const userIntent = intentFromUrl(url);
   const { userNumber, connection } = await login(userIntent);
 
