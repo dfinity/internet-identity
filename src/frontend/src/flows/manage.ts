@@ -106,16 +106,12 @@ const bindRemoveListener = (
 
     // Otherwise, remove identity
     try {
-      await withLoader(() =>
-        connection.remove(userNumber, publicKey).then(() => {
-          listItem.parentElement?.removeChild(listItem);
-        })
-      );
-
+      await withLoader(() => connection.remove(userNumber, publicKey));
       if (sameDevice) {
         localStorage.clear();
         location.reload();
       }
+      renderManage(userNumber, connection)
     } catch (err) {
       await displayError({
         title: "Failed to remove the device",
