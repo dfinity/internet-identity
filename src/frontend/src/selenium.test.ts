@@ -484,14 +484,14 @@ test('Screenshots', async () => {
             expect(alertText).toBe("This will remove your current device and you will be logged out");
         })
 
-	// About page
+        // About page
         await driver.get("about:blank");
         await driver.get(IDP_URL + "#about");
         await wait_for_fonts(driver);
         await on_About(driver);
         await screenshot('14-about', driver);
 
-	// Test device removal
+        // Test device removal
         await driver.get(IDP_URL);
         const userNumber3 = await on_WelcomeBack(driver);
         expect(userNumber3).toBe(userNumber);
