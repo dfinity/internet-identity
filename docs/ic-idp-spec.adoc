@@ -667,11 +667,20 @@ ic-admin \
     --wasm-module-path idp_service
 ----
 
-If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`,
+If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`:
+
 [source,bash]
 ----
 dfx --identity default canister --no-wallet --network=mercury call governance list_proposals --type=idl '(record {limit=25; include_reward_status=vec{}; exclude_topic=vec{}; include_status=vec{1}})'
 ----
+
+You can check that deployment went through running
+
+[source,bash]
+----
+dfx canister --network mainnet --no-wallet info idp_service
+----
+
 
 Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
 
