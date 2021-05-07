@@ -13,6 +13,7 @@ environment. The following steps _should_ build the official Wasm image
 
     docker build -t idp-service .
     docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
+    sha256sum idp_service.wasm
 
 The resulting `idp_service.wasm` is ready for deployment as
 `rdmx6-jaaaa-aaaaa-aaadq-cai`, which is the reserved principal for this service.
