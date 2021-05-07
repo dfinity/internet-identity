@@ -16,5 +16,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "exclude": ["src/frontend/generated/*"]
+  "exclude": ["src/**/*.test.ts", "src/frontend/generated/*"]
 }
