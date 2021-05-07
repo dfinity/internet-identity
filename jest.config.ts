@@ -1,3 +1,4 @@
+// eslint-disable-next-line
 const path = require("path");
 const idp_service = path.join(__dirname, "src/frontend/generated/idp_idl.ts");
 

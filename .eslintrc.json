@@ -5,16 +5,9 @@
       "plugin:@typescript-eslint/recommended"
     ],
     "parser": "@typescript-eslint/parser",
+    "parserOptions": { "project": ["./tsconfig.json"]},
     "plugins": [
       "@typescript-eslint"
-    ],
-    "overrides": [
-      {
-        "files": ["*.ts", "*.test.ts"],
-        "parserOptions": {
-          "project": ["./tsconfig.json"]
-        }
-      }
     ],
     "rules": {
       "@typescript-eslint/strict-boolean-expressions": 2
