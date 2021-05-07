@@ -56,7 +56,7 @@ const DEVICE_NAME2 = 'Other WebAuthn device';
 // View: Welcome
 
 async function on_Welcome(driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 3_000);
+    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 10_000);
 }
 
 async function on_Welcome_TypeUserNumber(user_number: string, driver: ThenableWebDriver) {
@@ -125,6 +125,10 @@ async function on_Main_Fixup(driver : ThenableWebDriver) {
     // replace the user number for a reproducible screenshot
     let elem = await driver.findElement(By.className('highlightBox'));
     await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
+}
+
+async function on_Main_Remove(device_name : string, driver : ThenableWebDriver) {
+    await driver.findElement(By.xpath(`//div[string()='${device_name}']/following-sibling::button`)).click()
 }
 
 // View: Welcome back
@@ -460,13 +464,52 @@ test('Screenshots', async () => {
             await on_Main_Fixup(driver2);
             await screenshot('13-new-device-listed', driver2);
 
+            // Try to remove current device
+            await on_Main_Remove(DEVICE_NAME2, driver2);
+            await driver2.wait(until.alertIsPresent(), 1_000);
+            const alert = driver2.switchTo().alert();
+            // Cannot take screenshots of modal dialogs, it seems
+            // Also dismiss before asserting things, the exception
+            // handler doesn’t work well while modal dialogs are open
+            const alertText = await alert.getText();
+            await alert.dismiss();
+            expect(alertText).toBe("This will remove your current device and you will be logged out");
         })
 
+	// About page
         await driver.get("about:blank");
         await driver.get(IDP_URL + "#about");
         await wait_for_fonts(driver);
 	await on_About(driver);
         await screenshot('14-about', driver);
+
+	// Test device removal
+        await driver.get(IDP_URL);
+        const userNumber3 = await on_WelcomeBack(driver);
+        expect(userNumber3).toBe(userNumber);
+        await on_WelcomeBack_Login(driver);
+        await on_Main(DEVICE_NAME2, driver);
+        const buttonElem2 = await driver.findElement(By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`));
+        await on_Main_Remove(DEVICE_NAME2, driver);
+        // No dialog here!
+
+        await driver.wait(until.stalenessOf(buttonElem2));
+        await on_Main(DEVICE_NAME1, driver);
+        await on_Main_Fixup(driver);
+        await screenshot('15-after-removal', driver);
+
+        await on_Main_Remove(DEVICE_NAME1, driver);
+        const alert1 = driver.switchTo().alert();
+        const alertText1 = await alert1.getText();
+        await alert1.accept();
+        expect(alertText1).toBe("This will remove your current device and you will be logged out");
+        const alert2 = driver.switchTo().alert();
+        const alertText2 = await alert2.getText();
+        await alert2.accept();
+        expect(alertText2).toBe("This will remove your only remaining identity and may impact your ability to log in to accounts you have linked");
+
+        await on_Welcome(driver);
+
     })
 }, 300_000);
 
