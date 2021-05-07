@@ -84,7 +84,7 @@ const bindRemoveListener = (
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
     const sameDevice = connection.identity.getPublicKey().toDer().equals(derBlobFromBlob(blobFromUint8Array(publicKey)));
-    const isOnlyDevice = listItem.parentElement?.childElementCount < 2;
+    const isOnlyDevice = listItem.parentElement!.childElementCount < 2;
 
     if (sameDevice) {
       const shouldProceed = confirm(
