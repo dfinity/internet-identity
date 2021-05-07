@@ -20,7 +20,7 @@ export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWor
   let nonce = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 
   const canisterIdBlob = canisterId.toBlob();
-  let message = Buffer.concat([
+  const message = Buffer.concat([
       Buffer.from([DOMAIN.length]),
       Buffer.from(DOMAIN),
       toLeBytes(timestamp),
@@ -38,7 +38,7 @@ export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWor
 
     // Hash doesn't check. Increment nonce and update the message.
     nonce += BigInt(1);
-    let nonce_encoded = toLeBytes(nonce);
+    const nonce_encoded = toLeBytes(nonce);
     for (let i = 0; i < nonce_encoded.length; i++) {
       message[NONCE_OFFSET + i] = nonce_encoded[i];
     }

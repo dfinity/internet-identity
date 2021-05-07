@@ -162,7 +162,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         userNumber: result.userNumber,
         connection: result.connection,
       };
-    };
+    }
     case "authFail": {
       return {
         tag: "err",
@@ -170,7 +170,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
         detail: result.error.message
       };
-    };
+    }
     case "unknownUser": {
       return {
         tag: "err",
@@ -178,7 +178,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
         detail: ""
       };
-    };
+    }
     case "apiError": {
       return {
         tag: "err",
@@ -186,7 +186,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: "We failed to call the Internet Identity service, please try again.",
         detail: result.error.message
       };
-    };
+    }
     case "registerNoSpace": {
       return {
         tag: "err",

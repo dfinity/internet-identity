@@ -123,7 +123,7 @@ async function on_Main_Logout(driver : ThenableWebDriver) {
 
 async function on_Main_Fixup(driver : ThenableWebDriver) {
     // replace the user number for a reproducible screenshot
-    let elem = await driver.findElement(By.className('highlightBox'));
+    const elem = await driver.findElement(By.className('highlightBox'));
     await driver.executeScript("arguments[0].innerText = arguments[1];", elem, '12345');
 }
 
@@ -163,7 +163,7 @@ async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_n
 
 async function on_AddDeviceUserNumber_Fixup(driver : ThenableWebDriver) {
     // replace the user number for a reproducible screenshot
-    let elem = await driver.findElement(By.id('addDeviceUserNumber'));
+    const elem = await driver.findElement(By.id('addDeviceUserNumber'));
     await driver.executeScript("arguments[0].value = arguments[1];", elem, '12345');
 }
 
@@ -253,7 +253,7 @@ async function addVirtualAuthenticator(driver: ThenableWebDriver) {
 }
 
 async function screenshot(name : string, driver: ThenableWebDriver) {
-    let image = await driver.takeScreenshot();
+    const image = await driver.takeScreenshot();
     // writing to a subdirectory has the nice property that it fails if
     // this is run in the wrong directory
     await writeFile(`screenshots/${name}.png`, image, 'base64');
@@ -261,12 +261,12 @@ async function screenshot(name : string, driver: ThenableWebDriver) {
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
 async function wait_for_fonts(driver : ThenableWebDriver) {
-  for(var i = 0; i <= 50; i++) {
+  for(let i = 0; i <= 50; i++) {
     if (await driver.executeScript("return document.fonts.status;") == "loaded") {
       return
     }
     driver.sleep(200);
-  };
+  }
   console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
 }
 
@@ -298,7 +298,7 @@ async function run_in_browser_common(outer, test) {
            await driver.quit();
         }
     }
-};
+}
 
 /*
 ## Combined flows
@@ -332,7 +332,7 @@ test('_Register new identity and login with it', async () => {
     await run_in_browser(async (driver) => {
         await addVirtualAuthenticator(driver);
         await driver.get(IDP_URL);
-        let userNumber = await registerNewIdentity(driver);
+        const userNumber = await registerNewIdentity(driver);
         await on_Main(DEVICE_NAME1, driver);
         await await on_Main_Logout(driver);
         await login(userNumber, driver);
@@ -356,7 +356,7 @@ test('Log into client application, after registration', async () => {
         // enable virtual authenticator in the new window
         await addVirtualAuthenticator(driver);
 
-        let userNumber = await registerNewIdentity(driver);
+        const userNumber = await registerNewIdentity(driver);
         await on_AuthApp(driver);
         await on_AuthApp_Confirm(driver);
 
@@ -370,7 +370,7 @@ test('Log into client application, after registration', async () => {
         await driver.switchTo().window(handles[0]);
 
         // check that we are indeed being redirected back to demo app
-        let principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
+        const principal = await driver.wait(until.elementLocated(By.id('principal')), 10_000).getText();
         // and that we see a non-anonymous principal
         expect(principal).not.toBe('2vxsx-fae');
 
@@ -382,9 +382,9 @@ test('Log into client application, after registration', async () => {
         await driver.findElement(By.id('canisterId')).sendKeys(Key.DELETE);
         await driver.findElement(By.id('canisterId')).sendKeys(WHOAMI_CANISTER);
         await driver.findElement(By.id('whoamiBtn')).click();
-        let whoamiResponseElem = await driver.findElement(By.id('whoamiResponse'));
+        const whoamiResponseElem = await driver.findElement(By.id('whoamiResponse'));
         await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
-        let principal2 = await whoamiResponseElem.getText();
+        const principal2 = await whoamiResponseElem.getText();
         expect(principal2).toBe(principal);
 
     })

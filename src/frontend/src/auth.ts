@@ -123,7 +123,7 @@ const retryGetDelegation = async (
   hostname: string,
   sessionKey: PublicKey,
   timestamp: bigint,
-  maxRetries: number = 5,
+  maxRetries = 5,
 ): Promise<SignedDelegation> => {
   for (let i = 0; i < maxRetries; i++) {
     // Linear backoff
@@ -137,7 +137,7 @@ const retryGetDelegation = async (
     if (isDelegationResponse(res)) {
       return res.signed_delegation
     }
-  };
+  }
   throw new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
 };
 

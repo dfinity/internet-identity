@@ -44,7 +44,7 @@ const init = () => {
             const publicKey = identity.getPublicKey().toDer();
             const rawId = blobToHex(identity.rawId);
 
-            let url = new URL(location.toString());
+            const url = new URL(location.toString());
             url.pathname = '/';
             url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
             const link = encodeURI(url.toString());
@@ -53,8 +53,8 @@ const init = () => {
             loginInterval = window.setInterval(async () => {
                 console.log("checking if authenticated");
                 try {
-                    let devices = await IDPActor.lookup(userNumber);
-                    let matchedDevice = devices.find((deviceData) =>
+                    const devices = await IDPActor.lookup(userNumber);
+                    const matchedDevice = devices.find((deviceData) =>
                         derBlobFromBlob(
                             blobFromUint8Array(Buffer.from(deviceData.pubkey))
                         ).equals(publicKey)

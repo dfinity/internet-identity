@@ -51,7 +51,7 @@ const init = (userNumber: bigint, connection: IDPActor) => {
     const url = new URL(document.URL);
     const parsedParams = parseNewDeviceParam(url.hash?.split("device=")[1]);
 
-    if (!!parsedParams) {
+    if (parsedParams) {
       const { userNumber: expectedUserNumber, publicKey, rawId } = parsedParams;
       if (expectedUserNumber !== userNumber) {
         // Here we're adding a device to our userNumber that was supposed to be added to a different one.

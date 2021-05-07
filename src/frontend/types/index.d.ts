@@ -3,6 +3,6 @@ declare module "*.png" {
   export = value;
 }
 
-declare module globalThis {
-  mockActor: any;
+declare namespace globalThis {
+  any;
 }

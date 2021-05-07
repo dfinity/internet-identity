@@ -89,7 +89,7 @@ export class IDPActor {
     if (registerResponse.hasOwnProperty('canister_full')) {
       return { kind: "registerNoSpace"}
     } else if (registerResponse.hasOwnProperty('registered')) {
-      let userNumber = registerResponse['registered'].user_number;
+      const userNumber = registerResponse['registered'].user_number;
       console.log(`registered user number ${userNumber}`);
       return {
         kind: "loginSuccess",
@@ -144,7 +144,7 @@ export class IDPActor {
       kind: "loginSuccess",
       userNumber,
       connection: new IDPActor(
-        multiIdent._actualIdentity!!,
+        multiIdent._actualIdentity!,
         delegationIdentity,
         actor
       )
