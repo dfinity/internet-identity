@@ -650,9 +650,9 @@ Similar to the steps during initial installation. The main difference is that yo
 
 ==== On Mainnet
 
-Write a proposal description like
+Write a proposal description like those in
 
-https://github.com/dfinity/nns-proposals/blob/main/proposals/identity/2021-05-07T16:09Z.md
+https://github.com/dfinity/nns-proposals/blob/main/proposals/identity/
 
 You will need to get someone with authorization to submit the proposal and get enough votes for it (ping @trusted-neurons on slack). The command will look like:
 
@@ -667,7 +667,13 @@ ic-admin \
     --wasm-module-path idp_service
 ----
 
-Afterwards, tag the commit with `mainnet-<date-from-proposal-url>`.
+If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`,
+[source,bash]
+----
+dfx --identity default canister --no-wallet --network=mercury call governance list_proposals --type=idl '(record {limit=25; include_reward_status=vec{}; exclude_topic=vec{}; include_status=vec{1}})'
+----
+
+Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
 
 
 ==== On testnets
