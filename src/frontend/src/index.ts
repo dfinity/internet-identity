@@ -17,7 +17,7 @@ const init = async () => {
   if (!await hasRequiredFeatures(url)) {
     return compatibilityNotice()
   }
-    
+
   const userIntent = intentFromUrl(url);
   const { userNumber, connection } = await login(userIntent);
 
