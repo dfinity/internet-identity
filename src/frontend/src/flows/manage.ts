@@ -68,7 +68,8 @@ const renderIdentities = async (connection, userNumber) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
-    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey);
+    const isOnlyDevice = identities.length < 2;
+    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey, isOnlyDevice);
     list.appendChild(identityElement);
   });
 
@@ -80,11 +81,11 @@ const bindRemoveListener = (
   connection: IDPActor,
   listItem: HTMLElement,
   publicKey,
+  isOnlyDevice: boolean
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
     const sameDevice = connection.identity.getPublicKey().toDer().equals(derBlobFromBlob(blobFromUint8Array(publicKey)));
-    const isOnlyDevice = listItem.parentElement!.childElementCount < 2;
 
     if (sameDevice) {
       const shouldProceed = confirm(
