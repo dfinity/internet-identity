@@ -9,7 +9,8 @@ use idp_service::metrics_encoder::MetricsEncoder;
 use idp_service::nonce_cache::NonceCache;
 use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
-use serde_bytes::ByteBuf;
+use serde_bytes::{ByteBuf, Bytes};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -102,7 +103,7 @@ struct HttpRequest {
 struct HttpResponse {
     status_code: u16,
     headers: Vec<HeaderField>,
-    body: ByteBuf,
+    body: Cow<'static, Bytes>,
     streaming_strategy: Option<StreamingStrategy>,
 }
 
@@ -427,14 +428,14 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                             ),
                             ("Content-Length".to_string(), body.len().to_string()),
                         ],
-                        body: ByteBuf::from(body),
+                        body: Cow::Owned(ByteBuf::from(body)),
                         streaming_strategy: None,
                     }
                 }
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: vec![],
-                    body: ByteBuf::from(format!("Failed to encode metrics: {}", err)),
+                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {}", err))),
                     streaming_strategy: None,
                 },
             }
@@ -456,14 +457,17 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     HttpResponse {
                         status_code: 200,
                         headers,
-                        body: ByteBuf::from(value.clone()),
+                        body: Cow::Borrowed(Bytes::new(value)),
                         streaming_strategy: None,
                     }
                 }
                 None => HttpResponse {
                     status_code: 404,
                     headers: vec![certificate_header],
-                    body: ByteBuf::from(format!("Asset {} not found.", probably_an_asset)),
+                    body: Cow::Owned(ByteBuf::from(format!(
+                        "Asset {} not found.",
+                        probably_an_asset
+                    ))),
                     streaming_strategy: None,
                 },
             })
