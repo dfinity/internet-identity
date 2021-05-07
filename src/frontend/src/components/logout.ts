@@ -1,8 +1,8 @@
-import { html } from "lit-html";
+import { html, TemplateResult } from "lit-html";
 import { clearHash } from "../flows/addDevice";
 import { logoutIcon } from "./icons";
 
-export const logoutSection = (alternativeLabel?: string) => html`<style>
+export const logoutSection = (alternativeLabel?: string): TemplateResult => html`<style>
     #logoutIcon {
         position: relative;
         top: 6px;
@@ -18,7 +18,7 @@ export const logoutSection = (alternativeLabel?: string) => html`<style>
     </button>
   </div>`;
 
-export const initLogout = () => {
+export const initLogout = (): void => {
     const logoutButton = document.getElementById("logoutButton") as HTMLElement;
     logoutButton.onclick = () => {
         localStorage.clear();

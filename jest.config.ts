@@ -11,5 +11,4 @@ export default {
     "^.+\\.jsx?$": "ts-jest",
     "^.+\\.tsx?$": "ts-jest",
   },
-  setupFiles: ["./setupTests.ts"],
 };

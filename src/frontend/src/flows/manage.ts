@@ -32,14 +32,14 @@ const deviceListItem = (alias: string) => html`
   </button>
 `;
 
-export const renderManage = (userNumber: bigint, connection: IDPActor) => {
+export const renderManage = (userNumber: bigint, connection: IDPActor): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
   render(pageContent(userNumber), container);
   init(userNumber, connection);
 };
 
-export const init = async (userNumber: bigint, connection: IDPActor) => {
+const init = async (userNumber: bigint, connection: IDPActor) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
   renderIdentities(userNumber, connection);

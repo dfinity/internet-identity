@@ -1,5 +1,5 @@
 import { Builder, By, until, ThenableWebDriver, Key, logging} from 'selenium-webdriver';
-import { Executor, Command } from 'selenium-webdriver/lib/command';
+import { Command } from 'selenium-webdriver/lib/command';
 import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 import { writeFile } from 'fs/promises';
 
@@ -60,7 +60,7 @@ async function on_Welcome(driver: ThenableWebDriver) {
 }
 
 async function on_Welcome_TypeUserNumber(user_number: string, driver: ThenableWebDriver) {
-    await driver.findElement(By.id('registerUserNumber'), 3_000).sendKeys(user_number);
+    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 3_000).sendKeys(user_number);
 }
 
 async function on_Welcome_Login(driver: ThenableWebDriver) {
@@ -76,9 +76,8 @@ async function on_Welcome_AddDevice(driver: ThenableWebDriver) {
 }
 
 // View: Register
-
-async function on_Register(driver: ThenableWebDriver) {
-}
+// eslint-disable-next-line
+async function on_Register(driver: ThenableWebDriver) {}
 
 async function on_Register_TypeAliasEnter(alias : string, driver: ThenableWebDriver) {
     await driver.findElement(By.id('registerAlias')).sendKeys(alias, Key.RETURN);
@@ -154,9 +153,10 @@ async function on_AddDeviceUserNumber(driver: ThenableWebDriver): Promise<string
 
 async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_number?: string) {
     if (user_number) {
-        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(Key.CONTROL + "a");
-        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(Key.DELETE);
-        await driver.findElement(By.id('addDeviceUserNumber'), 3_000).sendKeys(user_number);
+        await driver.wait(until.elementLocated(By.id("addDeviceUserNumber")), 3_000);
+        await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.CONTROL + "a");
+        await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.DELETE);
+        await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(user_number);
     }
     await driver.findElement(By.id('addDeviceUserNumberContinue')).click()
 }
@@ -270,21 +270,23 @@ async function wait_for_fonts(driver : ThenableWebDriver) {
   console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
 }
 
-async function run_in_browser(test) {
+async function run_in_browser(test: (driver: ThenableWebDriver) => Promise<void>) {
     await run_in_browser_common(true, test)
 }
 
-async function run_in_nested_browser(test) {
+async function run_in_nested_browser(test: (driver: ThenableWebDriver) => Promise<void>) {
     await run_in_browser_common(false, test)
 }
 
-async function run_in_browser_common(outer, test) {
+async function run_in_browser_common(outer: boolean, test: (driver: ThenableWebDriver) => Promise<void>) {
+    const loggingPreferences = new logging.Preferences();
+    loggingPreferences.setLevel('browser', logging.Level.ALL);
     const driver = new Builder().forBrowser('chrome')
         .setChromeOptions(new ChromeOptions()
           .headless() // hides the click show: uncomment to watch it
           .windowSize({width: 1024, height: 768})
         )
-        .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
+        .setLoggingPrefs(loggingPreferences)
         .build();
     try {
         await test(driver);
@@ -329,7 +331,7 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
 ## The actual tests
 */
 test('_Register new identity and login with it', async () => {
-    await run_in_browser(async (driver) => {
+    await run_in_browser(async (driver: ThenableWebDriver) => {
         await addVirtualAuthenticator(driver);
         await driver.get(IDP_URL);
         const userNumber = await registerNewIdentity(driver);
@@ -340,7 +342,7 @@ test('_Register new identity and login with it', async () => {
 }, 300_000);
 
 test('Log into client application, after registration', async () => {
-    await run_in_browser(async (driver) => {
+    await run_in_browser(async (driver: ThenableWebDriver) => {
         await addVirtualAuthenticator(driver);
         await driver.get(DEMO_APP_URL);
         await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
@@ -356,12 +358,12 @@ test('Log into client application, after registration', async () => {
         // enable virtual authenticator in the new window
         await addVirtualAuthenticator(driver);
 
-        const userNumber = await registerNewIdentity(driver);
+        await registerNewIdentity(driver);
         await on_AuthApp(driver);
         await on_AuthApp_Confirm(driver);
 
         // wait for window to close
-        await driver.wait(async (driver) => {
+        await driver.wait(async (driver: ThenableWebDriver) => {
           return (await driver.getAllWindowHandles()).length == 1
         }, 10_000);
 
@@ -391,7 +393,7 @@ test('Log into client application, after registration', async () => {
 }, 300_000);
 
 test('Screenshots', async () => {
-    await run_in_browser(async (driver) => {
+    await run_in_browser(async (driver: ThenableWebDriver) => {
         await addVirtualAuthenticator(driver);
         await driver.get(IDP_URL);
         await wait_for_fonts(driver);
@@ -433,7 +435,7 @@ test('Screenshots', async () => {
             await on_Welcome(driver2);
             await on_Welcome_TypeUserNumber(userNumber, driver2);
             await on_Welcome_AddDevice(driver2);
-            const carriedUserNumber = await on_AddDeviceUserNumber(driver2);
+            await on_AddDeviceUserNumber(driver2);
             await on_AddDeviceUserNumber_Fixup(driver2);
             await screenshot('06-new-device-user-number', driver2);
             await on_AddDeviceUserNumber_Continue(driver2, userNumber);

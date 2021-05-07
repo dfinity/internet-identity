@@ -47,7 +47,7 @@ const qrContent = (qrcode: Element) => html`
   </div>
 `
 
-export const displayAddDeviceLink = (link: string) => {
+export const displayAddDeviceLink = (link: string): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(link), container);
   init(link)

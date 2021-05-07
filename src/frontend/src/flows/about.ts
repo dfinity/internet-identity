@@ -34,7 +34,7 @@ const pageContent = html`
   </div>
 `;
 
-export const aboutView = () => {
+export const aboutView = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
 };

@@ -30,7 +30,8 @@ export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWor
   ]);
 
   // Keep incrementing the nonce until we find a hash that checks.
-  while (true) {
+  // eslint-disable-next-line
+  while(true) {
     const hash = cubeHash(message);
     if (hashOk(hash)) {
       break;

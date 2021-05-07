@@ -1,8 +1,9 @@
-import { BinaryBlob, blobFromUint8Array, Principal } from "@dfinity/agent";
-import { FrontendHostname, GetDelegationResponse, PublicKey, SignedDelegation, UserNumber } from "../generated/idp_types";
+import { blobFromUint8Array, Principal } from "@dfinity/agent";
+import { FrontendHostname, PublicKey, SignedDelegation, UserNumber } from "../generated/idp_types";
 import { withLoader } from "./components/loader";
 import { confirmRedirect } from "./flows/confirmRedirect";
 import { IDPActor } from "./utils/idp_actor";
+import { hasOwnProperty } from "./utils/utils";
 
 interface AuthRequest {
     kind: "authorize-client";
@@ -40,7 +41,7 @@ const READY_MESSAGE = {
  *
  * This method expects to be called after the login flow.
  */
-export default async function setup(userNumber: UserNumber, connection: IDPActor) {
+export default async function setup(userNumber: UserNumber, connection: IDPActor): Promise<void> {
   // Set up an event listener for receiving messages from the client.
   window.addEventListener("message", async (event) => {
     const message = event.data;
@@ -134,15 +135,9 @@ const retryGetDelegation = async (
       sessionKey,
       timestamp
     );
-    if (isDelegationResponse(res)) {
+    if (hasOwnProperty(res, "signed_delegation")) {
       return res.signed_delegation
     }
   }
   throw new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
 };
-
-function isDelegationResponse(
-  x: GetDelegationResponse
-): x is { signed_delegation: SignedDelegation } {
-  return x && x.hasOwnProperty("signed_delegation");
-}

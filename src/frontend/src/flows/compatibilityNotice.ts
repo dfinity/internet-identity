@@ -28,7 +28,7 @@ const pageContent = html`
   </div>
   `;
 
-export const compatibilityNotice = () => {
+export const compatibilityNotice = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
 }

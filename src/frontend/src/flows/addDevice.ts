@@ -11,7 +11,6 @@ import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { parseUserNumber } from "../utils/userNumber";
 import { pickDeviceAlias } from "./addDevicePickAlias";
-import { login } from "./login";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
 const pageContent = (userNumber: bigint) => html`
@@ -28,7 +27,7 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
-export const addDevice = (userNumber: bigint, connection: IDPActor) => {
+export const addDevice = (userNumber: bigint, connection: IDPActor): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   init(userNumber, connection);
@@ -46,7 +45,7 @@ const init = (userNumber: bigint, connection: IDPActor) => {
     clearHash();
     window.location.reload()
   }
-  addDeviceButton.onclick = async (ev) => {
+  addDeviceButton.onclick = async () => {
     // Check URL if user has pasted in an Add Identity link
     const url = new URL(document.URL);
     const parsedParams = parseNewDeviceParam(url.hash?.split("device=")[1]);
@@ -66,7 +65,6 @@ const init = (userNumber: bigint, connection: IDPActor) => {
       try {
         const deviceName = await pickDeviceAlias();
         await withLoader(() => connection.add(userNumber, deviceName, publicKey, rawId));
-        const container = document.getElementById("pageContent") as HTMLElement;
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
       } catch (error) {
@@ -107,7 +105,7 @@ const parseNewDeviceParam = (
   return { userNumber, publicKey, rawId };
 };
 
-export const clearHash = () => {
+export const clearHash = (): void => {
   history.pushState(
     // Preserve the #authorize hash if it's present.
     /authorize/.test(window.location.hash) ? "authorize" : "",
