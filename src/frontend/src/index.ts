@@ -6,14 +6,15 @@ import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { intentFromUrl } from "./utils/userIntent";
+import { hasRequiredFeatures } from "./utils/featureDetection";
 
 const init = async () => {
   const url = new URL(document.URL);
-  if (url.hash == "#about") {
+  if (url.hash === "#about") {
     return aboutView()
   }
 
-  if (!window.PublicKeyCredential) {
+  if (!await hasRequiredFeatures(url)) {
     return compatibilityNotice()
   }
 

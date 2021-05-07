@@ -229,6 +229,12 @@ async function on_About(driver: ThenableWebDriver) {
     await driver.wait(until.elementLocated(By.id('about')), 3_000);
 }
 
+// View: Compatibility notice
+
+async function on_CompatibilityNotice(driver: ThenableWebDriver) {
+    await driver.wait(until.elementLocated(By.id('compatibilityNotice')), 3_000);
+}
+
 /*
 ## Setup helpers
 */
@@ -480,7 +486,7 @@ test('Screenshots', async () => {
         await driver.get("about:blank");
         await driver.get(IDP_URL + "#about");
         await wait_for_fonts(driver);
-	await on_About(driver);
+        await on_About(driver);
         await screenshot('14-about', driver);
 
 	// Test device removal
@@ -509,6 +515,13 @@ test('Screenshots', async () => {
         expect(alertText2).toBe("This will remove your only remaining identity and may impact your ability to log in to accounts you have linked");
 
         await on_Welcome(driver);
+
+    // Compatibility notice page
+        await driver.get("about:blank");
+        await driver.get(IDP_URL + "#compatibilityNotice");
+        await wait_for_fonts(driver);
+        await on_CompatibilityNotice(driver);
+        await screenshot('16-compatibility-notice', driver);
 
     })
 }, 300_000);
