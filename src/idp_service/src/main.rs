@@ -206,6 +206,7 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
             ));
         }
         nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
 
         let mut store = s.storage.borrow_mut();
         match store.allocate_user_number() {
