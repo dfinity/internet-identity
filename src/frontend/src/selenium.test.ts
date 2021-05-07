@@ -486,7 +486,7 @@ test('Screenshots', async () => {
         await driver.get("about:blank");
         await driver.get(IDP_URL + "#about");
         await wait_for_fonts(driver);
-	await on_About(driver);
+        await on_About(driver);
         await screenshot('14-about', driver);
 
 	// Test device removal
@@ -520,7 +520,7 @@ test('Screenshots', async () => {
         await driver.get("about:blank");
         await driver.get(IDP_URL + "#compatibilityNotice");
         await wait_for_fonts(driver);
-    await on_CompatibilityNotice(driver);
+        await on_CompatibilityNotice(driver);
         await screenshot('16-compatibility-notice', driver);
 
     })
