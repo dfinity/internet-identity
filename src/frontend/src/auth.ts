@@ -81,7 +81,7 @@ async function handleAuthRequest(
         hostname,
         sessionKey
     );
-    if (!prepRes || prepRes.length != 2) {
+    if (prepRes.length !== 2) {
         throw new Error(
         `Error preparing the delegation. Result received: ${prepRes}`
         );

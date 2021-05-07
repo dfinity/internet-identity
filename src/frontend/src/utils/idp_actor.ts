@@ -161,8 +161,7 @@ export class IDPActor {
 
   // Create an actor representing the backend
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
-    for (const { delegation } of this.delegationIdentity.getDelegation()
-      .delegations || []) {
+    for (const { delegation } of this.delegationIdentity.getDelegation().delegations) {
       // prettier-ignore
       if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
         this.actor = undefined;

@@ -152,7 +152,7 @@ async function on_AddDeviceUserNumber(driver: ThenableWebDriver): Promise<string
 }
 
 async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_number?: string) {
-    if (user_number) {
+    if (user_number !== undefined) {
         await driver.wait(until.elementLocated(By.id("addDeviceUserNumber")), 3_000);
         await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.CONTROL + "a");
         await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.DELETE);

@@ -8,7 +8,16 @@
     "plugins": [
       "@typescript-eslint"
     ],
+    "overrides": [
+      {
+        "files": ["*.ts", "*.test.ts"],
+        "parserOptions": {
+          "project": ["./tsconfig.json"]
+        }
+      }
+    ],
     "rules": {
+      "@typescript-eslint/strict-boolean-expressions": 2
     },
     "ignorePatterns": ["src/frontend/generated/*"]
   }
