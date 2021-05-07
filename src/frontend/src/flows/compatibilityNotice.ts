@@ -8,7 +8,7 @@ const pageContent = html`
     }
   </style>
   <div class="container">
-    <h1>Your browser isn't supported for<br/>Internet Identity</h1>
+    <h1 id="compatibilityNotice">Your browser isn't supported for<br/>Internet Identity</h1>
     <p>Unfortunately your browser doesn't support the necessary features that power your Internet Identity.</p>
     <p>At this moment the following browsers are known to work:</p>
     <h3>For Desktop</h3>
