@@ -89,7 +89,7 @@ export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult>
   });
 };
 
-const initRegister = (resolve, reject) => {
+const initRegister = (resolve: (res: LoginResult) => void, reject: (err: Error) => void) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
@@ -106,7 +106,7 @@ const initRegister = (resolve, reject) => {
   };
 };
 
-const initLogin = (resolve) => {
+const initLogin = (resolve: (res: LoginResult) => void) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -127,8 +127,8 @@ const initLogin = (resolve) => {
     if (userNumber === null) {
       return resolve({
         tag: "err",
-        message: "Please enter a valid User Number",
-        detail: `${userNumber} doesn't parse as a number`,
+        title: "Please enter a valid User Number",
+        message: `${userNumber} doesn't parse as a number`,
       });
     }
     const result = await withLoader(() => IDPActor.login(userNumber));

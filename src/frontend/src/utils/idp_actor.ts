@@ -28,6 +28,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { hasOwnProperty } from "./utils";
 
 const canisterId: string = process.env.CANISTER_ID!;
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
@@ -88,7 +89,7 @@ export class IDPActor {
     
     if (registerResponse.hasOwnProperty('canister_full')) {
       return { kind: "registerNoSpace"}
-    } else if (registerResponse.hasOwnProperty('registered')) {
+    } else if (hasOwnProperty(registerResponse, 'registered')) {
       const userNumber = registerResponse['registered'].user_number;
       console.log(`registered user number ${userNumber}`);
       return {

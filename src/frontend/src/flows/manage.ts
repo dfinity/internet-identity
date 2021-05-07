@@ -1,10 +1,10 @@
 import { render, html } from "lit-html";
 import { IDPActor } from "../utils/idp_actor";
-import { derBlobFromBlob, blobFromUint8Array } from "@dfinity/agent";
+import { derBlobFromBlob, blobFromUint8Array, DerEncodedBlob } from "@dfinity/agent";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
-import { DeviceData } from "../../generated/idp_types";
+import { DeviceData, PublicKey } from "../../generated/idp_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 
@@ -39,13 +39,13 @@ export const renderManage = (userNumber: bigint, connection: IDPActor) => {
   init(userNumber, connection);
 };
 
-export const init = async (userNumber, connection) => {
+export const init = async (userNumber: bigint, connection: IDPActor) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
-  renderIdentities(connection, userNumber);
+  renderIdentities(userNumber, connection);
 };
 
-const renderIdentities = async (connection, userNumber) => {
+const renderIdentities = async (userNumber: bigint, connection: IDPActor) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
@@ -80,12 +80,13 @@ const bindRemoveListener = (
   userNumber: bigint,
   connection: IDPActor,
   listItem: HTMLElement,
-  publicKey,
+  publicKey: PublicKey,
   isOnlyDevice: boolean
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const sameDevice = connection.identity.getPublicKey().toDer().equals(derBlobFromBlob(blobFromUint8Array(publicKey)));
+    const pubKey: DerEncodedBlob = derBlobFromBlob(blobFromUint8Array(new Uint8Array(publicKey)))
+    const sameDevice = connection.identity.getPublicKey().toDer().equals(pubKey);
 
     if (sameDevice) {
       const shouldProceed = confirm(

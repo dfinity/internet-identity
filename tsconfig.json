@@ -1,7 +1,6 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "noImplicitAny": false,
     "allowJs": true,
     "checkJs": false,
     "esModuleInterop": true,
@@ -18,5 +17,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["src/frontend/generated/*.ts", "src/frontend/**/*.test.ts"]
 }

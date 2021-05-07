@@ -8,7 +8,7 @@ interface HashState {
   x: Uint32Array
 }
 
-function ROTATE (a, b) {
+function ROTATE (a: number, b: number) {
   return (((a) << (b)) | ((a) >>> (32 - b)))
 }
 

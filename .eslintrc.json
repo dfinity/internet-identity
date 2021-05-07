@@ -9,5 +9,6 @@
       "@typescript-eslint"
     ],
     "rules": {
-    }
+    },
+    "ignorePatterns": ["src/frontend/generated/*"]
   }
