@@ -89,7 +89,7 @@ export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult>
   });
 };
 
-const initRegister = (resolve, reject) => {
+const initRegister = (resolve: (res: LoginResult) => void, reject: (err: Error) => void) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
@@ -106,7 +106,7 @@ const initRegister = (resolve, reject) => {
   };
 };
 
-const initLogin = (resolve) => {
+const initLogin = (resolve: (res: LoginResult) => void) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -127,8 +127,8 @@ const initLogin = (resolve) => {
     if (userNumber === null) {
       return resolve({
         tag: "err",
-        message: "Please enter a valid User Number",
-        detail: `${userNumber} doesn't parse as a number`,
+        title: "Please enter a valid User Number",
+        message: `${userNumber} doesn't parse as a number`,
       });
     }
     const result = await withLoader(() => IDPActor.login(userNumber));
@@ -162,7 +162,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         userNumber: result.userNumber,
         connection: result.connection,
       };
-    };
+    }
     case "authFail": {
       return {
         tag: "err",
@@ -170,7 +170,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
         detail: result.error.message
       };
-    };
+    }
     case "unknownUser": {
       return {
         tag: "err",
@@ -178,7 +178,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
         detail: ""
       };
-    };
+    }
     case "apiError": {
       return {
         tag: "err",
@@ -186,7 +186,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         message: "We failed to call the Internet Identity service, please try again.",
         detail: result.error.message
       };
-    };
+    }
     case "registerNoSpace": {
       return {
         tag: "err",

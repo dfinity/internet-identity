@@ -68,7 +68,7 @@ const init = (): Promise<LoginResult | null> =>
         const pendingIdentity = WebAuthnIdentity.create().catch((error) => {
           resolve(apiResultToLoginResult({ kind: "authFail", error }));
           // We can never get here, but TS doesn't understand that
-          return 0 as any;
+          return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
         // Do PoW before registering.

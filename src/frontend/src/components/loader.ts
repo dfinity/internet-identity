@@ -32,12 +32,12 @@ const loader = () => html`<style>
     <img src="/glitch-loop.webp" alt="loading" />
   </picture>`;
 
-export const startLoader = () => {
+const startLoader = () => {
   const container = document.getElementById("loaderContainer") as HTMLElement;
   render(loader(), container);
 };
 
-export const endLoader = () => {
+const endLoader = () => {
   const container = document.getElementById("loaderContainer") as HTMLElement;
   render(html``, container);
 };

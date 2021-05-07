@@ -28,7 +28,7 @@ const pageContent = (link: string) => html`
   </div>
   `;
 
-const qrContent = (qrcode) => html`
+const qrContent = (qrcode: Element) => html`
   <style>
     #qrBox {
         display: flex;
@@ -47,7 +47,7 @@ const qrContent = (qrcode) => html`
   </div>
 `
 
-export const displayAddDeviceLink = (link: string) => {
+export const displayAddDeviceLink = (link: string): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(link), container);
   init(link)
@@ -55,7 +55,7 @@ export const displayAddDeviceLink = (link: string) => {
 
 const displayAddDeviceQR = (link: string) => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  var el = kjua({text: link, render: "svg"});
+  const el = kjua({text: link, render: "svg"});
   render(qrContent(el), container);
   initQR(link) 
 }

@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/idp_types";
 
-const pageContent = (hostName) => html`
+const pageContent = (hostName: string) => html`
   <style>
     #confirmRedirectHostname {
       font-size: 0.875rem;

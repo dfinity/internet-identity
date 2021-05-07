@@ -1,13 +1,11 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "noImplicitAny": false,
     "allowJs": true,
     "checkJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "jsx": "react-jsx",
-    "lib": ["ES2019", "DOM", "esnext"],
+    "lib": ["ES2019", "DOM"],
     "module": "commonjs",
     "strict": true,
     "target": "es2018",
@@ -18,5 +16,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["src/**/*.test.ts", "src/frontend/generated/*"]
 }

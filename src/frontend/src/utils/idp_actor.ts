@@ -19,6 +19,7 @@ import _SERVICE, {
   DeviceData,
   ProofOfWork,
   RegisterResponse,
+  GetDelegationResponse,
 } from "../../generated/idp_types";
 import {
   DelegationChain,
@@ -28,7 +29,9 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { hasOwnProperty } from "./utils";
 
+// eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
@@ -86,10 +89,10 @@ export class IDPActor {
       return { kind: "apiError", error }
     }
     
-    if (registerResponse.hasOwnProperty('canister_full')) {
+    if (hasOwnProperty(registerResponse, 'canister_full')) {
       return { kind: "registerNoSpace"}
-    } else if (registerResponse.hasOwnProperty('registered')) {
-      let userNumber = registerResponse['registered'].user_number;
+    } else if (hasOwnProperty(registerResponse, 'registered')) {
+      const userNumber = registerResponse['registered'].user_number;
       console.log(`registered user number ${userNumber}`);
       return {
         kind: "loginSuccess",
@@ -144,7 +147,8 @@ export class IDPActor {
       kind: "loginSuccess",
       userNumber,
       connection: new IDPActor(
-        multiIdent._actualIdentity!!,
+        // eslint-disable-next-line
+        multiIdent._actualIdentity!,
         delegationIdentity,
         actor
       )
@@ -157,8 +161,7 @@ export class IDPActor {
 
   // Create an actor representing the backend
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
-    for (const { delegation } of this.delegationIdentity.getDelegation()
-      .delegations || []) {
+    for (const { delegation } of this.delegationIdentity.getDelegation().delegations) {
       // prettier-ignore
       if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
         this.actor = undefined;
@@ -185,7 +188,7 @@ export class IDPActor {
     alias: string,
     newPublicKey: DerEncodedBlob,
     credentialId?: BinaryBlob
-  ) => {
+  ): Promise<void> => {
     const actor = await this.getActor();
     return await actor.add(userNumber, {
       alias,
@@ -194,7 +197,7 @@ export class IDPActor {
     });
   };
 
-  remove = async (userNumber: UserNumber, publicKey: PublicKey) => {
+  remove = async (userNumber: UserNumber, publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
     await actor.remove(userNumber, publicKey);
   };
@@ -203,7 +206,7 @@ export class IDPActor {
     userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey
-  ) => {
+  ): Promise<[PublicKey, bigint]> => {
     console.log(
       `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
@@ -216,7 +219,7 @@ export class IDPActor {
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
-  ) => {
+  ): Promise<GetDelegationResponse> => {
     console.log(
       `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );

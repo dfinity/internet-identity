@@ -31,7 +31,7 @@ The service will create a different, random identity for each application you us
   </div>
 `;
 
-export const aboutView = () => {
+export const aboutView = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
 };

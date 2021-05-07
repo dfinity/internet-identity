@@ -2,25 +2,15 @@
     "root": true,
     "extends": [
       "eslint:recommended",
-      "plugin:@typescript-eslint/recommended",
-      "plugin:jsdoc/recommended"
+      "plugin:@typescript-eslint/recommended"
     ],
     "parser": "@typescript-eslint/parser",
+    "parserOptions": { "project": ["./tsconfig.json"]},
     "plugins": [
-      "@typescript-eslint",
-      "jsdoc"
+      "@typescript-eslint"
     ],
     "rules": {
-      "jsdoc/newline-after-description": "off",
-      "jsdoc/require-returns-type": "off",
-      "jsdoc/require-param-type": "off",
-      "jsdoc/require-jsdoc": [
-        "error",
-        {
-          "publicOnly": true
-        }
-      ],
-      "jsdoc/require-returns": "off",
-      "jsdoc/require-returns-description": "warn"
-    }
+      "@typescript-eslint/strict-boolean-expressions": 2
+    },
+    "ignorePatterns": ["src/frontend/generated/*"]
   }

@@ -1,3 +1,4 @@
+// eslint-disable-next-line
 const path = require("path");
 const idp_service = path.join(__dirname, "src/frontend/generated/idp_idl.ts");
 
@@ -11,5 +12,4 @@ export default {
     "^.+\\.jsx?$": "ts-jest",
     "^.+\\.tsx?$": "ts-jest",
   },
-  setupFiles: ["./setupTests.ts"],
 };

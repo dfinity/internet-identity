@@ -3,22 +3,22 @@ import { initLogout, logoutSection } from "../components/logout";
 import { IDPActor } from "../utils/idp_actor";
 import { renderManage } from "./manage";
 
-const pageContent = (alias) => html`
+const pageContent = (name: string) => html`
   <div class="container">
     <h1>Success!</h1>
     <p>You have successfully added your new device.</p>
     <label>Device name:</label>
     <div class="highlightBox">
-      ${alias}
+      ${name}
     </div>
     <button id="manageDevicesButton" class="primary">Manage devices</button>
     ${logoutSection()}
   </div>
   `;
 
-export const successfullyAddedDevice = async (alias: string, userNumber: bigint, connection: IDPActor): Promise<void> => {
+export const successfullyAddedDevice = async (name: string, userNumber: bigint, connection: IDPActor): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(alias), container);
+  render(pageContent(name), container);
   initLogout();
   init(userNumber, connection);
 }
