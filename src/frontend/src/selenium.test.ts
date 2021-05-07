@@ -526,6 +526,4 @@ test('Screenshots', async () => {
         await screenshot('16-compatibility-notice', driver);
 
     })
-}, 300_000);
-
-
+}, 400_000);
