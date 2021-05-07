@@ -487,6 +487,8 @@ test('Screenshots', async () => {
         const buttonElem2 = await driver.findElement(By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`));
         await on_Main_Remove(DEVICE_NAME2, driver);
         // No dialog here!
+
+        await on_Main(DEVICE_NAME1, driver);
         await driver.wait(until.stalenessOf(buttonElem2));
         await screenshot('15-after-removal', driver);
 
