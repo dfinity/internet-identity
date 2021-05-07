@@ -229,7 +229,9 @@ async function on_About(driver: ThenableWebDriver) {
 ## Setup helpers
 */
 
-async function addVirtualAuthenticator(executor: Executor, sessionId: string) {
+async function addVirtualAuthenticator(driver: ThenableWebDriver) {
+    const executor = driver.getExecutor();
+    const sessionId = (await driver.getSession()).getId();
     executor.defineCommand("AddVirtualAuthenticator", "POST", "/session/:sessionId/webauthn/authenticator");
     const cmd = new Command('AddVirtualAuthenticator');
     cmd.setParameter('protocol', 'ctap2');
@@ -258,15 +260,15 @@ async function wait_for_fonts(driver : ThenableWebDriver) {
   console.log('Odd, document.font.status never reached state loaded, stuck at', await driver.executeScript("return document.fonts.status;"))
 }
 
-async function run_in_browser_with_virtual_authenticator(test) {
-    await run_in_browser_with_virtual_authenticator_common(true, test)
+async function run_in_browser(test) {
+    await run_in_browser_common(true, test)
 }
 
-async function run_in_nested_browser_with_virtual_authenticator(test) {
-    await run_in_browser_with_virtual_authenticator_common(false, test)
+async function run_in_nested_browser(test) {
+    await run_in_browser_common(false, test)
 }
 
-async function run_in_browser_with_virtual_authenticator_common(outer, test) {
+async function run_in_browser_common(outer, test) {
     const driver = new Builder().forBrowser('chrome')
         .setChromeOptions(new ChromeOptions()
           .headless() // hides the click show: uncomment to watch it
@@ -275,7 +277,6 @@ async function run_in_browser_with_virtual_authenticator_common(outer, test) {
         .setLoggingPrefs(new logging.Preferences().setLevel('browser', 'all'))
         .build();
     try {
-        await addVirtualAuthenticator(driver.getExecutor(), (await driver.getSession()).getId());
         await test(driver);
     } catch (e) {
         console.log(await driver.manage().logs().get('browser'));
@@ -318,7 +319,8 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
 ## The actual tests
 */
 test('_Register new identity and login with it', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
+    await run_in_browser(async (driver) => {
+        await addVirtualAuthenticator(driver);
         await driver.get(IDP_URL);
         let userNumber = await registerNewIdentity(driver);
         await on_Main(DEVICE_NAME1, driver);
@@ -328,7 +330,8 @@ test('_Register new identity and login with it', async () => {
 }, 300_000);
 
 test('Log into client application, after registration', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
+    await run_in_browser(async (driver) => {
+        await addVirtualAuthenticator(driver);
         await driver.get(DEMO_APP_URL);
         await driver.findElement(By.id('idpUrl')).sendKeys(Key.CONTROL + "a");
         await driver.findElement(By.id('idpUrl')).sendKeys(Key.DELETE);
@@ -340,8 +343,8 @@ test('Log into client application, after registration', async () => {
         expect(handles.length).toBe(2);
         await driver.switchTo().window(handles[1])
 
-        // enable virtual authenticator here
-        await addVirtualAuthenticator(driver.getExecutor(), (await driver.getSession()).getId());
+        // enable virtual authenticator in the new window
+        await addVirtualAuthenticator(driver);
 
         let userNumber = await registerNewIdentity(driver);
         await on_AuthApp(driver);
@@ -378,7 +381,8 @@ test('Log into client application, after registration', async () => {
 }, 300_000);
 
 test('Screenshots', async () => {
-    await run_in_browser_with_virtual_authenticator(async (driver) => {
+    await run_in_browser(async (driver) => {
+        await addVirtualAuthenticator(driver);
         await driver.get(IDP_URL);
         await wait_for_fonts(driver);
 
@@ -413,7 +417,8 @@ test('Screenshots', async () => {
         await on_Main(DEVICE_NAME1, driver);
 
         // Now the link device flow, using a second browser
-        await run_in_nested_browser_with_virtual_authenticator (async (driver2) => {
+        await run_in_nested_browser (async (driver2) => {
+            await addVirtualAuthenticator(driver2);
             await driver2.get(IDP_URL);
             await on_Welcome(driver2);
             await on_Welcome_TypeUserNumber(userNumber, driver2);
