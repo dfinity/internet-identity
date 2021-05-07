@@ -5,33 +5,37 @@ import { ProofOfWork, Timestamp } from "../../generated/idp_types";
 
 const DIFFICULTY = 2; // Number of leading bytes that must equal zero in the hash.
 const DOMAIN = "ic-proof-of-work";
-const NONCE_OFFSET = DOMAIN.length + 1 /* domain + prefix */ + 8 /* timestamp length */;
+const NONCE_OFFSET =
+  DOMAIN.length + 1 /* domain + prefix */ + 8; /* timestamp length */
 
 /**
  * Compute a ProofOfWork (PoW).
- * 
+ *
  * @param timestamp The timestamp at which the PoW is valid.
  * @param canisterId The principal of the IDP canister to be included in the signature.
- * @returns 
+ * @returns
  */
-export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWork {
-  console.time('PoW');
+export default function (
+  timestamp: Timestamp,
+  canisterId: Principal
+): ProofOfWork {
+  console.time("PoW");
   // Start from a random nonce.
   let nonce = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 
   const canisterIdBlob = canisterId.toBlob();
   const message = Buffer.concat([
-      Buffer.from([DOMAIN.length]),
-      Buffer.from(DOMAIN),
-      toLeBytes(timestamp),
-      toLeBytes(nonce),
-      Buffer.from([canisterIdBlob.length]),
-      canisterIdBlob
+    Buffer.from([DOMAIN.length]),
+    Buffer.from(DOMAIN),
+    toLeBytes(timestamp),
+    toLeBytes(nonce),
+    Buffer.from([canisterIdBlob.length]),
+    canisterIdBlob,
   ]);
 
   // Keep incrementing the nonce until we find a hash that checks.
   // eslint-disable-next-line
-  while(true) {
+  while (true) {
     const hash = cubeHash(message);
     if (hashOk(hash)) {
       break;
@@ -44,12 +48,12 @@ export default function(timestamp: Timestamp, canisterId: Principal): ProofOfWor
       message[NONCE_OFFSET + i] = nonce_encoded[i];
     }
   }
-  
-  console.timeEnd('PoW');
+
+  console.timeEnd("PoW");
   return {
     timestamp: timestamp,
-    nonce: nonce
-  }
+    nonce: nonce,
+  };
 }
 
 function toLeBytes(num: BigInt): Buffer {

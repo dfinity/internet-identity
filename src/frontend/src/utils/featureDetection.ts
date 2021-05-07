@@ -4,8 +4,8 @@ export const hasRequiredFeatures = async (url: URL): Promise<boolean> => {
   // For mobile devices we want to make sure we can use platform authenticators
   if (!navigator.userAgent.match(/(iPhone|iPod|iPad|Android)/)) return true;
   try {
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
   } catch (error) {
     return false;
   }
-}
+};

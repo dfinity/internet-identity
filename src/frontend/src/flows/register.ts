@@ -26,9 +26,7 @@ const constructingContent = html`
   <div class="container flex center">
     <h1>Constructing your Internet Identity</h1>
     ${icLogo}
-    <p>
-      This may take a while. Please wait and do not refresh the page.
-    </p>
+    <p>This may take a while. Please wait and do not refresh the page.</p>
   </div>
 `;
 
@@ -68,7 +66,7 @@ const init = (): Promise<LoginResult | null> =>
         const pendingIdentity = WebAuthnIdentity.create().catch((error) => {
           resolve(apiResultToLoginResult({ kind: "authFail", error }));
           // We can never get here, but TS doesn't understand that
-          return 0 as unknown as WebAuthnIdentity;
+          return (0 as unknown) as WebAuthnIdentity;
         });
         await tick();
         // Do PoW before registering.
