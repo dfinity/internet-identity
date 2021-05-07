@@ -60,7 +60,7 @@ async function on_Welcome(driver: ThenableWebDriver) {
 }
 
 async function on_Welcome_TypeUserNumber(user_number: string, driver: ThenableWebDriver) {
-    await driver.wait(until.elementLocated(By.id('registerUserNumber')), 3_000).sendKeys(user_number);
+    await driver.findElement(By.id('registerUserNumber')).sendKeys(user_number);
 }
 
 async function on_Welcome_Login(driver: ThenableWebDriver) {
@@ -153,7 +153,6 @@ async function on_AddDeviceUserNumber(driver: ThenableWebDriver): Promise<string
 
 async function on_AddDeviceUserNumber_Continue(driver: ThenableWebDriver, user_number?: string) {
     if (user_number !== undefined) {
-        await driver.wait(until.elementLocated(By.id("addDeviceUserNumber")), 3_000);
         await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.CONTROL + "a");
         await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(Key.DELETE);
         await driver.findElement(By.id('addDeviceUserNumber')).sendKeys(user_number);
