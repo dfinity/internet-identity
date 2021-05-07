@@ -6,32 +6,16 @@ import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { intentFromUrl } from "./utils/userIntent";
+import { hasRequiredFeatures } from "./utils/featureDetection";
 
 const init = async () => {
   const url = new URL(document.URL);
-  if (url.hash == "#about") {
+  if (url.hash === "#about") {
     return aboutView()
   }
 
-  if (window.PublicKeyCredential) {
-    const isIos = navigator.userAgent.match(/(iPhone|iPod|iPad)/);
-    const isAndroid = navigator.userAgent.match(/Android/);
-    if(isIos || isAndroid){ 
-      try {
-        const available = PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        if (available) {
-          // Proceed
-        } else {
-          return compatibilityNotice();
-        }
-      } catch (error) {
-        return compatibilityNotice(); 
-      }
-    } else {
-      // proceed
-    }
-  } else {
-    return compatibilityNotice();
+  if (!await hasRequiredFeatures(url)) {
+    return compatibilityNotice()
   }
     
   const userIntent = intentFromUrl(url);
