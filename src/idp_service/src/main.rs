@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
 
+mod assets;
+
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
@@ -151,7 +153,7 @@ impl Default for State {
 
 thread_local! {
     static STATE: State = State::default();
-    static ASSETS: RefCell<HashMap<String, (Vec<HeaderField>, Vec<u8>)>> = RefCell::new(HashMap::default());
+    static ASSETS: RefCell<HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>> = RefCell::new(HashMap::default());
 }
 
 #[update]
@@ -482,42 +484,23 @@ fn stats() -> InternetIdentityStats {
 
 // used both in init and post_upgrade
 fn init_assets() {
+    use assets::ContentEncoding;
+
     STATE.with(|s| {
         let mut asset_hashes = s.asset_hashes.borrow_mut();
 
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
-
-            let mut add_asset = |name, headers, bytes| {
-                asset_hashes.insert(name, hash::hash_bytes(&bytes));
-                assets.insert(name.to_string(), (headers, bytes));
-            };
-
-            add_asset(
-                "/index.html",
-                vec![],
-                include_bytes!("../../../dist/index.html").to_vec(),
-            );
-            add_asset(
-                "/",
-                vec![],
-                include_bytes!("../../../dist/index.html").to_vec(),
-            );
-            add_asset(
-                "/index.js",
-                vec![("Content-Encoding".to_string(), "gzip".to_string())],
-                include_bytes!("../../../dist/index.js.gz").to_vec(),
-            );
-            add_asset(
-                "/glitch-loop.webp",
-                vec![],
-                include_bytes!("../../../dist/glitch-loop.webp").to_vec(),
-            );
-            add_asset(
-                "/favicon.ico",
-                vec![],
-                include_bytes!("../../../dist/favicon.ico").to_vec(),
-            );
+            assets::for_each_asset(|name, encoding, contents, hash| {
+                asset_hashes.insert(name, *hash);
+                let headers = match encoding {
+                    ContentEncoding::Identity => vec![],
+                    ContentEncoding::GZip => {
+                        vec![("Content-Encoding".to_string(), "gzip".to_string())]
+                    }
+                };
+                assets.insert(name, (headers, contents));
+            });
         });
     });
 }
