@@ -1,0 +1,41 @@
+= What is the Internet identity service?
+:keywords: Internet Computer,blockchain,protocol,replica,subnet,data center,canister,developer
+:proglang: Motoko
+:platform: Internet Computer platform
+:IC: Internet Computer
+:company-id: DFINITY
+:sdk-short-name: DFINITY Canister SDK
+
+The Internet Identity service enables you to authenticate securely and anonymously when you access applications that use the service as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. 
+
+Unlike most authentication services, your Internet identity does not require you to set and manage passwords, generate a cryptographically-secure seed phrase, or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
+
+[[id-overview]]
+== How Internet Identity works
+
+Internet Identity is an authentication service that takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication for applications running on th e{IC}. 
+The Internet Identity service enables you to use security chips built into your smart phone or your laptop or security keys plugged into the USB port of your computer to verify your identity and authorize access to an application. 
+
+Applications that integrate with the Internet Identity service prompt you to register or log in with a previously-registered user number. 
+Registering a device is a simple process that generates a unique cryptographic key for you that is stored on the Internet Computer under a user number. You can then use your user number to register additional devices, so that you can access applications across all of your devices.
+
+When you access an application that uses the Internet Identity service to authenticate your identity, your browser connects to the Internet Identity service and generates a key for use with that application. 
+After you verify your identity, the Internet Identity service authorizes access to the application. 
+Your browser downloads the authorization, then redirects you to the application.
+The application verifies the authorization from the Internet Identity service and grants you access as an application-specific identity. 
+Internally, you have a different identity for each application, but your identity for any single application is the same across all of your devices. 
+All of your devices just represent different methods you can use to authenticate your user number. 
+
+
+////
+
+== Want to learn more?
+
+If you are looking for more information about authentication options and using the Internet identity service, check out the following related resources:
+
+* link:https://www.youtube.com/watch?v=XgsOKP224Zw[Overview of the Internet Computer (video)]
+* link:https://www.youtube.com/watch?v=jduSMHxdYD8[Building on the {IC}: Fundamentals (video)]
+* link:https://www.youtube.com/watch?v=LKpGuBOXxtQ[Introducing Canisters — An Evolution of Smart Contracts (video)]
+* link:https://dfinity.org/faq/[Frequently Asked Questions (video and short articles)]
+
+////
