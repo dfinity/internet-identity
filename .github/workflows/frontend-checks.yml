@@ -8,6 +8,7 @@ on:
 
 jobs:
   frontend-checks:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - run: npm i
