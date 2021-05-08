@@ -45,8 +45,8 @@ const endLoader = () => {
 export const withLoader = async <A>(action: () => Promise<A>): Promise<A> => {
   startLoader();
   try {
-    return await action()
+    return await action();
   } finally {
-    endLoader()
+    endLoader();
   }
-}
+};

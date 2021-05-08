@@ -11,11 +11,11 @@ import { hasRequiredFeatures } from "./utils/featureDetection";
 const init = async () => {
   const url = new URL(document.URL);
   if (url.hash === "#about") {
-    return aboutView()
+    return aboutView();
   }
 
-  if (!await hasRequiredFeatures(url)) {
-    return compatibilityNotice()
+  if (!(await hasRequiredFeatures(url))) {
+    return compatibilityNotice();
   }
 
   const userIntent = intentFromUrl(url);

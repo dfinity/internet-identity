@@ -15,17 +15,24 @@ const pageContent = (hostName: string) => html`
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
   </div>
-  `;
+`;
 
-export const confirmRedirect = async (hostName: FrontendHostname): Promise<boolean> => {
+export const confirmRedirect = async (
+  hostName: FrontendHostname
+): Promise<boolean> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(hostName), container);
-  return init()
-}
+  return init();
+};
 
-const init = (): Promise<boolean> => new Promise(resolve => {
-  const confirmRedirect = document.getElementById("confirmRedirect") as HTMLButtonElement;
-  const cancelRedirect = document.getElementById("cancelRedirect") as HTMLButtonElement;
-  confirmRedirect.onclick = () => resolve(true)
-  cancelRedirect.onclick = () => resolve(false)
-});
+const init = (): Promise<boolean> =>
+  new Promise((resolve) => {
+    const confirmRedirect = document.getElementById(
+      "confirmRedirect"
+    ) as HTMLButtonElement;
+    const cancelRedirect = document.getElementById(
+      "cancelRedirect"
+    ) as HTMLButtonElement;
+    confirmRedirect.onclick = () => resolve(true);
+    cancelRedirect.onclick = () => resolve(false);
+  });

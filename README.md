@@ -53,28 +53,28 @@ echo "http://localhost:8000?canisterId=$(dfx canister id frontend)"
 
 ### Contributing to the frontend
 
-We are practicing TDD for functional requirements for this project. For your ticket, either find an open spec under `src/frontend/src/__tests__` or create a new unit test to cover your functionality.
-
-Mocking and stubbing is recommended for Unit tests, as long as you make sure the returned types match the candid definitions.
-
 The fastest workflow to get the development environment running is to deploy once with
 
 ```bash
 npm ci
 dfx start [--clean] [--background]
 dfx deploy --no-wallet --argument '(null)'
-
 ```
 
 Then, run `CANISTER_ID=$(dfx canister id idp_service) npm start` to start webpack-dev-server.
 
-Unit tests are tbd. They can be run with `npm run test`. To run tests throughout your development cycle, run `npm run test -- --watchAll` or use [wallaby.js](https://wallabyjs.com/) as a test-runner. Frontend tests are not required to pass at this time.
-
 To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
-
 ```
 CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
+
+We have a set of Selenium tests that run through the various flows. To run them locally follow the steps in `.github/workflows/selenium.yml`.
+
+We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
+If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
+
+We use `eslint` to check the frontend code. You can run it with `npm run lint`, or set up your editor to do it for you.
+
 
 ### Contributing to the backend
 

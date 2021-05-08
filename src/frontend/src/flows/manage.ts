@@ -1,6 +1,10 @@
 import { render, html } from "lit-html";
 import { IDPActor } from "../utils/idp_actor";
-import { derBlobFromBlob, blobFromUint8Array, DerEncodedBlob } from "@dfinity/agent";
+import {
+  derBlobFromBlob,
+  blobFromUint8Array,
+  DerEncodedBlob,
+} from "@dfinity/agent";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
@@ -9,14 +13,17 @@ import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 
 const pageContent = (userNumber: bigint) => html`<style>
-  #deviceLabel {
-    margin-top: 1rem;
-    margin-bottom: 0;
-  }
+    #deviceLabel {
+      margin-top: 1rem;
+      margin-bottom: 0;
+    }
   </style>
   <div class="container">
     <h1>Identity Management</h1>
-    <p>You can view and manage your Internet identity and your registered devices here.</p>
+    <p>
+      You can view and manage your Internet identity and your registered devices
+      here.
+    </p>
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
     <label id="deviceLabel">Registered devices</label>
@@ -27,12 +34,13 @@ const pageContent = (userNumber: bigint) => html`<style>
 
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
-  <button type="button" class="deviceItemRemove">
-    ${closeIcon}
-  </button>
+  <button type="button" class="deviceItemRemove">${closeIcon}</button>
 `;
 
-export const renderManage = (userNumber: bigint, connection: IDPActor): void => {
+export const renderManage = (
+  userNumber: bigint,
+  connection: IDPActor
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
   render(pageContent(userNumber), container);
@@ -55,11 +63,12 @@ const renderIdentities = async (userNumber: bigint, connection: IDPActor) => {
   } catch (err) {
     await displayError({
       title: "Failed to list your devices",
-      message: "An unexpected error occured when displaying your devices. Please try again",
+      message:
+        "An unexpected error occured when displaying your devices. Please try again",
       detail: err.toString(),
-      primaryButton: "Try again"
+      primaryButton: "Try again",
     });
-    return renderManage(userNumber, connection)
+    return renderManage(userNumber, connection);
   }
 
   const list = document.createElement("ul");
@@ -69,7 +78,13 @@ const renderIdentities = async (userNumber: bigint, connection: IDPActor) => {
     identityElement.className = "deviceItem";
     render(deviceListItem(identity.alias), identityElement);
     const isOnlyDevice = identities.length < 2;
-    bindRemoveListener(userNumber, connection, identityElement, identity.pubkey, isOnlyDevice);
+    bindRemoveListener(
+      userNumber,
+      connection,
+      identityElement,
+      identity.pubkey,
+      isOnlyDevice
+    );
     list.appendChild(identityElement);
   });
 
@@ -85,8 +100,13 @@ const bindRemoveListener = (
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const pubKey: DerEncodedBlob = derBlobFromBlob(blobFromUint8Array(new Uint8Array(publicKey)))
-    const sameDevice = connection.identity.getPublicKey().toDer().equals(pubKey);
+    const pubKey: DerEncodedBlob = derBlobFromBlob(
+      blobFromUint8Array(new Uint8Array(publicKey))
+    );
+    const sameDevice = connection.identity
+      .getPublicKey()
+      .toDer()
+      .equals(pubKey);
 
     if (sameDevice) {
       const shouldProceed = confirm(
@@ -113,15 +133,16 @@ const bindRemoveListener = (
         localStorage.clear();
         location.reload();
       }
-      renderManage(userNumber, connection)
+      renderManage(userNumber, connection);
     } catch (err) {
       await displayError({
         title: "Failed to remove the device",
-        message: "An unexpected error occured when trying to remove the device. Please try again",
+        message:
+          "An unexpected error occured when trying to remove the device. Please try again",
         detail: err.toString(),
-        primaryButton: "Back to Manage"
+        primaryButton: "Back to Manage",
       });
-      renderManage(userNumber, connection)
+      renderManage(userNumber, connection);
     }
   };
 };

@@ -60,7 +60,7 @@ input {
 }
 
 input.errored {
-  border: double 2px var(--flamingo-500); 
+  border: double 2px var(--flamingo-500);
 }
 input.errored::placeholder {
   color: var(--flamingo-500);
@@ -102,7 +102,9 @@ button {
   letter-spacing: 0.005em;
 }
 
-button:hover, button:focus, a:focus {
+button:hover,
+button:focus,
+a:focus {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
   outline: 2px dotted transparent;
@@ -121,7 +123,6 @@ ul {
   width: 100%;
   padding: 0;
 }
-
 
 form,
 label {
@@ -156,7 +157,7 @@ label {
 }
 
 main::before {
-  content: '';
+  content: "";
   display: block;
   flex-grow: 1;
   height: 24px;
@@ -170,7 +171,7 @@ main {
 }
 
 main::after {
-  content: '';
+  content: "";
   display: block;
   flex-grow: 2;
   height: 24px;
@@ -201,14 +202,14 @@ main::after {
 }
 
 .highlightBox {
-    background-color: var(--grey-100);
-    padding: 0.7rem 0rem;
-    text-align: center;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-    overflow-wrap: break-word;
-    font-size: 1.5rem;
-    font-weight: 500;
+  background-color: var(--grey-100);
+  padding: 0.7rem 0rem;
+  text-align: center;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  overflow-wrap: break-word;
+  font-size: 1.5rem;
+  font-weight: 500;
 }
 
 .warningBox {
