@@ -14,7 +14,9 @@ const init = async () => {
     return aboutView();
   }
 
-  if (!(await hasRequiredFeatures(url))) {return compatibilityNotice();}
+  if (!(await hasRequiredFeatures(url))) {
+    return compatibilityNotice();
+  }
 
   const userIntent = intentFromUrl(url);
   const { userNumber, connection } = await login(userIntent);
