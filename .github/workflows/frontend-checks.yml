@@ -8,14 +8,6 @@ on:
 
 jobs:
   frontend-checks:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        rust: [ '1.51.0' ]
-        os: [ ubuntu-latest ]
-        dfx: [ '0.7.0-beta.6' ]
-        start-flag: [ '', '--emulator' ]
-
     steps:
       - uses: actions/checkout@v2
       - run: npm i
