@@ -18,7 +18,7 @@ jobs:
         run: npm run format
       - name: Commit Formatting changes
         uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
+        if: ${{ github.event_name == 'pull_request' }}
         with:
           add: src/frontend
           author_name: Formatting Committer
