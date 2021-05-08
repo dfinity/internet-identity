@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: npm i
+      - run: npm ci
       - name: Run ESLint
         run: npm run lint
       - name: Check formatting
