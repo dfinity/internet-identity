@@ -11,7 +11,7 @@ use idp_service::signature_map::SignatureMap;
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
@@ -139,6 +139,7 @@ struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
+    last_upgrade_timestamp: Cell<Timestamp>,
 }
 
 impl Default for State {
@@ -148,6 +149,7 @@ impl Default for State {
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
+            last_upgrade_timestamp: Cell::new(0),
         }
     }
 }
@@ -407,6 +409,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             stable_size() as f64,
             "Number of stable memory pages used by this canister.",
         )?;
+        w.encode_gauge(
+            "internet_identity_last_upgrade_timestamp",
+            s.last_upgrade_timestamp.get() as f64,
+            "The most recent IC time (in nanos) when this canister was successfully upgraded.",
+        )?;
         Ok(())
     })
 }
@@ -528,6 +535,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 fn retrieve_data() {
     init_assets();
     STATE.with(|s| {
+        s.last_upgrade_timestamp.set(time() as u64);
         match Storage::from_stable_memory() {
             Some(storage) => {
                 s.storage.replace(storage);
