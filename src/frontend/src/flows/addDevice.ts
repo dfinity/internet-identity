@@ -8,7 +8,7 @@ import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber } from "../utils/userNumber";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
@@ -30,13 +30,13 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
-export const addDevice = (userNumber: bigint, connection: IDPActor): void => {
+export const addDevice = (userNumber: bigint, connection: IIConnection): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   init(userNumber, connection);
 };
 
-const init = (userNumber: bigint, connection: IDPActor) => {
+const init = (userNumber: bigint, connection: IIConnection) => {
   initLogout();
   const addDeviceButton = document.querySelector(
     "#addDevice"

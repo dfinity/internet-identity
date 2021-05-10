@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IDPActor, ApiResult } from "../utils/idp_actor";
+import { IIConnection, ApiResult } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
@@ -71,7 +71,7 @@ export type LoginResult =
   | {
       tag: "ok";
       userNumber: bigint;
-      connection: IDPActor;
+      connection: IIConnection;
     }
   | {
       tag: "err";
@@ -137,7 +137,7 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => IDPActor.login(userNumber));
+    const result = await withLoader(() => IIConnection.login(userNumber));
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
