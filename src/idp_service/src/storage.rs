@@ -36,9 +36,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// Creates a new empty storage that manages the data of users in
     /// the specified range.
     pub fn new(user_number_range: (UserNumber, UserNumber)) -> Self {
-        let storage = Self {
+        Self {
             header: Header {
-                magic: b"IIC".clone(),
+                magic: *b"IIC",
                 version: 1,
                 num_users: 0,
                 id_range_lo: user_number_range.0,
@@ -47,8 +47,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 salt: EMPTY_SALT,
             },
             _marker: PhantomData,
-        };
-        storage
+        }
     }
 
     pub fn salt(&self) -> Option<&Salt> {
@@ -135,7 +134,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         if pages > current_size {
             let pages_to_grow = pages - current_size;
             let result = stable_grow(pages - current_size);
-            if !result.is_ok() {
+            if result.is_err() {
                 trap(&format!(
                     "failed to grow stable memory by {} pages",
                     pages_to_grow
@@ -179,7 +178,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn flush(&self) {
         if stable_size() < 1 {
             let result = stable_grow(1);
-            if !result.is_ok() {
+            if result.is_err() {
                 trap("failed to grow stable memory by 1 page");
             }
         }
