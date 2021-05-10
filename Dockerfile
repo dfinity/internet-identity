@@ -1,6 +1,7 @@
 # Use this with
 #
-# docker build --output out .
+#  docker build -t idp-service .
+#  docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
 #
 # and find the .wasmfile in out/
 
