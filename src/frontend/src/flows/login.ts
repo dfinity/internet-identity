@@ -29,7 +29,7 @@ const pageContent = (userNumber: bigint, userIntent: string) => html` <div
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a succesful user number connection pair
+// We retry logging in until we get a successful user number connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
   userIntent: UserIntent
