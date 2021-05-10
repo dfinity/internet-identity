@@ -678,7 +678,7 @@ You can check that deployment went through running
 
 [source,bash]
 ----
-dfx canister --network mainnet --no-wallet info idp_service
+dfx canister --network mainnet --no-wallet info internet_identity
 ----
 
 
