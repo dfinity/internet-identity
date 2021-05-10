@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { withLoader } from "../components/loader";
-import { IDPActor, canisterIdPrincipal } from "../utils/idp_actor";
+import { IIConnection, canisterIdPrincipal } from "../utils/iiConnection";
 import { setUserNumber } from "../utils/userNumber";
 import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
@@ -50,11 +50,9 @@ const init = (): Promise<LoginResult | null> =>
 
     registerCancel.onclick = () => resolve(null);
     form.onsubmit = async (e) => {
-      // Enter pending state
       e.preventDefault();
       e.stopPropagation();
 
-      // Read values from inputs
       const registerAlias = form.querySelector(
         "#registerAlias"
       ) as HTMLInputElement;
@@ -74,9 +72,8 @@ const init = (): Promise<LoginResult | null> =>
         const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
         const identity = await pendingIdentity;
         if (await confirmRegister()) {
-          // Send values through actor
           const result = await withLoader(async () =>
-            IDPActor.register(identity, alias, pow)
+            IIConnection.register(identity, alias, pow)
           );
           if (result.kind === "loginSuccess") {
             setUserNumber(result.userNumber);

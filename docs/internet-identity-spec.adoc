@@ -91,7 +91,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 
 When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
-The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
+The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
 The Internet Identity Service Frontend also manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
@@ -571,36 +571,54 @@ This section needs to describe aspects like
 * why and how the frontend is bundled with and served by the canister itself.
 * how the Internet Identity Service canister id stays predictable and well-known
 
-=== Integration with bootstrap of NNS
+=== Installation of ic-admin
 
-The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
+You will need the `ic-admin` tool. You have various options
 
-=== Initial installation (should happen only once)
+* Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
 
-In a checkout of this repository, run the following to build the official image:
-[source,bash]
-----
-docker build -t idp-service .
-docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
-----
-
-The resulting `idp_service.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
-
-Make note of the hash of wasm module:
-[source,bash]
-----
-shasum -a 256 idp_service.wasm
-----
-
-Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
-
-Alternatively, you can build it from source. In a checkout of `dfinity`, run:
+* You can build it from source. In a checkout of `dfinity`, run:
++
 [source,bash]
 ----
 cd rs
 nix-shell
 cargo build --bin ic-admin
 ----
+
+* You can install it into your nix environment. In a checkout of `dfinity`, run:
++
+[source,bash]
+----
+nix-env -iA dfinity.rs.ic-admin-unwrapped -f .
+----
+
+=== Canister id reservation during NNS bootstrap
+
+The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
+
+=== Official build
+
+For installation or upgrade, you should build it the “official” way.
+
+In a checkout of this repository, run the following to build the official image:
+[source,bash]
+----
+docker build -t internet-identity-service .
+docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+----
+
+The resulting `internet_identity.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
+
+Make note of the hash of wasm module:
+[source,bash]
+----
+shasum -a 256 internet_identity.wasm
+----
+
+Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job “docker build” and look at the output of step “Run sha256sum out/internet_identity.wasm”.
+
+=== Initial installation (should happen only once)
 
 Next, you will need `didc` to be able to produce the binary encoded Candid argument needed for installation. Either download it from https://github.com/dfinity/candid/releases/[the latest candid release] or build it from source.
 
@@ -612,25 +630,14 @@ didc encode '(null)' | xxd -r -p > arg.in
 
 ==== Submitting proposal and voting on mainnet
 
-You will need to ask someone who has authorization to submit the proposal. Then you will need to ping @trusted-neurons slack alias to get enough votes for it. The command will look like:
-[source,bash]
-----
-ic-admin \
-    -s "${PROPOSER_KEY_FILE}" \
-    --nns-url "${child_nns_url}" \
-    propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
-    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
-    --mode install \
-    --wasm-module-path <path_to_wasm> \
-    --arg <init_arg_file>
-----
+(This section was removed. We have deployed to mainnet, and should not have to do it again. Please see git history if you need to know this.)
 
 ==== Submitting proposal on testnets
 
 Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm --arg arg.in
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path internet_identity.wasm --arg arg.in
 ----
 
 The above will need to be adjusted to submit a proposal on the beta network (specifically the NNS url and we need to use a real neuron ID as the proposer instead of the test-neuron-proposer).
@@ -643,7 +650,11 @@ Similar to the steps during initial installation. The main difference is that yo
 
 ==== On Mainnet
 
-You will still need to get someone with authorization to submit the proposal and get enough votes for it (ping @trusted-neurons on slack). The command will look like:
+Write a proposal description like those in
+
+https://github.com/dfinity/nns-proposals/blob/main/proposals/identity/
+
+You will need to get someone with authorization to submit the proposal and get enough votes for it (ping @trusted-neurons on slack). The command will look like:
 
 [source,bash]
 ----
@@ -652,9 +663,27 @@ ic-admin \
     --nns-url "${child_nns_url}" \
     propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
     --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
-    --mode upgrade \ 
-    --wasm-module-path <path_to_wasm>
+    --mode upgrade \
+    --wasm-module-path internet_identity.wasm
 ----
+
+If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`:
+
+[source,bash]
+----
+dfx --identity default canister --no-wallet --network=mercury call governance list_proposals --type=idl '(record {limit=25; include_reward_status=vec{}; exclude_topic=vec{}; include_status=vec{1}})'
+----
+
+You can check that deployment went through running
+
+[source,bash]
+----
+dfx canister --network mainnet --no-wallet info internet_identity
+----
+
+
+Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
+
 
 ==== On testnets
 
@@ -662,7 +691,7 @@ Once you've built the binary, you can then run (for `messaging`):
 
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/idp_service.wasm
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path internet_identity.wasm
 ----
 
 === Disaster recovery
@@ -675,6 +704,3 @@ If the Internet Computer goes down and has to be re-boot-strapped, or else the b
 We can then install a temporary upload canister that does nothing but set the stable memory to that binary (something like `backend-tests/stable-memory-setter.wat`, but extended to allow the upload in chunks, if it is larger than 2Mb), and upgrade from that.
 
 The backend tests have a test that exercises this. See `backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md` for notes about that test.
-
-
-

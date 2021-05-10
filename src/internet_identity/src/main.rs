@@ -5,9 +5,9 @@ use ic_cdk::api::stable::stable_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
-use idp_service::metrics_encoder::MetricsEncoder;
-use idp_service::nonce_cache::NonceCache;
-use idp_service::signature_map::SignatureMap;
+use internet_identity::metrics_encoder::MetricsEncoder;
+use internet_identity::nonce_cache::NonceCache;
+use internet_identity::signature_map::SignatureMap;
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
@@ -45,7 +45,7 @@ type Timestamp = u64;
 type Signature = ByteBuf;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct DeviceData {
+struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
@@ -420,7 +420,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
-    let parts: Vec<&str> = req.url.split("?").collect();
+    let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
         "/metrics" => {
             let mut writer = MetricsEncoder::new(vec![], time() / 1_000_000);

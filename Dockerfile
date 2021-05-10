@@ -1,6 +1,7 @@
 # Use this with
 #
-# docker build --output out .
+#  docker build -t internet-identity .
+#  docker run --rm --entrypoint cat internet-identity /internet_identity.wasm > internet_identity.wasm
 #
 # and find the .wasmfile in out/
 
@@ -50,6 +51,6 @@ RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release -j1
 RUN sha256sum dist/*
-RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm -o /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm
-RUN cp /cargo_target/wasm32-unknown-unknown/release/idp_service.wasm .
-RUN sha256sum idp_service.wasm
+RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
+RUN cp /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm .
+RUN sha256sum internet_identity.wasm

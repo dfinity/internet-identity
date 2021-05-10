@@ -8,7 +8,7 @@ const hostUrlEl = document.getElementById("hostUrl");
 const whoAmIResponseEl = document.getElementById("whoamiResponse");
 const canisterIdEl = document.getElementById("canisterId");
 const principalEl = document.getElementById("principal");
-const idpUrlEl = document.getElementById("idpUrl");
+const iiUrlEl = document.getElementById("iiUrl");
 
 let authClient;
 
@@ -19,7 +19,7 @@ const init = async () => {
   // Redirect to the identity provider
   signInBtn.onclick = async () => {
     authClient.login({
-      identityProvider: idpUrlEl.value,
+      identityProvider: iiUrlEl.value,
       onSuccess: async () => {
         principalEl.innerText = await authClient.getIdentity().getPrincipal();
       },

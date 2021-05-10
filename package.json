@@ -1,17 +1,16 @@
 {
-  "name": "idp_service_assets",
+  "name": "internet_identity_assets",
   "version": "0.1.0",
   "description": "",
   "keywords": [],
   "scripts": {
     "start": "webpack serve",
-    "generate:types": "didc bind ./src/idp_service/idp_service.did -t ts > src/frontend/generated/idp_types.d.ts",
-    "generate:js": "didc bind ./src/idp_service/idp_service.did -t js > src/frontend/generated/idp_idl.js",
+    "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
+    "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
     "test": "jest",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend",
-    "format-check": "prettier --check src/frontend"
+    "format": "prettier --write src/frontend"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.11.10",

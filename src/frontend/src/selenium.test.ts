@@ -45,12 +45,12 @@ import { writeFile } from "fs/promises";
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../.dfx/local/canister_ids.json";
-const IDENTITY_CANISTER = canister_ids1.idp_service.local;
+const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 import canister_ids2 from "../../../demos/whoami/.dfx/local/canister_ids.json";
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
-const IDP_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
+const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -416,7 +416,7 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
 test("_Register new identity and login with it", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
-    await driver.get(IDP_URL);
+    await driver.get(II_URL);
     const userNumber = await registerNewIdentity(driver);
     await on_Main(DEVICE_NAME1, driver);
     await await on_Main_Logout(driver);
@@ -428,9 +428,9 @@ test("Log into client application, after registration", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     await driver.get(DEMO_APP_URL);
-    await driver.findElement(By.id("idpUrl")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("idpUrl")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("idpUrl")).sendKeys(IDP_URL);
+    await driver.findElement(By.id("iiUrl")).sendKeys(Key.CONTROL + "a");
+    await driver.findElement(By.id("iiUrl")).sendKeys(Key.DELETE);
+    await driver.findElement(By.id("iiUrl")).sendKeys(II_URL);
     await driver.findElement(By.id("signinBtn")).click();
 
     // there should be one new window now
@@ -484,7 +484,7 @@ test("Log into client application, after registration", async () => {
 test("Screenshots", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
-    await driver.get(IDP_URL);
+    await driver.get(II_URL);
     await wait_for_fonts(driver);
 
     await on_Welcome(driver);
@@ -509,7 +509,7 @@ test("Screenshots", async () => {
     await on_Welcome_Login(driver);
     await on_Main(DEVICE_NAME1, driver);
 
-    await driver.get(IDP_URL);
+    await driver.get(II_URL);
     const userNumber2 = await on_WelcomeBack(driver);
     expect(userNumber2).toBe(userNumber);
     await on_WelcomeBack_Fixup(driver);
@@ -520,7 +520,7 @@ test("Screenshots", async () => {
     // Now the link device flow, using a second browser
     await run_in_nested_browser(async (driver2) => {
       await addVirtualAuthenticator(driver2);
-      await driver2.get(IDP_URL);
+      await driver2.get(II_URL);
       await on_Welcome(driver2);
       await on_Welcome_TypeUserNumber(userNumber, driver2);
       await on_Welcome_AddDevice(driver2);
@@ -577,13 +577,13 @@ test("Screenshots", async () => {
 
     // About page
     await driver.get("about:blank");
-    await driver.get(IDP_URL + "#about");
+    await driver.get(II_URL + "#about");
     await wait_for_fonts(driver);
     await on_About(driver);
     await screenshot("14-about", driver);
 
     // Test device removal
-    await driver.get(IDP_URL);
+    await driver.get(II_URL);
     const userNumber3 = await on_WelcomeBack(driver);
     expect(userNumber3).toBe(userNumber);
     await on_WelcomeBack_Login(driver);
@@ -617,7 +617,7 @@ test("Screenshots", async () => {
 
     // Compatibility notice page
     await driver.get("about:blank");
-    await driver.get(IDP_URL + "#compatibilityNotice");
+    await driver.get(II_URL + "#compatibilityNotice");
     await wait_for_fonts(driver);
     await on_CompatibilityNotice(driver);
     await screenshot("16-compatibility-notice", driver);

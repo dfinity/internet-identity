@@ -1,7 +1,8 @@
 import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
-import { IDPActor } from "../utils/idp_actor";
+import { displayError } from "../components/displayError";
+import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 
@@ -49,7 +50,19 @@ const init = () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
       userNumberInput.classList.toggle("errored", false);
-      const identity = await WebAuthnIdentity.create();
+      let identity: WebAuthnIdentity;
+      try {
+        identity = await WebAuthnIdentity.create();
+      } catch (error) {
+        await displayError({
+          title: "Failed to authenticate",
+          message:
+            "We failed to collect the necessary information from your security device.",
+          detail: error.message,
+          primaryButton: "Try again",
+        });
+        return addDeviceUserNumber(userNumber);
+      }
       const publicKey = identity.getPublicKey().toDer();
       const rawId = blobToHex(identity.rawId);
 
@@ -62,7 +75,7 @@ const init = () => {
       loginInterval = window.setInterval(async () => {
         console.log("checking if authenticated");
         try {
-          const devices = await IDPActor.lookup(userNumber);
+          const devices = await IIConnection.lookup(userNumber);
           const matchedDevice = devices.find((deviceData) =>
             derBlobFromBlob(
               blobFromUint8Array(Buffer.from(deviceData.pubkey))

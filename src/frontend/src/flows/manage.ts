@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import {
   derBlobFromBlob,
   blobFromUint8Array,
@@ -8,7 +8,7 @@ import {
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
-import { DeviceData, PublicKey } from "../../generated/idp_types";
+import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 
@@ -39,7 +39,7 @@ const deviceListItem = (alias: string) => html`
 
 export const renderManage = (
   userNumber: bigint,
-  connection: IDPActor
+  connection: IIConnection
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -47,19 +47,22 @@ export const renderManage = (
   init(userNumber, connection);
 };
 
-const init = async (userNumber: bigint, connection: IDPActor) => {
+const init = async (userNumber: bigint, connection: IIConnection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
   renderIdentities(userNumber, connection);
 };
 
-const renderIdentities = async (userNumber: bigint, connection: IDPActor) => {
+const renderIdentities = async (
+  userNumber: bigint,
+  connection: IIConnection
+) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
   let identities: DeviceData[];
   try {
-    identities = await IDPActor.lookup(userNumber);
+    identities = await IIConnection.lookup(userNumber);
   } catch (err) {
     await displayError({
       title: "Failed to list your devices",
@@ -93,7 +96,7 @@ const renderIdentities = async (userNumber: bigint, connection: IDPActor) => {
 
 const bindRemoveListener = (
   userNumber: bigint,
-  connection: IDPActor,
+  connection: IIConnection,
   listItem: HTMLElement,
   publicKey: PublicKey,
   isOnlyDevice: boolean

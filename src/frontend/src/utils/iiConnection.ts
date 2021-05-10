@@ -8,7 +8,7 @@ import {
   HttpAgent,
   SignIdentity,
 } from "@dfinity/agent";
-import idp_idl from "../../generated/idp_idl";
+import internet_identity_idl from "../../generated/internet_identity_idl";
 import _SERVICE, {
   PublicKey,
   SessionKey,
@@ -20,7 +20,7 @@ import _SERVICE, {
   ProofOfWork,
   RegisterResponse,
   GetDelegationResponse,
-} from "../../generated/idp_types";
+} from "../../generated/internet_identity_types";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -34,7 +34,7 @@ import { hasOwnProperty } from "./utils";
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
-export const baseActor = Actor.createActor<_SERVICE>(idp_idl, {
+export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   agent: new HttpAgent({}),
   canisterId,
 });
@@ -49,7 +49,7 @@ export type RegisterResult =
 
 type LoginSuccess = {
   kind: "loginSuccess";
-  connection: IDPActor;
+  connection: IIConnection;
   userNumber: bigint;
 };
 type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
@@ -57,7 +57,7 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 
-export class IDPActor {
+export class IIConnection {
   protected constructor(
     public identity: WebAuthnIdentity,
     public delegationIdentity: DelegationIdentity,
@@ -77,7 +77,7 @@ export class IDPActor {
     }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
-    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: canisterId,
     });
@@ -108,7 +108,7 @@ export class IDPActor {
       console.log(`registered user number ${userNumber}`);
       return {
         kind: "loginSuccess",
-        connection: new IDPActor(identity, delegationIdentity, actor),
+        connection: new IIConnection(identity, delegationIdentity, actor),
         userNumber,
       };
     } else {
@@ -150,7 +150,7 @@ export class IDPActor {
     }
 
     const agent = new HttpAgent({ identity: delegationIdentity });
-    const actor = Actor.createActor<_SERVICE>(idp_idl, {
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: canisterId,
     });
@@ -158,7 +158,7 @@ export class IDPActor {
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IDPActor(
+      connection: new IIConnection(
         // eslint-disable-next-line
         multiIdent._actualIdentity!,
         delegationIdentity,
@@ -187,7 +187,7 @@ export class IDPActor {
       this.delegationIdentity = await requestFEDelegation(this.identity);
 
       const agent = new HttpAgent({ identity: this.delegationIdentity });
-      this.actor = Actor.createActor<_SERVICE>(idp_idl, {
+      this.actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
         agent,
         canisterId,
       });

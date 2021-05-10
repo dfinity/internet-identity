@@ -4,7 +4,7 @@ import { displayError } from "../components/displayError";
 import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import { bannerFromIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
@@ -29,13 +29,13 @@ const pageContent = (userNumber: bigint, userIntent: string) => html` <div
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a succesful user number connection pair
+// We retry logging in until we get a successful user number connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
   userIntent: UserIntent
 ): Promise<{
   userNumber: bigint;
-  connection: IDPActor;
+  connection: IIConnection;
 }> => {
   try {
     const x = await tryLogin(userIntent);
@@ -86,7 +86,7 @@ const init = async (
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const result = await withLoader(() => IDPActor.login(userNumber));
+      const result = await withLoader(() => IIConnection.login(userNumber));
       resolve(apiResultToLoginResult(result));
     };
 

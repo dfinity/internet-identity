@@ -11,7 +11,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   - cargo build --release
 
 * Make sure you have dfx version `0.7.0-beta.6`
-* In a checkout of `idp-service`, `main` branch, reset the dfx state:
+* In a checkout of `internet-identity`, `main` branch, reset the dfx state:
   ```
   rm -rf .dfx
   ```
@@ -23,7 +23,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   rm -rf .dfx
   ```
   (or less expensive, `rm -f .dfx/local/canister_ids.json .dfx/local/wallets.json`)
-* In idp-service, run the replica.
+* In internet-identity, run the replica.
   ```
   dfx start
   ```
@@ -32,7 +32,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   replica(s): http://localhost:41549/
   ```
 
-* In `idp-service` , build and deploy:
+* In `internet-identity-service` , build and deploy:
   ```
   npm ci
   dfx deploy --argument '(null)'

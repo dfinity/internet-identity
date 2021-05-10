@@ -45,8 +45,8 @@ pub fn hash_with_domain(sep: &[u8], bytes: &[u8]) -> Hash {
 
 fn hash_key_val(key: &str, val: Value<'_>) -> Vec<u8> {
     let mut key_hash = hash_string(key).to_vec();
-    let mut val_hash = hash_val(val);
-    key_hash.extend_from_slice(&mut val_hash[..]);
+    let val_hash = hash_val(val);
+    key_hash.extend_from_slice(&val_hash[..]);
     key_hash
 }
 
