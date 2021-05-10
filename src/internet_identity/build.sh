@@ -5,18 +5,18 @@ set -euo pipefail
 echo Compiling frontend assets
 npm run build
 
-IDP_DIR="$(dirname "$0")"
+II_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
 
-cargo build --manifest-path "$IDP_DIR/Cargo.toml" --target $TARGET --release -j1
+cargo build --manifest-path "$II_DIR/Cargo.toml" --target $TARGET --release -j1
 
-cargo install ic-cdk-optimizer --root "$IDP_DIR"/../../target
+cargo install ic-cdk-optimizer --root "$II_DIR"/../../target
 STATUS=$?
 
 if [ "$STATUS" -eq "0" ]; then
-      "$IDP_DIR"/../../target/bin/ic-cdk-optimizer \
-      "$IDP_DIR/../../target/$TARGET/release/internet_identity.wasm" \
-      -o "$IDP_DIR/../../target/$TARGET/release/internet_identity.wasm"
+      "$II_DIR"/../../target/bin/ic-cdk-optimizer \
+      "$II_DIR/../../target/$TARGET/release/internet_identity.wasm" \
+      -o "$II_DIR/../../target/$TARGET/release/internet_identity.wasm"
 
   true
 else

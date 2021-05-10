@@ -7,7 +7,7 @@ import {
 } from "../generated/internet_identity_types";
 import { withLoader } from "./components/loader";
 import { confirmRedirect } from "./flows/confirmRedirect";
-import { IDPActor } from "./utils/idp_actor";
+import { IIConnection } from "./utils/iiConnection";
 import { hasOwnProperty } from "./utils/utils";
 
 interface AuthRequest {
@@ -36,7 +36,7 @@ interface AuthResponseFailure {
 
 type AuthResponse = AuthResponseSuccess | AuthResponseFailure;
 
-// A message to signal that the IDP is ready to receive authorization requests.
+// A message to signal that the II is ready to receive authorization requests.
 const READY_MESSAGE = {
   kind: "authorize-ready",
 };
@@ -48,7 +48,7 @@ const READY_MESSAGE = {
  */
 export default async function setup(
   userNumber: UserNumber,
-  connection: IDPActor
+  connection: IIConnection
 ): Promise<void> {
   // Set up an event listener for receiving messages from the client.
   window.addEventListener("message", async (event) => {
@@ -75,7 +75,7 @@ export default async function setup(
 }
 
 async function handleAuthRequest(
-  connection: IDPActor,
+  connection: IIConnection,
   userNumber: UserNumber,
   request: AuthRequest,
   hostname: FrontendHostname
@@ -130,7 +130,7 @@ async function handleAuthRequest(
 }
 
 const retryGetDelegation = async (
-  connection: IDPActor,
+  connection: IIConnection,
   userNumber: bigint,
   hostname: string,
   sessionKey: PublicKey,

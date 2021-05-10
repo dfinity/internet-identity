@@ -2,7 +2,7 @@ import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { displayError } from "../components/displayError";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 
@@ -75,7 +75,7 @@ const init = () => {
       loginInterval = window.setInterval(async () => {
         console.log("checking if authenticated");
         try {
-          const devices = await IDPActor.lookup(userNumber);
+          const devices = await IIConnection.lookup(userNumber);
           const matchedDevice = devices.find((deviceData) =>
             derBlobFromBlob(
               blobFromUint8Array(Buffer.from(deviceData.pubkey))

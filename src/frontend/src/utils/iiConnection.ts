@@ -49,7 +49,7 @@ export type RegisterResult =
 
 type LoginSuccess = {
   kind: "loginSuccess";
-  connection: IDPActor;
+  connection: IIConnection;
   userNumber: bigint;
 };
 type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
@@ -57,7 +57,7 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 
-export class IDPActor {
+export class IIConnection {
   protected constructor(
     public identity: WebAuthnIdentity,
     public delegationIdentity: DelegationIdentity,
@@ -108,7 +108,7 @@ export class IDPActor {
       console.log(`registered user number ${userNumber}`);
       return {
         kind: "loginSuccess",
-        connection: new IDPActor(identity, delegationIdentity, actor),
+        connection: new IIConnection(identity, delegationIdentity, actor),
         userNumber,
       };
     } else {
@@ -158,7 +158,7 @@ export class IDPActor {
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IDPActor(
+      connection: new IIConnection(
         // eslint-disable-next-line
         multiIdent._actualIdentity!,
         delegationIdentity,

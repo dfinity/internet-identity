@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { withLoader } from "../components/loader";
-import { IDPActor, canisterIdPrincipal } from "../utils/idp_actor";
+import { IIConnection, canisterIdPrincipal } from "../utils/iiConnection";
 import { setUserNumber } from "../utils/userNumber";
 import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
@@ -73,7 +73,7 @@ const init = (): Promise<LoginResult | null> =>
         const identity = await pendingIdentity;
         if (await confirmRegister()) {
           const result = await withLoader(async () =>
-            IDPActor.register(identity, alias, pow)
+            IIConnection.register(identity, alias, pow)
           );
           if (result.kind === "loginSuccess") {
             setUserNumber(result.userNumber);
