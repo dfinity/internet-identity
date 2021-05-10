@@ -3,7 +3,7 @@ members = [
     "src/certified_map",
     "src/cubehash",
     "src/hashtree",
-    "src/idp_service",
+    "src/internet_identity",
 ]
 
 [profile.release]

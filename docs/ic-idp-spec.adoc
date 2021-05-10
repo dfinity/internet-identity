@@ -91,7 +91,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 
 When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
-The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a lifetime of *TODO*.
+The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
 The Internet Identity Service Frontend also manages a _identity frontend delegation_, delegating from the security device’s public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
@@ -604,16 +604,16 @@ For installation or upgrade, you should build it the “official” way.
 In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-docker build -t idp-service .
-docker run --rm --entrypoint cat idp-service /idp_service.wasm > idp_service.wasm
+docker build -t internet-identity-service .
+docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
 ----
 
-The resulting `idp_service.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
+The resulting `internet_identity.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
 
 Make note of the hash of wasm module:
 [source,bash]
 ----
-shasum -a 256 idp_service.wasm
+shasum -a 256 internet_identity.wasm
 ----
 
 Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job “docker build” and look at the output of step “Run sha256sum out/idp_service.wasm”.
@@ -637,7 +637,7 @@ didc encode '(null)' | xxd -r -p > arg.in
 Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path idp_service.wasm --arg arg.in
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path internet_identity.wasm --arg arg.in
 ----
 
 The above will need to be adjusted to submit a proposal on the beta network (specifically the NNS url and we need to use a real neuron ID as the proposer instead of the test-neuron-proposer).
@@ -691,7 +691,7 @@ Once you've built the binary, you can then run (for `messaging`):
 
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path idp_service.wasm
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path internet_identity.wasm
 ----
 
 === Disaster recovery

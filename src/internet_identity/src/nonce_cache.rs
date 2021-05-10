@@ -1,3 +1,4 @@
+//! A cache of recently seen nonces.
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 

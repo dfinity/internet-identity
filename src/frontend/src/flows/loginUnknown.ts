@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IDPActor, ApiResult } from "../utils/idp_actor";
+import { IIConnection, ApiResult } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { withLoader } from "../components/loader";
 import { register } from "./register";
@@ -54,7 +54,9 @@ const pageContent = (userIntent: string) => html` <style>
     <button type="button" id="loginButton" class="primary">Login</button>
     <div class="textLink" id="registerSection">
       New user?
-      <button id="registerButton" class="linkStyle">Register with Internet Identity.</button>
+      <button id="registerButton" class="linkStyle">
+        Register with Internet Identity.
+      </button>
     </div>
     <div class="textLink">
       Already registered
@@ -67,19 +69,20 @@ const pageContent = (userIntent: string) => html` <style>
 
 export type LoginResult =
   | {
-    tag: "ok",
-    userNumber: bigint,
-    connection: IDPActor,
-  }
+      tag: "ok";
+      userNumber: bigint;
+      connection: IIConnection;
+    }
   | {
-    tag: "err",
-    title: string,
-    message: string,
-    detail?: string,
-  };
+      tag: "err";
+      title: string;
+      message: string;
+      detail?: string;
+    };
 
-export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult> => {
-  
+export const loginUnknown = async (
+  userIntent: UserIntent
+): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(bannerFromIntent(userIntent)), container);
   return new Promise((resolve, reject) => {
@@ -89,20 +92,23 @@ export const loginUnknown = async (userIntent: UserIntent): Promise<LoginResult>
   });
 };
 
-const initRegister = (resolve: (res: LoginResult) => void, reject: (err: Error) => void) => {
+const initRegister = (
+  resolve: (res: LoginResult) => void,
+  reject: (err: Error) => void
+) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
     register()
-      .then(res => {
+      .then((res) => {
         if (res === null) {
           window.location.reload();
         } else {
           resolve(res);
         }
       })
-      .catch(reject)
+      .catch(reject);
   };
 };
 
@@ -114,13 +120,13 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     "loginButton"
   ) as HTMLButtonElement;
 
-  userNumberInput.onkeypress = (e)=>{
+  userNumberInput.onkeypress = (e) => {
     // submit if user hits enter
-    if(e.key === "Enter"){
-        e.preventDefault();
-        loginButton.click();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      loginButton.click();
     }
-}
+  };
 
   loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
@@ -131,12 +137,12 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => IDPActor.login(userNumber));
+    const result = await withLoader(() => IIConnection.login(userNumber));
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
     resolve(apiResultToLoginResult(result));
-  }
+  };
 };
 
 const initLinkDevice = () => {
@@ -150,7 +156,7 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    addDeviceUserNumber(userNumber)
+    addDeviceUserNumber(userNumber);
   };
 };
 
@@ -167,8 +173,9 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
       return {
         tag: "err",
         title: "Failed to authenticate",
-        message: "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
-        detail: result.error.message
+        message:
+          "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
+        detail: result.error.message,
       };
     }
     case "unknownUser": {
@@ -176,23 +183,25 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         tag: "err",
         title: "Unknown user",
         message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
-        detail: ""
+        detail: "",
       };
     }
     case "apiError": {
       return {
         tag: "err",
         title: "We couldn't reach Internet Identity",
-        message: "We failed to call the Internet Identity service, please try again.",
-        detail: result.error.message
+        message:
+          "We failed to call the Internet Identity service, please try again.",
+        detail: result.error.message,
       };
     }
     case "registerNoSpace": {
       return {
         tag: "err",
         title: "Failed to register",
-        message: "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
-      }
+        message:
+          "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+      };
     }
   }
-}
+};

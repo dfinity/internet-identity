@@ -5,13 +5,13 @@ use ic_cdk::api::stable::stable_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
-use idp_service::metrics_encoder::MetricsEncoder;
-use idp_service::nonce_cache::NonceCache;
-use idp_service::signature_map::SignatureMap;
+use internet_identity::metrics_encoder::MetricsEncoder;
+use internet_identity::nonce_cache::NonceCache;
+use internet_identity::signature_map::SignatureMap;
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
@@ -45,7 +45,7 @@ type Timestamp = u64;
 type Signature = ByteBuf;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct DeviceData {
+struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
@@ -139,6 +139,7 @@ struct State {
     storage: RefCell<Storage<Vec<DeviceData>>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
+    last_upgrade_timestamp: Cell<Timestamp>,
 }
 
 impl Default for State {
@@ -148,6 +149,7 @@ impl Default for State {
             storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
+            last_upgrade_timestamp: Cell::new(0),
         }
     }
 }
@@ -407,13 +409,18 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             stable_size() as f64,
             "Number of stable memory pages used by this canister.",
         )?;
+        w.encode_gauge(
+            "internet_identity_last_upgrade_timestamp",
+            s.last_upgrade_timestamp.get() as f64,
+            "The most recent IC time (in nanos) when this canister was successfully upgraded.",
+        )?;
         Ok(())
     })
 }
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
-    let parts: Vec<&str> = req.url.split("?").collect();
+    let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
         "/metrics" => {
             let mut writer = MetricsEncoder::new(vec![], time() / 1_000_000);
@@ -528,6 +535,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 fn retrieve_data() {
     init_assets();
     STATE.with(|s| {
+        s.last_upgrade_timestamp.set(time() as u64);
         match Storage::from_stable_memory() {
             Some(storage) => {
                 s.storage.replace(storage);

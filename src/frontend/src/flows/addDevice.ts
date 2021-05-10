@@ -8,7 +8,7 @@ import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber } from "../utils/userNumber";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
@@ -19,32 +19,36 @@ const pageContent = (userNumber: bigint) => html`
     <label>User Number:</label>
     <div class="highlightBox">${userNumber}</div>
     <p class="warningBox">
-      Warning: Click the button below only if you have transferred the link from your other device.
+      Warning: Click the button below only if you have transferred the link from
+      your other device.
     </p>
-    <button type="button" class="primary" id="addDevice">Yes, add new device</button>
+    <button type="button" class="primary" id="addDevice">
+      Yes, add new device
+    </button>
     <button type="button" id="cancelAdd">Cancel</button>
     ${logoutSection()}
   </div>
 `;
 
-export const addDevice = (userNumber: bigint, connection: IDPActor): void => {
+export const addDevice = (
+  userNumber: bigint,
+  connection: IIConnection
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   init(userNumber, connection);
 };
 
-const init = (userNumber: bigint, connection: IDPActor) => {
+const init = (userNumber: bigint, connection: IIConnection) => {
   initLogout();
   const addDeviceButton = document.querySelector(
     "#addDevice"
   ) as HTMLButtonElement;
-  const cancelAdd = document.querySelector(
-    "#cancelAdd"
-  ) as HTMLButtonElement;
+  const cancelAdd = document.querySelector("#cancelAdd") as HTMLButtonElement;
   cancelAdd.onclick = () => {
     clearHash();
-    window.location.reload()
-  }
+    window.location.reload();
+  };
   addDeviceButton.onclick = async () => {
     // Check URL if user has pasted in an Add Identity link
     const url = new URL(document.URL);
@@ -57,31 +61,35 @@ const init = (userNumber: bigint, connection: IDPActor) => {
         await displayError({
           title: "Wrong user number",
           message: `We're expecting to add a device to the user number ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct user number when creating the add device link, or log in with the expected user number.`,
-          primaryButton: "Back to Login"
+          primaryButton: "Back to Login",
         });
         window.location.reload();
       }
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await pickDeviceAlias();
-        await withLoader(() => connection.add(userNumber, deviceName, publicKey, rawId));
+        await withLoader(() =>
+          connection.add(userNumber, deviceName, publicKey, rawId)
+        );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await displayError({
           title: "Failed to add the device",
-          message: "Something went wrong when adding the new device. Please try again",
+          message:
+            "Something went wrong when adding the new device. Please try again",
           detail: error.toString(),
-          primaryButton: "Back to Login"
+          primaryButton: "Back to Login",
         });
         window.location.reload();
       }
     } else {
       await displayError({
         title: "Not a valid link",
-        message: "We failed to recognize your add device link. Please make sure you copy the entire link, and only use links you created yourself.",
-        primaryButton: "Back to Login"
+        message:
+          "We failed to recognize your add device link. Please make sure you copy the entire link, and only use links you created yourself.",
+        primaryButton: "Back to Login",
       });
       clearHash();
       window.location.reload();
@@ -91,7 +99,11 @@ const init = (userNumber: bigint, connection: IDPActor) => {
 
 const parseNewDeviceParam = (
   param: string
-): { userNumber: bigint; publicKey: DerEncodedBlob; rawId?: BinaryBlob } | null => {
+): {
+  userNumber: bigint;
+  publicKey: DerEncodedBlob;
+  rawId?: BinaryBlob;
+} | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
     return null;
@@ -112,4 +124,4 @@ export const clearHash = (): void => {
     document.title,
     window.location.pathname + window.location.search
   );
-}
+};

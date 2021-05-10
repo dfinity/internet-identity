@@ -1,39 +1,44 @@
 import { blobFromUint8Array, Principal } from "@dfinity/agent";
-import { FrontendHostname, PublicKey, SignedDelegation, UserNumber } from "../generated/idp_types";
+import {
+  FrontendHostname,
+  PublicKey,
+  SignedDelegation,
+  UserNumber,
+} from "../generated/internet_identity_types";
 import { withLoader } from "./components/loader";
 import { confirmRedirect } from "./flows/confirmRedirect";
-import { IDPActor } from "./utils/idp_actor";
+import { IIConnection } from "./utils/iiConnection";
 import { hasOwnProperty } from "./utils/utils";
 
 interface AuthRequest {
-    kind: "authorize-client";
-    sessionPublicKey: Uint8Array;
-    maxTimeToLive?: BigInt;
+  kind: "authorize-client";
+  sessionPublicKey: Uint8Array;
+  maxTimeToLive?: BigInt;
 }
 
 interface AuthResponseSuccess {
-    kind: "authorize-client-success";
-    delegations: {
-      delegation: {
-        pubkey: Uint8Array;
-        expiration: BigInt;
-        targets?: Principal[];
-      };
-      signature: Uint8Array;
-    }[];
-    userPublicKey: Uint8Array;
+  kind: "authorize-client-success";
+  delegations: {
+    delegation: {
+      pubkey: Uint8Array;
+      expiration: BigInt;
+      targets?: Principal[];
+    };
+    signature: Uint8Array;
+  }[];
+  userPublicKey: Uint8Array;
 }
 
 interface AuthResponseFailure {
-    kind: "authorize-client-failure";
-    text: string;
+  kind: "authorize-client-failure";
+  text: string;
 }
 
 type AuthResponse = AuthResponseSuccess | AuthResponseFailure;
 
-// A message to signal that the IDP is ready to receive authorization requests.
+// A message to signal that the II is ready to receive authorization requests.
 const READY_MESSAGE = {
-  kind: "authorize-ready"
+  kind: "authorize-ready",
 };
 
 /**
@@ -41,16 +46,24 @@ const READY_MESSAGE = {
  *
  * This method expects to be called after the login flow.
  */
-export default async function setup(userNumber: UserNumber, connection: IDPActor): Promise<void> {
+export default async function setup(
+  userNumber: UserNumber,
+  connection: IIConnection
+): Promise<void> {
   // Set up an event listener for receiving messages from the client.
   window.addEventListener("message", async (event) => {
     const message = event.data;
     if (message.kind === "authorize-client") {
       console.log("Handling authorize-client request.");
-      const response = await handleAuthRequest(connection, userNumber, message, event.origin);
+      const response = await handleAuthRequest(
+        connection,
+        userNumber,
+        message,
+        event.origin
+      );
       (event.source as Window).postMessage(response, event.origin);
     } else {
-      console.log(`Message of unknown kind received: ${message}`)
+      console.log(`Message of unknown kind received: ${message}`);
     }
   });
 
@@ -62,29 +75,29 @@ export default async function setup(userNumber: UserNumber, connection: IDPActor
 }
 
 async function handleAuthRequest(
-    connection: IDPActor,
-    userNumber: UserNumber,
-    request: AuthRequest,
-    hostname: FrontendHostname): Promise<AuthResponse> {
-
-  if (!await confirmRedirect(hostname)) {
+  connection: IIConnection,
+  userNumber: UserNumber,
+  request: AuthRequest,
+  hostname: FrontendHostname
+): Promise<AuthResponse> {
+  if (!(await confirmRedirect(hostname))) {
     return {
-        kind: "authorize-client-failure",
-        text: `User did not grant access to ${hostname}.`
+      kind: "authorize-client-failure",
+      text: `User did not grant access to ${hostname}.`,
     };
   }
 
   return await withLoader(async () => {
     const sessionKey = Array.from(blobFromUint8Array(request.sessionPublicKey));
     const prepRes = await connection.prepareDelegation(
-        userNumber,
-        hostname,
-        sessionKey
+      userNumber,
+      hostname,
+      sessionKey
     );
     if (prepRes.length !== 2) {
-        throw new Error(
+      throw new Error(
         `Error preparing the delegation. Result received: ${prepRes}`
-        );
+      );
     }
 
     const [userKey, timestamp] = prepRes;
@@ -100,35 +113,35 @@ async function handleAuthRequest(
 
     // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
     const parsed_signed_delegation = {
-        delegation: {
-            pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
-            expiration: BigInt(signed_delegation.delegation.expiration),
-            targets: undefined,
-        },
-        signature: Uint8Array.from(signed_delegation.signature),
+      delegation: {
+        pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
+        expiration: BigInt(signed_delegation.delegation.expiration),
+        targets: undefined,
+      },
+      signature: Uint8Array.from(signed_delegation.signature),
     };
 
     return {
-        kind: "authorize-client-success",
-        delegations: [
-            parsed_signed_delegation
-        ],
-        userPublicKey: Uint8Array.from(userKey),
+      kind: "authorize-client-success",
+      delegations: [parsed_signed_delegation],
+      userPublicKey: Uint8Array.from(userKey),
     };
   });
 }
 
 const retryGetDelegation = async (
-  connection: IDPActor,
+  connection: IIConnection,
   userNumber: bigint,
   hostname: string,
   sessionKey: PublicKey,
   timestamp: bigint,
-  maxRetries = 5,
+  maxRetries = 5
 ): Promise<SignedDelegation> => {
   for (let i = 0; i < maxRetries; i++) {
     // Linear backoff
-    await new Promise(resolve => { setInterval(resolve, 1000 * i) });
+    await new Promise((resolve) => {
+      setInterval(resolve, 1000 * i);
+    });
     const res = await connection.getDelegation(
       userNumber,
       hostname,
@@ -136,8 +149,10 @@ const retryGetDelegation = async (
       timestamp
     );
     if (hasOwnProperty(res, "signed_delegation")) {
-      return res.signed_delegation
+      return res.signed_delegation;
     }
   }
-  throw new Error(`Failed to retrieve a delegation after ${maxRetries} retries.`);
+  throw new Error(
+    `Failed to retrieve a delegation after ${maxRetries} retries.`
+  );
 };

@@ -14,11 +14,14 @@ const pageContent = html`
       single service to log into apps on the Internet Computer.
     </p>
     <p>
-      The Internet Identity service protects your privacy. When you register, you will not be asked to provide any personal information to the service or to the applications you access.
-The service will create a different, random identity for each application you use.
+      The Internet Identity service protects your privacy. When you register,
+      you will not be asked to provide any personal information to the service
+      or to the applications you access. The service will create a different,
+      random identity for each application you use.
     </p>
     <p>
-      The Internet Identity service works without passwords! You log in with your own registered devices using their associated authentication methods.
+      The Internet Identity service works without passwords! You log in with
+      your own registered devices using their associated authentication methods.
     </p>
     <p>
       If you have questions about how to get started with Internet Identity, you

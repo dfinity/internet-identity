@@ -4,13 +4,18 @@ import { displayError } from "../components/displayError";
 import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
-import { IDPActor } from "../utils/idp_actor";
+import { IIConnection } from "../utils/iiConnection";
 import { bannerFromIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
-import { apiResultToLoginResult, LoginResult, loginUnknown } from "./loginUnknown";
+import {
+  apiResultToLoginResult,
+  LoginResult,
+  loginUnknown,
+} from "./loginUnknown";
 
-const pageContent = (userNumber: bigint, userIntent: string) => html`
-  <div class="container">
+const pageContent = (userNumber: bigint, userIntent: string) => html` <div
+    class="container"
+  >
     ${icLogo}
     <h1>Welcome back!</h1>
     <p>Login to ${userIntent}.</p>
@@ -24,11 +29,13 @@ const pageContent = (userNumber: bigint, userIntent: string) => html`
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a succesful user number connection pair
+// We retry logging in until we get a successful user number connection pair
 // If we encounter an unexpected error we reload to be safe
-export const login = async (userIntent: UserIntent): Promise<{
+export const login = async (
+  userIntent: UserIntent
+): Promise<{
   userNumber: bigint;
-  connection: IDPActor;
+  connection: IIConnection;
 }> => {
   try {
     const x = await tryLogin(userIntent);
@@ -47,7 +54,7 @@ export const login = async (userIntent: UserIntent): Promise<{
       title: "Something went wrong",
       message: "An unexpected error occured during login. Please try again",
       detail: err,
-      primaryButton: "Try again"
+      primaryButton: "Try again",
     });
     window.location.reload();
     return Promise.reject(err);
@@ -65,7 +72,10 @@ const tryLogin = async (userIntent: UserIntent): Promise<LoginResult> => {
   }
 };
 
-const init = async (userNumber: bigint, userIntent: UserIntent): Promise<LoginResult> => {
+const init = async (
+  userNumber: bigint,
+  userIntent: UserIntent
+): Promise<LoginResult> => {
   return new Promise((resolve) => {
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
@@ -76,7 +86,7 @@ const init = async (userNumber: bigint, userIntent: UserIntent): Promise<LoginRe
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const result = await withLoader(() => IDPActor.login(userNumber));
+      const result = await withLoader(() => IIConnection.login(userNumber));
       resolve(apiResultToLoginResult(result));
     };
 
