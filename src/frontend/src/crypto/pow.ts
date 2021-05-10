@@ -15,7 +15,7 @@ const NONCE_OFFSET =
  * Compute a ProofOfWork (PoW).
  *
  * @param timestamp The timestamp at which the PoW is valid.
- * @param canisterId The principal of the IDP canister to be included in the signature.
+ * @param canisterId The principal of the II canister to be included in the signature.
  * @returns
  */
 export default function (

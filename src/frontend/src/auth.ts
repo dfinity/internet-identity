@@ -36,7 +36,7 @@ interface AuthResponseFailure {
 
 type AuthResponse = AuthResponseSuccess | AuthResponseFailure;
 
-// A message to signal that the IDP is ready to receive authorization requests.
+// A message to signal that the II is ready to receive authorization requests.
 const READY_MESSAGE = {
   kind: "authorize-ready",
 };
