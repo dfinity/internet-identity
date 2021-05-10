@@ -68,4 +68,4 @@ jobs:
         shell: bash
         run: |
           cd backend-tests
-          $HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/idp_service.wasm\
+          $HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/internet_identity.wasm\

@@ -45,7 +45,7 @@ import { writeFile } from "fs/promises";
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../.dfx/local/canister_ids.json";
-const IDENTITY_CANISTER = canister_ids1.idp_service.local;
+const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 import canister_ids2 from "../../../demos/whoami/.dfx/local/canister_ids.json";
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 

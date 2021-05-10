@@ -65,7 +65,7 @@ import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
--- copied from ./src/idp_service/idp_service.did,
+-- copied from ./src/internet_identity/internet_identity.did,
 -- and then modified to replace vec nat8 with blob
 type IDPInterface m = [Candid.candid|
 
@@ -884,7 +884,7 @@ fromPrincipal s = cid
 newtype WasmOption = WasmOption String
 
 instance IsOption WasmOption where
-  defaultValue = WasmOption "../target/wasm32-unknown-unknown/release/idp_service.wasm"
+  defaultValue = WasmOption "../target/wasm32-unknown-unknown/release/internet_identity.wasm"
   parseValue = Just . WasmOption
   optionName = return "wasm"
   optionHelp = return "webassembly module of the identity provider"

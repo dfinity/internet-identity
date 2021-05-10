@@ -8,7 +8,7 @@ import {
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
-import { DeviceData, PublicKey } from "../../generated/idp_types";
+import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 

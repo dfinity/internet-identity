@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { FrontendHostname } from "../../generated/idp_types";
+import { FrontendHostname } from "../../generated/internet_identity_types";
 
 const pageContent = (hostName: string) => html`
   <style>

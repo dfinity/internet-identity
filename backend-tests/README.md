@@ -21,7 +21,7 @@ Setup
 Running
 -------
 
- * Build the top-level directory, build the backend canister (`dfx build idp_service`)
+ * Build the top-level directory, build the backend canister (`dfx build internet_identity`)
  * In the present directory, run
    ```
    cabal run -v0 backend-tests --
@@ -32,7 +32,7 @@ Options
 
 By default, this tests the wasm file in
 
-    ../target/wasm32-unknown-unknown/release/idp_service.wasm
+    ../target/wasm32-unknown-unknown/release/internet_identity.wasm
 
 to use a different one, pass the `--wasm` flag to `backend-tests`
 
