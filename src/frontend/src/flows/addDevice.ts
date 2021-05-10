@@ -30,7 +30,10 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
-export const addDevice = (userNumber: bigint, connection: IIConnection): void => {
+export const addDevice = (
+  userNumber: bigint,
+  connection: IIConnection
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   init(userNumber, connection);

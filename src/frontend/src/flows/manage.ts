@@ -53,7 +53,10 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
   renderIdentities(userNumber, connection);
 };
 
-const renderIdentities = async (userNumber: bigint, connection: IIConnection) => {
+const renderIdentities = async (
+  userNumber: bigint,
+  connection: IIConnection
+) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
