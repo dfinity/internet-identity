@@ -616,7 +616,7 @@ Make note of the hash of wasm module:
 shasum -a 256 internet_identity.wasm
 ----
 
-Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job “docker build” and look at the output of step “Run sha256sum out/idp_service.wasm”.
+Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job “docker build” and look at the output of step “Run sha256sum out/internet_identity.wasm”.
 
 === Initial installation (should happen only once)
 
