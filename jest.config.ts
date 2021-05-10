@@ -8,8 +8,4 @@ export default {
   moduleNameMapper: {
     "dfx-generated/internet_identity": internet_identity,
   },
-  transform: {
-    "^.+\\.jsx?$": "ts-jest",
-    "^.+\\.tsx?$": "ts-jest",
-  },
 };

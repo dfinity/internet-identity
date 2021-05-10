@@ -10,8 +10,7 @@
     "build": "NODE_ENV=production webpack",
     "test": "jest",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend",
-    "format-check": "prettier --check src/frontend"
+    "format": "prettier --write src/frontend"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.11.10",
