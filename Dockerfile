@@ -1,7 +1,7 @@
 # Use this with
 #
-#  docker build -t internet-identity-service .
-#  docker run --rm --entrypoint cat internet-identity-service /internet_identity_service.wasm > internet_identity_service.wasm
+#  docker build -t internet-identity .
+#  docker run --rm --entrypoint cat internet-identity /internet_identity_service.wasm > internet_identity_service.wasm
 #
 # and find the .wasmfile in out/
 
