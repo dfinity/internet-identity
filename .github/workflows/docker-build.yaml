@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t idp-service .
+      - run: docker build -t internet-identity .
       - run: mkdir out/
-      - run: docker run --rm --entrypoint cat idp-service /internet_identity.wasm > out/internet_identity.wasm
-      - run: docker run --rm --entrypoint tar idp-service -c -f - dist| tar -C out -x
+      - run: docker run --rm --entrypoint cat internet-identity /internet_identity.wasm > out/internet_identity.wasm
+      - run: docker run --rm --entrypoint tar internet-identity -c -f - dist| tar -C out -x
       - run: sha256sum out/internet_identity.wasm
       - name: 'Upload artifacts'
         uses: actions/upload-artifact@v2

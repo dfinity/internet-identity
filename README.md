@@ -1,6 +1,6 @@
 # Internet Identity Service
 
-See `./docs/ic-idp-spec.adoc` for a details specification and technical
+See `./docs/internet-identity-spec.adoc` for a details specification and technical
 documentation.
 
 ## Official build
@@ -13,6 +13,7 @@ environment. The following steps _should_ build the official Wasm image
 
     docker build -t internet-identity-service .
     docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+    sha256sum internet_identity.wasm
 
 The resulting `internet_identity.wasm` is ready for deployment as
 `rdmx6-jaaaa-aaaaa-aaadq-cai`, which is the reserved principal for this service.

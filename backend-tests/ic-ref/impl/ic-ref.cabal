@@ -1,7 +1,7 @@
 cabal-version:       2.2
 name:                ic-ref
 version:             0.0.1
-author:              Joachim Breitner
+author:              DFINITY
 build-type:          Simple
 extra-source-files:  cbits/*.h ic.did
 
