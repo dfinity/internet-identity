@@ -12,7 +12,7 @@ Unlike most authentication services, your Internet identity does not require you
 
 NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See <<Add a device,`+Add a device+`>>.
 
-Firefox does not currently accept OSX with any decvice authentication method other than a security key. 
+Firefox does not currently accept OSX with any device authentication method other than a security key. 
 
 == Create an Internet identity
 
