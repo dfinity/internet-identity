@@ -1,6 +1,6 @@
 # Internet Identity Service
 
-See `./docs/ic-idp-spec.adoc` for a details specification and technical
+See `./docs/internet-identity-spec.adoc` for a details specification and technical
 documentation.
 
 ## Official build
