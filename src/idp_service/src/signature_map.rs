@@ -1,3 +1,4 @@
+//! Maintains user signatures and expirations.
 use certified_map::{AsHashTree, RbTree};
 use hashtree::{leaf_hash, Hash, HashTree};
 use std::collections::BinaryHeap;

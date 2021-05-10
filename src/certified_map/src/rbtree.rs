@@ -65,7 +65,7 @@ impl<K: 'static + AsRef<[u8]>, V: AsHashTree + 'static> AsHashTree for RbTree<K,
 // 2. Children of a red node are black.
 // 3. Every path from a node goes through the same number of black
 //    nodes.
-pub struct Node<K, V> {
+struct Node<K, V> {
     key: K,
     value: V,
     left: *mut Node<K, V>,

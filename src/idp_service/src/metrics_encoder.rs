@@ -1,3 +1,4 @@
+//! Encodes metrics for Prometheus.
 use std::io;
 
 /// `MetricsEncoder` provides methods to encode metrics in a text format
