@@ -10,6 +10,10 @@ The Internet Identity service enables you to authenticate securely and anonymous
 
 Unlike most authentication services, your Internet identity does not require you to set and manage passwords, generate a cryptographically-secure seed phrase, or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
+NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See <<Add a device,`+Add a device+`>>.
+
+Firefox does not currently accept OSX with any decvice authentication method other than a security key. 
+
 == Create an Internet identity
 
 You can access applications running in the {IC} securely by selecting an authentication method and having an Internet Identity user number generated for you.
@@ -27,10 +31,8 @@ To create an Internet Identity as a first-time user:
 For example, if your device has biometrics enabled to unlock it, you might see the option to use those as your authentication method. You can also use the password that unlocks your computer or a pin that unlocks your phone, depending on the device you’re using.
 +
 
-NOTE: As a best practice, use a dedicated security key. You can then add another authentication device if you prefer to use one, such as your phone, and store the key in a safe place in the event that you are unable to to use your preferred device.  
+NOTE: As a best practice, use a dedicated security key. You can then add another authentication device if you prefer to use one, such as your phone, and store the key in a safe place in the event that you are unable to to use your preferred device. When you use a dedicated security key, you can log in to any {IC} application using any browser, with any device that recognizes it. 
 +
-NOTE: On OSX (including iPhones), TouchId authentication on Safari is coupled to your browser profile. If you want to log in with other browsers as well, or if you use multiple Safari browser profiles, you have to add them as a new device (see below).
-
 . Click *Register* when prompted. 
 +
 Your identity is not created until you perform this step. 
