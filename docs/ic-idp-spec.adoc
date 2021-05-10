@@ -580,8 +580,8 @@ The Internet Identity canister is created as an empty canister (i.e. no wasm mod
 In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-docker build -t idp-service .
-docker run --rm --entrypoint cat idp-service /internet_identity.wasm > internet_identity.wasm
+docker build -t internet-identity-service .
+docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
 ----
 
 The resulting `internet_identity.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
@@ -630,7 +630,7 @@ ic-admin \
 Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/internet_identity.wasm --arg arg.in
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path ~/work/internet-identity/target/wasm32-unknown-unknown/release/internet_identity.wasm --arg arg.in
 ----
 
 The above will need to be adjusted to submit a proposal on the beta network (specifically the NNS url and we need to use a real neuron ID as the proposer instead of the test-neuron-proposer).
@@ -662,7 +662,7 @@ Once you've built the binary, you can then run (for `messaging`):
 
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/idp-service/target/wasm32-unknown-unknown/release/internet_identity.wasm
+ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path ~/work/internet-identity/target/wasm32-unknown-unknown/release/internet_identity.wasm
 ----
 
 === Disaster recovery
