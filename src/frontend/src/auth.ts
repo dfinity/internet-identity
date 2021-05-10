@@ -4,7 +4,7 @@ import {
   PublicKey,
   SignedDelegation,
   UserNumber,
-} from "../generated/idp_types";
+} from "../generated/internet_identity_types";
 import { withLoader } from "./components/loader";
 import { confirmRedirect } from "./flows/confirmRedirect";
 import { IDPActor } from "./utils/idp_actor";
