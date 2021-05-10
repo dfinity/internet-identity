@@ -664,7 +664,7 @@ ic-admin \
     propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
     --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
     --mode upgrade \
-    --wasm-module-path idp_service
+    --wasm-module-path internet_identity.wasm
 ----
 
 If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`:
