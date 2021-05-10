@@ -28,6 +28,8 @@ For example, if your device has biometrics enabled to unlock it, you might see t
 +
 
 NOTE: As a best practice, use a dedicated security key. You can then add another authentication device if you prefer to use one, such as your phone, and store the key in a safe place in the event that you are unable to to use your preferred device.  
++
+NOTE: On OSX (including iPhones), TouchId authentication on Safari is coupled to your browser profile. If you want to log in with other browsers as well, or if you use multiple Safari browser profiles, you have to add them as a new device (see below).
 
 . Click *Register* when prompted. 
 +
