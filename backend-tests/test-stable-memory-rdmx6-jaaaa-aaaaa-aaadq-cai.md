@@ -23,7 +23,7 @@ To create the user with the key that our tests can log into, I had to
    `~/.config/dfinity/dfx/identity/default/identity.pem`
  * Used
    ```
-   dfx canister --no-wallet --network messaging call idp_service register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 0; timestamp = 0})'
+   dfx canister --no-wallet --network messaging call internet_identity register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 0; timestamp = 0})'
    ```
    the error message tells me the current time stamp
  * Used
@@ -33,15 +33,15 @@ To create the user with the key that our tests can log into, I had to
    to geneate a PoW nonce
  * Registered
    ```
-   dfx canister --no-wallet --network messaging call idp_service register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 6872029500088652; timestamp = 1619677860554976404})'
+   dfx canister --no-wallet --network messaging call internet_identity register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 6872029500088652; timestamp = 1619677860554976404})'
    ```
  * Added the `webauthPK` used from testing:
    ```
-   dfx canister --no-wallet --network messaging call idp_service add '(10030, record {pubkey = blob "0^0\0c\06\n+\06\01\04\01\83\b8C\01\01\03N\00\a5\01\02\03& \01!X lR\be\ad]\f5, \8a\9b\1c{\e0\a6\08GW>[\e4\acO\e0\8e\a4\806\d0\ba\1d*\cf\"X \b3=\ae\b8;\c9\c7}\8a\d7b\fdh\e3\ea\b0\86\84\e4c\c4\93Q\b3\ab*\14\a4\00\13\83\87"; alias = "testkey"})'
+   dfx canister --no-wallet --network messaging call internet_identity add '(10030, record {pubkey = blob "0^0\0c\06\n+\06\01\04\01\83\b8C\01\01\03N\00\a5\01\02\03& \01!X lR\be\ad]\f5, \8a\9b\1c{\e0\a6\08GW>[\e4\acO\e0\8e\a4\806\d0\ba\1d*\cf\"X \b3=\ae\b8;\c9\c7}\8a\d7b\fdh\e3\ea\b0\86\84\e4c\c4\93Q\b3\ab*\14\a4\00\13\83\87"; alias = "testkey"})'
    ```
  * Got a delegation so see my public key there:
    ```
-   dfx canister --no-wallet --network messaging call idp_service prepare_delegation '(10030, "example.com", blob "dummykey", null)'
+   dfx canister --no-wallet --network messaging call internet_identity prepare_delegation '(10030, "example.com", blob "dummykey", null)'
    ```
 
 To get the stable memory, I logged into a messaging testnet replica,

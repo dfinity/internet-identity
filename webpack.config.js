@@ -9,7 +9,7 @@ require("dotenv").config();
 let localCanister;
 
 try {
-  localCanister = require("./.dfx/local/canister_ids.json").idp_service.local;
+  localCanister = require("./.dfx/local/canister_ids.json").internet_identity.local;
 } catch {}
 
 /**

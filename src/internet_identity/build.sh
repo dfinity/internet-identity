@@ -15,8 +15,8 @@ STATUS=$?
 
 if [ "$STATUS" -eq "0" ]; then
       "$IDP_DIR"/../../target/bin/ic-cdk-optimizer \
-      "$IDP_DIR/../../target/$TARGET/release/idp_service.wasm" \
-      -o "$IDP_DIR/../../target/$TARGET/release/idp_service.wasm"
+      "$IDP_DIR/../../target/$TARGET/release/internet_identity.wasm" \
+      -o "$IDP_DIR/../../target/$TARGET/release/internet_identity.wasm"
 
   true
 else
