@@ -8,8 +8,4 @@ export default {
   moduleNameMapper: {
     "dfx-generated/idp_service": idp_service,
   },
-  transform: {
-    "^.+\\.jsx?$": "ts-jest",
-    "^.+\\.tsx?$": "ts-jest",
-  },
 };
