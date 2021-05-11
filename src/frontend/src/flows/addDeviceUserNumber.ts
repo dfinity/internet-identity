@@ -2,6 +2,7 @@ import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { displayError } from "../components/displayError";
+import { clearHash } from "../flows/addDevice";
 import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
@@ -17,6 +18,7 @@ const pageContent = (userNumber: bigint | null) => html`
       value=${userNumber ?? ""}
     />
     <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
+    <button type="button" id="cancelAdd">Cancel</button>
   </div>
 `;
 
@@ -42,6 +44,12 @@ const init = () => {
       e.preventDefault();
       addDeviceUserNumberContinue.click();
     }
+  };
+
+  const cancelAdd = document.querySelector("#cancelAdd") as HTMLButtonElement;
+  cancelAdd.onclick = () => {
+    clearHash();
+    window.location.reload();
   };
 
   addDeviceUserNumberContinue.onclick = async () => {
