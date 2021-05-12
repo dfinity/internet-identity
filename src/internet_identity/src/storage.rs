@@ -13,10 +13,12 @@ const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const WASM_PAGE_SIZE: u32 = 65536;
 const STABLE_MEMORY_SIZE: u64 = 1 << 32;
+/// We reserve last ~10% of the stable memory for later new features.
+const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
 
 /// The maximum number of users this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
-    (STABLE_MEMORY_SIZE - HEADER_SIZE as u64) / DEFAULT_ENTRY_SIZE as u64;
+    (STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
@@ -215,7 +217,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     }
 
     pub fn max_users(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64) / self.header.entry_size as u64) as usize
+        ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE)
+            / self.header.entry_size as u64) as usize
     }
 
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
