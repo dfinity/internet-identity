@@ -293,7 +293,7 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
-Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client applicaition as per the <<client-auth-protocol,client authentication protocol>>.
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client application as per the <<client-auth-protocol,client authentication protocol>>.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
@@ -388,7 +388,7 @@ NOTE: Even with that provision the same nonce can be used to ingress multiple me
 === Initialization
 
 The Internet Identity canister is designed for sharded deployments.
-There can be many simultaniously installed instances of the canister code, each serving requests of a subset of users.
+There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users.
 As users are identified by their user number, we split the range of user numbers into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
 The assigned range is passed to the canister as an init argument, encoded in Candid:
 
@@ -426,7 +426,7 @@ user number, if known under the key `user_number`.
 
 The following flows are not prescriptive of the UI, e.g. “the frontend asks the user for X” may also mean that on the previous shown page, there is already a field for X.
 
-The possible login subflows are shared among entry points `/` and `/authorized`, and are thus described separately. At the end of a succesful login subflow:
+The possible login subflows are shared among entry points `/` and `/authorized`, and are thus described separately. At the end of a successful login subflow:
 
 * The frontend knows the `user_number` (also stored in local storage).
 * the frontend has a temporary session key
@@ -529,7 +529,7 @@ This flow is the boring default
 
 1. The user accesses `/#add_device=…`
 2. 👆 The appropriate login subflow happens
-3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on an maliciously hidden `add_device` link will not continue.
+3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on a maliciously hidden `add_device` link will not continue.
 4. Call `add()` to add new device
 5. The hash fragment is removed from the URL
 6. The user is told that they can go back to their other device.
@@ -542,7 +542,7 @@ This flow is the boring default
 2. 👆 The appropriate login subflow happens
 3. The frontend listens to a `message` event (as per https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage[`postMessage` API])
 4. The `event.data` should be a message as per our <<client-auth-protocol>>.
-5. The `event.origin` is used as the Application Frontned’s hostname
+5. The `event.origin` is used as the Application Frontend’s hostname
 6. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
 7. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
 8. The frontend queries `get_delegation()` to get the delegation data
