@@ -26,8 +26,8 @@ const fn secs_to_nanos(secs: u64) -> u64 {
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
 // 8 days
 const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
-// 10 mins
-const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
+// 1 min
+const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 // 5 mins
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 
