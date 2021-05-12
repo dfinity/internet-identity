@@ -199,6 +199,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         (self.header.id_range_lo, self.header.id_range_hi)
     }
 
+    pub fn set_user_number_range(&mut self, (lo, hi): (UserNumber, UserNumber)) {
+        self.header.id_range_lo = lo;
+        self.header.id_range_hi = hi;
+        self.flush();
+    }
+
     fn value_size_limit(&self) -> usize {
         self.header.entry_size as usize - std::mem::size_of::<u16>()
     }

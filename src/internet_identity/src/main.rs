@@ -31,6 +31,9 @@ const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(600);
 // 5 mins
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 
+/// The maximum number of users we can store in a single canister.
+const MAX_USERS_PER_CANISTER: u64 = 2_000_000_000;
+
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
@@ -144,9 +147,13 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
+        const FIRST_USER_ID: UserNumber = 10_000;
         Self {
             nonce_cache: RefCell::new(NonceCache::default()),
-            storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
+            storage: RefCell::new(Storage::new((
+                FIRST_USER_ID,
+                FIRST_USER_ID.saturating_add(MAX_USERS_PER_CANISTER),
+            ))),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
@@ -522,6 +529,13 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     STATE.with(|state| {
         if let Some(arg) = maybe_arg {
+            let (lo, hi) = arg.assigned_user_number_range;
+            if (hi - lo) > MAX_USERS_PER_CANISTER {
+                trap(&format!(
+                    "specified user range [{}, {}) contains more users than this canister can store ({})",
+                    lo, hi, MAX_USERS_PER_CANISTER
+                ));
+            }
             state
                 .storage
                 .replace(Storage::new(arg.assigned_user_number_range));
@@ -537,7 +551,21 @@ fn retrieve_data() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time() as u64);
         match Storage::from_stable_memory() {
-            Some(storage) => {
+            Some(mut storage) => {
+                let (lo, hi) = storage.assigned_user_number_range();
+                if (hi - lo) > MAX_USERS_PER_CANISTER {
+                    // We used to specify a nonsensical limit of 8M
+                    // users by default.  We can't store more than
+                    // 2M users in a single canister, so we adjust the
+                    // limit in post upgrade.
+                    if storage.user_count() as u64 > MAX_USERS_PER_CANISTER {
+                        trap(&format!(
+                            "the storage somehow has {} users which is more than a single canister can have ({})",
+                            storage.user_count(), MAX_USERS_PER_CANISTER
+                        ));
+                    }
+                    storage.set_user_number_range((lo, lo.saturating_add(MAX_USERS_PER_CANISTER)));
+                }
                 s.storage.replace(storage);
             }
             None => {
