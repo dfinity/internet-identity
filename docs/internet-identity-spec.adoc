@@ -388,7 +388,7 @@ NOTE: Even with that provision the same nonce can be used to ingress multiple me
 === Initialization
 
 The Internet Identity canister is designed for sharded deployments.
-There can be many simultaniously installed instances of the canister code, each serving requests of a subset of users.
+There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users.
 As users are identified by their user number, we split the range of user numbers into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
 The assigned range is passed to the canister as an init argument, encoded in Candid:
 
