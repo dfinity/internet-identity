@@ -10,17 +10,19 @@ The Internet Identity service enables you to authenticate securely and anonymous
 
 Unlike most authentication services, your Internet identity does not require you to set and manage passwords, generate a cryptographically-secure seed phrase, or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
-NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See <<Add a device,`+Add a device+`>>.
+NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
 
 Firefox does not currently accept OSX with any device authentication method other than a security key. 
 
 == Create an Internet identity
 
-You can access applications running in the {IC} securely by selecting an authentication method and having an Internet Identity user number generated for you.
+You can access applications running in the {IC} securely by selecting an authentication method and having an Internet Identity user number generated for you. 
 
 When you first access an application running on the {IC}, you are directed to the Internet Identity service and asked to enter a User Number to log in. If you are a new user, you need to register first.
 
 To create an Internet Identity as a first-time user:
+
+. Go to link:https://identity.ic0.app/[The Internet Identity service portal].
 
 . Click *Register with Internet Identity*. 
 

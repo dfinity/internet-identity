@@ -26,6 +26,9 @@ The application verifies the authorization from the Internet Identity service an
 Internally, you have a different identity for each application, but your identity for any single application is the same across all of your devices. 
 All of your devices just represent different methods you can use to authenticate your user number. 
 
+To learn how to register a device step-by-step, see: link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use the Internet Identity service]. 
+
+
 
 ////
 
