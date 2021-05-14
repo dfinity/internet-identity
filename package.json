@@ -48,9 +48,9 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/agent": "0.8.8",
-    "@dfinity/authentication": "0.8.8",
-    "@dfinity/identity": "0.8.8",
+    "@dfinity/agent": "0.8.9",
+    "@dfinity/authentication": "0.8.9",
+    "@dfinity/identity": "0.8.9",
     "biguintle": "^1.0.3",
     "clipboard": "^2.0.8",
     "kjua": "^0.9.0",
