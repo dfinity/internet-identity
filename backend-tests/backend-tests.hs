@@ -202,9 +202,6 @@ type InitCandid = [Candid.candidType|
     assigned_user_number_range : record { nat64; nat64; };
   }
   |]
-type Init = (Word64, Word64)
-toInitCandid :: Init -> Maybe InitCandid
-toInitCandid (l,u) = Just $ #assigned_user_number_range .== (#_0_ .== l .+ #_1_ .== u)
 
 type ProofOfWork = [Candid.candidType|record {
   timestamp : nat64;
@@ -470,7 +467,7 @@ assertMetric repo name expectedValue =
 
 validateHttpResponse :: HasCallStack => Blob -> String -> HttpResponse -> M ()
 validateHttpResponse cid asset resp = do
-  h <- case [ t .! #_1_ | t <- V.toList (resp .! #headers), t .! #_0_ == "IC-Certificate"] of
+  h <- case [ v | ("IC-Certificate", v) <- V.toList (resp .! #headers)] of
     [] -> lift $ assertFailure "IC-Certificate header not found"
     [h] -> return $ BS.fromStrict $ T.encodeUtf8  h
     _ -> lift $ assertFailure "IC-Certificate header duplicated???"
@@ -711,8 +708,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range .! #_0_ @?= 100
-    lift $ s .! #assigned_user_number_range .! #_1_ @?= 103
+    lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     assertStats cid 0
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
@@ -724,8 +720,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     when should_upgrade $ doUpgrade cid
     s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range .! #_0_ @?= 100
-    lift $ s .! #assigned_user_number_range .! #_1_ @?= 103
+    lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     liftIO $ user_number @?= 102
@@ -735,8 +730,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range .! #_0_ @?= 100
-    lift $ s .! #assigned_user_number_range .! #_1_ @?= 100
+    lift $ s .! #assigned_user_number_range @?= (100, 100)
     response <- callII cid webauthID #register (device1, powAt cid 0)
     assertVariant #canister_full response
 
@@ -789,10 +783,9 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     when should_upgrade $ doUpgrade cid
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #users_registered @?= 31
-    lift $ s .! #assigned_user_number_range .! #_0_ @?= 10_000
     -- The actual value in the dump is 8B, but it's way too large
     -- and should be auto-corrected on upgrade
-    lift $ s .! #assigned_user_number_range .! #_1_ @?= 1897436
+    lift $ s .! #assigned_user_number_range @?= (10_000, 1897436)
     lookupIs cid 9_999 []
     lookupIs cid 10_000 [#alias .== "Desktop" .+ #credential_id .== Just "c\184\175\179\134\221u}\250[\169U\v\202f\147g\ETBvo9[\175\173\144R\163\132\237\196F\177\DC2(\188\185\203hI\128\187Z\129'\v1\212\185V\ETB\135)m@ M1\233l\ESC8kI\132" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \238o!-\ESC\148\252\192\DC4\240P\176\135\240j\211AW\255S\193\153\129\227\151hB\177dK\n\FS\"X \rk\197\238\a{\210\&0\v<\134\223\135\170_\223\144\210V\208\DC3\RS\251\228D$3\r\232\176\EOTq"]
     lookupIs cid 10_002 [#alias .== "andrew-mbp" .+ #credential_id .== Just "\SOH\191#%\217u\247\178L-K\182\254\249J.m\187\179_I\ACK\137\244`\163o\SI\150qz\197Hz\214\&8\153\239\213\159\208\RS\243\138\171\138\"\139\173\170\ESC\148\205\129\149ri\\Dn,7\151\146\175\DEL" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X rMm*\229BDe\SOH4\228u\170\206\216\216-ER\v\166r\217\137,\141\227M*@\230\243\"X \225\248\159\191\242\224Z>\241\163\\\GS\155\178\222\139^\136V\253q\v\SUBSJ\bA\131\\\183\147\170",#alias .== "andrew phone chrome" .+ #credential_id .== Just ",\235x\NUL\a\140`~\148\248\233C/\177\205\158\ETX0\129\167" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \140\169\203@\ETX\CAN\ETB,\177\153\179\223/|`\US\STX\252r\190s(.\188\136\171\SI\181V*\174@\"X \245<\174AbV\225\234\ENQ\146\247\129\245\ACK\200\205\217\250g\219\179)\197\252\164i\172kXh\180\205"]
@@ -816,7 +809,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       ic <- initialIC
       evalStateT act ic
 
-    iiTestWithInit name init act = testCase name $ withIC $ do
+    iiTestWithInit name (l, u) act = testCase name $ withIC $ do
       wasm <- lift $ BS.readFile wasm_file
       r <- callManagement controllerId #create_canister (#settings .== Nothing)
       let Candid.Principal cid = r .! #canister_id
@@ -824,7 +817,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #mode .== V.IsJust #install ()
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
-        .+ #arg .== Candid.encode (toInitCandid init)
+        .+ #arg .== Candid.encode (Just (#assigned_user_number_range .== (l :: Word64, u :: Word64)))
       act cid
 
     iiTest name act = testCase name $ withIC $ do
