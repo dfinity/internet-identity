@@ -92,7 +92,10 @@ async function handleAuthRequest(
     const prepRes = await connection.prepareDelegation(
       userNumber,
       hostname,
-      sessionKey
+      sessionKey,
+      request.maxTimeToLive !== undefined
+        ? BigInt(request.maxTimeToLive)
+        : undefined
     );
     if (prepRes.length !== 2) {
       throw new Error(

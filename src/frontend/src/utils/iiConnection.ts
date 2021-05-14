@@ -221,13 +221,19 @@ export class IIConnection {
   prepareDelegation = async (
     userNumber: UserNumber,
     hostname: FrontendHostname,
-    sessionKey: SessionKey
+    sessionKey: SessionKey,
+    maxTimeToLive?: bigint
   ): Promise<[PublicKey, bigint]> => {
     console.log(
       `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
-    return await actor.prepare_delegation(userNumber, hostname, sessionKey, []);
+    return await actor.prepare_delegation(
+      userNumber,
+      hostname,
+      sessionKey,
+      maxTimeToLive !== undefined ? [maxTimeToLive] : []
+    );
   };
 
   getDelegation = async (

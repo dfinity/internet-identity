@@ -1,4 +1,5 @@
 import { Actor, HttpAgent, Principal } from "@dfinity/agent";
+import { DelegationIdentity } from "@dfinity/identity";
 import { AuthClient } from "@dfinity/auth-client";
 
 const signInBtn = document.getElementById("signinBtn");
@@ -8,27 +9,54 @@ const hostUrlEl = document.getElementById("hostUrl");
 const whoAmIResponseEl = document.getElementById("whoamiResponse");
 const canisterIdEl = document.getElementById("canisterId");
 const principalEl = document.getElementById("principal");
+const delegationEl = document.getElementById("delegation");
+const expirationEl = document.getElementById("expiration");
 const iiUrlEl = document.getElementById("iiUrl");
+const maxTimeToLiveEl = document.getElementById("maxTimeToLive");
 
 let authClient;
 
 const init = async () => {
   authClient = await AuthClient.create();
-  principalEl.innerText = await authClient.getIdentity().getPrincipal();
 
-  // Redirect to the identity provider
+  const updateView = () => {
+    const identity = authClient.getIdentity();
+
+    principalEl.innerText = identity.getPrincipal();
+    if (identity instanceof DelegationIdentity) {
+      delegationEl.innerText = JSON.stringify(identity.getDelegation().toJSON());
+
+      const nextExpiration =
+        identity.getDelegation().delegations
+         .map(d => d.delegation.expiration)
+         .reduce((current, next) => next < current ? next : current);
+      expirationEl.innerText = nextExpiration - BigInt(Date.now()) * BigInt(1000_000);
+    } else {
+      delegationEl.innerText = "Current identity is not a DelegationIdentity";
+      expirationEl.innerText = "N/A";
+    }
+  }
+
+  updateView();
+
   signInBtn.onclick = async () => {
-    authClient.login({
-      identityProvider: iiUrlEl.value,
-      onSuccess: async () => {
-        principalEl.innerText = await authClient.getIdentity().getPrincipal();
-      },
-    });
+    if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
+      authClient.login({
+        identityProvider: iiUrlEl.value,
+        maxTimeToLive: BigInt(maxTimeToLive.value),
+        onSuccess: updateView
+      })
+    } else {
+      authClient.login({
+        identityProvider: iiUrlEl.value,
+        onSuccess: updateView
+      });
+    }
   };
 
   signOutBtn.onclick = async () => {
     authClient.logout();
-    principalEl.innerText = await authClient.getIdentity().getPrincipal();
+    updateView();
   };
 };
 
