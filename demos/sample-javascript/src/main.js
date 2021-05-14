@@ -24,7 +24,7 @@ const init = async () => {
 
     principalEl.innerText = identity.getPrincipal();
     if (identity instanceof DelegationIdentity) {
-      delegationEl.innerText = JSON.stringify(identity.getDelegation().toJSON());
+      delegationEl.innerText = JSON.stringify(identity.getDelegation().toJSON(), undefined, 2);
 
       const nextExpiration =
         identity.getDelegation().delegations
