@@ -497,7 +497,7 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
 --
 The link format is:
 
-  https://identity.ic0.app/#add_device=<userNumber>;<publicKey>[;<credentialId>]
+  https://identity.ic0.app/#device=<userNumber>;<publicKey>[;<credentialId>]
 
 where
 
@@ -527,9 +527,9 @@ This flow is the boring default
 
 === Flow: adding devices via link
 
-1. The user accesses `/#add_device=…`
+1. The user accesses `/#device=…`
 2. 👆 The appropriate login subflow happens
-3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on a maliciously hidden `add_device` link will not continue.
+3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on a maliciously hidden `device` link will not continue.
 4. Call `add()` to add new device
 5. The hash fragment is removed from the URL
 6. The user is told that they can go back to their other device.
