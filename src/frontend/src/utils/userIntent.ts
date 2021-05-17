@@ -15,7 +15,7 @@ export const intentFromUrl = (url: URL): UserIntent => {
   }
 };
 
-export const bannerFromIntent = (intent: UserIntent): string => {
+export const verbFromIntent = (intent: UserIntent): string => {
   switch (intent.kind) {
     case "addDevice":
       return "add your new device to your Internet Identity";
