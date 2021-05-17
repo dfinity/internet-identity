@@ -54,7 +54,9 @@ jobs:
       - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: Deploy Internet Identity
-        run: dfx deploy --no-wallet --argument '(null)'
+        run: |
+          export II_ENV=development
+          dfx deploy --no-wallet --argument '(null)'
 
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
