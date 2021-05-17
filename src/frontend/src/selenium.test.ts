@@ -654,8 +654,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Fixup(driver2);
       await screenshot("12-new-device-login", driver2);
       await on_WelcomeBack_Login(driver2);
-      await on_SingleDeviceLoginWarning(driver);
-      await on_SingleDeviceLoginWarning_Continue(driver);
+      await on_SingleDeviceLoginWarning(driver2);
+      await on_SingleDeviceLoginWarning_Continue(driver2);
       await on_Main(DEVICE_NAME2, driver2);
       await on_Main_Fixup(driver2);
       await screenshot("13-new-device-listed", driver2);
