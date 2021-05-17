@@ -139,6 +139,10 @@ async function on_SingleDeviceLoginWarning(driver: ThenableWebDriver) {
   );
 }
 
+async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("displayWarningPrimary")).click();
+}
+
 // View: Main view
 
 async function on_Main(device_name: string, driver: ThenableWebDriver) {
@@ -189,10 +193,6 @@ async function on_WelcomeBack_Fixup(driver: ThenableWebDriver) {
 
 async function on_WelcomeBack_Login(driver: ThenableWebDriver) {
   await driver.findElement(By.id("login")).click();
-}
-
-async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
-  await driver.findElement(By.id("displayWarningPrimary")).click();
 }
 
 // View: Add device user number
@@ -410,7 +410,7 @@ async function run_in_browser_common(
     .setChromeOptions(
       new ChromeOptions()
         .headless() // hides the click show: uncomment to watch it
-        .windowSize({ width: 1024, height: 768 })
+        .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
     .build();
