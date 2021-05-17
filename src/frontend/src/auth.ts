@@ -13,7 +13,7 @@ import { hasOwnProperty } from "./utils/utils";
 interface AuthRequest {
   kind: "authorize-client";
   sessionPublicKey: Uint8Array;
-  maxTimeToLive?: BigInt;
+  maxTimeToLive?: bigint;
 }
 
 interface AuthResponseSuccess {
@@ -21,7 +21,7 @@ interface AuthResponseSuccess {
   delegations: {
     delegation: {
       pubkey: Uint8Array;
-      expiration: BigInt;
+      expiration: bigint;
       targets?: Principal[];
     };
     signature: Uint8Array;
@@ -92,7 +92,8 @@ async function handleAuthRequest(
     const prepRes = await connection.prepareDelegation(
       userNumber,
       hostname,
-      sessionKey
+      sessionKey,
+      request.maxTimeToLive
     );
     if (prepRes.length !== 2) {
       throw new Error(
