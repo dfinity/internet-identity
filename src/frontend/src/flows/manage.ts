@@ -28,7 +28,9 @@ const pageContent = (userNumber: bigint) => html`<style>
     </p>
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
-    <button id="addAdditionalDevice" type="button">Add an additional device</button>
+    <button id="addAdditionalDevice" type="button">
+      Add an additional device
+    </button>
     <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
     ${logoutSection()}
@@ -64,8 +66,7 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
     } catch (error) {
       await displayError({
         title: "Failed to authenticate",
-        message:
-          "Helpful message about how to add a new external device",
+        message: "Helpful message about how to add a new external device",
         detail: error.message,
         primaryButton: "Try again",
       });
@@ -74,7 +75,14 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
     const deviceName = await pickDeviceAlias();
     // TODO check whether newDevice is already registered
     try {
-      await withLoader(() => connection.add(userNumber, deviceName, newDevice.getPublicKey().toDer(), newDevice.rawId));
+      await withLoader(() =>
+        connection.add(
+          userNumber,
+          deviceName,
+          newDevice.getPublicKey().toDer(),
+          newDevice.rawId
+        )
+      );
     } catch (error) {
       await displayError({
         title: "Failed to add the new device",
@@ -84,7 +92,7 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
         primaryButton: "Try again",
       });
     }
-    renderManage(userNumber, connection)
+    renderManage(userNumber, connection);
   };
 
   renderIdentities(userNumber, connection);
