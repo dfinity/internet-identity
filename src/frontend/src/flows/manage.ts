@@ -85,7 +85,9 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
     if (deviceName === null) {
       return renderManage(userNumber, connection);
     }
-    // TODO check whether newDevice is already registered
+    // TODO check whether newDevice is already registered,
+    // or better, pass existing devices to `.create` so that they
+    // cannot be added again
     try {
       await withLoader(() =>
         connection.add(
