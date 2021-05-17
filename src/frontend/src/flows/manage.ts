@@ -11,6 +11,8 @@ import { aboutLink } from "../components/aboutLink";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
+import { pickDeviceAlias } from "./addDevicePickAlias";
+import { WebAuthnIdentity } from "@dfinity/identity";
 
 const pageContent = (userNumber: bigint) => html`<style>
     #deviceLabel {
@@ -26,6 +28,7 @@ const pageContent = (userNumber: bigint) => html`<style>
     </p>
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
+    <button id="addAdditionalDevice" type="button">Add an additional device</button>
     <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
     ${logoutSection()}
@@ -50,6 +53,40 @@ export const renderManage = (
 const init = async (userNumber: bigint, connection: IIConnection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
+  const addAdditionalDevice = document.querySelector(
+    "#addAdditionalDevice"
+  ) as HTMLButtonElement;
+
+  addAdditionalDevice.onclick = async () => {
+    let newDevice: WebAuthnIdentity;
+    try {
+      newDevice = await WebAuthnIdentity.create();
+    } catch (error) {
+      await displayError({
+        title: "Failed to authenticate",
+        message:
+          "Helpful message about how to add a new external device",
+        detail: error.message,
+        primaryButton: "Try again",
+      });
+      return renderManage(userNumber, connection);
+    }
+    const deviceName = await pickDeviceAlias();
+    // TODO check whether newDevice is already registered
+    try {
+      await withLoader(() => connection.add(userNumber, deviceName, newDevice.getPublicKey().toDer(), newDevice.rawId));
+    } catch (error) {
+      await displayError({
+        title: "Failed to add the new device",
+        message:
+          "We failed to add the new device to your identity. Please try again",
+        detail: error.message,
+        primaryButton: "Try again",
+      });
+    }
+    renderManage(userNumber, connection)
+  };
+
   renderIdentities(userNumber, connection);
 };
 
