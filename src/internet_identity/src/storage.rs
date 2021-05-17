@@ -12,6 +12,13 @@ const HEADER_SIZE: u32 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const WASM_PAGE_SIZE: u32 = 65536;
+const STABLE_MEMORY_SIZE: u64 = 1 << 32;
+/// We reserve last ~10% of the stable memory for later new features.
+const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
+
+/// The maximum number of users this canister can store.
+pub const DEFAULT_RANGE_SIZE: u64 =
+    (STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
@@ -35,14 +42,28 @@ struct Header {
 impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// Creates a new empty storage that manages the data of users in
     /// the specified range.
-    pub fn new(user_number_range: (UserNumber, UserNumber)) -> Self {
+    pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber)) -> Self {
+        if id_range_hi < id_range_lo {
+            trap(&format!(
+                "improper user number range: [{}, {})",
+                id_range_lo, id_range_hi,
+            ));
+        }
+
+        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
+            trap(&format!(
+                "id range [{}, {}) is too large for a single canister (max {} entries)",
+                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE,
+            ));
+        }
+
         Self {
             header: Header {
                 magic: *b"IIC",
                 version: 1,
                 num_users: 0,
-                id_range_lo: user_number_range.0,
-                id_range_hi: user_number_range.1,
+                id_range_lo,
+                id_range_hi,
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
             },
@@ -195,8 +216,33 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         self.header.num_users as usize
     }
 
+    pub fn max_users(&self) -> usize {
+        ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE)
+            / self.header.entry_size as u64) as usize
+    }
+
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
         (self.header.id_range_lo, self.header.id_range_hi)
+    }
+
+    pub fn set_user_number_range(&mut self, (lo, hi): (UserNumber, UserNumber)) {
+        if hi < lo {
+            trap(&format!(
+                "set_user_number_range: improper user number range [{}, {})",
+                lo, hi
+            ));
+        }
+        let max_entries = self.max_users() as u64;
+        if (hi - lo) > max_entries {
+            trap(&format!(
+                "set_user_number_range: specified range [{}, {}) is too large for this canister \
+                 (max {} entries)",
+                lo, hi, max_entries
+            ));
+        }
+        self.header.id_range_lo = lo;
+        self.header.id_range_hi = hi;
+        self.flush();
     }
 
     fn value_size_limit(&self) -> usize {
