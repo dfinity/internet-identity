@@ -411,10 +411,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             s.storage.borrow().user_count() as f64,
             "Number of users registered in this canister.",
         )?;
+        let (lo, hi) = s.storage.borrow().assigned_user_number_range();
         w.encode_gauge(
-            "internet_identity_max_users",
-            s.storage.borrow().max_users() as f64,
-            "Max number of users this canister can serve.",
+            "internet_identity_min_user_number",
+            lo as f64,
+            "The lowest user number served by this canister.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_max_user_number",
+            (hi - 1) as f64,
+            "The highest user number that can be served by this canister.",
         )?;
         w.encode_gauge(
             "internet_identity_signature_count",
