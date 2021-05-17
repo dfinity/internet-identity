@@ -19,8 +19,6 @@ function generateWebpackConfigForCanister(name, info) {
   const isProduction = process.env.NODE_ENV === "production";
   const devtool = isProduction ? undefined : "source-map";
 
-  process.env.CANISTER_ID = process.env.CANISTER_ID || localCanister;
-
   return {
     mode: isProduction ? "production" : "development",
     entry: {
@@ -81,7 +79,10 @@ function generateWebpackConfigForCanister(name, info) {
         Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
       }),
-      new webpack.EnvironmentPlugin(["CANISTER_ID"]),
+      new webpack.EnvironmentPlugin({
+        "CANISTER_ID": localCanister,
+        "II_ENV": "production"
+      }),
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,
       }),
