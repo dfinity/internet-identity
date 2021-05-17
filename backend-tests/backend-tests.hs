@@ -653,18 +653,18 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     (userPK, ts1) <- callII cid webauthID #prepare_delegation delegationArgs
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
 
-    setCanisterTimeTo cid (7*60*1000_000_000)
+    setCanisterTimeTo cid (30*1000_000_000)
     (userPK, ts2) <- callII cid webauthID #prepare_delegation delegationArgs
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
 
-    setCanisterTimeTo cid (14*60*1000_000_000)
+    setCanisterTimeTo cid (70*1000_000_000)
     (userPK, ts3) <- callII cid webauthID #prepare_delegation delegationArgs
     getButNotThere cid webauthID delegationArgs ts1
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
 
-    setCanisterTimeTo cid (21*60*1000_000_000)
+    setCanisterTimeTo cid (120*1000_000_000)
     (userPK, ts4) <- callII cid webauthID #prepare_delegation delegationArgs
     getButNotThere cid webauthID delegationArgs ts1
     getButNotThere cid webauthID delegationArgs ts2
