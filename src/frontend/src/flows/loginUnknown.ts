@@ -8,7 +8,7 @@ import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
 import { bannerFromIntent, UserIntent } from "../utils/userIntent";
 
-const pageContent = (userIntent: string) => html` <style>
+const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
       border-style: double;
@@ -41,29 +41,36 @@ const pageContent = (userIntent: string) => html` <style>
       text-decoration: none;
       color: black;
     }
+    .spacer {
+      height: 2rem;
+    }
   </style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your user number to login and ${userIntent}.</p>
+    <p>
+      Provide your user number to login and ${bannerFromIntent(userIntent)}.
+    </p>
     <input
       type="text"
       id="registerUserNumber"
       placeholder="Enter User Number"
     />
     <button type="button" id="loginButton" class="primary">Login</button>
-    <div class="textLink" id="registerSection">
-      New user?
-      <button id="registerButton" class="linkStyle">
-        Register with Internet Identity.
-      </button>
-    </div>
-    <div class="textLink">
-      Already registered
-      <button id="addNewDeviceButton" class="linkStyle">
-        but using a new device?
-      </button>
-    </div>
+    ${userIntent.kind === "addDevice"
+      ? html`<div class="spacer"></div>`
+      : html`<div class="textLink" id="registerSection">
+            New user?
+            <button id="registerButton" class="linkStyle">
+              Register with Internet Identity.
+            </button>
+          </div>
+          <div class="textLink">
+            Already registered
+            <button id="addNewDeviceButton" class="linkStyle">
+              but using a new device?
+            </button>
+          </div>`}
   </div>
   ${aboutLink}`;
 
@@ -84,11 +91,13 @@ export const loginUnknown = async (
   userIntent: UserIntent
 ): Promise<LoginResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(bannerFromIntent(userIntent)), container);
+  render(pageContent(userIntent), container);
   return new Promise((resolve, reject) => {
     initLogin(resolve);
-    initLinkDevice();
-    initRegister(resolve, reject);
+    if (userIntent.kind !== "addDevice") {
+      initLinkDevice();
+      initRegister(resolve, reject);
+    }
   });
 };
 
