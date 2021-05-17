@@ -1,9 +1,9 @@
-import { html, render } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 
 export type ErrorOptions = {
   title: string;
-  message: string;
+  message: string | TemplateResult;
   detail?: string;
   primaryButton: string;
 };

@@ -65,8 +65,17 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
       newDevice = await WebAuthnIdentity.create();
     } catch (error) {
       await displayError({
-        title: "Failed to authenticate",
-        message: "Helpful message about how to add a new external device",
+        title: "Failed to add new device",
+        message: html`
+          We failed to add your new device.<br />
+          If you're trying to add a device that is not attached to this machine
+          try following the instructions at<br />
+          <a
+            target="_blank"
+            href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
+            >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
+          >
+        `,
         detail: error.message,
         primaryButton: "Try again",
       });
@@ -115,7 +124,7 @@ const renderIdentities = async (
     await displayError({
       title: "Failed to list your devices",
       message:
-        "An unexpected error occured when displaying your devices. Please try again",
+        "An unexpected error occurred when displaying your devices. Please try again",
       detail: err.toString(),
       primaryButton: "Try again",
     });
