@@ -6,7 +6,7 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
-import { bannerFromIntent, UserIntent } from "../utils/userIntent";
+import { verbFromIntent, UserIntent } from "../utils/userIntent";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -48,9 +48,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>
-      Provide your user number to login and ${bannerFromIntent(userIntent)}.
-    </p>
+    <p>Provide your user number to login and ${verbFromIntent(userIntent)}.</p>
     <input
       type="text"
       id="registerUserNumber"

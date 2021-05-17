@@ -5,7 +5,7 @@ import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
-import { bannerFromIntent, UserIntent } from "../utils/userIntent";
+import { verbFromIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
   apiResultToLoginResult,
@@ -18,7 +18,7 @@ const pageContent = (userNumber: bigint, userIntent: UserIntent) => html` <div
   >
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>Login to ${bannerFromIntent(userIntent)}.</p>
+    <p>Login to ${verbFromIntent(userIntent)}.</p>
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
