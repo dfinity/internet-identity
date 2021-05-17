@@ -1,27 +1,34 @@
 //! A cache of recently seen nonces.
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 
 type Timestamp = u64;
 
 /// Data structure containing the list of recently seen proof of work
 /// nonces.
 #[derive(Default)]
-pub struct NonceCache(BinaryHeap<(Reverse<Timestamp>, u64)>);
+pub struct NonceCache {
+    known_nonces: HashSet<(Timestamp, u64)>,
+    expiration_queue: BinaryHeap<(Reverse<Timestamp>, u64)>,
+}
 
 impl NonceCache {
     /// Adds the specified combination of timestamp and nonce to this
     /// cache.
     pub fn add(&mut self, ts: Timestamp, nonce: u64) {
-        self.0.push((Reverse(ts), nonce))
+        if self.known_nonces.insert((ts, nonce)) {
+            self.expiration_queue.push((Reverse(ts), nonce));
+        }
     }
 
     /// Prunes all the entries older from the specified expiry
     /// timestamp from the cache.
     pub fn prune_expired(&mut self, expiry: Timestamp) {
-        while let Some((t, _)) = self.0.peek() {
-            if t.0 <= expiry {
-                self.0.pop();
+        while let Some((Reverse(ts), nonce)) = self.expiration_queue.peek() {
+            if *ts <= expiry {
+                let entry = (*ts, *nonce);
+                self.expiration_queue.pop();
+                self.known_nonces.remove(&entry);
             } else {
                 return;
             }
@@ -31,7 +38,7 @@ impl NonceCache {
     /// Returns true if the specified combination of timestamp and
     /// nonce is in this cache.
     pub fn contains(&self, ts: Timestamp, nonce: u64) -> bool {
-        self.0.iter().any(|e| *e == (Reverse(ts), nonce))
+        self.known_nonces.contains(&(ts, nonce))
     }
 }
 
