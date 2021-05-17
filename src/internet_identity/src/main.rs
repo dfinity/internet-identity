@@ -313,6 +313,14 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     STATE.with(|s| s.storage.borrow().read(user_number).unwrap_or_default())
 }
 
+/// This makes this Candid service self-describing, so that for example Candid UI, but also other
+/// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
+/// provisional, but works.
+#[query]
+fn __get_candid_interface_tmp_hack() -> String {
+    include_str!("../internet_identity.did").to_string()
+}
+
 #[update]
 async fn prepare_delegation(
     user_number: UserNumber,
