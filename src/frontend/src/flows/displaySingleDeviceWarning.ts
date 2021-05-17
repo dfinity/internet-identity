@@ -56,16 +56,15 @@ const pageContent = () => html`
 `;
 
 export const displaySingleDeviceWarning = async (): Promise<void> => {
-  return new Promise((resolve: (value: void) => void) => {
-    const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(), container);
-    return init(resolve);
-  });
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(pageContent(), container);
+  return init();
 };
 
-const init = (resolve: () => void) => {
-  const displayWarningPrimary = document.getElementById(
-    "displayWarningPrimary"
-  ) as HTMLButtonElement;
-  displayWarningPrimary.onclick = () => resolve();
-};
+const init = (): Promise<void> =>
+  new Promise((resolve) => {
+    const displayWarningPrimary = document.getElementById(
+      "displayWarningPrimary"
+    ) as HTMLButtonElement;
+    displayWarningPrimary.onclick = () => resolve();
+  });
