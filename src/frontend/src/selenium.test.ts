@@ -197,13 +197,7 @@ async function on_AddDeviceUserNumber_Continue(
   user_number?: string
 ) {
   if (user_number !== undefined) {
-    await driver
-      .findElement(By.id("addDeviceUserNumber"))
-      .sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("addDeviceUserNumber")).sendKeys(Key.DELETE);
-    await driver
-      .findElement(By.id("addDeviceUserNumber"))
-      .sendKeys(user_number);
+    await fillText(driver, "addDeviceUserNumber", user_number);
   }
   await driver.findElement(By.id("addDeviceUserNumberContinue")).click();
 }
@@ -303,6 +297,41 @@ async function on_CompatibilityNotice(driver: ThenableWebDriver) {
 }
 
 /*
+## Demoapp helpers
+*/
+
+async function on_DemoApp(driver: ThenableWebDriver): Promise<string> {
+  return await driver
+    .wait(until.elementLocated(By.id("principal")), 10_000)
+    .getText();
+}
+
+async function openDemoApp(driver: ThenableWebDriver) {
+  await driver.get(DEMO_APP_URL);
+  await fillText(driver, "iiUrl", II_URL);
+}
+
+async function on_DemoApp_Signin(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("signinBtn")).click();
+}
+
+async function on_DemoApp_SetMaxTimeToLive(
+  driver: ThenableWebDriver,
+  mttl: BigInt
+) {
+  await fillText(driver, "maxTimeToLive", String(mttl));
+}
+
+async function on_DemoApp_Whoami(driver: ThenableWebDriver) {
+  await fillText(driver, "hostUrl", REPLICA_URL);
+  await fillText(driver, "canisterId", WHOAMI_CANISTER);
+  await driver.findElement(By.id("whoamiBtn")).click();
+  const whoamiResponseElem = await driver.findElement(By.id("whoamiResponse"));
+  await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
+  return await whoamiResponseElem.getText();
+}
+
+/*
 ## Setup helpers
 */
 
@@ -387,6 +416,30 @@ async function run_in_browser_common(
   }
 }
 
+async function fillText(driver: ThenableWebDriver, id: string, text: string) {
+  const elem = await driver.findElement(By.id(id));
+  elem.sendKeys(Key.CONTROL + "a");
+  elem.sendKeys(Key.DELETE);
+  elem.sendKeys(text);
+}
+
+async function switchToPopup(driver: ThenableWebDriver) {
+  let handles = await driver.getAllWindowHandles();
+  expect(handles.length).toBe(2);
+  await driver.switchTo().window(handles[1]);
+  // enable virtual authenticator in the new window
+  await addVirtualAuthenticator(driver);
+}
+async function waitToClose(driver: ThenableWebDriver) {
+  await driver.wait(async (driver: ThenableWebDriver) => {
+    return (await driver.getAllWindowHandles()).length == 1;
+  }, 10_000);
+
+  const handles = await driver.getAllWindowHandles();
+  expect(handles.length).toBe(1);
+  await driver.switchTo().window(handles[0]);
+}
+
 /*
 ## Combined flows
 */
@@ -427,57 +480,76 @@ test("_Register new identity and login with it", async () => {
 test("Log into client application, after registration", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
-    await driver.get(DEMO_APP_URL);
-    await driver.findElement(By.id("iiUrl")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("iiUrl")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("iiUrl")).sendKeys(II_URL);
-    await driver.findElement(By.id("signinBtn")).click();
-
-    // there should be one new window now
-    let handles = await driver.getAllWindowHandles();
-    expect(handles.length).toBe(2);
-    await driver.switchTo().window(handles[1]);
-
-    // enable virtual authenticator in the new window
-    await addVirtualAuthenticator(driver);
-
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
     await registerNewIdentity(driver);
     await on_AuthApp(driver);
     await on_AuthApp_Confirm(driver);
-
-    // wait for window to close
-    await driver.wait(async (driver: ThenableWebDriver) => {
-      return (await driver.getAllWindowHandles()).length == 1;
-    }, 10_000);
-
-    handles = await driver.getAllWindowHandles();
-    expect(handles.length).toBe(1);
-    await driver.switchTo().window(handles[0]);
-
-    // check that we are indeed being redirected back to demo app
-    const principal = await driver
-      .wait(until.elementLocated(By.id("principal")), 10_000)
-      .getText();
-    // and that we see a non-anonymous principal
+    await waitToClose(driver);
+    const principal = await on_DemoApp(driver);
     expect(principal).not.toBe("2vxsx-fae");
+    expect(await on_DemoApp_Whoami(driver)).toBe(principal);
+    // default value
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
+  });
+}, 300_000);
 
-    // we can invoke the whoami service?
-    await driver.findElement(By.id("hostUrl")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("hostUrl")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("hostUrl")).sendKeys(REPLICA_URL);
-    await driver.findElement(By.id("canisterId")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("canisterId")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("canisterId")).sendKeys(WHOAMI_CANISTER);
-    await driver.findElement(By.id("whoamiBtn")).click();
-    const whoamiResponseElem = await driver.findElement(
-      By.id("whoamiResponse")
-    );
-    await driver.wait(
-      until.elementTextContains(whoamiResponseElem, "-"),
-      6_000
-    );
-    const principal2 = await whoamiResponseElem.getText();
-    expect(principal2).toBe(principal);
+test("Delegation maxTimeToLive: 1 min", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(60_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    // compare only up to one decimal place for the 1min test
+    expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 0);
+  });
+}, 300_000);
+
+test("Delegation maxTimeToLive: 1 day", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(86400_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    expect(Number(exp) / 86400_000_000_000).toBeCloseTo(1);
+  });
+}, 300_000);
+
+test("Delegation maxTimeToLive: 1 month", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(2592000_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    // NB: Max out at 8 days
+    expect(Number(exp) / 691200_000_000_000).toBeCloseTo(1);
   });
 }, 300_000);
 

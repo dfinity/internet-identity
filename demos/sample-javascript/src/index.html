@@ -4,7 +4,7 @@
       <h1>Identity</h1>
       <h2>Sign In</h2>
       <div>
-        <label for="iiUrl" style="display: inline-block; width: 120px"
+        <label for="iiUrl" style="display: inline-block; width: 200px"
           >Identity Provider:
         </label>
         <input
@@ -13,10 +13,24 @@
           value="https://identity.ic0.app/"
         />
       </div>
+      <div>
+        <label for="maxTimeToLive" style="display: inline-block; width: 200px"
+          >Max Time to live (ms):</label>
+        <input
+          type="text"
+	  type="number"
+          id="maxTimeToLive"
+	  placeholder="(use default)"
+        />
+      </div>
       <button id="signinBtn">Sign In</button>
       <button id="signoutBtn">Sign Out</button>
-      <h2>Principal:</h2>
+      <h3>Principal:</h3>
       <div id="principal"></div>
+      <h3>Delegation:</h3>
+      <pre id="delegation"></pre>
+      <h3>Expiry (ns from now)</h3>
+      <div id="expiration"></div>
     </div>
 
     <div>
