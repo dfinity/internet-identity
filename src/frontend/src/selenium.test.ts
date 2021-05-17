@@ -589,8 +589,8 @@ test("Screenshots", async () => {
     await screenshot("03-register-user-number", driver);
     await on_RegisterShowNumber_Continue(driver);
     await on_SingleDeviceLoginWarning(driver);
-    await on_SingleDeviceLoginWarning_Continue(driver);
     await screenshot("17-single-device-warning", driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
     await on_Main_Fixup(driver);
     await screenshot("04-main", driver);
