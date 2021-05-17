@@ -144,9 +144,13 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
+        const FIRST_USER_ID: UserNumber = 10_000;
         Self {
             nonce_cache: RefCell::new(NonceCache::default()),
-            storage: RefCell::new(Storage::new((10_000, 8_000_000_000))),
+            storage: RefCell::new(Storage::new((
+                FIRST_USER_ID,
+                FIRST_USER_ID.saturating_add(storage::DEFAULT_RANGE_SIZE),
+            ))),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
@@ -307,6 +311,14 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     STATE.with(|s| s.storage.borrow().read(user_number).unwrap_or_default())
+}
+
+/// This makes this Candid service self-describing, so that for example Candid UI, but also other
+/// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
+/// provisional, but works.
+#[query]
+fn __get_candid_interface_tmp_hack() -> String {
+    include_str!("../internet_identity.did").to_string()
 }
 
 #[update]
@@ -537,7 +549,16 @@ fn retrieve_data() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time() as u64);
         match Storage::from_stable_memory() {
-            Some(storage) => {
+            Some(mut storage) => {
+                let (lo, hi) = storage.assigned_user_number_range();
+                let max_users = storage.max_users() as u64;
+                if (hi - lo) > max_users {
+                    // We used to specify a nonsensical limit of 8M
+                    // users by default.  We can't store more than
+                    // 2M users in a single canister, so we adjust the
+                    // limit in post upgrade.
+                    storage.set_user_number_range((lo, lo.saturating_add(max_users)));
+                }
                 s.storage.replace(storage);
             }
             None => {
