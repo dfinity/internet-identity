@@ -412,6 +412,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of users registered in this canister.",
         )?;
         w.encode_gauge(
+            "internet_identity_max_users",
+            s.storage.borrow().max_users() as f64,
+            "Max number of users this canister can serve.",
+        )?;
+        w.encode_gauge(
             "internet_identity_signature_count",
             s.sigs.borrow().len() as f64,
             "Number of active signatures issued by this canister.",
