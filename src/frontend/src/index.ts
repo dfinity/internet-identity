@@ -7,6 +7,7 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
+import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -20,6 +21,8 @@ const init = async () => {
 
   const userIntent = intentFromUrl(url);
   const { userNumber, connection } = await login(userIntent);
+
+  await displaySingleDeviceWarning();
 
   switch (userIntent.kind) {
     case "auth": {
