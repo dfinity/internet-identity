@@ -13,7 +13,7 @@ Unlike most authentication services, your Internet identity does not require you
 [[id-overview]]
 == How Internet Identity works
 
-Internet Identity is an authentication service that takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication for applications running on th e{IC}. 
+Internet Identity is an authentication service that takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication for applications running on the{IC}. 
 The Internet Identity service enables you to use security chips built into your smart phone or your laptop or security keys plugged into the USB port of your computer to verify your identity and authorize access to an application. 
 
 Applications that integrate with the Internet Identity service prompt you to register or log in with a previously-registered user number. 
