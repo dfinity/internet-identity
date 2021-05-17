@@ -511,7 +511,8 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     await waitToClose(driver);
     expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
     const exp = await driver.findElement(By.id("expiration")).getText();
-    expect(Number(exp) / 60_000_000_000).toBeCloseTo(1);
+    // compare only up to one decimal place for the 1min test
+    expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 1);
   });
 }, 300_000);
 
