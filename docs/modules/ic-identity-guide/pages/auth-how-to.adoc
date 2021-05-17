@@ -81,3 +81,5 @@ If you’re sure that the link you pasted in the browser came from you, click *Y
 . Give the device profile a name and click *Link Device*.
 +
 Your phone will be redirected to the login page, and you can now use it with your user number to log in.
+
+NOTE: You should register as many devices as possible to prevent you from losing access to your applications should you lose a device. Again, the best way to prevent accidental loss is to use a dedicated security key as a registered device, in addition to other devices, and keep it in a safe place. 
