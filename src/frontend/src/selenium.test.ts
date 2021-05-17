@@ -131,6 +131,18 @@ async function on_RegisterShowNumber_Fixup(driver: ThenableWebDriver) {
   );
 }
 
+// View: Single device login warning
+async function on_SingleDeviceLoginWarning(driver: ThenableWebDriver) {
+  await driver.wait(
+    until.elementLocated(By.id("displayWarningPrimary")),
+    3_000
+  );
+}
+
+async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("displayWarningPrimary")).click();
+}
+
 // View: Main view
 
 async function on_Main(device_name: string, driver: ThenableWebDriver) {
@@ -398,7 +410,7 @@ async function run_in_browser_common(
     .setChromeOptions(
       new ChromeOptions()
         .headless() // hides the click show: uncomment to watch it
-        .windowSize({ width: 1024, height: 768 })
+        .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
     .build();
@@ -453,6 +465,8 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
   await on_RegisterConfirm_Confirm(driver);
   const userNumber = await on_RegisterShowNumber(driver);
   await on_RegisterShowNumber_Continue(driver);
+  await on_SingleDeviceLoginWarning(driver);
+  await on_SingleDeviceLoginWarning_Continue(driver);
   return userNumber;
 }
 
@@ -460,6 +474,8 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
   await on_Welcome(driver);
   await on_Welcome_TypeUserNumber(userNumber, driver);
   await on_Welcome_Login(driver);
+  await on_SingleDeviceLoginWarning(driver);
+  await on_SingleDeviceLoginWarning_Continue(driver);
   await on_Main(DEVICE_NAME1, driver);
 }
 
@@ -572,6 +588,9 @@ test("Screenshots", async () => {
     await on_RegisterShowNumber_Fixup(driver);
     await screenshot("03-register-user-number", driver);
     await on_RegisterShowNumber_Continue(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await screenshot("17-single-device-warning", driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
     await on_Main_Fixup(driver);
     await screenshot("04-main", driver);
@@ -579,6 +598,8 @@ test("Screenshots", async () => {
     await on_Welcome(driver); // no point taking screenshot
     await on_Welcome_TypeUserNumber(userNumber, driver);
     await on_Welcome_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     await driver.get(II_URL);
@@ -587,6 +608,8 @@ test("Screenshots", async () => {
     await on_WelcomeBack_Fixup(driver);
     await screenshot("05-welcome-back", driver);
     await on_WelcomeBack_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     // Now the link device flow, using a second browser
@@ -613,6 +636,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Fixup(driver);
       await screenshot("08-new-device-login", driver);
       await on_WelcomeBack_Login(driver);
+      await on_SingleDeviceLoginWarning(driver);
+      await on_SingleDeviceLoginWarning_Continue(driver);
       await on_AddDeviceConfirm(driver);
       await on_AddDeviceConfirm_Fixup(driver);
       await screenshot("09-new-device-confirm", driver);
@@ -629,6 +654,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Fixup(driver2);
       await screenshot("12-new-device-login", driver2);
       await on_WelcomeBack_Login(driver2);
+      await on_SingleDeviceLoginWarning(driver2);
+      await on_SingleDeviceLoginWarning_Continue(driver2);
       await on_Main(DEVICE_NAME2, driver2);
       await on_Main_Fixup(driver2);
       await screenshot("13-new-device-listed", driver2);
@@ -659,6 +686,8 @@ test("Screenshots", async () => {
     const userNumber3 = await on_WelcomeBack(driver);
     expect(userNumber3).toBe(userNumber);
     await on_WelcomeBack_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME2, driver);
     const buttonElem2 = await driver.findElement(
       By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)
