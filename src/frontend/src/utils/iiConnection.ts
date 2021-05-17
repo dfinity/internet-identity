@@ -173,6 +173,7 @@ export class IIConnection {
     // this is conservative, and defaults to _not_ fetching the root key
     if (
       window.location.origin.startsWith("http://localhost:") ||
+      window.location.origin.startsWith("http://127.0.0.1:") ||
       window.location.origin.endsWith(".dfinity.network")
     ) {
       await agent.fetchRootKey();
