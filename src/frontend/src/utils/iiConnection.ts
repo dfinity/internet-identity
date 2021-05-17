@@ -169,12 +169,9 @@ export class IIConnection {
     delegationIdentity: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> {
     const agent = new HttpAgent({ identity: delegationIdentity });
-    // try to recognize development environments
-    // this is conservative, and defaults to _not_ fetching the root key
-    if (
-      window.location.origin.startsWith("http://localhost:") ||
-      window.location.origin.endsWith(".dfinity.network")
-    ) {
+
+    // Only fetch the root key when we're not in prod
+    if (process.env.II_ENV === "development") {
       await agent.fetchRootKey();
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
