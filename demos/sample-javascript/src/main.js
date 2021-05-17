@@ -26,8 +26,11 @@ const init = async () => {
     if (identity instanceof DelegationIdentity) {
       delegationEl.innerText = JSON.stringify(identity.getDelegation().toJSON(), undefined, 2);
 
+      // cannot use Math.min, as we deal with bigint here
       const nextExpiration =
-        Math.min(...identity.getDelegation().delegations.map(d => d.delegation.expiration));
+        identity.getDelegation().delegations
+         .map(d => d.delegation.expiration)
+         .reduce((current, next) => next < current ? next : current);
       expirationEl.innerText = nextExpiration - BigInt(Date.now()) * BigInt(1000_000);
     } else {
       delegationEl.innerText = "Current identity is not a DelegationIdentity";
