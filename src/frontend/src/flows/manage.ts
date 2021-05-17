@@ -73,6 +73,9 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
       return renderManage(userNumber, connection);
     }
     const deviceName = await pickDeviceAlias();
+    if (deviceName === null) {
+      return renderManage(userNumber, connection);
+    }
     // TODO check whether newDevice is already registered
     try {
       await withLoader(() =>

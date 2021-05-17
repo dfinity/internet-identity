@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../components/logout";
-import { clearHash } from "./addDevice";
 
 const pageContent = () => html`
   <div class="container">
@@ -13,13 +12,13 @@ const pageContent = () => html`
   </div>
 `;
 
-export const pickDeviceAlias = async (): Promise<string> => {
+export const pickDeviceAlias = async (): Promise<string | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init();
 };
 
-const init = (): Promise<string> =>
+const init = (): Promise<string | null> =>
   new Promise((resolve) => {
     initLogout();
     const deviceAlias = document.getElementById(
@@ -32,8 +31,7 @@ const init = (): Promise<string> =>
       "deviceAliasCancel"
     ) as HTMLButtonElement;
     deviceAliasCancel.onclick = () => {
-      clearHash();
-      window.location.reload();
+      resolve(null);
     };
     deviceAliasContinue.onclick = () => {
       resolve(deviceAlias.value);
