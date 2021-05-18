@@ -149,8 +149,12 @@ async function on_Main(device_name: string, driver: ThenableWebDriver) {
   // wait for device list to load
   await driver.wait(
     until.elementLocated(By.xpath(`//div[string()='${device_name}']`)),
-    3_000
+    10_000
   );
+}
+
+async function on_Main_AddAdditionalDevice(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("addAdditionalDevice")).click();
 }
 
 async function on_Main_Logout(driver: ThenableWebDriver) {
@@ -347,7 +351,7 @@ async function on_DemoApp_Whoami(driver: ThenableWebDriver) {
 ## Setup helpers
 */
 
-async function addVirtualAuthenticator(driver: ThenableWebDriver) {
+async function addVirtualAuthenticator(driver: ThenableWebDriver): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
@@ -361,6 +365,19 @@ async function addVirtualAuthenticator(driver: ThenableWebDriver) {
   cmd.setParameter("hasResidentKey", true);
   cmd.setParameter("isUserConsenting", true);
   cmd.setParameter("sessionId", sessionId);
+  return await executor.execute(cmd);
+}
+
+async function setUserVerified(driver: ThenableWebDriver, authenticatorId: string) {
+  const executor = driver.getExecutor();
+  const sessionId = (await driver.getSession()).getId();
+  executor.defineCommand(
+    "SetUserVerified",
+    "POST",
+    `/session/${sessionId}/webauthn/authenticator/${authenticatorId}/uv`
+  );
+  const cmd = new Command("SetUserVerified");
+  cmd.setParameter("isUserVerified", true);
   await executor.execute(cmd);
 }
 
@@ -488,6 +505,30 @@ test("_Register new identity and login with it", async () => {
     await driver.get(II_URL);
     const userNumber = await registerNewIdentity(driver);
     await on_Main(DEVICE_NAME1, driver);
+    await await on_Main_Logout(driver);
+    await login(userNumber, driver);
+  });
+}, 300_000);
+
+test.only("Register new identity and add additional device", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    const firstAuthenticator = await addVirtualAuthenticator(driver);
+    await driver.get(II_URL);
+    const userNumber = await registerNewIdentity(driver);
+    await on_Main(DEVICE_NAME1, driver);
+    const secondAuthenticator = await addVirtualAuthenticator(driver);
+    setUserVerified(driver, secondAuthenticator);
+    await on_Main_AddAdditionalDevice(driver);
+
+    await on_AddDeviceAlias(driver);
+    await on_AddDeviceAlias_Type(DEVICE_NAME2, driver);
+    await on_AddDeviceAlias_Continue(driver);
+
+    await driver.sleep(10_000);
+
+    await on_Main(DEVICE_NAME1, driver);
+    await on_Main(DEVICE_NAME2, driver);
+
     await await on_Main_Logout(driver);
     await login(userNumber, driver);
   });
