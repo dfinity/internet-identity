@@ -77,7 +77,7 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
           >
         `,
         detail: error.message,
-        primaryButton: "Try again",
+        primaryButton: "Back to manage",
       });
       return renderManage(userNumber, connection);
     }
@@ -103,7 +103,7 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
         message:
           "We failed to add the new device to your identity. Please try again",
         detail: error.message,
-        primaryButton: "Try again",
+        primaryButton: "Back to manage",
       });
     }
     renderManage(userNumber, connection);
