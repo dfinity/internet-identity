@@ -515,7 +515,7 @@ test("_Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test.only("Register new identity and add additional device", async () => {
+test("Register new identity and add additional device", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     const firstAuthenticator = await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
