@@ -21,6 +21,9 @@ const pageContent = () => html`
     #warningContainer a {
       margin-bottom: 1rem;
     }
+    .spacer {
+      min-height: 48px;
+    }
   </style>
   <div id="warningContainer" class="container">
     ${warningIcon}
@@ -53,6 +56,7 @@ const pageContent = () => html`
       >https://dfinity.org/faq/</a
     >
     <button id="displayWarningPrimary" class="primary">Understood</button>
+    <div class="spacer"></div>
   </div>
 `;
 
