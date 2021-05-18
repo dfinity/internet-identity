@@ -30,13 +30,13 @@ const pageContent = () => html`
       that one device, you will be locked out.
     </p>
     <p>
-      Additionally on iOS and MacOS clearing your Safari browser data will
+      Additionally, on iOS and MacOS, clearing your Safari browser data will
       <em>delete</em> your logins from the device.
     </p>
     <p>
-      Hence as a best practice we always recommend you add multiple devices to
-      your Internet Identity and at <em>least</em> one actual security key. You
-      can see how to add more devices here:
+      As a best practice we always recommend you add multiple devices to your
+      Internet Identity and at <em>least</em> one actual security key. You can
+      see how to add more devices here:
     </p>
     <a
       target="_blank"
@@ -44,9 +44,10 @@ const pageContent = () => html`
       >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html</a
     >
     <p>
-      For now, the best recovery strategy is to add extra devices or a Yubikey
-      to your account and keep that in a safe place. For more information about
-      Identity and the NNS, please check out our FAQ page:
+      Currently the best strategy to ensure you can log in is to add extra
+      devices and at least one security key to your account and keep that in a
+      safe place. For more information about Identity and the NNS, please check
+      out our FAQ page:
     </p>
     <a target="_blank" href="https://dfinity.org/faq/"
       >https://dfinity.org/faq/</a
