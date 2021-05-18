@@ -351,7 +351,9 @@ async function on_DemoApp_Whoami(driver: ThenableWebDriver) {
 ## Setup helpers
 */
 
-async function addVirtualAuthenticator(driver: ThenableWebDriver): Promise<string> {
+async function addVirtualAuthenticator(
+  driver: ThenableWebDriver
+): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
@@ -368,7 +370,10 @@ async function addVirtualAuthenticator(driver: ThenableWebDriver): Promise<strin
   return await executor.execute(cmd);
 }
 
-async function setUserVerified(driver: ThenableWebDriver, authenticatorId: string) {
+async function setUserVerified(
+  driver: ThenableWebDriver,
+  authenticatorId: string
+) {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
