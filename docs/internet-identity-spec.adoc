@@ -658,12 +658,17 @@ You will need to get someone with authorization to submit the proposal and get e
 [source,bash]
 ----
 ic-admin \
-    -s "${PROPOSER_KEY_FILE}" \
+    --use-hsm
+    --key-id "${KEY_ID}"
+    --slot 0
+    --pin "${SECRET_PIN_FOR_HSM}"
     --nns-url "${child_nns_url}" \
     propose-to-change-nns-canister "${PROPOSER_NEURON_INDEX}" \
     --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
     --mode upgrade \
     --wasm-module-path internet_identity.wasm
+    --summary "${SUMMARY_TO_INCLUDE_IN_PROPOSAL}"
+    --proposal-url "${URL_FOR_PROPOSAL_DOCUMENTATION}"
 ----
 
 If you know the proposal number, you can observe all open proposals by running, in `…/dfinity/rs/nns`:
