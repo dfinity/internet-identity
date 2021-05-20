@@ -1,4 +1,6 @@
+import ClipboardJS from "clipboard";
 import { html, render } from "lit-html";
+import { checkmarkIcon } from "../../components/icons";
 
 const pageContent = (seedPhrase: string) => html`
   <div class="container">
@@ -7,7 +9,7 @@ const pageContent = (seedPhrase: string) => html`
       ${seedPhrase}
     </textarea
     >
-    <button id="copyButton">Copy</button>
+    <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
     <button id="displaySeedPhraseContinue" class="primary">Continue</button>
   </div>
 `;
@@ -24,5 +26,10 @@ const init = (): Promise<void> =>
       "displaySeedPhraseContinue"
     ) as HTMLButtonElement;
     displaySeedPhraseContinue.onclick = () => resolve();
-    // TODO Setup copy button
+
+    const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
+    new ClipboardJS(seedCopy).on("success", () => {
+      const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
+      render(checkmarkIcon, seedCopy);
+    });
   });
