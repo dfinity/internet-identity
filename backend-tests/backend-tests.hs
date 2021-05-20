@@ -177,6 +177,8 @@ record {
   pubkey : blob;
   alias : text;
   credential_id : opt blob;
+  purpose: Purpose;
+  key_type: KeyType;
 }
   |]
 
