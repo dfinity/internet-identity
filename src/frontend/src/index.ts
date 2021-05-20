@@ -15,8 +15,8 @@ const init = async () => {
     return aboutView();
   }
 
+  return compatibilityNotice();
   if (!(await hasRequiredFeatures(url))) {
-    return compatibilityNotice();
   }
 
   const userIntent = intentFromUrl(url);
