@@ -11,6 +11,8 @@ import { aboutLink } from "../components/aboutLink";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
+import { pickDeviceAlias } from "./addDevicePickAlias";
+import { WebAuthnIdentity } from "@dfinity/identity";
 
 const pageContent = (userNumber: bigint) => html`<style>
     #deviceLabel {
@@ -26,6 +28,9 @@ const pageContent = (userNumber: bigint) => html`<style>
     </p>
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
+    <button id="addAdditionalDevice" type="button">
+      Add an additional device
+    </button>
     <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
     ${logoutSection()}
@@ -50,6 +55,60 @@ export const renderManage = (
 const init = async (userNumber: bigint, connection: IIConnection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
+  const addAdditionalDevice = document.querySelector(
+    "#addAdditionalDevice"
+  ) as HTMLButtonElement;
+
+  addAdditionalDevice.onclick = async () => {
+    let newDevice: WebAuthnIdentity;
+    try {
+      newDevice = await WebAuthnIdentity.create();
+    } catch (error) {
+      await displayError({
+        title: "Failed to add new device",
+        message: html`
+          We failed to add your new device.<br />
+          If you're trying to add a device that is not attached to this machine
+          try following the instructions at<br />
+          <a
+            target="_blank"
+            href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
+            >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
+          >
+        `,
+        detail: error.message,
+        primaryButton: "Back to manage",
+      });
+      return renderManage(userNumber, connection);
+    }
+    const deviceName = await pickDeviceAlias();
+    if (deviceName === null) {
+      return renderManage(userNumber, connection);
+    }
+    // TODO check whether newDevice is already registered,
+    // or better, pass existing devices to `.create` so that they
+    // cannot be added again
+    try {
+      await withLoader(() =>
+        connection.add(
+          userNumber,
+          deviceName,
+          newDevice.getPublicKey().toDer(),
+          newDevice.rawId
+        )
+      );
+    } catch (error) {
+      await displayError({
+        title: "Failed to add the new device",
+        message:
+          "We failed to add the new device to your identity. Please try again",
+        detail: error.message,
+        primaryButton: "Back to manage",
+      });
+    }
+    renderManage(userNumber, connection);
+  };
+
   renderIdentities(userNumber, connection);
 };
 
@@ -67,7 +126,7 @@ const renderIdentities = async (
     await displayError({
       title: "Failed to list your devices",
       message:
-        "An unexpected error occured when displaying your devices. Please try again",
+        "An unexpected error occurred when displaying your devices. Please try again",
       detail: err.toString(),
       primaryButton: "Try again",
     });

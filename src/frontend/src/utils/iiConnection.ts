@@ -76,11 +76,7 @@ export class IIConnection {
       return { kind: "authFail", error };
     }
 
-    const agent = new HttpAgent({ identity: delegationIdentity });
-    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-      agent,
-      canisterId: canisterId,
-    });
+    const actor = await IIConnection.createActor(delegationIdentity);
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
@@ -149,11 +145,7 @@ export class IIConnection {
       return { kind: "authFail", error: e };
     }
 
-    const agent = new HttpAgent({ identity: delegationIdentity });
-    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-      agent,
-      canisterId: canisterId,
-    });
+    const actor = await IIConnection.createActor(delegationIdentity);
 
     return {
       kind: "loginSuccess",
@@ -172,6 +164,23 @@ export class IIConnection {
   }
 
   // Create an actor representing the backend
+
+  static async createActor(
+    delegationIdentity: DelegationIdentity
+  ): Promise<ActorSubclass<_SERVICE>> {
+    const agent = new HttpAgent({ identity: delegationIdentity });
+
+    // Only fetch the root key when we're not in prod
+    if (process.env.II_ENV === "development") {
+      await agent.fetchRootKey();
+    }
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId: canisterId,
+    });
+    return actor;
+  }
+
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
@@ -185,12 +194,7 @@ export class IIConnection {
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await requestFEDelegation(this.identity);
-
-      const agent = new HttpAgent({ identity: this.delegationIdentity });
-      this.actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-        agent,
-        canisterId,
-      });
+      this.actor = await IIConnection.createActor(this.delegationIdentity);
     }
 
     return this.actor;
@@ -221,13 +225,19 @@ export class IIConnection {
   prepareDelegation = async (
     userNumber: UserNumber,
     hostname: FrontendHostname,
-    sessionKey: SessionKey
+    sessionKey: SessionKey,
+    maxTimeToLive?: bigint
   ): Promise<[PublicKey, bigint]> => {
     console.log(
       `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
-    return await actor.prepare_delegation(userNumber, hostname, sessionKey, []);
+    return await actor.prepare_delegation(
+      userNumber,
+      hostname,
+      sessionKey,
+      maxTimeToLive !== undefined ? [maxTimeToLive] : []
+    );
   };
 
   getDelegation = async (

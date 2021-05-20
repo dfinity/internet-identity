@@ -68,6 +68,10 @@ const init = (userNumber: bigint, connection: IIConnection) => {
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await pickDeviceAlias();
+        if (deviceName === null) {
+          clearHash();
+          return window.location.reload();
+        }
         await withLoader(() =>
           connection.add(userNumber, deviceName, publicKey, rawId)
         );

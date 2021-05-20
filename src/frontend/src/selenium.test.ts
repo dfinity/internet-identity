@@ -131,14 +131,30 @@ async function on_RegisterShowNumber_Fixup(driver: ThenableWebDriver) {
   );
 }
 
+// View: Single device login warning
+async function on_SingleDeviceLoginWarning(driver: ThenableWebDriver) {
+  await driver.wait(
+    until.elementLocated(By.id("displayWarningPrimary")),
+    3_000
+  );
+}
+
+async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("displayWarningPrimary")).click();
+}
+
 // View: Main view
 
 async function on_Main(device_name: string, driver: ThenableWebDriver) {
   // wait for device list to load
   await driver.wait(
     until.elementLocated(By.xpath(`//div[string()='${device_name}']`)),
-    3_000
+    10_000
   );
+}
+
+async function on_Main_AddAdditionalDevice(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("addAdditionalDevice")).click();
 }
 
 async function on_Main_Logout(driver: ThenableWebDriver) {
@@ -197,13 +213,7 @@ async function on_AddDeviceUserNumber_Continue(
   user_number?: string
 ) {
   if (user_number !== undefined) {
-    await driver
-      .findElement(By.id("addDeviceUserNumber"))
-      .sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("addDeviceUserNumber")).sendKeys(Key.DELETE);
-    await driver
-      .findElement(By.id("addDeviceUserNumber"))
-      .sendKeys(user_number);
+    await fillText(driver, "addDeviceUserNumber", user_number);
   }
   await driver.findElement(By.id("addDeviceUserNumberContinue")).click();
 }
@@ -303,10 +313,47 @@ async function on_CompatibilityNotice(driver: ThenableWebDriver) {
 }
 
 /*
+## Demoapp helpers
+*/
+
+async function on_DemoApp(driver: ThenableWebDriver): Promise<string> {
+  return await driver
+    .wait(until.elementLocated(By.id("principal")), 10_000)
+    .getText();
+}
+
+async function openDemoApp(driver: ThenableWebDriver) {
+  await driver.get(DEMO_APP_URL);
+  await fillText(driver, "iiUrl", II_URL);
+}
+
+async function on_DemoApp_Signin(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("signinBtn")).click();
+}
+
+async function on_DemoApp_SetMaxTimeToLive(
+  driver: ThenableWebDriver,
+  mttl: BigInt
+) {
+  await fillText(driver, "maxTimeToLive", String(mttl));
+}
+
+async function on_DemoApp_Whoami(driver: ThenableWebDriver) {
+  await fillText(driver, "hostUrl", REPLICA_URL);
+  await fillText(driver, "canisterId", WHOAMI_CANISTER);
+  await driver.findElement(By.id("whoamiBtn")).click();
+  const whoamiResponseElem = await driver.findElement(By.id("whoamiResponse"));
+  await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
+  return await whoamiResponseElem.getText();
+}
+
+/*
 ## Setup helpers
 */
 
-async function addVirtualAuthenticator(driver: ThenableWebDriver) {
+async function addVirtualAuthenticator(
+  driver: ThenableWebDriver
+): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
@@ -320,6 +367,22 @@ async function addVirtualAuthenticator(driver: ThenableWebDriver) {
   cmd.setParameter("hasResidentKey", true);
   cmd.setParameter("isUserConsenting", true);
   cmd.setParameter("sessionId", sessionId);
+  return await executor.execute(cmd);
+}
+
+async function setUserVerified(
+  driver: ThenableWebDriver,
+  authenticatorId: string
+) {
+  const executor = driver.getExecutor();
+  const sessionId = (await driver.getSession()).getId();
+  executor.defineCommand(
+    "SetUserVerified",
+    "POST",
+    `/session/${sessionId}/webauthn/authenticator/${authenticatorId}/uv`
+  );
+  const cmd = new Command("SetUserVerified");
+  cmd.setParameter("isUserVerified", true);
   await executor.execute(cmd);
 }
 
@@ -369,7 +432,7 @@ async function run_in_browser_common(
     .setChromeOptions(
       new ChromeOptions()
         .headless() // hides the click show: uncomment to watch it
-        .windowSize({ width: 1024, height: 768 })
+        .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
     .build();
@@ -387,6 +450,30 @@ async function run_in_browser_common(
   }
 }
 
+async function fillText(driver: ThenableWebDriver, id: string, text: string) {
+  const elem = await driver.findElement(By.id(id));
+  elem.sendKeys(Key.CONTROL + "a");
+  elem.sendKeys(Key.DELETE);
+  elem.sendKeys(text);
+}
+
+async function switchToPopup(driver: ThenableWebDriver) {
+  let handles = await driver.getAllWindowHandles();
+  expect(handles.length).toBe(2);
+  await driver.switchTo().window(handles[1]);
+  // enable virtual authenticator in the new window
+  await addVirtualAuthenticator(driver);
+}
+async function waitToClose(driver: ThenableWebDriver) {
+  await driver.wait(async (driver: ThenableWebDriver) => {
+    return (await driver.getAllWindowHandles()).length == 1;
+  }, 10_000);
+
+  const handles = await driver.getAllWindowHandles();
+  expect(handles.length).toBe(1);
+  await driver.switchTo().window(handles[0]);
+}
+
 /*
 ## Combined flows
 */
@@ -400,6 +487,8 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
   await on_RegisterConfirm_Confirm(driver);
   const userNumber = await on_RegisterShowNumber(driver);
   await on_RegisterShowNumber_Continue(driver);
+  await on_SingleDeviceLoginWarning(driver);
+  await on_SingleDeviceLoginWarning_Continue(driver);
   return userNumber;
 }
 
@@ -407,6 +496,8 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
   await on_Welcome(driver);
   await on_Welcome_TypeUserNumber(userNumber, driver);
   await on_Welcome_Login(driver);
+  await on_SingleDeviceLoginWarning(driver);
+  await on_SingleDeviceLoginWarning_Continue(driver);
   await on_Main(DEVICE_NAME1, driver);
 }
 
@@ -424,60 +515,103 @@ test("_Register new identity and login with it", async () => {
   });
 }, 300_000);
 
+test("Register new identity and add additional device", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    const firstAuthenticator = await addVirtualAuthenticator(driver);
+    await driver.get(II_URL);
+    const userNumber = await registerNewIdentity(driver);
+    await on_Main(DEVICE_NAME1, driver);
+    const secondAuthenticator = await addVirtualAuthenticator(driver);
+    setUserVerified(driver, secondAuthenticator);
+    await on_Main_AddAdditionalDevice(driver);
+
+    await on_AddDeviceAlias(driver);
+    await on_AddDeviceAlias_Type(DEVICE_NAME2, driver);
+    await on_AddDeviceAlias_Continue(driver);
+
+    await driver.sleep(10_000);
+
+    await on_Main(DEVICE_NAME1, driver);
+    await on_Main(DEVICE_NAME2, driver);
+
+    await await on_Main_Logout(driver);
+    await login(userNumber, driver);
+  });
+}, 300_000);
+
 test("Log into client application, after registration", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
-    await driver.get(DEMO_APP_URL);
-    await driver.findElement(By.id("iiUrl")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("iiUrl")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("iiUrl")).sendKeys(II_URL);
-    await driver.findElement(By.id("signinBtn")).click();
-
-    // there should be one new window now
-    let handles = await driver.getAllWindowHandles();
-    expect(handles.length).toBe(2);
-    await driver.switchTo().window(handles[1]);
-
-    // enable virtual authenticator in the new window
-    await addVirtualAuthenticator(driver);
-
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
     await registerNewIdentity(driver);
     await on_AuthApp(driver);
     await on_AuthApp_Confirm(driver);
-
-    // wait for window to close
-    await driver.wait(async (driver: ThenableWebDriver) => {
-      return (await driver.getAllWindowHandles()).length == 1;
-    }, 10_000);
-
-    handles = await driver.getAllWindowHandles();
-    expect(handles.length).toBe(1);
-    await driver.switchTo().window(handles[0]);
-
-    // check that we are indeed being redirected back to demo app
-    const principal = await driver
-      .wait(until.elementLocated(By.id("principal")), 10_000)
-      .getText();
-    // and that we see a non-anonymous principal
+    await waitToClose(driver);
+    const principal = await on_DemoApp(driver);
     expect(principal).not.toBe("2vxsx-fae");
+    expect(await on_DemoApp_Whoami(driver)).toBe(principal);
+    // default value
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
+  });
+}, 300_000);
 
-    // we can invoke the whoami service?
-    await driver.findElement(By.id("hostUrl")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("hostUrl")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("hostUrl")).sendKeys(REPLICA_URL);
-    await driver.findElement(By.id("canisterId")).sendKeys(Key.CONTROL + "a");
-    await driver.findElement(By.id("canisterId")).sendKeys(Key.DELETE);
-    await driver.findElement(By.id("canisterId")).sendKeys(WHOAMI_CANISTER);
-    await driver.findElement(By.id("whoamiBtn")).click();
-    const whoamiResponseElem = await driver.findElement(
-      By.id("whoamiResponse")
-    );
-    await driver.wait(
-      until.elementTextContains(whoamiResponseElem, "-"),
-      6_000
-    );
-    const principal2 = await whoamiResponseElem.getText();
-    expect(principal2).toBe(principal);
+test("Delegation maxTimeToLive: 1 min", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(60_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    // compare only up to one decimal place for the 1min test
+    expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 0);
+  });
+}, 300_000);
+
+test("Delegation maxTimeToLive: 1 day", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(86400_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    expect(Number(exp) / 86400_000_000_000).toBeCloseTo(1);
+  });
+}, 300_000);
+
+test("Delegation maxTimeToLive: 1 month", async () => {
+  await run_in_browser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await openDemoApp(driver);
+    expect(await on_DemoApp(driver)).toBe("2vxsx-fae");
+    await on_DemoApp_SetMaxTimeToLive(driver, BigInt(2592000_000_000_000));
+    await on_DemoApp_Signin(driver);
+    await switchToPopup(driver);
+    await registerNewIdentity(driver);
+    await on_AuthApp(driver);
+    await on_AuthApp_Confirm(driver);
+    await waitToClose(driver);
+    expect(await on_DemoApp(driver)).not.toBe("2vxsx-fae");
+    const exp = await driver.findElement(By.id("expiration")).getText();
+    // NB: Max out at 8 days
+    expect(Number(exp) / 691200_000_000_000).toBeCloseTo(1);
   });
 }, 300_000);
 
@@ -500,6 +634,9 @@ test("Screenshots", async () => {
     await on_RegisterShowNumber_Fixup(driver);
     await screenshot("03-register-user-number", driver);
     await on_RegisterShowNumber_Continue(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await screenshot("17-single-device-warning", driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
     await on_Main_Fixup(driver);
     await screenshot("04-main", driver);
@@ -507,6 +644,8 @@ test("Screenshots", async () => {
     await on_Welcome(driver); // no point taking screenshot
     await on_Welcome_TypeUserNumber(userNumber, driver);
     await on_Welcome_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     await driver.get(II_URL);
@@ -515,6 +654,8 @@ test("Screenshots", async () => {
     await on_WelcomeBack_Fixup(driver);
     await screenshot("05-welcome-back", driver);
     await on_WelcomeBack_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     // Now the link device flow, using a second browser
@@ -541,6 +682,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Fixup(driver);
       await screenshot("08-new-device-login", driver);
       await on_WelcomeBack_Login(driver);
+      await on_SingleDeviceLoginWarning(driver);
+      await on_SingleDeviceLoginWarning_Continue(driver);
       await on_AddDeviceConfirm(driver);
       await on_AddDeviceConfirm_Fixup(driver);
       await screenshot("09-new-device-confirm", driver);
@@ -557,6 +700,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Fixup(driver2);
       await screenshot("12-new-device-login", driver2);
       await on_WelcomeBack_Login(driver2);
+      await on_SingleDeviceLoginWarning(driver2);
+      await on_SingleDeviceLoginWarning_Continue(driver2);
       await on_Main(DEVICE_NAME2, driver2);
       await on_Main_Fixup(driver2);
       await screenshot("13-new-device-listed", driver2);
@@ -587,6 +732,8 @@ test("Screenshots", async () => {
     const userNumber3 = await on_WelcomeBack(driver);
     expect(userNumber3).toBe(userNumber);
     await on_WelcomeBack_Login(driver);
+    await on_SingleDeviceLoginWarning(driver);
+    await on_SingleDeviceLoginWarning_Continue(driver);
     await on_Main(DEVICE_NAME2, driver);
     const buttonElem2 = await driver.findElement(
       By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)

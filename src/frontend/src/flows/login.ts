@@ -5,7 +5,7 @@ import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
-import { bannerFromIntent, UserIntent } from "../utils/userIntent";
+import { verbFromIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
   apiResultToLoginResult,
@@ -13,12 +13,12 @@ import {
   loginUnknown,
 } from "./loginUnknown";
 
-const pageContent = (userNumber: bigint, userIntent: string) => html` <div
+const pageContent = (userNumber: bigint, userIntent: UserIntent) => html` <div
     class="container"
   >
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>Login to ${userIntent}.</p>
+    <p>Login to ${verbFromIntent(userIntent)}.</p>
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
@@ -67,7 +67,7 @@ const tryLogin = async (userIntent: UserIntent): Promise<LoginResult> => {
     return loginUnknown(userIntent);
   } else {
     const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(userNumber, bannerFromIntent(userIntent)), container);
+    render(pageContent(userNumber, userIntent), container);
     return init(userNumber, userIntent);
   }
 };

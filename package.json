@@ -4,7 +4,7 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "start": "webpack serve",
+    "start": "II_ENV=development webpack serve",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
@@ -50,9 +50,9 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/agent": "0.8.8",
-    "@dfinity/authentication": "0.8.8",
-    "@dfinity/identity": "0.8.8",
+    "@dfinity/agent": "0.8.9",
+    "@dfinity/authentication": "0.8.9",
+    "@dfinity/identity": "0.8.9",
     "biguintle": "^1.0.3",
     "bip39": "^3.0.4",
     "clipboard": "^2.0.8",

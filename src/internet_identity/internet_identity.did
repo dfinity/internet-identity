@@ -46,7 +46,7 @@ type DeviceData = record {
 type RegisterResponse = variant {
   // A new user was successfully registered.
   registered: record { user_number: UserNumber; };
-  // No more registrations are possible in this instance of the II service caniser.
+  // No more registrations are possible in this instance of the II service canister.
   canister_full;
 };
 
