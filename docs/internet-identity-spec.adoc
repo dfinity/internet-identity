@@ -198,7 +198,7 @@ type DeviceData = record {
   alias : text;
   credential_id : opt CredentialId;
   purpose : { #recovery; #authentication };
-  type : { #unknown; #platform; #crossPlatform; #seedPhrase };
+  key_type : { #unknown; #platform; #cross_platform; #seed_phrase };
 };
 
 type Delegation = record {
