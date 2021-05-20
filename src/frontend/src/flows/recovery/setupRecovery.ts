@@ -1,5 +1,9 @@
-import { IIConnection } from "../../utils/iiConnection";
+import { withLoader } from "../../components/loader";
+import { fromMnemonic } from "../../crypto/ed25519";
+import { generateMnemonic } from "../../crypto/mnemonic";
+import { IC_DERIVATION_PATH, IIConnection } from "../../utils/iiConnection";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
+import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async (
   userNumber: bigint,
@@ -18,8 +22,15 @@ export const setupRecovery = async (
     }
     case "seedPhrase": {
       const name = "Recovery phrase";
-      // 2 b) Seed phrase: Generate Seed phrase, display it to the user, (make them print it back?), add it as a recovery device
-      return;
+      const seedPhrase = generateMnemonic();
+      await displaySeedPhrase(seedPhrase);
+      const recoverIdentity = await fromMnemonic(
+        seedPhrase,
+        IC_DERIVATION_PATH
+      );
+      await withLoader(() =>
+        connection.add(userNumber, name, recoverIdentity.getPublicKey().toDer())
+      );
     }
   }
 };

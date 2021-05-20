@@ -13,6 +13,7 @@ import { closeIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { setupRecovery } from "./recovery/setupRecovery";
 
 const pageContent = (userNumber: bigint) => html`<style>
     #deviceLabel {
@@ -30,6 +31,9 @@ const pageContent = (userNumber: bigint) => html`<style>
     <div class="highlightBox">${userNumber}</div>
     <button id="addAdditionalDevice" type="button">
       Add an additional device
+    </button>
+    <button id="setupRecoveryButton" type="button">
+      Set up a recovery option
     </button>
     <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
@@ -55,6 +59,15 @@ export const renderManage = (
 const init = async (userNumber: bigint, connection: IIConnection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
+  const setupRecoveryButton = document.querySelector(
+    "#setupRecoveryButton"
+  ) as HTMLButtonElement;
+
+  setupRecoveryButton.onclick = async () => {
+    await setupRecovery(userNumber, connection);
+    renderManage(userNumber, connection);
+  };
+
   const addAdditionalDevice = document.querySelector(
     "#addAdditionalDevice"
   ) as HTMLButtonElement;

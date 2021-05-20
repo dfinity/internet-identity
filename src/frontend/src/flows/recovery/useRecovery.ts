@@ -62,7 +62,7 @@ const loginWithRecovery = async (
       // TODO think about error handling here
       throw Error("Canceled seedphrase input");
     }
-    return IIConnection.fromSeedPhrase(seedPhrase);
+    return await IIConnection.fromSeedPhrase(userNumber, seedPhrase);
   } else {
     return IIConnection.fromWebauthnDevices(userNumber, [device]);
   }

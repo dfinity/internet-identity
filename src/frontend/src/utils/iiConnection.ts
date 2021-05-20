@@ -30,6 +30,7 @@ import {
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
+import { fromMnemonic } from "../crypto/ed25519";
 
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
@@ -38,6 +39,8 @@ export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   agent: new HttpAgent({}),
   canisterId,
 });
+
+export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
 export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError;
@@ -59,7 +62,7 @@ type RegisterNoSpace = { kind: "registerNoSpace" };
 
 export class IIConnection {
   protected constructor(
-    public identity: WebAuthnIdentity,
+    public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public actor?: ActorSubclass<_SERVICE>
   ) {}
@@ -168,9 +171,19 @@ export class IIConnection {
     };
   }
 
-  static fromSeedPhrase(seedPhrase: string): LoginResult {
-    // TODO
-    return 0 as any;
+  static async fromSeedPhrase(
+    userNumber: bigint,
+    seedPhrase: string
+  ): Promise<LoginResult> {
+    const identity = await fromMnemonic(seedPhrase, IC_DERIVATION_PATH);
+    const delegationIdentity = await requestFEDelegation(identity);
+    const actor = await IIConnection.createActor(delegationIdentity);
+
+    return {
+      kind: "loginSuccess",
+      userNumber,
+      connection: new IIConnection(identity, delegationIdentity, actor),
+    };
   }
 
   static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
