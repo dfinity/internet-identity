@@ -16,7 +16,7 @@ const pageContent = (seedPhrase: string) => html`
 
 export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(seedPhrase), container);
+  render(pageContent(seedPhrase.trim()), container);
   return init();
 };
 

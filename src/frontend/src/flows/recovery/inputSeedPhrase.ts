@@ -41,6 +41,6 @@ const init = (): Promise<string | null> =>
       resolve(null);
     };
     inputSeedPhraseContinue.onclick = () => {
-      resolve(inputSeedPhrase.value);
+      resolve(inputSeedPhrase.value.trim());
     };
   });
