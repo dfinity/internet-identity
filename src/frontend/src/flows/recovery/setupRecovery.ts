@@ -22,7 +22,7 @@ export const setupRecovery = async (
     }
     case "seedPhrase": {
       const name = "Recovery phrase";
-      const seedPhrase = generateMnemonic();
+      const seedPhrase = generateMnemonic().trim();
       await displaySeedPhrase(seedPhrase);
       const recoverIdentity = await fromMnemonic(
         seedPhrase,
