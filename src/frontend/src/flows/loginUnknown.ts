@@ -131,9 +131,8 @@ const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLButtonElement;
-  recoverButton.onclick = () => useRecovery()
+  recoverButton.onclick = () => useRecovery();
 };
-
 
 const initLogin = (resolve: (res: LoginResult) => void) => {
   const userNumberInput = document.getElementById(

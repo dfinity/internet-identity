@@ -24,10 +24,13 @@ export const init = (devices: DeviceData[]): Promise<DeviceData> =>
 
     const list = document.createElement("ul");
 
-    devices.forEach(device => {
+    devices.forEach((device) => {
       const identityElement = document.createElement("li");
       identityElement.className = "deviceItem";
-      render(html`<div class="deviceItemAlias">${device.alias}</div>`, identityElement);
+      render(
+        html`<div class="deviceItemAlias">${device.alias}</div>`,
+        identityElement
+      );
       identityElement.onclick = () => resolve(device);
       list.appendChild(identityElement);
     });

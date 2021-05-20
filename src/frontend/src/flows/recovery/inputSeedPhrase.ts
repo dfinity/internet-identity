@@ -2,14 +2,14 @@ import { html, render } from "lit-html";
 
 const pageContent = () => html`
   <style>
-  #inputSeedPhrase {
-    width: 100%;
-    height: 6rem;
-    box-sizing: border-box;
-    margin-bottom: 1rem;
-    font-size: 1rem;
-    font-weight: 400;
-  }
+    #inputSeedPhrase {
+      width: 100%;
+      height: 6rem;
+      box-sizing: border-box;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      font-weight: 400;
+    }
   </style>
   <div class="container">
     <h1>Your seed phrase</h1>
