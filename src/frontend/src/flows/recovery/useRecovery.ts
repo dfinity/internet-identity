@@ -44,7 +44,7 @@ export const useRecovery = async (): Promise<void> => {
       return renderManage(loginResult.userNumber, loginResult.connection);
     }
     case "err": {
-      // TODO: Display a recovery specific error
+      // TODO Display a recovery specific error
       await displayError({ ...loginResult, primaryButton: "Try again" });
       return useRecovery();
     }
@@ -55,9 +55,13 @@ const loginWithRecovery = async (
   userNumber: bigint,
   device: DeviceData
 ): Promise<LoginResult> => {
-  // TODO: Would be nicer as a switch
+  // TODO Make this a switch
   if (wantsSeedPhrase(device)) {
     const seedPhrase = await inputSeedPhrase();
+    if (seedPhrase === null) {
+      // TODO think about error handling here
+      throw Error("Canceled seedphrase input");
+    }
     return IIConnection.fromSeedPhrase(seedPhrase);
   } else {
     return IIConnection.fromWebauthnDevices(userNumber, [device]);
