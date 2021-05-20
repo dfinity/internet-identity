@@ -130,6 +130,13 @@ export class IIConnection {
       return { kind: "unknownUser", userNumber };
     }
 
+    return this.fromWebauthnDevices(userNumber, devices);
+  }
+
+  static async fromWebauthnDevices(
+    userNumber: bigint,
+    devices: DeviceData[]
+  ): Promise<LoginResult> {
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
         device.credential_id.map((credentialId: CredentialId) => ({
@@ -159,6 +166,11 @@ export class IIConnection {
         actor
       ),
     };
+  }
+
+  static fromSeedPhrase(seedPhrase: string): LoginResult {
+    // TODO
+    return 0 as any;
   }
 
   static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
