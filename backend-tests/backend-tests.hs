@@ -79,8 +79,16 @@ type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
-type Purpose = { #recovery; #authentication };
-type KeyType = { #unknown; #platform; #cross_platform; #seed_phrase };
+type Purpose = variant {
+    recovery;
+    authentication 
+};
+type KeyType = variant {
+    unknown;
+    platform;
+    cross_platform;
+    seed_phrase 
+};
 
 type DeviceData = record {
   pubkey : DeviceKey;
