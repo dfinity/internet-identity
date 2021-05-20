@@ -69,8 +69,46 @@ struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
+    purpose: Purpose,
+    key_type: KeyType,
+}
+
+/// This is an internal version of `DeviceData` primarily useful to provide a
+/// backwards compatible level between older device data stored in stable memory
+/// (that might not contain purpose or key_type) and new ones added.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct DeviceDataInternal {
+    pubkey: DeviceKey,
+    alias: String,
+    credential_id: Option<CredentialId>,
     purpose: Option<Purpose>,
     key_type: Option<KeyType>,
+}
+
+impl From<DeviceData> for DeviceDataInternal {
+    fn from(device_data: DeviceData) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            alias: device_data.alias,
+            credential_id: device_data.credential_id,
+            purpose: Some(device_data.purpose),
+            key_type: Some(device_data.key_type),
+        }
+    }
+}
+
+impl From<DeviceDataInternal> for DeviceData {
+    fn from(device_data_internal: DeviceDataInternal) -> Self {
+        Self {
+            pubkey: device_data_internal.pubkey,
+            alias: device_data_internal.alias,
+            credential_id: device_data_internal.credential_id,
+            purpose: device_data_internal
+                .purpose
+                .unwrap_or(Purpose::Authentication),
+            key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -158,7 +196,7 @@ type AssetHashes = RbTree<&'static str, Hash>;
 
 struct State {
     nonce_cache: RefCell<NonceCache>,
-    storage: RefCell<Storage<Vec<DeviceData>>>,
+    storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -241,7 +279,7 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
         match store.allocate_user_number() {
             Some(user_number) => {
                 store
-                    .write(user_number, vec![device_data])
+                    .write(user_number, vec![DeviceDataInternal::from(device_data)])
                     .unwrap_or_else(|err| {
                         trap(&format!("failed to store user device data: {}", err))
                     });
@@ -284,7 +322,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
             ));
         }
 
-        entries.push(device_data);
+        entries.push(DeviceDataInternal::from(device_data));
         s.storage
             .borrow()
             .write(user_number, entries)
@@ -338,11 +376,7 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
             .read(user_number)
             .unwrap_or_default()
             .into_iter()
-            .map(|mut data| {
-                data.purpose.get_or_insert(Purpose::Authentication);
-                data.key_type.get_or_insert(KeyType::Unknown);
-                data
-            })
+            .map(DeviceData::from)
             .collect()
     })
 }
