@@ -3,7 +3,7 @@ import { html } from "lit-html";
 export const compatibilityChart = html`<p>
     Browser support for WebAuthentication is constantly evolving. Your preferred
     browser may not support WebAuthentication, or may only support it using a
-    security key. If you run into issues, we please try again with one of our
+    security key. If you run into issues, please try again with one of our
     recommended browsers.
   </p>
   <h3>For Desktop</h3>
