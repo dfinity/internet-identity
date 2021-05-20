@@ -1,20 +1,60 @@
 import { html, render } from "lit-html";
+import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 
 const pageContent = () => html`
   <style>
-  #skipRecovery {
-    margin-top: 3rem;
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
+    #skipRecovery {
+      margin-top: 3.5rem;
+      font-weight: 600;
+      font-size: 1rem;      
+    }
+    .recoveryContainer {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .recoveryOption {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 1px solid gray;
+      border-radius: 4px;
+      width: 100%;
+      padding: 1rem;
+      font-family: "Montserrat", sans-serif;
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+    }
+    .recoveryIcon {
+      height: 52px;
+    }
+    .recoveryTitle {
+      font-weight: 500;
+      margin: 0.5rem;
+    }
+    .recoveryDescription {
+      text-align: center;
+      font-size: 1rem;
+    }
+
   </style>
   <div class="container">
-    <h1>Choose a recovery mechanism</h1>
+    <h1>Recovery Options</h1>
     <p>Set up account recovery to protect your Internet Identity.</p>
-    <button id="securityKey"">Additional security key</button>
-    <button id="seedPhrase"">Recovery password</button>
+    <div class="recoveryContainer">
+      <button class="recoveryOption" id="seedPhrase">
+        <span class="recoveryIcon">${seedPhraseIcon}</span>
+        <div class="recoveryTitle">Seedphrase</div>
+        <div class="recoveryDescription">Use your own storage</div>
+      </button>
+      <button class="recoveryOption" id="securityKey">
+        <span class="recoveryIcon">${securityKeyIcon}</span>
+        <div class="recoveryTitle">Security Key</div>
+        <div class="recoveryDescription">Use if you own a security key</div>
+      </button>
+    </div>
     <button id="skipRecovery" class="linkStyle">
-      Do it later and risk losing access
+      Set recovery later
     </button>
   </div>
 `;

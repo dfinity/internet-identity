@@ -75,6 +75,7 @@ textarea {
   font-family: inherit;
   resize: none;
   padding: 0.3rem;
+  text-align: center;
 }
 
 h1 {
