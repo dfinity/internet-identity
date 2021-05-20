@@ -71,7 +71,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
             </button>
           </div>
           <div class="textLink">
-            Lost a device
+            Lost access
             <button id="recoverButton" class="linkStyle">
               and want to recover?
             </button>
