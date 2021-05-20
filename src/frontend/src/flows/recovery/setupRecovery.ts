@@ -1,10 +1,13 @@
 import { IIConnection } from "../../utils/iiConnection";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 
-export const setupRecovery = async (userNumber: bigint, connection: IIConnection): Promise<void> => {
-  const recoveryMechanism = await chooseRecoveryMechanism()
+export const setupRecovery = async (
+  userNumber: bigint,
+  connection: IIConnection
+): Promise<void> => {
+  const recoveryMechanism = await chooseRecoveryMechanism();
   if (recoveryMechanism === null) {
-    return
+    return;
   }
 
   switch (recoveryMechanism) {
@@ -20,5 +23,3 @@ export const setupRecovery = async (userNumber: bigint, connection: IIConnection
     }
   }
 };
-
-
