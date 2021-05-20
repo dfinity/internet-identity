@@ -7,6 +7,7 @@ import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
 import { verbFromIntent, UserIntent } from "../utils/userIntent";
+import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -68,6 +69,12 @@ const pageContent = (userIntent: UserIntent) => html` <style>
             <button id="addNewDeviceButton" class="linkStyle">
               but using a new device?
             </button>
+          </div>
+          <div class="textLink">
+            Lost a device
+            <button id="recoverButton" class="linkStyle">
+              and want to recover?
+            </button>
           </div>`}
   </div>
   ${aboutLink}`;
@@ -95,6 +102,7 @@ export const loginUnknown = async (
     if (userIntent.kind !== "addDevice") {
       initLinkDevice();
       initRegister(resolve, reject);
+      initRecovery();
     }
   });
 };
@@ -118,6 +126,14 @@ const initRegister = (
       .catch(reject);
   };
 };
+
+const initRecovery = () => {
+  const recoverButton = document.getElementById(
+    "recoverButton"
+  ) as HTMLButtonElement;
+  recoverButton.onclick = () => useRecovery()
+};
+
 
 const initLogin = (resolve: (res: LoginResult) => void) => {
   const userNumberInput = document.getElementById(

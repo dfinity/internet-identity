@@ -1,10 +1,20 @@
 import { html, render } from "lit-html";
 
 const pageContent = () => html`
+  <style>
+  #inputSeedPhrase {
+    width: 100%;
+    height: 6rem;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 400;
+  }
+  </style>
   <div class="container">
     <h1>Your seed phrase</h1>
     <p>Please provide your seed phrase</p>
-    <input id="inputSeedPhrase" placeholder="Your seed phrase" />
+    <textarea id="inputSeedPhrase" placeholder="Your seed phrase"></textarea>
     <button id="inputSeedPhraseContinue" class="primary">Continue</button>
     <button id="inputSeedPhraseCancel">Cancel</button>
   </div>

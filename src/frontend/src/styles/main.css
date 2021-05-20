@@ -66,6 +66,17 @@ input.errored::placeholder {
   color: var(--flamingo-500);
 }
 
+textarea {
+  width: 100%;
+  height: 6rem;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+  font-weight: 400;
+  font-family: inherit;
+  resize: none;
+  padding: 0.3rem;
+}
+
 h1 {
   margin-top: 0;
   font-size: 1.8rem;
@@ -250,6 +261,7 @@ hr {
   align-items: center;
   flex: 1 1 auto;
   margin-right: 0.5rem;
+  margin-bottom: 16px;
   padding-left: 1rem;
 }
 

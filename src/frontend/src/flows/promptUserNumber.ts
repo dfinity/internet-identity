@@ -21,6 +21,9 @@ export const promptUserNumber = async (
   userNumber: bigint | null
 ): Promise<bigint> =>
   new Promise((resolve) => {
+    const container = document.getElementById("pageContent") as HTMLElement;
+    render(pageContent(title, userNumber), container);
+
     const userNumberContinue = document.getElementById(
       "userNumberContinue"
     ) as HTMLButtonElement;
@@ -45,7 +48,4 @@ export const promptUserNumber = async (
         userNumberInput.placeholder = "Please enter your User Number first";
       }
     };
-
-    const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(title, userNumber), container);
   });
