@@ -45,10 +45,32 @@ type Timestamp = u64;
 type Signature = ByteBuf;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
+enum Purpose {
+    #[serde(rename = "recovery")]
+    Recovery,
+    #[serde(rename = "authentication")]
+    Authentication,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum KeyType {
+    #[serde(rename = "unknown")]
+    Unknown,
+    #[serde(rename = "platform")]
+    Platform,
+    #[serde(rename = "cross_platform")]
+    CrossPlatform,
+    #[serde(rename = "seed_phrase")]
+    SeedPhrase,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
 struct DeviceData {
     pubkey: DeviceKey,
     alias: String,
     credential_id: Option<CredentialId>,
+    purpose: Option<Purpose>,
+    key_type: Option<KeyType>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -310,7 +332,19 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
-    STATE.with(|s| s.storage.borrow().read(user_number).unwrap_or_default())
+    STATE.with(|s| {
+        s.storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|mut data| {
+                data.purpose.get_or_insert(Purpose::Authentication);
+                data.key_type.get_or_insert(KeyType::Unknown);
+                data
+            })
+            .collect()
+    })
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other
