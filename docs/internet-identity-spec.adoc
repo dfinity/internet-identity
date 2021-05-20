@@ -523,7 +523,7 @@ This flow is the boring default
 +
 - Their user number
 - A button to add additional devices
-- The list of their devices, with device aliases, and a button to remove
+- The list of their devices, with device aliases, a symbol marking recovery devices, and a button to remove
 - A “logout” button
 
 (One could imagine additional information, such last time a device was used, or even a list of recent client applications that the user logged into.)
