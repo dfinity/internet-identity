@@ -13,18 +13,16 @@ const HARDENED = 0x80000000;
  */
 export async function fromSeedWithSlip0010(
   masterSeed: Uint8Array,
-  derivationPath?: number[]
+  derivationPath: number[] = []
 ): Promise<Ed25519KeyIdentity> {
   let [slipSeed, chainCode] = await generateMasterKey(masterSeed);
 
-  if (derivationPath) {
-    for (let i = 0; i < derivationPath.length; i++) {
-      [slipSeed, chainCode] = await derive(
-        slipSeed,
-        chainCode,
-        derivationPath[i] | HARDENED
-      );
-    }
+  for (let i = 0; i < derivationPath.length; i++) {
+    [slipSeed, chainCode] = await derive(
+      slipSeed,
+      chainCode,
+      derivationPath[i] | HARDENED
+    );
   }
 
   return Ed25519KeyIdentity.generate(slipSeed);
