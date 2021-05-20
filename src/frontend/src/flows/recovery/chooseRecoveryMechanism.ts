@@ -6,7 +6,7 @@ const pageContent = () => html`
     #skipRecovery {
       margin-top: 3.5rem;
       font-weight: 600;
-      font-size: 1rem;      
+      font-size: 1rem;
     }
     .recoveryContainer {
       display: flex;
@@ -36,7 +36,6 @@ const pageContent = () => html`
       text-align: center;
       font-size: 1rem;
     }
-
   </style>
   <div class="container">
     <h1>Recovery Options</h1>
@@ -53,9 +52,7 @@ const pageContent = () => html`
         <div class="recoveryDescription">Use if you own a security key</div>
       </button>
     </div>
-    <button id="skipRecovery" class="linkStyle">
-      Set recovery later
-    </button>
+    <button id="skipRecovery" class="linkStyle">Set recovery later</button>
   </div>
 `;
 

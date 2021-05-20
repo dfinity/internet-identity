@@ -5,8 +5,7 @@ import { checkmarkIcon } from "../../components/icons";
 const pageContent = (seedPhrase: string) => html`
   <div class="container">
     <h1>Your Seedphrase</h1>
-    <textarea id="seedPhrase" readonly>${seedPhrase}</textarea
-    >
+    <textarea id="seedPhrase" readonly>${seedPhrase}</textarea>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
     <button id="displaySeedPhraseContinue" class="primary">Continue</button>
   </div>
