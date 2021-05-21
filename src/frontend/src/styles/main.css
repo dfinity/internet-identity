@@ -215,7 +215,7 @@ main::after {
 
 .highlightBox {
   background-color: var(--grey-100);
-  padding: 0.7rem 0rem;
+  padding: 0.7rem 0.5rem;
   text-align: center;
   border-radius: 4px;
   margin-bottom: 1rem;
@@ -227,7 +227,18 @@ main::after {
 .warningBox {
   border: 1px var(--grey-200) solid;
   border-radius: 4px;
-  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+.warningIcon {
+  height: 2rem;
+  width: 2rem;
+}
+.warningMessage {
+  font-size: 1rem;
 }
 
 hr {
