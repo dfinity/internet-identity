@@ -32,6 +32,7 @@ import {
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
+import * as tweetnacl from "tweetnacl";
 import { fromMnemonic } from "../crypto/ed25519";
 
 // eslint-disable-next-line
@@ -323,4 +324,41 @@ const requestFEDelegation = async (
     }
   );
   return DelegationIdentity.fromDelegation(sessionKey, chain);
+};
+
+export const creationOptions = (
+  exclude: DeviceData[] = [],
+  authenticatorAttachment?: AuthenticatorAttachment
+): PublicKeyCredentialCreationOptions => {
+  return {
+    authenticatorSelection: {
+      userVerification: "preferred",
+      authenticatorAttachment,
+    },
+    excludeCredentials: exclude.flatMap((device) =>
+      device.credential_id.length === 0
+        ? []
+        : {
+            id: new Uint8Array(device.credential_id[0]),
+            type: "public-key",
+          }
+    ),
+    attestation: "direct",
+    challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+    pubKeyCredParams: [
+      {
+        type: "public-key",
+        // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
+        alg: -7,
+      },
+    ],
+    rp: {
+      name: "Internet Identity Service",
+    },
+    user: {
+      id: tweetnacl.randomBytes(16),
+      name: "Internet Identity",
+      displayName: "Internet Identity",
+    },
+  };
 };

@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../utils/iiConnection";
+import { creationOptions, IIConnection } from "../utils/iiConnection";
 import {
   derBlobFromBlob,
   blobFromUint8Array,
@@ -187,7 +187,7 @@ const init = async (
   addAdditionalDevice.onclick = async () => {
     let newDevice: WebAuthnIdentity;
     try {
-      newDevice = await WebAuthnIdentity.create();
+      newDevice = await WebAuthnIdentity.create({ publicKey: creationOptions(devices)});
     } catch (error) {
       await displayError({
         title: "Failed to add new device",
