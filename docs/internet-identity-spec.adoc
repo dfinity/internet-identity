@@ -552,7 +552,7 @@ This flow is the boring default
 === Flow: Use recovery
 1. On the login page the user selects "Recover my account"
 2. The user is prompted for their user number
-3. If no `DeviceData with` the purpose `#recovery` is found for the user number an error is displayed
+3. If no `DeviceData` with the purpose `#recovery` is found for the user number an error is displayed
 4. The user is asked to provide the seed phrase or 👆 their recovery security key
 5. The management page is shown
 
