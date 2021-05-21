@@ -17,10 +17,6 @@ import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty } from "../utils/utils";
 
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
-    #deviceLabel {
-      margin-top: 1rem;
-      margin-bottom: 0;
-    }
     .nagBox {
       display: flex;
       align-items: center;
@@ -58,12 +54,40 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
       margin-bottom: 1rem;
       font-size: 1rem;
     }
-    #recoveryNagButton {
+    .recoveryNagButton {
       padding: 0.2rem 0.4rem;
       border-radius: 2px;
       width: fit-content;
       align-self: flex-end;
       margin: 0;
+    }
+    .labelWithAction {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .labelWithAction label {
+      margin: 0;
+    }
+
+    .labelAction {
+      padding: 0;
+      border: none;
+      display: inline;
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+      color: #387ff7;
+      font-size: 12px;
+      font-family: "Montserrat", sans-serif;
+      text-align: right;
+      font-weight: 600;
+    }
+    .labelAction::before {
+      content: "+";
+      margin-right: 3px;
+      color: #387ff7;
     }
   </style>
   <div class="container">
@@ -75,11 +99,24 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
     ${shouldNag(devices) ? recoveryNag() : undefined}
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
-    <button id="addAdditionalDevice" type="button">
-      Add an additional device
-    </button>
-    <label id="deviceLabel">Registered devices</label>
+    <div class="labelWithAction">
+      <label id="deviceLabel">Registered devices</label>
+      <button class="labelAction" id="addAdditionalDevice">
+        ADD NEW DEVICE
+      </button>
+    </div>
     <div id="deviceList"></div>
+    ${shouldNag(devices)
+      ? undefined
+      : html`
+          <div class="labelWithAction">
+            <label id="deviceLabel">Recovery devices</label>
+            <button class="labelAction" id="addRecovery">
+              ADD ACCOUNT RECOVERY
+            </button>
+          </div>
+          <div id="recoveryList"></div>
+        `}
     ${logoutSection()}
   </div>
   ${aboutLink}`;
@@ -97,7 +134,7 @@ const recoveryNag = () => html`
       <div class="recoveryNagMessage">
         Set an account recovery to help protect your Internet Identity.
       </div>
-      <button id="recoveryNagButton" class="primary">Set Recovery Key</button>
+      <button id="addRecovery" class="primary recoveryNagButton">Set Recovery Key</button>
     </div>
   </div>
 `;
@@ -132,16 +169,14 @@ const init = async (
 ) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
-  if (shouldNag(devices)) {
-    const setupRecoveryButton = document.querySelector(
-      "#recoveryNagButton"
-    ) as HTMLButtonElement;
+  const setupRecoveryButton = document.querySelector(
+    "#addRecovery"
+  ) as HTMLButtonElement;
 
-    setupRecoveryButton.onclick = async () => {
-      await setupRecovery(userNumber, connection);
-      renderManage(userNumber, connection);
-    };
-  }
+  setupRecoveryButton.onclick = async () => {
+    await setupRecovery(userNumber, connection);
+    renderManage(userNumber, connection);
+  };
 
   const addAdditionalDevice = document.querySelector(
     "#addAdditionalDevice"
@@ -207,10 +242,8 @@ const renderDevices = async (
   connection: IIConnection,
   devices: DeviceData[]
 ) => {
-  const deviceList = document.getElementById("deviceList") as HTMLElement;
-  deviceList.innerHTML = ``;
-
   const list = document.createElement("ul");
+  const recoveryList = document.createElement("ul");
 
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
@@ -224,10 +257,22 @@ const renderDevices = async (
       device.pubkey,
       isOnlyDevice
     );
-    list.appendChild(identityElement);
+    hasOwnProperty(device.purpose, "recovery")
+      ? recoveryList.appendChild(identityElement)
+      : list.appendChild(identityElement);
   });
-
+  const deviceList = document.getElementById("deviceList") as HTMLElement;
+  deviceList.innerHTML = ``;
   deviceList.appendChild(list);
+
+  const recoveryDevices = document.getElementById(
+    "recoveryList"
+  ) as HTMLElement;
+
+  if (recoveryDevices !== null) {
+    recoveryDevices.innerHTML = ``;
+    recoveryDevices.appendChild(recoveryList);
+  }
 };
 
 const bindRemoveListener = (
