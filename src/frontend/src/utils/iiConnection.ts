@@ -178,7 +178,10 @@ export class IIConnection {
     userNumber: bigint,
     seedPhrase: string
   ): Promise<LoginResult> {
-    const identity = await fromMnemonicWithoutValidation(seedPhrase, IC_DERIVATION_PATH);
+    const identity = await fromMnemonicWithoutValidation(
+      seedPhrase,
+      IC_DERIVATION_PATH
+    );
     const delegationIdentity = await requestFEDelegation(identity);
     const actor = await IIConnection.createActor(delegationIdentity);
 
