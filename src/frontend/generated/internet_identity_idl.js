@@ -5,10 +5,22 @@ export default ({ IDL }) => {
   const UserNumber = IDL.Nat64;
   const PublicKey = IDL.Vec(IDL.Nat8);
   const DeviceKey = PublicKey;
+  const KeyType = IDL.Variant({
+    'platform' : IDL.Null,
+    'seed_phrase' : IDL.Null,
+    'cross_platform' : IDL.Null,
+    'unknown' : IDL.Null,
+  });
+  const Purpose = IDL.Variant({
+    'authentication' : IDL.Null,
+    'recovery' : IDL.Null,
+  });
   const CredentialId = IDL.Vec(IDL.Nat8);
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
     'pubkey' : DeviceKey,
+    'key_type' : KeyType,
+    'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
   const FrontendHostname = IDL.Text;

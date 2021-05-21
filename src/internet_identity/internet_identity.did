@@ -37,10 +37,24 @@ type StreamingStrategy = variant {
   };
 };
 
+type Purpose = variant {
+    recovery;
+    authentication;
+};
+
+type KeyType = variant {
+    unknown;
+    platform;
+    cross_platform;
+    seed_phrase;
+};
+
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
   credential_id : opt CredentialId;
+  purpose: Purpose;
+  key_type: KeyType;
 };
 
 type RegisterResponse = variant {

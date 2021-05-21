@@ -90,6 +90,8 @@ export class IIConnection {
           alias,
           pubkey,
           credential_id: [credential_id],
+          key_type: { unknown: null },
+          purpose: { authentication: null },
         },
         pow
       );
@@ -211,6 +213,8 @@ export class IIConnection {
       alias,
       pubkey: Array.from(newPublicKey),
       credential_id: credentialId ? [Array.from(credentialId)] : [],
+      key_type: { unknown: null },
+      purpose: { authentication: null },
     });
   };
 
