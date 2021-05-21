@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import { compatibilityChart } from "../components/compatibilityChart";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
@@ -31,6 +32,8 @@ const pageContent = html`
       >
       for step-by-step directions.
     </p>
+    <h2>Compatibility</h2>
+    ${compatibilityChart}
   </div>
 `;
 
