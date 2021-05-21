@@ -83,3 +83,18 @@ test("derive Ed25519 via SLIP 0010", async () => {
     })
   );
 });
+
+test("Reject invalid mnemonics", async () => {
+  await expect(ed25519.fromMnemonic("")).rejects.toThrow();
+  await expect(ed25519.fromMnemonic("g4rb4g3")).rejects.toThrow();
+  await expect(ed25519.fromMnemonic("basket actual")).rejects.toThrow();
+
+  // This is valid, so should succeed.
+  await expect(ed25519.fromMnemonic("abandon amount liar amount expire adjust cage candy arch gather drum buyer")).resolves.not.toThrow();
+});
+
+test("Can forcefully derive identity from invalid mnemonic", async () => {
+  await expect(ed25519.fromMnemonic("", [], true)).resolves.not.toThrow();
+  await expect(ed25519.fromMnemonic("g4rb4g3", [], true)).resolves.not.toThrow();
+  await expect(ed25519.fromMnemonic("basket actual", [], true)).resolves.not.toThrow();
+});
