@@ -1,5 +1,5 @@
 import { Ed25519KeyIdentity } from "@dfinity/identity";
-import { mnemonicToSeedSync, validateMnemonic } from "bip39";
+import { mnemonicToSeedSync } from "bip39";
 
 // A constant used for xor-ing derived paths to make them hardened.
 const HARDENED = 0x80000000;
@@ -31,21 +31,19 @@ export async function fromSeedWithSlip0010(
 /**
  * Create an Ed25519 based on a mnemonic phrase according to SLIP 0010:
  * https://github.com/satoshilabs/slips/blob/master/slip-0010.md
+ * 
+ * NOTE: This method derives an identity even if the mnemonic is invalid. It's
+ * the responsibility of the caller to validate the mnemonic before calling this method.
  *
  * @param mnemonic A BIP-39 mnemonic.
  * @param derivationPath an array that is always interpreted as a hardened path.
  * e.g. to generate m/44'/223’/0’/0’/0' the derivation path should be [44, 223, 0, 0, 0]
  * @param skipValidation if true, validation checks on the mnemonics are skipped.
  */
-export async function fromMnemonic(
+export async function fromMnemonicWithoutValidation(
   mnemonic: string,
   derivationPath: number[] = [],
-  skipValidation = false
 ): Promise<Ed25519KeyIdentity> {
-  if (!skipValidation && !validateMnemonic(mnemonic)) {
-    throw new Error(`Invalid mnemonic: ${mnemonic}`);
-  }
-
   const seed = mnemonicToSeedSync(mnemonic);
   return fromSeedWithSlip0010(seed, derivationPath);
 }
