@@ -20,6 +20,8 @@ import _SERVICE, {
   ProofOfWork,
   RegisterResponse,
   GetDelegationResponse,
+  Purpose,
+  KeyType,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -230,6 +232,8 @@ export class IIConnection {
   add = async (
     userNumber: UserNumber,
     alias: string,
+    keyType: KeyType,
+    purpose: Purpose,
     newPublicKey: DerEncodedBlob,
     credentialId?: BinaryBlob
   ): Promise<void> => {
@@ -238,8 +242,8 @@ export class IIConnection {
       alias,
       pubkey: Array.from(newPublicKey),
       credential_id: credentialId ? [Array.from(credentialId)] : [],
-      key_type: { unknown: null },
-      purpose: { authentication: null },
+      key_type: keyType,
+      purpose,
     });
   };
 

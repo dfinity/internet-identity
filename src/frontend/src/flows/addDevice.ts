@@ -77,7 +77,14 @@ const init = (userNumber: bigint, connection: IIConnection) => {
           return window.location.reload();
         }
         await withLoader(() =>
-          connection.add(userNumber, deviceName, publicKey, rawId)
+          connection.add(
+            userNumber,
+            deviceName,
+            { unknown: null },
+            { authentication: null },
+            publicKey,
+            rawId
+          )
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);

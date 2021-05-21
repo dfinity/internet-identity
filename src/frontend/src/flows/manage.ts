@@ -161,6 +161,8 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
         connection.add(
           userNumber,
           deviceName,
+          { unknown: null },
+          { authentication: null },
           newDevice.getPublicKey().toDer(),
           newDevice.rawId
         )

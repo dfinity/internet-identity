@@ -29,7 +29,13 @@ export const setupRecovery = async (
         IC_DERIVATION_PATH
       );
       await withLoader(() =>
-        connection.add(userNumber, name, recoverIdentity.getPublicKey().toDer())
+        connection.add(
+          userNumber,
+          name,
+          { seed_phrase: null },
+          { recovery: null },
+          recoverIdentity.getPublicKey().toDer()
+        )
       );
     }
   }

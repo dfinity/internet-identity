@@ -1,6 +1,7 @@
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
 import { IIConnection, LoginResult } from "../../utils/iiConnection";
+import { hasOwnProperty } from "../../utils/utils";
 import { apiResultToLoginResult } from "../loginUnknown";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";
@@ -8,13 +9,11 @@ import { inputSeedPhrase } from "./inputSeedPhrase";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 
 const isRecovery = (device: DeviceData): boolean => {
-  // TODO
-  return true;
+  return hasOwnProperty(device.purpose, "recovery");
 };
 
 const wantsSeedPhrase = (device: DeviceData): boolean => {
-  // TODO
-  return true;
+  return hasOwnProperty(device.key_type, "seed_phrase")
 };
 
 export const useRecovery = async (): Promise<void> => {
