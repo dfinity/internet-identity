@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { withLoader } from "../../components/loader";
-import { fromMnemonic } from "../../crypto/ed25519";
-import { generateMnemonic } from "../../crypto/mnemonic";
+import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
+import { generate } from "../../crypto/mnemonic";
 import {
   creationOptions,
   IC_DERIVATION_PATH,
@@ -39,9 +39,9 @@ export const setupRecovery = async (
     }
     case "seedPhrase": {
       const name = "Recovery phrase";
-      const seedPhrase = generateMnemonic().trim();
+      const seedPhrase = generate().trim();
       await displaySeedPhrase(seedPhrase);
-      const recoverIdentity = await fromMnemonic(
+      const recoverIdentity = await fromMnemonicWithoutValidation(
         seedPhrase,
         IC_DERIVATION_PATH
       );

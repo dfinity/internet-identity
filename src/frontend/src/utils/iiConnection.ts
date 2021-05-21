@@ -33,7 +33,7 @@ import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
-import { fromMnemonic } from "../crypto/ed25519";
+import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
@@ -178,7 +178,7 @@ export class IIConnection {
     userNumber: bigint,
     seedPhrase: string
   ): Promise<LoginResult> {
-    const identity = await fromMnemonic(seedPhrase, IC_DERIVATION_PATH);
+    const identity = await fromMnemonicWithoutValidation(seedPhrase, IC_DERIVATION_PATH);
     const delegationIdentity = await requestFEDelegation(identity);
     const actor = await IIConnection.createActor(delegationIdentity);
 
