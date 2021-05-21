@@ -21,7 +21,9 @@ const pageContent = (seedPhrase: string) => html`
     <label>Your seed phrase</label>
     <div id="seedPhrase" class="highlightBox">${seedPhrase}</div>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
-    <button id="displaySeedPhraseContinue" class="primary hidden">Continue</button>
+    <button id="displaySeedPhraseContinue" class="primary hidden">
+      Continue
+    </button>
   </div>
 `;
 
