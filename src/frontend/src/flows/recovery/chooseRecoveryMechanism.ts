@@ -60,7 +60,7 @@ const pageContent = (devices: DeviceData[]) => html`
         id="seedPhrase"
       >
         <span class="recoveryIcon">${seedPhraseIcon}</span>
-        <div class="recoveryTitle">Seedphrase</div>
+        <div class="recoveryTitle">Seed Phrase</div>
         <div class="recoveryDescription">Use your own storage</div>
       </button>
       <button
