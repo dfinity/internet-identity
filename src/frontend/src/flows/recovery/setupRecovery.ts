@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
 import { generate } from "../../crypto/mnemonic";
@@ -23,9 +24,21 @@ export const setupRecovery = async (
   switch (recoveryMechanism) {
     case "securityKey": {
       const name = "Recovery key";
-      const recoverIdentity = await WebAuthnIdentity.create({
-        publicKey: creationOptions(devices, "cross-platform"),
-      });
+      let recoverIdentity: WebAuthnIdentity;
+      try {
+        recoverIdentity = await WebAuthnIdentity.create({
+          publicKey: creationOptions(devices, "cross-platform"),
+        });
+      } catch (err) {
+        await displayError({
+          title: "Authentication failure",
+          message: "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
+          detail: err.toString(),
+          primaryButton: "Try a different method"
+        });
+        return setupRecovery(userNumber, connection)
+      }
+
       return await withLoader(() =>
         connection.add(
           userNumber,
