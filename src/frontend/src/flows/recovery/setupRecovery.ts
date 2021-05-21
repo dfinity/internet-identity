@@ -9,7 +9,11 @@ export const setupRecovery = async (
   userNumber: bigint,
   connection: IIConnection
 ): Promise<void> => {
-  const recoveryMechanism = await chooseRecoveryMechanism();
+  const devices = await IIConnection.lookup(userNumber);
+  const hasRecoveryPhrase = devices.some(
+    (device) => device.alias === "Recovery phrase"
+  );
+  const recoveryMechanism = await chooseRecoveryMechanism(hasRecoveryPhrase);
   if (recoveryMechanism === null) {
     return;
   }

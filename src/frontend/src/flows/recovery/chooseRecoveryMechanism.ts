@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 
-const pageContent = () => html`
+const pageContent = (hasRecoveryPhrase: boolean) => html`
   <style>
     #skipRecovery {
       margin-top: 3.5rem;
@@ -25,6 +25,30 @@ const pageContent = () => html`
       font-size: 1.2rem;
       margin-bottom: 2rem;
     }
+    .recoveryOptionDisabled {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 1px solid gray;
+      border-radius: 4px;
+      width: 100%;
+      padding: 1rem;
+      font-family: "Montserrat", sans-serif;
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+    }
+    .recoveryOptionDisabled div {
+      color: gray;
+    }
+    .recoveryOptionDisabled svg {
+      filter: invert(93%) sepia(0%) saturate(33%) hue-rotate(255deg)
+        brightness(94%) contrast(79%);
+    }
+    .recoveryOptionDisabled:hover,
+    .recoveryOptionDisabled:focus {
+      outline: none;
+      box-shadow: none;
+    }
     .recoveryIcon {
       height: 52px;
     }
@@ -41,7 +65,10 @@ const pageContent = () => html`
     <h1>Recovery Options</h1>
     <p>Set up account recovery to protect your Internet Identity.</p>
     <div class="recoveryContainer">
-      <button class="recoveryOption" id="seedPhrase">
+      <button
+        class=${hasRecoveryPhrase ? "recoveryOptionDisabled" : "recoveryOption"}
+        id="seedPhrase"
+      >
         <span class="recoveryIcon">${seedPhraseIcon}</span>
         <div class="recoveryTitle">Seedphrase</div>
         <div class="recoveryDescription">Use your own storage</div>
@@ -58,13 +85,15 @@ const pageContent = () => html`
 
 export type RecoveryMechanism = "securityKey" | "seedPhrase";
 
-export const chooseRecoveryMechanism = async (): Promise<RecoveryMechanism | null> => {
+export const chooseRecoveryMechanism = async (
+  hasRecoveryPhrase: boolean
+): Promise<RecoveryMechanism | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
-  return init();
+  render(pageContent(hasRecoveryPhrase), container);
+  return init(hasRecoveryPhrase);
 };
 
-const init = (): Promise<RecoveryMechanism | null> =>
+const init = (hasRecoveryPhrase: boolean): Promise<RecoveryMechanism | null> =>
   new Promise((resolve) => {
     const securityKey = document.getElementById(
       "securityKey"
@@ -76,6 +105,8 @@ const init = (): Promise<RecoveryMechanism | null> =>
       "skipRecovery"
     ) as HTMLButtonElement;
     securityKey.onclick = () => resolve("securityKey");
-    seedPhrase.onclick = () => resolve("seedPhrase");
+    if (!hasRecoveryPhrase) {
+      seedPhrase.onclick = () => resolve("seedPhrase");
+    }
     skipRecovery.onclick = () => resolve(null);
   });
