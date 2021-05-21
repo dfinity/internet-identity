@@ -9,6 +9,7 @@ import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
+import { setupRecovery } from "./recovery/setupRecovery";
 
 const pageContent = html`
   <div class="container">
@@ -78,6 +79,7 @@ const init = (): Promise<LoginResult | null> =>
           if (result.kind === "loginSuccess") {
             setUserNumber(result.userNumber);
             await displayUserNumber(result.userNumber);
+            await setupRecovery(result.userNumber, result.connection);
           }
           resolve(apiResultToLoginResult(result));
         } else {
