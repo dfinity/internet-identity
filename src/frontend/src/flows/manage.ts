@@ -134,7 +134,9 @@ const recoveryNag = () => html`
       <div class="recoveryNagMessage">
         Set an account recovery to help protect your Internet Identity.
       </div>
-      <button id="addRecovery" class="primary recoveryNagButton">Set Recovery Key</button>
+      <button id="addRecovery" class="primary recoveryNagButton">
+        Set Recovery Key
+      </button>
     </div>
   </div>
 `;
