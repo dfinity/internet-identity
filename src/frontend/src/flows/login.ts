@@ -12,10 +12,17 @@ import {
   LoginResult,
   loginUnknown,
 } from "./loginUnknown";
+import { useRecovery } from "./recovery/useRecovery";
 
-const pageContent = (userNumber: bigint, userIntent: UserIntent) => html` <div
-    class="container"
-  >
+const pageContent = (
+  userNumber: bigint,
+  userIntent: UserIntent
+) => html` <style>
+    .spacer {
+      height: 2rem;
+    }
+  </style>
+  <div class="container">
     ${icLogo}
     <h1>Welcome back!</h1>
     <p>Login to ${verbFromIntent(userIntent)}.</p>
@@ -25,6 +32,11 @@ const pageContent = (userNumber: bigint, userIntent: UserIntent) => html` <div
     <button type="button" id="loginDifferent">
       Use a different user number
     </button>
+    <div class="spacer"></div>
+    <div class="textLink">
+      Lost access
+      <button id="recoverButton" class="linkStyle">and want to recover?</button>
+    </div>
     ${logoutSection("Clear user number from browser")}
   </div>
   ${aboutLink}`;
@@ -95,5 +107,9 @@ const init = async (
       ev.stopPropagation();
       resolve(await loginUnknown(userIntent));
     };
+    const recoverButton = document.getElementById(
+      "recoverButton"
+    ) as HTMLButtonElement;
+    recoverButton.onclick = () => useRecovery(userNumber);
   });
 };

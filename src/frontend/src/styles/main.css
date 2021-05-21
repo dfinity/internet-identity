@@ -245,6 +245,18 @@ main::after {
   font-size: 1rem;
 }
 
+.textLink {
+  margin-bottom: 0.7rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+.textLink button {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: black;
+}
+
 hr {
   margin-bottom: 1rem;
   width: 100%;

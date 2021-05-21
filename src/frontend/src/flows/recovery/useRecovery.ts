@@ -12,8 +12,11 @@ const wantsSeedPhrase = (device: DeviceData): boolean => {
   return hasOwnProperty(device.key_type, "seed_phrase");
 };
 
-export const useRecovery = async (): Promise<void> => {
-  const userNumber = await promptUserNumber("Recover your Identity", null);
+export const useRecovery = async (userNumber?: bigint): Promise<void> => {
+  userNumber =
+    userNumber === undefined
+      ? await promptUserNumber("Recover your Identity", null)
+      : userNumber;
   const recoveryDevices = await IIConnection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({

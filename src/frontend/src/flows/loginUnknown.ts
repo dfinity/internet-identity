@@ -31,17 +31,6 @@ const pageContent = (userIntent: UserIntent) => html` <style>
       margin-top: 4rem;
     }
 
-    .textLink {
-      margin-bottom: 0.7rem;
-      font-size: 0.95rem;
-      white-space: nowrap;
-    }
-    .textLink button {
-      font-size: 0.95rem;
-      font-weight: 600;
-      text-decoration: none;
-      color: black;
-    }
     .spacer {
       height: 2rem;
     }
