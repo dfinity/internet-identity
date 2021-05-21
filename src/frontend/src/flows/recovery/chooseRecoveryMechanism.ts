@@ -1,7 +1,8 @@
 import { html, render } from "lit-html";
+import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 
-const pageContent = (hasRecoveryPhrase: boolean) => html`
+const pageContent = (devices: DeviceData[]) => html`
   <style>
     #skipRecovery {
       margin-top: 3.5rem;
@@ -25,27 +26,15 @@ const pageContent = (hasRecoveryPhrase: boolean) => html`
       font-size: 1.2rem;
       margin-bottom: 2rem;
     }
-    .recoveryOptionDisabled {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border: 1px solid gray;
-      border-radius: 4px;
-      width: 100%;
-      padding: 1rem;
-      font-family: "Montserrat", sans-serif;
-      font-size: 1.2rem;
-      margin-bottom: 2rem;
-    }
-    .recoveryOptionDisabled div {
+    .recoveryOption:disabled div {
       color: gray;
     }
-    .recoveryOptionDisabled svg {
+    .recoveryOption:disabled svg {
       filter: invert(93%) sepia(0%) saturate(33%) hue-rotate(255deg)
         brightness(94%) contrast(79%);
     }
-    .recoveryOptionDisabled:hover,
-    .recoveryOptionDisabled:focus {
+    .recoveryOption:disabled:hover,
+    .recoveryOption:disabled:focus {
       outline: none;
       box-shadow: none;
     }
@@ -66,14 +55,19 @@ const pageContent = (hasRecoveryPhrase: boolean) => html`
     <p>Set up account recovery to protect your Internet Identity.</p>
     <div class="recoveryContainer">
       <button
-        class=${hasRecoveryPhrase ? "recoveryOptionDisabled" : "recoveryOption"}
+        ?disabled=${hasRecoveryPhrase(devices)}
+        class="recoveryOption"
         id="seedPhrase"
       >
         <span class="recoveryIcon">${seedPhraseIcon}</span>
         <div class="recoveryTitle">Seedphrase</div>
         <div class="recoveryDescription">Use your own storage</div>
       </button>
-      <button class="recoveryOption" id="securityKey">
+      <button
+        ?disabled=${hasRecoveryKey(devices)}
+        class="recoveryOption"
+        id="securityKey"
+      >
         <span class="recoveryIcon">${securityKeyIcon}</span>
         <div class="recoveryTitle">Security Key</div>
         <div class="recoveryDescription">Use if you own a security key</div>
@@ -86,14 +80,14 @@ const pageContent = (hasRecoveryPhrase: boolean) => html`
 export type RecoveryMechanism = "securityKey" | "seedPhrase";
 
 export const chooseRecoveryMechanism = async (
-  hasRecoveryPhrase: boolean
+  devices: DeviceData[]
 ): Promise<RecoveryMechanism | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(hasRecoveryPhrase), container);
-  return init(hasRecoveryPhrase);
+  render(pageContent(devices), container);
+  return init();
 };
 
-const init = (hasRecoveryPhrase: boolean): Promise<RecoveryMechanism | null> =>
+const init = (): Promise<RecoveryMechanism | null> =>
   new Promise((resolve) => {
     const securityKey = document.getElementById(
       "securityKey"
@@ -105,8 +99,11 @@ const init = (hasRecoveryPhrase: boolean): Promise<RecoveryMechanism | null> =>
       "skipRecovery"
     ) as HTMLButtonElement;
     securityKey.onclick = () => resolve("securityKey");
-    if (!hasRecoveryPhrase) {
-      seedPhrase.onclick = () => resolve("seedPhrase");
-    }
+    seedPhrase.onclick = () => resolve("seedPhrase");
     skipRecovery.onclick = () => resolve(null);
   });
+
+const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
+  devices.some((device) => device.alias === "Recovery phrase");
+const hasRecoveryKey = (devices: DeviceData[]): boolean =>
+  devices.some((device) => device.alias === "Recovery key");

@@ -49,12 +49,11 @@ const loginWithRecovery = async (
   userNumber: bigint,
   device: DeviceData
 ): Promise<LoginResult> => {
-  // TODO Make this a switch
   if (wantsSeedPhrase(device)) {
     const seedPhrase = await inputSeedPhrase();
     if (seedPhrase === null) {
-      // TODO think about error handling here
-      throw Error("Canceled seedphrase input");
+      // TODO do proper error handling
+      return { kind: "authFail", error: new Error("Invalid seedphrase") };
     }
     return await IIConnection.fromSeedPhrase(userNumber, seedPhrase);
   } else {

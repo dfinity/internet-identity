@@ -1,19 +1,18 @@
+import { WebAuthnIdentity } from "@dfinity/identity";
 import { withLoader } from "../../components/loader";
 import { fromMnemonic } from "../../crypto/ed25519";
 import { generateMnemonic } from "../../crypto/mnemonic";
 import { IC_DERIVATION_PATH, IIConnection } from "../../utils/iiConnection";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
+import * as tweetnacl from "tweetnacl";
 
 export const setupRecovery = async (
   userNumber: bigint,
   connection: IIConnection
 ): Promise<void> => {
   const devices = await IIConnection.lookupAll(userNumber);
-  const hasRecoveryPhrase = devices.some(
-    (device) => device.alias === "Recovery phrase"
-  );
-  const recoveryMechanism = await chooseRecoveryMechanism(hasRecoveryPhrase);
+  const recoveryMechanism = await chooseRecoveryMechanism(devices);
   if (recoveryMechanism === null) {
     return;
   }
@@ -21,8 +20,49 @@ export const setupRecovery = async (
   switch (recoveryMechanism) {
     case "securityKey": {
       const name = "Recovery key";
-      // 2 a) Security key: Prompt for user touch, generate credential, add it as a recovery device
-      return;
+      const recoverIdentity = await WebAuthnIdentity.create({
+        publicKey: {
+          authenticatorSelection: {
+            userVerification: "preferred",
+            authenticatorAttachment: "cross-platform",
+          },
+          excludeCredentials: devices.flatMap((device) =>
+            device.credential_id.length === 0
+              ? []
+              : {
+                  id: new Uint8Array(device.credential_id[0]),
+                  type: "public-key",
+                }
+          ),
+          attestation: "direct",
+          challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+          pubKeyCredParams: [
+            {
+              type: "public-key",
+              // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
+              alg: -7,
+            },
+          ],
+          rp: {
+            name: "Internet Identity Service",
+          },
+          user: {
+            id: tweetnacl.randomBytes(16),
+            name: "Internet Identity",
+            displayName: "Internet Identity",
+          },
+        },
+      });
+      return await withLoader(() =>
+        connection.add(
+          userNumber,
+          name,
+          { cross_platform: null },
+          { recovery: null },
+          recoverIdentity.getPublicKey().toDer(),
+          recoverIdentity.rawId
+        )
+      );
     }
     case "seedPhrase": {
       const name = "Recovery phrase";
