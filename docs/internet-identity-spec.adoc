@@ -541,10 +541,9 @@ This flow is the boring default
 (This could include a button to go to the management screen, or maybe this _is_ the management screen with a info box.)
 
 === Flow: Setup recovery
-1. The user is offered two options for recovery
+1. The user is offered two options for recovery and the option to skip
   * A security key
   * A BIP-39 seed phrase
-  * (Skip?)
 2. Depending on their choice
  a) If they choose the seed phrase it is generated and displayed to them with a copy button and an explanation of having to keep this phrase secure
  b) 👆 If they choose the security key they generate new credentials for the touched device
