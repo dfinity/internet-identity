@@ -187,7 +187,9 @@ const init = async (
   addAdditionalDevice.onclick = async () => {
     let newDevice: WebAuthnIdentity;
     try {
-      newDevice = await WebAuthnIdentity.create({ publicKey: creationOptions(devices)});
+      newDevice = await WebAuthnIdentity.create({
+        publicKey: creationOptions(devices),
+      });
     } catch (error) {
       await displayError({
         title: "Failed to add new device",
