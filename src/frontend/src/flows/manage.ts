@@ -14,8 +14,9 @@ import { displayError } from "../components/displayError";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
+import { hasOwnProperty } from "../utils/utils";
 
-const pageContent = (userNumber: bigint) => html`<style>
+const pageContent = (userNumber: bigint, shouldNag: boolean) => html`<style>
     #deviceLabel {
       margin-top: 1rem;
       margin-bottom: 0;
@@ -71,7 +72,7 @@ const pageContent = (userNumber: bigint) => html`<style>
       You can view and manage your Internet identity and your registered devices
       here.
     </p>
-    ${recoveryNag()}
+    ${shouldNag ? recoveryNag() : undefined}
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
     <button id="addAdditionalDevice" type="button">
@@ -101,27 +102,50 @@ const recoveryNag = () => html`
   </div>
 `;
 
-export const renderManage = (
+export const renderManage = async (
   userNumber: bigint,
   connection: IIConnection
-): void => {
+): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  render(pageContent(userNumber), container);
-  init(userNumber, connection);
+  let devices: DeviceData[];
+  try {
+    devices = await withLoader(() => IIConnection.lookup(userNumber));
+  } catch (err) {
+    await displayError({
+      title: "Failed to list your devices",
+      message:
+        "An unexpected error occurred when displaying your devices. Please try again",
+      detail: err.toString(),
+      primaryButton: "Try again",
+    });
+    return renderManage(userNumber, connection);
+  }
+  const shouldNag = !devices.some((device) =>
+    hasOwnProperty(device.purpose, "recovery")
+  );
+  render(pageContent(userNumber, shouldNag), container);
+  init(userNumber, connection, devices, shouldNag);
 };
 
-const init = async (userNumber: bigint, connection: IIConnection) => {
+const init = async (
+  userNumber: bigint,
+  connection: IIConnection,
+  devices: DeviceData[],
+  shouldNag: boolean
+) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
-  const setupRecoveryButton = document.querySelector(
-    "#recoveryNagButton"
-  ) as HTMLButtonElement;
+  if (shouldNag) {
+    const setupRecoveryButton = document.querySelector(
+      "#recoveryNagButton"
+    ) as HTMLButtonElement;
 
-  setupRecoveryButton.onclick = async () => {
-    await setupRecovery(userNumber, connection);
-    renderManage(userNumber, connection);
-  };
+    setupRecoveryButton.onclick = async () => {
+      await setupRecovery(userNumber, connection);
+      renderManage(userNumber, connection);
+    };
+  }
 
   const addAdditionalDevice = document.querySelector(
     "#addAdditionalDevice"
@@ -179,42 +203,29 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
     renderManage(userNumber, connection);
   };
 
-  renderIdentities(userNumber, connection);
+  renderDevices(userNumber, connection, devices);
 };
 
-const renderIdentities = async (
+const renderDevices = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: IIConnection,
+  devices: DeviceData[]
 ) => {
   const deviceList = document.getElementById("deviceList") as HTMLElement;
   deviceList.innerHTML = ``;
 
-  let identities: DeviceData[];
-  try {
-    identities = await IIConnection.lookup(userNumber);
-  } catch (err) {
-    await displayError({
-      title: "Failed to list your devices",
-      message:
-        "An unexpected error occurred when displaying your devices. Please try again",
-      detail: err.toString(),
-      primaryButton: "Try again",
-    });
-    return renderManage(userNumber, connection);
-  }
-
   const list = document.createElement("ul");
 
-  identities.forEach((identity) => {
+  devices.forEach((device) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
-    render(deviceListItem(identity.alias), identityElement);
-    const isOnlyDevice = identities.length < 2;
+    render(deviceListItem(device.alias), identityElement);
+    const isOnlyDevice = devices.length < 2;
     bindRemoveListener(
       userNumber,
       connection,
       identityElement,
-      identity.pubkey,
+      device.pubkey,
       isOnlyDevice
     );
     list.appendChild(identityElement);
