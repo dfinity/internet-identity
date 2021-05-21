@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import { compatibilityChart } from "../components/compatibilityChart";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
@@ -15,21 +16,7 @@ const pageContent = html`
       Unfortunately your browser doesn't support the necessary features that
       power your Internet Identity.
     </p>
-    <p>At this moment the following browsers are known to work:</p>
-    <h3>For Desktop</h3>
-    <ul>
-      <li>Chrome version 67 or newer</li>
-      <li>Firefox version 60 or newer</li>
-      <li>Safari version 13 or newer</li>
-      <li>Edge version 18 or newer</li>
-    </ul>
-    <h3>For Mobile</h3>
-    <ul>
-      <li>Chrome (Android)</li>
-      <li>Safari 14.4 or newer (iOS)</li>
-      <li>Firefox latest (iOS)</li>
-      <li>Chrome latest (iOS)</li>
-    </ul>
+    ${compatibilityChart}
   </div>
 `;
 
