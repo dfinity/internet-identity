@@ -31,7 +31,7 @@ export async function fromSeedWithSlip0010(
 /**
  * Create an Ed25519 based on a mnemonic phrase according to SLIP 0010:
  * https://github.com/satoshilabs/slips/blob/master/slip-0010.md
- * 
+ *
  * NOTE: This method derives an identity even if the mnemonic is invalid. It's
  * the responsibility of the caller to validate the mnemonic before calling this method.
  *
@@ -42,7 +42,7 @@ export async function fromSeedWithSlip0010(
  */
 export async function fromMnemonicWithoutValidation(
   mnemonic: string,
-  derivationPath: number[] = [],
+  derivationPath: number[] = []
 ): Promise<Ed25519KeyIdentity> {
   const seed = mnemonicToSeedSync(mnemonic);
   return fromSeedWithSlip0010(seed, derivationPath);
