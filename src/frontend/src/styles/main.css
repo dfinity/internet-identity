@@ -205,6 +205,10 @@ main::after {
   }
 }
 
+.hidden {
+  visibility: hidden;
+}
+
 #logout-button {
   display: flex;
   padding: 8px;

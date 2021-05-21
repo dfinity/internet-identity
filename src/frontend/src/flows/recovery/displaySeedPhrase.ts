@@ -1,13 +1,27 @@
 import ClipboardJS from "clipboard";
 import { html, render } from "lit-html";
-import { checkmarkIcon } from "../../components/icons";
+import { checkmarkIcon, warningIcon } from "../../components/icons";
 
 const pageContent = (seedPhrase: string) => html`
+  <style>
+    #seedPhrase {
+      font-size: 1rem;
+    }
+  </style>
   <div class="container">
-    <h1>Your Seedphrase</h1>
-    <textarea id="seedPhrase" readonly>${seedPhrase}</textarea>
+    <h1>Seedphrase</h1>
+    <p>Your seed phrase makes it easy to recover your account.</p>
+    <div class="warningBox">
+      <span class="warningIcon">${warningIcon}</span>
+      <div class="warningMessage">
+        Do <b>NOT</b> forget to save this seed phrase. Save a backup on a
+        storage medium and write it down.
+      </div>
+    </div>
+    <label>Your seed phrase</label>
+    <div id="seedPhrase" class="highlightBox">${seedPhrase}</div>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
-    <button id="displaySeedPhraseContinue" class="primary">Continue</button>
+    <button id="displaySeedPhraseContinue" class="primary hidden">Continue</button>
   </div>
 `;
 
@@ -27,6 +41,7 @@ const init = (): Promise<void> =>
     const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
     new ClipboardJS(seedCopy).on("success", () => {
       const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
+      displaySeedPhraseContinue.classList.toggle("hidden", false);
       render(checkmarkIcon, seedCopy);
     });
   });
