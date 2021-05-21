@@ -65,11 +65,11 @@ import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
--- copied from ./src/internet_identity/internet_identity.did,
--- and then modified to replace vec nat8 with blob
+-- We cannot do
+-- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
+-- just yet, because haskell-candid doesn’t like init arguments to service, so
+-- for now we have to copy it
 type IIInterface m = [Candid.candid|
-
-
 type UserNumber = nat64;
 type PublicKey = blob;
 type CredentialId = blob;
