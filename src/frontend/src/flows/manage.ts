@@ -16,7 +16,7 @@ import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty } from "../utils/utils";
 
-const pageContent = (userNumber: bigint, shouldNag: boolean) => html`<style>
+const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
     #deviceLabel {
       margin-top: 1rem;
       margin-bottom: 0;
@@ -72,7 +72,7 @@ const pageContent = (userNumber: bigint, shouldNag: boolean) => html`<style>
       You can view and manage your Internet identity and your registered devices
       here.
     </p>
-    ${shouldNag ? recoveryNag() : undefined}
+    ${shouldNag(devices) ? recoveryNag() : undefined}
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
     <button id="addAdditionalDevice" type="button">
@@ -110,7 +110,7 @@ export const renderManage = async (
 
   let devices: DeviceData[];
   try {
-    devices = await withLoader(() => IIConnection.lookup(userNumber));
+    devices = await withLoader(() => IIConnection.lookupAll(userNumber));
   } catch (err) {
     await displayError({
       title: "Failed to list your devices",
@@ -121,22 +121,18 @@ export const renderManage = async (
     });
     return renderManage(userNumber, connection);
   }
-  const shouldNag = !devices.some((device) =>
-    hasOwnProperty(device.purpose, "recovery")
-  );
-  render(pageContent(userNumber, shouldNag), container);
-  init(userNumber, connection, devices, shouldNag);
+  render(pageContent(userNumber, devices), container);
+  init(userNumber, connection, devices);
 };
 
 const init = async (
   userNumber: bigint,
   connection: IIConnection,
-  devices: DeviceData[],
-  shouldNag: boolean
+  devices: DeviceData[]
 ) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
-  if (shouldNag) {
+  if (shouldNag(devices)) {
     const setupRecoveryButton = document.querySelector(
       "#recoveryNagButton"
     ) as HTMLButtonElement;
@@ -289,3 +285,6 @@ const bindRemoveListener = (
     }
   };
 };
+
+const shouldNag = (devices: DeviceData[]): boolean =>
+  !devices.some((device) => hasOwnProperty(device.purpose, "recovery"));

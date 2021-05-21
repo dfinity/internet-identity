@@ -75,7 +75,7 @@ const init = () => {
       loginInterval = window.setInterval(async () => {
         console.log("checking if authenticated");
         try {
-          const devices = await IIConnection.lookup(userNumber);
+          const devices = await IIConnection.lookupAuthenticators(userNumber);
           const matchedDevice = devices.find((deviceData) =>
             derBlobFromBlob(
               blobFromUint8Array(Buffer.from(deviceData.pubkey))

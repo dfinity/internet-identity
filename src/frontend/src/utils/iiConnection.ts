@@ -123,7 +123,7 @@ export class IIConnection {
   static async login(userNumber: bigint): Promise<LoginResult> {
     let devices: DeviceData[];
     try {
-      devices = await baseActor.lookup(userNumber);
+      devices = await this.lookupAuthenticators(userNumber);
     } catch (e) {
       return {
         kind: "apiError",
@@ -188,8 +188,24 @@ export class IIConnection {
     };
   }
 
-  static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
-    return baseActor.lookup(userNumber);
+  static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
+    return await baseActor.lookup(userNumber);
+  }
+
+  static async lookupAuthenticators(
+    userNumber: UserNumber
+  ): Promise<DeviceData[]> {
+    const allDevices = await baseActor.lookup(userNumber);
+    return allDevices.filter((device) =>
+      hasOwnProperty(device.purpose, "authentication")
+    );
+  }
+
+  static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
+    const allDevices = await baseActor.lookup(userNumber);
+    return allDevices.filter((device) =>
+      hasOwnProperty(device.purpose, "recovery")
+    );
   }
 
   // Create an actor representing the backend

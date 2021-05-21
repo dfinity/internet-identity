@@ -8,18 +8,13 @@ import { promptUserNumber } from "../promptUserNumber";
 import { inputSeedPhrase } from "./inputSeedPhrase";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 
-const isRecovery = (device: DeviceData): boolean => {
-  return hasOwnProperty(device.purpose, "recovery");
-};
-
 const wantsSeedPhrase = (device: DeviceData): boolean => {
   return hasOwnProperty(device.key_type, "seed_phrase");
 };
 
 export const useRecovery = async (): Promise<void> => {
   const userNumber = await promptUserNumber("Recover your Identity", null);
-  const devices = await IIConnection.lookup(userNumber);
-  const recoveryDevices = devices.filter(isRecovery);
+  const recoveryDevices = await IIConnection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
