@@ -32,11 +32,12 @@ export const setupRecovery = async (
       } catch (err) {
         await displayError({
           title: "Authentication failure",
-          message: "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
+          message:
+            "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
           detail: err.toString(),
-          primaryButton: "Try a different method"
+          primaryButton: "Try a different method",
         });
-        return setupRecovery(userNumber, connection)
+        return setupRecovery(userNumber, connection);
       }
 
       return await withLoader(() =>
