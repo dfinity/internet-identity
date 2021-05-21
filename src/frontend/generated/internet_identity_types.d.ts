@@ -10,6 +10,8 @@ export interface Delegation {
 export interface DeviceData {
   'alias' : string,
   'pubkey' : DeviceKey,
+  'key_type' : KeyType,
+  'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 };
 export type DeviceKey = PublicKey;
@@ -36,8 +38,14 @@ export interface InternetIdentityStats {
   'users_registered' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
 };
+export type KeyType = { 'platform' : null } |
+  { 'seed_phrase' : null } |
+  { 'cross_platform' : null } |
+  { 'unknown' : null };
 export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp };
 export type PublicKey = Array<number>;
+export type Purpose = { 'authentication' : null } |
+  { 'recovery' : null };
 export type RegisterResponse = { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
 export type SessionKey = PublicKey;
