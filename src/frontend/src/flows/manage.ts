@@ -9,7 +9,7 @@ import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
-import { closeIcon } from "../components/icons";
+import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -20,6 +20,50 @@ const pageContent = (userNumber: bigint) => html`<style>
       margin-top: 1rem;
       margin-bottom: 0;
     }
+    .nagBox {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      box-sizing: border-box;
+      border-style: double;
+      border-width: 2px;
+      border-radius: 4px;
+      border-image-slice: 1;
+      outline: none;
+      border-image-source: linear-gradient(
+        270.05deg,
+        #29abe2 10.78%,
+        #522785 22.2%,
+        #ed1e79 42.46%,
+        #f15a24 59.41%,
+        #fbb03b 77.09%
+      );
+    }
+    .nagIcon {
+      align-self: flex-start;
+    }
+    .recoveryNag {
+      display: flex;
+      flex-direction: column;
+    }
+    .recoveryNagTitle {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .recoveryNagMessage {
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    #recoveryNagButton {
+      padding: 0.2rem 0.4rem;
+      border-radius: 2px;
+      width: fit-content;
+      align-self: flex-end;
+      margin: 0;
+    }
   </style>
   <div class="container">
     <h1>Identity Management</h1>
@@ -27,13 +71,11 @@ const pageContent = (userNumber: bigint) => html`<style>
       You can view and manage your Internet identity and your registered devices
       here.
     </p>
+    ${recoveryNag()}
     <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
     <button id="addAdditionalDevice" type="button">
       Add an additional device
-    </button>
-    <button id="setupRecoveryButton" type="button">
-      Set up a recovery option
     </button>
     <label id="deviceLabel">Registered devices</label>
     <div id="deviceList"></div>
@@ -44,6 +86,19 @@ const pageContent = (userNumber: bigint) => html`<style>
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
   <button type="button" class="deviceItemRemove">${closeIcon}</button>
+`;
+
+const recoveryNag = () => html`
+  <div class="nagBox">
+    <div class="nagIcon">${warningIcon}</div>
+    <div class="recoveryNag">
+      <div class="recoveryNagTitle">Account Recovery</div>
+      <div class="recoveryNagMessage">
+        Set an account recovery to help protect your Internet Identity.
+      </div>
+      <button id="recoveryNagButton" class="primary">Set Recovery Key</button>
+    </div>
+  </div>
 `;
 
 export const renderManage = (
@@ -60,7 +115,7 @@ const init = async (userNumber: bigint, connection: IIConnection) => {
   // TODO - Check alias for current identity, and populate #nameSpan
   initLogout();
   const setupRecoveryButton = document.querySelector(
-    "#setupRecoveryButton"
+    "#recoveryNagButton"
   ) as HTMLButtonElement;
 
   setupRecoveryButton.onclick = async () => {
