@@ -13,7 +13,7 @@ const isRecovery = (device: DeviceData): boolean => {
 };
 
 const wantsSeedPhrase = (device: DeviceData): boolean => {
-  return hasOwnProperty(device.key_type, "seed_phrase")
+  return hasOwnProperty(device.key_type, "seed_phrase");
 };
 
 export const useRecovery = async (): Promise<void> => {
