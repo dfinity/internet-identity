@@ -79,7 +79,6 @@ const init = (): Promise<LoginResult | null> =>
           if (result.kind === "loginSuccess") {
             setUserNumber(result.userNumber);
             await displayUserNumber(result.userNumber);
-            await setupRecovery(result.userNumber, result.connection);
           }
           resolve(apiResultToLoginResult(result));
         } else {
