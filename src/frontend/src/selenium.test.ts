@@ -440,7 +440,7 @@ async function run_in_browser_common(
     .forBrowser("chrome")
     .setChromeOptions(
       new ChromeOptions()
-        // .headless() // hides the click show: uncomment to watch it
+        .headless() // hides the click show: uncomment to watch it
         .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
@@ -449,7 +449,7 @@ async function run_in_browser_common(
     await test(driver);
   } catch (e) {
     console.log(await driver.manage().logs().get("browser"));
-    // console.log(await driver.getPageSource());
+    console.log(await driver.getPageSource());
     throw e;
   } finally {
     // only close outer session
