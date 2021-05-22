@@ -20,6 +20,8 @@ import _SERVICE, {
   ProofOfWork,
   RegisterResponse,
   GetDelegationResponse,
+  Purpose,
+  KeyType,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -30,6 +32,8 @@ import {
 import { Principal } from "@dfinity/agent";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
+import * as tweetnacl from "tweetnacl";
+import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
@@ -38,6 +42,8 @@ export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   agent: new HttpAgent({}),
   canisterId,
 });
+
+export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
 export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError;
@@ -59,7 +65,7 @@ type RegisterNoSpace = { kind: "registerNoSpace" };
 
 export class IIConnection {
   protected constructor(
-    public identity: WebAuthnIdentity,
+    public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public actor?: ActorSubclass<_SERVICE>
   ) {}
@@ -118,7 +124,7 @@ export class IIConnection {
   static async login(userNumber: bigint): Promise<LoginResult> {
     let devices: DeviceData[];
     try {
-      devices = await baseActor.lookup(userNumber);
+      devices = await this.lookupAuthenticators(userNumber);
     } catch (e) {
       return {
         kind: "apiError",
@@ -130,6 +136,13 @@ export class IIConnection {
       return { kind: "unknownUser", userNumber };
     }
 
+    return this.fromWebauthnDevices(userNumber, devices);
+  }
+
+  static async fromWebauthnDevices(
+    userNumber: bigint,
+    devices: DeviceData[]
+  ): Promise<LoginResult> {
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
         device.credential_id.map((credentialId: CredentialId) => ({
@@ -161,8 +174,42 @@ export class IIConnection {
     };
   }
 
-  static async lookup(userNumber: UserNumber): Promise<DeviceData[]> {
-    return baseActor.lookup(userNumber);
+  static async fromSeedPhrase(
+    userNumber: bigint,
+    seedPhrase: string
+  ): Promise<LoginResult> {
+    const identity = await fromMnemonicWithoutValidation(
+      seedPhrase,
+      IC_DERIVATION_PATH
+    );
+    const delegationIdentity = await requestFEDelegation(identity);
+    const actor = await IIConnection.createActor(delegationIdentity);
+
+    return {
+      kind: "loginSuccess",
+      userNumber,
+      connection: new IIConnection(identity, delegationIdentity, actor),
+    };
+  }
+
+  static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
+    return await baseActor.lookup(userNumber);
+  }
+
+  static async lookupAuthenticators(
+    userNumber: UserNumber
+  ): Promise<DeviceData[]> {
+    const allDevices = await baseActor.lookup(userNumber);
+    return allDevices.filter((device) =>
+      hasOwnProperty(device.purpose, "authentication")
+    );
+  }
+
+  static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
+    const allDevices = await baseActor.lookup(userNumber);
+    return allDevices.filter((device) =>
+      hasOwnProperty(device.purpose, "recovery")
+    );
   }
 
   // Create an actor representing the backend
@@ -205,6 +252,8 @@ export class IIConnection {
   add = async (
     userNumber: UserNumber,
     alias: string,
+    keyType: KeyType,
+    purpose: Purpose,
     newPublicKey: DerEncodedBlob,
     credentialId?: BinaryBlob
   ): Promise<void> => {
@@ -213,8 +262,8 @@ export class IIConnection {
       alias,
       pubkey: Array.from(newPublicKey),
       credential_id: credentialId ? [Array.from(credentialId)] : [],
-      key_type: { unknown: null },
-      purpose: { authentication: null },
+      key_type: keyType,
+      purpose,
     });
   };
 
@@ -278,4 +327,41 @@ const requestFEDelegation = async (
     }
   );
   return DelegationIdentity.fromDelegation(sessionKey, chain);
+};
+
+export const creationOptions = (
+  exclude: DeviceData[] = [],
+  authenticatorAttachment?: AuthenticatorAttachment
+): PublicKeyCredentialCreationOptions => {
+  return {
+    authenticatorSelection: {
+      userVerification: "preferred",
+      authenticatorAttachment,
+    },
+    excludeCredentials: exclude.flatMap((device) =>
+      device.credential_id.length === 0
+        ? []
+        : {
+            id: new Uint8Array(device.credential_id[0]),
+            type: "public-key",
+          }
+    ),
+    attestation: "direct",
+    challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+    pubKeyCredParams: [
+      {
+        type: "public-key",
+        // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
+        alg: -7,
+      },
+    ],
+    rp: {
+      name: "Internet Identity Service",
+    },
+    user: {
+      id: tweetnacl.randomBytes(16),
+      name: "Internet Identity",
+      displayName: "Internet Identity",
+    },
+  };
 };

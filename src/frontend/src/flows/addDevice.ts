@@ -6,6 +6,7 @@ import {
 } from "@dfinity/agent";
 import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
+import { warningIcon } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
@@ -18,10 +19,13 @@ const pageContent = (userNumber: bigint) => html`
     <h1>New device</h1>
     <label>User Number:</label>
     <div class="highlightBox">${userNumber}</div>
-    <p class="warningBox">
-      Warning: Click the button below only if you have transferred the link from
-      your other device.
-    </p>
+    <div class="warningBox">
+      <span class="warningIcon">${warningIcon}</span>
+      <div class="warningMessage">
+        Click the button below only if you have transferred the link from your
+        other device.
+      </div>
+    </div>
     <button type="button" class="primary" id="addDevice">
       Yes, add new device
     </button>
@@ -73,7 +77,14 @@ const init = (userNumber: bigint, connection: IIConnection) => {
           return window.location.reload();
         }
         await withLoader(() =>
-          connection.add(userNumber, deviceName, publicKey, rawId)
+          connection.add(
+            userNumber,
+            deviceName,
+            { unknown: null },
+            { authentication: null },
+            publicKey,
+            rawId
+          )
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
