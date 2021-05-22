@@ -70,7 +70,7 @@ const pageContent = (devices: DeviceData[]) => html`
       >
         <span class="recoveryIcon">${securityKeyIcon}</span>
         <div class="recoveryTitle">Security Key</div>
-        <div class="recoveryDescription">Use if you own a security key</div>
+        <div class="recoveryDescription">Use an extra security key</div>
       </button>
     </div>
     <button id="skipRecovery" class="linkStyle">Set recovery later</button>
