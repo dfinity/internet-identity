@@ -145,10 +145,7 @@ async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
 
 // View: Recovery method selector
 async function on_RecoveryMethodSelector(driver: ThenableWebDriver) {
-  await driver.wait(
-    until.elementLocated(By.id("skipRecovery")),
-    3_000
-  );
+  await driver.wait(until.elementLocated(By.id("skipRecovery")), 3_000);
 }
 
 async function on_RecoveryMethodSelector_Skip(driver: ThenableWebDriver) {
