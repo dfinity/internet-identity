@@ -54,7 +54,7 @@ export const setupRecovery = async (
     case "seedPhrase": {
       const name = "Recovery phrase";
       const seedPhrase = generate().trim();
-      await displaySeedPhrase(seedPhrase);
+      await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
       const recoverIdentity = await fromMnemonicWithoutValidation(
         seedPhrase,
         IC_DERIVATION_PATH

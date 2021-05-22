@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { displayError } from "../../components/displayError";
 import { validate } from "../../crypto/mnemonic";
+import { parseUserNumber } from "../../utils/userNumber";
 
 const pageContent = () => html`
   <style>
@@ -43,7 +44,9 @@ const init = (): Promise<string | null> =>
       resolve(null);
     };
     inputSeedPhraseContinue.onclick = async () => {
-      const inputValue = inputSeedPhraseInput.value.trim();
+      const inputValue = dropLeadingUserNumber(
+        inputSeedPhraseInput.value.trim()
+      );
       if (validate(inputValue)) {
         resolve(inputValue);
       } else {
@@ -57,3 +60,12 @@ const init = (): Promise<string | null> =>
       }
     };
   });
+
+const dropLeadingUserNumber = (s: string): string => {
+  const i = s.indexOf(" ");
+  if (i !== -1 && parseUserNumber(s.slice(0, i)) !== null) {
+    return s.slice(i + 1);
+  } else {
+    return s;
+  }
+};
