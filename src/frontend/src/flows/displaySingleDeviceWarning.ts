@@ -55,7 +55,9 @@ const pageContent = () => html`
     <a target="_blank" href="https://dfinity.org/faq/"
       >https://dfinity.org/faq/</a
     >
-    <button id="displayWarningPrimary" class="primary">Understood</button>
+    <button id="displayWarningPrimary" class="primary">
+      Set up Account recovery
+    </button>
     <div class="spacer"></div>
   </div>
 `;

@@ -8,6 +8,8 @@ import { aboutView } from "./flows/about";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
+import { setupRecovery } from "./flows/recovery/setupRecovery";
+import { IIConnection } from "./utils/iiConnection";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -22,7 +24,10 @@ const init = async () => {
   const userIntent = intentFromUrl(url);
   const { userNumber, connection } = await login(userIntent);
 
-  await displaySingleDeviceWarning();
+  if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
+    await displaySingleDeviceWarning();
+    await setupRecovery(userNumber, connection);
+  }
 
   switch (userIntent.kind) {
     case "auth": {
