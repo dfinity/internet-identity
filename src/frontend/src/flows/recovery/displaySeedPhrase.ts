@@ -16,8 +16,8 @@ const pageContent = (seedPhrase: string) => html`
       <div class="warningMessage">
         Do <b>NOT</b> forget to save this seed phrase. Save a backup on a
         storage medium and write it down.<br />
-        Keep it secret &mdash; knowledge of the seed phrase will enable access to your
-        account!
+        Keep it secret &mdash; knowledge of the seed phrase will enable access
+        to your account!
       </div>
     </div>
     <label>Your seed phrase</label>
