@@ -143,6 +143,18 @@ async function on_SingleDeviceLoginWarning_Continue(driver: ThenableWebDriver) {
   await driver.findElement(By.id("displayWarningPrimary")).click();
 }
 
+// View: Recovery method selector
+async function on_RecoveryMethodSelector(driver: ThenableWebDriver) {
+  await driver.wait(
+    until.elementLocated(By.id("skipRecovery")),
+    3_000
+  );
+}
+
+async function on_RecoveryMethodSelector_Skip(driver: ThenableWebDriver) {
+  await driver.findElement(By.id("skipRecovery")).click();
+}
+
 // View: Main view
 
 async function on_Main(device_name: string, driver: ThenableWebDriver) {
@@ -431,7 +443,7 @@ async function run_in_browser_common(
     .forBrowser("chrome")
     .setChromeOptions(
       new ChromeOptions()
-        .headless() // hides the click show: uncomment to watch it
+        // .headless() // hides the click show: uncomment to watch it
         .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
@@ -440,7 +452,7 @@ async function run_in_browser_common(
     await test(driver);
   } catch (e) {
     console.log(await driver.manage().logs().get("browser"));
-    console.log(await driver.getPageSource());
+    // console.log(await driver.getPageSource());
     throw e;
   } finally {
     // only close outer session
@@ -489,6 +501,8 @@ async function registerNewIdentity(driver: ThenableWebDriver): Promise<string> {
   await on_RegisterShowNumber_Continue(driver);
   await on_SingleDeviceLoginWarning(driver);
   await on_SingleDeviceLoginWarning_Continue(driver);
+  await on_RecoveryMethodSelector(driver);
+  await on_RecoveryMethodSelector_Skip(driver);
   return userNumber;
 }
 
@@ -498,6 +512,8 @@ async function login(userNumber: string, driver: ThenableWebDriver) {
   await on_Welcome_Login(driver);
   await on_SingleDeviceLoginWarning(driver);
   await on_SingleDeviceLoginWarning_Continue(driver);
+  await on_RecoveryMethodSelector(driver);
+  await on_RecoveryMethodSelector_Skip(driver);
   await on_Main(DEVICE_NAME1, driver);
 }
 
@@ -637,6 +653,9 @@ test("Screenshots", async () => {
     await on_SingleDeviceLoginWarning(driver);
     await screenshot("17-single-device-warning", driver);
     await on_SingleDeviceLoginWarning_Continue(driver);
+    await on_RecoveryMethodSelector(driver);
+    await screenshot("18-recover-method-selector", driver);
+    await on_RecoveryMethodSelector_Skip(driver);
     await on_Main(DEVICE_NAME1, driver);
     await on_Main_Fixup(driver);
     await screenshot("04-main", driver);
@@ -646,6 +665,8 @@ test("Screenshots", async () => {
     await on_Welcome_Login(driver);
     await on_SingleDeviceLoginWarning(driver);
     await on_SingleDeviceLoginWarning_Continue(driver);
+    await on_RecoveryMethodSelector(driver);
+    await on_RecoveryMethodSelector_Skip(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     await driver.get(II_URL);
@@ -656,6 +677,8 @@ test("Screenshots", async () => {
     await on_WelcomeBack_Login(driver);
     await on_SingleDeviceLoginWarning(driver);
     await on_SingleDeviceLoginWarning_Continue(driver);
+    await on_RecoveryMethodSelector(driver);
+    await on_RecoveryMethodSelector_Skip(driver);
     await on_Main(DEVICE_NAME1, driver);
 
     // Now the link device flow, using a second browser
@@ -684,6 +707,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Login(driver);
       await on_SingleDeviceLoginWarning(driver);
       await on_SingleDeviceLoginWarning_Continue(driver);
+      await on_RecoveryMethodSelector(driver);
+      await on_RecoveryMethodSelector_Skip(driver);
       await on_AddDeviceConfirm(driver);
       await on_AddDeviceConfirm_Fixup(driver);
       await screenshot("09-new-device-confirm", driver);
@@ -702,6 +727,8 @@ test("Screenshots", async () => {
       await on_WelcomeBack_Login(driver2);
       await on_SingleDeviceLoginWarning(driver2);
       await on_SingleDeviceLoginWarning_Continue(driver2);
+      await on_RecoveryMethodSelector(driver2);
+      await on_RecoveryMethodSelector_Skip(driver2);
       await on_Main(DEVICE_NAME2, driver2);
       await on_Main_Fixup(driver2);
       await screenshot("13-new-device-listed", driver2);
@@ -734,6 +761,8 @@ test("Screenshots", async () => {
     await on_WelcomeBack_Login(driver);
     await on_SingleDeviceLoginWarning(driver);
     await on_SingleDeviceLoginWarning_Continue(driver);
+    await on_RecoveryMethodSelector(driver);
+    await on_RecoveryMethodSelector_Skip(driver);
     await on_Main(DEVICE_NAME2, driver);
     const buttonElem2 = await driver.findElement(
       By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)
