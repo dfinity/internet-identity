@@ -22,6 +22,7 @@ import _SERVICE, {
   GetDelegationResponse,
   Purpose,
   KeyType,
+  DeviceKey,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -46,7 +47,12 @@ export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
-export type LoginResult = LoginSuccess | UnknownUser | AuthFail | ApiError;
+export type LoginResult =
+  | LoginSuccess
+  | UnknownUser
+  | AuthFail
+  | ApiError
+  | SeedPhraseFail;
 export type RegisterResult =
   | LoginSuccess
   | AuthFail
@@ -62,6 +68,7 @@ type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
 type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
+type SeedPhraseFail = { kind: "seedPhraseFail" };
 
 export class IIConnection {
   protected constructor(
@@ -146,9 +153,7 @@ export class IIConnection {
     const multiIdent = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
         device.credential_id.map((credentialId: CredentialId) => ({
-          pubkey: derBlobFromBlob(
-            blobFromUint8Array(Buffer.from(device.pubkey))
-          ),
+          pubkey: derFromPubkey(device.pubkey),
           credentialId: blobFromUint8Array(Buffer.from(credentialId)),
         }))
       )
@@ -176,12 +181,20 @@ export class IIConnection {
 
   static async fromSeedPhrase(
     userNumber: bigint,
-    seedPhrase: string
+    seedPhrase: string,
+    expected: DeviceData
   ): Promise<LoginResult> {
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
       IC_DERIVATION_PATH
     );
+    if (
+      !identity.getPublicKey().toDer().equals(derFromPubkey(expected.pubkey))
+    ) {
+      return {
+        kind: "seedPhraseFail",
+      };
+    }
     const delegationIdentity = await requestFEDelegation(identity);
     const actor = await IIConnection.createActor(delegationIdentity);
 
@@ -365,3 +378,6 @@ export const creationOptions = (
     },
   };
 };
+
+const derFromPubkey = (pubkey: DeviceKey): DerEncodedBlob =>
+  derBlobFromBlob(blobFromUint8Array(Buffer.from(pubkey)));
