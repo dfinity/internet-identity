@@ -21,53 +21,62 @@ export const setupRecovery = async (
     return;
   }
 
-  switch (recoveryMechanism) {
-    case "securityKey": {
-      const name = "Recovery key";
-      let recoverIdentity: WebAuthnIdentity;
-      try {
-        recoverIdentity = await WebAuthnIdentity.create({
-          publicKey: creationOptions(devices, "cross-platform"),
-        });
-      } catch (err) {
-        await displayError({
-          title: "Authentication failure",
-          message:
-            "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
-          detail: err.toString(),
-          primaryButton: "Try a different method",
-        });
-        return setupRecovery(userNumber, connection);
-      }
+  try {
+    switch (recoveryMechanism) {
+      case "securityKey": {
+        const name = "Recovery key";
+        let recoverIdentity: WebAuthnIdentity;
+        try {
+          recoverIdentity = await WebAuthnIdentity.create({
+            publicKey: creationOptions(devices, "cross-platform"),
+          });
+        } catch (err) {
+          await displayError({
+            title: "Authentication failure",
+            message:
+              "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
+            detail: err.toString(),
+            primaryButton: "Try a different method",
+          });
+          return setupRecovery(userNumber, connection);
+        }
 
-      return await withLoader(() =>
-        connection.add(
-          userNumber,
-          name,
-          { cross_platform: null },
-          { recovery: null },
-          recoverIdentity.getPublicKey().toDer(),
-          recoverIdentity.rawId
-        )
-      );
+        return await withLoader(() =>
+          connection.add(
+            userNumber,
+            name,
+            { cross_platform: null },
+            { recovery: null },
+            recoverIdentity.getPublicKey().toDer(),
+            recoverIdentity.rawId
+          )
+        );
+      }
+      case "seedPhrase": {
+        const name = "Recovery phrase";
+        const seedPhrase = generate().trim();
+        await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
+        const recoverIdentity = await fromMnemonicWithoutValidation(
+          seedPhrase,
+          IC_DERIVATION_PATH
+        );
+        await withLoader(() =>
+          connection.add(
+            userNumber,
+            name,
+            { seed_phrase: null },
+            { recovery: null },
+            recoverIdentity.getPublicKey().toDer()
+          )
+        );
+      }
     }
-    case "seedPhrase": {
-      const name = "Recovery phrase";
-      const seedPhrase = generate().trim();
-      await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
-      const recoverIdentity = await fromMnemonicWithoutValidation(
-        seedPhrase,
-        IC_DERIVATION_PATH
-      );
-      await withLoader(() =>
-        connection.add(
-          userNumber,
-          name,
-          { seed_phrase: null },
-          { recovery: null },
-          recoverIdentity.getPublicKey().toDer()
-        )
-      );
-    }
+  } catch (err) {
+    await displayError({
+      title: "Failed to set up recovery",
+      message: "We failed to set up recovery for your account.",
+      detail: err.toString(),
+      primaryButton: "Continue",
+    });
   }
 };
