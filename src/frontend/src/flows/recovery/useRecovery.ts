@@ -55,10 +55,9 @@ const loginWithRecovery = async (
   if (wantsSeedPhrase(device)) {
     const seedPhrase = await inputSeedPhrase();
     if (seedPhrase === null) {
-      // TODO do proper error handling
-      return { kind: "authFail", error: new Error("Invalid seedphrase") };
+      return { kind: "seedPhraseFail" };
     }
-    return await IIConnection.fromSeedPhrase(userNumber, seedPhrase);
+    return await IIConnection.fromSeedPhrase(userNumber, seedPhrase, device);
   } else {
     return IIConnection.fromWebauthnDevices(userNumber, [device]);
   }
