@@ -9,7 +9,6 @@ import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
-import { setupRecovery } from "./recovery/setupRecovery";
 
 const pageContent = html`
   <div class="container">
