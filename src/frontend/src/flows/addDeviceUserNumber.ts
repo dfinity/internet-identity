@@ -1,8 +1,9 @@
 import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
+import { DeviceData } from "../../generated/internet_identity_types";
 import { displayError } from "../components/displayError";
-import { IIConnection } from "../utils/iiConnection";
+import { creationOptions, IIConnection } from "../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 
@@ -50,9 +51,18 @@ const init = () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
       userNumberInput.classList.toggle("errored", false);
+      let existingDevices: DeviceData[];
+      try {
+        existingDevices = await IIConnection.lookupAll(userNumber);
+      } catch (err) {
+        console.log("Failed to fetch devices for user number:", userNumber, err)
+        existingDevices = [];
+      }
       let identity: WebAuthnIdentity;
       try {
-        identity = await WebAuthnIdentity.create();
+        identity = await WebAuthnIdentity.create({
+          publicKey: creationOptions(existingDevices),
+        });
       } catch (error) {
         await displayError({
           title: "Failed to authenticate",
