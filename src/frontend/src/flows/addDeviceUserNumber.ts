@@ -55,7 +55,11 @@ const init = () => {
       try {
         existingDevices = await IIConnection.lookupAll(userNumber);
       } catch (err) {
-        console.log("Failed to fetch devices for user number:", userNumber, err)
+        console.log(
+          "Failed to fetch devices for user number:",
+          userNumber,
+          err
+        );
         existingDevices = [];
       }
       let identity: WebAuthnIdentity;
