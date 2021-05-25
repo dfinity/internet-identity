@@ -86,6 +86,7 @@ function generateWebpackConfigForCanister(name, info) {
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,
       }),
+      new webpack.IgnorePlugin(/^\.\/wordlists\/(?!english)/, /bip39\/src$/),
     ],
   };
 }

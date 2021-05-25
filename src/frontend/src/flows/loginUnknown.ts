@@ -7,6 +7,7 @@ import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
 import { verbFromIntent, UserIntent } from "../utils/userIntent";
+import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -30,17 +31,6 @@ const pageContent = (userIntent: UserIntent) => html` <style>
       margin-top: 4rem;
     }
 
-    .textLink {
-      margin-bottom: 0.7rem;
-      font-size: 0.95rem;
-      white-space: nowrap;
-    }
-    .textLink button {
-      font-size: 0.95rem;
-      font-weight: 600;
-      text-decoration: none;
-      color: black;
-    }
     .spacer {
       height: 2rem;
     }
@@ -67,6 +57,12 @@ const pageContent = (userIntent: UserIntent) => html` <style>
             Already registered
             <button id="addNewDeviceButton" class="linkStyle">
               but using a new device?
+            </button>
+          </div>
+          <div class="textLink">
+            Lost access
+            <button id="recoverButton" class="linkStyle">
+              and want to recover?
             </button>
           </div>`}
   </div>
@@ -95,6 +91,7 @@ export const loginUnknown = async (
     if (userIntent.kind !== "addDevice") {
       initLinkDevice();
       initRegister(resolve, reject);
+      initRecovery();
     }
   });
 };
@@ -117,6 +114,13 @@ const initRegister = (
       })
       .catch(reject);
   };
+};
+
+const initRecovery = () => {
+  const recoverButton = document.getElementById(
+    "recoverButton"
+  ) as HTMLButtonElement;
+  recoverButton.onclick = () => useRecovery();
 };
 
 const initLogin = (resolve: (res: LoginResult) => void) => {
@@ -208,6 +212,14 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         title: "Failed to register",
         message:
           "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+      };
+    }
+    case "seedPhraseFail": {
+      return {
+        tag: "err",
+        title: "Invalid Seed Phrase",
+        message:
+          "Failed to recover using this seedphrase. Did you enter it correctly?",
       };
     }
   }
