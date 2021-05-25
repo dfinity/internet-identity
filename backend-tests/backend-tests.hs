@@ -16,6 +16,7 @@ module Main where
 
 import Options.Applicative hiding (empty)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Text.Hex as H
@@ -793,7 +794,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     t <- getTimestamp
     -- Need a fixed id for this to work
     let cid = fromPrincipal "rdmx6-jaaaa-aaaaa-aaadq-cai"
-    createEmptyCanister (EntityId cid) controllerId t
+    createEmptyCanister (EntityId cid) (S.singleton controllerId) t
     -- Load a backup. This backup is taking from the messaging subnet installation
     -- on 2021-04-29
     stable_memory <- lift $ BS.readFile "test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.bin"
@@ -874,24 +875,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
         .+ #arg .== Candid.encode ()
-
-
--- Convenience copy from IC.Ref; maybe worth exposing there
-createEmptyCanister :: CanisterId -> EntityId -> Timestamp -> M ()
-createEmptyCanister cid controller time = modify $ \ic ->
-    ic { canisters = M.insert cid can (canisters ic) }
-  where
-    can = CanState
-      { content = Nothing
-      , run_status = IsRunning
-      , controller = controller
-      , memory_allocation = 0
-      , compute_allocation = 0
-      , freezing_threshold = 2592000
-      , time = time
-      , cycle_balance = 0
-      , certified_data = ""
-      }
 
 
 asHex :: Blob -> String

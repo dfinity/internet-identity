@@ -9,3 +9,8 @@ source-repository-package
     type: git
     location: https://github.com/nomeata/haskell-candid
     tag: 2f699033b9d255b036b511c66d2e6b86c1798c70
+
+source-repository-package
+    type: git
+    location: https://github.com/dfinity/ic-hs
+    tag: cc8d44c9b6b653c43670c91eacbcf29c636a602b
