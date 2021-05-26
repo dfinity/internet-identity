@@ -306,12 +306,7 @@ const bindRemoveListener = (
     }
 
     if (isOnlyDevice) {
-      const shouldProceed = confirm(
-        "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
-      );
-      if (!shouldProceed) {
-        return;
-      }
+      return alert("You can not remove your last registered device.");
     }
 
     // Otherwise, remove identity
