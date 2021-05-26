@@ -24,7 +24,7 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 ## Software versions
 
-- `dfx` version 0.7.0-beta.6
+- `dfx` version 0.7.0
 
 - Rust version 1.51
 
@@ -88,9 +88,9 @@ Run the following command in the root of the repository to execute the test suit
 cargo test
 ```
 
-The backed canister is also used to serve the frontend assets.
+The backend canister is also used to serve the frontend assets.
 This creates a dependency between the frontend and the backend.
-So running the usual `cargo build --target wasm32-unknown-unknow -p internet_identity` might not work or include an outdated version of the frontend.
+So running the usual `cargo build --target wasm32-unknown-unknown -p internet_identity` might not work or include an outdated version of the frontend.
 
 Use the following command to build the backend canister Wasm file instead:
 
