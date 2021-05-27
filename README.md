@@ -49,7 +49,7 @@ dfx canister call internet_identity register '(123, "test", vec {1; 2; 3}, null)
 To open the front-end, you can run the following and open the URL.
 
 ```bash
-echo "http://localhost:8000?canisterId=$(dfx canister id frontend)"
+echo "http://localhost:8000?canisterId=$(dfx canister id internet_identity)"
 ```
 
 ### Contributing to the frontend
