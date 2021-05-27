@@ -55,7 +55,6 @@ export const setupRecovery = async (
       case "seedPhrase": {
         const name = "Recovery phrase";
         const seedPhrase = generate().trim();
-        await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
         const recoverIdentity = await fromMnemonicWithoutValidation(
           seedPhrase,
           IC_DERIVATION_PATH
@@ -69,6 +68,7 @@ export const setupRecovery = async (
             recoverIdentity.getPublicKey().toDer()
           )
         );
+        await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
       }
     }
   } catch (err) {
