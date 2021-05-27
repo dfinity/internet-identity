@@ -779,14 +779,13 @@ test("Screenshots", async () => {
     expect(alertText1).toBe(
       "This will remove your current device and you will be logged out"
     );
+    await driver.wait(until.alertIsPresent());
     const alert2 = driver.switchTo().alert();
     const alertText2 = await alert2.getText();
     await alert2.accept();
-    expect(alertText2).toBe(
-      "This will remove your only remaining identity and may impact your ability to log in to accounts you have linked"
-    );
-
-    await on_Welcome(driver);
+    expect(alertText2).toBe("You can not remove your last registered device.");
+    // device still present. You can't remove your last device.
+    await on_Main(DEVICE_NAME1, driver);
 
     // Compatibility notice page
     await driver.get("about:blank");
