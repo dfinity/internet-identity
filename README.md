@@ -37,7 +37,7 @@ To run the internet_identity canisters, proceed as follows after cloning the rep
 ```bash
 npm install
 dfx start [--clean] [--background]
-dfx deploy --no-wallet --argument '(null)'
+II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then the canister can be used as
