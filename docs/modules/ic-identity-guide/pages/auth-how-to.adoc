@@ -6,9 +6,10 @@
 :company-id: DFINITY
 :sdk-short-name: DFINITY Canister SDK
 
-The Internet Identity service enables you to authenticate securely and anonymously when you access applications that use the service as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. 
+The Internet Identity enables you to authenticate securely and anonymously when you access applications that use it as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. This is all accomplished using encrypted smart contracts that run on the {IC} blockchain.
 
-Unlike most authentication services, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
+Unlike most authentication services, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using a user number andccccccucjchjeurinuvdiktghvvvjgkungljtvuitljj
+ the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
 NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
 
@@ -18,17 +19,17 @@ Firefox does not currently accept OSX with any device authentication method othe
 
 == Create an Internet Identity
 
-You can securely access applications that use the Identity service, running in the {IC}, by selecting an authentication method and having an Internet Identity user number generated for you. You can create as many identities as you want by registering new user numbers. 
+You can securely access applications running on the {IC} that use the Internet Identity for authentication, by selecting an authentication method and having an Internet Identity user number generated for you. You can create as many identities as you want by registering new user numbers. 
 
-When you first access an application running on the {IC}, you are directed to the Internet Identity service and asked to enter a User Number to log in. If you are a new user, you need to register first.
+When you first access an application running on the {IC}, you are directed to Internet Identity and asked to enter a User Number to log in. If you are a new user, you need to register first.
 
 To create an Internet Identity as a first-time user:
 
-. Go to link:https://identity.ic0.app/[The Internet Identity service portal].
+. Go to link:https://identity.ic0.app/[Internet Identity].
 
 . Click *Register with Internet Identity*. 
 
-. Enter a name for the device profile you’re using to create your Internet identity. For example: iPhone, or YubiKey. 
+. Enter a name for the device profile you’re using to create your Internet Identity. For example: iPhone, or YubiKey. 
 
 . Register your device.
 +
@@ -55,7 +56,7 @@ When you have registered your device, you’ll receive a *User Number*.
 This number is unique, but it is not a secret, so you should save the number in multiple places. 
 Your browser will remember your user number, but you will need it if you log in on a different computer, change your browser profile, or if you clear your browser state. 
 +
-WARNING: If you lose your user number and are logged out on all devices, you cannot log in to the Identity service to manage your devices, or access any of your applications unless you have set up account recovery in the next step.
+WARNING: If you lose your user number and are logged out on all devices, you cannot log in to Internet Identity to manage your devices, or access any of your applications, unless you have set up account recovery in the next step.
 
 . Click *Continue*. 
 
@@ -67,13 +68,13 @@ On the next screen, you can select one of the following options:
 
 * *Seed Phrase*
 + 
-Select this option to generate a cryptographically-secure seed phrase that you can use to recover your account. Make sure you save this phrase somewhere safe and known only to you. *Note that the first string in your seed phrase is your user number*. You will need this number to begin the the recovery process.
+Select this option to generate a cryptographically-secure seed-phrase that you can use to recover your account. Make sure you save this phrase somewhere safe and known only to you. *Note that the first string in your seed phrase is your user number*. You will need this number to begin the the recovery process.
 +
 NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered. 
 
 * *Security Key*
 +
-Use a dedicated security key to recover your account in the event that you lose access to your authorized devices. This key must be different from one that you actively use to log in to the Identity service. Keep this key somewhere safe and known only to you. You will need to know your user number to begin recovery.
+Use a dedicated security key to recover your account in the event that you lose access to your authorized devices. This key must be different from one that you actively use to log in to Internet Identity. Keep this key somewhere safe and known only to you. You will need to know your user number to begin recovery.
 
 * *Set recovery later*
 +
@@ -94,7 +95,7 @@ Other workflows can be more complex, for example, adding your phone as an authen
  
 To register your phone as an additional authentication method using the phone's unlock methods:
 
-. Open the Internet Identity service in your phone’s browser. 
+. Open the Internet Identity web page in your phone’s browser. 
 
 . Click *Already registered but using a new device?*
 
@@ -126,6 +127,6 @@ NOTE: You should register as many devices as possible to prevent you from losing
 == Recover a lost identity
 When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase or to add a dedicated security key for recovery purposes. 
 
-You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authoized devices, you will need the seed phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
+You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authorized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
 
 If you have set up a recovery phrase or recovery security key, you can regain access to your identity by clicking *Lost access and want to recover?* from the Internet Identity landing page. 
