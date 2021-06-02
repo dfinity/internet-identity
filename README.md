@@ -37,7 +37,7 @@ To run the internet_identity canisters, proceed as follows after cloning the rep
 ```bash
 npm install
 dfx start [--clean] [--background]
-dfx deploy --no-wallet --argument '(null)'
+II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then the canister can be used as
@@ -49,7 +49,7 @@ dfx canister call internet_identity register '(123, "test", vec {1; 2; 3}, null)
 To open the front-end, you can run the following and open the URL.
 
 ```bash
-echo "http://localhost:8000?canisterId=$(dfx canister id frontend)"
+echo "http://localhost:8000?canisterId=$(dfx canister id internet_identity)"
 ```
 
 ### Contributing to the frontend
