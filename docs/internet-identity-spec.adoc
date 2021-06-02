@@ -628,7 +628,7 @@ docker build -t internet-identity-service .
 docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
 ----
 
-The resulting `internet_identity.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
+The resulting `internet_identity.wasm` is ready for deployment on `mercury` (or any testnet if you want to run experiments).
 
 Make note of the hash of wasm module:
 [source,bash]
@@ -648,9 +648,9 @@ The canister accepts a range of user ids that it's responsible for in `canister_
 didc encode '(null)' | xxd -r -p > arg.in
 ----
 
-==== Submitting proposal and voting on mainnet
+==== Submitting proposal and voting on mercury
 
-(This section was removed. We have deployed to mainnet, and should not have to do it again. Please see git history if you need to know this.)
+(This section was removed. We have deployed to mercury, and should not have to do it again. Please see git history if you need to know this.)
 
 ==== Submitting proposal on testnets
 
@@ -702,11 +702,11 @@ You can check that deployment went through running
 
 [source,bash]
 ----
-dfx canister --network mainnet --no-wallet info internet_identity
+dfx canister --network mercury --no-wallet info internet_identity
 ----
 
 
-Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
+Once the deployment went through, tag the commit with `mercury-<date-from-proposal-url>`.
 
 
 ==== On testnets

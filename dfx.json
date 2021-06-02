@@ -22,7 +22,7 @@
       "providers": ["http://10.12.36.13:8080"],
       "type": "persistent"
     },
-    "mainnet": {
+    "mercury": {
       "providers": ["https://identity.ic0.app"],
       "type": "persistent"
     }
