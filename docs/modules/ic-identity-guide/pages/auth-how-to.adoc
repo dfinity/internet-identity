@@ -73,7 +73,7 @@ NOTE: You must click the *copy* button and then *continue* or the seed phrase wi
 
 * *Security Key*
 +
-Use a dedicated security key to recover your account in the event that you lose access to your authorized devices.This key must be different from one that you actively use to log in to the Identity service. Keep this key somewhere safe and known only to you. You will need to know your user number to begin recovery.
+Use a dedicated security key to recover your account in the event that you lose access to your authorized devices. This key must be different from one that you actively use to log in to the Identity service. Keep this key somewhere safe and known only to you. You will need to know your user number to begin recovery.
 
 * *Set recovery later*
 +
