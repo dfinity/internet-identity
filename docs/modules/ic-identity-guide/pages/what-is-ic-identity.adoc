@@ -1,4 +1,4 @@
-= What is the Internet identity service?
+= What is the Internet Identity service?
 :keywords: Internet Computer,blockchain,protocol,replica,subnet,data center,canister,developer
 :proglang: Motoko
 :platform: Internet Computer platform
@@ -8,7 +8,7 @@
 
 The Internet Identity service enables you to authenticate securely and anonymously when you access applications that use the service as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. 
 
-Unlike most authentication services, your Internet Identity does not require you to set and manage passwords, generate a cryptographically-secure seed phrase, or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
+Unlike most authentication services, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to the service. Instead, you create authentication profiles that use the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
 [[id-overview]]
 == How Internet Identity works
@@ -25,6 +25,11 @@ Your browser downloads the authorization, then redirects you to the application.
 The application verifies the authorization from the Internet Identity service and grants you access as an application-specific identity. 
 Internally, you have a different identity for each application, but your identity for any single application is the same across all of your devices. 
 All of your devices just represent different methods you can use to authenticate your user number. 
+
+== Identity recovery
+When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase or to add a dedicated security key for recovery purposes. 
+
+You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authoized devices, you will need the seed phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
 
 To learn how to register a device step-by-step, see: link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use the Internet Identity service]. 
 
