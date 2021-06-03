@@ -1,4 +1,4 @@
-= How to use the Internet Identity service
+= How to use the Internet Identity 
 :keywords: Internet Computer,blockchain,protocol,replica,subnet,data center,canister,developer
 :proglang: Motoko
 :platform: Internet Computer platform

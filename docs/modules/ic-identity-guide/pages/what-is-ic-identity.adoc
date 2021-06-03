@@ -1,4 +1,4 @@
-= What is the Internet Identity service?
+= What is Internet Identity?
 :keywords: Internet Computer,blockchain,protocol,replica,subnet,data center,canister,developer
 :proglang: Motoko
 :platform: Internet Computer platform
@@ -13,16 +13,17 @@ Unlike most authentication services, your Internet Identities do not require you
 [[id-overview]]
 == How Internet Identity works
 
-Internet Identity is an authentication service that takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication using smart contracts for applications running on the {IC}. 
-The Internet Identity service enables you to use security chips built into your smart phone or your laptop or security keys plugged into the USB port of your computer to verify your identity and authorize access to an application. 
+Internet Identity takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication using smart contracts for applications running on the {IC}. 
+Internet Identity enables you to use security chips built into your smart phone or your laptop or security keys plugged into the USB port of your computer to verify your identity and authorize access to an application. 
 
-Applications that integrate with the Internet Identity service prompt you to register or log in with a previously-registered user number. 
-Registering a device is a simple process that generates a unique cryptographic key for you that is stored on the Internet Computer under a user number. You can then use your user number to register additional devices, so that you can access applications across all of your devices.
+Applications that integrate with Internet Identity prompt you to register or log in with a previously-registered user number. 
+Registering a device is a simple process that generates a unique cryptographic key for you that is stored on the Internet Computer blockchain. You can then use your user number to register additional devices, so that you can access applications across all of your devices.
 
 When you access an application that uses Internet Identity to authenticate your identity, your browser connects to Internet Identity and generates a key for use with that application. 
-After you verify your identity, the Internet Identity service authorizes access to the application. 
+After you verify your identity, Internet Identity authorizes access to the application. 
+
 Your browser downloads the authorization, then redirects you to the application.
-The application verifies the authorization from the Internet Identity service and grants you access as an application-specific identity. 
+The application verifies the authorization from Internet Identity and grants you access as an application-specific anonymous identity. 
 Internally, you have a different identity for each application, but your identity for any single application is the same across all of your devices. 
 All of your devices just represent different methods you can use to authenticate your user number. 
 
@@ -33,7 +34,7 @@ When you register an identity, you will be prompted to copy a cryptographically-
 
 You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authoized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
 
-To learn how to register a device step-by-step, see: link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use the Internet Identity service]. 
+To learn how to register a device step-by-step, see: link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use Internet Identity]. 
 
 
 
@@ -41,7 +42,7 @@ To learn how to register a device step-by-step, see: link:https://sdk.dfinity.or
 
 == Want to learn more?
 
-If you are looking for more information about authentication options and using the Internet identity service, check out the following related resources:
+If you are looking for more information about authentication options and using Internet identity, check out the following related resources:
 
 * link:https://www.youtube.com/watch?v=XgsOKP224Zw[Overview of the Internet Computer (video)]
 * link:https://www.youtube.com/watch?v=jduSMHxdYD8[Building on the {IC}: Fundamentals (video)]
