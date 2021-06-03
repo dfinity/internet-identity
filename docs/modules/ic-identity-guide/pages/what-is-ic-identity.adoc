@@ -21,6 +21,7 @@ Registering a device is a simple process that generates a unique cryptographic k
 
 When you access an application that uses Internet Identity to authenticate your identity, your browser connects to Internet Identity and generates a key for use with that application. 
 After you verify your identity, Internet Identity authorizes access to the application. 
+
 Your browser downloads the authorization, then redirects you to the application.
 The application verifies the authorization from Internet Identity and grants you access as an application-specific anonymous identity. 
 Internally, you have a different identity for each application, but your identity for any single application is the same across all of your devices. 

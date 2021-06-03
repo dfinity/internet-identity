@@ -8,7 +8,7 @@
 
 The Internet Identity enables you to authenticate securely and anonymously when you access applications that use it as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. This is all accomplished using encrypted smart contracts that run on the {IC} blockchain.
 
-Unlike most authentications, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using a user number and the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
+Unlike most authentication services, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using a user number and the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
 NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
 
