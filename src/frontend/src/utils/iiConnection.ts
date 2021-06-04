@@ -348,7 +348,7 @@ export const creationOptions = (
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
-      userVerification: "preferred",
+      userVerification: "discouraged",
       authenticatorAttachment,
     },
     excludeCredentials: exclude.flatMap((device) =>
