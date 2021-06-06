@@ -30,6 +30,8 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 - NodeJS (with npm) version TBD
 
+- CMake
+
 ## Running Locally
 
 To run the internet_identity canisters, proceed as follows after cloning the repository
