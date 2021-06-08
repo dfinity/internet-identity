@@ -381,6 +381,30 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     })
 }
 
+#[query]
+fn get_principal(user_number: UserNumber, frontend : FrontendHostname) -> Principal {
+    check_frontend_length(&frontend);
+
+    STATE.with(|state| {
+        let entries = state
+            .storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        let seed = calculate_seed(user_number, &frontend);
+        let public_key = der_encode_canister_sig_key(seed.to_vec());
+        Principal::self_authenticating(&public_key)
+    })
+}
+
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other
 /// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
 /// provisional, but works.

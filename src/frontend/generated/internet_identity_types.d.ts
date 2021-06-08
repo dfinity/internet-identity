@@ -72,6 +72,9 @@ export default interface _SERVICE {
       arg_2: SessionKey,
       arg_3: Timestamp,
     ) => Promise<GetDelegationResponse>,
+  'get_principal' : (arg_0: UserNumber, arg_1: FrontendHostname) => Promise<
+      Principal
+    >,
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
   'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
