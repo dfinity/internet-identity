@@ -80,7 +80,7 @@ async function handleAuthRequest(
   request: AuthRequest,
   hostname: FrontendHostname
 ): Promise<AuthResponse> {
-  const userPrincipal = connection.getPrincipal(userNumber, hostname)
+  const userPrincipal = connection.getPrincipal(userNumber, hostname);
 
   if (!(await confirmRedirect(hostname, (await userPrincipal).toString()))) {
     return {
