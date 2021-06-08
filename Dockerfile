@@ -42,7 +42,8 @@ ENV CARGO_HOME=/cargo \
     PATH=/cargo/bin:$PATH
 
 # Install IC CDK optimizer
-RUN cargo install ic-cdk-optimizer
+# (keep version in sync with src/internet_identity/build.sh)
+RUN cargo install ic-cdk-optimizer --version 0.3.0
 
 COPY . .
 
