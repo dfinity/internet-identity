@@ -87,6 +87,11 @@ export default ({ IDL }) => {
         [GetDelegationResponse],
         ['query'],
       ),
+    'get_principal' : IDL.Func(
+        [UserNumber, FrontendHostname],
+        [IDL.Principal],
+        ['query'],
+      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),

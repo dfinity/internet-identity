@@ -228,6 +228,7 @@ service : {
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
+  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
@@ -275,6 +276,12 @@ It is the responsibility of the frontend UI to protect the user from doing these
 Fetches all data associated with a user.
 
 *Authorization*: Anyone can call this
+
+=== The `get_principal` query method
+
+Fetches the principal for a given user and front end.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 === The `prepare_delegation` method
 
@@ -563,11 +570,12 @@ This flow is the boring default
 3. The frontend listens to a `message` event (as per https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage[`postMessage` API])
 4. The `event.data` should be a message as per our <<client-auth-protocol>>.
 5. The `event.origin` is used as the Application Frontend’s hostname
-6. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
-7. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
-8. The frontend queries `get_delegation()` to get the delegation data
-9. It posts that data to the client application, using `event.source.postMessage` and the types specified in <<client-auth-protocol>>.
-10. It shows a message indicating that the login is complete.
+6. The front end calls `get_principal()` to obtain the user- and front-end-specific principal.
+7. The user is asked if they want to log into the client application, showing the client application frontend’s hostname and the used principal.
+8. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
+9. The frontend queries `get_delegation()` to get the delegation data
+10. It posts that data to the client application, using `event.source.postMessage` and the types specified in <<client-auth-protocol>>.
+11. It shows a message indicating that the login is complete.
 
 === Flow: Deleting devices
 

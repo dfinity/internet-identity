@@ -288,6 +288,14 @@ export class IIConnection {
     await actor.remove(userNumber, publicKey);
   };
 
+  getPrincipal = async (
+    userNumber: UserNumber,
+    frontend: FrontendHostname
+  ): Promise<Principal> => {
+    const actor = await this.getActor();
+    return await actor.get_principal(userNumber, frontend);
+  };
+
   prepareDelegation = async (
     userNumber: UserNumber,
     hostname: FrontendHostname,

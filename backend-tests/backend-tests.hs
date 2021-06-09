@@ -47,6 +47,7 @@ import Test.Tasty.Runners.Html
 
 import GHC.TypeLits (KnownSymbol, symbolVal)
 import Data.Row (empty, (.==), (.+), type (.!), (.!), Label, AllUniqueLabels, Var)
+import Codec.Candid (Principal(..))
 import qualified Codec.Candid as Candid
 import qualified Data.Row.Variants as V
 
@@ -162,6 +163,7 @@ service : {
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
+  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
@@ -601,6 +603,12 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIIReject cid webauth2ID #add (user_number, device2)
     lookupIs cid user_number [device1]
 
+  , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
+    queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
+    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    when should_upgrade $ doUpgrade cid
+    queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
+
   , withUpgrade $ \should_upgrade -> iiTest "get delegation and validate" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
 
@@ -705,12 +713,16 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let sessionPK = toPublicKey sessionSK
     let delegationArgs1 = (user_number, "front.end.com", sessionPK, Nothing)
     (user1PK, _exp) <- callII cid webauthID #prepare_delegation delegationArgs1
+    Principal user1Principal <- queryII cid webauthID #get_principal (user_number, "front.end.com")
+    lift $ user1Principal @?= mkSelfAuthenticatingId user1PK
 
     when should_upgrade $ do
       doUpgrade cid
 
     let delegationArgs2 = (user_number, "other-front.end.com", sessionPK, Nothing)
     (user2PK, _exp) <- callII cid webauthID #prepare_delegation delegationArgs2
+    Principal user2Principal <- queryII cid webauthID #get_principal (user_number, "other-front.end.com")
+    lift $ user2Principal @?= mkSelfAuthenticatingId user2PK
 
     when (user1PK == user2PK) $
       lift $ assertFailure "User identities coincide for different frontends"
