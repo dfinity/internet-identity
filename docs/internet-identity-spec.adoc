@@ -68,17 +68,15 @@ NOTE: Due to replication of data in canisters, the salt should not be considered
 
 A user account is identified by a unique _user number_, a smallish natural number chosen by the canister.
 
-A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
-Computer.
+A client application frontend is identified by its hostname, or, more precisely, it’s _origin_ (e.g., `https://abcde-efg.ic0.app`, `https://nice-name.ic0.app`, `https://non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet Computer.
 
-A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] of the form
-....
-user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02` (29 bytes)
-....
-
-that is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
+....
+which yields the https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_]
+....
+user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02
 ....
 where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname (at most 255 bytes).
 
