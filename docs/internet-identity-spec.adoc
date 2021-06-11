@@ -70,7 +70,7 @@ A user account is identified by a unique _user number_, a smallish natural numbe
 
 A client application frontend is identified by its hostname, or, more precisely, it’s _origin_ (e.g., `https://abcde-efg.ic0.app`, `https://nice-name.ic0.app`, `https://non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet Computer.
 
-A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is derived from a https://sdk.dfinity.org/docs/interface-spec/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 ....
