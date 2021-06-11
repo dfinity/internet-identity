@@ -39,11 +39,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>Provide your ID number to login and ${verbFromIntent(userIntent)}.</p>
-    <input
-      type="text"
-      id="registerUserNumber"
-      placeholder="Enter ID Number"
-    />
+    <input type="text" id="registerUserNumber" placeholder="Enter ID Number" />
     <button type="button" id="loginButton" class="primary">Login</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`

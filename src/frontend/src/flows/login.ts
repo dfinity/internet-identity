@@ -29,9 +29,7 @@ const pageContent = (
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
-    <button type="button" id="loginDifferent">
-      Use a different ID number
-    </button>
+    <button type="button" id="loginDifferent">Use a different ID number</button>
     <div class="spacer"></div>
     <div class="textLink">
       Lost access
