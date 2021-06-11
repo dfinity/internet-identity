@@ -38,12 +38,8 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your user number to login and ${verbFromIntent(userIntent)}.</p>
-    <input
-      type="text"
-      id="registerUserNumber"
-      placeholder="Enter User Number"
-    />
+    <p>Provide your ID number to login and ${verbFromIntent(userIntent)}.</p>
+    <input type="text" id="registerUserNumber" placeholder="Enter ID Number" />
     <button type="button" id="loginButton" class="primary">Login</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
@@ -144,7 +140,7 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     if (userNumber === null) {
       return resolve({
         tag: "err",
-        title: "Please enter a valid User Number",
+        title: "Please enter a valid ID Number",
         message: `${userNumber} doesn't parse as a number`,
       });
     }
@@ -193,7 +189,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
       return {
         tag: "err",
         title: "Unknown user",
-        message: `Failed to find an identity for the user number ${result.userNumber}. Please check your user number and try again.`,
+        message: `Failed to find an identity for the ID number ${result.userNumber}. Please check your ID number and try again.`,
         detail: "",
       };
     }

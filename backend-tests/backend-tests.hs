@@ -743,7 +743,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     user_number2 <- callII cid webauthID #register (device1, powAt cid 1) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     when (user_number == user_number2) $
-      lift $ assertFailure "User number re-used"
+      lift $ assertFailure "ID number re-used"
 
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
