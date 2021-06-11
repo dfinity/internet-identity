@@ -4,10 +4,10 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Congratulations!</h1>
     <p>
-      Please record your user number. You will need it later to use your
+      Please record your ID number. You will need it later to use your
       Internet Identity or to register additional devices.
     </p>
-    <label>User Number:</label>
+    <label>ID Number:</label>
     <div class="highlightBox">${userNumber}</div>
     <button id="displayUserContinue" class="primary">Continue</button>
   </div>

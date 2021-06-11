@@ -116,7 +116,7 @@ export class IIConnection {
       return { kind: "registerNoSpace" };
     } else if (hasOwnProperty(registerResponse, "registered")) {
       const userNumber = registerResponse["registered"].user_number;
-      console.log(`registered user number ${userNumber}`);
+      console.log(`registered ID number ${userNumber}`);
       return {
         kind: "loginSuccess",
         connection: new IIConnection(identity, delegationIdentity, actor),

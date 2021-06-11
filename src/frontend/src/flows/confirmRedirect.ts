@@ -16,7 +16,7 @@ const pageContent = (hostName: string, principal: string) => html`
     <h1>Authorize Login</h1>
     <p>Proceed to login in to:</p>
     <div id="confirmRedirectHostname" class="highlightBox">${hostName}</div>
-    <p>With application-specific user id:</p>
+    <p>With application-specific pseudonym:</p>
     <div id="confirmRedirectPrincipal" class="highlightBox">${principal}</div>
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>

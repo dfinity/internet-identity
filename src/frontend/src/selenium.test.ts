@@ -171,7 +171,7 @@ async function on_Main_Logout(driver: ThenableWebDriver) {
 }
 
 async function on_Main_Fixup(driver: ThenableWebDriver) {
-  // replace the user number for a reproducible screenshot
+  // replace the ID number for a reproducible screenshot
   const elem = await driver.findElement(By.className("highlightBox"));
   await driver.executeScript(
     "arguments[0].innerText = arguments[1];",
@@ -208,7 +208,7 @@ async function on_WelcomeBack_Login(driver: ThenableWebDriver) {
   await driver.findElement(By.id("login")).click();
 }
 
-// View: Add device user number
+// View: Add device ID number
 async function on_AddDeviceUserNumber(
   driver: ThenableWebDriver
 ): Promise<string> {
@@ -228,7 +228,7 @@ async function on_AddDeviceUserNumber_Continue(
 }
 
 async function on_AddDeviceUserNumber_Fixup(driver: ThenableWebDriver) {
-  // replace the user number for a reproducible screenshot
+  // replace the ID number for a reproducible screenshot
   const elem = await driver.findElement(By.id("addDeviceUserNumber"));
   await driver.executeScript(
     "arguments[0].value = arguments[1];",
