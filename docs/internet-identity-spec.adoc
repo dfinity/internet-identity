@@ -1,7 +1,7 @@
 = The Internet Identity Specification
 :toc2:
 :toclevel: 4
-:sectnumbers:
+:sectanchors:
 
 == Introduction
 
