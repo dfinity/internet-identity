@@ -6,6 +6,7 @@ export type ErrorOptions = {
   message: string | TemplateResult;
   detail?: string;
   primaryButton: string;
+  secondaryButton?: string;
 };
 
 const pageContent = (options: ErrorOptions) => html`
@@ -38,6 +39,11 @@ const pageContent = (options: ErrorOptions) => html`
           <pre>${options.detail}</pre>
         </details>`
       : ""}
+    ${options.secondaryButton !== undefined
+      ? html`<button id="displayErrorSecondary" class="secondary">
+          ${options.secondaryButton}
+        </button>`
+      : ""}
     <button id="displayErrorPrimary" class="primary">
       ${options.primaryButton}
     </button>
@@ -51,9 +57,17 @@ export const displayError = async (options: ErrorOptions): Promise<void> => {
 };
 
 const init = (): Promise<void> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const displayErrorPrimary = document.getElementById(
       "displayErrorPrimary"
     ) as HTMLButtonElement;
     displayErrorPrimary.onclick = () => resolve();
+
+    const displayErrorSecondary = document.getElementById(
+      "displayErrorSecondary"
+    ) as HTMLButtonElement | null;
+
+    if (displayErrorSecondary != null) {
+      displayErrorSecondary.onclick = () => reject();
+    }
   });
