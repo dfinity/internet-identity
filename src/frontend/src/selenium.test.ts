@@ -461,8 +461,7 @@ async function run_in_browser_common(
 
 async function fillText(driver: ThenableWebDriver, id: string, text: string) {
   const elem = await driver.findElement(By.id(id));
-  elem.sendKeys(Key.CONTROL + "a");
-  elem.sendKeys(Key.DELETE);
+  elem.clear();
   elem.sendKeys(text);
 }
 
