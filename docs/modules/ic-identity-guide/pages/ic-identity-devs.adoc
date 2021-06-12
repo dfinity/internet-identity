@@ -1,0 +1,43 @@
+= Integrating Internet Identity for developers
+:keywords: Internet Computer,blockchain,protocol,replica,subnet,data center,canister,developer
+:proglang: Motoko
+:platform: Internet Computer platform
+:IC: Internet Computer
+:company-id: DFINITY
+:sdk-short-name: DFINITY Canister SDK
+
+Internet Identity is a blockchain authentication system that you can use as a way to authenticate users to your application without the need for them to provide any personal information, passwords, or seed-phrases (aside from the option to generate one for recovery). 
+
+== How Internet Identity works
+Internet Identity is built on the browser standard, Web Authentication (WebAuthn), that enables users to apply the combination of the authentication methods of their personal devices with an ID number, to securely and anonymously log in to applications that run on the {IC}, at which point a unique identity is created for them. 
+
+If you're familiar with the way WebAuthn works, then you are familiar with Internet Identity. For more information on WebAuthn, see: link:https://webauthn.guide[https://webauthn.guide].
+
+When a user registers a device with Internet Identity, a private key is produced from the security chip within the device. This private key never leaves the device, and is completely unknown. It does however create a unique signature. When this signature is sent to Interent Identity, it defeats the prompt challenge, and a ID number is assigned that is created that represents an encrypted public key. 
+
+When a registered user goes to your URL, they will re-directed and asked to authenticate using Internet Identity. When they enter their user number, they are prompted to authenticate using a registered device authentication method. The action of using the device triggers the device signature to be sent to Internet Identity which proves that the user is in possession of the associated private key.
+
+Once Internet Identity confirms the signature, a unique identity is created and persisted by your app. 
+
+Any time a user logs in, as long as they know their ID number and use a registered device for authentication, they will be able to use the same identity. 
+
+== Why wouldn't you use Internet Identity?
+Internet Identity integration is not a requirement. You don’t have to use it as the authentication method for your application or service. Rather, it’s offered as an out of the box tool that is fully open sourced. In fact, there are a number of reasons that this kind of authentication method might not serve your purposes: 
+
+
+* Users can create as many different Internet Identities as they want.
++
+Because of this feature, you would have no way of blocking a user from accessing your app. Of course, they would also need to create a new app profile. For example, in the case of social media apps, some disincentives might be the loss of kharma, badges, app-specific tokens, etc…
+
+
+* You might actually want to collect the user’s information. 
+
+
+* The newness of the authentication workflow might scare some users.
++
+You might find that the general population is more likely to know that an app is collecting their information and allow this, then to trust a new tech they don’t fully understand. 
+
+* Internet Identity leverages Web Authentication.
++
+This means that not all devices, browsers, and operating systems will be able to be used without a security key as an authorization device.
+
