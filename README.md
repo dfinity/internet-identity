@@ -61,7 +61,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-dfx deploy --no-wallet --argument '(null)'
+II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then, run `CANISTER_ID=$(dfx canister id internet_identity) npm start` to start webpack-dev-server.
