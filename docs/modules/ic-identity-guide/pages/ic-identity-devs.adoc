@@ -15,7 +15,7 @@ If you're familiar with the way WebAuthn works, then you will be familiar with I
 
 When a user registers a device with Internet Identity, a private key is produced from the security chip within the device. This private key never leaves the device, and is completely unknown. It does however create a unique signature. When this signature is sent to Interent Identity, it defeats the prompt challenge, and a ID number is assigned that represents an encrypted public key. 
 
-When a registered user goes to your app URL, they will be re-directed and asked to authenticate using Internet Identity. When they enter their user number, they are prompted to authenticate using a registered device authentication method. The action of using the device triggers the device signature to be sent to Internet Identity which proves that the user is in possession of the associated private key.
+When a registered user goes to your app URL, they will be re-directed and asked to authenticate using Internet Identity. When they enter their identification number, they are prompted to authenticate using a registered device authentication method. The action of using the device triggers the device signature to be sent to Internet Identity which proves that the user is in possession of the associated private key.
 
 Once Internet Identity confirms the signature, a unique identity is created and persisted by your app. They are then logged in, and re-directed back to your site. 
 

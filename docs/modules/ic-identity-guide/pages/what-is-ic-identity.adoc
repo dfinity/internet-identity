@@ -25,7 +25,7 @@ While different identities are created for each application you access, you only
 Additionally, you can register as many identities with different ID numbers as you want for redundancy, to set up different device authentication profiles for other device users, or to ensure access to services that use the Internet Identity. However, it is important to note that if you lose your ID number, you will not be able to login to any app with the original identity created for you that is associated with the number. Even if you create a different ID number, with all of the same authentication devices as the original, the key pair will be different, and a new identity will be created for each app. Don't lose your ID number!
 
 == Identity recovery
-When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase (this includes your user number as the first entry) or to add a dedicated security key for recovery purposes. 
+When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase (this includes your identification number as the first entry) or to add a dedicated security key for recovery purposes. 
 
 You can choose to do this at any time, but note that if you lose your ID number or if you no longer have access to authorized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
 
