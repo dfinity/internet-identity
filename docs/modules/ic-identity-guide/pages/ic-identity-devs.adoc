@@ -11,15 +11,19 @@ Internet Identity is a blockchain authentication system that you can use as a wa
 == How Internet Identity works
 Internet Identity is built on the browser standard, Web Authentication (WebAuthn), that enables users to apply the combination of the authentication methods of their personal devices with an ID number, to securely and anonymously log in to applications that run on the {IC}, at which point a unique identity is created for them. 
 
-If you're familiar with the way WebAuthn works, then you are familiar with Internet Identity. For more information on WebAuthn, see: link:https://webauthn.guide[https://webauthn.guide].
+If you're familiar with the way WebAuthn works, then you will be familiar with Internet Identity. For more information on WebAuthn, see: link:https://webauthn.guide[https://webauthn.guide].
 
-When a user registers a device with Internet Identity, a private key is produced from the security chip within the device. This private key never leaves the device, and is completely unknown. It does however create a unique signature. When this signature is sent to Interent Identity, it defeats the prompt challenge, and a ID number is assigned that is created that represents an encrypted public key. 
+When a user registers a device with Internet Identity, a private key is produced from the security chip within the device. This private key never leaves the device, and is completely unknown. It does however create a unique signature. When this signature is sent to Interent Identity, it defeats the prompt challenge, and a ID number is assigned that represents an encrypted public key. 
 
-When a registered user goes to your URL, they will re-directed and asked to authenticate using Internet Identity. When they enter their user number, they are prompted to authenticate using a registered device authentication method. The action of using the device triggers the device signature to be sent to Internet Identity which proves that the user is in possession of the associated private key.
+When a registered user goes to your app URL, they will be re-directed and asked to authenticate using Internet Identity. When they enter their user number, they are prompted to authenticate using a registered device authentication method. The action of using the device triggers the device signature to be sent to Internet Identity which proves that the user is in possession of the associated private key.
 
-Once Internet Identity confirms the signature, a unique identity is created and persisted by your app. 
+Once Internet Identity confirms the signature, a unique identity is created and persisted by your app. They are then logged in, and re-directed back to your site. 
 
 Any time a user logs in, as long as they know their ID number and use a registered device for authentication, they will be able to use the same identity. 
+
+== How to integrate with Internet Identity
+
+If you chose to integrate Internet Identity with your application, see the followig blog post, written by Dfinity team member Kyle Peacock: link:https://kyle-peacock.com/blog/dfinity/integrating-internet-identity/[Integrating with Internet Identity] and check back here soon for an official tutorial. 
 
 == Why wouldn't you use Internet Identity?
 Internet Identity integration is not a requirement. You don’t have to use it as the authentication method for your application or service. Rather, it’s offered as an out of the box tool that is fully open sourced. In fact, there are a number of reasons that this kind of authentication method might not serve your purposes: 
@@ -35,9 +39,11 @@ Because of this feature, you would have no way of blocking a user from accessing
 
 * The newness of the authentication workflow might scare some users.
 +
-You might find that the general population is more likely to know that an app is collecting their information and allow this, then to trust a new tech they don’t fully understand. 
+You might find that the general population is more likely to know that an app is collecting their information and allow this, then to trust a new tech they don’t fully understand. It might be a good idea to give a brief overview of the safety of Internet Identity if you chose to use it. 
 
 * Internet Identity leverages Web Authentication.
 +
-This means that not all devices, browsers, and operating systems will be able to be used without a security key as an authorization device.
+This means that not all devices, browsers, and operating systems will be able to be used without a security key as an authorization device. Though adoption is increasing, not every device/OS/browser combination is accurate.
+
+
 
