@@ -45,7 +45,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber)) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
-                "improper ID number range: [{}, {})",
+                "improper user number range: [{}, {})",
                 id_range_lo, id_range_hi,
             ));
         }
@@ -124,9 +124,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         })
     }
 
-    /// Allocates a fresh ID number.
+    /// Allocates a fresh user number.
     ///
-    /// Returns None if the range of ID number assigned to this
+    /// Returns None if the range of user number assigned to this
     /// storage is exhausted.
     pub fn allocate_user_number(&mut self) -> Option<UserNumber> {
         let user_number = self.header.id_range_lo + self.header.num_users as u64;
@@ -173,7 +173,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
 
         let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
         if stable_offset + self.header.entry_size as u32 > stable_size() * WASM_PAGE_SIZE {
-            trap("a record for a valid ID number is out of stable memory bounds");
+            trap("a record for a valid user number is out of stable memory bounds");
         }
 
         let mut buf = vec![0; self.header.entry_size as usize];
@@ -228,7 +228,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn set_user_number_range(&mut self, (lo, hi): (UserNumber, UserNumber)) {
         if hi < lo {
             trap(&format!(
-                "set_user_number_range: improper ID number range [{}, {})",
+                "set_user_number_range: improper user number range [{}, {})",
                 lo, hi
             ));
         }
@@ -281,10 +281,10 @@ impl fmt::Display for StorageError {
         match self {
             Self::UserNumberOutOfRange { user_number, range } => write!(
                 f,
-                "ID number {} is out of range [{}, {})",
+                "user number {} is out of range [{}, {})",
                 user_number, range.0, range.1
             ),
-            Self::BadUserNumber(n) => write!(f, "bad ID number {}", n),
+            Self::BadUserNumber(n) => write!(f, "bad user number {}", n),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {}", err)
             }
