@@ -32,7 +32,7 @@ Additionally, you can register as many user numbers as you want for redundancy, 
 == Identity recovery
 When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase or to add a dedicated security key for recovery purposes. 
 
-You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authoized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
+You can choose to do this at any time, but note that if you lose your user number or if you no longer have access to authorized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
 
 To learn how to register a device step-by-step, see: link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use Internet Identity]. 
 
