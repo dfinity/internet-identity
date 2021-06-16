@@ -10,11 +10,11 @@ import { displayAddDeviceLink } from "./displayAddDeviceLink";
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
     <h1>New device</h1>
-    <p>Please provide your ID number.</p>
+    <p>Please provide your user number.</p>
     <input
       type="text"
       id="addDeviceUserNumber"
-      placeholder="Enter ID Number"
+      placeholder="Enter User Number"
       value=${userNumber ?? ""}
     />
     <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
@@ -55,7 +55,11 @@ const init = () => {
       try {
         existingDevices = await IIConnection.lookupAll(userNumber);
       } catch (err) {
-        console.log("Failed to fetch devices for ID number:", userNumber, err);
+        console.log(
+          "Failed to fetch devices for user number:",
+          userNumber,
+          err
+        );
         existingDevices = [];
       }
       let identity: WebAuthnIdentity;
@@ -102,7 +106,7 @@ const init = () => {
       }, 2500);
     } else {
       userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your ID Number first";
+      userNumberInput.placeholder = "Please enter your User Number first";
     }
   };
 };

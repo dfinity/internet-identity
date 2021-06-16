@@ -29,17 +29,19 @@ const pageContent = (
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Login</button>
     <p style="text-align: center;">Or</p>
-    <button type="button" id="loginDifferent">Use a different ID number</button>
+    <button type="button" id="loginDifferent">
+      Use a different user number
+    </button>
     <div class="spacer"></div>
     <div class="textLink">
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    ${logoutSection("Clear ID number from browser")}
+    ${logoutSection("Clear user number from browser")}
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a successful ID number connection pair
+// We retry logging in until we get a successful user number connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
   userIntent: UserIntent

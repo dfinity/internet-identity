@@ -97,7 +97,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
       here.
     </p>
     ${shouldNag(devices) ? recoveryNag() : undefined}
-    <label>ID Number</label>
+    <label>User Number</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
       <label id="deviceLabel">Registered devices</label>
