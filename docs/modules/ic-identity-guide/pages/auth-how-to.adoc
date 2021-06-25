@@ -10,7 +10,7 @@ The Internet Identity enables you to authenticate securely and anonymously when 
 
 Unlike most authentication methods, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using a user number and the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
 
-NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
+NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>. Furthermore, if you are authenticating on iOS or MacOS with the Safari browser, *do not clear your Safari browser data*. Doing so will delete your login from the device, meaning that you will not be able to access your Internet Identity from the device where the browser data has been cleared in the Safari browser.
 
 Windows users can only use a security key as an authorized device.
 
