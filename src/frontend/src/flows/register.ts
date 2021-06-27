@@ -1,7 +1,11 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { withLoader } from "../components/loader";
-import { IIConnection, canisterIdPrincipal } from "../utils/iiConnection";
+import {
+  IIConnection,
+  canisterIdPrincipal,
+  creationOptions,
+} from "../utils/iiConnection";
 import { setUserNumber } from "../utils/userNumber";
 import { confirmRegister } from "./confirmRegister";
 import { displayUserNumber } from "./displayUserNumber";
@@ -61,7 +65,10 @@ const init = (): Promise<LoginResult | null> =>
       await tick();
 
       try {
-        const pendingIdentity = WebAuthnIdentity.create().catch((error) => {
+        const pendingIdentity = WebAuthnIdentity.create({
+          publicKey: creationOptions(),
+        }).catch((error) => {
+          console.log(error);
           resolve(apiResultToLoginResult({ kind: "authFail", error }));
           // We can never get here, but TS doesn't understand that
           return (0 as unknown) as WebAuthnIdentity;
