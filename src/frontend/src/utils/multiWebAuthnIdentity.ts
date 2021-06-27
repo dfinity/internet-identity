@@ -16,6 +16,7 @@ import {
 } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
+import { unwrapDERCose } from "./derCose";
 
 export type CredentialId = BinaryBlob;
 export type CredentialData = {
@@ -70,7 +71,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
       ) {
         // would be nice if WebAuthnIdentity had a directly usable constructor
-        const strippedKey = cd.pubkey.slice(19);
+        const strippedKey = unwrapDERCose(cd.pubkey);
         this._actualIdentity = WebAuthnIdentity.fromJSON(
           JSON.stringify({
             rawId: Buffer.from(cd.credentialId).toString("hex"),
