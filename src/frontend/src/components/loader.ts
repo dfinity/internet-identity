@@ -19,17 +19,17 @@ const loader = () => html`<style>
     }
     @media (min-width: 767px) {
       #loader img {
-        width: 600px;
+        width: 300px;
       }
     }
     @media (min-width: 1024px) {
       #loader img {
-        width: 800px;
+        width: 500px;
       }
     }
   </style>
   <picture id="loader">
-    <img src="/glitch-loop.webp" alt="loading" />
+    <img src="/loader.webp" alt="loading" />
   </picture>`;
 
 const startLoader = () => {

@@ -29,8 +29,8 @@ fn main() -> Result<(), String> {
         ),
         ("/index.js", "../../dist/index.js.gz", ContentEncoding::GZip),
         (
-            "/glitch-loop.webp",
-            "../../dist/glitch-loop.webp",
+            "/loader.webp",
+            "../../dist/loader.webp",
             ContentEncoding::Identity,
         ),
         (
