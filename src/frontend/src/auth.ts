@@ -1,4 +1,5 @@
-import { blobFromUint8Array, Principal } from "@dfinity/agent";
+import { blobFromUint8Array } from "@dfinity/candid";
+import { Principal } from "@dfinity/principal";
 import {
   FrontendHostname,
   PublicKey,

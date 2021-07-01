@@ -50,9 +50,10 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/agent": "0.8.9",
-    "@dfinity/authentication": "0.8.9",
-    "@dfinity/identity": "0.8.9",
+    "@dfinity/agent": "0.9.1-beta-1",
+    "@dfinity/identity": "0.9.1-beta-1",
+    "@dfinity/candid": "0.9.1",
+    "@dfinity/principal": "0.9.1",
     "biguintle": "^1.0.3",
     "bip39": "^3.0.4",
     "clipboard": "^2.0.8",

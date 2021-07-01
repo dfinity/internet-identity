@@ -1,4 +1,4 @@
-import { blobFromHex } from "@dfinity/agent";
+import { blobFromHex } from "@dfinity/candid";
 import { Ed25519PublicKey } from "@dfinity/identity";
 import * as ed25519 from "./ed25519";
 

@@ -7,16 +7,14 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
+import { PublicKey, SignIdentity } from "@dfinity/agent";
 import {
   BinaryBlob,
   blobFromUint8Array,
   DerEncodedBlob,
-  PublicKey,
-  SignIdentity,
-} from "@dfinity/agent";
-import { WebAuthnIdentity } from "@dfinity/identity";
+} from "@dfinity/candid";
+import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
-import { unwrapDERCose } from "./derCose";
 
 export type CredentialId = BinaryBlob;
 export type CredentialData = {
@@ -71,7 +69,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
       ) {
         // would be nice if WebAuthnIdentity had a directly usable constructor
-        const strippedKey = unwrapDERCose(cd.pubkey);
+        const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
         this._actualIdentity = WebAuthnIdentity.fromJSON(
           JSON.stringify({
             rawId: Buffer.from(cd.credentialId).toString("hex"),

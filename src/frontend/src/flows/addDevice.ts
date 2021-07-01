@@ -3,7 +3,7 @@ import {
   blobFromHex,
   derBlobFromBlob,
   DerEncodedBlob,
-} from "@dfinity/agent";
+} from "@dfinity/candid";
 import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
 import { warningIcon } from "../components/icons";
