@@ -6,7 +6,11 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
-import { verbFromIntent, UserIntent, verbFromIntent2 } from "../utils/userIntent";
+import {
+  verbFromIntent,
+  UserIntent,
+  verbFromIntent2,
+} from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
@@ -38,7 +42,10 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your identity anchor to authenticate ${verbFromIntent2(userIntent)}.</p>
+    <p>
+      Provide your identity anchor to authenticate
+      ${verbFromIntent2(userIntent)}.
+    </p>
     <input
       type="text"
       id="registerUserNumber"
