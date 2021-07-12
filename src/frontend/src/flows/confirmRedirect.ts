@@ -13,8 +13,8 @@ const pageContent = (hostName: string) => html`
     }
   </style>
   <div class="container">
-    <h1>Authorize Login</h1>
-    <p>Proceed to login in to:</p>
+    <h1>Authorize Authentication</h1>
+    <p>Proceed to authenticate with:</p>
     <div id="confirmRedirectHostname" class="highlightBox">${hostName}</div>
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>

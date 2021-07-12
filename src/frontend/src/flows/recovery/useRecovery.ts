@@ -22,7 +22,7 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
     await displayError({
       title: "Failed to recover",
       message:
-        "You do not have any recovery devices configured. Did you mean to login with one of your devices instead?",
+        "You do not have any recovery devices configured. Did you mean to authenticate with one of your devices instead?",
       primaryButton: "Go back",
     });
     return window.location.reload();

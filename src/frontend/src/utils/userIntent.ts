@@ -18,10 +18,21 @@ export const intentFromUrl = (url: URL): UserIntent => {
 export const verbFromIntent = (intent: UserIntent): string => {
   switch (intent.kind) {
     case "addDevice":
-      return "add your new device to your Internet Identity";
+      return "to add your new device to your Internet Identity";
     case "auth":
-      return "authenticate using your Internet Identity";
+      return "using your Internet Identity";
     case "manage":
-      return "manage your Internet Identity";
+      return "to manage your Internet Identity";
+  }
+};
+
+export const verbFromIntent2 = (intent: UserIntent): string => {
+  switch (intent.kind) {
+    case "addDevice":
+      return "and to add your new device to your Internet Identity";
+    case "auth":
+      return "using your Internet Identity";
+    case "manage":
+      return "and to manage your Internet Identity";
   }
 };

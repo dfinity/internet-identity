@@ -25,9 +25,9 @@ const pageContent = (
   <div class="container">
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>Login to ${verbFromIntent(userIntent)}.</p>
+    <p>Authenticate ${verbFromIntent(userIntent)}.</p>
     <div class="highlightBox">${userNumber}</div>
-    <button type="button" id="login" class="primary">Login</button>
+    <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">
       Use a different user number
@@ -64,7 +64,7 @@ export const login = async (
   } catch (err) {
     await displayError({
       title: "Something went wrong",
-      message: "An unexpected error occured during login. Please try again",
+      message: "An unexpected error occured during authentication. Please try again",
       detail: err,
       primaryButton: "Try again",
     });

@@ -6,7 +6,7 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
-import { verbFromIntent, UserIntent } from "../utils/userIntent";
+import { verbFromIntent, UserIntent, verbFromIntent2 } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
@@ -38,13 +38,13 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide your user number to login and ${verbFromIntent(userIntent)}.</p>
+    <p>Provide your user number to authenticate ${verbFromIntent2(userIntent)}.</p>
     <input
       type="text"
       id="registerUserNumber"
       placeholder="Enter User Number"
     />
-    <button type="button" id="loginButton" class="primary">Login</button>
+    <button type="button" id="loginButton" class="primary">Authenticate</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
       : html`<div class="textLink" id="registerSection">

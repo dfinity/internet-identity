@@ -65,7 +65,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         await displayError({
           title: "Wrong user number",
           message: `We're expecting to add a device to the user number ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct user number when creating the add device link, or log in with the expected user number.`,
-          primaryButton: "Back to Login",
+          primaryButton: "Back to Authenticate",
         });
         window.location.reload();
       }
@@ -95,7 +95,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
           message:
             "Something went wrong when adding the new device. Please try again",
           detail: error.toString(),
-          primaryButton: "Back to Login",
+          primaryButton: "Back to Authenticate",
         });
         window.location.reload();
       }
@@ -104,7 +104,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         title: "Not a valid link",
         message:
           "We failed to recognize your add device link. Please make sure you copy the entire link, and only use links you created yourself.",
-        primaryButton: "Back to Login",
+        primaryButton: "Back to Authenticate",
       });
       clearHash();
       window.location.reload();
