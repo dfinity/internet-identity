@@ -6,11 +6,7 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
-import {
-  verbFromIntent,
-  UserIntent,
-  verbFromIntent2,
-} from "../utils/userIntent";
+import { UserIntent, verbFromIntent2 } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
