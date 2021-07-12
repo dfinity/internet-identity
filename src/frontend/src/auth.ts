@@ -80,9 +80,7 @@ async function handleAuthRequest(
   request: AuthRequest,
   hostname: FrontendHostname
 ): Promise<AuthResponse> {
-  const userPrincipal = connection.getPrincipal(userNumber, hostname);
-
-  if (!(await confirmRedirect(hostname, (await userPrincipal).toString()))) {
+  if (!(await confirmRedirect(hostname))) {
     return {
       kind: "authorize-client-failure",
       text: `User did not grant access to ${hostname}.`,
