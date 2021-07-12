@@ -26,6 +26,7 @@ export const verbFromIntent = (intent: UserIntent): string => {
   }
 };
 
+// TODO: Remove me
 export const verbFromIntent2 = (intent: UserIntent): string => {
   switch (intent.kind) {
     case "addDevice":
