@@ -17,7 +17,7 @@ import { successfullyAddedDevice } from "./successfulDeviceAddition";
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>New device</h1>
-    <label>User Number:</label>
+    <label>Identity anchor:</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="warningBox">
       <span class="warningIcon">${warningIcon}</span>
@@ -63,8 +63,8 @@ const init = (userNumber: bigint, connection: IIConnection) => {
       if (expectedUserNumber !== userNumber) {
         // Here we're adding a device to our userNumber that was supposed to be added to a different one.
         await displayError({
-          title: "Wrong user number",
-          message: `We're expecting to add a device to the user number ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct user number when creating the add device link, or log in with the expected user number.`,
+          title: "Wrong identity anchor",
+          message: `We're expecting to add a device to the identity anchor ${expectedUserNumber}, but you're logged in as ${userNumber}. Please choose the correct identity anchor when creating the add device link, or log in with the expected identity anchor.`,
           primaryButton: "Back to Authenticate",
         });
         window.location.reload();

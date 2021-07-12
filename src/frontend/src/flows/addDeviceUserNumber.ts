@@ -10,11 +10,11 @@ import { displayAddDeviceLink } from "./displayAddDeviceLink";
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
     <h1>New device</h1>
-    <p>Please provide your user number.</p>
+    <p>Please provide your identity anchor.</p>
     <input
       type="text"
       id="addDeviceUserNumber"
-      placeholder="Enter User Number"
+      placeholder="Enter Identity anchor"
       value=${userNumber ?? ""}
     />
     <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
@@ -56,7 +56,7 @@ const init = () => {
         existingDevices = await IIConnection.lookupAll(userNumber);
       } catch (err) {
         console.log(
-          "Failed to fetch devices for user number:",
+          "Failed to fetch devices for identity anchor:",
           userNumber,
           err
         );
@@ -106,7 +106,7 @@ const init = () => {
       }, 2500);
     } else {
       userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your User Number first";
+      userNumberInput.placeholder = "Please enter your Identity anchor first";
     }
   };
 };
