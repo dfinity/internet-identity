@@ -53,11 +53,11 @@ const pageContent = (userIntent: UserIntent) => html` <style>
       : html`<div class="textLink" id="registerSection">
             New user?
             <button id="registerButton" class="linkStyle">
-              Register with Internet Identity.
+              Create Internet Identity Anchor.
             </button>
           </div>
           <div class="textLink">
-            Already registered
+            Already have an anchor
             <button id="addNewDeviceButton" class="linkStyle">
               but using a new device?
             </button>
