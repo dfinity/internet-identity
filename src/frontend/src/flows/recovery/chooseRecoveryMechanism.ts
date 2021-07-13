@@ -52,7 +52,7 @@ const pageContent = (devices: DeviceData[]) => html`
   </style>
   <div class="container">
     <h1>Recovery Options</h1>
-    <p>Set up account recovery to protect your Internet Identity.</p>
+    <p>Set up account recovery to protect this Identity Anchor.</p>
     <div class="recoveryContainer">
       <button
         ?disabled=${hasRecoveryPhrase(devices)}

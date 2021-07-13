@@ -24,7 +24,7 @@ const pageContent = html`
 
 const constructingContent = html`
   <div class="container flex center">
-    <h1>Constructing your Internet Identity</h1>
+    <h1>Constructing new Identity Anchor</h1>
     ${icLogo}
     <p>This may take a while. Please wait and do not refresh the page.</p>
   </div>

@@ -10,14 +10,14 @@ const pageContent = (seedPhrase: string) => html`
   </style>
   <div class="container">
     <h1>Seedphrase</h1>
-    <p>Your seed phrase makes it easy to recover your account.</p>
+    <p>Your seed phrase makes it easy to recover this identity anchor.</p>
     <div class="warningBox">
       <span class="warningIcon">${warningIcon}</span>
       <div class="warningMessage">
         Do <b>NOT</b> forget to save this seed phrase. Save a backup on a
         storage medium and write it down.<br />
         Keep it secret &mdash; knowledge of the seed phrase will enable access
-        to your account!
+        to this identity anchor!
       </div>
     </div>
     <label>Your seed phrase</label>

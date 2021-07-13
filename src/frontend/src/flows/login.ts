@@ -5,7 +5,7 @@ import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
-import { verbFromIntent, UserIntent } from "../utils/userIntent";
+import { authenticateIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
   apiResultToLoginResult,
@@ -25,7 +25,7 @@ const pageContent = (
   <div class="container">
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>Authenticate ${verbFromIntent(userIntent)}.</p>
+    <p>${authenticateIntent(userIntent)}.</p>
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>

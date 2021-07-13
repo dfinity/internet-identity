@@ -93,14 +93,14 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
   <div class="container">
     <h1>Identity Management</h1>
     <p>
-      You can view and manage your Internet identity and your registered devices
+      You can view and manage this Identity Anchor and your added devices
       here.
     </p>
     ${shouldNag(devices) ? recoveryNag() : undefined}
     <label>Identity anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
-      <label id="deviceLabel">Registered devices</label>
+      <label id="deviceLabel">Added devices</label>
       <button class="labelAction" id="addAdditionalDevice">
         ADD NEW DEVICE
       </button>
@@ -132,7 +132,7 @@ const recoveryNag = () => html`
     <div class="recoveryNag">
       <div class="recoveryNagTitle">Account Recovery</div>
       <div class="recoveryNagMessage">
-        Set an account recovery to help protect your Internet Identity.
+        Set an account recovery to help protect this Identity Anchor.
       </div>
       <button id="addRecovery" class="primary recoveryNagButton">
         Set Recovery Key
@@ -230,7 +230,7 @@ const init = async (
       await displayError({
         title: "Failed to add the new device",
         message:
-          "We failed to add the new device to your identity. Please try again",
+          "We failed to add the new device to this identity anchor. Please try again",
         detail: error.message,
         primaryButton: "Back to manage",
       });
@@ -306,7 +306,7 @@ const bindRemoveListener = (
     }
 
     if (isOnlyDevice) {
-      return alert("You can not remove your last registered device.");
+      return alert("You can not remove your last device.");
     }
 
     // Otherwise, remove identity

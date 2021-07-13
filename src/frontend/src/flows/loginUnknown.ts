@@ -6,7 +6,7 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
-import { UserIntent, verbFromIntent2 } from "../utils/userIntent";
+import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
@@ -39,7 +39,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>
-      Provide an identity anchor to authenticate ${verbFromIntent2(userIntent)}.
+      Provide an identity anchor to authenticate${authenticateUnknownIntent(userIntent)}.
     </p>
     <input
       type="text"

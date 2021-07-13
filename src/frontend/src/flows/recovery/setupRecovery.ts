@@ -34,7 +34,7 @@ export const setupRecovery = async (
           await displayError({
             title: "Authentication failure",
             message:
-              "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a passphrase instead.",
+              "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a seedphrase instead.",
             detail: err.toString(),
             primaryButton: "Try a different method",
           });
@@ -74,7 +74,7 @@ export const setupRecovery = async (
   } catch (err) {
     await displayError({
       title: "Failed to set up recovery",
-      message: "We failed to set up recovery for your account.",
+      message: "We failed to set up recovery for this identity anchor.",
       detail: err.toString(),
       primaryButton: "Continue",
     });

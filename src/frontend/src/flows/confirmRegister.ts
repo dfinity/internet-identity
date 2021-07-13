@@ -3,7 +3,7 @@ import { html, render } from "lit-html";
 const pageContent = html`
   <div class="container">
     <h1>Confirm new device</h1>
-    <p>Please confirm to add your device to Identity Anchor.</p>
+    <p>Please confirm to add your device.</p>
     <button type="button" class="primary" id="confirmRegisterButton">
       Confirm
     </button>
