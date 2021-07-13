@@ -56,7 +56,7 @@ const pageContent = () => html`
       >https://dfinity.org/faq/</a
     >
     <button id="displayWarningPrimary" class="primary">
-      Set up Account recovery
+      Add a recovery mechanism
     </button>
     <div class="spacer"></div>
   </div>

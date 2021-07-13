@@ -111,7 +111,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
           <div class="labelWithAction">
             <label id="deviceLabel">Recovery devices</label>
             <button class="labelAction" id="addRecovery">
-              ADD ACCOUNT RECOVERY
+              ADD RECOVERY MECHANISM
             </button>
           </div>
           <div id="recoveryList"></div>
@@ -129,12 +129,12 @@ const recoveryNag = () => html`
   <div class="nagBox">
     <div class="nagIcon">${warningIcon}</div>
     <div class="recoveryNag">
-      <div class="recoveryNagTitle">Account Recovery</div>
+      <div class="recoveryNagTitle">Recovery Mechanism</div>
       <div class="recoveryNagMessage">
-        Set an account recovery to help protect this Identity Anchor.
+        Add a recovery mechanism to help protect this Identity Anchor.
       </div>
       <button id="addRecovery" class="primary recoveryNagButton">
-        Set Recovery Key
+        Add Recovery Key
       </button>
     </div>
   </div>
