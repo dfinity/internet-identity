@@ -13,6 +13,7 @@ import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
+import { blobFromText } from "@dfinity/candid";
 
 const pageContent = html`
   <div class="container">
@@ -77,6 +78,10 @@ const init = (): Promise<LoginResult | null> =>
         const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
         const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
         const identity = await pendingIdentity;
+
+        console.log("signed", (await identity.sign(blobFromText("hello"))).toString("hex"));
+        console.log("pubkey", identity.getPublicKey().toDer().toString("hex"));
+
         if (await confirmRegister()) {
           const result = await withLoader(async () =>
             IIConnection.register(identity, alias, pow)
