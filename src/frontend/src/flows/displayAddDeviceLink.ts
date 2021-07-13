@@ -19,7 +19,7 @@ const pageContent = (link: string) => html`
   <div class="container">
     <h1>New device</h1>
     <p>
-      Please open this URL on an already registered device. This page will
+      Please open this URL on an already authenticated device. This page will
       automatically update when you have succeeded.
     </p>
     <label>URL</label>

@@ -29,17 +29,18 @@ const pageContent = () => html`
     ${warningIcon}
     <h1 id="warningHeading">Warning</h1>
     <p>
-      If you have your Internet Identity tied to only one device and you lose
-      that one device, you will be locked out.
+      If you have only one device attached to an identity anchor and lose that
+      device, you will no longer be able to use that identity anchor.
     </p>
     <p>
       Additionally, on iOS and MacOS, clearing your Safari browser data will
-      <em>delete</em> your logins from the device.
+      <em>delete</em> your authentication keys from the respective device,
+      disabling it.
     </p>
     <p>
-      As a best practice we always recommend you add multiple devices to your
-      Internet Identity and at <em>least</em> one actual security key. You can
-      see how to add more devices here:
+      As a best practice we always recommend you add multiple devices to an
+      Identity Anchor and at <em>least</em> one portable authenticator (USB
+      key). You can see how to add more devices here:
     </p>
     <a
       target="_blank"
@@ -47,16 +48,16 @@ const pageContent = () => html`
       >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html</a
     >
     <p>
-      Currently the best strategy to ensure you can log in is to add extra
-      devices and at least one security key to your account and keep that in a
-      safe place. For more information about Identity and the NNS, please check
-      out our FAQ page:
+      It is recommended to add multiple devices (among them at least one
+      portable authenticator) to an identity anchor and keep the portable
+      authenticator in a safe place. For more information about Internet
+      Identity and the NNS, please check out our FAQ page:
     </p>
     <a target="_blank" href="https://dfinity.org/faq/"
       >https://dfinity.org/faq/</a
     >
     <button id="displayWarningPrimary" class="primary">
-      Set up Account recovery
+      Add a recovery mechanism to an identity anchor
     </button>
     <div class="spacer"></div>
   </div>

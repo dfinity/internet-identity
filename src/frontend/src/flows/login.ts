@@ -5,7 +5,7 @@ import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
 import { logoutSection, initLogout } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
-import { verbFromIntent, UserIntent } from "../utils/userIntent";
+import { authenticateIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
   apiResultToLoginResult,
@@ -25,23 +25,23 @@ const pageContent = (
   <div class="container">
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>Login to ${verbFromIntent(userIntent)}.</p>
+    <p>${authenticateIntent(userIntent)}.</p>
     <div class="highlightBox">${userNumber}</div>
-    <button type="button" id="login" class="primary">Login</button>
+    <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">
-      Use a different user number
+      Use a different identity anchor
     </button>
     <div class="spacer"></div>
     <div class="textLink">
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    ${logoutSection("Clear user number from browser")}
+    ${logoutSection("Clear identity anchor from browser")}
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a successful user number connection pair
+// We retry logging in until we get a successful identity anchor connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
   userIntent: UserIntent
@@ -64,7 +64,8 @@ export const login = async (
   } catch (err) {
     await displayError({
       title: "Something went wrong",
-      message: "An unexpected error occured during login. Please try again",
+      message:
+        "An unexpected error occured during authentication. Please try again",
       detail: err,
       primaryButton: "Try again",
     });

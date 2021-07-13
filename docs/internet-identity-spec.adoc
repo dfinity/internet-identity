@@ -66,7 +66,7 @@ The canister maintains a salt (in the following the `salt`), a 32 byte long blob
 
 NOTE: Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
 
-A user account is identified by a unique _user number_, a smallish natural number chosen by the canister.
+A user account is identified by a unique _identity anchor_, a smallish natural number chosen by the canister.
 
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
 Computer.
@@ -80,9 +80,9 @@ that is derived from a https://docs.dfinity.systems/public/#canister-signatures[
 ....
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 ....
-where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the user number as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname (at most 255 bytes).
+where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the identity anchor as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend’s hostname (at most 255 bytes).
 
-The Internet Identity Service Backend stores the following data in user accounts, indexed by the respective user number:
+The Internet Identity Service Backend stores the following data in user accounts, indexed by the respective identity anchor:
 
 * a set of _device information_, consisting of
 - the device’s public key (DER-encoded)
@@ -239,7 +239,7 @@ The `init_salt` method is mostly internal, see <<salt>>.
 
 === The `register` method
 
-The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ user number, creates the account record, and adds the given device as the first device.
+The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ identity anchor, creates the account record, and adds the given device as the first device.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
@@ -265,7 +265,7 @@ The `remove` method removes a device, identified by its public key, from the lis
 
 It is allowed to remove the key that is used to sign this request. This can be useful for a panic button functionality.
 
-It is allowed to remove the last key, to completely disable a user. The canister may forget that user completely then, assuming the user number generation algorithm prevents new users from getting the same user number.
+It is allowed to remove the last key, to completely disable a user. The canister may forget that user completely then, assuming the identity anchor generation algorithm prevents new users from getting the same identity anchor.
 
 It is the responsibility of the frontend UI to protect the user from doing these things accidentally.
 
@@ -285,7 +285,7 @@ Fetches the principal for a given user and front end.
 
 === The `prepare_delegation` method
 
-The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given user number and Client Application Frontend Hostname to the given session key.
+The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given identity anchor and Client Application Frontend Hostname to the given session key.
 
 This method returns the user’s identity that’s associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_delegation` query, we prevent attacks that trick the user into using a wrong identity.
 
@@ -340,7 +340,7 @@ Therefore the Internet Identity Canister intentionally does not implement `canis
 
 === Internal data model and data structures used
 
-The primary data structure used by the backend is a map from user number to the list of user devices.
+The primary data structure used by the backend is a map from identity anchor to the list of user devices.
 Device lists are stored directly in canister stable memory.
 The total amount of storage for is limited to 510 bytes per user.
 With the stable memory size of 4GiB we can store around 8 * 10^6 user records in a single canister.
@@ -375,7 +375,7 @@ UserRecord ::= {
 }
 ....
 
-User record for user number N is stored at offset `sizeof(Header) + (N - user_number_range_lo) * sizeof(UserRecord)`.
+User record for identity anchor N is stored at offset `sizeof(Header) + (N - user_number_range_lo) * sizeof(UserRecord)`.
 Each record consists of a 16 bit `size` ∈ [0..510] followed by `size` bytes of Candid-serialized list of devices.
 
 ....
@@ -398,12 +398,12 @@ NOTE: Even with that provision the same nonce can be used to ingress multiple me
 
 The Internet Identity canister is designed for sharded deployments.
 There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users.
-As users are identified by their user number, we split the range of user numbers into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
+As users are identified by their identity anchor, we split the range of identity anchors into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
 The assigned range is passed to the canister as an init argument, encoded in Candid:
 
 ....
 type InternetIdentityInit = record {
-  // Half-closed interval of user numbers assigned to this canister, [ left_bound, right_bound )
+  // Half-closed interval of identity anchors assigned to this canister, [ left_bound, right_bound )
   assigned_user_number_range: record { nat64; nat64; };
 };
 ....
@@ -429,7 +429,7 @@ The Internet Identity Service frontend is the user-visible part of the Internet 
 === Storage used
 
 The frontend only stores a single piece of local storage, namely the current
-user number, if known under the key `user_number`.
+identity anchor, if known under the key `user_number`.
 
 === Flows
 
@@ -450,7 +450,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 1. The frontend notices that `user_number` is present in local storage.
 2. The frontend offers the choices
-   * Welcome <user number>. Do you want to log in?
+   * Welcome <identity anchor>. Do you want to log in?
    * Log in as a different user
 3. User wants to log in
 4. The frontend uses `lookup` to fetch the list of devices
@@ -489,7 +489,7 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
    * Log into existing account with existing device
    * Log into existing account with new device
 3. The user selects “Log into existing account with existing device”
-4. The frontend asks the user for their user number, and stores that in `user_number`.
+4. The frontend asks the user for their identity anchor, and stores that in `user_number`.
 5. Continue as in “Subflow: Login as returning user”
 
 === Subflow: Login via new device
@@ -500,7 +500,7 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
    * Log into existing account with existing device
    * Log into existing account with new device
 3. The user selects “Log into existing account with new device”
-4. The frontend asks the user for their user number, and stores that in `user_number`.
+4. The frontend asks the user for their identity anchor, and stores that in `user_number`.
 5. 👆 Frontend asks security device for a new public key and credential id.
 6. The frontend generates a link to be opened on another device where an existing authentication device exists.
 +
@@ -511,7 +511,7 @@ The link format is:
 
 where
 
-- `userNumber` is the user number, as a decimal number
+- `userNumber` is the identity anchor, as a decimal number
 - `publicKey` is the hex-encoded DER-encoded WebAuth public key
 - `credentialId`, if present, is the hex-encoded credential id required for this key
 
@@ -529,7 +529,7 @@ This flow is the boring default
 2. 👆 The appropriate login subflow happens
 3. User sees their management screen. In particular
 +
-- Their user number
+- Their identity anchor
 - A button to add additional devices
 - The list of their devices, with device aliases, a symbol marking recovery devices, and a button to remove
 - A “logout” button
@@ -558,8 +558,8 @@ This flow is the boring default
 
 === Flow: Use recovery
 1. On the login page the user selects "Recover my account"
-2. The user is prompted for their user number
-3. If no `DeviceData` with the purpose `#recovery` is found for the user number an error is displayed
+2. The user is prompted for their identity anchor
+3. If no `DeviceData` with the purpose `#recovery` is found for the identity anchor an error is displayed
 4. The user is asked to provide the seed phrase or 👆 their recovery security key
 5. The management page is shown
 

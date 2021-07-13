@@ -12,11 +12,11 @@ import { icLogo } from "../components/icons";
 
 const pageContent = html`
   <div class="container">
-    <h1>Register your new Internet Identity</h1>
+    <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please provide a name for your device.</p>
       <input id="registerAlias" placeholder="Device name" />
-      <button type="submit" class="primary">Register</button>
+      <button type="submit" class="primary">Create</button>
       <button id="registerCancel" type="button">Cancel</button>
     </form>
   </div>
@@ -24,7 +24,7 @@ const pageContent = html`
 
 const constructingContent = html`
   <div class="container flex center">
-    <h1>Constructing your Internet Identity</h1>
+    <h1>Constructing new Identity Anchor</h1>
     ${icLogo}
     <p>This may take a while. Please wait and do not refresh the page.</p>
   </div>

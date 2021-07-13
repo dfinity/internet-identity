@@ -15,14 +15,14 @@ const wantsSeedPhrase = (device: DeviceData): boolean => {
 export const useRecovery = async (userNumber?: bigint): Promise<void> => {
   userNumber =
     userNumber === undefined
-      ? await promptUserNumber("Recover your Identity", null)
+      ? await promptUserNumber("Recover Identity Anchor", null)
       : userNumber;
   const recoveryDevices = await IIConnection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
       message:
-        "You do not have any recovery devices configured. Did you mean to login with one of your devices instead?",
+        "You do not have any recovery devices configured. Did you mean to authenticate with one of your devices instead?",
       primaryButton: "Go back",
     });
     return window.location.reload();

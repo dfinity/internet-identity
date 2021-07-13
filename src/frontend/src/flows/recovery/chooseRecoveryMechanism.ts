@@ -51,8 +51,8 @@ const pageContent = (devices: DeviceData[]) => html`
     }
   </style>
   <div class="container">
-    <h1>Recovery Options</h1>
-    <p>Set up account recovery to protect your Internet Identity.</p>
+    <h1>Recovery Mechanism</h1>
+    <p>Add a recovery mechanism to this Identity Anchor.</p>
     <div class="recoveryContainer">
       <button
         ?disabled=${hasRecoveryPhrase(devices)}
@@ -73,7 +73,7 @@ const pageContent = (devices: DeviceData[]) => html`
         <div class="recoveryDescription">Use an extra security key</div>
       </button>
     </div>
-    <button id="skipRecovery" class="linkStyle">Set recovery later</button>
+    <button id="skipRecovery" class="linkStyle">Add recovery later</button>
   </div>
 `;
 

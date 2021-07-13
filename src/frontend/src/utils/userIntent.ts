@@ -15,13 +15,25 @@ export const intentFromUrl = (url: URL): UserIntent => {
   }
 };
 
-export const verbFromIntent = (intent: UserIntent): string => {
+export const authenticateIntent = (intent: UserIntent): string => {
   switch (intent.kind) {
     case "addDevice":
-      return "add your new device to your Internet Identity";
+      return "Authenticate to add your new device";
     case "auth":
-      return "authenticate using your Internet Identity";
+      return "Authenticate using Internet Identity";
     case "manage":
-      return "manage your Internet Identity";
+      return "Authenticate using Internet Identity";
+  }
+};
+
+// TODO: Remove me
+export const authenticateUnknownIntent = (intent: UserIntent): string => {
+  switch (intent.kind) {
+    case "addDevice":
+      return " and to add your new device";
+    case "auth":
+      return " using your Internet Identity";
+    case "manage":
+      return "";
   }
 };

@@ -9,20 +9,21 @@ const pageContent = html`
     }
   </style>
   <div class="container" id="about">
-    <h1>About the Internet Identity</h1>
+    <h1>About Internet Identity</h1>
     <p>
       Internet Identity is the identity provider for the Internet Computer: A
-      single service to log into apps on the Internet Computer.
+      dapp facilitating authentication on the Internet Computer.
     </p>
     <p>
-      The Internet Identity service protects your privacy. When you register,
-      you will not be asked to provide any personal information to the service
-      or to the applications you access. The service will create a different,
-      random identity for each application you use.
+      Internet Identity protects your privacy. When you create an identity
+      anchor, you will not be asked to provide any personal information.
+      Internet Identity will create a different, random pseudonym for each dapp
+      you use with the same identity anchor and identity anchors are hidden from
+      dapps.
     </p>
     <p>
-      The Internet Identity service works without passwords! You log in with
-      your own registered devices using their associated authentication methods.
+      Internet Identity works without passwords! You can use your devices with
+      their associated authentication methods.
     </p>
     <p>
       If you have questions about how to get started with Internet Identity, you
