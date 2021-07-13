@@ -39,7 +39,7 @@ const pageContent = () => html`
     </p>
     <p>
       As a best practice we always recommend you add multiple devices to an
-      Identity Anchor and at <em>least</em> one portable authenticator (usb
+      Identity Anchor and at <em>least</em> one portable authenticator (USB
       key). You can see how to add more devices here:
     </p>
     <a
