@@ -10,7 +10,9 @@ import { displayAddDeviceLink } from "./displayAddDeviceLink";
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
     <h1>New device</h1>
-    <p>Please provide the identity anchor to which you want to add your device.</p>
+    <p>
+      Please provide the identity anchor to which you want to add your device.
+    </p>
     <input
       type="text"
       id="addDeviceUserNumber"

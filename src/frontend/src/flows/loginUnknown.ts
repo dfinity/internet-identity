@@ -39,8 +39,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>
-      Provide an identity anchor to authenticate
-      ${verbFromIntent2(userIntent)}.
+      Provide an identity anchor to authenticate ${verbFromIntent2(userIntent)}.
     </p>
     <input
       type="text"
