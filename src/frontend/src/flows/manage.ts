@@ -93,8 +93,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
   <div class="container">
     <h1>Identity Management</h1>
     <p>
-      You can view and manage this Identity Anchor and your added devices
-      here.
+      You can view and manage this Identity Anchor and your added devices here.
     </p>
     ${shouldNag(devices) ? recoveryNag() : undefined}
     <label>Identity anchor</label>
