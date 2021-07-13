@@ -5,7 +5,7 @@ const pageContent = (userNumber: bigint) => html`
     <h1>Congratulations!</h1>
     <p>
       Please record your identity anchor. You will need it later to use your
-      Internet Identity or to register additional devices.
+      Internet Identity or to add additional devices.
     </p>
     <label>Identity anchor:</label>
     <div class="highlightBox">${userNumber}</div>

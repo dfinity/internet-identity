@@ -2,8 +2,8 @@ import { html, render } from "lit-html";
 
 const pageContent = html`
   <div class="container">
-    <h1>Confirm registration</h1>
-    <p>Please confirm your registration.</p>
+    <h1>Confirm new device</h1>
+    <p>Please confirm to add your device to Identity Anchor.</p>
     <button type="button" class="primary" id="confirmRegisterButton">
       Confirm
     </button>

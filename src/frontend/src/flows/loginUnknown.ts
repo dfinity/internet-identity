@@ -39,7 +39,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>
-      Provide your identity anchor to authenticate
+      Provide an identity anchor to authenticate
       ${verbFromIntent2(userIntent)}.
     </p>
     <input
@@ -53,7 +53,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
       : html`<div class="textLink" id="registerSection">
             New user?
             <button id="registerButton" class="linkStyle">
-              Create Internet Identity Anchor.
+              Create an Internet Identity Anchor.
             </button>
           </div>
           <div class="textLink">
@@ -195,7 +195,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
     case "unknownUser": {
       return {
         tag: "err",
-        title: "Unknown user",
+        title: "Unknown identity anchor",
         message: `Failed to find an identity for the identity anchor ${result.userNumber}. Please check your identity anchor and try again.`,
         detail: "",
       };
