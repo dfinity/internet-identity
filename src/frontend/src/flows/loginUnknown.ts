@@ -48,6 +48,8 @@ const pageContent = (userIntent: UserIntent) => html` <style>
       placeholder="Enter Identity anchor"
     />
     <button type="button" id="loginButton" class="primary">Authenticate</button>
+    <button type="button" id="spinnerButton" class="primary">Test Spinner</button>
+
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
       : html`<div class="textLink" id="registerSection">
@@ -134,6 +136,10 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     "loginButton"
   ) as HTMLButtonElement;
 
+  const spinnerButton = document.getElementById(
+    "spinnerButton"
+  ) as HTMLButtonElement;
+
   userNumberInput.onkeypress = (e) => {
     // submit if user hits enter
     if (e.key === "Enter") {
@@ -141,6 +147,9 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
       loginButton.click();
     }
   };
+  spinnerButton.onclick = () => {
+    withLoader(() => new Promise(() => {return}))
+  }
 
   loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
