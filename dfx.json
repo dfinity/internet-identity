@@ -18,8 +18,8 @@
       "bind": "127.0.0.1:8000",
       "type": "ephemeral"
     },
-    "messaging": {
-      "providers": ["http://10.12.36.13:8080"],
+    "identity": {
+      "providers": ["http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080"],
       "type": "persistent"
     },
     "mainnet": {
