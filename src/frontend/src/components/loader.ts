@@ -13,19 +13,9 @@ const loader = () => html`<style>
       align-items: center;
     }
     #loader img {
-      width: auto;
-      min-width: auto;
+      width: 250px;
+      min-width: 250px;
       max-width: calc(100vw - 1rem);
-    }
-    @media (min-width: 767px) {
-      #loader img {
-        width: 300px;
-      }
-    }
-    @media (min-width: 1024px) {
-      #loader img {
-        width: 500px;
-      }
     }
   </style>
   <picture id="loader">
