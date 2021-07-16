@@ -13,23 +13,13 @@ const loader = () => html`<style>
       align-items: center;
     }
     #loader img {
-      width: auto;
-      min-width: auto;
+      width: 125px;
+      min-width: 125px;
       max-width: calc(100vw - 1rem);
-    }
-    @media (min-width: 767px) {
-      #loader img {
-        width: 600px;
-      }
-    }
-    @media (min-width: 1024px) {
-      #loader img {
-        width: 800px;
-      }
     }
   </style>
   <picture id="loader">
-    <img src="/glitch-loop.webp" alt="loading" />
+    <img src="/loader.webp" alt="loading" />
   </picture>`;
 
 const startLoader = () => {
