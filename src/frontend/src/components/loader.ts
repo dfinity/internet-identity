@@ -13,8 +13,8 @@ const loader = () => html`<style>
       align-items: center;
     }
     #loader img {
-      width: 250px;
-      min-width: 250px;
+      width: 125px;
+      min-width: 125px;
       max-width: calc(100vw - 1rem);
     }
   </style>
