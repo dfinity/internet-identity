@@ -782,7 +782,7 @@ test("Screenshots", async () => {
     const alert2 = driver.switchTo().alert();
     const alertText2 = await alert2.getText();
     await alert2.accept();
-    expect(alertText2).toBe("You can not remove your last registered device.");
+    expect(alertText2).toBe("You can not remove your last device.");
     // device still present. You can't remove your last device.
     await on_Main(DEVICE_NAME1, driver);
 
