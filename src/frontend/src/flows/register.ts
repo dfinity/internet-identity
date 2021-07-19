@@ -79,7 +79,10 @@ const init = (): Promise<LoginResult | null> =>
         const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
         const identity = await pendingIdentity;
 
-        console.log("signed", (await identity.sign(blobFromText("hello"))).toString("hex"));
+        console.log(
+          "signed",
+          (await identity.sign(blobFromText("hello"))).toString("hex")
+        );
         console.log("pubkey", identity.getPublicKey().toDer().toString("hex"));
 
         if (await confirmRegister()) {
