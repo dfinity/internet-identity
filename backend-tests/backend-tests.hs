@@ -56,6 +56,7 @@ import IC.Ref
 import IC.Management
 import IC.Hash
 import IC.Crypto
+import qualified IC.Crypto.WebAuthn as WebAuthn
 import IC.Id.Forms hiding (Blob)
 import IC.HTTP.GenR
 import IC.HTTP.RequestId
@@ -399,7 +400,7 @@ device1 = empty
     .+ #key_type .== enum #cross_platform
 
 webauth2SK :: SecretKey
-webauth2SK = createSecretKeyWebAuthn "foobar2"
+webauth2SK = WebAuthn $ WebAuthn.createRSAKey "foobar2"
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
