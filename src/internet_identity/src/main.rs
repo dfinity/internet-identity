@@ -864,7 +864,7 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
 
 fn check_entry_limits(device_data: &DeviceData) {
     const ALIAS_LEN_LIMIT: usize = 64;
-    const PK_LEN_LIMIT: usize = 300;
+    const PK_LEN_LIMIT: usize = 600;
     const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
 
     let n = device_data.alias.len();
