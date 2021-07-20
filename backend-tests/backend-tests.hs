@@ -147,7 +147,7 @@ type HttpResponse = record {
 
 type StreamingCallbackHttpResponse = record {
   body: blob;
-  token: opt Token;
+  token: Token;
 };
 
 type Token = record {};
