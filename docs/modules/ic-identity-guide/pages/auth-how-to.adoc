@@ -6,9 +6,9 @@
 :company-id: DFINITY
 :sdk-short-name: DFINITY Canister SDK
 
-The Internet Identity enables you to authenticate securely and anonymously when you access applications that use it as an authentication method. A different identity is created for each application you log in to, and you will be able to use all of your registered devices or authentication methods to log in to the same account. This is all accomplished using encrypted smart contracts that run on the {IC} blockchain.
+The Internet Identity enables you to authenticate securely and anonymously when you access applications that use it as an authentication method. A different pseudonym is created for each application you use, and you will be able to use all of your registered devices or authentication methods to log in to the same account. This is all accomplished using smart contracts that run on the {IC} blockchain.
 
-Unlike most authentication methods, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using a identity anchor and the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key. 
+Unlike most authentication methods, your Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity. Instead, you create authentication profiles using an identity anchor and the authentication methods you choose such as facial recognition from a smartphone, your computer unlock password, or a security key.
 
 NOTE: On OSX (including iPhones), authentication using Safari is coupled to your browser profile. If you want to log in to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
 
@@ -20,24 +20,24 @@ Firefox does not currently accept OSX with any device authentication method othe
 
 You can securely access applications running on the {IC} that use the Internet Identity for authentication, by selecting an authentication method and having an Internet Identity identity anchor generated for you. You can create as many identities as you want by registering new identity anchors. 
 
-When you first access an application running on the {IC}, you are directed to Internet Identity and asked to enter a Identity anchor to log in. If you are a new user, you need to register to obtain a identity anchor.
+When you first access an application running on the {IC}, you are directed to Internet Identity and asked to enter an identity anchor to log in. If you are a new user, you need to register to obtain an identity anchor.
 
-To create an Internet Identity as a first-time user:
+To create a new identity anchor as a first-time user:
 
-. Go to link:https://identity.ic0.app/[Internet Identity].
+. Go to link:https://identity.ic0.app/[Internet Identity landing page].
 
-. Click *Register with Internet Identity*. 
+. Click *Create a new Internet Identity Anchor*.
 
-. Enter a name for the device profile you’re using to create your Internet Identity. For example: iPhone, or YubiKey. 
+. Enter a name for the device profile you’re using to create your Internet Identity anchor. For example: iPhone, or YubiKey.
 
-. Register your device.
+. Create the identity anchor using your device as authentication method.
 +
-Choose to register using either a dedicated security key, or with an authentication method of the device you are using, if that option is available. 
+Choose to create the identity anchor using either a dedicated security key, or with an authentication method of the device you are using, if that option is available.
 +
 For example, if your device has biometrics enabled to unlock it, you might see the option to use those as your authentication method. You can also use the password that unlocks your computer or a pin that unlocks your phone, depending on the device you’re using.
 +
 
-NOTE: As a best practice, use at least one dedicated security key. You can then add other authentication devices, such as your phone, your computer, or a second security key you actively use. Use this method to store the first key in a safe place in the event that you are unable to to use your preferred device. When you use a dedicated security key, you can log in to any {IC} application using any browser, with any device that recognizes it. 
+NOTE: As a best practice, use at least one dedicated security key. You can then add other authentication methods, such as your phone, your computer, or a second security key you actively use. Store the first key in a safe place for the event that you are unable to to use your preferred device. When you use a dedicated security key, you can log in to any {IC} application using any browser, with any device that recognizes it.
 +
 . Authenticate the device.
 + 
@@ -45,44 +45,44 @@ Authenticate using the method you selected when prompted.
 
 . Click *Confirm*. 
 +
-Your identity is not created until you perform this step. 
+Your identity anchor is not created until you perform this step.
 +
 At this point, depending on the device you are using, you might be asked to either use your device authenitication method, or to use an identity saved to your security key. If you are registering for the first time, choose to use the device authentication. 
 . Save your *Identity anchor*.
 +
-When you have registered your device, you’ll receive a *Identity anchor*. 
+When you have registered your device, you’ll receive an *Identity anchor*.
 +
-This number is unique, but it is not a secret, so you should save the number in multiple places. 
+Your identity anchor is represented by a unique number. It is not a secret and you should save it in multiple places so you don't lose it.
 Your browser will remember your identity anchor, but you will need it if you log in on a different computer, change your browser profile, or if you clear your browser state. 
 +
 WARNING: If you lose your identity anchor and are logged out on all devices, you cannot log in to Internet Identity to manage your devices, or access any of your applications, unless you have set up account recovery in the next step.
 
 . Click *Continue*. 
 
-. Set up account recovery
+. Add a recovery mechanism to an identity anchor
 +
-In addition to registering multiple devices and using security keys, you can set up account recovery at the prompt by clicking *Set up Account recovery*. 
+In addition to registering multiple devices and using security keys, you can set up account recovery at the prompt by clicking *Add a recovery mechanism to an identity anchor*.
 +
 On the next screen, you can select one of the following options:
 
 * *Seed Phrase*
 + 
-Select this option to generate a cryptographically-secure seed-phrase that you can use to recover your account. Make sure you save this phrase somewhere safe and known only to you. *Note that the first string in your seed phrase is your identity anchor*. You will need this number to begin the the recovery process.
+Select this option to generate a cryptographically-secure seed phrase that you can use to recover your account. Make sure you save this phrase somewhere safe and known only to you, since anyone who knows the seed phrase will be able to take full control of your identity anchor. *Note that the first string in your seed phrase is your identity anchor*. You will need this number to begin the the recovery process.
 +
 NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered. 
 
 * *Security Key*
 +
-Use a dedicated security key to recover your account in the event that you lose access to your authorized devices. This key must be different from one that you actively use to log in to Internet Identity. Keep this key somewhere safe and known only to you. You will need to know your identity anchor to begin recovery.
+Use a dedicated security key to recover your account in the event that you lose access to your authorized devices. This key must be different from one that you actively use to log in to Internet Identity. Keep this key somewhere safe and known only to you. As above, anyone in possession of this security key will be able to take full control of your identity anchor. You will need to know your identity anchor to begin recovery.
 
 * *Set recovery later*
 +
-You can skip the account recovery process and choose to set it up at any time from the login page. 
+You can skip the account recovery process and choose to set it up at any time from the login page. However, we highly recommend setting up a recovery mechanism so you don't lose access to your account.
 
 . Click *Continue*
 +
 On the next screen, you will see your identity anchor and your registered authentication devices. 
-From here, you can add and remove devices, and set up an account recovery method. 
+From here, you can add and remove devices, and set up an additional account recovery method.
 
 == Add a device 
 
@@ -96,11 +96,11 @@ To register your phone as an additional authentication method using the phone's 
 
 . Open the Internet Identity web page in your phone’s browser. 
 
-. Click *Already registered but using a new device?*
+. Click *Already have an anchor but using a new device?*
 
 . Enter your identity anchor and click *Continue*.
 
-. Click *GET STARTED*. 
+. Click *GET STARTED*, or *Continue*, depending on the phone you are using.
 
 . Select *Use this device with screen lock*. 
 +
@@ -112,20 +112,20 @@ NOTE: To use the screen lock option, you have to have screen lock activated on y
 . Authorize your phone.
 +
 After you’ve unlocked your phone, you will be provided with a URL and a QR code. You must use the URL or QR code in a browser in the computer that has already been authorized. For example, you can copy the URL and email it to yourself, then paste it into a browser on the computer. 
-. Enter your Identity anchor and click *Login*.
+. In the browser on the computer that has already been authorized, open the above link, enter your identity anchor and click *Authenticate* and authenticate using an existing authentication method.
 . Link your phone to your identity. 
 +
-If you’re sure that the link you pasted in the browser came from you, click *Yes, link new device*.
-. Give the device profile a name and click *Link Device*.
+If you’re sure that the link you pasted in the browser came from you, click *Yes, add new device*.
+. Give the device profile a name and click *Add Device*.
 +
 Your phone will be redirected to the login page, and you can now use it with your identity anchor to log in.
 
-NOTE: You should register as many devices as possible to prevent you from losing access to your applications should you lose a device. Again, the best way to prevent accidental loss is to set up a recovery method. 
+WARNING: You should register as many devices as possible to prevent you from losing access to your applications in case you lose a device. Again, the best way to prevent accidental loss is to set up a recovery method.
 
 
 == Recover a lost identity
-When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase or to add a dedicated security key for recovery purposes. 
+When you register an identity, you will be prompted to copy a cryptographically-secure seed phrase or to add a dedicated security key as recovery mechanism.
 
-You can choose to do this at any time, but note that if you lose your identity anchor or if you no longer have access to authorized devices, you will need the seed-phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity. 
+You can choose to do this at any time, but note that if you lose your identity anchor or if you no longer have access to authorized devices, you will need the seed phrase or the recovery security key to recover your identity. Without one of these, you will be locked out of any applications that require the associated identity.
 
 If you have set up a recovery phrase or recovery security key, you can regain access to your identity by clicking *Lost access and want to recover?* from the Internet Identity landing page. 
