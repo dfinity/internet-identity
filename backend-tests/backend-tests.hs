@@ -14,7 +14,7 @@
 
 module Main where
 
-import Options.Applicative hiding (empty)
+import Options.Applicative (metavar)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -30,20 +30,20 @@ import Codec.CBOR.Term
 import Codec.CBOR.Read
 import Data.Proxy
 import Data.Bifunctor
-import Data.Word
+import Data.Word (Word64)
 import Control.Monad.Random.Lazy
-import Data.Time.Clock.POSIX
-import Text.Printf
+import Data.Time.Clock.POSIX (getPOSIXTime)
+import Text.Printf (printf)
 import Text.Regex.TDFA ((=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Tasty.Ingredients
-import Test.Tasty.Ingredients.Basic
-import Test.Tasty.Ingredients.Rerun
-import Test.Tasty.Runners.AntXML
+import Test.Tasty.Ingredients (composeReporters)
+import Test.Tasty.Ingredients.Basic (listingTests, consoleTestReporter)
+import Test.Tasty.Ingredients.Rerun (rerunningTests)
+import Test.Tasty.Runners.AntXML (antXMLRunner)
 import Test.Tasty.Options
-import Test.Tasty.Runners.Html
+import Test.Tasty.Runners.Html (htmlRunner)
 
 import GHC.TypeLits (KnownSymbol, symbolVal)
 import Data.Row (empty, (.==), (.+), type (.!), (.!), Label, AllUniqueLabels, Var)
@@ -491,9 +491,8 @@ assertMetric repo name expectedValue =
     Left err ->
       liftIO $ assertFailure $ printf "failed to lookup metric %s: %s, repository: %s" name err (show repo)
     Right (actualValue, _) ->
-      if expectedValue /= actualValue
-      then liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
-      else return ()
+      when (expectedValue /= actualValue) $
+        liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
 
 validateHttpResponse :: HasCallStack => Blob -> String -> HttpResponse -> M ()
 validateHttpResponse cid asset resp = do
@@ -548,7 +547,7 @@ decodeTree s =
 
 
 tests :: FilePath -> TestTree
-tests wasm_file = testGroup "Tests" $ upgradeGroups $
+tests wasm_file = testGroup "Tests" $ upgradeGroups
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
     return ()
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
