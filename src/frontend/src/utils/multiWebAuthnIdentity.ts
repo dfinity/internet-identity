@@ -7,13 +7,12 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
+import { PublicKey, SignIdentity } from "@dfinity/agent";
 import {
   BinaryBlob,
   blobFromUint8Array,
   DerEncodedBlob,
-  PublicKey,
-  SignIdentity,
-} from "@dfinity/agent";
+} from "@dfinity/candid";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
 

@@ -4,7 +4,7 @@ import {
   derBlobFromBlob,
   blobFromUint8Array,
   DerEncodedBlob,
-} from "@dfinity/agent";
+} from "@dfinity/candid";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";

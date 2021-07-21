@@ -1,4 +1,4 @@
-import { blobFromUint32Array } from "@dfinity/agent";
+import { blobFromUint32Array } from "@dfinity/candid";
 import { entropyToMnemonic, wordlists, validateMnemonic } from "bip39";
 
 /**
