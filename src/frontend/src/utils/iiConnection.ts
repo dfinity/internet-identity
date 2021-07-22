@@ -1,13 +1,10 @@
+import { Actor, ActorSubclass, HttpAgent, SignIdentity } from "@dfinity/agent";
 import {
-  Actor,
-  ActorSubclass,
   BinaryBlob,
   blobFromUint8Array,
   derBlobFromBlob,
   DerEncodedBlob,
-  HttpAgent,
-  SignIdentity,
-} from "@dfinity/agent";
+} from "@dfinity/candid";
 import internet_identity_idl from "../../generated/internet_identity_idl";
 import _SERVICE, {
   PublicKey,
@@ -30,7 +27,7 @@ import {
   Ed25519KeyIdentity,
   WebAuthnIdentity,
 } from "@dfinity/identity";
-import { Principal } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";

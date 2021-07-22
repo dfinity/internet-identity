@@ -1,4 +1,8 @@
-import { blobFromUint8Array, blobToHex, derBlobFromBlob } from "@dfinity/agent";
+import {
+  blobFromUint8Array,
+  blobToHex,
+  derBlobFromBlob,
+} from "@dfinity/candid";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { DeviceData } from "../../generated/internet_identity_types";
