@@ -534,7 +534,7 @@ test("Register new identity and add additional device", async () => {
     const userNumber = await registerNewIdentity(driver);
     await on_Main(DEVICE_NAME1, driver);
     const secondAuthenticator = await addVirtualAuthenticator(driver);
-    setUserVerified(driver, secondAuthenticator);
+    await setUserVerified(driver, secondAuthenticator);
     await on_Main_AddAdditionalDevice(driver);
 
     await on_AddDeviceAlias(driver);
