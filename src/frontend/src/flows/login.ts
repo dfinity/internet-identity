@@ -30,18 +30,18 @@ const pageContent = (
     <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">
-      Use a different identity anchor
+      Use a different Identity Anchor
     </button>
     <div class="spacer"></div>
     <div class="textLink">
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    ${logoutSection("Clear identity anchor from browser")}
+    ${logoutSection("Clear Identity Anchor from browser")}
   </div>
   ${aboutLink}`;
 
-// We retry logging in until we get a successful identity anchor connection pair
+// We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
   userIntent: UserIntent

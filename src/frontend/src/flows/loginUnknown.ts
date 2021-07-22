@@ -39,19 +39,19 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
     <p>
-      Provide an identity anchor to
+      Provide an Identity Anchor to
       authenticate${authenticateUnknownIntent(userIntent)}.
     </p>
     <input
       type="text"
       id="registerUserNumber"
-      placeholder="Enter Identity anchor"
+      placeholder="Enter Identity Anchor"
     />
     <button type="button" id="loginButton" class="primary">Authenticate</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
       : html`<div class="textLink" id="registerSection">
-            New user?
+            New?
             <button id="registerButton" class="linkStyle">
               Create an Internet Identity Anchor.
             </button>
@@ -147,7 +147,7 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     if (userNumber === null) {
       return resolve({
         tag: "err",
-        title: "Please enter a valid Identity anchor",
+        title: "Please enter a valid Identity Anchor",
         message: `${userNumber} doesn't parse as a number`,
       });
     }
@@ -195,8 +195,8 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
     case "unknownUser": {
       return {
         tag: "err",
-        title: "Unknown identity anchor",
-        message: `Failed to find an identity for the identity anchor ${result.userNumber}. Please check your identity anchor and try again.`,
+        title: "Unknown Identity Anchor",
+        message: `Failed to find an identity for the Identity Anchor ${result.userNumber}. Please check your Identity Anchor and try again.`,
         detail: "",
       };
     }

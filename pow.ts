@@ -3,7 +3,7 @@
 // (parameters are canister id and timestamp)
 
 import proofOfWork from "./src/frontend/src/crypto/pow"
-import { Principal } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
 
 const timestamp = BigInt(process.argv[3]);
 const canisterId = Principal.fromText(process.argv[2]);

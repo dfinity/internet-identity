@@ -4,7 +4,7 @@ import {
   derBlobFromBlob,
   blobFromUint8Array,
   DerEncodedBlob,
-} from "@dfinity/agent";
+} from "@dfinity/candid";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
@@ -91,12 +91,12 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
     }
   </style>
   <div class="container">
-    <h1>Identity Management</h1>
+    <h1>Anchor Management</h1>
     <p>
-      You can view and manage this Identity Anchor and your added devices here.
+      You can view and manage this Identity Anchor and its added devices here.
     </p>
     ${shouldNag(devices) ? recoveryNag() : undefined}
-    <label>Identity anchor</label>
+    <label>Identity Anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
       <label id="deviceLabel">Added devices</label>
@@ -109,7 +109,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
       ? undefined
       : html`
           <div class="labelWithAction">
-            <label id="deviceLabel">Recovery devices</label>
+            <label id="deviceLabel">Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
               ADD RECOVERY MECHANISM
             </button>
@@ -229,7 +229,7 @@ const init = async (
       await displayError({
         title: "Failed to add the new device",
         message:
-          "We failed to add the new device to this identity anchor. Please try again",
+          "We failed to add the new device to this Identity Anchor. Please try again",
         detail: error.message,
         primaryButton: "Back to manage",
       });

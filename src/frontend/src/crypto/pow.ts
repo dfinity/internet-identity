@@ -1,5 +1,5 @@
 import cubeHash from "./cubehash";
-import { Principal } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
 import bigUintLE from "biguintle";
 import {
   ProofOfWork,
@@ -26,7 +26,7 @@ export default function (
   // Start from a random nonce.
   let nonce = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 
-  const canisterIdBlob = canisterId.toBlob();
+  const canisterIdBlob = canisterId.toUint8Array();
   const message = Buffer.concat([
     Buffer.from([DOMAIN.length]),
     Buffer.from(DOMAIN),

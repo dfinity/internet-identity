@@ -1,4 +1,5 @@
-import { blobFromUint8Array, Principal } from "@dfinity/agent";
+import { blobFromUint8Array } from "@dfinity/candid";
+import { Principal } from "@dfinity/principal";
 import {
   FrontendHostname,
   PublicKey,
@@ -71,7 +72,14 @@ export default async function setup(
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
-  window.opener.postMessage(READY_MESSAGE, "*");
+  if (window.opener !== null) {
+    window.opener.postMessage(READY_MESSAGE, "*");
+  } else {
+    // If there's no `window.opener` a user has manually navigated to "/#authorize". Let's
+    // redirect them to the non-hash version.
+    window.location.hash = "";
+    window.location.reload();
+  }
 }
 
 async function handleAuthRequest(
