@@ -15,10 +15,10 @@ const pageContent = html`
       dapp facilitating authentication on the Internet Computer.
     </p>
     <p>
-      Internet Identity protects your privacy. When you create an identity
-      anchor, you will not be asked to provide any personal information.
+      Internet Identity protects your privacy. When you create an Identity
+      Anchor, you will not be asked to provide any personal information.
       Internet Identity will create a different, random pseudonym for each dapp
-      you use with the same identity anchor and identity anchors are hidden from
+      you use with the same Identity Anchor and Identity Anchors are hidden from
       dapps.
     </p>
     <p>

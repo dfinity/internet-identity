@@ -4,11 +4,11 @@ import { parseUserNumber } from "../utils/userNumber";
 const pageContent = (title: string, userNumber: bigint | null) => html`
   <div class="container">
     <h1>${title}</h1>
-    <p>Please provide an identity anchor.</p>
+    <p>Please provide an Identity Anchor.</p>
     <input
       type="text"
       id="userNumberInput"
-      placeholder="Enter Identity anchor"
+      placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
     <button id="userNumberContinue" class="primary">Continue</button>
@@ -45,7 +45,7 @@ export const promptUserNumber = async (
         resolve(userNumber);
       } else {
         userNumberInput.classList.toggle("errored", true);
-        userNumberInput.placeholder = "Please enter an Identity anchor first";
+        userNumberInput.placeholder = "Please enter an Identity Anchor first";
       }
     };
   });
