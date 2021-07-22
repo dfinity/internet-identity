@@ -395,22 +395,6 @@ async function removeVirtualAuthenticator(
   return await executor.execute(cmd);
 }
 
-async function setUserVerified(
-  driver: ThenableWebDriver,
-  authenticatorId: string
-) {
-  const executor = driver.getExecutor();
-  const sessionId = (await driver.getSession()).getId();
-  executor.defineCommand(
-    "SetUserVerified",
-    "POST",
-    `/session/${sessionId}/webauthn/authenticator/${authenticatorId}/uv`
-  );
-  const cmd = new Command("SetUserVerified");
-  cmd.setParameter("isUserVerified", true);
-  await executor.execute(cmd);
-}
-
 async function screenshot(name: string, driver: ThenableWebDriver) {
   const image = await driver.takeScreenshot();
   // writing to a subdirectory has the nice property that it fails if
