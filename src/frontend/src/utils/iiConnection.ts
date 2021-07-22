@@ -113,7 +113,7 @@ export class IIConnection {
       return { kind: "registerNoSpace" };
     } else if (hasOwnProperty(registerResponse, "registered")) {
       const userNumber = registerResponse["registered"].user_number;
-      console.log(`registered identity anchor ${userNumber}`);
+      console.log(`registered Identity Anchor ${userNumber}`);
       return {
         kind: "loginSuccess",
         connection: new IIConnection(identity, delegationIdentity, actor),

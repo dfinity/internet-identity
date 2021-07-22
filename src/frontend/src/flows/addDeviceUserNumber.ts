@@ -15,12 +15,12 @@ const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
     <h1>New device</h1>
     <p>
-      Please provide the identity anchor to which you want to add your device.
+      Please provide the Identity Anchor to which you want to add your device.
     </p>
     <input
       type="text"
       id="addDeviceUserNumber"
-      placeholder="Enter Identity anchor"
+      placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
     <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
@@ -62,7 +62,7 @@ const init = () => {
         existingDevices = await IIConnection.lookupAll(userNumber);
       } catch (err) {
         console.log(
-          "Failed to fetch devices for identity anchor:",
+          "Failed to fetch devices for Identity Anchor:",
           userNumber,
           err
         );
@@ -112,7 +112,7 @@ const init = () => {
       }, 2500);
     } else {
       userNumberInput.classList.toggle("errored", true);
-      userNumberInput.placeholder = "Please enter your Identity anchor first";
+      userNumberInput.placeholder = "Please enter your Identity Anchor first";
     }
   };
 };

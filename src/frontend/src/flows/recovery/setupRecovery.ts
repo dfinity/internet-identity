@@ -74,7 +74,7 @@ export const setupRecovery = async (
   } catch (err) {
     await displayError({
       title: "Failed to set up recovery",
-      message: "We failed to set up recovery for this identity anchor.",
+      message: "We failed to set up recovery for this Identity Anchor.",
       detail: err.toString(),
       primaryButton: "Continue",
     });

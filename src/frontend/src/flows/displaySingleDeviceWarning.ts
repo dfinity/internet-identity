@@ -29,8 +29,8 @@ const pageContent = () => html`
     ${warningIcon}
     <h1 id="warningHeading">Warning</h1>
     <p>
-      If you have only one device attached to an identity anchor and lose that
-      device, you will no longer be able to use that identity anchor.
+      If you have only one device attached to an Identity Anchor and lose that
+      device, you will no longer be able to use that Identity Anchor.
     </p>
     <p>
       Additionally, on iOS and MacOS, clearing your Safari browser data will
@@ -49,7 +49,7 @@ const pageContent = () => html`
     >
     <p>
       It is recommended to add multiple devices (among them at least one
-      portable authenticator) to an identity anchor and keep the portable
+      portable authenticator) to an Identity Anchor and keep the portable
       authenticator in a safe place. For more information about Internet
       Identity and the NNS, please check out our FAQ page:
     </p>
@@ -57,7 +57,7 @@ const pageContent = () => html`
       >https://dfinity.org/faq/</a
     >
     <button id="displayWarningPrimary" class="primary">
-      Add a recovery mechanism to an identity anchor
+      Add a recovery mechanism to an Identity Anchor
     </button>
     <div class="spacer"></div>
   </div>
