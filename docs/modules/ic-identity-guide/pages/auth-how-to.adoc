@@ -6,21 +6,21 @@
 :company-id: DFINITY
 :sdk-short-name: DFINITY Canister SDK
 
-_Internet Identity_ is a smart contract implemented on the {IC} bockchain. It enables you to authenticate securely and anonymously when you access applications that use it for authentication. An account is associated with an _Identity Anchor_, and a user is free to set up multiple of these. For each application you authenticate to using an Identity Anchor, a different _pseudonym_ specific to that application is created. This pseudonym cannot be linked to the Identity Anchor. You can add multiple _authentication methods_, such as security keys or facial recognition on computers or phones to an Identity Anchor, and you will be able to use all of the added authentication methods to authenticate using that Identity Anchor.
+_Internet Identity_ is a smart contract implemented on the {IC} blockchain. It enables you to authenticate securely and anonymously when you access applications that use it for authentication. An account is associated with an _Identity Anchor_, and a user is free to set up multiple of these. For each application you authenticate to using an Identity Anchor, a different _pseudonym_ specific to that application is created. This pseudonym cannot be linked to the Identity Anchor. You can add multiple _authentication methods_, such as security keys or facial recognition on computers or phones to an Identity Anchor, and you will be able to use all of the added authentication methods to authenticate using that Identity Anchor.
 
 Unlike most authentication methods, Internet Identity does not require you to set and manage passwords or provide any personal identifying information to applications or to Internet Identity.
 
-All currently supported authentication methods follow the _WebAuhn_ standard. The following restrictions apply:
+All currently supported authentication methods follow the _WebAuthn_ standard. The following restrictions apply:
 
-* On OS X (including iPhones), authentication using Safari is coupled to your browser profile. If you want to authenticate to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>.
+* On OS X, authentication using Safari is coupled to your browser profile. If you want to authenticate to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>. Note that on iOS, in contrast to OS X, authentication works across browsers.
 
 * Windows users can only use a security key as an authorized device.
 
 * Firefox does not currently accept OS X with any device authentication method other than a security key.
 
-== Create an Internet Identity
+== Create an Identity Anchor
 
-You can securely access applications running on the {IC} that use Internet Identity for authentication, by selecting an authentication method and having an Internet Identity Identity Anchor generated for you. You can create as many identities as you want by registering new Identity Anchors.
+You can securely access applications running on the {IC} that use Internet Identity for authentication, by selecting an authentication method and having an Internet Identity Identity Anchor generated for you. You can create as many identities as you want by creating new Identity Anchors.
 
 When you first access an application running on the {IC}, you are directed to Internet Identity and asked to enter an Identity Anchor to authenticate. If you are a new user, you need to first create an Identity Anchor:
 
@@ -47,7 +47,7 @@ Authenticate using the method you selected when prompted.
 +
 Your Identity Anchor is not created until you perform this step.
 +
-At this point, depending on the device you are using, you might be asked to either use your device authenitication method, or to use an identity saved to your security key. If you are registering for the first time, choose to use the device authentication.
+At this point, depending on the device you are using, you might be asked to either use your device authenitication method, or to use your security key. If you are registering for the first time, choose to use the device authentication.
 . Save your Identity Anchor.
 +
 When your device has been added, you’ll receive an Identity Anchor.
@@ -67,7 +67,7 @@ On the next screen, you can select one of the following options:
 
 * *Seed Phrase*
 + 
-Select this option to generate a cryptographically-secure seed phrase that you can use to recover an Identity Anchor. Make sure you save this phrase somewhere safe and known only to you, since anyone who knows the seed phrase will be able to take full control of this Identity Anchor. *Note that the first string in your seed phrase is the Identity Anchor*. You will need this number to begin the the recovery process.
+Select this option to generate a cryptographically-secure seed phrase that you can use to recover an Identity Anchor. Make sure you save this phrase somewhere safe and known only to you, since anyone who knows the seed phrase will be able to take full control of this Identity Anchor. *Note that the first string in your seed phrase is the Identity Anchor*. You will need this number to begin the recovery process.
 +
 NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered. 
 
@@ -117,7 +117,7 @@ After you’ve unlocked your phone, you will be provided with a URL and a QR cod
 +
 If you’re sure that the link you pasted in the browser came from you, click *Yes, add new device*.
 +
-WARNING: Never add authentication methods with links that were given to you or that you are not sure you can trust. If you register an attacker's device, they will be able to take over this Identity Anchor.
+WARNING: Never add authentication methods with links that were given to you or that you are not sure you can trust. If you add an attacker's device, they will be able to take over this Identity Anchor.
 . Give the device profile a name and click *Add Device*.
 +
 Your phone will be redirected to the login page, and you can now use it with your Identity Anchor to authenticate.
