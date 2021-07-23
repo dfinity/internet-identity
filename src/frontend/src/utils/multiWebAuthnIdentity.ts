@@ -68,19 +68,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       if (
         cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
       ) {
-        // would be nice if WebAuthnIdentity had a directly usable constructor
-        console.log(
-          "publicKey",
-          Buffer.from(new Uint8Array(cd.pubkey)).toString("hex")
-        );
-        console.log(
-          "signature",
-          Buffer.from(
-            new Uint8Array((result.response as any).signature)
-          ).toString("hex")
-        );
-        console.log("challenge", blob.toString("hex"));
         const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
+        // would be nice if WebAuthnIdentity had a directly usable constructor
         this._actualIdentity = WebAuthnIdentity.fromJSON(
           JSON.stringify({
             rawId: Buffer.from(cd.credentialId).toString("hex"),
