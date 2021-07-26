@@ -14,22 +14,22 @@ Unlike most authentication methods, Internet Identity does not require you to se
 == How Internet Identity works
 
 Internet Identity takes advantage of the Web Authentication (WebAuthn) API to provide secure cryptographic authentication using smart contracts for applications running on the {IC}. 
-Internet Identity enables you to use security modules built into your smart phone, your laptop or security keys plugged into the USB port of your computer to verify your identity and authorize access to an application.
+Internet Identity enables you to use security modules built into your smart phone, your laptop or security keys plugged into the USB port of your computer to authenticate and authorize access to a dapps running on the {IC}.
 
-Applications that integrate with Internet Identity prompt you to authenticate with an Identity Anchor. If you don't have an Identity Anchor yet, creating one is a simple process that generates a unique cryptographic key for you that is stored on the Internet Computer blockchain. You can then use your Identity Anchor to add additional devices, so that you can access applications across all of your devices.
+Applications that integrate with Internet Identity prompt you to authenticate using an Identity Anchor. If you don't have an Identity Anchor yet, creating one is a simple process that generates a unique cryptographic key for you, whose public part is stored on the Internet Computer blockchain. You can then use your Identity Anchor to add additional devices, so that you can access applications across all of your devices.
 
-When you access an application that uses Internet Identity for authentication, you first specify the Identity Anchor you want to use. After authenticating using an authentication method for this Identity Anchor, your browser connects to Internet Identity and generates a key for use with that application.
-Finally, you are asked to authorize access to the application.
+When you access a dapp that uses Internet Identity for authentication, you first specify the Identity Anchor you want to use. After authenticating using an authentication method for this Identity Anchor, your browser connects to Internet Identity and generates a key for use with that dapp.
+Finally, you are asked to authorize access to the dapp.
 
-Your browser downloads the authorization, then redirects you to the application.
-The application verifies the authorization from Internet Identity and grants you access as an application-specific anonymous identity that we call pseudonym.
-Internally, you have a different pseudonym for each application, but your pseudonym for any single application is the same across all of your devices.
+Your browser downloads the authorization, then redirects you to the dapp.
+The dapp verifies the authorization from Internet Identity and grants you access as an application-specific anonymous identity that we call pseudonym.
+Internally, you have a different pseudonym for each dapp, but your pseudonym for any single dapp is the same across all of your devices.
 All of your devices just represent different methods you can use to authenticate your Identity Anchor. 
 
 You can register as many Identity Anchors as you want for redundancy, to set up different device authentication profiles for other device users, or to ensure access to services that use Internet Identity.
 
 == How to use Internet Identity
-To learn how create and use Identity Anchors step-by-step, see link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use Internet Identity]. This also describes how to set up recovery mechanisms for Identity Anchors.
+To learn how to create and use Identity Anchors step-by-step, see link:https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html[How to use Internet Identity]. This also describes how to set up recovery mechanisms for Identity Anchors.
 
 ////
 
