@@ -14,6 +14,10 @@ All currently supported authentication methods follow the _WebAuthn_ standard. T
 
 * On OS X, authentication using Safari is coupled to your browser profile. If you want to authenticate to an application in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>. Note that on iOS, in contrast to OS X, authentication works across browsers.
 
+* On OS X and iOS, clearing Safari's browser history leads to the user's registered WebAuthn keys being deleted from the secure enclave, and authentication with these key is no longer possible.
++
+WARNING: We highly recommend to set up recovery mechanisms so you won't be locked out of any dapps that require the associated identity. How a recovery mechanism can be set up is described below.
+
 * Windows users can only use a security key as an authorized device.
 
 * Firefox does not currently accept OS X with any device authentication method other than a security key.
