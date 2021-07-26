@@ -379,20 +379,20 @@ async function addVirtualAuthenticator(
   return await executor.execute(cmd);
 }
 
-async function setUserVerified(
+async function removeVirtualAuthenticator(
   driver: ThenableWebDriver,
   authenticatorId: string
-) {
+): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
-    "SetUserVerified",
-    "POST",
-    `/session/${sessionId}/webauthn/authenticator/${authenticatorId}/uv`
+    "RemoveVirtualAuthenticator",
+    "DELETE",
+    `/session/:sessionId/webauthn/authenticator/${authenticatorId}`
   );
-  const cmd = new Command("SetUserVerified");
-  cmd.setParameter("isUserVerified", true);
-  await executor.execute(cmd);
+  const cmd = new Command("RemoveVirtualAuthenticator");
+  cmd.setParameter("sessionId", sessionId);
+  return await executor.execute(cmd);
 }
 
 async function screenshot(name: string, driver: ThenableWebDriver) {
@@ -533,8 +533,8 @@ test("Register new identity and add additional device", async () => {
     await driver.get(II_URL);
     const userNumber = await registerNewIdentity(driver);
     await on_Main(DEVICE_NAME1, driver);
+    await removeVirtualAuthenticator(driver, firstAuthenticator);
     const secondAuthenticator = await addVirtualAuthenticator(driver);
-    setUserVerified(driver, secondAuthenticator);
     await on_Main_AddAdditionalDevice(driver);
 
     await on_AddDeviceAlias(driver);
@@ -546,7 +546,7 @@ test("Register new identity and add additional device", async () => {
     await on_Main(DEVICE_NAME1, driver);
     await on_Main(DEVICE_NAME2, driver);
 
-    await await on_Main_Logout(driver);
+    await on_Main_Logout(driver);
     await login(userNumber, driver);
   });
 }, 300_000);

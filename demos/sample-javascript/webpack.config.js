@@ -47,6 +47,11 @@ module.exports = {
     },
   },
   devtool: 'source-map',
+  devServer: {
+    client: {
+      overlay: false
+    }
+  },
   plugins: [
     new HtmlWebpackPlugin({
       template: 'src/index.html',
