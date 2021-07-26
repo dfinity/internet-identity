@@ -56,7 +56,6 @@ import IC.Ref
 import IC.Management
 import IC.Hash
 import IC.Crypto
-import qualified IC.Crypto.WebAuthn as WebAuthn
 import IC.Id.Forms hiding (Blob)
 import IC.HTTP.GenR
 import IC.HTTP.RequestId
@@ -386,7 +385,7 @@ callIIReject cid user_id l x = do
 
 -- Some common devices
 webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthn "foobar"
+webauthSK = createSecretKeyWebAuthnECDSA "foobar"
 webauthPK :: PublicKey
 webauthPK = toPublicKey webauthSK
 webauthID :: EntityId
@@ -400,7 +399,7 @@ device1 = empty
     .+ #key_type .== enum #cross_platform
 
 webauth2SK :: SecretKey
-webauth2SK = WebAuthn $ WebAuthn.createRSAKey "foobar2"
+webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
