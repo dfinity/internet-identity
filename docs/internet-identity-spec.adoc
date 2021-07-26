@@ -603,8 +603,6 @@ This section needs to describe aspects like
 
 You will need the `ic-admin` tool. You have various options
 
-* Download `ic-admin` for your platform from https://blobules.dfinity.systems/dfinity-ci-build.dfinity/ic-admin/0.1.0/[blobules]. If you are on macOS you will likely need to right-click on `ic-admin` and then select `Open` (to avoid having it considered malware).
-
 * You can build it from source. In a checkout of `dfinity`, run:
 +
 [source,bash]
@@ -636,7 +634,7 @@ docker build -t internet-identity-service .
 docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
 ----
 
-The resulting `internet_identity.wasm` is ready for deployment on `mainnet` (or any testnet if you want to run experiments).
+The resulting `internet_identity.wasm` is ready for deployment on `mainnet`.
 
 Make note of the hash of wasm module:
 [source,bash]
@@ -656,27 +654,11 @@ The canister accepts a range of user ids that it's responsible for in `canister_
 didc encode '(null)' | xxd -r -p > arg.in
 ----
 
-==== Submitting proposal and voting on mainnet
+==== Submitting proposal for installation and voting on mainnet
 
 (This section was removed. We have deployed to mainnet, and should not have to do it again. Please see git history if you need to know this.)
 
-==== Submitting proposal on testnets
-
-Submit the proposal to install the canister on `messaging` (replace for other testnets as appropriate):
-[source,bash]
-----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode install --wasm-module-path internet_identity.wasm --arg arg.in
-----
-
-The above will need to be adjusted to submit a proposal on the beta network (specifically the NNS url and we need to use a real neuron ID as the proposer instead of the test-neuron-proposer).
-
-You can check http://dcs-messaging-13.dfinity.systems:8080/_/dashboard[messaging's dashboard] to confirm the hash of the wasm installed on the canister matches the one you took note of in the previous steps.
-
-=== Upgrades of the canister
-
-Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin` and we don't need any arguments in this case.
-
-==== On Mainnet
+=== Upgrading on Mainnet
 
 Write a proposal description like those in <https://github.com/dfinity/nns-proposals/blob/main/proposals/network_canister_management/>. Use a recent Internet Identity upgrade proposal as a template. It contains a condensed `git log` of the changes since the last release.
 
@@ -716,14 +698,39 @@ dfx canister --network mainnet --no-wallet info internet_identity
 
 Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
 
+=== Deploying on testnets
 
-==== On testnets
+==== Building the canister for the identity testnet
 
-Once you've built the binary, you can then run (for `messaging`):
+Because we need to fetch the root key for all networks that are not mainnet, we can not use the regular Docker build.
+Instead we build ourselves with the `II_ENV` environment variable set to `development`.
 
 [source,bash]
 ----
-ic-admin --nns-url http://dcs-messaging-13.dfinity.systems:8080/ propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path internet_identity.wasm
+didc encode '(null)' | xxd -r -p > arg.in
+npm ci
+II_ENV=development dfx build --network identity
+cp target/wasm32-unknown-unknown/release/internet_identity.wasm .
+----
+
+This will create the Wasm file you want to use for the following deployment steps at `./internet_identity.wasm`.
+
+==== Installing on testnets
+
+Submit the proposal to install the canister on our `identity` testnet (replace for other testnets as appropriate):
+[source,bash]
+----
+ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode reinstall --wasm-module-path internet_identity.wasm --arg arg.in
+----
+
+You can check http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/_/dashboard[our testnet's dashboard] to confirm the hash of the wasm installed on the canister matches the one you took note of in the previous steps.
+
+==== Upgrading on testnets
+
+Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin` and we don't need any arguments in this case.
+[source,bash]
+----
+ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path internet_identity.wasm
 ----
 
 === Disaster recovery
