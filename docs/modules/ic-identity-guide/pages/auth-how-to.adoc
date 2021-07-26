@@ -72,7 +72,7 @@ On the next screen, you can select one of the following options:
 
 * *Seed Phrase*
 + 
-Select this option to generate a cryptographically-secure seed phrase that you can use to recover an Identity Anchor. Make sure you store this phrase somewhere safe it is known only to you, as anyone who knows the seed phrase will be able to take full control of this Identity Anchor. *Note that the first string in your seed phrase is the Identity Anchor*. You will need this number to begin the recovery process.
+Select this option to generate a cryptographically-secure seed phrase that you can use to recover an Identity Anchor. Make sure you store this phrase somewhere safe and it is known only to you, as anyone who knows the seed phrase will be able to take full control of this Identity Anchor. *Note that the first string in your seed phrase is the Identity Anchor*. You will need this number to begin the recovery process.
 +
 NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered. 
 
