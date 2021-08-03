@@ -28,7 +28,7 @@ const pageContent = (hostName: string, principal: string) => html`
       background-color: var(--grey-500);
       color: #fff;
       text-align: center;
-      padding: 10px;
+      padding: 0.9rem;
       border-radius: 6px;
       font-size: 0.7rem;
       position: absolute;
