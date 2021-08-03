@@ -1,13 +1,9 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
 
-const pageContent = (hostName: string) => html`
+const pageContent = (hostName: string, principal: string) => html`
   <style>
     #confirmRedirectHostname {
-      font-size: 0.875rem;
-      font-weight: 400;
-    }
-    #confirmRedirectPrincipal {
       font-size: 0.875rem;
       font-weight: 400;
     }
@@ -18,14 +14,16 @@ const pageContent = (hostName: string) => html`
     <div id="confirmRedirectHostname" class="highlightBox">${hostName}</div>
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
+    <div id="confirmRedirectPrincipal" class="hintBox">Application-specific ID for ${hostName}:<br/><br/> ${principal}</div>
   </div>
 `;
 
 export const confirmRedirect = async (
-  hostName: FrontendHostname
+  hostName: FrontendHostname,
+  userPrincipal: string
 ): Promise<boolean> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(hostName), container);
+  render(pageContent(hostName, userPrincipal), container);
   return init();
 };
 
