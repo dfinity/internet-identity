@@ -228,18 +228,6 @@ main::after {
   font-weight: 500;
 }
 
-.hintBox {
-  background-color: transparent;
-  padding: 0.7rem 0.5rem;
-  text-align: center;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  overflow-wrap: break-word;
-  font-size: 0.7rem;
-  color: var(--grey-500);
-  font-weight: 400;
-}
-
 .warningBox {
   border: 1px var(--grey-200) solid;
   border-radius: 4px;

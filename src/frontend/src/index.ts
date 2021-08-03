@@ -13,7 +13,6 @@ import { IIConnection } from "./utils/iiConnection";
 import { confirmRedirect } from "./flows/confirmRedirect";
 
 const init = async () => {
-
   const url = new URL(document.URL);
   if (url.hash === "#about") {
     return aboutView();
