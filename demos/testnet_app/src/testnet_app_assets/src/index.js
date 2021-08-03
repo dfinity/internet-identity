@@ -6,7 +6,6 @@ import { idlFactory as testnet_app_idl, canisterId as testnet_app_id } from 'dfx
 
 
 const testnetII = "https://rdmx6-jaaaa-aaaaa-aaadq-cai.identity.dfinity.network/"
-// const testnetII =  "http://localhost:8080/"
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const authClient = await AuthClient.create();

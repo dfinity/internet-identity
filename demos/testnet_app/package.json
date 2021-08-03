@@ -4,7 +4,8 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "build": "webpack"
+    "build": "webpack",
+    "start": "webpack serve"
   },
   "dependencies": {
     "@dfinity/agent": "^0.9.2",

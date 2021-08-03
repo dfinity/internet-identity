@@ -42,7 +42,13 @@ function generateWebpackConfigForCanister(name, info) {
       // to replace the extension to `.js`.
       index: path.join(__dirname, info.frontend.entrypoint).replace(/\.html$/, ".js"),
     },
-    devtool: "source-map",
+    devServer: {
+      port: 8081,
+      proxy: {
+        "/api": "http://localhost:8000"
+      },
+      allowedHosts: [".localhost", ".local", ".ngrok.io"],
+    },
     optimization: {
       minimize: true,
       minimizer: [new TerserPlugin()],
