@@ -5,7 +5,7 @@ import { FrontendHostname } from "../../generated/internet_identity_types";
 // nature of pseudonyms. This is the text that gets displayed when hovering.
 const textTooltip = `Internet Identity issues a unique "pseudonym" for each application requesting
 authentication. Since this pseudonym is unique for each application you
-authenticate for, it cannot be used to track you.
+authenticate for, applications cannot use it to track you.
 `;
 const pageContent = (hostName: string, principal: string) => html`
   <style>
