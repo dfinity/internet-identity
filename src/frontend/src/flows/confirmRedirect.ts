@@ -22,7 +22,7 @@ const pageContent = (hostName: string, principal: string) => html`
       border-bottom: 1px dotted black;
     }
     /* The actual tooltip text */
-    .tooltip .tooltiptext {
+    .tooltiptext {
       visibility: hidden;
       width: 200px;
       background-color: var(--grey-500);
