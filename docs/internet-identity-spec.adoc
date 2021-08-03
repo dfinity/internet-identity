@@ -32,7 +32,7 @@ The Internet Identity service allows users to
 
 Some functional requirements are
 
- * users have separate identities per client application (more precisely, per client application frontend "hostname")
+ * users have separate identities (or "pseudonyms") per client application (more precisely, per client application frontend "hostname")
  * these identities are stable, i.e., do not depend on a user's security devices
  * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
  * users do not need ever to remember secret information (but possibly per-user non-secret information)
@@ -132,9 +132,9 @@ where `msg` is a value with of type
 where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
-* the `maxTimeToLive`, if present, indicates the desired time span until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+* the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
 --
-6. Now it expects a message back, with data `event`.
+6. Now the client application window expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
 8. The `event.data` value is a JS object with the following type:
 +
@@ -163,7 +163,7 @@ where the `userPublicKey` is the user’s Identity on the given frontend and `de
 The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
 The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/auth-client`] and
-The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authetication`] NPM packages provide helpful functionality here.
+The https://www.npmjs.com/package/@dfinity/authentication[`@dfinity/authentication`] NPM packages provide helpful functionality here.
 
 The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
@@ -342,8 +342,8 @@ Therefore the Internet Identity Canister intentionally does not implement `canis
 
 The primary data structure used by the backend is a map from Identity Anchor to the list of user devices.
 Device lists are stored directly in canister stable memory.
-The total amount of storage for is limited to 510 bytes per user.
-With the stable memory size of 4GiB we can store around 8 * 10^6 user records in a single canister.
+The total amount of storage for is limited to 2KiB bytes per user.
+With the stable memory size of 4GiB we can store around 2 * 10^6 user records in a single canister.
 
 There is also a set of recently seen proof of work nonces.
 
@@ -534,7 +534,7 @@ This flow is the boring default
 - The list of their devices, with device aliases, a symbol marking recovery devices, and a button to remove
 - A “logout” button
 
-(One could imagine additional information, such last time a device was used, or even a list of recent client applications that the user logged into.)
+(One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.)
 
 === Flow: adding devices via link
 

@@ -39,16 +39,26 @@ To run the internet_identity canisters, proceed as follows after cloning the rep
 ```bash
 npm install
 dfx start [--clean] [--background]
+```
+
+In a different terminal, run the following command to install the Internet Identity canister:
+
+```bash
 II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then the canister can be used as
 
 ```bash
-dfx canister call internet_identity register '(123, "test", vec {1; 2; 3}, null)'
+$ dfx canister call internet_identity init_salt
+()
+$ echo $?
+0
 ```
 
-To open the front-end, you can run the following and open the URL.
+See `dfx canister call --help` and [the documentation](https://sdk.dfinity.org/docs/developers-guide/cli-reference/dfx-canister.html#_examples) for more information.
+
+The `dfx` executable can proxy queries to the canister. To view it, run the following and open the resulting link in your browser:
 
 ```bash
 echo "http://localhost:8000?canisterId=$(dfx canister id internet_identity)"
@@ -64,12 +74,31 @@ dfx start [--clean] [--background]
 II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
-Then, run `CANISTER_ID=$(dfx canister id internet_identity) npm start` to start webpack-dev-server.
+To serve the frontend locally via webpack (recommended during development), run
+the following:
+
+```bash
+npm start
+```
+
+Then open `http://localhost:8080` in your browser.
 
 To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
 ```
 CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
+
+Finally, to test workflows like authentication from a client application, you start the sample app:
+
+```bash
+cd demos/sample-javascript
+npm run develop
+```
+
+Then open `http://localhost:8081` in your browser.
+
+Make sure that the "Identity Provider" is set to "http://localhost:8080" if you
+serve the Internet Identity frontend from webpack.
 
 We have a set of Selenium tests that run through the various flows. To run them locally follow the steps in `.github/workflows/selenium.yml`.
 
