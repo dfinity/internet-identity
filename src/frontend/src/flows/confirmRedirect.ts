@@ -1,15 +1,51 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
 
-const pageContent = (hostName: string) => html`
+// We show a tooltip giving more information about the "application-specific"
+// nature of pseudonyms. This is the text that gets displayed when hovering.
+const textTooltip = `Internet Identity issues a unique "pseudonym" for each application requesting
+authentication. Since this pseudonym is unique for each application you
+authenticate for, applications cannot use it to track you.
+`;
+const pageContent = (hostName: string, principal: string) => html`
   <style>
     #confirmRedirectHostname {
       font-size: 0.875rem;
       font-weight: 400;
     }
+
+    /* The tooltip */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      /* fake a dotted underline that works across browsers */
+      border-bottom: 1px dotted black;
+    }
+    /* The actual tooltip text */
+    .tooltiptext {
+      visibility: hidden;
+      width: 200px;
+      background-color: var(--grey-500);
+      color: #fff;
+      text-align: center;
+      padding: 0.9rem;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      position: absolute;
+      z-index: 1;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+    }
+
     #confirmRedirectPrincipal {
-      font-size: 0.875rem;
+      background-color: transparent;
+    }
+
+    #confirmRedirectPrincipal > * {
+      font-size: 0.7rem;
       font-weight: 400;
+      color: var(--grey-500);
     }
   </style>
   <div class="container">
@@ -18,14 +54,24 @@ const pageContent = (hostName: string) => html`
     <div id="confirmRedirectHostname" class="highlightBox">${hostName}</div>
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
+    <div id="confirmRedirectPrincipal" class="highlightBox">
+      <span class="tooltip">
+        <span class="tooltiptext">${textTooltip}</span>
+        Application-specific
+      </span>
+      <span> ID for ${hostName}:</span>
+      <br />
+      <p>${principal}</p>
+    </div>
   </div>
 `;
 
 export const confirmRedirect = async (
-  hostName: FrontendHostname
+  hostName: FrontendHostname,
+  userPrincipal: string
 ): Promise<boolean> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(hostName), container);
+  render(pageContent(hostName, userPrincipal), container);
   return init();
 };
 
