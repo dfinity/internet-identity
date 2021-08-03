@@ -3,8 +3,7 @@ import { FrontendHostname } from "../../generated/internet_identity_types";
 
 // We show a tooltip giving more information about the "application-specific"
 // nature of pseudonyms. This is the text that gets displayed when hovering.
-const textTooltip = `
-Internet Identity issues a unique "pseudonym" for each application requesting
+const textTooltip = `Internet Identity issues a unique "pseudonym" for each application requesting
 authentication. Since this pseudonym is unique for each application you
 authenticate for, it cannot be used to track you.
 `;
