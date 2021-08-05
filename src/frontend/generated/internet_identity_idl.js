@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });

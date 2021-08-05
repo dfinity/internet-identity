@@ -1,19 +1,17 @@
-import type { Principal } from '@dfinity/agent';
-export type CredentialId = Array<
-  number
->;
+import type { Principal } from '@dfinity/principal';
+export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
-};
+}
 export interface DeviceData {
   'alias' : string,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
-};
+}
 export type DeviceKey = PublicKey;
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
@@ -24,25 +22,25 @@ export interface HttpRequest {
   'method' : string,
   'body' : Array<number>,
   'headers' : Array<HeaderField>,
-};
+}
 export interface HttpResponse {
   'body' : Array<number>,
   'headers' : Array<HeaderField>,
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
-};
+}
 export interface InternetIdentityInit {
   'assigned_user_number_range' : [bigint, bigint],
-};
+}
 export interface InternetIdentityStats {
   'users_registered' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
-};
+}
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp };
+export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp }
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
@@ -52,11 +50,11 @@ export type SessionKey = PublicKey;
 export interface SignedDelegation {
   'signature' : Array<number>,
   'delegation' : Delegation,
-};
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Array<number>,
-};
+}
 export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
@@ -64,7 +62,7 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
-export default interface _SERVICE {
+export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
   'get_delegation' : (
       arg_0: UserNumber,
@@ -89,4 +87,4 @@ export default interface _SERVICE {
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
-};
+}

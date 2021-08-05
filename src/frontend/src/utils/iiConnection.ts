@@ -5,8 +5,9 @@ import {
   derBlobFromBlob,
   DerEncodedBlob,
 } from "@dfinity/candid";
-import internet_identity_idl from "../../generated/internet_identity_idl";
-import _SERVICE, {
+import { idlFactory } from "../../generated/internet_identity_idl";
+import {
+  _SERVICE,
   PublicKey,
   SessionKey,
   CredentialId,
@@ -36,7 +37,7 @@ import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
-export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+export const baseActor = Actor.createActor<_SERVICE>(idlFactory, {
   agent: new HttpAgent({}),
   canisterId,
 });
@@ -233,7 +234,7 @@ export class IIConnection {
     if (process.env.II_ENV === "development") {
       await agent.fetchRootKey();
     }
-    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    const actor = Actor.createActor<_SERVICE>(idlFactory, {
       agent,
       canisterId: canisterId,
     });
