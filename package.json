@@ -49,10 +49,10 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@dfinity/agent": "0.9.3",
-    "@dfinity/candid": "0.9.3",
-    "@dfinity/identity": "0.9.3",
-    "@dfinity/principal": "0.9.3",
+    "@dfinity/agent": "0.10.0-beta.1",
+    "@dfinity/candid": "0.10.0-beta.1",
+    "@dfinity/identity": "0.10.0-beta.1",
+    "@dfinity/principal": "0.10.0-beta.1",
     "biguintle": "^1.0.3",
     "bip39": "^3.0.4",
     "clipboard": "^2.0.8",

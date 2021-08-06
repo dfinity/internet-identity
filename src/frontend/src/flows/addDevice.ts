@@ -1,9 +1,5 @@
-import {
-  BinaryBlob,
-  blobFromHex,
-  derBlobFromBlob,
-  DerEncodedBlob,
-} from "@dfinity/candid";
+import { DerEncodedPublicKey } from "@dfinity/agent";
+import { fromHexString } from "@dfinity/candid/lib/cjs/utils/buffer";
 import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
 import { warningIcon } from "../components/icons";
@@ -116,8 +112,8 @@ const parseNewDeviceParam = (
   param: string
 ): {
   userNumber: bigint;
-  publicKey: DerEncodedBlob;
-  rawId?: BinaryBlob;
+  publicKey: DerEncodedPublicKey;
+  rawId?: ArrayBuffer;
 } | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
@@ -127,8 +123,8 @@ const parseNewDeviceParam = (
   if (userNumber === null) {
     return null;
   }
-  const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
-  const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
+  const publicKey = fromHexString(segments[1]) as DerEncodedPublicKey;
+  const rawId = segments[2] ? fromHexString(segments[2]) : undefined;
   return { userNumber, publicKey, rawId };
 };
 

@@ -7,16 +7,16 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
-import { PublicKey, SignIdentity } from "@dfinity/agent";
 import {
-  BinaryBlob,
-  blobFromUint8Array,
-  DerEncodedBlob,
-} from "@dfinity/candid";
+  PublicKey,
+  SignIdentity,
+} from "@dfinity/agent";
+import { DerEncodedBlob } from "@dfinity/candid";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
+import { bufferEquals } from "./utils";
 
-export type CredentialId = BinaryBlob;
+export type CredentialId = ArrayBuffer;
 export type CredentialData = {
   pubkey: DerEncodedBlob;
   credentialId: CredentialId;
@@ -52,7 +52,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     }
   }
 
-  public async sign(blob: BinaryBlob): Promise<BinaryBlob> {
+  public async sign(blob: ArrayBuffer): Promise<ArrayBuffer> {
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
@@ -65,9 +65,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     })) as PublicKeyCredential;
 
     this.credentialData.forEach((cd) => {
-      if (
-        cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
-      ) {
+      if (bufferEquals(cd.credentialId, result.rawId)) {
         const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
         // would be nice if WebAuthnIdentity had a directly usable constructor
         this._actualIdentity = WebAuthnIdentity.fromJSON(
@@ -100,7 +98,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       if (!cbor) {
         throw new Error("failed to encode cbor");
       }
-      return blobFromUint8Array(new Uint8Array(cbor));
+      return cbor;
     } else {
       throw new Error("Invalid response from WebAuthn.");
     }

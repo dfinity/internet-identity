@@ -1,10 +1,10 @@
-import { Actor, ActorSubclass, HttpAgent, SignIdentity } from "@dfinity/agent";
 import {
-  BinaryBlob,
-  blobFromUint8Array,
-  derBlobFromBlob,
-  DerEncodedBlob,
-} from "@dfinity/candid";
+  Actor,
+  ActorSubclass,
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
 import { idlFactory } from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
@@ -30,7 +30,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { hasOwnProperty } from "./utils";
+import { bufferEquals, hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
@@ -88,8 +88,8 @@ export class IIConnection {
     }
 
     const actor = await IIConnection.createActor(delegationIdentity);
-    const credential_id = Array.from(identity.rawId);
-    const pubkey = Array.from(identity.getPublicKey().toDer());
+    const credential_id = arrayFromBuffer(identity.rawId);
+    const pubkey = arrayFromBuffer(identity.getPublicKey().toDer());
 
     console.log(
       `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`
@@ -152,7 +152,7 @@ export class IIConnection {
       devices.flatMap((device) =>
         device.credential_id.map((credentialId: CredentialId) => ({
           pubkey: derFromPubkey(device.pubkey),
-          credentialId: blobFromUint8Array(Buffer.from(credentialId)),
+          credentialId: new Uint8Array(credentialId),
         }))
       )
     );
@@ -187,7 +187,10 @@ export class IIConnection {
       IC_DERIVATION_PATH
     );
     if (
-      !identity.getPublicKey().toDer().equals(derFromPubkey(expected.pubkey))
+      !bufferEquals(
+        identity.getPublicKey().toDer(),
+        derFromPubkey(expected.pubkey)
+      )
     ) {
       return {
         kind: "seedPhraseFail",
@@ -265,14 +268,14 @@ export class IIConnection {
     alias: string,
     keyType: KeyType,
     purpose: Purpose,
-    newPublicKey: DerEncodedBlob,
-    credentialId?: BinaryBlob
+    newPublicKey: DerEncodedPublicKey,
+    credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
     return await actor.add(userNumber, {
       alias,
-      pubkey: Array.from(newPublicKey),
-      credential_id: credentialId ? [Array.from(credentialId)] : [],
+      pubkey: arrayFromBuffer(newPublicKey),
+      credential_id: credentialId ? [arrayFromBuffer(credentialId)] : [],
       key_type: keyType,
       purpose,
     });
@@ -389,5 +392,8 @@ export const creationOptions = (
   };
 };
 
-const derFromPubkey = (pubkey: DeviceKey): DerEncodedBlob =>
-  derBlobFromBlob(blobFromUint8Array(Buffer.from(pubkey)));
+const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
+  Uint8Array.from(pubkey) as ArrayBuffer as DerEncodedPublicKey;
+
+const arrayFromBuffer = (buffer: ArrayBuffer): number[] =>
+  Array.from(new Uint8Array(buffer));

@@ -1,4 +1,4 @@
-import { blobFromUint32Array } from "@dfinity/candid";
+import { toHexString } from "@dfinity/candid/lib/cjs/utils/buffer";
 import { entropyToMnemonic, wordlists, validateMnemonic } from "bip39";
 
 /**
@@ -8,7 +8,7 @@ export function generate(): string {
   const entropy = new Uint32Array(32);
   crypto.getRandomValues(entropy);
   return entropyToMnemonic(
-    blobFromUint32Array(entropy).toString("hex"),
+    toHexString(entropy),
     wordlists.english
   );
 }

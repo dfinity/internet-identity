@@ -1,10 +1,5 @@
 import { render, html } from "lit-html";
 import { creationOptions, IIConnection } from "../utils/iiConnection";
-import {
-  derBlobFromBlob,
-  blobFromUint8Array,
-  DerEncodedBlob,
-} from "@dfinity/candid";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
@@ -15,7 +10,8 @@ import { displayError } from "../components/displayError";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
-import { hasOwnProperty } from "../utils/utils";
+import { bufferEquals, hasOwnProperty } from "../utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
     .nagBox {
@@ -288,13 +284,10 @@ const bindRemoveListener = (
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const pubKey: DerEncodedBlob = derBlobFromBlob(
-      blobFromUint8Array(new Uint8Array(publicKey))
+    const sameDevice = bufferEquals(
+      connection.identity.getPublicKey().toDer(),
+      new Uint8Array(publicKey)
     );
-    const sameDevice = connection.identity
-      .getPublicKey()
-      .toDer()
-      .equals(pubKey);
 
     if (sameDevice) {
       const shouldProceed = confirm(
