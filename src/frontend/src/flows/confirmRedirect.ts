@@ -55,7 +55,7 @@ const pageContent = (hostName: string, principal: string) => html`
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
     <div id="confirmRedirectPrincipal" class="highlightBox">
-      <span class="tooltip">
+      <span class="tooltip" onclick="">
         <span class="tooltiptext">${textTooltip}</span>
         Application-specific
       </span>
@@ -70,9 +70,21 @@ export const confirmRedirect = async (
   hostName: FrontendHostname,
   userPrincipal: string
 ): Promise<boolean> => {
+  // In order to make the ":hover" work on mobile, we set "onclick" on the
+  // tooltip (which makes the tooltip actually show) and we set "onclick" on
+  // the body (which makes the tooltip disappear. Here we make sure that upon
+  // exit we reinstate the original body onclick.
+  const originalBodyOnclick = document.body.onclick;
+
+  // make sure tooltip is closed when user clicks/touches out
+  document.body.onclick = () => { return;};
+
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(hostName, userPrincipal), container);
-  return init();
+  return init().then((resolve) => {
+    document.body.onclick = originalBodyOnclick;
+    return resolve;
+  });
 };
 
 const init = (): Promise<boolean> =>
