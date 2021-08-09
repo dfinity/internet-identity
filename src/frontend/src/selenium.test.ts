@@ -352,6 +352,7 @@ async function on_DemoApp_Whoami(driver: ThenableWebDriver) {
   await fillText(driver, "canisterId", WHOAMI_CANISTER);
   await driver.findElement(By.id("whoamiBtn")).click();
   const whoamiResponseElem = await driver.findElement(By.id("whoamiResponse"));
+  console.log({ whoamiResponseElem });
   await driver.wait(until.elementTextContains(whoamiResponseElem, "-"), 6_000);
   return await whoamiResponseElem.getText();
 }
