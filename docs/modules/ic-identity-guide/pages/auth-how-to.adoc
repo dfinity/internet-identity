@@ -17,9 +17,9 @@ All currently supported authentication methods follow the _WebAuthn_ standard. T
 +
 WARNING: We highly recommend to set up recovery mechanisms so you won't be locked out of any dapps that require the associated identity. How a recovery mechanism can be set up is described below.
 
-* Windows users can only use a security key as an authorized device.
-
 * Firefox does not currently accept OS X with any device authentication method other than a security key.
+
+* Windows Hello authentication is supported in Chrome, Edge, and Firefox.
 
 == Create an Identity Anchor
 
@@ -93,6 +93,8 @@ From here, you can add and remove authentication methods, and set up additional 
 == Add a device 
 
 The workflow for adding a device can vary depending on what devices you’ve already added to an Identity Anchor. For example, if you first authorized your computer to create the Identity Anchor, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you want to add by using a device that is already authorized.
+
+NOTE: If you start the add device flow on a Windows device that supports Windows Hello authentication, the browser first asks you to add Windows Hello as the new authentication method. If you have registered the device with Windows Hello already and would like to add e.g. a security key instead, you need to cancel the Windows Hello prompt. Then the browser lets you choose a different authentication method, such as a security key.
 
 If you are adding a new device, such as a new security key, or a new browser profile using a computer or phone that has already been added as an authentication method, you can do this easily and directly from within Internet Identity Management.
 
