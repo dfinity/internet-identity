@@ -365,13 +365,17 @@ export const creationOptions = (
             type: "public-key",
           }
     ),
-    attestation: "direct",
     challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
     pubKeyCredParams: [
       {
         type: "public-key",
         // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
         alg: -7,
+      },
+      {
+        type: "public-key",
+        // alg: PubKeyCoseAlgo.RSA_WITH_SHA256
+        alg: -257,
       },
     ],
     rp: {

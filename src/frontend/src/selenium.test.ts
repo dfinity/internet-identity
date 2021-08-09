@@ -533,6 +533,9 @@ test("Register new identity and add additional device", async () => {
     await driver.get(II_URL);
     const userNumber = await registerNewIdentity(driver);
     await on_Main(DEVICE_NAME1, driver);
+    // We're removing the first authenticator here, because unfortunately we
+    // can't tell Chrome to _actually_ use the second authenticator, which
+    // leads to flaky tests otherwise.
     await removeVirtualAuthenticator(driver, firstAuthenticator);
     const secondAuthenticator = await addVirtualAuthenticator(driver);
     await on_Main_AddAdditionalDevice(driver);

@@ -13,7 +13,7 @@ import {
   blobFromUint8Array,
   DerEncodedBlob,
 } from "@dfinity/candid";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
 
 export type CredentialId = BinaryBlob;
@@ -68,8 +68,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       if (
         cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
       ) {
+        const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
         // would be nice if WebAuthnIdentity had a directly usable constructor
-        const strippedKey = cd.pubkey.slice(19);
         this._actualIdentity = WebAuthnIdentity.fromJSON(
           JSON.stringify({
             rawId: Buffer.from(cd.credentialId).toString("hex"),

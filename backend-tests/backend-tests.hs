@@ -147,7 +147,7 @@ type HttpResponse = record {
 
 type StreamingCallbackHttpResponse = record {
   body: blob;
-  token: opt Token;
+  token: Token;
 };
 
 type Token = record {};
@@ -385,7 +385,7 @@ callIIReject cid user_id l x = do
 
 -- Some common devices
 webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthn "foobar"
+webauthSK = createSecretKeyWebAuthnECDSA "foobar"
 webauthPK :: PublicKey
 webauthPK = toPublicKey webauthSK
 webauthID :: EntityId
@@ -399,7 +399,7 @@ device1 = empty
     .+ #key_type .== enum #cross_platform
 
 webauth2SK :: SecretKey
-webauth2SK = createSecretKeyWebAuthn "foobar2"
+webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
