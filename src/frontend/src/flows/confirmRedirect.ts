@@ -77,7 +77,9 @@ export const confirmRedirect = async (
   const originalBodyOnclick = document.body.onclick;
 
   // make sure tooltip is closed when user clicks/touches out
-  document.body.onclick = () => { return;};
+  document.body.onclick = () => {
+    return;
+  };
 
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(hostName, userPrincipal), container);
