@@ -100,6 +100,23 @@ Then open `http://localhost:8081` in your browser.
 Make sure that the "Identity Provider" is set to "http://localhost:8080" if you
 serve the Internet Identity frontend from webpack.
 
+**NOTE on testing on LAN:**
+
+If you are testing on LAN -- for instance, connecting to an Internet Identity
+server running on your laptop from your smartphone over WiFi -- you may run
+into the following issues:
+
+* The webpage may not be accessible on LAN. By default webpack will serve the
+  content using the `localhost` host. Firewall rules for `localhost` are
+  somewhat strict; if you cannot access the page from devices on your LAN try
+  serving with `webpack serve --host 0.0.0.0`.
+* Internet Identity may tell you that your browser is not supported. The reason
+  for this is that some security-focused features are only enabled on `https`
+  and `localhost` pages. A workaround is to use [ngrok](http://ngrok.com) to
+  forward your local port over https.
+
+#### Test suites
+
 We have a set of Selenium tests that run through the various flows. To run them locally follow the steps in `.github/workflows/selenium.yml`.
 
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
