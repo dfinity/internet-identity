@@ -1,0 +1,62 @@
+# Windows Hello Guide for Internet Identity
+
+## Checking your machine is Windows Hello compatible
+
+Open your Windows Settings, and select "Accounts"
+
+image::hello-guide/settings-accounts.png[]
+
+Then select "Sign-in Options"
+
+image::hello-guide/settings-sign-in.png[]
+
+and check your device supports Windows Hello for signing in
+
+image::hello-guide/settings-hello.png[]
+
+If your device supports Windows Hello we can continue. Follow Option A if you've set-up an Identity Anchor using your phone or Option B if you've used a security key.
+
+## Option A: Your phone is added to your Identity Anchor
+
+On your Windows computer go to <https://identity.ic0.app> and click on "Already have an Anchor but using a new device?"
+
+image::hello-guide/add-device-start.png[]
+
+Enter your Identity Anchor
+
+image::hello-guide/add-device-anchor.png[]
+
+Complete the Windows Hello dialog
+
+image::hello-guide/add-device-hello.png[]
+
+Once the link is shown click on "Display as QR Code"
+
+image::hello-guide/add-device-show-link.png[]
+
+Scan the QR code with your Phone
+
+image::hello-guide/add-device-show-qr.png[]
+
+Continue on your phone and follow the steps to add your new Windows Hello device. Once you've completed the steps on your phone you should now be able to authenticate on your Windows machine using Windows Hello
+
+image::hello-guide/login-hello.png[]
+
+## Option B: Your security key is added to your Identity Anchor
+
+On your Windows computer go to <https://identity.ic0.app> and authenticate using your security key to reach the Anchor Management page. Once you're there click on "+ ADD NEW DEVICE".
+
+image::hello-guide/anchor-management.png[]
+
+Complete the Windows Hello dialog
+
+image::hello-guide/management-add-device-dialog.png[]
+
+and choose a name for your Windows machine
+
+image::hello-guide/management-add-device-name.png[]
+
+If you refresh the page, you should now be able to authenticate with Windows Hello
+
+image::hello-guide/login-hello.png[]
+
