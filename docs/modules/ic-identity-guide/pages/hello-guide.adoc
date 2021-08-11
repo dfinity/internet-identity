@@ -1,5 +1,7 @@
 # Windows Hello Guide for Internet Identity
 
+Internet Identity supports Windows Hello as an authentication method. This guide explains how to set up Windows Hello authentication for an existing Identity Anchor that was set up either on your phone or using a security key. The setup is explained below in Options A and B, respectively.
+
 ## Checking if your Windows machine supports Windows Hello
 
 Open your Windows Settings, and select "Accounts"
