@@ -22,6 +22,7 @@ fn main() -> Result<(), String> {
     let assets_module_path = Path::new(&out_dir).join("assets.rs");
     let asset_rel_paths = [
         ("/", "../../dist/index.html", ContentEncoding::Identity),
+        ("/faq", "../../dist/index.html", ContentEncoding::Identity),
         (
             "/index.html",
             "../../dist/index.html",
