@@ -55,10 +55,7 @@ const pageContent = (hostName: string, principal: string) => html`
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
     <div id="confirmRedirectPrincipal" class="highlightBox">
-      <span class="tooltip">
-        <span class="tooltiptext">${textTooltip}</span>
-        Application-specific
-      </span>
+      <a href="/faq#can-i" target="_blank"> Application-specific </a>
       <span> ID for ${hostName}:</span>
       <br />
       <p>${principal}</p>
