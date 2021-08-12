@@ -52,7 +52,7 @@ NOTE: Just for background: At launch this means we will rely on the trustworthin
 
 * The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
-* The data included in a redirect from the Internet Identity Service frontend to a client application backend can be considered confidential.
+* The user's browser is trustworthy, postMessage communication between different origins is authentic.
 
 * For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties). 
 
