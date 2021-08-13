@@ -9,6 +9,7 @@ export { questions } from "./questions";
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
   <style>
+    /* briefly flash the question when redirected to a particular question */
     @keyframes example {
       0% {
         background-color: transparent;
@@ -25,7 +26,7 @@ const pageContent = html`
       list-style-type: none;
     }
     li {
-      border-radius: 1rem;
+      border-radius: 0.5rem;
       padding: 0.5rem;
     }
     :target {
@@ -44,8 +45,6 @@ const pageContent = html`
           </li>`
       )}
     </ul>
-    <h2>Compatibility</h2>
-    ${compatibilityChart}
   </div>
 `;
 
