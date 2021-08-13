@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
+import { questions } from "../flows/faq";
 
 // We show a tooltip giving more information about the "application-specific"
 // nature of pseudonyms. This is the text that gets displayed when hovering.
@@ -55,7 +56,9 @@ const pageContent = (hostName: string, principal: string) => html`
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
     <div id="confirmRedirectPrincipal" class="highlightBox">
-      <a href="/faq#can-i" target="_blank"> Application-specific </a>
+      <a href="/faq#${questions.canI.anchor}" target="_blank">
+        Application-specific
+      </a>
       <span> ID for ${hostName}:</span>
       <br />
       <p>${principal}</p>

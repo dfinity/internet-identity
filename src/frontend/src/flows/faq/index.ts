@@ -1,10 +1,10 @@
 import { html, render } from "lit-html";
-import { compatibilityChart } from "../components/compatibilityChart";
+import { compatibilityChart } from "../../components/compatibilityChart";
 
-// TODO: test for unique anchors
-const faqs = [
-  { question: "can I?", anchor: "can-i", answer: "oh yes you can" },
-];
+import { questions } from "./questions";
+
+// re-export for ease of use
+export { questions } from "./questions";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
@@ -20,7 +20,7 @@ const pageContent = html`
   <div class="container" id="faq">
     <h1>FAQ</h1>
     <ul>
-      ${faqs.map(
+      ${Object.values(questions).map(
         (faq) =>
           html`<li id=${faq.anchor}>
             <h3>${faq.question}</h3>
