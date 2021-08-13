@@ -9,12 +9,28 @@ export { questions } from "./questions";
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
   <style>
+    @keyframes example {
+      0% {
+        background-color: transparent;
+      }
+      50% {
+        background-color: var(--grey-100);
+      }
+      100% {
+        background-color: transparent;
+      }
+    }
+
     ul {
       list-style-type: none;
     }
+    li {
+      border-radius: 1rem;
+      padding: 0.5rem;
+    }
     :target {
-      background-color: #000;
-      transition: background-color 1s linear;
+      animation-name: example;
+      animation-duration: 3s;
     }
   </style>
   <div class="container" id="faq">
