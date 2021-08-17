@@ -11,7 +11,6 @@ import { hasRequiredFeatures } from "./utils/featureDetection";
 import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
 import { setupRecovery } from "./flows/recovery/setupRecovery";
 import { IIConnection } from "./utils/iiConnection";
-import { confirmRedirect } from "./flows/confirmRedirect";
 
 const init = async () => {
   const url = new URL(document.URL);

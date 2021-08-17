@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { compatibilityChart } from "../../components/compatibilityChart";
 
 import { questions } from "./questions";
 

@@ -2,12 +2,6 @@ import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
 import { questions } from "../flows/faq";
 
-// We show a tooltip giving more information about the "application-specific"
-// nature of pseudonyms. This is the text that gets displayed when hovering.
-const textTooltip = `Internet Identity issues a unique "pseudonym" for each application requesting
-authentication. Since this pseudonym is unique for each application you
-authenticate for, applications cannot use it to track you.
-`;
 const pageContent = (hostName: string, principal: string) => html`
   <style>
     #confirmRedirectHostname {
