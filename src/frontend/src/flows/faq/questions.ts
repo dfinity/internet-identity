@@ -4,7 +4,7 @@ export const questions = {
   windowsHello: {
     question: "Does Internet Identity support Windows Hello?",
     anchor: "windows-hello",
-    answer: "oh yes it sure does!",
+    answer: "Yes! Internet Identity supports authenticating via Windows Hello. If Windows Hello is set up on your PR then Internet Identity will offer you to authenticate through Windows Hello.",
   },
   lostDevice: {
     question: "If I lose my device, can I still use Internet Identity?",
@@ -21,6 +21,6 @@ export const questions = {
   canIBeTracked: {
     question: "Can I be tracked across DApps with Internet Identity?",
     anchor: "can-i-be-tracked",
-    answer: "Hell no! Pseudonyms!",
+    answer: "No. Internet Identity issues a different Principal ID (a \"pseudonym\") for each DApp that you authenticate for using Internet Identity. Since the pseudonyms Internet Identity generates for you are different for each DApp, the DApps cannot use pseudonyms to track you.",
   },
 };
