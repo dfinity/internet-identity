@@ -70,9 +70,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
             </button>
           </div>`}
   </div>
-  <div id="navbar" >
-  ${aboutLink} &middot; ${faqLink}
-  </div>`;
+  <div id="navbar">${aboutLink} &middot; ${faqLink}</div>`;
 
 export type LoginResult =
   | {

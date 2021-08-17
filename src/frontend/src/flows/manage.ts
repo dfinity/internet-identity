@@ -119,9 +119,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
         `}
     ${logoutSection()}
   </div>
-  <div id="navbar" >
-  ${aboutLink} &middot; ${faqLink}
-  </div>`;
+  <div id="navbar">${aboutLink} &middot; ${faqLink}</div>`;
 
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
