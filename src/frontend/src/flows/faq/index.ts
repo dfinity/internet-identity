@@ -1,9 +1,33 @@
 import { html, render } from "lit-html";
 
 import { questions } from "./questions";
+import type { Question } from "./questions";
 
 // re-export for ease of use
 export { questions } from "./questions";
+
+// The rendered (list item) question
+function renderQuestion(faq: Question) {
+  return html`<li id=${faq.anchor}>
+    <h3>${faq.question}</h3>
+    <p>${faq.answer}</p>
+    <ul class="links-list">
+      ${Object.values(faq.links).map(
+        (link) =>
+          html`<li>
+            &middot;
+            <a
+              class="textLink"
+              rel="noopener noreferrer"
+              href="${link.link}"
+              target="_blank"
+              >${link.name}</a
+            >
+          </li>`
+      )}
+    </ul>
+  </li>`;
+}
 
 // The FAQ page
 const pageContent = html`
@@ -41,28 +65,7 @@ const pageContent = html`
   <div class="container" id="faq">
     <h1>FAQ</h1>
     <ul>
-      ${Object.values(questions).map(
-        (faq) =>
-          html`<li id=${faq.anchor}>
-            <h3>${faq.question}</h3>
-            <p>${faq.answer}</p>
-            <ul class="links-list">
-              ${Object.values(faq.links).map(
-                (link) =>
-                  html`<li>
-                    &middot;
-                    <a
-                      class="textLink"
-                      rel="noopener noreferrer"
-                      href="${link.link}"
-                      target="_blank"
-                      >${link.name}</a
-                    >
-                  </li>`
-              )}
-            </ul>
-          </li>`
-      )}
+      ${Object.values(questions).map((faq) => renderQuestion(faq))}
     </ul>
   </div>
 `;

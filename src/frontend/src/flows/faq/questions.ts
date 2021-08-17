@@ -4,9 +4,21 @@
 // `lit-html`.
 //
 // Each question has a `question` (the actual question), an anchor (use as e.g.
-// `/faq#anchor`, should be unique), answer and links. Due to the jest
-// limitation above we can't really inline the links, because that would mean
-// importing `lit-html` here...
+// `/faq#anchor`, should be unique), answer and links (see types below). Due to
+// the jest limitation above we can't really inline the links, because that
+// would mean importing `lit-html` here...
+
+interface Link {
+  name: string;
+  link: string;
+}
+
+export interface Question {
+  question: string;
+  anchor: string;
+  answer: string;
+  links: Array<Link>;
+}
 
 export const questions = {
   windowsHello: {
