@@ -6,6 +6,7 @@ import { register } from "./register";
 import { icLogo } from "../components/icons";
 import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { aboutLink } from "../components/aboutLink";
+import { faqLink } from "../components/faqLink";
 import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
@@ -69,7 +70,9 @@ const pageContent = (userIntent: UserIntent) => html` <style>
             </button>
           </div>`}
   </div>
-  ${aboutLink}`;
+  <div id="navbar" >
+  ${aboutLink} &middot; ${faqLink}
+  </div>`;
 
 export type LoginResult =
   | {

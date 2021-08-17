@@ -49,7 +49,7 @@ const pageContent = html`
             <p>${faq.answer}</p>
             <ul class="links-list">
               ${Object.values(faq.links).map(
-                (link) => html`<li>&middot; <a href="${link.link}">${link.name}</a></li>`
+                (link) => html`<li>&middot; <a class="textLink" href="${link.link}" target="_blank">${link.name}</a></li>`
               )}
             </ul>
           </li>`
