@@ -51,7 +51,11 @@ const pageContent = html`
                 (link) =>
                   html`<li>
                     &middot;
-                    <a class="textLink" rel="noopener noreferrer" href="${link.link}" target="_blank"
+                    <a
+                      class="textLink"
+                      rel="noopener noreferrer"
+                      href="${link.link}"
+                      target="_blank"
                       >${link.name}</a
                     >
                   </li>`
