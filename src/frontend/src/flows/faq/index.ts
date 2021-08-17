@@ -22,9 +22,14 @@ const pageContent = html`
       }
     }
 
+    a {
+        color: var(--grey-800);
+    }
+
     ul {
       list-style-type: none;
     }
+
     li {
       border-radius: 0.5rem;
       padding: 0.5rem;
@@ -42,9 +47,9 @@ const pageContent = html`
           html`<li id=${faq.anchor}>
             <h3>${faq.question}</h3>
             <p>${faq.answer}</p>
-            <ul>
+            <ul class="links-list">
               ${Object.values(faq.links).map(
-                (link) => html`<a href="${link.link}">${link.name}</a>`
+                (link) => html`<li>&middot; <a href="${link.link}">${link.name}</a></li>`
               )}
             </ul>
           </li>`
