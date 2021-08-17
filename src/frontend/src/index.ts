@@ -14,12 +14,9 @@ import { IIConnection } from "./utils/iiConnection";
 import { confirmRedirect } from "./flows/confirmRedirect";
 
 const init = async () => {
-  // TODO: remove me
-  if (window.location.pathname === "/confirm-redirect") {
-    await confirmRedirect("foo", "bar");
-  }
-
   const url = new URL(document.URL);
+
+  // Custom routing to the FAQ page
   if (window.location.pathname === "/faq") {
     return faqView();
   }

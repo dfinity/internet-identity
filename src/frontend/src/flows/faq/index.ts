@@ -6,7 +6,7 @@ import { questions } from "./questions";
 // re-export for ease of use
 export { questions } from "./questions";
 
-// Taken from: https://caniuse.com/?search=PublicKeyCredential
+// The FAQ page
 const pageContent = html`
   <style>
     /* briefly flash the question when redirected to a particular question */
@@ -44,7 +44,7 @@ const pageContent = html`
             <p>${faq.answer}</p>
             <ul>
               ${Object.values(faq.links).map(
-                  (link) => html`<a href="${link.link}">${link.name}</a>`
+                (link) => html`<a href="${link.link}">${link.name}</a>`
               )}
             </ul>
           </li>`

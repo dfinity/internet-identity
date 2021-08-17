@@ -49,7 +49,7 @@ function generateWebpackConfigForCanister(name, info) {
         "/authorize": "http://localhost:8081",
       },
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
-      historyApiFallback: true,
+      historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
     },
 
     // Depending in the language or framework you are using for
