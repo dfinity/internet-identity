@@ -33,7 +33,7 @@ function renderQuestion(faq: Question) {
 const pageContent = html`
   <style>
     /* briefly flash the question when redirected to a particular question */
-    @keyframes example {
+    @keyframes flash-question {
       0% {
         background-color: transparent;
       }
@@ -58,7 +58,7 @@ const pageContent = html`
       padding: 0.5rem;
     }
     :target {
-      animation-name: example;
+      animation-name: flash-question;
       animation-duration: 3s;
     }
   </style>
