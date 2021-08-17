@@ -269,7 +269,9 @@ hr {
   margin-top: -3rem;
 }
 
-#aboutLink {
+
+
+#navbar a {
   text-decoration: none;
   color: var(--grey-600);
   margin-top: 1rem;
