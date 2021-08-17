@@ -14,7 +14,12 @@ export const questions = {
     anchor: "windows-hello",
     answer:
       "Yes! Internet Identity supports authenticating via Windows Hello. If Windows Hello is set up on your PC then Internet Identity will offer you to authenticate through Windows Hello.",
-    links: [],
+    links: [
+      {
+        name: "Windows Hello Guide for Internet Identity",
+        link: "https://sdk.dfinity.org/docs/ic-identity-guide/hello-guide.html",
+      },
+    ],
   },
   lostDevice: {
     question: "If I lose my device, can I still use Internet Identity?",
