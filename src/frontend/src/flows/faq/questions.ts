@@ -58,10 +58,10 @@ export const questions = {
     ],
   },
   canIBeTracked: {
-    question: "Can I be tracked across DApps with Internet Identity?",
-    anchor: "can-i-be-tracked",
+    question: "Does Internet Identity share my Identity Anchor with DApps?",
+    anchor: "does-ii-share-my-anchor",
     answer:
-      'No. Internet Identity issues a different Principal ID (a "pseudonym") for each DApp that you authenticate for using Internet Identity. Since the pseudonyms Internet Identity generates for you are different for each DApp, the DApps cannot use pseudonyms to track you.',
+      'No. Internet Identity issues a different Principal ID (a "pseudonym") for each DApp that you authenticate for using Internet Identity. Since the pseudonyms Internet Identity generates for you are different for each DApp, and because each pseudonym is random, in principle the DApps cannot use pseudonyms to track you across DApps.',
     links: [],
   },
 };
