@@ -23,7 +23,7 @@ export const questions = {
       "If you have an Identity Anchor tied to only one device and you lose that one device, you will be locked out. As a best practice, we recommend adding multiple devices multiple devices and recovery mechanisms to every Identity Anchor.",
     links: [
       {
-        name: "Internet Identity Management How-To",
+        name: "Device Management How-To",
         link: "https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html",
       },
     ],
