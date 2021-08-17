@@ -22,6 +22,8 @@ fn main() -> Result<(), String> {
     let assets_module_path = Path::new(&out_dir).join("assets.rs");
     let asset_rel_paths = [
         ("/", "../../dist/index.html", ContentEncoding::Identity),
+
+        // The FAQ page is the same webapp, but the webapp routes to the correct page
         ("/faq", "../../dist/index.html", ContentEncoding::Identity),
         (
             "/index.html",
