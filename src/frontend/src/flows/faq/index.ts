@@ -42,6 +42,11 @@ const pageContent = html`
           html`<li id=${faq.anchor}>
             <h3>${faq.question}</h3>
             <p>${faq.answer}</p>
+            <ul>
+              ${Object.values(faq.links).map(
+                  (link) => html`<a href="${link.link}">${link.name}</a>`
+              )}
+            </ul>
           </li>`
       )}
     </ul>
