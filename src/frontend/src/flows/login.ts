@@ -1,6 +1,5 @@
 import { render, html } from "lit-html";
-import { aboutLink } from "../components/aboutLink";
-import { faqLink } from "../components/faqLink";
+import { navbar } from "../components/navbar";
 import { displayError } from "../components/displayError";
 import { icLogo } from "../components/icons";
 import { withLoader } from "../components/loader";
@@ -40,7 +39,7 @@ const pageContent = (
     </div>
     ${logoutSection("Clear Identity Anchor from browser")}
   </div>
-  <div id="navbar">${aboutLink} &middot; ${faqLink}</div>`;
+  ${navbar}`;
 
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
