@@ -11,7 +11,7 @@ TARGET="wasm32-unknown-unknown"
 cargo build --manifest-path "$II_DIR/Cargo.toml" --target $TARGET --release -j1
 
 # keep version in sync with Dockerfile
-cargo install ic-cdk-optimizer --version 0.3.0 --root "$II_DIR"/../../target
+cargo install ic-cdk-optimizer --version 0.3.1 --root "$II_DIR"/../../target
 STATUS=$?
 
 if [ "$STATUS" -eq "0" ]; then
