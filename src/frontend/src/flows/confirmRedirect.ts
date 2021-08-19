@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
-import { questions } from "../flows/faq";
 
 const pageContent = (hostName: string, principal: string) => html`
   <style>
@@ -50,10 +49,7 @@ const pageContent = (hostName: string, principal: string) => html`
     <button id="confirmRedirect" class="primary">Proceed</button>
     <button id="cancelRedirect">Cancel</button>
     <div id="confirmRedirectPrincipal" class="highlightBox">
-      <a href="/faq#${questions.canIBeTracked.anchor}" target="_blank">
-        Application-specific
-      </a>
-      <span> ID for ${hostName}:</span>
+      <span>Application-specific ID for ${hostName}:</span>
       <br />
       <p>${principal}</p>
     </div>
