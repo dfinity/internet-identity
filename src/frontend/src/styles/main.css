@@ -269,10 +269,13 @@ hr {
   margin-top: -3rem;
 }
 
-#aboutLink {
+#navbar {
+  margin: 1rem 0;
+}
+
+.navbar-link {
   text-decoration: none;
   color: var(--grey-600);
-  margin-top: 1rem;
   font-size: 0.875rem;
 }
 

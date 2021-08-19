@@ -8,6 +8,7 @@ import {
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { aboutLink } from "../components/aboutLink";
+import { faqLink } from "../components/faqLink";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
@@ -118,7 +119,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
         `}
     ${logoutSection()}
   </div>
-  ${aboutLink}`;
+  <div id="navbar">${aboutLink} &middot; ${faqLink}</div>`;
 
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
