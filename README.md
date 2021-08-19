@@ -81,7 +81,11 @@ the following:
 npm start
 ```
 
-Then open `http://localhost:8080` in your browser.
+Then open `http://localhost:8080` in your browser. Webpack will reload the page whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
+
+```bash
+npm run format && npm run lint
+```
 
 To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
 ```
