@@ -62,7 +62,7 @@ export const questions = {
       "Does Internet Identity share my anchor or personal information with DApps?",
     anchor: "share-ii-anchor",
     answer:
-      'No. Internet Identity uses a different Principal ID (a "pseudonym") for each DApp that you authenticate for using Internet Identity. Since the pseudonyms Internet Identity generates for you are different for each DApp, and because each pseudonym is random, in principle the DApps cannot use pseudonyms to track you across DA',
+      'No. Internet Identity uses a different Principal (a "pseudonym") for each DApp that you authenticate to using Internet Identity. Since the pseudonyms Internet Identity generates for you are different for each DApp, DApps cannot use them to track you outside of their realm.',
     links: [],
   },
 };
