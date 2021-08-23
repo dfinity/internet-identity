@@ -8,8 +8,13 @@ export { questions } from "./questions";
 
 // The rendered (list item) question
 function renderQuestion(faq: Question) {
-  return html`<li id=${faq.anchor} class="sm:mx-4 sm:mb-10 sm:border-b-0 border-b-2 border-blue-400 sm:ring-2 sm:rounded-md p-4">
-    <div class="font-bold font-sans border-b-2 w-full border-blue-400">${faq.question}</div>
+  return html`<li
+    id=${faq.anchor}
+    class="sm:mx-4 sm:mb-10 sm:border-b-0 border-b-2 border-blue-400 sm:ring-2 sm:rounded-md p-4"
+  >
+    <div class="font-bold font-sans border-b-2 w-full border-blue-400">
+      ${faq.question}
+    </div>
     <div class="pl-4 pt-4">
       <p>${faq.answer}</p>
       <ul class="p-2">
@@ -60,8 +65,12 @@ const pageContent = html`
       animation-duration: 3s;
     }
   </style>
-  <div class="container rounded-md m-auto h-full sm:my-10 bg-blue-100 sm:shadow-md text-blue-500 max-w-2xl">
-    <h1 class="text-2xl text-center sm:text-left font-bold tracking-wide p-4">FAQ</h1>
+  <div
+    class="container rounded-md m-auto h-full sm:my-10 bg-blue-100 sm:shadow-md text-blue-500 max-w-2xl"
+  >
+    <h1 class="text-2xl text-center sm:text-left font-bold tracking-wide p-4">
+      FAQ
+    </h1>
     <ul>
       ${Object.values(questions).map((faq) => renderQuestion(faq))}
     </ul>
