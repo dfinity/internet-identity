@@ -1,0 +1,62 @@
+name: Android emulator e2e tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  android-e2e-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        rust: [ '1.51.0' ]
+        os: [ macOS-latest ]
+        dfx: [ '0.7.0' ]
+        start-flag: [ '', '--emulator' ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
+
+      - name: install appium
+        run: |
+          npm install -g appium --chromedriver_version="83"
+          appium -v
+          appium --allow-insecure=adb_shell &>/dev/null &
+
+      - run: rm -v -f screenshots/android/*.png
+
+      - name: run appium tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          profile: Pixel
+          arch: x86
+          target: google_apis_playstore
+          ram-size: 4096M
+          script: |
+            adb shell locksettings set-pin 1234
+            adb shell am start -a android.settings.SECURITY_SETTINGS
+            npm run appium-android
+      - run: dfx stop
+
+      - name: Commit screenshots
+        uses: EndBug/add-and-commit@v7.2.0
+        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
+        with:
+          add: screenshots/android
+          author_name: Screenshot Committer
+          author_email: "<nobody@example.com>"
+          message: "Updating android screenshots"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull_strategy: "NO-PULL"
