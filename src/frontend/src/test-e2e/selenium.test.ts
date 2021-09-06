@@ -16,10 +16,6 @@ import { writeFile } from "fs/promises";
 
  - Setup helpers (getting web driver, waiting for fonts to be loaded)
 
- - Combined flows
-   Sequences of assertions and actions used in multiple tests to model
-   higher-level concept
-
  - The actual tests
 */
 
@@ -37,12 +33,12 @@ import {
   AboutView,
   AddDeviceAliasView, AddDeviceView, AddIdentityAnchorView,
   AuthorizeAppView, CompatabilityNoticeView, DemoAppView,
-  FLOWS,
   MainView, RecoveryMethodSelector,
   RegisterView, SingleDeviceWarningView,
   WelcomeBackView,
   WelcomeView
 } from "./views";
+import { FLOWS } from "./flows";
 
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
