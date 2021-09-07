@@ -38,7 +38,7 @@ import {
   CompatabilityNoticeView,
   DemoAppView,
   MainView,
-  RecoveryMethodSelector,
+  RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
   WelcomeBackView,
@@ -193,13 +193,11 @@ test("_Register new identity and login with it", async () => {
 
 test("Register new identity and add additional device", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const mainView = new MainView(driver);
-    const addDeviceAliasView = new AddDeviceAliasView(driver);
-
     const firstAuthenticator = await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
     const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
 
+    const mainView = new MainView(driver);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     // We're removing the first authenticator here, because unfortunately we
     // can't tell Chrome to _actually_ use the second authenticator, which
@@ -208,6 +206,7 @@ test("Register new identity and add additional device", async () => {
     await addVirtualAuthenticator(driver);
     await mainView.addAdditionalDevice();
 
+    const addDeviceAliasView = new AddDeviceAliasView(driver);
     await addDeviceAliasView.waitForDisplay();
     await addDeviceAliasView.addAdditionalDevice(DEVICE_NAME2);
     await addDeviceAliasView.continue();
@@ -224,8 +223,8 @@ test("Register new identity and add additional device", async () => {
 
 test("Log into client application, after registration", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const demoAppView = new DemoAppView(driver);
     await addVirtualAuthenticator(driver);
+    const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
@@ -250,8 +249,8 @@ test("Log into client application, after registration", async () => {
 
 test("Delegation maxTimeToLive: 1 min", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const demoAppView = new DemoAppView(driver);
     await addVirtualAuthenticator(driver);
+    const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
@@ -273,8 +272,8 @@ test("Delegation maxTimeToLive: 1 min", async () => {
 
 test("Delegation maxTimeToLive: 1 day", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const demoAppView = new DemoAppView(driver);
     await addVirtualAuthenticator(driver);
+    const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
@@ -294,8 +293,8 @@ test("Delegation maxTimeToLive: 1 day", async () => {
 
 test("Delegation maxTimeToLive: 1 month", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const demoAppView = new DemoAppView(driver);
     await addVirtualAuthenticator(driver);
+    const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
@@ -316,22 +315,15 @@ test("Delegation maxTimeToLive: 1 month", async () => {
 
 test("Screenshots", async () => {
   await run_in_browser(async (driver: ThenableWebDriver) => {
-    const welcomeView = new WelcomeView(driver);
-    const registerView = new RegisterView(driver);
-    const recoveryMethodSelector = new RecoveryMethodSelector(driver);
-    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
-    const mainView = new MainView(driver);
-    const addDeviceView = new AddDeviceView(driver);
-    const aboutView = new AboutView(driver);
-    const compatabilityNoticeView = new CompatabilityNoticeView(driver);
-
     await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
 
     await wait_for_fonts(driver);
+    const welcomeView = new WelcomeView(driver);
     await welcomeView.waitForDisplay();
     await screenshot("00-welcome", driver);
     await welcomeView.register();
+    const registerView = new RegisterView(driver);
     await registerView.waitForDisplay();
     await screenshot("01-register", driver);
     await registerView.enterAlias(DEVICE_NAME1);
@@ -344,12 +336,15 @@ test("Screenshots", async () => {
     await registerView.registerIdentityFixup();
     await screenshot("03-register-user-number", driver);
     await registerView.registerConfirmIdentity();
+    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
     await singleDeviceWarningView.waitForDisplay();
     await screenshot("17-single-device-warning", driver);
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
+    await recoveryMethodSelectorView.waitForDisplay();
     await screenshot("18-recover-method-selector", driver);
-    await recoveryMethodSelector.skip();
+    await recoveryMethodSelectorView.skip();
+    const mainView = new MainView(driver);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
     await screenshot("04-main", driver);
@@ -359,8 +354,8 @@ test("Screenshots", async () => {
     await welcomeView.login();
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
-    await recoveryMethodSelector.skip();
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skip();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     await driver.get(II_URL);
@@ -373,28 +368,24 @@ test("Screenshots", async () => {
     await welcomeBackView.login();
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
-    await recoveryMethodSelector.skip();
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skip();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Now the link device flow, using a second browser
     await run_in_nested_browser(async (driver2) => {
-      const welcomeView2 = new WelcomeView(driver2);
-      const addIdentityAnchorView2 = new AddIdentityAnchorView(driver2);
-      const recoveryMethodSelector2 = new RecoveryMethodSelector(driver2);
-      const singleDeviceWarningView2 = new SingleDeviceWarningView(driver2);
-      const mainView2 = new MainView(driver2);
-      const addDeviceView2 = new AddDeviceView(driver2);
-
       await addVirtualAuthenticator(driver2);
       await driver2.get(II_URL);
+      const welcomeView2 = new WelcomeView(driver2);
       await welcomeView2.waitForDisplay();
       await welcomeView2.typeUserNumber(userNumber);
       await welcomeView2.addDevice();
+      const addIdentityAnchorView2 = new AddIdentityAnchorView(driver2);
       await addIdentityAnchorView2.waitForDisplay();
       await addIdentityAnchorView2.fixup();
       await screenshot("06-new-device-user-number", driver2);
       await addIdentityAnchorView2.continue(userNumber);
+      const addDeviceView2 = new AddDeviceView(driver2);
       await addDeviceView2.waitForDisplay();
 
       const link = await addDeviceView2.getLinkText();
@@ -413,8 +404,9 @@ test("Screenshots", async () => {
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
-      await recoveryMethodSelector.waitForDisplay();
-      await recoveryMethodSelector.skip();
+      await recoveryMethodSelectorView.waitForDisplay();
+      await recoveryMethodSelectorView.skip();
+      const addDeviceView = new AddDeviceView(driver);
       await addDeviceView.waitForConfirmDisplay();
       await addDeviceView.fixupConfirm();
       await screenshot("09-new-device-confirm", driver);
@@ -432,10 +424,15 @@ test("Screenshots", async () => {
       await welcomeBackView2.fixup();
       await screenshot("12-new-device-login", driver2);
       await welcomeBackView2.login();
+      const singleDeviceWarningView2 = new SingleDeviceWarningView(driver2);
       await singleDeviceWarningView2.waitForDisplay();
       await singleDeviceWarningView2.continue();
-      await recoveryMethodSelector2.waitForDisplay();
-      await recoveryMethodSelector2.skip();
+      const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
+        driver2
+      );
+      await recoveryMethodSelectorView2.waitForDisplay();
+      await recoveryMethodSelectorView2.skip();
+      const mainView2 = new MainView(driver2);
       await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView2.fixup();
       await screenshot("13-new-device-listed", driver2);
@@ -458,6 +455,7 @@ test("Screenshots", async () => {
     await driver.get("about:blank");
     await driver.get(II_URL + "#about");
     await wait_for_fonts(driver);
+    const aboutView = new AboutView(driver);
     await aboutView.waitForDisplay();
     await screenshot("14-about", driver);
 
@@ -469,8 +467,8 @@ test("Screenshots", async () => {
     await welcomeBackView.login();
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
-    await recoveryMethodSelector.skip();
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skip();
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
     const buttonElem2 = await driver.findElement(
       By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)
@@ -502,6 +500,7 @@ test("Screenshots", async () => {
     await driver.get("about:blank");
     await driver.get(II_URL + "#compatibilityNotice");
     await wait_for_fonts(driver);
+    const compatabilityNoticeView = new CompatabilityNoticeView(driver);
     await compatabilityNoticeView.waitForDisplay();
     await screenshot("16-compatibility-notice", driver);
   });

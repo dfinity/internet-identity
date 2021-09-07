@@ -104,7 +104,7 @@ export class SingleDeviceWarningView extends View {
   }
 }
 
-export class RecoveryMethodSelector extends View {
+export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.driver.wait(until.elementLocated(By.id("skipRecovery")), 3_000);
   }

@@ -1,7 +1,7 @@
 import { ThenableWebDriver } from "selenium-webdriver";
 import {
   MainView,
-  RecoveryMethodSelector,
+  RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
   WelcomeView,
@@ -13,12 +13,9 @@ export const FLOWS = {
     driver: ThenableWebDriver
   ): Promise<string> => {
     const welcomeView = new WelcomeView(driver);
-    const registerView = new RegisterView(driver);
-    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
-    const recoveryMethodSelector = new RecoveryMethodSelector(driver);
-
     await welcomeView.waitForDisplay();
     await welcomeView.register();
+    const registerView = new RegisterView(driver);
     await registerView.waitForDisplay();
     await registerView.enterAlias(deviceName);
     await registerView.create();
@@ -27,10 +24,12 @@ export const FLOWS = {
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();
+    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
-    await recoveryMethodSelector.skip();
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skip();
     return userNumber;
   },
   login: async (
@@ -39,17 +38,16 @@ export const FLOWS = {
     driver: ThenableWebDriver
   ): Promise<void> => {
     const welcomeView = new WelcomeView(driver);
-    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
-    const recoveryMethodSelector = new RecoveryMethodSelector(driver);
-    const mainView = new MainView(driver);
-
     await welcomeView.waitForDisplay();
     await welcomeView.typeUserNumber(userNumber);
     await welcomeView.login();
+    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
-    await recoveryMethodSelector.waitForDisplay();
-    await recoveryMethodSelector.skip();
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skip();
+    const mainView = new MainView(driver);
     await mainView.waitForDeviceDisplay(deviceName);
   },
 };
