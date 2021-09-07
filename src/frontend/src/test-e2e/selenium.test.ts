@@ -1,34 +1,4 @@
-import {
-  Builder,
-  By,
-  until,
-  ThenableWebDriver,
-  logging,
-} from "selenium-webdriver";
-import { Command } from "selenium-webdriver/lib/command";
-import { Options as ChromeOptions } from "selenium-webdriver/chrome";
-import { writeFile } from "fs/promises";
-
-/*
-## Structure of this file
-
- - Constants
-
- - Setup helpers (getting web driver, waiting for fonts to be loaded)
-
- - The actual tests
-*/
-
-/*
-## Constants
-*/
-
-// Read canister ids from the corresponding dfx files.
-// This assumes that they have been successfully dfx-deployed
-import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
-
-const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
-import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
+import { By, ThenableWebDriver, until, } from "selenium-webdriver";
 import {
   AboutView,
   AddDeviceAliasView,
@@ -45,7 +15,23 @@ import {
   WelcomeView,
 } from "./views";
 import { FLOWS } from "./flows";
+import {
+  addVirtualAuthenticator,
+  removeVirtualAuthenticator,
+  runInBrowser,
+  runInNestedBrowser,
+  screenshot,
+  switchToPopup,
+  waitForFonts,
+  waitToClose
+} from "./util";
 
+// Read canister ids from the corresponding dfx files.
+// This assumes that they have been successfully dfx-deployed
+import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
+import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
+
+const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
@@ -55,132 +41,8 @@ const DEMO_APP_URL = "http://localhost:8080/";
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
 
-/*
-## Setup helpers
-*/
-
-async function addVirtualAuthenticator(
-  driver: ThenableWebDriver
-): Promise<string> {
-  const executor = driver.getExecutor();
-  const sessionId = (await driver.getSession()).getId();
-  executor.defineCommand(
-    "AddVirtualAuthenticator",
-    "POST",
-    "/session/:sessionId/webauthn/authenticator"
-  );
-  const cmd = new Command("AddVirtualAuthenticator");
-  cmd.setParameter("protocol", "ctap2");
-  cmd.setParameter("transport", "usb");
-  cmd.setParameter("hasResidentKey", true);
-  cmd.setParameter("isUserConsenting", true);
-  cmd.setParameter("sessionId", sessionId);
-  return await executor.execute(cmd);
-}
-
-async function removeVirtualAuthenticator(
-  driver: ThenableWebDriver,
-  authenticatorId: string
-): Promise<string> {
-  const executor = driver.getExecutor();
-  const sessionId = (await driver.getSession()).getId();
-  executor.defineCommand(
-    "RemoveVirtualAuthenticator",
-    "DELETE",
-    `/session/:sessionId/webauthn/authenticator/${authenticatorId}`
-  );
-  const cmd = new Command("RemoveVirtualAuthenticator");
-  cmd.setParameter("sessionId", sessionId);
-  return await executor.execute(cmd);
-}
-
-async function screenshot(name: string, driver: ThenableWebDriver) {
-  const image = await driver.takeScreenshot();
-  // writing to a subdirectory has the nice property that it fails if
-  // this is run in the wrong directory
-  await writeFile(`screenshots/${name}.png`, image, "base64");
-}
-
-// Inspired by https://stackoverflow.com/a/66919695/946226
-async function wait_for_fonts(driver: ThenableWebDriver) {
-  for (let i = 0; i <= 50; i++) {
-    if (
-      (await driver.executeScript("return document.fonts.status;")) == "loaded"
-    ) {
-      return;
-    }
-    driver.sleep(200);
-  }
-  console.log(
-    "Odd, document.font.status never reached state loaded, stuck at",
-    await driver.executeScript("return document.fonts.status;")
-  );
-}
-
-async function run_in_browser(
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  await run_in_browser_common(true, test);
-}
-
-async function run_in_nested_browser(
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  await run_in_browser_common(false, test);
-}
-
-async function run_in_browser_common(
-  outer: boolean,
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  const loggingPreferences = new logging.Preferences();
-  loggingPreferences.setLevel("browser", logging.Level.ALL);
-  const driver = new Builder()
-    .forBrowser("chrome")
-    .setChromeOptions(
-      new ChromeOptions()
-        .headless() // hides the click show: uncomment to watch it
-        .windowSize({ width: 1050, height: 1400 })
-    )
-    .setLoggingPrefs(loggingPreferences)
-    .build();
-  try {
-    await test(driver);
-  } catch (e) {
-    console.log(await driver.manage().logs().get("browser"));
-    console.log(await driver.getPageSource());
-    throw e;
-  } finally {
-    // only close outer session
-    if (outer) {
-      await driver.quit();
-    }
-  }
-}
-
-async function switchToPopup(driver: ThenableWebDriver) {
-  let handles = await driver.getAllWindowHandles();
-  expect(handles.length).toBe(2);
-  await driver.switchTo().window(handles[1]);
-  // enable virtual authenticator in the new window
-  await addVirtualAuthenticator(driver);
-}
-
-async function waitToClose(driver: ThenableWebDriver) {
-  await driver.wait(async (driver: ThenableWebDriver) => {
-    return (await driver.getAllWindowHandles()).length == 1;
-  }, 10_000);
-
-  const handles = await driver.getAllWindowHandles();
-  expect(handles.length).toBe(1);
-  await driver.switchTo().window(handles[0]);
-}
-
-/*
-## The actual tests
-*/
 test("_Register new identity and login with it", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
     const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
@@ -192,7 +54,7 @@ test("_Register new identity and login with it", async () => {
 }, 300_000);
 
 test("Register new identity and add additional device", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     const firstAuthenticator = await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
     const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
@@ -222,7 +84,7 @@ test("Register new identity and add additional device", async () => {
 }, 300_000);
 
 test("Log into client application, after registration", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
@@ -248,7 +110,7 @@ test("Log into client application, after registration", async () => {
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 min", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
@@ -271,7 +133,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 day", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
@@ -292,7 +154,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 month", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     const demoAppView = new DemoAppView(driver);
     await demoAppView.open(DEMO_APP_URL, II_URL);
@@ -314,11 +176,11 @@ test("Delegation maxTimeToLive: 1 month", async () => {
 }, 300_000);
 
 test("Screenshots", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
     await driver.get(II_URL);
 
-    await wait_for_fonts(driver);
+    await waitForFonts(driver);
     const welcomeView = new WelcomeView(driver);
     await welcomeView.waitForDisplay();
     await screenshot("00-welcome", driver);
@@ -373,7 +235,7 @@ test("Screenshots", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Now the link device flow, using a second browser
-    await run_in_nested_browser(async (driver2) => {
+    await runInNestedBrowser(async (driver2) => {
       await addVirtualAuthenticator(driver2);
       await driver2.get(II_URL);
       const welcomeView2 = new WelcomeView(driver2);
@@ -396,7 +258,7 @@ test("Screenshots", async () => {
       // Log in with previous browser again
       await driver.get("about:blank");
       await driver.get(link);
-      await wait_for_fonts(driver);
+      await waitForFonts(driver);
       const welcomeBackView = new WelcomeBackView(driver);
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
@@ -454,7 +316,7 @@ test("Screenshots", async () => {
     // About page
     await driver.get("about:blank");
     await driver.get(II_URL + "#about");
-    await wait_for_fonts(driver);
+    await waitForFonts(driver);
     const aboutView = new AboutView(driver);
     await aboutView.waitForDisplay();
     await screenshot("14-about", driver);
@@ -499,7 +361,7 @@ test("Screenshots", async () => {
     // Compatibility notice page
     await driver.get("about:blank");
     await driver.get(II_URL + "#compatibilityNotice");
-    await wait_for_fonts(driver);
+    await waitForFonts(driver);
     const compatabilityNoticeView = new CompatabilityNoticeView(driver);
     await compatabilityNoticeView.waitForDisplay();
     await screenshot("16-compatibility-notice", driver);
