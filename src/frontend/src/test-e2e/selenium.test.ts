@@ -31,12 +31,18 @@ const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
 import {
   AboutView,
-  AddDeviceAliasView, AddDeviceView, AddIdentityAnchorView,
-  AuthorizeAppView, CompatabilityNoticeView, DemoAppView,
-  MainView, RecoveryMethodSelector,
-  RegisterView, SingleDeviceWarningView,
+  AddDeviceAliasView,
+  AddDeviceView,
+  AddIdentityAnchorView,
+  AuthorizeAppView,
+  CompatabilityNoticeView,
+  DemoAppView,
+  MainView,
+  RecoveryMethodSelector,
+  RegisterView,
+  SingleDeviceWarningView,
   WelcomeBackView,
-  WelcomeView
+  WelcomeView,
 } from "./views";
 import { FLOWS } from "./flows";
 
@@ -134,7 +140,7 @@ async function run_in_browser_common(
     .setChromeOptions(
       new ChromeOptions()
         .headless() // hides the click show: uncomment to watch it
-        .windowSize({width: 1050, height: 1400})
+        .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
     .build();
@@ -233,7 +239,9 @@ test("Log into client application, after registration", async () => {
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
-    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(principal);
+    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
+      principal
+    );
     // default value
     const exp = await driver.findElement(By.id("expiration")).getText();
     expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);

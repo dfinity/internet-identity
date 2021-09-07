@@ -1,8 +1,17 @@
 import { ThenableWebDriver } from "selenium-webdriver";
-import { MainView, RecoveryMethodSelector, RegisterView, SingleDeviceWarningView, WelcomeView } from "./views";
+import {
+  MainView,
+  RecoveryMethodSelector,
+  RegisterView,
+  SingleDeviceWarningView,
+  WelcomeView,
+} from "./views";
 
 export const FLOWS = {
-  registerNewIdentity: async (deviceName: string, driver: ThenableWebDriver): Promise<string> => {
+  registerNewIdentity: async (
+    deviceName: string,
+    driver: ThenableWebDriver
+  ): Promise<string> => {
     const welcomeView = new WelcomeView(driver);
     const registerView = new RegisterView(driver);
     const singleDeviceWarningView = new SingleDeviceWarningView(driver);
@@ -24,7 +33,11 @@ export const FLOWS = {
     await recoveryMethodSelector.skip();
     return userNumber;
   },
-  login: async (userNumber: string, deviceName: string, driver: ThenableWebDriver): Promise<void> => {
+  login: async (
+    userNumber: string,
+    deviceName: string,
+    driver: ThenableWebDriver
+  ): Promise<void> => {
     const welcomeView = new WelcomeView(driver);
     const singleDeviceWarningView = new SingleDeviceWarningView(driver);
     const recoveryMethodSelector = new RecoveryMethodSelector(driver);
@@ -38,5 +51,5 @@ export const FLOWS = {
     await recoveryMethodSelector.waitForDisplay();
     await recoveryMethodSelector.skip();
     await mainView.waitForDeviceDisplay(deviceName);
-  }
-}
+  },
+};
