@@ -29,7 +29,7 @@ export const FLOWS = {
     await singleDeviceWarningView.continue();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     return userNumber;
   },
   login: async (
@@ -46,8 +46,25 @@ export const FLOWS = {
     await singleDeviceWarningView.continue();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     const mainView = new MainView(driver);
     await mainView.waitForDeviceDisplay(deviceName);
+  },
+  addRecoveryMechanismSeedPhrase: async (
+    driver: ThenableWebDriver
+  ): Promise<string> => {
+    const mainView = new MainView(driver);
+    await mainView.waitForDisplay();
+    await mainView.addRecovery();
+
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.useSeedPhrase();
+    await recoveryMethodSelectorView.waitForSeedPhrase();
+    const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
+    await recoveryMethodSelectorView.copySeedPhrase();
+    await recoveryMethodSelectorView.seedPhraseContinue();
+
+    return seedPhrase;
   },
 };

@@ -1,4 +1,4 @@
-import { By, ThenableWebDriver, until, } from "selenium-webdriver";
+import { By, ThenableWebDriver, until } from "selenium-webdriver";
 import {
   AboutView,
   AddDeviceAliasView,
@@ -8,6 +8,7 @@ import {
   CompatabilityNoticeView,
   DemoAppView,
   MainView,
+  RecoverView,
   RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
@@ -23,7 +24,7 @@ import {
   screenshot,
   switchToPopup,
   waitForFonts,
-  waitToClose
+  waitToClose,
 } from "./util";
 
 // Read canister ids from the corresponding dfx files.
@@ -175,6 +176,30 @@ test("Delegation maxTimeToLive: 1 month", async () => {
   });
 }, 300_000);
 
+test("Recover access, after registration", async () => {
+  await runInBrowser(async (driver: ThenableWebDriver) => {
+    await addVirtualAuthenticator(driver);
+    await driver.get(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
+    const mainView = new MainView(driver);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(driver);
+    await mainView.waitForDisplay();
+    await mainView.logout();
+
+    const welcomeView = new WelcomeView(driver);
+    await welcomeView.recover();
+    const recoveryView = new RecoverView(driver);
+    await recoveryView.waitForDisplay();
+    await recoveryView.enterIdentityAnchor(userNumber);
+    await recoveryView.continue();
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+  });
+}, 300_000);
+
 test("Screenshots", async () => {
   await runInBrowser(async (driver: ThenableWebDriver) => {
     await addVirtualAuthenticator(driver);
@@ -205,7 +230,7 @@ test("Screenshots", async () => {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
     await recoveryMethodSelectorView.waitForDisplay();
     await screenshot("18-recover-method-selector", driver);
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     const mainView = new MainView(driver);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
@@ -217,7 +242,7 @@ test("Screenshots", async () => {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     await driver.get(II_URL);
@@ -231,7 +256,7 @@ test("Screenshots", async () => {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Now the link device flow, using a second browser
@@ -267,7 +292,7 @@ test("Screenshots", async () => {
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
-      await recoveryMethodSelectorView.skip();
+      await recoveryMethodSelectorView.skipRecovery();
       const addDeviceView = new AddDeviceView(driver);
       await addDeviceView.waitForConfirmDisplay();
       await addDeviceView.fixupConfirm();
@@ -293,7 +318,7 @@ test("Screenshots", async () => {
         driver2
       );
       await recoveryMethodSelectorView2.waitForDisplay();
-      await recoveryMethodSelectorView2.skip();
+      await recoveryMethodSelectorView2.skipRecovery();
       const mainView2 = new MainView(driver2);
       await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView2.fixup();
@@ -330,7 +355,7 @@ test("Screenshots", async () => {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
     const buttonElem2 = await driver.findElement(
       By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)

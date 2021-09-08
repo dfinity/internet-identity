@@ -29,6 +29,10 @@ export class WelcomeView extends View {
   async addDevice(): Promise<void> {
     await this.driver.findElement(By.id("addNewDeviceButton")).click();
   }
+
+  async recover(): Promise<void> {
+    await this.driver.findElement(By.id("recoverButton")).click();
+  }
 }
 
 export class RegisterView extends View {
@@ -109,12 +113,42 @@ export class RecoveryMethodSelectorView extends View {
     await this.driver.wait(until.elementLocated(By.id("skipRecovery")), 3_000);
   }
 
-  async skip(): Promise<void> {
+  async useSeedPhrase(): Promise<void> {
+    await this.driver.findElement(By.id("seedPhrase")).click();
+  }
+
+  async waitForSeedPhrase(): Promise<void> {
+    await this.driver.wait(
+      until.elementLocated(By.xpath(`//h1[string()='Seedphrase']`)),
+      15_000
+    );
+  }
+
+  async getSeedPhrase(): Promise<string> {
+    return await this.driver.findElement(By.id("seedPhrase")).getText();
+  }
+
+  async skipRecovery(): Promise<void> {
     await this.driver.findElement(By.id("skipRecovery")).click();
+  }
+
+  async copySeedPhrase(): Promise<void> {
+    await this.driver.findElement(By.id("seedCopy")).click();
+  }
+
+  async seedPhraseContinue(): Promise<void> {
+    await this.driver.findElement(By.id("displaySeedPhraseContinue")).click();
   }
 }
 
 export class MainView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.driver.wait(
+      until.elementLocated(By.xpath(`//h1[string()='Anchor Management']`)),
+      5_000
+    );
+  }
+
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.driver.wait(
       until.elementLocated(By.xpath(`//div[string()='${deviceName}']`)),
@@ -128,6 +162,10 @@ export class MainView extends View {
 
   async logout(): Promise<void> {
     await this.driver.findElement(By.id("logoutButton")).click();
+  }
+
+  async addRecovery(): Promise<void> {
+    await this.driver.findElement(By.id("addRecovery")).click();
   }
 
   async fixup(): Promise<void> {
@@ -349,6 +387,45 @@ export class DemoAppView extends View {
       6_000
     );
     return await whoamiResponseElem.getText();
+  }
+}
+
+export class RecoverView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.driver.wait(
+      until.elementLocated(
+        By.xpath(`//h1[string()='Recover Identity Anchor']`)
+      ),
+      5_000
+    );
+  }
+
+  async enterIdentityAnchor(identityAnchor: string): Promise<void> {
+    await this.driver
+      .findElement(By.id("userNumberInput"))
+      .sendKeys(identityAnchor);
+  }
+
+  async continue(): Promise<void> {
+    await this.driver.findElement(By.id("userNumberContinue")).click();
+  }
+
+  // enter seed phrase view
+  async waitForSeedInputDisplay(): Promise<void> {
+    await this.driver.wait(
+      until.elementLocated(By.xpath(`//h1[string()='Your seed phrase']`)),
+      5_000
+    );
+  }
+
+  async enterSeedPhrase(seedPhrase: string): Promise<void> {
+    await this.driver
+      .findElement(By.id("inputSeedPhrase"))
+      .sendKeys(seedPhrase);
+  }
+
+  async enterSeedPhraseContinue(): Promise<void> {
+    await this.driver.findElement(By.id("inputSeedPhraseContinue")).click();
   }
 }
 

@@ -3,7 +3,9 @@ import { Command } from "selenium-webdriver/lib/command";
 import { writeFile } from "fs/promises";
 import { Options as ChromeOptions } from "selenium-webdriver/chrome";
 
-export async function addVirtualAuthenticator(driver: ThenableWebDriver): Promise<string> {
+export async function addVirtualAuthenticator(
+  driver: ThenableWebDriver
+): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
@@ -20,7 +22,10 @@ export async function addVirtualAuthenticator(driver: ThenableWebDriver): Promis
   return await executor.execute(cmd);
 }
 
-export async function removeVirtualAuthenticator(driver: ThenableWebDriver, authenticatorId: string): Promise<string> {
+export async function removeVirtualAuthenticator(
+  driver: ThenableWebDriver,
+  authenticatorId: string
+): Promise<string> {
   const executor = driver.getExecutor();
   const sessionId = (await driver.getSession()).getId();
   executor.defineCommand(
@@ -56,15 +61,22 @@ export async function waitForFonts(driver: ThenableWebDriver) {
   );
 }
 
-export async function runInBrowser(test: (driver: ThenableWebDriver) => Promise<void>) {
+export async function runInBrowser(
+  test: (driver: ThenableWebDriver) => Promise<void>
+) {
   await runInBrowserCommon(true, test);
 }
 
-export async function runInNestedBrowser(test: (driver: ThenableWebDriver) => Promise<void>) {
+export async function runInNestedBrowser(
+  test: (driver: ThenableWebDriver) => Promise<void>
+) {
   await runInBrowserCommon(false, test);
 }
 
-export async function runInBrowserCommon(outer: boolean, test: (driver: ThenableWebDriver) => Promise<void>) {
+export async function runInBrowserCommon(
+  outer: boolean,
+  test: (driver: ThenableWebDriver) => Promise<void>
+) {
   const loggingPreferences = new logging.Preferences();
   loggingPreferences.setLevel("browser", logging.Level.ALL);
   const driver = new Builder()
@@ -72,7 +84,7 @@ export async function runInBrowserCommon(outer: boolean, test: (driver: Thenable
     .setChromeOptions(
       new ChromeOptions()
         .headless() // hides the click show: uncomment to watch it
-        .windowSize({width: 1050, height: 1400})
+        .windowSize({ width: 1050, height: 1400 })
     )
     .setLoggingPrefs(loggingPreferences)
     .build();
