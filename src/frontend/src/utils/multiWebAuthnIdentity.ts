@@ -8,17 +8,18 @@
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
 import {
+  DerEncodedPublicKey,
   PublicKey,
+  Signature,
   SignIdentity,
 } from "@dfinity/agent";
-import { DerEncodedBlob } from "@dfinity/candid";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
 import { bufferEquals } from "./utils";
 
 export type CredentialId = ArrayBuffer;
 export type CredentialData = {
-  pubkey: DerEncodedBlob;
+  pubkey: DerEncodedPublicKey;
   credentialId: CredentialId;
 };
 
@@ -52,7 +53,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     }
   }
 
-  public async sign(blob: ArrayBuffer): Promise<ArrayBuffer> {
+  public async sign(blob: ArrayBuffer): Promise<Signature> {
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
