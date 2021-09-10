@@ -7,10 +7,7 @@ import { entropyToMnemonic, wordlists, validateMnemonic } from "bip39";
 export function generate(): string {
   const entropy = new Uint32Array(32);
   crypto.getRandomValues(entropy);
-  return entropyToMnemonic(
-    toHexString(entropy),
-    wordlists.english
-  );
+  return entropyToMnemonic(toHexString(entropy), wordlists.english);
 }
 
 /**

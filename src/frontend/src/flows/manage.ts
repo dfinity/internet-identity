@@ -11,7 +11,6 @@ import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { bufferEquals, hasOwnProperty } from "../utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
 
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`<style>
     .nagBox {

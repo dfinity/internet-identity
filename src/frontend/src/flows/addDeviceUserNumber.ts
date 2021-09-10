@@ -94,7 +94,10 @@ const init = () => {
         try {
           const devices = await IIConnection.lookupAuthenticators(userNumber);
           const matchedDevice = devices.find((deviceData) =>
-            bufferEquals(publicKey, wrapDER(new Uint8Array(deviceData.pubkey), DER_COSE_OID))
+            bufferEquals(
+              publicKey,
+              wrapDER(new Uint8Array(deviceData.pubkey), DER_COSE_OID)
+            )
           );
           if (matchedDevice !== undefined) {
             window.clearInterval(loginInterval);
