@@ -10,7 +10,7 @@ These instructions start from a mostly clean slate. Apply common sense when foll
   - switch to branch `next`.
   - cargo build --release
 
-* Make sure you have dfx version `0.7.0-beta.6`
+* Make sure you have dfx version `0.8.1`
 * In a checkout of `internet-identity`, `main` branch, reset the dfx state:
   ```
   rm -rf .dfx
