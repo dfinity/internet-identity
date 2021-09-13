@@ -9,12 +9,13 @@ export { questions } from "./questions";
 // The rendered (list item) question
 function renderQuestion(faq: Question) {
   return html`<li
-    id=${faq.anchor}
-    class="p-4"
+    class="py-8"
   >
-    <div class="font-bold font-sans border-b-2 w-full border-green-400">
+    <details
+    id=${faq.anchor} >
+    <summary class="font-bold font-sans border-b-2 w-full border-green-200">
       ${faq.question}
-    </div>
+    </summary>
     <div class="p-6">
       <p class="leading-8 font-extralight max-w-md">${faq.answer}</p>
       <ul class="p-4">
@@ -39,13 +40,18 @@ function renderQuestion(faq: Question) {
 // The FAQ page
 const pageContent = html`
   <style>
+    html,
+    body,
+    main {
+      height: max-content;
+    }
     /* briefly flash the question when redirected to a particular question */
     @keyframes flash-question {
       0% {
         background-color: transparent;
       }
       50% {
-        background-color: #A7F3D0;
+        background-color: #a7f3d0;
       }
       100% {
         background-color: transparent;
@@ -60,21 +66,30 @@ const pageContent = html`
       animation-duration: 600ms;
     }
   </style>
-  <div
-    class="container rounded-md m-auto h-full sm:my-10 bg-gray-100 sm:shadow-md text-gray-500 max-w-2xl"
-  >
-    <h1 class="text-7xl text-center font-bold tracking-wide p-4 text-green-300">
+  <div class="container p-6 mx-auto h-full bg-gray-100 text-gray-500 max-w-2xl">
+    <h1 class="text-7xl text-center font-bold tracking-wide p-8 text-green-300">
       FAQ
     </h1>
-    <ul>
+    <ul class="px-6">
       ${Object.values(questions).map((faq) => renderQuestion(faq))}
     </ul>
   </div>
 `;
 
+const openAnchor = (): void => {
+  var hash = location.hash.substring(1);
+  if (hash) {
+    var details = document.getElementById(hash) as HTMLDetailsElement;
+    if (details) {
+      details.open = true;
+    }
+  }
+};
+
 export const faqView = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  openAnchor(); // needs to happen after DOM was rendered
 };
 
 faqView();
