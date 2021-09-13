@@ -3,9 +3,9 @@ import { AuthClient } from "@dfinity/auth-client";
 import { idlFactory as testnet_app_idl, canisterId as testnet_app_id } from 'dfx-generated/testnet_app';
 
 
-const testnetII = "https://rdmx6-jaaaa-aaaaa-aaadq-cai.identity.dfinity.network/"
-
+// Autofills the <input> for the II Url to point to our testnet.
 document.body.onload = () => {
+  const testnetII = "https://rdmx6-jaaaa-aaaaa-aaadq-cai.identity.dfinity.network/"
   document.getElementById("iiUrl").value = testnetII;
 };
 
