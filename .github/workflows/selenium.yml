@@ -14,7 +14,6 @@ jobs:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
         dfx: [ '0.8.1' ]
-        start-flag: [ '', '--emulator' ]
 
     steps:
       - uses: actions/checkout@v2
