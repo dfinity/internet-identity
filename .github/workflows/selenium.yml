@@ -42,14 +42,6 @@ jobs:
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Run demo app
-        run: |
-          cd demos/sample-javascript/
-          npm ci
-          npm run build
-          npm run develop --no-live-reload --no-devtool &
-          sleep 10 # crude
-
       - run: npm ci
       - run: dfx start ${{ matrix.start-flag }} --background
 
@@ -60,6 +52,14 @@ jobs:
 
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
+
+      - name: Run demo app
+        run: |
+          cd demos/sample-javascript/
+          npm ci
+          npm run build
+          npm run develop --no-live-reload --no-devtool &
+          sleep 10 # crude
 
       - run: rm -v -f screenshots/*.png
       - run: npm test -- --verbose
