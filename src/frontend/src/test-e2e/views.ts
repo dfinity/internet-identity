@@ -346,7 +346,7 @@ export class DemoAppView extends View {
     );
     await this.driver.wait(
       until.elementTextContains(whoamiResponseElem, "-"),
-      6_000
+      20_000
     );
     return await whoamiResponseElem.getText();
   }
