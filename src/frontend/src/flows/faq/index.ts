@@ -13,8 +13,9 @@ function renderQuestion(faq: Question) {
   >
     <details
     id=${faq.anchor} >
-    <summary class="font-bold font-sans border-b-2 w-full border-green-200">
+    <summary class="font-bold font-sans">
       ${faq.question}
+    <div class="gradient-decoration-small"></div>
     </summary>
     <div class="p-6">
       <p class="leading-8 font-extralight max-w-md">${faq.answer}</p>
@@ -61,15 +62,38 @@ const pageContent = html`
       list-style-type: none;
     }
 
+    .gradient-decoration {
+        background: -webkit-gradient(linear,left top,right top,from(#29abe2),color-stop(33%,#fbb03b),color-stop(66%,#f15a24),to(#ed1e79));
+        background: linear-gradient(90deg,#29abe2,#fbb03b 33%,#f15a24 66%,#ed1e79);
+        height: 2px;
+        /*position: absolute; */
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin: 2em 5em;
+    }
+
+    .gradient-decoration-small {
+        background: -webkit-gradient(linear,left top,right top,from(#29abe2),color-stop(33%,#fbb03b),color-stop(66%,#f15a24),to(#ed1e79));
+        background: linear-gradient(90deg,#29abe2,#fbb03b 33%,#f15a24 66%,#ed1e79);
+        height: 1px;
+        /*position: absolute; */
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
+
     :target {
       animation-name: flash-question;
       animation-duration: 600ms;
     }
   </style>
   <div class="container p-6 mx-auto h-full bg-gray-100 text-gray-500 max-w-2xl">
-    <h1 class="text-7xl text-center font-bold tracking-wide p-8 text-green-300">
+  <div>
+    <h1 class="text-7xl baba text-center font-bold tracking-wide p-8 text-gray-700">
       FAQ
     </h1>
+    <div class="gradient-decoration"></div>
     <ul class="px-6">
       ${Object.values(questions).map((faq) => renderQuestion(faq))}
     </ul>
