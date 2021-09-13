@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import "../../styles/main.css";
 
 import { questions } from "./questions";
 import type { Question } from "./questions";
@@ -9,23 +10,23 @@ export { questions } from "./questions";
 // The rendered (list item) question
 function renderQuestion(faq: Question) {
   return html`<li
-    class="py-8"
+    class="faq__question"
   >
     <details
     id=${faq.anchor} >
-    <summary class="font-bold font-sans">
+    <summary class="faq__question-summary">
       ${faq.question}
-    <div class="gradient-decoration-small"></div>
+    <div class="faq__question-underline"></div>
     </summary>
-    <div class="p-6">
-      <p class="leading-8 font-extralight max-w-md">${faq.answer}</p>
-      <ul class="p-4">
+    <div>
+      <p class="faq__answer">${faq.answer}</p>
+      <ul class="faq__answer-links">
         ${Object.values(faq.links).map(
           (link) =>
             html`<li>
               &middot;
               <a
-                class="text-gray-800"
+                class="faq__answer-link"
                 rel="noopener noreferrer"
                 href="${link.link}"
                 target="_blank"
@@ -52,7 +53,8 @@ const pageContent = html`
         background-color: transparent;
       }
       50% {
-        background-color: #a7f3d0;
+        background-color: rgba(237,186,152,1);
+        border-radius: 0.3em;;
       }
       100% {
         background-color: transparent;
@@ -60,9 +62,45 @@ const pageContent = html`
     }
     ul {
       list-style-type: none;
+      width: auto;
     }
 
-    .gradient-decoration {
+    .faq__questions {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+
+    .faq__question {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    .faq__question-underline {
+        background: -webkit-gradient(linear,left top,right top,from(#29abe2),color-stop(33%,#fbb03b),color-stop(66%,#f15a24),to(#ed1e79));
+        background: linear-gradient(90deg,#29abe2,#fbb03b 33%,#f15a24 66%,#ed1e79);
+        height: 1px;
+        /*position: absolute; */
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
+    .faq__question-summary {
+        font-weight: 700;
+        font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+
+    }
+
+    .faq__title {
+        color: rgba(55,65,81,1);
+        font-weight: 700;
+        font-size: 4.5rem;
+        line-height: 1;
+        text-align: center;
+        letter-spacing: 0.025em;
+        padding: 2rem;
+    }
+
+    .faq__title-underline {
         background: -webkit-gradient(linear,left top,right top,from(#29abe2),color-stop(33%,#fbb03b),color-stop(66%,#f15a24),to(#ed1e79));
         background: linear-gradient(90deg,#29abe2,#fbb03b 33%,#f15a24 66%,#ed1e79);
         height: 2px;
@@ -73,14 +111,33 @@ const pageContent = html`
         margin: 2em 5em;
     }
 
-    .gradient-decoration-small {
-        background: -webkit-gradient(linear,left top,right top,from(#29abe2),color-stop(33%,#fbb03b),color-stop(66%,#f15a24),to(#ed1e79));
-        background: linear-gradient(90deg,#29abe2,#fbb03b 33%,#f15a24 66%,#ed1e79);
-        height: 1px;
-        /*position: absolute; */
-        bottom: 0;
-        left: 0;
-        right: 0;
+    .faq__question-details-container {
+        height: max-content;
+    }
+
+    .faq__answer {
+        line-height: 2rem;
+        font-weight: 200;
+        max-width: 28rem;
+    }
+
+    .faq__answer-links {
+        padding: 1rem;
+    }
+
+    .faq__answer-link {
+        color: rgba(31,41,55,1);
+    }
+
+    .faq__container {
+        color: rgba(107,114,128,1);
+        padding: 1.5rem;
+        background-color: rgba(243,244,246,1);
+        max-width: 42rem;
+        height: 100%;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
     }
 
     :target {
@@ -88,13 +145,13 @@ const pageContent = html`
       animation-duration: 600ms;
     }
   </style>
-  <div class="container p-6 mx-auto h-full bg-gray-100 text-gray-500 max-w-2xl">
+  <div class="faq__container">
   <div>
-    <h1 class="text-7xl baba text-center font-bold tracking-wide p-8 text-gray-700">
+    <h1 class="faq__title">
       FAQ
     </h1>
-    <div class="gradient-decoration"></div>
-    <ul class="px-6">
+    <div class="faq__title-underline"></div>
+    <ul class="faq__questions">
       ${Object.values(questions).map((faq) => renderQuestion(faq))}
     </ul>
   </div>
@@ -111,6 +168,7 @@ const openAnchor = (): void => {
 };
 
 export const faqView = (): void => {
+  document.title = "FAQ | Internet Identity";
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   openAnchor(); // needs to happen after DOM was rendered

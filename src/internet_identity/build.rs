@@ -24,8 +24,7 @@ fn main() -> Result<(), String> {
         ("/", "../../dist/index.html", ContentEncoding::Identity),
 
         // The FAQ page is the same webapp, but the webapp routes to the correct page
-        // (well _almost_, the faq includes tailwind)
-        ("/faq", "../../dist/faq/index.html", ContentEncoding::Identity),
+        ("/faq", "../../dist/index.html", ContentEncoding::Identity),
         (
             "/index.html",
             "../../dist/index.html",
