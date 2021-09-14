@@ -61,8 +61,11 @@ jobs:
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
 
+      - name: install selenium webdrivers
+        run: npm run install-webdrivers
+
       - run: rm -v -f screenshots/*.png
-      - run: npm test -- --verbose
+      - run: npm test
       - run: dfx stop
 
       - name: Commit screenshots

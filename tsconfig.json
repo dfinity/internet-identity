@@ -14,7 +14,8 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "types": ["node", "jest", "webdriverio/async"]
   },
   "exclude": ["src/**/*.test.ts", "src/frontend/generated/*"]
 }
