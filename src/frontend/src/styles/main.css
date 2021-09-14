@@ -20,6 +20,8 @@
   --primary: black;
   --secondary: #cdcdcd;
   --accent: #323232;
+  --rainbow-orange: rgba(237, 186, 152, 1);
+
   background: var(--background-color);
   color: var(--text-color);
   box-sizing: border-box;
@@ -304,4 +306,117 @@ hr {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* FAQ related stuff */
+
+@media only screen and (max-width: 600px) {
+  .faq__container {
+    padding: 0.6rem;
+  }
+}
+@media only screen and (min-width: 600px) {
+  .faq__container {
+    padding: 4rem;
+  }
+}
+
+.faq__questions {
+  padding: 0;
+  list-style-type: none;
+}
+
+.faq__question {
+  padding: 1.5rem 0;
+}
+
+.faq__question-underline {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    right top,
+    from(#29abe2),
+    color-stop(33%, #fbb03b),
+    color-stop(66%, #f15a24),
+    to(#ed1e79)
+  );
+  background: linear-gradient(
+    90deg,
+    #29abe2,
+    #fbb03b 33%,
+    #f15a24 66%,
+    #ed1e79
+  );
+  height: 1px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+}
+.faq__question-summary {
+  font-weight: 700;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+.faq__title {
+  color: rgba(55, 65, 81, 1);
+  font-weight: 700;
+  font-size: 4.5rem;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0.025em;
+  padding: 2rem;
+}
+
+.faq__title-underline {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    right top,
+    from(#29abe2),
+    color-stop(33%, #fbb03b),
+    color-stop(66%, #f15a24),
+    to(#ed1e79)
+  );
+  background: linear-gradient(
+    90deg,
+    #29abe2,
+    #fbb03b 33%,
+    #f15a24 66%,
+    #ed1e79
+  );
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 2em 5em;
+}
+
+.faq__question-details-container {
+  height: max-content;
+}
+
+.faq__answer {
+  line-height: 2rem;
+  font-weight: 200;
+  max-width: 28rem;
+  padding: 1.2em;
+  margin: auto 0;
+}
+
+.faq__answer-links {
+  padding: 1rem;
+  list-style-type: none;
+  width: auto;
+}
+
+.faq__answer-link {
+  color: rgba(31, 41, 55, 1);
+}
+
+.faq__container {
+  background-color: rgba(243, 244, 246, 1);
+  max-width: 42rem;
 }
