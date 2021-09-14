@@ -18,22 +18,24 @@ export async function runInNestedBrowser(
 export async function startWebdriver(): Promise<ChildProcess | undefined> {
   let webdriverProcess: ChildProcess | undefined;
   let retryCount = 0;
+  let error;
   while (!webdriverProcess && retryCount < 10) {
     try {
-      console.log("starting webdriver...");
+      error = undefined;
       webdriverProcess = await SeleniumStandalone.start();
-      console.log("webdriver started");
     } catch (e) {
       // port may still be used from previous stopped webdriver, try again
+      error = e;
       retryCount++;
-      console.warn(e);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
-  if (!webdriverProcess)
+  if (error) {
     console.warn(
       'selenium could not be started. Make sure you installed the required webdrivers ("install-webdrivers")'
     );
+    console.error(error);
+  }
   return webdriverProcess;
 }
 
@@ -61,6 +63,7 @@ export async function runInBrowserCommon(
     },
     automationProtocol: "webdriver",
     path: "/wd/hub",
+    logLevel: "warn",
   });
 
   // setup test suite
@@ -71,6 +74,7 @@ export async function runInBrowserCommon(
     await test(browser);
   } catch (e) {
     console.log(await browser.getPageSource());
+    console.error(e);
     throw e;
   } finally {
     if (outer) {
