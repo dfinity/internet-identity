@@ -52,11 +52,7 @@ export async function runInBrowserCommon(
     capabilities: {
       browserName: "chrome",
       "goog:chromeOptions": {
-        args: [
-          "--headless",
-          "--disable-gpu",
-          "--window-size=1050,1400",
-        ],
+        args: ["--headless", "--disable-gpu", "--window-size=1050,1400"],
       },
     },
     automationProtocol: "webdriver",
