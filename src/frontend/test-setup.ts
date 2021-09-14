@@ -12,7 +12,6 @@ declare global {
         isUserConsenting: boolean
       ) => Promise<string>;
       removeVirtualWebAuth: (authenticatorId: string) => Promise<void>;
-      myNewCommand: (id: string, authenticatorId: string) => Promise<void>;
     }
   }
 }
