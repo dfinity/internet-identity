@@ -361,13 +361,16 @@ test("Screenshots", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
     await mainView.removeDevice(DEVICE_NAME2);
     // No dialog here!
-    await browser.waitUntil(async () => {
-      const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
-      return !(await device2.isDisplayed());
-    }, {
-      timeout: 5_000,
-      timeoutMsg: "expected device2 to be gone after 5s",
-    });
+    await browser.waitUntil(
+      async () => {
+        const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
+        return !(await device2.isDisplayed());
+      },
+      {
+        timeout: 5_000,
+        timeoutMsg: "expected device2 to be gone after 5s",
+      }
+    );
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
     await screenshot("15-after-removal", browser);
