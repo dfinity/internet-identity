@@ -82,12 +82,10 @@ const pageContent = html`
 `;
 
 const openAnchor = (): void => {
-  var hash = location.hash.substring(1);
+  const hash = location.hash.substring(1);
   if (hash) {
-    var details = document.getElementById(hash) as HTMLDetailsElement;
-    if (details) {
-      details.open = true;
-    }
+    const details = document.getElementById(hash) as HTMLDetailsElement;
+    details.open = true;
   }
 };
 
