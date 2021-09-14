@@ -23,7 +23,6 @@
     "@typescript-eslint/parser": "^4.28.4",
     "assert": "2.0.0",
     "buffer": "6.0.3",
-    "chromedriver": "^93.0.1",
     "compression-webpack-plugin": "^8.0.1",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.2.0",
