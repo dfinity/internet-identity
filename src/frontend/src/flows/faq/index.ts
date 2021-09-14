@@ -61,18 +61,19 @@ const pageContent = html`
     }
   </style>
   <div class="faq__container">
-      <h1 class="faq__title">FAQ</h1>
-      <ul class="faq__questions">
-        ${Object.values(questions).map((faq) => renderQuestion(faq))}
-      </ul>
+    <h1 class="faq__title">FAQ</h1>
+    <ul class="faq__questions">
+      ${Object.values(questions).map((faq) => renderQuestion(faq))}
+    </ul>
   </div>
 `;
 
 const openAnchor = (): void => {
   const hash = location.hash.substring(1);
 
-  if (hash) { // TODO: allowString false: https://github.com/typescript-eslint/typescript-eslint/blob/master/packages/eslint-plugin/docs/rules/strict-boolean-expressions.md#options
-      // and allowNumber
+  if (hash) {
+    // TODO: allowString false: https://github.com/typescript-eslint/typescript-eslint/blob/master/packages/eslint-plugin/docs/rules/strict-boolean-expressions.md#options
+    // and allowNumber
     const details = document.getElementById(hash) as HTMLDetailsElement;
     details.open = true; // FIXME
   }
