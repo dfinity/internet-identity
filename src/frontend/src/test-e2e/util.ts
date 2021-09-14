@@ -53,8 +53,6 @@ export async function runInBrowserCommon(
       browserName: "chrome",
       "goog:chromeOptions": {
         args: [
-          "--no-sandbox",
-          "--disable-infobars",
           "--headless",
           "--disable-gpu",
           "--window-size=1050,1400",
