@@ -347,7 +347,6 @@ export class DemoAppView extends View {
   async whoami(replicaUrl: string, whoamiCanister: string): Promise<string> {
     await fillText(this.browser, "hostUrl", replicaUrl);
     await fillText(this.browser, "canisterId", whoamiCanister);
-    await this.browser.$("#registerButton").click();
     await this.browser.$("#whoamiBtn").click();
     const whoamiResponseElem = await this.browser.$("#whoamiResponse");
     await whoamiResponseElem.waitUntil(

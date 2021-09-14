@@ -15,18 +15,25 @@ export async function runInNestedBrowser(
   await runInBrowserCommon(false, test);
 }
 
-export async function startWebdriver(): Promise<ChildProcess> {
-  let webdriverProcess;
+export async function startWebdriver(): Promise<ChildProcess | undefined> {
+  let webdriverProcess: ChildProcess | undefined;
   let retryCount = 0;
-  while (!webdriverProcess || retryCount > 10) {
+  while (!webdriverProcess && retryCount < 10) {
     try {
+      console.log("starting webdriver...");
       webdriverProcess = await SeleniumStandalone.start();
+      console.log("webdriver started");
     } catch (e) {
       // port may still be used from previous stopped webdriver, try again
       retryCount++;
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.warn(e);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
+  if (!webdriverProcess)
+    console.warn(
+      'selenium could not be started. Make sure you installed the required webdrivers ("install-webdrivers")'
+    );
   return webdriverProcess;
 }
 
@@ -181,7 +188,7 @@ export async function switchToPopup(
   expect(handles.length).toBe(2);
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
-  await addVirtualAuthenticator(driver);
+  await addVirtualAuthenticator(browser);
 }
 
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {

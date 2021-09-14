@@ -263,7 +263,7 @@ test("Screenshots", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Now the link device flow, using a second browser
-    await runInNestedBrowser(async (browser2) => {
+    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
       await browser2.url(II_URL);
       const welcomeView2 = new WelcomeView(browser2);
@@ -337,6 +337,7 @@ test("Screenshots", async () => {
         "This will remove your current device and you will be logged out"
       );
       await browser2.dismissAlert();
+      await browser2.deleteSession();
     });
 
     // About page
@@ -358,14 +359,12 @@ test("Screenshots", async () => {
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
-    const buttonElem2 = await browser.$(
-      `//div[string()='${DEVICE_NAME2}']/following-sibling::button`
-    );
     await mainView.removeDevice(DEVICE_NAME2);
     // No dialog here!
-    await browser.waitUntil(async () => !(await buttonElem2.isDisplayed()), {
+    const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
+    await browser.waitUntil(async () => !(await device2.isDisplayed()), {
       timeout: 3_000,
-      timeoutMsg: "expected button to be hidden after 3s",
+      timeoutMsg: "expected device2 to be gone after 3s",
     });
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
