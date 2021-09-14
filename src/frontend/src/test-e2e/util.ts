@@ -30,7 +30,7 @@ export async function startWebdriver(): Promise<ChildProcess | undefined> {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
-  if (error) {
+  if (error !== undefined) {
     console.warn(
       'selenium could not be started. Make sure you installed the required webdrivers ("install-webdrivers")'
     );
