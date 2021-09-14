@@ -368,7 +368,7 @@ test("Screenshots", async () => {
       },
       {
         timeout: 10_000,
-        timeoutMsg: "expected \"Other WebAuthn device\" to be gone after 10s",
+        timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
       }
     );
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
