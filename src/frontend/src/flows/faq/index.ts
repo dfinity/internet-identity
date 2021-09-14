@@ -42,16 +42,6 @@ function renderQuestion(faq: Question) {
 // The FAQ page
 const pageContent = html`
   <style>
-    html,
-    body,
-    main {
-      height: max-content;
-      overflow-x: hidden;
-    }
-
-    body {
-      position: relative;
-    }
     /* briefly flash the question when redirected to a particular question */
     @keyframes flash-question {
       0% {
@@ -71,21 +61,20 @@ const pageContent = html`
     }
   </style>
   <div class="faq__container">
-    <div>
       <h1 class="faq__title">FAQ</h1>
-      <div class="faq__title-underline"></div>
       <ul class="faq__questions">
         ${Object.values(questions).map((faq) => renderQuestion(faq))}
       </ul>
-    </div>
   </div>
 `;
 
 const openAnchor = (): void => {
   const hash = location.hash.substring(1);
-  if (hash) {
+
+  if (hash) { // TODO: allowString false: https://github.com/typescript-eslint/typescript-eslint/blob/master/packages/eslint-plugin/docs/rules/strict-boolean-expressions.md#options
+      // and allowNumber
     const details = document.getElementById(hash) as HTMLDetailsElement;
-    details.open = true;
+    details.open = true; // FIXME
   }
 };
 

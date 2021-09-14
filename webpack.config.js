@@ -23,7 +23,6 @@ function generateWebpackConfigForCanister(name, info) {
     mode: isProduction ? "production" : "development",
     entry: {
       index: path.join(__dirname, "src", "frontend", "src", "index"),
-      faq: path.join(__dirname, "src", "frontend", "src", "index"),
     },
     devtool,
     optimization: {

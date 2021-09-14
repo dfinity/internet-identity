@@ -20,6 +20,7 @@ export interface Question {
   links: Array<Link>;
 }
 
+// TODO: add prio + lexico
 export const questions = {
   windowsHello: {
     question: "Does Internet Identity support Windows Hello?",
