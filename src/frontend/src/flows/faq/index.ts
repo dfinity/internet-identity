@@ -46,6 +46,11 @@ const pageContent = html`
     body,
     main {
       height: max-content;
+      overflow-x: hidden;
+    }
+
+    body {
+        position: relative;
     }
     /* briefly flash the question when redirected to a particular question */
     @keyframes flash-question {
@@ -65,14 +70,23 @@ const pageContent = html`
       width: auto;
     }
 
+    @media only screen and (max-width: 600px) {
+        .faq__container {
+            padding: 0.6rem;
+        }
+    }
+    @media only screen and (min-width: 600px) {
+        .faq__container {
+            padding: 4rem;
+        }
+    }
+
     .faq__questions {
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
+        padding: 0;
     }
 
     .faq__question {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding: 1.5rem 0;
     }
 
     .faq__question-underline {
@@ -83,6 +97,7 @@ const pageContent = html`
         bottom: 0;
         left: 0;
         right: 0;
+        margin: auto;
     }
     .faq__question-summary {
         font-weight: 700;
@@ -119,6 +134,8 @@ const pageContent = html`
         line-height: 2rem;
         font-weight: 200;
         max-width: 28rem;
+        padding: 1.2em;
+        margin: auto 0;
     }
 
     .faq__answer-links {
@@ -130,14 +147,8 @@ const pageContent = html`
     }
 
     .faq__container {
-        color: rgba(107,114,128,1);
-        padding: 1.5rem;
         background-color: rgba(243,244,246,1);
         max-width: 42rem;
-        height: 100%;
-        margin-left: auto;
-        margin-right: auto;
-        width: 100%;
     }
 
     :target {
