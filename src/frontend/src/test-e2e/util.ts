@@ -70,7 +70,9 @@ export async function runInBrowserCommon(
   } catch (e) {
     console.log(await browser.getPageSource());
     console.error(e);
-    await browser.saveScreenshot(`screenshots/error/${(new Date()).toISOString()}.png`);
+    await browser.saveScreenshot(
+      `screenshots/error/${new Date().toISOString()}.png`
+    );
     throw e;
   } finally {
     if (outer) {
