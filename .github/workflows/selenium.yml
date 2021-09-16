@@ -85,3 +85,8 @@ jobs:
         with:
           name: e2e-test-log
           path: wdio.log
+      - name: Archive screenshots
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-screenshots
+          path: screenshots/**/*.png
