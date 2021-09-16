@@ -401,9 +401,7 @@ export class FAQView extends View {
   }
 
   async openQuestion(questionAnchor: string): Promise<void> {
-    await this.browser
-      .$(`#${questionAnchor} summary`)
-      .click();
+    await this.browser.$(`#${questionAnchor} summary`).click();
   }
 }
 
