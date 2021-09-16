@@ -37,6 +37,7 @@ const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -406,7 +407,7 @@ test("Screenshots", async () => {
 
     // Compatibility notice page
     await browser.url("about:blank");
-    await browser.url(II_URL + "/faq");
+    await browser.url(FAQ_URL);
     await waitForFonts(browser);
     const faqView = new FAQView(browser);
     await faqView.waitForDisplay();

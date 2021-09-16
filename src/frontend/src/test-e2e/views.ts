@@ -396,7 +396,7 @@ export class RecoverView extends View {
 export class FAQView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("//h1[string()='FAQ'")
+      .$("//h1[string()='FAQ']")
       .waitForDisplayed({ timeout: 5_000 });
   }
 }
