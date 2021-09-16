@@ -129,7 +129,7 @@ export class IIConnection {
     let devices: DeviceData[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
-      console.warn('iiConnection devices: ', devices);
+      console.warn("iiConnection devices: ", devices);
     } catch (e) {
       return {
         kind: "apiError",
@@ -159,13 +159,13 @@ export class IIConnection {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
-      console.warn('iiConnection delegationIdentity: ', delegationIdentity);
+      console.warn("iiConnection delegationIdentity: ", delegationIdentity);
     } catch (e) {
       return { kind: "authFail", error: e };
     }
 
     const actor = await IIConnection.createActor(delegationIdentity);
-    console.warn('iiConnection actor: ', actor);
+    console.warn("iiConnection actor: ", actor);
 
     return {
       kind: "loginSuccess",
