@@ -211,11 +211,6 @@ test("Screenshots", async () => {
 
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    console.log(
-      "webauth credentials1 start:",
-      // @ts-ignore
-      await browser.getVirtualWebAuthCredentials(authenticator1)
-    );
     await waitForFonts(browser);
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
@@ -230,11 +225,6 @@ test("Screenshots", async () => {
     await screenshots.take("register-confirm", browser);
     await registerView.confirmRegisterConfirm();
     await registerView.waitForIdentity();
-    console.log(
-      "webauth credentials1 registered:",
-      // @ts-ignore
-      await browser.getVirtualWebAuthCredentials(authenticator1)
-    );
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerIdentityFixup();
     await screenshots.take("register-user-number", browser);
@@ -277,7 +267,7 @@ test("Screenshots", async () => {
 
     // Now the link device flow, using a second browser
     await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
-      const authenticator2 = await addVirtualAuthenticator(browser2);
+      await addVirtualAuthenticator(browser2);
       await browser2.url(II_URL);
       const welcomeView2 = new WelcomeView(browser2);
       await welcomeView2.waitForDisplay();
@@ -290,12 +280,6 @@ test("Screenshots", async () => {
       await addIdentityAnchorView2.continue(userNumber);
       const addDeviceView2 = new AddDeviceView(browser2);
       await addDeviceView2.waitForDisplay();
-
-      console.log(
-        "webauth credentials2:",
-        // @ts-ignore
-        await browser2.getVirtualWebAuthCredentials(authenticator2)
-      );
 
       const link = await addDeviceView2.getLinkText();
       console.log("The add device link is", link);
@@ -310,12 +294,8 @@ test("Screenshots", async () => {
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
+      await browser.pause(5000);
       await welcomeBackView.login();
-      console.log(
-        "webauth credentials1 later later:",
-        // @ts-ignore
-        await browser.getVirtualWebAuthCredentials(authenticator1)
-      );
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
