@@ -405,12 +405,17 @@ test("Screenshots", async () => {
     await compatabilityNoticeView.waitForDisplay();
     await screenshots.take("compatibility-notice", browser);
 
-    // Compatibility notice page
+    // FAQ page
     await browser.url("about:blank");
     await browser.url(FAQ_URL);
     await waitForFonts(browser);
     const faqView = new FAQView(browser);
     await faqView.waitForDisplay();
     await screenshots.take("faq", browser);
+
+    // FAQ open page
+    await faqView.openQuestion("lost-device");
+    await faqView.waitForDisplay();
+    await screenshots.take("faq-open", browser);
   });
 }, 400_000);
