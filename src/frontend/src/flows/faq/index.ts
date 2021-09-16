@@ -71,7 +71,7 @@ const pageContent = html`
 const openAnchor = (): void => {
   const hash = location.hash.substring(1);
 
-  if (hash) {
+  if (hash !== "") {
     const details = document.getElementById(hash) as HTMLDetailsElement;
     details.open = true; // FIXME
   }
