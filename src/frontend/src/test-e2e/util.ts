@@ -58,7 +58,7 @@ export async function runInBrowserCommon(
     automationProtocol: "webdriver",
     path: "/wd/hub",
     logLevel: "info",
-    outputDir: "./"
+    outputDir: "./",
   });
 
   // setup test suite
