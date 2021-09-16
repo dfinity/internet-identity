@@ -19,7 +19,7 @@ export async function startWebdriver(): Promise<ChildProcess | undefined> {
   let webdriverProcess: ChildProcess | undefined;
   let retryCount = 0;
   let error;
-  while (!webdriverProcess && retryCount < 10) {
+  while (webdriverProcess === undefined && retryCount < 10) {
     try {
       error = undefined;
       webdriverProcess = await SeleniumStandalone.start();
