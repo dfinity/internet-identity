@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import "../../styles/main.css";
 
 import { questionsArray } from "./questions";
-import type { Question } from "./questions";
+import type { Question, Link } from "./questions";
 
 // re-export for ease of use
 export { questions } from "./questions";
@@ -20,8 +20,15 @@ function renderQuestion(faq: Question) {
     </summary>
     <div>
       <p class="faq__answer">${faq.answer}</p>
+      ${ faq.links.length > 0 ? renderFaqLinks(faq.links) : "" }
+    </div>
+  </li>`;
+}
+
+function renderFaqLinks(links: Link[]) {
+    return html`
       <ul class="faq__answer-links">
-        ${Object.values(faq.links).map(
+        ${Object.values(links).map(
           (link) =>
             html`<li>
               &middot;
@@ -34,9 +41,8 @@ function renderQuestion(faq: Question) {
               >
             </li>`
         )}
-      </ul>
-    </div>
-  </li>`;
+      </ul>`
+
 }
 
 // The FAQ page

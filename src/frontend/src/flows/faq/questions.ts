@@ -8,7 +8,7 @@
 // the jest limitation above we can't really inline the links, because that
 // would mean importing `lit-html` here...
 
-interface Link {
+export interface Link {
   name: string;
   link: string;
 }
