@@ -79,3 +79,9 @@ jobs:
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
           pull_strategy: "NO-PULL"
+
+      - name: Archive test logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-log
+          path: wdio.log
