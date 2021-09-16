@@ -58,6 +58,7 @@ export async function runInBrowserCommon(
     automationProtocol: "webdriver",
     path: "/wd/hub",
     logLevel: "info",
+    // outputDir pipes all webdriver log output into ./wdio.log
     outputDir: "./",
   });
 
@@ -72,6 +73,9 @@ export async function runInBrowserCommon(
     console.error(e);
     await browser.saveScreenshot(
       `screenshots/error/${new Date().toISOString()}.png`
+    );
+    console.log(
+      "An error occurred during e2e test execution. Logs can be found in the wdio.log file and an additional error screenshot was saved under screenshots/error. On Github Actions you can find the log and screenshots under 'Artifacts'."
     );
     throw e;
   } finally {
