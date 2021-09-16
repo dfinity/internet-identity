@@ -311,6 +311,11 @@ test("Screenshots", async () => {
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
       await welcomeBackView.login();
+      console.log(
+        "webauth credentials1 later later:",
+        // @ts-ignore
+        await browser.getVirtualWebAuthCredentials(authenticator1)
+      );
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
