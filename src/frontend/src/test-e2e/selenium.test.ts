@@ -6,6 +6,7 @@ import {
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
+  FAQView,
   MainView,
   RecoverView,
   RecoveryMethodSelectorView,
@@ -402,5 +403,13 @@ test("Screenshots", async () => {
     const compatabilityNoticeView = new CompatabilityNoticeView(browser);
     await compatabilityNoticeView.waitForDisplay();
     await screenshots.take("compatibility-notice", browser);
+
+    // Compatibility notice page
+    await browser.url("about:blank");
+    await browser.url(II_URL + "/faq");
+    await waitForFonts(browser);
+    const faqView = new FAQView(browser);
+    await faqView.waitForDisplay();
+    await screenshots.take("faq", browser);
   });
 }, 400_000);
