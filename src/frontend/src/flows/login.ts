@@ -51,7 +51,7 @@ export const login = async (
 }> => {
   try {
     const x = await tryLogin(userIntent);
-    console.warn('tryLogin done');
+    console.warn("tryLogin done");
 
     switch (x.tag) {
       case "ok": {
@@ -82,7 +82,7 @@ const tryLogin = async (userIntent: UserIntent): Promise<LoginResult> => {
   } else {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(pageContent(userNumber, userIntent), container);
-    console.warn('login page rendered');
+    console.warn("login page rendered");
     return init(userNumber, userIntent);
   }
 };
@@ -99,14 +99,14 @@ const init = async (
     ) as HTMLButtonElement;
 
     loginButton.onclick = async (ev) => {
-      console.warn('login button clicked');
+      console.warn("login button clicked");
       ev.preventDefault();
       ev.stopPropagation();
       const result = await withLoader(() => IIConnection.login(userNumber));
-      console.warn('logged in');
+      console.warn("logged in");
       resolve(apiResultToLoginResult(result));
     };
-    console.warn('login button initialized');
+    console.warn("login button initialized");
 
     loginDifferentButton.onclick = async (ev) => {
       ev.preventDefault();

@@ -35,7 +35,7 @@ const init = async () => {
     await displaySingleDeviceWarning();
     await setupRecovery(userNumber, connection);
   } else {
-    console.warn('no single device warning should be shown');
+    console.warn("no single device warning should be shown");
   }
 
   switch (userIntent.kind) {
