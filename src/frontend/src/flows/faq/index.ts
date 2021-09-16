@@ -68,12 +68,18 @@ const pageContent = html`
   </div>
 `;
 
+
+// Open the anchor with id="foo" if the page hash is "#foo"
 const openAnchor = (): void => {
   const hash = location.hash.substring(1);
 
   if (hash !== "") {
-    const details = document.getElementById(hash) as HTMLDetailsElement;
-    details.open = true; // FIXME
+    const details = document.getElementById(hash);
+    console.log(details);
+
+    if(details) {
+        details.setAttribute("open", "");
+    }
   }
 };
 
