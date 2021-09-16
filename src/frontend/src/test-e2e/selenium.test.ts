@@ -286,6 +286,9 @@ test("Screenshots", async () => {
       await addDeviceView2.fixup();
       await screenshots.take("new-device", browser2);
 
+      console.log('-----browser logs-----');
+      console.log(await browser.getLogs('browser'));
+
       // Log in with previous browser again
       await browser.url("about:blank");
       await browser.url(link);
@@ -294,11 +297,6 @@ test("Screenshots", async () => {
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
-      console.log('-----browser logs-----');
-      console.log(await browser.getLogs('browser'));
-      await welcomeBackView.login();
-      console.log('-----browser logs-----');
-      console.log(await browser.getLogs('browser'));
       await browser.pause(5000);
       console.log('-----browser logs-----');
       console.log(await browser.getLogs('browser'));

@@ -51,6 +51,7 @@ export const login = async (
 }> => {
   try {
     const x = await tryLogin(userIntent);
+    console.warn('tryLogin done');
 
     switch (x.tag) {
       case "ok": {
@@ -102,6 +103,7 @@ const init = async (
       ev.preventDefault();
       ev.stopPropagation();
       const result = await withLoader(() => IIConnection.login(userNumber));
+      console.warn('logged in');
       resolve(apiResultToLoginResult(result));
     };
     console.warn('login button initialized');

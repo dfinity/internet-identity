@@ -34,6 +34,8 @@ const init = async () => {
   if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
     await displaySingleDeviceWarning();
     await setupRecovery(userNumber, connection);
+  } else {
+    console.warn('no single device warning should be shown');
   }
 
   switch (userIntent.kind) {

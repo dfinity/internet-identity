@@ -66,6 +66,7 @@ const pageContent = () => html`
 export const displaySingleDeviceWarning = async (): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  console.warn('single device warning rendered');
   return init();
 };
 
