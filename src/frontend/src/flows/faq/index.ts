@@ -20,29 +20,31 @@ function renderQuestion(faq: Question) {
     </summary>
     <div>
       <p class="faq__answer">${faq.answer}</p>
-      ${ faq.links.length > 0 ? renderFaqLinks(faq.links) : "" }
+      ${faq.links.length > 0 ? renderFaqLinks(faq.links) : ""}
     </div>
   </li>`;
 }
 
 function renderFaqLinks(links: Link[]) {
-    return html`
-      <ul class="faq__answer-links">
-        ${Object.values(links).sort((a,b) => { return a.link < b.link ? -1 : 1 }).map(
-          (link) =>
-            html`<li>
-              &middot;
-              <a
-                class="faq__answer-link"
-                rel="noopener noreferrer"
-                href="${link.link}"
-                target="_blank"
-                >${link.name} &#8599;</a
-              >
-            </li>`
-        )}
-      </ul>`
-
+  return html` <ul class="faq__answer-links">
+    ${Object.values(links)
+      .sort((a, b) => {
+        return a.link < b.link ? -1 : 1;
+      })
+      .map(
+        (link) =>
+          html`<li>
+            &middot;
+            <a
+              class="faq__answer-link"
+              rel="noopener noreferrer"
+              href="${link.link}"
+              target="_blank"
+              >${link.name} &#8599;</a
+            >
+          </li>`
+      )}
+  </ul>`;
 }
 
 // The FAQ page
