@@ -149,6 +149,28 @@ export async function addCustomCommands(
       }
     )
   );
+
+  await browser.addCommand(
+    "getVirtualWebAuthCredentials",
+    command(
+      "GET",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
+      {
+        command: "getVirtualWebAuthCredentials",
+        description: "remove a virtual authenticator",
+        ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-add-virtual-authenticator",
+        variables: [
+          {
+            name: "authenticatorId",
+            type: "string",
+            description: "The id of the authenticator to remove",
+            required: true,
+          },
+        ],
+        parameters: [],
+      }
+    )
+  );
 }
 
 export async function addVirtualAuthenticator(
