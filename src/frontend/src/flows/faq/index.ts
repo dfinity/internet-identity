@@ -28,7 +28,7 @@ function renderQuestion(faq: Question) {
 function renderFaqLinks(links: Link[]) {
     return html`
       <ul class="faq__answer-links">
-        ${Object.values(links).map(
+        ${Object.values(links).sort((a,b) => { return a.link < b.link ? -1 : 1 }).map(
           (link) =>
             html`<li>
               &middot;
