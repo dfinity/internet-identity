@@ -81,11 +81,14 @@ jobs:
           pull_strategy: "NO-PULL"
 
       - name: Archive test logs
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: e2e-test-log ${{ matrix.start-flag }}
           path: wdio.log
+
       - name: Archive screenshots
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: e2e-screenshots ${{ matrix.start-flag }}
