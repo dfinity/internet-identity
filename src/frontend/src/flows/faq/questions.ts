@@ -71,9 +71,9 @@ export const questions = {
   },
 };
 
-// The questions, sorted by Priority (first) and then lexicographically (by anchor).
+// The questions, sorted lexicographically (by anchor) and then by Priority.
 export const questionsArray = Object.values(questions)
-  .sort((a, b) => a.priority - b.priority)
   .sort((a, b) => {
     return a.anchor > b.anchor ? +1 : -1;
-  });
+  })
+  .sort((a, b) => a.priority - b.priority);
