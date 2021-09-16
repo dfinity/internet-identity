@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import "../../styles/main.css";
 
-import { questions } from "./questions";
+import { questionsArray } from "./questions";
 import type { Question } from "./questions";
 
 // re-export for ease of use
@@ -63,7 +63,7 @@ const pageContent = html`
   <div class="faq__container">
     <h1 class="faq__title">FAQ</h1>
     <ul class="faq__questions">
-      ${Object.values(questions).map((faq) => renderQuestion(faq))}
+      ${questionsArray.map((faq) => renderQuestion(faq))}
     </ul>
   </div>
 `;

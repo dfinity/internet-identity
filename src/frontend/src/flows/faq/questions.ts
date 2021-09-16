@@ -20,9 +20,9 @@ export interface Question {
   links: Array<Link>;
 }
 
-// TODO: add prio + lexico
 export const questions = {
   windowsHello: {
+    priority: 10,
     question: "Does Internet Identity support Windows Hello?",
     anchor: "windows-hello",
     answer:
@@ -35,6 +35,7 @@ export const questions = {
     ],
   },
   lostDevice: {
+    priority: 1,
     question: "If I lose my device, can I still use Internet Identity?",
     anchor: "lost-device",
     answer:
@@ -47,6 +48,7 @@ export const questions = {
     ],
   },
   moreDevices: {
+    priority: 1,
     question: "How do I add more devices to my Identity Anchor?",
     anchor: "more-devices",
     answer:
@@ -59,6 +61,7 @@ export const questions = {
     ],
   },
   shareIIAnchor: {
+    priority: 10,
     question:
       "Does Internet Identity share my anchor or personal information with DApps?",
     anchor: "share-ii-anchor",
@@ -67,3 +70,10 @@ export const questions = {
     links: [],
   },
 };
+
+// The questions, sorted by Priority (first) and then lexicographically (by anchor).
+export const questionsArray = Object.values(questions)
+  .sort((a, b) => a.priority - b.priority)
+  .sort((a, b) => {
+    return a.anchor > b.anchor ? +1 : -1;
+  });
