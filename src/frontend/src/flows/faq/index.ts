@@ -83,9 +83,7 @@ const openAnchor = (): void => {
   if (hash !== "") {
     const details = document.getElementById(hash);
 
-    if (details) {
-      details.setAttribute("open", "");
-    }
+    details?.setAttribute("open", "");
   }
 };
 
