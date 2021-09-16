@@ -68,7 +68,6 @@ const pageContent = html`
   </div>
 `;
 
-
 // Open the anchor with id="foo" if the page hash is "#foo"
 const openAnchor = (): void => {
   const hash = location.hash.substring(1);
@@ -77,8 +76,8 @@ const openAnchor = (): void => {
     const details = document.getElementById(hash);
     console.log(details);
 
-    if(details) {
-        details.setAttribute("open", "");
+    if (details) {
+      details.setAttribute("open", "");
     }
   }
 };
