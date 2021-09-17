@@ -27,7 +27,6 @@ import {
   waitToClose,
 } from "./util";
 
-
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
@@ -52,36 +51,37 @@ const DEMO_APP_URL = "http://localhost:8080/";
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
 
-async function setupTestUser () {
-  const testPhrase = "script strategy fat bonus minimum elegant art hire vital palace combine vague proud exercise arrow copy media aim sleep soul energy crane amazing rely";
+async function setupTestUser() {
+  const testPhrase =
+    "script strategy fat bonus minimum elegant art hire vital palace combine vague proud exercise arrow copy media aim sleep soul energy crane amazing rely";
 
   const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent: new HttpAgent({}),
     canisterId: IDENTITY_CANISTER,
   });
   const testIdentity = await fromMnemonicWithoutValidation(testPhrase);
-  const testDevice: DeviceData = { 
-    alias: "testDevice", 
+  const testDevice: DeviceData = {
+    alias: "testDevice",
     pubkey: Array.from(testIdentity.getPublicKey().toDer()),
     key_type: { unknown: null },
     purpose: { authentication: null },
-    credential_id: []
+    credential_id: [],
   };
 
   const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
   const pow = getProofOfWork(now_in_ns, Principal.fromText(IDENTITY_CANISTER));
-  
+
   const response = await actor.register(testDevice, pow);
   if (hasOwnProperty(response, "registered")) {
-    return response.registered.user_number
+    return response.registered.user_number;
   } else {
-    throw new Error("Failed to create test user")
+    throw new Error("Failed to create test user");
   }
 }
 
 test.only("Use the test user", async () => {
   const anchor = await setupTestUser();
-  expect(anchor).toBe(BigInt(10_000))
+  expect(anchor).toBe(BigInt(10_000));
 }, 300_000);
 
 test("_Register new identity and login with it", async () => {
