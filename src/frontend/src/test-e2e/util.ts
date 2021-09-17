@@ -46,6 +46,8 @@ export async function runInBrowserCommon(
     console.log(
       "An error occurred during e2e test execution. Logs can be found in the wdio.log file and an additional error screenshot was saved under screenshots/error. On Github Actions you can find the log and screenshots under 'Artifacts'."
     );
+    console.log("-----browser logs error-----");
+    console.log(await browser.getLogs("browser"));
     throw e;
   } finally {
     if (outer) {
