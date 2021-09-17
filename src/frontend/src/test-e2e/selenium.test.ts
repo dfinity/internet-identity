@@ -288,6 +288,8 @@ test("Screenshots", async () => {
 
       console.log("-----browser logs-----");
       console.log(await browser.getLogs("browser"));
+      console.log("-----browser2 logs-----");
+      console.log(await browser2.getLogs("browser"));
 
       // Log in with previous browser again
       await browser.url("about:blank");
@@ -301,6 +303,8 @@ test("Screenshots", async () => {
       await browser.pause(3000);
       console.log("-----browser logs-----");
       console.log(await browser.getLogs("browser"));
+      console.log("-----browser2 logs-----");
+      console.log(await browser2.getLogs("browser"));
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
