@@ -128,7 +128,7 @@ const parseNewDeviceParam = (
     return null;
   }
   const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
-  const rawId = segments[2] ? blobFromHex(segments[2]) : undefined;
+  const rawId = segments[2] !== "" ? blobFromHex(segments[2]) : undefined;
   return { userNumber, publicKey, rawId };
 };
 

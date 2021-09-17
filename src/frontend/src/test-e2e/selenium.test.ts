@@ -6,6 +6,7 @@ import {
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
+  FAQView,
   MainView,
   RecoverView,
   RecoveryMethodSelectorView,
@@ -16,11 +17,11 @@ import {
 } from "./views";
 import { FLOWS } from "./flows";
 import {
+  Screenshots,
   addVirtualAuthenticator,
   removeVirtualAuthenticator,
   runInBrowser,
   runInNestedBrowser,
-  screenshot,
   switchToPopup,
   waitForFonts,
   waitToClose,
@@ -36,6 +37,7 @@ const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -205,39 +207,41 @@ test("Recover access, after registration", async () => {
 
 test("Screenshots", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const screenshots = new Screenshots("screenshots");
+
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
 
     await waitForFonts(browser);
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
-    await screenshot("00-welcome", browser);
+    await screenshots.take("welcome", browser);
     await welcomeView.register();
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
-    await screenshot("01-register", browser);
+    await screenshots.take("register", browser);
     await registerView.enterAlias(DEVICE_NAME1);
     await registerView.create();
     await registerView.waitForRegisterConfirm();
-    await screenshot("02-register-confirm", browser);
+    await screenshots.take("register-confirm", browser);
     await registerView.confirmRegisterConfirm();
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerIdentityFixup();
-    await screenshot("03-register-user-number", browser);
+    await screenshots.take("register-user-number", browser);
     await registerView.registerConfirmIdentity();
     const singleDeviceWarningView = new SingleDeviceWarningView(browser);
     await singleDeviceWarningView.waitForDisplay();
-    await screenshot("17-single-device-warning", browser);
+    await screenshots.take("single-device-warning", browser);
     await singleDeviceWarningView.continue();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
-    await screenshot("18-recover-method-selector", browser);
+    await screenshots.take("recover-method-selector", browser);
     await recoveryMethodSelectorView.skipRecovery();
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
-    await screenshot("04-main", browser);
+    await screenshots.take("main", browser);
     await mainView.logout();
     await welcomeView.waitForDisplay(); // no point taking screenshot
     await welcomeView.typeUserNumber(userNumber);
@@ -254,7 +258,7 @@ test("Screenshots", async () => {
     const userNumber2 = await welcomeBackView.getIdentityAnchor();
     expect(userNumber2).toBe(userNumber);
     await welcomeBackView.fixup();
-    await screenshot("05-welcome-back", browser);
+    await screenshots.take("welcome-back", browser);
     await welcomeBackView.login();
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
@@ -273,7 +277,7 @@ test("Screenshots", async () => {
       const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
       await addIdentityAnchorView2.waitForDisplay();
       await addIdentityAnchorView2.fixup();
-      await screenshot("06-new-device-user-number", browser2);
+      await screenshots.take("new-device-user-number", browser2);
       await addIdentityAnchorView2.continue(userNumber);
       const addDeviceView2 = new AddDeviceView(browser2);
       await addDeviceView2.waitForDisplay();
@@ -281,7 +285,7 @@ test("Screenshots", async () => {
       const link = await addDeviceView2.getLinkText();
       console.log("The add device link is", link);
       await addDeviceView2.fixup();
-      await screenshot("07-new-device", browser2);
+      await screenshots.take("new-device", browser2);
 
       // Log in with previous browser again
       await browser.url("about:blank");
@@ -290,7 +294,7 @@ test("Screenshots", async () => {
       const welcomeBackView = new WelcomeBackView(browser);
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
-      await screenshot("08-new-device-login", browser);
+      await screenshots.take("new-device-login", browser);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
@@ -299,20 +303,20 @@ test("Screenshots", async () => {
       const addDeviceView = new AddDeviceView(browser);
       await addDeviceView.waitForConfirmDisplay();
       await addDeviceView.fixupConfirm();
-      await screenshot("09-new-device-confirm", browser);
+      await screenshots.take("new-device-confirm", browser);
       await addDeviceView.confirm();
       await addDeviceView.waitForAliasDisplay();
-      await screenshot("10-new-device-alias", browser);
+      await screenshots.take("new-device-alias", browser);
       await addDeviceView.addDeviceAlias(DEVICE_NAME2);
       await addDeviceView.addDeviceAliasContinue();
       await addDeviceView.waitForAddDeviceSuccess();
-      await screenshot("11-new-device-done", browser);
+      await screenshots.take("new-device-done", browser);
 
       // Back to other browser, should be a welcome view now
       const welcomeBackView2 = new WelcomeBackView(browser2);
       await welcomeBackView2.waitForDisplay();
       await welcomeBackView2.fixup();
-      await screenshot("12-new-device-login", browser2);
+      await screenshots.take("new-device-login", browser2);
       await welcomeBackView2.login();
       const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
       await singleDeviceWarningView2.waitForDisplay();
@@ -325,7 +329,7 @@ test("Screenshots", async () => {
       const mainView2 = new MainView(browser2);
       await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView2.fixup();
-      await screenshot("13-new-device-listed", browser2);
+      await screenshots.take("new-device-listed", browser2);
 
       // Try to remove current device
       await mainView2.removeDevice(DEVICE_NAME2);
@@ -346,7 +350,7 @@ test("Screenshots", async () => {
     await waitForFonts(browser);
     const aboutView = new AboutView(browser);
     await aboutView.waitForDisplay();
-    await screenshot("14-about", browser);
+    await screenshots.take("about", browser);
 
     // Test device removal
     await browser.url(II_URL);
@@ -373,7 +377,7 @@ test("Screenshots", async () => {
     );
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
-    await screenshot("15-after-removal", browser);
+    await screenshots.take("after-removal", browser);
 
     await mainView.removeDevice(DEVICE_NAME1);
     const alertText1 = await browser.getAlertText();
@@ -399,6 +403,19 @@ test("Screenshots", async () => {
     await waitForFonts(browser);
     const compatabilityNoticeView = new CompatabilityNoticeView(browser);
     await compatabilityNoticeView.waitForDisplay();
-    await screenshot("16-compatibility-notice", browser);
+    await screenshots.take("compatibility-notice", browser);
+
+    // FAQ page
+    await browser.url("about:blank");
+    await browser.url(FAQ_URL);
+    await waitForFonts(browser);
+    const faqView = new FAQView(browser);
+    await faqView.waitForDisplay();
+    await screenshots.take("faq", browser);
+
+    // FAQ open page
+    await faqView.openQuestion("lost-device");
+    await faqView.waitForDisplay();
+    await screenshots.take("faq-open", browser);
   });
 }, 400_000);

@@ -8,7 +8,7 @@
 // the jest limitation above we can't really inline the links, because that
 // would mean importing `lit-html` here...
 
-interface Link {
+export interface Link {
   name: string;
   link: string;
 }
@@ -22,6 +22,7 @@ export interface Question {
 
 export const questions = {
   windowsHello: {
+    priority: 10,
     question: "Does Internet Identity support Windows Hello?",
     anchor: "windows-hello",
     answer:
@@ -34,6 +35,7 @@ export const questions = {
     ],
   },
   lostDevice: {
+    priority: 1,
     question: "If I lose my device, can I still use Internet Identity?",
     anchor: "lost-device",
     answer:
@@ -46,6 +48,7 @@ export const questions = {
     ],
   },
   moreDevices: {
+    priority: 1,
     question: "How do I add more devices to my Identity Anchor?",
     anchor: "more-devices",
     answer:
@@ -58,6 +61,7 @@ export const questions = {
     ],
   },
   shareIIAnchor: {
+    priority: 10,
     question:
       "Does Internet Identity share my anchor or personal information with DApps?",
     anchor: "share-ii-anchor",
@@ -66,3 +70,10 @@ export const questions = {
     links: [],
   },
 };
+
+// The questions, sorted lexicographically (by anchor) and then by Priority.
+export const questionsArray = Object.values(questions)
+  .sort((a, b) => {
+    return a.anchor > b.anchor ? +1 : -1;
+  })
+  .sort((a, b) => a.priority - b.priority);

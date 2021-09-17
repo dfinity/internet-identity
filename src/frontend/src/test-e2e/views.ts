@@ -393,6 +393,18 @@ export class RecoverView extends View {
   }
 }
 
+export class FAQView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("//h1[string()='FAQ']")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async openQuestion(questionAnchor: string): Promise<void> {
+    await this.browser.$(`#${questionAnchor} summary`).click();
+  }
+}
+
 async function fillText(
   browser: WebdriverIO.Browser,
   id: string,

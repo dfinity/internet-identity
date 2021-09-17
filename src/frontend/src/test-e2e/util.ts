@@ -19,7 +19,7 @@ export async function startWebdriver(): Promise<ChildProcess | undefined> {
   let webdriverProcess: ChildProcess | undefined;
   let retryCount = 0;
   let error;
-  while (!webdriverProcess && retryCount < 10) {
+  while (webdriverProcess === undefined && retryCount < 10) {
     try {
       error = undefined;
       webdriverProcess = await SeleniumStandalone.start();
@@ -164,11 +164,20 @@ export async function removeVirtualAuthenticator(
   return await browser.removeVirtualWebAuth(authenticatorId);
 }
 
-export async function screenshot(
-  name: string,
-  browser: WebdriverIO.Browser
-): Promise<void> {
-  await browser.saveScreenshot(`screenshots/${name}.png`);
+// 'Screenshots' objects are used to make sure all screenshots end up in the
+// same directory, each with a different (increasing) number prefixed in the
+// filename.
+export class Screenshots {
+  private count = 0;
+
+  constructor(private directory: string) {}
+
+  async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
+    this.count++;
+    // Make sure that all screenshots are prefixed with "01-", "02-", ...
+    const countStr: string = this.count.toFixed().padStart(2, "0");
+    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}.png`);
+  }
 }
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
