@@ -131,6 +131,7 @@ export class IIConnection {
       devices = await this.lookupAuthenticators(userNumber);
       console.warn("iiConnection devices: ", devices);
     } catch (e) {
+      console.warn("iiConnection error: ", e);
       return {
         kind: "apiError",
         error: e,
