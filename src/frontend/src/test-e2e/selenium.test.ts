@@ -296,6 +296,7 @@ test("Screenshots", async () => {
       await browser.pause(3000);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
+      await browser.pause(3000);
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
@@ -307,6 +308,7 @@ test("Screenshots", async () => {
       await addDeviceView.waitForAliasDisplay();
       await screenshots.take("new-device-alias", browser);
       await addDeviceView.addDeviceAlias(DEVICE_NAME2);
+      await browser.pause(3000);
       await addDeviceView.addDeviceAliasContinue();
       await addDeviceView.waitForAddDeviceSuccess();
       await screenshots.take("new-device-done", browser);
@@ -324,6 +326,7 @@ test("Screenshots", async () => {
         browser2
       );
       await recoveryMethodSelectorView2.waitForDisplay();
+      await browser.pause(3000);
       await recoveryMethodSelectorView2.skipRecovery();
       const mainView2 = new MainView(browser2);
       await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
