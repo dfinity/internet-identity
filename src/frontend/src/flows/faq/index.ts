@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import "../../styles/main.css";
 
 import { questionsArray } from "./questions";
 import type { Question, Link } from "./questions";
