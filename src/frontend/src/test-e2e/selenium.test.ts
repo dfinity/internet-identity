@@ -309,7 +309,6 @@ test("Screenshots", async () => {
 
       await singleDeviceWarningView.waitForDisplay();
 
-
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
