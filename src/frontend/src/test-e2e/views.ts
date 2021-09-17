@@ -85,7 +85,7 @@ export class SingleDeviceWarningView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#displayWarningPrimary")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 30_000 });
   }
 
   async continue(): Promise<void> {

@@ -300,12 +300,16 @@ test("Screenshots", async () => {
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
       await welcomeBackView.login();
-      await browser.pause(30_000);
+
+      await browser.pause(3_000);
       console.log("-----browser logs-----");
       console.log(await browser.getLogs("browser"));
       console.log("-----browser2 logs-----");
       console.log(await browser2.getLogs("browser"));
+
       await singleDeviceWarningView.waitForDisplay();
+
+
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
