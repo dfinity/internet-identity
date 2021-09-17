@@ -273,7 +273,9 @@ export class IIConnection {
     newPublicKey: DerEncodedBlob,
     credentialId?: BinaryBlob
   ): Promise<void> => {
+    console.warn("connection add");
     const actor = await this.getActor();
+    console.warn("connection actor: ", actor);
     return await actor.add(userNumber, {
       alias,
       pubkey: Array.from(newPublicKey),

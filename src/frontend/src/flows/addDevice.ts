@@ -87,6 +87,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
             rawId
           )
         );
+        console.warn("addDevice connection added");
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
         console.warn("addDevice successfully added: ", deviceName);
