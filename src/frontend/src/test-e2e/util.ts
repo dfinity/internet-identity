@@ -72,7 +72,7 @@ export async function runInBrowserCommon(
     console.log(await browser.getPageSource());
     console.error(e);
     await browser.saveScreenshot(
-      `screenshots/error/${new Date().toISOString()}.png`
+      `screenshots/error/${new Date().getTime()}.png`
     );
     console.log(
       "An error occurred during e2e test execution. Logs can be found in the wdio.log file and an additional error screenshot was saved under screenshots/error. On Github Actions you can find the log and screenshots under 'Artifacts'."
