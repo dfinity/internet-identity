@@ -127,7 +127,7 @@ export async function addCustomCommands(
       "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
       {
         command: "getVirtualWebAuthCredentials",
-        description: "remove a virtual authenticator",
+        description: "get a virtual authenticator",
         ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-add-virtual-authenticator",
         variables: [
           {

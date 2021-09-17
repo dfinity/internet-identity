@@ -209,7 +209,7 @@ test("Screenshots", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const screenshots = new Screenshots("screenshots");
 
-    await addVirtualAuthenticator(browser);
+    const authenticator1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     await waitForFonts(browser);
     const welcomeView = new WelcomeView(browser);
@@ -259,6 +259,11 @@ test("Screenshots", async () => {
     await welcomeBackView.fixup();
     await screenshots.take("welcome-back", browser);
     await welcomeBackView.login();
+    console.log(
+      `1. credentials: `,
+      // @ts-ignore
+      await browser.getVirtualWebAuthCredentials(authenticator1)
+    );
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
@@ -267,7 +272,7 @@ test("Screenshots", async () => {
 
     // Now the link device flow, using a second browser
     await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
-      await addVirtualAuthenticator(browser2);
+      const authenticator2 = await addVirtualAuthenticator(browser2);
       await browser2.url(II_URL);
       const welcomeView2 = new WelcomeView(browser2);
       await welcomeView2.waitForDisplay();
@@ -299,8 +304,23 @@ test("Screenshots", async () => {
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
-      await welcomeBackView.login();
+      console.log(
+        `2. credentials: `,
+        // @ts-ignore
+        await browser.getVirtualWebAuthCredentials(authenticator1)
+      );
+      let shouldNotExistCredentials;
 
+      try {
+        // @ts-ignore
+        shouldNotExistCredentials = await browser.getVirtualWebAuthCredentials(
+          authenticator2
+        );
+      } catch (e) {
+        console.log("3. credentials do not exist here");
+      }
+      console.log(`3. credentials: `, shouldNotExistCredentials);
+      await welcomeBackView.login();
       await browser.pause(3_000);
       console.log("-----browser logs-----");
       console.log(await browser.getLogs("browser"));
