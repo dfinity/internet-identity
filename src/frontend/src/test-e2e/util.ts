@@ -32,7 +32,7 @@ export async function startWebdriver(): Promise<ChildProcess | undefined> {
   }
   if (error !== undefined) {
     console.warn(
-      'selenium could not be started. Make sure you installed the required webdrivers ("install-webdrivers")'
+      'selenium could not be started. Make sure you installed the required webdrivers ("npm run install-webdrivers")'
     );
     console.error(error);
   }
@@ -59,6 +59,7 @@ export async function runInBrowserCommon(
     path: "/wd/hub",
     logLevel: "info",
     // outputDir pipes all webdriver log output into ./wdio.log
+    // stdout only contains errors on test failures
     outputDir: "./",
   });
 
