@@ -6,6 +6,7 @@ import {
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
+  FAQView,
   MainView,
   RecoverView,
   RecoveryMethodSelectorView,
@@ -36,6 +37,7 @@ const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -402,5 +404,18 @@ test("Screenshots", async () => {
     const compatabilityNoticeView = new CompatabilityNoticeView(browser);
     await compatabilityNoticeView.waitForDisplay();
     await screenshots.take("compatibility-notice", browser);
+
+    // FAQ page
+    await browser.url("about:blank");
+    await browser.url(FAQ_URL);
+    await waitForFonts(browser);
+    const faqView = new FAQView(browser);
+    await faqView.waitForDisplay();
+    await screenshots.take("faq", browser);
+
+    // FAQ open page
+    await faqView.openQuestion("lost-device");
+    await faqView.waitForDisplay();
+    await screenshots.take("faq-open", browser);
   });
 }, 400_000);

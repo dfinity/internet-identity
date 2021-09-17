@@ -1,32 +1,49 @@
 import { html, render } from "lit-html";
 
-import { questions } from "./questions";
-import type { Question } from "./questions";
+import { questionsArray } from "./questions";
+import type { Question, Link } from "./questions";
 
 // re-export for ease of use
 export { questions } from "./questions";
 
 // The rendered (list item) question
 function renderQuestion(faq: Question) {
-  return html`<li id=${faq.anchor}>
-    <h3>${faq.question}</h3>
-    <p>${faq.answer}</p>
-    <ul class="links-list">
-      ${Object.values(faq.links).map(
+  return html`<li
+    class="faq__question"
+  >
+    <details
+    id=${faq.anchor} >
+    <summary class="faq__question-summary">
+      ${faq.question}
+    <div class="faq__question-underline"></div>
+    </summary>
+    <div>
+      <p class="faq__answer">${faq.answer}</p>
+      ${faq.links.length > 0 ? renderFaqLinks(faq.links) : ""}
+    </div>
+  </li>`;
+}
+
+function renderFaqLinks(links: Link[]) {
+  return html` <ul class="faq__answer-links">
+    ${Object.values(links)
+      .sort((a, b) => {
+        return a.link < b.link ? -1 : 1;
+      })
+      .map(
         (link) =>
           html`<li>
             &middot;
             <a
-              class="textLink"
+              class="faq__answer-link"
               rel="noopener noreferrer"
               href="${link.link}"
               target="_blank"
-              >${link.name}</a
+              >${link.name} &#8599;</a
             >
           </li>`
       )}
-    </ul>
-  </li>`;
+  </ul>`;
 }
 
 // The FAQ page
@@ -38,39 +55,43 @@ const pageContent = html`
         background-color: transparent;
       }
       50% {
-        background-color: var(--grey-100);
+        background-color: var(--rainbow-orange);
+        border-radius: 0.3em;
       }
       100% {
         background-color: transparent;
       }
     }
-
-    a {
-      color: var(--grey-800);
-    }
-
-    ul {
-      list-style-type: none;
-    }
-
-    li {
-      border-radius: 0.5rem;
-      padding: 0.5rem;
-    }
     :target {
       animation-name: flash-question;
-      animation-duration: 3s;
+      animation-duration: 600ms;
     }
   </style>
-  <div class="container" id="faq">
-    <h1>FAQ</h1>
-    <ul>
-      ${Object.values(questions).map((faq) => renderQuestion(faq))}
+  <div class="faq__container">
+    <h1 class="faq__title">FAQ</h1>
+    <ul class="faq__questions">
+      ${questionsArray.map((faq) => renderQuestion(faq))}
     </ul>
   </div>
 `;
 
+// Open the anchor with id="foo" if the page hash is "#foo"
+const openAnchor = (): void => {
+  const hash = location.hash.substring(1);
+
+  if (hash !== "") {
+    const details = document.getElementById(hash);
+    console.log(details);
+
+    if (details) {
+      details.setAttribute("open", "");
+    }
+  }
+};
+
 export const faqView = (): void => {
+  document.title = "FAQ | Internet Identity";
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  openAnchor(); // needs to happen after DOM was rendered
 };
