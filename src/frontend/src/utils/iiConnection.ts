@@ -212,7 +212,9 @@ export class IIConnection {
   static async lookupAuthenticators(
     userNumber: UserNumber
   ): Promise<DeviceData[]> {
+    console.warn("lookupAuthenticators start");
     const allDevices = await baseActor.lookup(userNumber);
+    console.warn("lookupAuthenticators allDevices: ", allDevices);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "authentication")
     );
