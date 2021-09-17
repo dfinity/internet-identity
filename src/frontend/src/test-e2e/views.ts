@@ -1,85 +1,79 @@
-import { By, ThenableWebDriver, until } from "selenium-webdriver";
-
 class View {
-  constructor(protected driver: ThenableWebDriver) {}
+  constructor(protected browser: WebdriverIO.Browser) {}
 }
 
 export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("registerUserNumber")),
-      10_000
-    );
+    await this.browser
+      .$("#registerUserNumber")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
-    await this.driver
-      .findElement(By.id("registerUserNumber"))
-      .sendKeys(userNumber);
+    await this.browser.$("#registerUserNumber").setValue(userNumber);
   }
 
   async login(): Promise<void> {
-    await this.driver.findElement(By.id("loginButton")).click();
+    await this.browser.$("#loginButton").click();
   }
 
   async register(): Promise<void> {
-    await this.driver.findElement(By.id("registerButton")).click();
+    await this.browser.$("#registerButton").click();
   }
 
   async addDevice(): Promise<void> {
-    await this.driver.findElement(By.id("addNewDeviceButton")).click();
+    await this.browser.$("#addNewDeviceButton").click();
+  }
+
+  async recover(): Promise<void> {
+    await this.browser.$("#recoverButton").click();
   }
 }
 
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("registerAlias")),
-      10_000
-    );
+    await this.browser
+      .$("#registerAlias")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async enterAlias(alias: string): Promise<void> {
-    await this.driver.findElement(By.id("registerAlias")).sendKeys(alias);
+    await this.browser.$("#registerAlias").setValue(alias);
   }
 
   async create(): Promise<void> {
-    await this.driver.findElement(By.css('button[type="submit"]')).click();
+    await this.browser.$('button[type="submit"]').click();
   }
 
   // View: Register confirmation
   async waitForRegisterConfirm(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("confirmRegisterButton")),
-      25_000
-    );
+    await this.browser
+      .$("#confirmRegisterButton")
+      .waitForDisplayed({ timeout: 25_000 });
   }
 
   async confirmRegisterConfirm(): Promise<void> {
-    await this.driver.findElement(By.id("confirmRegisterButton")).click();
+    await this.browser.$("#confirmRegisterButton").click();
   }
 
   // View: Register Show Number
   async waitForIdentity(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("displayUserContinue")),
-      15_000
-    );
+    await this.browser
+      .$("#displayUserContinue")
+      .waitForDisplayed({ timeout: 15_000 });
   }
 
   async registerGetIdentity(): Promise<string> {
-    return await this.driver
-      .findElement(By.className("highlightBox"))
-      .getText();
+    return await this.browser.$(".highlightBox").getText();
   }
 
   async registerConfirmIdentity(): Promise<void> {
-    await this.driver.findElement(By.id("displayUserContinue")).click();
+    await this.browser.$("#displayUserContinue").click();
   }
 
   async registerIdentityFixup(): Promise<void> {
-    const elem = await this.driver.findElement(By.className("highlightBox"));
-    await this.driver.executeScript(
+    const elem = await this.browser.$(".highlightBox");
+    await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
       "12345"
@@ -89,50 +83,80 @@ export class RegisterView extends View {
 
 export class SingleDeviceWarningView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("displayWarningPrimary")),
-      3_000
-    );
+    await this.browser
+      .$("#displayWarningPrimary")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async continue(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
-    await this.driver.executeScript(
+    await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.driver.findElement(By.id("displayWarningPrimary")).click();
+    await this.browser.$("#displayWarningPrimary").click();
   }
 }
 
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(until.elementLocated(By.id("skipRecovery")), 3_000);
+    await this.browser.$("#skipRecovery").waitForDisplayed({ timeout: 3_000 });
   }
 
-  async skip(): Promise<void> {
-    await this.driver.findElement(By.id("skipRecovery")).click();
+  async useSeedPhrase(): Promise<void> {
+    await this.browser.$("#seedPhrase").click();
+  }
+
+  async waitForSeedPhrase(): Promise<void> {
+    await this.browser
+      .$("//h1[string()='Seedphrase']")
+      .waitForDisplayed({ timeout: 15_000 });
+  }
+
+  async getSeedPhrase(): Promise<string> {
+    return await this.browser.$("#seedPhrase").getText();
+  }
+
+  async skipRecovery(): Promise<void> {
+    await this.browser.$("#skipRecovery").click();
+  }
+
+  async copySeedPhrase(): Promise<void> {
+    await this.browser.$("#seedCopy").click();
+  }
+
+  async seedPhraseContinue(): Promise<void> {
+    await this.browser.$("#displaySeedPhraseContinue").click();
   }
 }
 
 export class MainView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("//h1[string()='Anchor Management']")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.xpath(`//div[string()='${deviceName}']`)),
-      10_000
-    );
+    await this.browser
+      .$(`//div[string()='${deviceName}']`)
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async addAdditionalDevice(): Promise<void> {
-    await this.driver.findElement(By.id("addAdditionalDevice")).click();
+    await this.browser.$("#addAdditionalDevice").click();
   }
 
   async logout(): Promise<void> {
-    await this.driver.findElement(By.id("logoutButton")).click();
+    await this.browser.$("#logoutButton").click();
+  }
+
+  async addRecovery(): Promise<void> {
+    await this.browser.$("#addRecovery").click();
   }
 
   async fixup(): Promise<void> {
-    const elem = await this.driver.findElement(By.className("highlightBox"));
-    await this.driver.executeScript(
+    const elem = await this.browser.$(".highlightBox");
+    await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
       "12345"
@@ -140,65 +164,58 @@ export class MainView extends View {
   }
 
   async removeDevice(deviceName: string): Promise<void> {
-    await this.driver
-      .findElement(
-        By.xpath(`//div[string()='${deviceName}']/following-sibling::button`)
-      )
+    await this.browser
+      .$(`//div[string()='${deviceName}']/following-sibling::button`)
       .click();
   }
 }
 
 export class AddDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("deviceAliasContinue")),
-      3_000
-    );
+    await this.browser
+      .$("#deviceAliasContinue")
+      .waitForDisplayed({ timeout: 3_000 });
   }
 
   async addAdditionalDevice(alias: string): Promise<void> {
-    await this.driver.findElement(By.id("deviceAlias")).sendKeys(alias);
+    await this.browser.$("#deviceAlias").setValue(alias);
   }
 
   async continue(): Promise<void> {
-    await this.driver.findElement(By.id("deviceAliasContinue")).click();
+    await this.browser.$("#deviceAliasContinue").click();
   }
 }
 
 export class AuthorizeAppView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("confirmRedirect")),
-      5_000
-    );
+    await this.browser
+      .$("#confirmRedirect")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async confirm(): Promise<void> {
-    await this.driver.findElement(By.id("confirmRedirect")).click();
+    await this.browser.$("#confirmRedirect").click();
   }
 }
 
 export class WelcomeBackView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("loginDifferent")),
-      15_000
-    );
+    await this.browser
+      .$("#loginDifferent")
+      .waitForDisplayed({ timeout: 15_000 });
   }
 
   async getIdentityAnchor(): Promise<string> {
-    return await this.driver
-      .findElement(By.className("highlightBox"))
-      .getText();
+    return await this.browser.$(".highlightBox").getText();
   }
 
   async login(): Promise<void> {
-    await this.driver.findElement(By.id("login")).click();
+    await this.browser.$("#login").click();
   }
 
   async fixup(): Promise<void> {
-    const elem = await this.driver.findElement(By.className("highlightBox"));
-    await this.driver.executeScript(
+    const elem = await this.browser.$(".highlightBox");
+    await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
       "12345"
@@ -208,23 +225,22 @@ export class WelcomeBackView extends View {
 
 export class AddIdentityAnchorView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("addDeviceUserNumber")),
-      3_000
-    );
+    await this.browser
+      .$("#addDeviceUserNumber")
+      .waitForDisplayed({ timeout: 3_000 });
   }
 
   async continue(userNumber?: string): Promise<void> {
     if (userNumber !== undefined) {
-      await fillText(this.driver, "addDeviceUserNumber", userNumber);
+      await fillText(this.browser, "addDeviceUserNumber", userNumber);
     }
-    await this.driver.findElement(By.id("addDeviceUserNumberContinue")).click();
+    await this.browser.$("#addDeviceUserNumberContinue").click();
   }
 
   async fixup(): Promise<void> {
     // replace the Identity Anchor for a reproducible screenshot
-    const elem = await this.driver.findElement(By.id("addDeviceUserNumber"));
-    await this.driver.executeScript(
+    const elem = await this.browser.$("#addDeviceUserNumber");
+    await this.browser.execute(
       "arguments[0].value = arguments[1];",
       elem,
       "12345"
@@ -234,21 +250,17 @@ export class AddIdentityAnchorView extends View {
 
 export class AddDeviceView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(until.elementLocated(By.id("linkText")), 3_000);
+    await this.browser.$("#linkText").waitForDisplayed({ timeout: 3_000 });
   }
 
   async getLinkText(): Promise<string> {
-    return await this.driver
-      .findElement(By.id("linkText"))
-      .getAttribute("value");
+    return await this.browser.$("#linkText").getAttribute("value");
   }
 
   async fixup(): Promise<void> {
-    const elem = await this.driver.wait(
-      until.elementLocated(By.id("linkText")),
-      3_000
-    );
-    await this.driver.executeScript(
+    await this.browser.$("#linkText").waitForDisplayed({ timeout: 3_000 });
+    const elem = await this.browser.$("#linkText");
+    await this.browser.execute(
       "arguments[0].value = arguments[1];",
       elem,
       "(link removed from screenshot)"
@@ -257,18 +269,16 @@ export class AddDeviceView extends View {
 
   // View: Add device confirm
   async waitForConfirmDisplay(): Promise<void> {
-    await this.driver.wait(until.elementLocated(By.id("addDevice")), 3_000);
+    await this.browser.$("#addDevice").waitForDisplayed({ timeout: 3_000 });
   }
 
   async confirm(): Promise<void> {
-    await this.driver.findElement(By.id("addDevice")).click();
+    await this.browser.$("#addDevice").click();
   }
 
   async fixupConfirm(): Promise<void> {
-    const userNumberElem = await this.driver.findElement(
-      By.className("highlightBox")
-    );
-    await this.driver.executeScript(
+    const userNumberElem = await this.browser.$(".highlightBox");
+    await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       userNumberElem,
       "12345"
@@ -277,83 +287,130 @@ export class AddDeviceView extends View {
 
   // View: Add device alias
   async waitForAliasDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("deviceAliasContinue")),
-      3_000
-    );
+    await this.browser
+      .$("#deviceAliasContinue")
+      .waitForDisplayed({ timeout: 3_000 });
   }
 
   async addDeviceAlias(alias: string): Promise<void> {
-    await this.driver.findElement(By.id("deviceAlias")).sendKeys(alias);
+    await this.browser.$("#deviceAlias").setValue(alias);
   }
 
   async addDeviceAliasContinue(): Promise<void> {
-    await this.driver.findElement(By.id("deviceAliasContinue")).click();
+    await this.browser.$("#deviceAliasContinue").click();
   }
 
   // View: Add device success
   async waitForAddDeviceSuccess(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("manageDevicesButton")),
-      10_000
-    );
+    await this.browser
+      .$("#manageDevicesButton")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 }
 
 export class AboutView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(until.elementLocated(By.id("about")), 3_000);
+    await this.browser.$("#about").waitForDisplayed({ timeout: 3_000 });
   }
 }
 
 export class CompatabilityNoticeView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(
-      until.elementLocated(By.id("compatibilityNotice")),
-      3_000
-    );
+    await this.browser
+      .$("#compatibilityNotice")
+      .waitForDisplayed({ timeout: 3_000 });
   }
 }
 
 export class DemoAppView extends View {
   async open(demoAppUrl: string, iiUrl: string): Promise<void> {
-    await this.driver.get(demoAppUrl);
-    await fillText(this.driver, "iiUrl", iiUrl);
+    await this.browser.url(demoAppUrl);
+    await fillText(this.browser, "iiUrl", iiUrl);
   }
 
   async waitForDisplay(): Promise<void> {
-    await this.driver.wait(until.elementLocated(By.id("principal")), 10_000);
+    await this.browser.$("#principal").waitForDisplayed({ timeout: 10_000 });
   }
 
   async getPrincipal(): Promise<string> {
-    return await this.driver.findElement(By.id("principal")).getText();
+    return await this.browser.$("#principal").getText();
   }
 
   async signin(): Promise<void> {
-    await this.driver.findElement(By.id("signinBtn")).click();
+    await this.browser.$("#signinBtn").click();
   }
 
   async setMaxTimeToLive(mttl: BigInt): Promise<void> {
-    await fillText(this.driver, "maxTimeToLive", String(mttl));
+    await fillText(this.browser, "maxTimeToLive", String(mttl));
   }
 
   async whoami(replicaUrl: string, whoamiCanister: string): Promise<string> {
-    await fillText(this.driver, "hostUrl", replicaUrl);
-    await fillText(this.driver, "canisterId", whoamiCanister);
-    await this.driver.findElement(By.id("whoamiBtn")).click();
-    const whoamiResponseElem = await this.driver.findElement(
-      By.id("whoamiResponse")
-    );
-    await this.driver.wait(
-      until.elementTextContains(whoamiResponseElem, "-"),
-      20_000
+    await fillText(this.browser, "hostUrl", replicaUrl);
+    await fillText(this.browser, "canisterId", whoamiCanister);
+    await this.browser.$("#whoamiBtn").click();
+    const whoamiResponseElem = await this.browser.$("#whoamiResponse");
+    await whoamiResponseElem.waitUntil(
+      async () => {
+        return (await whoamiResponseElem.getText()).indexOf("-") !== -1;
+      },
+      {
+        timeout: 6_000,
+        timeoutMsg: 'expected whoami response to contain "-" for 6s',
+      }
     );
     return await whoamiResponseElem.getText();
   }
 }
 
-async function fillText(driver: ThenableWebDriver, id: string, text: string) {
-  const elem = await driver.findElement(By.id(id));
-  elem.clear();
-  elem.sendKeys(text);
+export class RecoverView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$(`//h1[string()='Recover Identity Anchor']`)
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterIdentityAnchor(identityAnchor: string): Promise<void> {
+    await this.browser.$("#userNumberInput").setValue(identityAnchor);
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#userNumberContinue").click();
+  }
+
+  // enter seed phrase view
+  async waitForSeedInputDisplay(): Promise<void> {
+    await this.browser
+      .$(`//h1[string()='Your seed phrase']`)
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterSeedPhrase(seedPhrase: string): Promise<void> {
+    await this.browser.$("#inputSeedPhrase").setValue(seedPhrase);
+  }
+
+  async enterSeedPhraseContinue(): Promise<void> {
+    await this.browser.$("#inputSeedPhraseContinue").click();
+  }
+}
+
+export class FAQView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("//h1[string()='FAQ']")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async openQuestion(questionAnchor: string): Promise<void> {
+    await this.browser.$(`#${questionAnchor} summary`).click();
+  }
+}
+
+async function fillText(
+  browser: WebdriverIO.Browser,
+  id: string,
+  text: string
+): Promise<void> {
+  const elem = await browser.$(`#${id}`);
+  await elem.clearValue();
+  await elem.setValue(text);
 }

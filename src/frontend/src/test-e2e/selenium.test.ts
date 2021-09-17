@@ -1,35 +1,4 @@
 import {
-  Builder,
-  By,
-  until,
-  ThenableWebDriver,
-  logging,
-} from "selenium-webdriver";
-import { Command } from "selenium-webdriver/lib/command";
-import { Options as ChromeOptions } from "selenium-webdriver/chrome";
-import { writeFile } from "fs/promises";
-
-/*
-## Structure of this file
-
- - Constants
-
- - Setup helpers (getting web driver, waiting for fonts to be loaded)
-
- - The actual tests
-*/
-
-/*
-## Constants
-*/
-
-// Read canister ids from the corresponding dfx files.
-// This assumes that they have been successfully dfx-deployed
-import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
-
-const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
-import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
-import {
   AboutView,
   AddDeviceAliasView,
   AddDeviceView,
@@ -37,7 +6,9 @@ import {
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
+  FAQView,
   MainView,
+  RecoverView,
   RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
@@ -45,196 +16,93 @@ import {
   WelcomeView,
 } from "./views";
 import { FLOWS } from "./flows";
+import {
+  Screenshots,
+  addVirtualAuthenticator,
+  removeVirtualAuthenticator,
+  runInBrowser,
+  runInNestedBrowser,
+  switchToPopup,
+  waitForFonts,
+  waitToClose,
+} from "./util";
 
+// Read canister ids from the corresponding dfx files.
+// This assumes that they have been successfully dfx-deployed
+import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
+import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
+
+const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
 const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
 
-/*
-## Setup helpers
-*/
-
-async function addVirtualAuthenticator(
-  driver: ThenableWebDriver
-): Promise<string> {
-  const executor = driver.getExecutor();
-  const sessionId = (await driver.getSession()).getId();
-  executor.defineCommand(
-    "AddVirtualAuthenticator",
-    "POST",
-    "/session/:sessionId/webauthn/authenticator"
-  );
-  const cmd = new Command("AddVirtualAuthenticator");
-  cmd.setParameter("protocol", "ctap2");
-  cmd.setParameter("transport", "usb");
-  cmd.setParameter("hasResidentKey", true);
-  cmd.setParameter("isUserConsenting", true);
-  cmd.setParameter("sessionId", sessionId);
-  return await executor.execute(cmd);
-}
-
-async function removeVirtualAuthenticator(
-  driver: ThenableWebDriver,
-  authenticatorId: string
-): Promise<string> {
-  const executor = driver.getExecutor();
-  const sessionId = (await driver.getSession()).getId();
-  executor.defineCommand(
-    "RemoveVirtualAuthenticator",
-    "DELETE",
-    `/session/:sessionId/webauthn/authenticator/${authenticatorId}`
-  );
-  const cmd = new Command("RemoveVirtualAuthenticator");
-  cmd.setParameter("sessionId", sessionId);
-  return await executor.execute(cmd);
-}
-
-async function screenshot(name: string, driver: ThenableWebDriver) {
-  const image = await driver.takeScreenshot();
-  // writing to a subdirectory has the nice property that it fails if
-  // this is run in the wrong directory
-  await writeFile(`screenshots/${name}.png`, image, "base64");
-}
-
-// Inspired by https://stackoverflow.com/a/66919695/946226
-async function wait_for_fonts(driver: ThenableWebDriver) {
-  for (let i = 0; i <= 50; i++) {
-    if (
-      (await driver.executeScript("return document.fonts.status;")) == "loaded"
-    ) {
-      return;
-    }
-    driver.sleep(200);
-  }
-  console.log(
-    "Odd, document.font.status never reached state loaded, stuck at",
-    await driver.executeScript("return document.fonts.status;")
-  );
-}
-
-async function run_in_browser(
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  await run_in_browser_common(true, test);
-}
-
-async function run_in_nested_browser(
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  await run_in_browser_common(false, test);
-}
-
-async function run_in_browser_common(
-  outer: boolean,
-  test: (driver: ThenableWebDriver) => Promise<void>
-) {
-  const loggingPreferences = new logging.Preferences();
-  loggingPreferences.setLevel("browser", logging.Level.ALL);
-  const driver = new Builder()
-    .forBrowser("chrome")
-    .setChromeOptions(
-      new ChromeOptions()
-        .headless() // hides the click show: uncomment to watch it
-        .windowSize({ width: 1050, height: 1400 })
-    )
-    .setLoggingPrefs(loggingPreferences)
-    .build();
-  try {
-    await test(driver);
-  } catch (e) {
-    console.log(await driver.manage().logs().get("browser"));
-    console.log(await driver.getPageSource());
-    throw e;
-  } finally {
-    // only close outer session
-    if (outer) {
-      await driver.quit();
-    }
-  }
-}
-
-async function switchToPopup(driver: ThenableWebDriver) {
-  let handles = await driver.getAllWindowHandles();
-  expect(handles.length).toBe(2);
-  await driver.switchTo().window(handles[1]);
-  // enable virtual authenticator in the new window
-  await addVirtualAuthenticator(driver);
-}
-
-async function waitToClose(driver: ThenableWebDriver) {
-  await driver.wait(async (driver: ThenableWebDriver) => {
-    return (await driver.getAllWindowHandles()).length == 1;
-  }, 10_000);
-
-  const handles = await driver.getAllWindowHandles();
-  expect(handles.length).toBe(1);
-  await driver.switchTo().window(handles[0]);
-}
-
-/*
-## The actual tests
-*/
 test("_Register new identity and login with it", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    await driver.get(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
-    const mainView = new MainView(driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.register();
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.logout();
-    await FLOWS.login(userNumber, DEVICE_NAME1, driver);
+    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 
 test("Register new identity and add additional device", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    const firstAuthenticator = await addVirtualAuthenticator(driver);
-    await driver.get(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const firstAuthenticator = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
 
-    const mainView = new MainView(driver);
+    const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     // We're removing the first authenticator here, because unfortunately we
     // can't tell Chrome to _actually_ use the second authenticator, which
     // leads to flaky tests otherwise.
-    await removeVirtualAuthenticator(driver, firstAuthenticator);
-    await addVirtualAuthenticator(driver);
+    await removeVirtualAuthenticator(browser, firstAuthenticator);
+    await addVirtualAuthenticator(browser);
     await mainView.addAdditionalDevice();
 
-    const addDeviceAliasView = new AddDeviceAliasView(driver);
+    const addDeviceAliasView = new AddDeviceAliasView(browser);
     await addDeviceAliasView.waitForDisplay();
     await addDeviceAliasView.addAdditionalDevice(DEVICE_NAME2);
     await addDeviceAliasView.continue();
 
-    await driver.sleep(10_000);
+    await browser.pause(10_000);
 
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
 
     await mainView.logout();
-    await FLOWS.login(userNumber, DEVICE_NAME1, driver);
+    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 
 test("Log into client application, after registration", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    const demoAppView = new DemoAppView(driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
     await demoAppView.signin();
-    await switchToPopup(driver);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
-    const authorizeAppView = new AuthorizeAppView(driver);
+    await switchToPopup(browser);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const authorizeAppView = new AuthorizeAppView(browser);
     await authorizeAppView.waitForDisplay();
     await authorizeAppView.confirm();
-    await waitToClose(driver);
+    await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
@@ -242,112 +110,138 @@ test("Log into client application, after registration", async () => {
       principal
     );
     // default value
-    const exp = await driver.findElement(By.id("expiration")).getText();
+    const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 min", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    const demoAppView = new DemoAppView(driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
     await demoAppView.setMaxTimeToLive(BigInt(60_000_000_000));
     await demoAppView.signin();
-    await switchToPopup(driver);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
-    const authorizeAppView = new AuthorizeAppView(driver);
+    await switchToPopup(browser);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const authorizeAppView = new AuthorizeAppView(browser);
     await authorizeAppView.waitForDisplay();
     await authorizeAppView.confirm();
-    await waitToClose(driver);
+    await waitToClose(browser);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
-    const exp = await driver.findElement(By.id("expiration")).getText();
+    const exp = await browser.$("#expiration").getText();
     // compare only up to one decimal place for the 1min test
     expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 0);
   });
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 day", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    const demoAppView = new DemoAppView(driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
     await demoAppView.setMaxTimeToLive(BigInt(86400_000_000_000));
     await demoAppView.signin();
-    await switchToPopup(driver);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
-    const authorizeAppView = new AuthorizeAppView(driver);
+    await switchToPopup(browser);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const authorizeAppView = new AuthorizeAppView(browser);
     await authorizeAppView.waitForDisplay();
     await authorizeAppView.confirm();
-    await waitToClose(driver);
+    await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
-    const exp = await driver.findElement(By.id("expiration")).getText();
+    const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / 86400_000_000_000).toBeCloseTo(1);
   });
 }, 300_000);
 
 test("Delegation maxTimeToLive: 1 month", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    const demoAppView = new DemoAppView(driver);
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
     await demoAppView.setMaxTimeToLive(BigInt(2592000_000_000_000));
     await demoAppView.signin();
-    await switchToPopup(driver);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, driver);
-    const authorizeAppView = new AuthorizeAppView(driver);
+    await switchToPopup(browser);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const authorizeAppView = new AuthorizeAppView(browser);
     await authorizeAppView.waitForDisplay();
     await authorizeAppView.confirm();
-    await waitToClose(driver);
+    await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
-    const exp = await driver.findElement(By.id("expiration")).getText();
+    const exp = await browser.$("#expiration").getText();
     // NB: Max out at 8 days
     expect(Number(exp) / 691200_000_000_000).toBeCloseTo(1);
   });
 }, 300_000);
 
-test("Screenshots", async () => {
-  await run_in_browser(async (driver: ThenableWebDriver) => {
-    await addVirtualAuthenticator(driver);
-    await driver.get(II_URL);
+test("Recover access, after registration", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+    await mainView.logout();
 
-    await wait_for_fonts(driver);
-    const welcomeView = new WelcomeView(driver);
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.recover();
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForDisplay();
+    await recoveryView.enterIdentityAnchor(userNumber);
+    await recoveryView.continue();
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+  });
+}, 300_000);
+
+test("Screenshots", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const screenshots = new Screenshots("screenshots");
+
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+
+    await waitForFonts(browser);
+    const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
-    await screenshot("00-welcome", driver);
+    await screenshots.take("welcome", browser);
     await welcomeView.register();
-    const registerView = new RegisterView(driver);
+    const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
-    await screenshot("01-register", driver);
+    await screenshots.take("register", browser);
     await registerView.enterAlias(DEVICE_NAME1);
     await registerView.create();
     await registerView.waitForRegisterConfirm();
-    await screenshot("02-register-confirm", driver);
+    await screenshots.take("register-confirm", browser);
     await registerView.confirmRegisterConfirm();
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerIdentityFixup();
-    await screenshot("03-register-user-number", driver);
+    await screenshots.take("register-user-number", browser);
     await registerView.registerConfirmIdentity();
-    const singleDeviceWarningView = new SingleDeviceWarningView(driver);
+    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
     await singleDeviceWarningView.waitForDisplay();
-    await screenshot("17-single-device-warning", driver);
+    await screenshots.take("single-device-warning", browser);
     await singleDeviceWarningView.continue();
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(driver);
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
-    await screenshot("18-recover-method-selector", driver);
-    await recoveryMethodSelectorView.skip();
-    const mainView = new MainView(driver);
+    await screenshots.take("recover-method-selector", browser);
+    await recoveryMethodSelectorView.skipRecovery();
+    const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
-    await screenshot("04-main", driver);
+    await screenshots.take("main", browser);
     await mainView.logout();
     await welcomeView.waitForDisplay(); // no point taking screenshot
     await welcomeView.typeUserNumber(userNumber);
@@ -355,112 +249,111 @@ test("Screenshots", async () => {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
-    await driver.get(II_URL);
-    const welcomeBackView = new WelcomeBackView(driver);
+    await browser.url(II_URL);
+    const welcomeBackView = new WelcomeBackView(browser);
     await welcomeBackView.waitForDisplay();
     const userNumber2 = await welcomeBackView.getIdentityAnchor();
     expect(userNumber2).toBe(userNumber);
     await welcomeBackView.fixup();
-    await screenshot("05-welcome-back", driver);
+    await screenshots.take("welcome-back", browser);
     await welcomeBackView.login();
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Now the link device flow, using a second browser
-    await run_in_nested_browser(async (driver2) => {
-      await addVirtualAuthenticator(driver2);
-      await driver2.get(II_URL);
-      const welcomeView2 = new WelcomeView(driver2);
+    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      await addVirtualAuthenticator(browser2);
+      await browser2.url(II_URL);
+      const welcomeView2 = new WelcomeView(browser2);
       await welcomeView2.waitForDisplay();
       await welcomeView2.typeUserNumber(userNumber);
       await welcomeView2.addDevice();
-      const addIdentityAnchorView2 = new AddIdentityAnchorView(driver2);
+      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
       await addIdentityAnchorView2.waitForDisplay();
       await addIdentityAnchorView2.fixup();
-      await screenshot("06-new-device-user-number", driver2);
+      await screenshots.take("new-device-user-number", browser2);
       await addIdentityAnchorView2.continue(userNumber);
-      const addDeviceView2 = new AddDeviceView(driver2);
+      const addDeviceView2 = new AddDeviceView(browser2);
       await addDeviceView2.waitForDisplay();
 
       const link = await addDeviceView2.getLinkText();
       console.log("The add device link is", link);
       await addDeviceView2.fixup();
-      await screenshot("07-new-device", driver2);
+      await screenshots.take("new-device", browser2);
 
       // Log in with previous browser again
-      await driver.get("about:blank");
-      await driver.get(link);
-      await wait_for_fonts(driver);
-      const welcomeBackView = new WelcomeBackView(driver);
+      await browser.url("about:blank");
+      await browser.url(link);
+      await waitForFonts(browser);
+      const welcomeBackView = new WelcomeBackView(browser);
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
-      await screenshot("08-new-device-login", driver);
+      await screenshots.take("new-device-login", browser);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
-      await recoveryMethodSelectorView.skip();
-      const addDeviceView = new AddDeviceView(driver);
+      await recoveryMethodSelectorView.skipRecovery();
+      const addDeviceView = new AddDeviceView(browser);
       await addDeviceView.waitForConfirmDisplay();
       await addDeviceView.fixupConfirm();
-      await screenshot("09-new-device-confirm", driver);
+      await screenshots.take("new-device-confirm", browser);
       await addDeviceView.confirm();
       await addDeviceView.waitForAliasDisplay();
-      await screenshot("10-new-device-alias", driver);
+      await screenshots.take("new-device-alias", browser);
       await addDeviceView.addDeviceAlias(DEVICE_NAME2);
       await addDeviceView.addDeviceAliasContinue();
       await addDeviceView.waitForAddDeviceSuccess();
-      await screenshot("11-new-device-done", driver);
+      await screenshots.take("new-device-done", browser);
 
       // Back to other browser, should be a welcome view now
-      const welcomeBackView2 = new WelcomeBackView(driver2);
+      const welcomeBackView2 = new WelcomeBackView(browser2);
       await welcomeBackView2.waitForDisplay();
       await welcomeBackView2.fixup();
-      await screenshot("12-new-device-login", driver2);
+      await screenshots.take("new-device-login", browser2);
       await welcomeBackView2.login();
-      const singleDeviceWarningView2 = new SingleDeviceWarningView(driver2);
+      const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
       await singleDeviceWarningView2.waitForDisplay();
       await singleDeviceWarningView2.continue();
       const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
-        driver2
+        browser2
       );
       await recoveryMethodSelectorView2.waitForDisplay();
-      await recoveryMethodSelectorView2.skip();
-      const mainView2 = new MainView(driver2);
+      await recoveryMethodSelectorView2.skipRecovery();
+      const mainView2 = new MainView(browser2);
       await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView2.fixup();
-      await screenshot("13-new-device-listed", driver2);
+      await screenshots.take("new-device-listed", browser2);
 
       // Try to remove current device
       await mainView2.removeDevice(DEVICE_NAME2);
-      await driver2.wait(until.alertIsPresent(), 1_000);
-      const alert = driver2.switchTo().alert();
-      // Cannot take screenshots of modal dialogs, it seems
-      // Also dismiss before asserting things, the exception
-      // handler doesn’t work well while modal dialogs are open
-      const alertText = await alert.getText();
-      await alert.dismiss();
-      expect(alertText).toBe(
+      await browser2.waitUntil(async () => !!(await browser2.getAlertText()), {
+        timeout: 1_000,
+        timeoutMsg: "expected alert to be displayed after 1s",
+      });
+      expect(await browser2.getAlertText()).toBe(
         "This will remove your current device and you will be logged out"
       );
+      await browser2.dismissAlert();
+      await browser2.deleteSession();
     });
 
     // About page
-    await driver.get("about:blank");
-    await driver.get(II_URL + "#about");
-    await wait_for_fonts(driver);
-    const aboutView = new AboutView(driver);
+    await browser.url("about:blank");
+    await browser.url(II_URL + "#about");
+    await waitForFonts(browser);
+    const aboutView = new AboutView(browser);
     await aboutView.waitForDisplay();
-    await screenshot("14-about", driver);
+    await screenshots.take("about", browser);
 
     // Test device removal
-    await driver.get(II_URL);
+    await browser.url(II_URL);
     await welcomeBackView.waitForDisplay();
     const userNumber3 = await welcomeBackView.getIdentityAnchor();
     expect(userNumber3).toBe(userNumber);
@@ -468,40 +361,61 @@ test("Screenshots", async () => {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.continue();
     await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skip();
+    await recoveryMethodSelectorView.skipRecovery();
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
-    const buttonElem2 = await driver.findElement(
-      By.xpath(`//div[string()='${DEVICE_NAME2}']/following-sibling::button`)
-    );
     await mainView.removeDevice(DEVICE_NAME2);
     // No dialog here!
-
-    await driver.wait(until.stalenessOf(buttonElem2));
+    await browser.waitUntil(
+      async () => {
+        const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
+        return !(await device2.isDisplayed());
+      },
+      {
+        timeout: 10_000,
+        timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
+      }
+    );
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.fixup();
-    await screenshot("15-after-removal", driver);
+    await screenshots.take("after-removal", browser);
 
     await mainView.removeDevice(DEVICE_NAME1);
-    const alert1 = driver.switchTo().alert();
-    const alertText1 = await alert1.getText();
-    await alert1.accept();
+    const alertText1 = await browser.getAlertText();
     expect(alertText1).toBe(
       "This will remove your current device and you will be logged out"
     );
-    await driver.wait(until.alertIsPresent());
-    const alert2 = driver.switchTo().alert();
-    const alertText2 = await alert2.getText();
-    await alert2.accept();
+    await browser.acceptAlert();
+
+    await browser.waitUntil(async () => !!(await browser.getAlertText()), {
+      timeout: 1_000,
+      timeoutMsg: "expected alert to be displayed after 1s",
+    });
+    const alertText2 = await browser.getAlertText();
     expect(alertText2).toBe("You can not remove your last device.");
+    await browser.acceptAlert();
+
     // device still present. You can't remove your last device.
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Compatibility notice page
-    await driver.get("about:blank");
-    await driver.get(II_URL + "#compatibilityNotice");
-    await wait_for_fonts(driver);
-    const compatabilityNoticeView = new CompatabilityNoticeView(driver);
+    await browser.url("about:blank");
+    await browser.url(II_URL + "#compatibilityNotice");
+    await waitForFonts(browser);
+    const compatabilityNoticeView = new CompatabilityNoticeView(browser);
     await compatabilityNoticeView.waitForDisplay();
-    await screenshot("16-compatibility-notice", driver);
+    await screenshots.take("compatibility-notice", browser);
+
+    // FAQ page
+    await browser.url("about:blank");
+    await browser.url(FAQ_URL);
+    await waitForFonts(browser);
+    const faqView = new FAQView(browser);
+    await faqView.waitForDisplay();
+    await screenshots.take("faq", browser);
+
+    // FAQ open page
+    await faqView.openQuestion("lost-device");
+    await faqView.waitForDisplay();
+    await screenshots.take("faq-open", browser);
   });
 }, 400_000);

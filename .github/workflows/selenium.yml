@@ -61,8 +61,11 @@ jobs:
           npm run develop --no-live-reload --no-devtool &
           sleep 10 # crude
 
+      - name: install selenium webdrivers
+        run: npm run install-webdrivers
+
       - run: rm -v -f screenshots/*.png
-      - run: npm test -- --verbose
+      - run: npm test
       - run: dfx stop
 
       - name: Commit screenshots
@@ -76,3 +79,17 @@ jobs:
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
           pull_strategy: "NO-PULL"
+
+      - name: Archive test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-log ${{ matrix.start-flag }}
+          path: wdio.log
+
+      - name: Archive screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-screenshots ${{ matrix.start-flag }}
+          path: screenshots/**/*.png

@@ -13,9 +13,3 @@
 # frontend code
 node_modules/
 dist/
-.env
-lib
-wdio.log
-
-# Cargo build output
-target/
