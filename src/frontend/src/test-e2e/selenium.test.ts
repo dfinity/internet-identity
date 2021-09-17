@@ -297,7 +297,8 @@ test("Screenshots", async () => {
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
-      await browser.pause(5000);
+      await welcomeBackView.login();
+      await browser.pause(3000);
       console.log("-----browser logs-----");
       console.log(await browser.getLogs("browser"));
       await singleDeviceWarningView.waitForDisplay();
@@ -308,11 +309,16 @@ test("Screenshots", async () => {
       await addDeviceView.waitForConfirmDisplay();
       await addDeviceView.fixupConfirm();
       await screenshots.take("new-device-confirm", browser);
+      console.log("-----browser logs-----");
+      console.log(await browser.getLogs("browser"));
       await addDeviceView.confirm();
       await addDeviceView.waitForAliasDisplay();
       await screenshots.take("new-device-alias", browser);
       await addDeviceView.addDeviceAlias(DEVICE_NAME2);
       await addDeviceView.addDeviceAliasContinue();
+      await browser.pause(3000);
+      console.log("-----browser logs-----");
+      console.log(await browser.getLogs("browser"));
       await addDeviceView.waitForAddDeviceSuccess();
       await screenshots.take("new-device-done", browser);
 
