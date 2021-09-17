@@ -95,5 +95,3 @@ export const faqView = (): void => {
   render(pageContent, container);
   openAnchor(); // needs to happen after DOM was rendered
 };
-
-faqView();
