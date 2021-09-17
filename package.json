@@ -8,10 +8,11 @@
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
-    "test": "jest --verbose",
+    "test": "npm run start-selenium-server > /dev/null 2>&1 & jest --verbose",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
     "format": "prettier --write src/frontend",
-    "install-webdrivers" : "selenium-standalone install"
+    "install-webdrivers": "selenium-standalone install",
+    "start-selenium-server": "selenium-standalone start"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",

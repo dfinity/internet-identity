@@ -293,6 +293,7 @@ test("Screenshots", async () => {
       await welcomeBackView.waitForDisplay();
       await welcomeBackView.fixup();
       await screenshots.take("new-device-login", browser);
+      await browser.pause(3000);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.continue();
