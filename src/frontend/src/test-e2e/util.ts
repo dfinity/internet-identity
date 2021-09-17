@@ -170,7 +170,7 @@ export async function removeVirtualAuthenticator(
 export class Screenshots {
   private count = 0;
 
-  constructor(private directory: string){}
+  constructor(private directory: string) {}
 
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
     this.count++;

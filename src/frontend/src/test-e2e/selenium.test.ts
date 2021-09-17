@@ -205,7 +205,6 @@ test("Recover access, after registration", async () => {
 
 test("Screenshots", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-
     const screenshots = new Screenshots("screenshots");
 
     await addVirtualAuthenticator(browser);
