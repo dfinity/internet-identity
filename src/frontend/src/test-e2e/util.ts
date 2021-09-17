@@ -47,11 +47,6 @@ export async function runInBrowserCommon(
       "An error occurred during e2e test execution. Logs can be found in the wdio.log file and an additional error screenshot was saved under screenshots/error. On Github Actions you can find the log and screenshots under 'Artifacts'."
     );
     throw e;
-  } finally {
-    if (outer) {
-      // only close outer session
-      await browser.deleteSession();
-    }
   }
 }
 
