@@ -38,6 +38,7 @@ const WHOAMI_CANISTER = canister_ids2.whoami.local;
 const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
 const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
+const ABOUT_URL = `http://localhost:8000/about?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -352,11 +353,19 @@ test("Screenshots", async () => {
 
     // About page
     await browser.url("about:blank");
-    await browser.url(II_URL + "#about");
+    await browser.url(ABOUT_URL);
     await waitForFonts(browser);
     const aboutView = new AboutView(browser);
     await aboutView.waitForDisplay();
     await screenshots.take("about", browser);
+
+    // About page, legacy link
+    await browser.url("about:blank");
+    await browser.url(II_URL + "#about");
+    await waitForFonts(browser);
+    const aboutViewLegacy = new AboutView(browser);
+    await aboutViewLegacy.waitForDisplay();
+    await screenshots.take("about-legacy", browser);
 
     // Test device removal
     await browser.url(II_URL);

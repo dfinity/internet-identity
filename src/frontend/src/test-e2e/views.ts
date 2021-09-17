@@ -310,7 +310,9 @@ export class AddDeviceView extends View {
 
 export class AboutView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("#about").waitForDisplayed({ timeout: 3_000 });
+    await this.browser
+      .$("//h1[string()='About']")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 }
 

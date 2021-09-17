@@ -23,8 +23,9 @@ fn main() -> Result<(), String> {
     let asset_rel_paths = [
         ("/", "../../dist/index.html", ContentEncoding::Identity),
 
-        // The FAQ page is the same webapp, but the webapp routes to the correct page
+        // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
         ("/faq", "../../dist/index.html", ContentEncoding::Identity),
+        ("/about", "../../dist/index.html", ContentEncoding::Identity),
         (
             "/index.html",
             "../../dist/index.html",

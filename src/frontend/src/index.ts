@@ -20,7 +20,7 @@ const init = async () => {
     return faqView();
   }
 
-  if (url.hash === "#about") {
+  if (window.location.pathname === "/about" || url.hash === "#about") {
     return aboutView();
   }
 
