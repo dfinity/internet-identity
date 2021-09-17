@@ -57,7 +57,7 @@ test("_Register new identity and login with it", async () => {
     await mainView.logout();
     await FLOWS.login(userNumber, DEVICE_NAME1, browser);
   });
-}, 60_000);
+}, 300_000);
 
 test("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -87,7 +87,7 @@ test("Register new identity and add additional device", async () => {
     await mainView.logout();
     await FLOWS.login(userNumber, DEVICE_NAME1, browser);
   });
-}, 60_000);
+}, 300_000);
 
 test("Log into client application, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -113,7 +113,7 @@ test("Log into client application, after registration", async () => {
     const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
   });
-}, 60_000);
+}, 300_000);
 
 test("Delegation maxTimeToLive: 1 min", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -136,7 +136,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     // compare only up to one decimal place for the 1min test
     expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 0);
   });
-}, 30_000);
+}, 300_000);
 
 test("Delegation maxTimeToLive: 1 day", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -157,7 +157,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
     const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / 86400_000_000_000).toBeCloseTo(1);
   });
-}, 30_000);
+}, 300_000);
 
 test("Delegation maxTimeToLive: 1 month", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -179,7 +179,7 @@ test("Delegation maxTimeToLive: 1 month", async () => {
     // NB: Max out at 8 days
     expect(Number(exp) / 691200_000_000_000).toBeCloseTo(1);
   });
-}, 30_000);
+}, 300_000);
 
 test("Recover access, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -203,7 +203,7 @@ test("Recover access, after registration", async () => {
     await recoveryView.enterSeedPhraseContinue();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
-}, 60_000);
+}, 300_000);
 
 test("Screenshots", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -435,4 +435,4 @@ test("Screenshots", async () => {
     await faqView.waitForDisplay();
     await screenshots.take("faq-open", browser);
   });
-}, 100_000);
+}, 400_000);
