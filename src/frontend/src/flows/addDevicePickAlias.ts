@@ -15,7 +15,7 @@ const pageContent = () => html`
 export const pickDeviceAlias = async (): Promise<string | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  console.warn('deviceAlias page rendered');
+  console.warn("deviceAlias page rendered");
   return init();
 };
 
@@ -35,8 +35,8 @@ const init = (): Promise<string | null> =>
       resolve(null);
     };
     deviceAliasContinue.onclick = () => {
-      console.warn('deviceAliasContinue click');
+      console.warn("deviceAliasContinue click");
       resolve(deviceAlias.value);
     };
-    console.warn('deviceAliasContinue onclick registered');
+    console.warn("deviceAliasContinue onclick registered");
   });

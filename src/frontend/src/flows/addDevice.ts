@@ -72,7 +72,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
       console.log("Adding new device with:", parsedParams);
       try {
         const deviceName = await pickDeviceAlias();
-        console.warn('addDevice device added: ', deviceName);
+        console.warn("addDevice device added: ", deviceName);
         if (deviceName === null) {
           clearHash();
           return window.location.reload();
@@ -89,7 +89,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
-        console.warn('addDevice successfully added: ', deviceName);
+        console.warn("addDevice successfully added: ", deviceName);
       } catch (error) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await displayError({
