@@ -50,7 +50,7 @@ export async function runInBrowserCommon(
   } finally {
     if (outer) {
       // only close outer session
-      await browser.deleteSession();
+      //await browser.deleteSession();
     }
   }
 }
