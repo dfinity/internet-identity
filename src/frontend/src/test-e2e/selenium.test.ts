@@ -27,10 +27,18 @@ import {
   waitToClose,
 } from "./util";
 
+
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
 import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
+import { Actor, HttpAgent } from "@dfinity/agent";
+import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
+import { Principal } from "@dfinity/principal";
+import { hasOwnProperty } from "../utils/utils";
+import getProofOfWork from "../crypto/pow";
+import _SERVICE, { DeviceData } from "../../generated/internet_identity_types";
+import internet_identity_idl from "../../generated/internet_identity_idl";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
@@ -43,6 +51,38 @@ const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
+
+async function setupTestUser () {
+  const testPhrase = "script strategy fat bonus minimum elegant art hire vital palace combine vague proud exercise arrow copy media aim sleep soul energy crane amazing rely";
+
+  const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent: new HttpAgent({}),
+    canisterId: IDENTITY_CANISTER,
+  });
+  const testIdentity = await fromMnemonicWithoutValidation(testPhrase);
+  const testDevice: DeviceData = { 
+    alias: "testDevice", 
+    pubkey: Array.from(testIdentity.getPublicKey().toDer()),
+    key_type: { unknown: null },
+    purpose: { authentication: null },
+    credential_id: []
+  };
+
+  const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+  const pow = getProofOfWork(now_in_ns, Principal.fromText(IDENTITY_CANISTER));
+  
+  const response = await actor.register(testDevice, pow);
+  if (hasOwnProperty(response, "registered")) {
+    return response.registered.user_number
+  } else {
+    throw new Error("Failed to create test user")
+  }
+}
+
+test.only("Use the test user", async () => {
+  const anchor = await setupTestUser();
+  expect(anchor).toBe(BigInt(10_000))
+}, 300_000);
 
 test("_Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
