@@ -654,13 +654,20 @@ fn retrieve_data() {
         match Storage::from_stable_memory() {
             Some(mut storage) => {
                 let (lo, hi) = storage.assigned_user_number_range();
-                let max_users = storage.max_users() as u64;
-                if (hi - lo) > max_users {
-                    // We used to specify a nonsensical limit of 8M
-                    // users by default.  We can't store more than
-                    // 2M users in a single canister, so we adjust the
-                    // limit in post upgrade.
-                    storage.set_user_number_range((lo, lo.saturating_add(max_users)));
+                let max_entries = storage.max_entries() as u64;
+                if (hi - lo) != max_entries {
+                    // This code might be executed for 2 reasons:
+                    //
+                    // 1. We used to specify a nonsensical limit of 8B entries
+                    //    by default.  We couldn't store more than 2M entries
+                    //    in a single canister at that point, so we needed to
+                    //    lower the upper limit on upgrade.
+                    //
+                    // 2. After stable memory limits were increased, we could
+                    //    affort storing more entries by using the 64 bit
+                    //    stable memory API.  So we needed to increase the
+                    //    upper limit on upgrade.
+                    storage.set_user_number_range((lo, lo.saturating_add(max_entries)));
                 }
                 s.storage.replace(storage);
             }

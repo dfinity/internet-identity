@@ -9,8 +9,8 @@ certified_map = { path = "../certified_map" }
 cubehash = { path = "../cubehash" }
 hashtree = { path = "../hashtree" }
 hex = "0.4"
-ic-cdk = "0.2.4"
-ic-cdk-macros = "0.2"
+ic-cdk = "0.3.2"
+ic-cdk-macros = "0.3"
 ic-types = "0.1.1"
 serde = "1"
 serde_bytes = "0.11"
