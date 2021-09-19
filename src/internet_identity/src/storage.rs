@@ -8,10 +8,10 @@ use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
 
-const HEADER_SIZE: u32 = 512;
+const HEADER_SIZE: u64 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
-const WASM_PAGE_SIZE: u32 = 65536;
+const WASM_PAGE_SIZE: u64 = 65536;
 const GB: u64 = 1 << 30;
 const STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
@@ -143,8 +143,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
-        let buf = candid::ser::encode_one(data).map_err(StorageError::SerializationError)?;
+        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
+        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
 
         if buf.len() > self.value_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
@@ -164,7 +164,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             }
         }
         stable64_write(stable_offset, &(buf.len() as u16).to_le_bytes());
-        stable64_write(stable_offset + std::mem::size_of::<u16>() as u32, &buf);
+        stable64_write(stable_offset + std::mem::size_of::<u16>() as u64, &buf);
         Ok(())
     }
 
@@ -172,8 +172,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
-        if stable_offset + self.header.entry_size as u32 > stable64_size() * WASM_PAGE_SIZE {
+        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
+        if stable_offset + self.header.entry_size as u64 > stable64_size() * WASM_PAGE_SIZE {
             trap("a record for a valid Identity Anchor is out of stable memory bounds");
         }
 
@@ -191,7 +191,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         }
 
         let data: T =
-            candid::de::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
+            candid::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
 
         Ok(data)
     }
@@ -235,7 +235,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 lo, hi
             ));
         }
-        let max_entries = self.max_users() as u64;
+        let max_entries = self.max_entries() as u64;
         if (hi - lo) > max_entries {
             trap(&format!(
                 "set_user_number_range: specified range [{}, {}) is too large for this canister \
