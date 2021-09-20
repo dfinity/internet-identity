@@ -2,6 +2,9 @@ import { html, TemplateResult } from "lit-html";
 import { clearHash } from "../flows/addDevice";
 import { logoutIcon } from "./icons";
 
+// Add a button at the bottom of the page. Clicking the button clears the local
+// storage and redirects to the welcome page.
+
 export const logoutSection = (
   alternativeLabel?: string
 ): TemplateResult => html`<style>
