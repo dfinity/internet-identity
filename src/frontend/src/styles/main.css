@@ -394,7 +394,6 @@ hr {
   background-color: rgba(243, 244, 246, 1);
   max-width: 42rem;
   height: 100%;
-  position: fixed;
 }
 
 @media only screen and (max-width: 512px) {
