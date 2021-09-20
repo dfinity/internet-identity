@@ -6,6 +6,7 @@ import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
+import { reactView } from "./flows/react";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
@@ -14,6 +15,11 @@ import { IIConnection } from "./utils/iiConnection";
 
 const init = async () => {
   const url = new URL(document.URL);
+
+  // Custom routing to the react page
+  if (window.location.pathname === "/react") {
+    return reactView();
+  }
 
   // Custom routing to the FAQ page
   if (window.location.pathname === "/faq") {

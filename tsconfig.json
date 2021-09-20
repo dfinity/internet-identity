@@ -2,6 +2,7 @@
   "include": ["src"],
   "compilerOptions": {
     "allowJs": true,
+    "jsx": "react",
     "checkJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
