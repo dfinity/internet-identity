@@ -36,7 +36,7 @@ const displayFailedToAddNewDevice = (error: Error) =>
     primaryButton: "Back to manage",
   });
 
-const displayFailedToAddTheDevice = (error: Error) => {
+const displayFailedToAddTheDevice = (error: Error) =>
   displayError({
     title: "Failed to add the new device",
     message:
@@ -44,9 +44,8 @@ const displayFailedToAddTheDevice = (error: Error) => {
     detail: error.message,
     primaryButton: "Back to manage",
   });
-};
 
-const displayFailedToListDevices = (error: Error) => {
+const displayFailedToListDevices = (error: Error) =>
   displayError({
     title: "Failed to list your devices",
     message:
@@ -54,7 +53,6 @@ const displayFailedToListDevices = (error: Error) => {
     detail: error.toString(),
     primaryButton: "Try again",
   });
-};
 
 // The styling of the page
 
