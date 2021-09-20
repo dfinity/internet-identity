@@ -268,7 +268,7 @@ const init = async (
     "#addAdditionalDevice"
   ) as HTMLButtonElement;
 
-  addAdditionalDeviceButton.onclick = async () =>
+  addAdditionalDeviceButton.onclick = () =>
     addAdditionalDevice(userNumber, connection, devices);
 
   // Add recovery
