@@ -314,17 +314,6 @@ hr {
 
 /* FAQ related stuff */
 
-@media only screen and (max-width: 512px) {
-  .faq__container {
-    padding: 0 0.6rem;
-  }
-}
-@media only screen and (min-width: 512px) {
-  .faq__container {
-    padding: 0 4rem;
-  }
-}
-
 .faq__questions {
   padding: 0;
   list-style-type: none;
@@ -405,5 +394,120 @@ hr {
   background-color: rgba(243, 244, 246, 1);
   max-width: 42rem;
   height: 100%;
-  position: fixed;
+}
+
+@media only screen and (max-width: 512px) {
+  .faq__container {
+    padding: 0 0.6rem;
+  }
+}
+@media only screen and (min-width: 512px) {
+  .faq__container {
+    padding: 0 4rem;
+  }
+}
+
+/* ABOUT stuff */
+
+.about__container {
+  background-color: rgba(243, 244, 246, 1);
+  max-width: 42rem;
+  height: 100%;
+}
+
+@media only screen and (max-width: 512px) {
+  .about_container {
+    padding: 0 0.6rem;
+  }
+}
+@media only screen and (min-width: 512px) {
+  .about__container {
+    padding: 0 4rem;
+  }
+}
+
+.about__title {
+  color: rgba(55, 65, 81, 1);
+  font-weight: 700;
+  font-size: 4.5rem;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0.025em;
+  margin: 1rem 0 7rem 0;
+}
+
+@media only screen and (max-width: 512px) {
+  .about__title {
+    margin: 1rem 0 0 0;
+  }
+}
+
+.about__section-title-underline {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    right top,
+    from(#29abe2),
+    color-stop(33%, #fbb03b),
+    color-stop(66%, #f15a24),
+    to(#ed1e79)
+  );
+  background: linear-gradient(
+    90deg,
+    #29abe2,
+    #fbb03b 33%,
+    #f15a24 66%,
+    #ed1e79
+  );
+  height: 1px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0.3rem auto;
+}
+
+.about__section {
+  margin: 2.5rem 1.2rem;
+}
+
+.about__subtitle {
+  letter-spacing: -0.01rem;
+  font-weight: 300;
+  font-size: 1.25rem;
+}
+
+.about__compatibility-type {
+  letter-spacing: -0.01rem;
+  font-weight: 500;
+  font-size: 1rem;
+  margin: 0;
+  text-align: center;
+}
+
+.about__compatibility-list {
+  padding: 1rem;
+  margin: 0;
+  list-style-type: none;
+  width: auto;
+  font-size: 0.9rem;
+}
+
+.about__compatibility-list-item {
+  letter-spacing: -0.01rem;
+  font-weight: 300;
+  font-size: 1rem;
+  color: rgba(31, 41, 55, 1);
+}
+
+.about__compatibility-flexparent {
+  display: flex;
+  flex-flow: wrap;
+  justify-content: center;
+  background-color: var(--rainbow-orange);
+  border-radius: 0.5rem;
+}
+
+.about__compatibility-flexchild {
+  min-width: 1rem;
+  padding: 1rem;
 }
