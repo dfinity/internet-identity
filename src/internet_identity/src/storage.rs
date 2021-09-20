@@ -152,7 +152,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
 
         let current_size = stable64_size();
         let pages =
-            (stable_offset + self.header.entry_size as u32 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+            (stable_offset + self.header.entry_size as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         if pages > current_size {
             let pages_to_grow = pages - current_size;
             let result = stable64_grow(pages - current_size);

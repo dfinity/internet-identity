@@ -538,7 +538,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
         "/metrics" => {
-            let mut writer = MetricsEncoder::new(vec![], time() / 1_000_000);
+            let mut writer = MetricsEncoder::new(vec![], time() as i64/ 1_000_000);
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
