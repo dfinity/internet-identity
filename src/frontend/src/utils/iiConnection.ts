@@ -5,8 +5,9 @@ import {
   derBlobFromBlob,
   DerEncodedBlob,
 } from "@dfinity/candid";
-import internet_identity_idl from "../../generated/internet_identity_idl";
-import _SERVICE, {
+import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import {
+  _SERVICE,
   PublicKey,
   SessionKey,
   CredentialId,

@@ -89,5 +89,7 @@ whoamiBtn.addEventListener("click", async () => {
   // Similar to the sample project on dfx new:
   actor.whoami().then((principal) => {
     whoAmIResponseEl.innerText = principal.toText();
+  }).catch(err => {
+    console.error("Failed to fetch whoami", err)
   });
 });
