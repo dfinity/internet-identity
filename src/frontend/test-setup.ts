@@ -1,5 +1,6 @@
 import crypto from "@trust/webcrypto";
 import textEncoding = require("text-encoding");
+import ChildProcess = require("child_process");
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -18,3 +19,11 @@ declare global {
 
 global.crypto = crypto;
 global.TextEncoder = textEncoding.TextEncoder;
+
+console.log("starting selenium-standalone server...");
+const seleniumServerProc = ChildProcess.spawn("selenium-standalone", ["start"]);
+
+afterAll(() => {
+  console.log("stopping selenium-standalone server...");
+  seleniumServerProc.kill();
+});
