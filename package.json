@@ -9,7 +9,7 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
     "test": "jest --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "SCREEN=desktop jest --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
+    "test:e2e": "jest --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
     "format": "prettier --write src/frontend",

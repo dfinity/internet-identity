@@ -3,82 +3,40 @@ import { command } from "webdriver";
 import * as SeleniumStandalone from "selenium-standalone";
 import { ChildProcess } from "selenium-standalone";
 
+const MOBILE_SCREEN: ScreenConfiguration = {
+  screenType: "mobile",
+  windowSize: "360,640",
+};
+
+const DESKTOP_SCREEN: ScreenConfiguration = {
+  screenType: "desktop",
+  windowSize: "1920,1080",
+};
+
 export async function runInBrowser(
-  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(true, test);
 }
 
 export async function runInNestedBrowser(
-  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(false, test);
 }
 
-export async function startWebdriver(): Promise<ChildProcess | undefined> {
-  let webdriverProcess: ChildProcess | undefined;
-  let retryCount = 0;
-  let error;
-  while (webdriverProcess === undefined && retryCount < 10) {
-    try {
-      error = undefined;
-      webdriverProcess = await SeleniumStandalone.start();
-    } catch (e) {
-      // port may still be used from previous stopped webdriver, try again
-      error = e;
-      retryCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  if (error !== undefined) {
-    console.warn(
-      'selenium could not be started. Make sure you installed the required webdrivers ("npm run install-webdrivers")'
-    );
-    console.error(error);
-  }
-  return webdriverProcess;
-}
-
-export interface ScreenConfiguration {
-  screenType: 'desktop' | 'mobile',
-  windowSize: string
-}
-
-export interface RunConfiguration {
-  screenConfiguration: ScreenConfiguration;
-}
-
-const MOBILE_SCREEN: ScreenConfiguration = {
-  screenType: 'mobile',
-  windowSize: '360,640'
-};
-
-const DESKTOP_SCREEN: ScreenConfiguration = {
-  screenType: 'desktop',
-  windowSize: '1920,1080'
-};
-
-function parseScreen(): ScreenConfiguration {
-  switch (process.env.SCREEN) {
-    case 'mobile':
-      return MOBILE_SCREEN;
-    case 'desktop':
-      return DESKTOP_SCREEN;
-    default:
-      console.log(`Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`);
-      return DESKTOP_SCREEN;
-  }
-}
-
-function parseRunConfiguration(): RunConfiguration {
-  return {
-    screenConfiguration: parseScreen(),
-  }
-}
-
 export async function runInBrowserCommon(
   outer: boolean,
-  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   let webdriverProcess;
   if (outer) {
@@ -91,7 +49,11 @@ export async function runInBrowserCommon(
     capabilities: {
       browserName: "chrome",
       "goog:chromeOptions": {
-        args: ["--headless", "--disable-gpu", `--window-size=${runConfig.screenConfiguration.windowSize}`],
+        args: [
+          "--headless",
+          "--disable-gpu",
+          `--window-size=${runConfig.screenConfiguration.windowSize}`,
+        ],
       },
     },
     automationProtocol: "webdriver",
@@ -125,6 +87,59 @@ export async function runInBrowserCommon(
       webdriverProcess?.kill();
     }
   }
+}
+
+export async function startWebdriver(): Promise<ChildProcess | undefined> {
+  let webdriverProcess: ChildProcess | undefined;
+  let retryCount = 0;
+  let error;
+  while (webdriverProcess === undefined && retryCount < 10) {
+    try {
+      error = undefined;
+      webdriverProcess = await SeleniumStandalone.start();
+    } catch (e) {
+      // port may still be used from previous stopped webdriver, try again
+      error = e;
+      retryCount++;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  if (error !== undefined) {
+    console.warn(
+      'selenium could not be started. Make sure you installed the required webdrivers ("npm run install-webdrivers")'
+    );
+    console.error(error);
+  }
+  return webdriverProcess;
+}
+
+export interface ScreenConfiguration {
+  screenType: "desktop" | "mobile";
+  windowSize: string;
+}
+
+export interface RunConfiguration {
+  screenConfiguration: ScreenConfiguration;
+}
+
+function parseScreen(): ScreenConfiguration {
+  switch (process.env.SCREEN) {
+    case "mobile":
+      return MOBILE_SCREEN;
+    case "desktop":
+      return DESKTOP_SCREEN;
+    default:
+      console.log(
+        `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`
+      );
+      return DESKTOP_SCREEN;
+  }
+}
+
+function parseRunConfiguration(): RunConfiguration {
+  return {
+    screenConfiguration: parseScreen(),
+  };
 }
 
 export async function addCustomCommands(
