@@ -66,6 +66,8 @@ jobs:
 
       - run: rm -v -f screenshots/*.png
       - run: npm test
+      - run: npm run test:e2e
+      - run: npm run test:e2e-mobile
       - run: dfx stop
 
       - name: Commit screenshots
