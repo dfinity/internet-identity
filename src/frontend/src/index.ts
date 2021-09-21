@@ -6,7 +6,10 @@ import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
-import { reactView } from "./flows/react";
+import {
+  renderManage as reactView,
+  IIConnection as RConn,
+} from "./flows/react";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
@@ -18,7 +21,8 @@ const init = async () => {
 
   // Custom routing to the react page
   if (window.location.pathname === "/react") {
-    return reactView();
+    const iiConnection = new RConn();
+    return reactView(BigInt(10000), iiConnection);
   }
 
   // Custom routing to the FAQ page
