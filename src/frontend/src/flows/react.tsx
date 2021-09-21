@@ -145,56 +145,140 @@ const style = `
     color: #387ff7;
   }`;
 
-// Actual page content. We display the Identity Anchor and the list of
-// (non-recovery) devices. Additionally, if the user does _not_ have any
-// recovery devices, we display a warning "nag box" and suggest to the user
-// that they add a recovery device. If the user _does_ have at least one
-// recovery device, then we do not display a "nag box", but we list the
-// recovery devices.
-const pageContent = (
-  userNumber: bigint,
-  devices: DeviceData[],
-  connection: IIConnection
-) => (
-  <div>
-    <style>{style}</style>
-    <div className="container">
-      <h1>Anchor Management</h1>
-      <p>
-        You can view and manage this Identity Anchor and its added devices here.
-      </p>
-      {hasRecoveryDevice(devices) && recoveryNag()}
-      <label>Identity Anchor</label>
-      <div className="highlightBox">{Number(userNumber) /* ... */}</div>
+interface Props {
+  userNumber: bigint;
+  connection: IIConnection;
+}
+
+interface State {
+  recoveryDevices: DeviceData[];
+  authDevices: DeviceData[];
+  failure: string | null; // TODO: use this
+}
+
+class AnchorManagement extends React.Component<Props, State> {
+  state = { recoveryDevices: [], authDevices: [], failure: null };
+  public constructor(props: Props) {
+    super(props);
+  }
+  allDevices() {
+    return this.state.authDevices.concat(this.state.recoveryDevices);
+  }
+
+  render() {
+    return (
+      <div>
+        <style>{style}</style>
+        <div className="container">
+          <h1>Anchor Management</h1>
+          <p>
+            You can view and manage this Identity Anchor and its added devices
+            here.
+          </p>
+          {!hasRecoveryDevice(this.state.recoveryDevices) || recoveryNag()}
+          <label>Identity Anchor</label>
+          <div className="highlightBox">
+            {
+              Number(
+                this.props.userNumber
+              ) /* react struggles to render BigInts */
+            }
+          </div>
+          <DeviceList
+            devices={this.state.authDevices}
+            deviceLabel="Added devices"
+            labelAction="ADD NEW DEVICE"
+            addAdditionalDevice={() => {
+              addAdditionalDevice(
+                this.props.userNumber,
+                this.props.connection,
+                this.allDevices()
+              );
+              this.reloadState();
+            }}
+          ></DeviceList>
+          {hasRecoveryDevice(this.allDevices()) || (
+            <DeviceList
+              devices={this.state.authDevices}
+              deviceLabel="Recovery mechanisms"
+              labelAction="ADD RECOVERY MECHANISM"
+              addAdditionalDevice={() =>
+                console.log("this should add a recovery")
+              }
+            ></DeviceList>
+          )}
+          {logoutSection()}
+        </div>
+        <div id="navbar">
+          {/* TODO: add aboutLink */} &middot; {/* TODO: add faqLink */}
+        </div>
+      </div>
+    );
+  }
+
+  reloadState() {
+    console.log("Component mounted");
+    let devices: DeviceData[];
+    const oldState = this.state;
+    try {
+      devices = this.props.connection.lookupAll();
+      let newState: State = Object.assign({}, this.state);
+      for (var device of devices) {
+        if (hasOwnProperty(device.purpose, "recovery")) {
+          newState.recoveryDevices.push(device);
+        } else {
+          newState.authDevices.push(device);
+        }
+      }
+      newState;
+      this.setState(Object.assign({}, this.state, { devices: devices }));
+    } catch (error) {
+      this.setState(
+        Object.assign({}, this.state, { failure: error.toString() })
+      );
+    }
+    console.log("done reloading");
+    console.log(this.state);
+  }
+
+  componentDidMount() {
+    this.reloadState();
+  }
+
+  componentDidUpdate() {
+    //this.reloadState();
+  }
+}
+
+interface DeviceListProps {
+  devices: DeviceData[];
+  deviceLabel: string;
+  labelAction: string;
+  addAdditionalDevice: () => void;
+}
+
+function DeviceList(props: DeviceListProps) {
+  return (
+    <div>
       <div className="labelWithAction">
-        <label id="deviceLabel">Added devices</label>
-        <button
-          className="labelAction"
-          id="addAdditionalDevice"
-          onClick={() => addAdditionalDevice(userNumber, connection, devices)}
-        >
-          ADD NEW DEVICE
+        <label>{props.deviceLabel}</label>
+        <button className="labelAction" onClick={props.addAdditionalDevice}>
+          {props.labelAction}
         </button>
       </div>
-      <div id="deviceList"></div>
-      {hasRecoveryDevice(devices) || (
-        <div>
-          <div className="labelWithAction">
-            <label id="deviceLabel">Recovery mechanisms</label>
-            <button className="labelAction" id="addRecovery">
-              ADD RECOVERY MECHANISM
-            </button>
-          </div>
-          <div id="recoveryList"></div>
-        </div>
+      {props.devices.length > 0 && (
+        <ul>
+          {props.devices.map((device) /* TODO: set key */ => (
+            <li className="deviceItem">
+              <div className="deviceItemAlias">{device.alias}</div>
+              <button type="button" className="deviceItemRemove"></button>
+            </li>
+          ))}
+        </ul>
       )}
-      {logoutSection()}
     </div>
-    <div id="navbar">
-      {/* TODO: add aboutLink */} &middot; {/* TODO: add faqLink */}
-    </div>
-  </div>
-);
+  );
+}
 
 const recoveryNag = () => (
   <div className="nagBox">
@@ -222,19 +306,13 @@ export const renderManage = async (
   document.title = "Manage | Internet Identity"; // Extra
 
   const container = document.getElementById("pageContent") as HTMLElement;
-  let devices: DeviceData[];
-  try {
-    //devices = await withLoader(() => lookupAll(userNumber));
-    devices = await lookupAll(userNumber);
-  } catch (error) {
-    await displayFailedToListDevices(error);
-    return renderManage(userNumber, connection);
-  }
 
   // NOTE: we cast userNumber to number because react fails to render big ints
   // https://github.com/facebook/react/issues/20492
-  ReactDOM.render(pageContent(userNumber, devices, connection), container);
-  // TODO: init
+  ReactDOM.render(
+    <AnchorManagement userNumber={userNumber} connection={connection} />,
+    container
+  );
 };
 
 // Add a new device (i.e. a device connected to the device the user is
@@ -245,44 +323,9 @@ const addAdditionalDevice = async (
   connection: IIConnection,
   devices: DeviceData[]
 ) => {
-  let newDevice: WebAuthnIdentity;
-  try {
-    newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices),
-    });
-  } catch (error) {
-    await displayFailedToAddNewDevice(error);
-    return renderManage(userNumber, connection);
-  }
-  //const deviceName = await pickDeviceAlias();
-
   const deviceName = "my device";
-  if (deviceName === null) {
-    return renderManage(userNumber, connection);
-  }
-  try {
-    //await withLoader(() =>
-    //connection.add(
-    //userNumber,
-    //deviceName,
-    //{ unknown: null },
-    //{ authentication: null },
-    //newDevice.getPublicKey().toDer(),
-    //newDevice.rawId
-    //)
-    //);
-    await connection.add(
-      userNumber,
-      deviceName,
-      { unknown: null },
-      { authentication: null },
-      newDevice.getPublicKey().toDer(),
-      newDevice.rawId
-    );
-  } catch (error) {
-    await displayFailedToAddTheDevice(error);
-  }
-  renderManage(userNumber, connection);
+  await connection.add(deviceName, { authentication: null });
+  console.log("done");
 };
 
 // Whether or the user has registered a device as recovery
@@ -290,11 +333,6 @@ const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
   !devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
 
 // TEMPORARY MOCKS
-
-const lookupAll = async (userNumber: bigint) => {
-  console.log(userNumber);
-  return [];
-};
 
 const displayError = async ({}) => {};
 
@@ -336,26 +374,25 @@ const logoutIcon = (
   </svg>
 );
 
+const newDevice = (alias: string, purpose: Purpose): DeviceData => {
+  return {
+    alias: alias,
+    pubkey: [0, 1, 2, 3],
+    key_type: { unknown: null },
+    purpose: purpose,
+    credential_id: [],
+  };
+};
+
 export class IIConnection {
   public devices: DeviceData[] = [];
 
-  add = async (
-    userNumber: UserNumber,
-    alias: string,
-    keyType: KeyType,
-    purpose: Purpose,
-    newPublicKey: DerEncodedBlob,
-    credentialId?: BinaryBlob
-  ): Promise<void> => {
+  add = async (alias: string, purpose: Purpose): Promise<void> => {
+    this.devices.push(newDevice(alias, purpose));
     console.log("New device added");
-    // TODO
-    //const actor = await this.getActor();
-    //return await actor.add(userNumber, {
-    //alias,
-    //pubkey: Array.from(newPublicKey),
-    //credential_id: credentialId ? [Array.from(credentialId)] : [],
-    //key_type: keyType,
-    //purpose,
-    //});
+  };
+
+  lookupAll = (): DeviceData[] => {
+    return this.devices;
   };
 }
