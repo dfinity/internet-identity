@@ -4,13 +4,13 @@ import * as SeleniumStandalone from "selenium-standalone";
 import { ChildProcess } from "selenium-standalone";
 
 export async function runInBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(true, test);
 }
 
 export async function runInNestedBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(false, test);
 }
@@ -39,20 +39,59 @@ export async function startWebdriver(): Promise<ChildProcess | undefined> {
   return webdriverProcess;
 }
 
+export interface ScreenConfiguration {
+  screenType: 'desktop' | 'mobile',
+  windowSize: string
+}
+
+export interface RunConfiguration {
+  screenConfiguration: ScreenConfiguration;
+}
+
+const MOBILE_SCREEN: ScreenConfiguration = {
+  screenType: 'mobile',
+  windowSize: '360,640'
+};
+
+const DESKTOP_SCREEN: ScreenConfiguration = {
+  screenType: 'desktop',
+  windowSize: '1920,1080'
+};
+
+function parseScreen(): ScreenConfiguration {
+  switch (process.env.SCREEN) {
+    case 'mobile':
+      return MOBILE_SCREEN;
+    case 'desktop':
+      return DESKTOP_SCREEN;
+    default:
+      console.log(`Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`);
+      return DESKTOP_SCREEN;
+  }
+}
+
+function parseRunConfiguration(): RunConfiguration {
+  return {
+    screenConfiguration: parseScreen(),
+  }
+}
+
 export async function runInBrowserCommon(
   outer: boolean,
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => Promise<void>
 ): Promise<void> {
   let webdriverProcess;
   if (outer) {
     webdriverProcess = await startWebdriver();
   }
 
+  const runConfig = parseRunConfiguration();
+
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
       "goog:chromeOptions": {
-        args: ["--headless", "--disable-gpu", "--window-size=1050,1400"],
+        args: ["--headless", "--disable-gpu", `--window-size=${runConfig.screenConfiguration.windowSize}`],
       },
     },
     automationProtocol: "webdriver",
@@ -68,7 +107,7 @@ export async function runInBrowserCommon(
 
   try {
     // run test
-    await test(browser);
+    await test(browser, runConfig);
   } catch (e) {
     console.log(await browser.getPageSource());
     console.error(e);
