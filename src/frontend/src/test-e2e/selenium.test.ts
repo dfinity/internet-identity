@@ -24,7 +24,7 @@ import {
   runInNestedBrowser,
   switchToPopup,
   waitForFonts,
-  waitToClose,
+  waitToClose, RunConfiguration,
 } from "./util";
 
 // Read canister ids from the corresponding dfx files.
@@ -213,8 +213,8 @@ test("Recover access, after registration", async () => {
 }, 300_000);
 
 test("Screenshots", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const screenshots = new Screenshots("screenshots");
+  await runInBrowser(async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {
+    const screenshots = new Screenshots(`screenshots/${runConfig.screenConfiguration.screenType}/`);
 
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
