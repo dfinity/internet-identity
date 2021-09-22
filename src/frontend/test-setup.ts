@@ -1,6 +1,8 @@
 import crypto from "@trust/webcrypto";
 import textEncoding = require("text-encoding");
 
+require('./src/test-e2e/mock-fetch');
+
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace WebdriverIO {
