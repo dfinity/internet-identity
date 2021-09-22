@@ -1,6 +1,6 @@
 import crypto from "@trust/webcrypto";
 import textEncoding = require("text-encoding");
-import * as ChildProc from 'child_process';
+import * as ChildProc from "child_process";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -27,21 +27,21 @@ beforeAll(async () => {
   seleniumServerProc = ChildProc.spawn("npx", ["selenium-standalone", "start"]);
 
   const promise = new Promise((resolve, reject) => {
-    seleniumServerProc.stdout?.on('data', (data) => {
+    seleniumServerProc.stdout?.on("data", (data) => {
       console.log(`stdout: ${data}`);
-      if (data.toString() === 'Selenium started\n') {
-        console.log('selenium-standalone started');
+      if (data.toString() === "Selenium started\n") {
+        console.log("selenium-standalone started");
         resolve(true);
       }
     });
 
-    seleniumServerProc.on('error', (err) => {
-      console.error('Failed to start selenium-server: ', err);
+    seleniumServerProc.on("error", (err) => {
+      console.error("Failed to start selenium-server: ", err);
       reject(err);
     });
 
     setTimeout(() => {
-      reject('selenium-standalone server startup timeout');
+      reject("selenium-standalone server startup timeout");
     }, 30_000);
   });
 
