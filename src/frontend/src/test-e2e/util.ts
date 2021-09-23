@@ -1,5 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
+import ChildProc from "child_process";
 
 export async function runInBrowser(
   test: (browser: WebdriverIO.Browser) => Promise<void>
@@ -186,4 +187,42 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(1);
   await browser.switchToWindow(handles[0]);
+}
+
+export function setupSeleniumServer(): void {
+  let seleniumServerProc: ChildProc.ChildProcess;
+
+  beforeAll(async () => {
+    console.log("starting selenium-standalone server...");
+    seleniumServerProc = ChildProc.spawn("npx", [
+      "selenium-standalone",
+      "start",
+    ]);
+
+    const promise = new Promise((resolve, reject) => {
+      seleniumServerProc.stdout?.on("data", (data) => {
+        console.log(`selenium-standalone stdout: ${data}`);
+        if (data.toString().indexOf("Selenium started") !== -1) {
+          console.log("selenium-standalone started");
+          resolve(true);
+        }
+      });
+
+      seleniumServerProc.on("error", (err) => {
+        console.error("Failed to start selenium-server: ", err);
+        reject(err);
+      });
+
+      setTimeout(() => {
+        reject("selenium-standalone server startup timeout");
+      }, 30_000);
+    });
+
+    await promise;
+  });
+
+  afterAll(() => {
+    console.log("stopping selenium-standalone server...");
+    seleniumServerProc.kill();
+  });
 }

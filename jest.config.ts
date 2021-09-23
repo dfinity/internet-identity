@@ -8,5 +8,5 @@ export default {
   moduleNameMapper: {
     "dfx-generated/internet_identity": internet_identity,
   },
-  setupFilesAfterEnv: [`<rootDir>/src/frontend/test-setup.ts`],
+  setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
 };
