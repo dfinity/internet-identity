@@ -1,4 +1,4 @@
-export const idlFactory = ({ IDL }) => {
+export const idlFactory = ({ IDL }: any) => {
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
@@ -105,7 +105,7 @@ export const idlFactory = ({ IDL }) => {
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
   });
 };
-export const init = ({ IDL }) => {
+export const init = ({ IDL }: any) => {
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });

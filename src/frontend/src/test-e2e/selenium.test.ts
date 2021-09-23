@@ -17,11 +17,11 @@ import {
 } from "./views";
 import { FLOWS } from "./flows";
 import {
-  Screenshots,
   addVirtualAuthenticator,
   removeVirtualAuthenticator,
   runInBrowser,
   runInNestedBrowser,
+  Screenshots,
   switchToPopup,
   waitForFonts,
   waitToClose,
@@ -31,14 +31,12 @@ import {
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
 import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
-import { Actor, HttpAgent } from "@dfinity/agent";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { Principal } from "@dfinity/principal";
 import { hasOwnProperty } from "../utils/utils";
 import getProofOfWork from "../crypto/pow";
-import _SERVICE, { DeviceData } from "../../generated/internet_identity_types";
-import internet_identity_idl from "../../generated/internet_identity_idl";
-import { IC_DERIVATION_PATH, IIConnection, requestFEDelegation } from "../utils/iiConnection";
+import { DeviceData } from "../../generated/internet_identity_types";
+import { IIConnection, requestFEDelegation, } from "../utils/iiConnection";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
