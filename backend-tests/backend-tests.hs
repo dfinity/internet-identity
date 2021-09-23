@@ -747,11 +747,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
-    -- The storage updates the upper bound on upgrade if it doesn't use the
-    -- full capacity. This is a hack that have to go away when we start using
-    -- multiple backend canisters.
-    let expected_upper_bound = if should_upgrade then 3_784_873 else 103
-    lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
+    lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     assertStats cid 0
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
@@ -763,7 +759,11 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     when should_upgrade $ doUpgrade cid
     s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range @?= (100, 103)
+    -- The storage updates the upper bound on upgrade if it doesn't use the
+    -- full capacity. This is a hack that have to go away when we start using
+    -- multiple backend canisters.
+    let expected_upper_bound = if should_upgrade then 3_784_873 else 103
+    lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
 
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     liftIO $ user_number @?= 102
