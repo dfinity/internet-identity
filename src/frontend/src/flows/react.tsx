@@ -166,6 +166,12 @@ class AnchorManagement extends React.Component<Props, State> {
   }
 
   render() {
+    const removeDevice = (pubkey: PublicKey) => {
+      this.props.connection.remove(pubkey);
+      this.reloadState();
+      // TODO: This should also clear localStorage and reload in case we remove the current device
+    };
+
     return (
       <div>
         <style>{style}</style>
@@ -196,6 +202,7 @@ class AnchorManagement extends React.Component<Props, State> {
               );
               this.reloadState();
             }}
+            removeDevice={removeDevice}
           ></DeviceList>
           {hasRecoveryDevice(this.allDevices()) || (
             <DeviceList
@@ -203,50 +210,50 @@ class AnchorManagement extends React.Component<Props, State> {
               deviceLabel="Recovery mechanisms"
               labelAction="ADD RECOVERY MECHANISM"
               addAdditionalDevice={() =>
-                console.log("this should add a recovery")
+                alert("Adding recovery is not supported yet")
               }
+              removeDevice={removeDevice}
             ></DeviceList>
           )}
           {logoutSection()}
         </div>
         <div id="navbar">
-          {/* TODO: add aboutLink */} &middot; {/* TODO: add faqLink */}
+          {aboutLink} &middot; {faqLink}
         </div>
       </div>
     );
   }
 
   reloadState() {
-    console.log("Component mounted");
     let devices: DeviceData[];
     const oldState = this.state;
     try {
+      let authDevices = [];
+      let recoveryDevices = [];
       devices = this.props.connection.lookupAll();
-      let newState: State = Object.assign({}, this.state);
       for (var device of devices) {
         if (hasOwnProperty(device.purpose, "recovery")) {
-          newState.recoveryDevices.push(device);
+          recoveryDevices.push(device);
         } else {
-          newState.authDevices.push(device);
+          authDevices.push(device);
         }
       }
-      newState;
-      this.setState(Object.assign({}, this.state, { devices: devices }));
+      this.setState(
+        Object.assign({}, this.state, {
+          authDevices: authDevices,
+          recoveryDevices: recoveryDevices,
+        })
+      );
     } catch (error) {
       this.setState(
         Object.assign({}, this.state, { failure: error.toString() })
       );
     }
-    console.log("done reloading");
     console.log(this.state);
   }
 
   componentDidMount() {
     this.reloadState();
-  }
-
-  componentDidUpdate() {
-    //this.reloadState();
   }
 }
 
@@ -255,6 +262,7 @@ interface DeviceListProps {
   deviceLabel: string;
   labelAction: string;
   addAdditionalDevice: () => void;
+  removeDevice: (arg0: PublicKey) => void;
 }
 
 function DeviceList(props: DeviceListProps) {
@@ -268,10 +276,14 @@ function DeviceList(props: DeviceListProps) {
       </div>
       {props.devices.length > 0 && (
         <ul>
-          {props.devices.map((device) /* TODO: set key */ => (
-            <li className="deviceItem">
+          {props.devices.map((device) => (
+            <li className="deviceItem" key={device.pubkey.toString()}>
               <div className="deviceItemAlias">{device.alias}</div>
-              <button type="button" className="deviceItemRemove"></button>
+              <button
+                type="button"
+                className="deviceItemRemove"
+                onClick={() => props.removeDevice(device.pubkey)}
+              ></button>
             </li>
           ))}
         </ul>
@@ -282,7 +294,7 @@ function DeviceList(props: DeviceListProps) {
 
 const recoveryNag = () => (
   <div className="nagBox">
-    <div className="nagIcon">{/* TODO: add warningIcon */}</div>
+    <div className="nagIcon">{warningIcon}</div>
     <div className="recoveryNag">
       <div className="recoveryNagTitle">Recovery Mechanism</div>
       <div className="recoveryNagMessage">
@@ -374,10 +386,40 @@ const logoutIcon = (
   </svg>
 );
 
+const warningIcon = (
+  <svg
+    className="warningIcon"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M22.3988 20.0625L12.6488 3.1875C12.5035 2.93672 12.2527 2.8125 11.9996 2.8125C11.7465 2.8125 11.4934 2.93672 11.3504 3.1875L1.6004 20.0625C1.31212 20.5641 1.67305 21.1875 2.24962 21.1875H21.7496C22.3262 21.1875 22.6871 20.5641 22.3988 20.0625ZM11.2496 9.75C11.2496 9.64687 11.334 9.5625 11.4371 9.5625H12.5621C12.6652 9.5625 12.7496 9.64687 12.7496 9.75V14.0625C12.7496 14.1656 12.6652 14.25 12.5621 14.25H11.4371C11.334 14.25 11.2496 14.1656 11.2496 14.0625V9.75ZM11.9996 18C11.7052 17.994 11.4249 17.8728 11.2188 17.6625C11.0128 17.4522 10.8973 17.1695 10.8973 16.875C10.8973 16.5805 11.0128 16.2978 11.2188 16.0875C11.4249 15.8772 11.7052 15.756 11.9996 15.75C12.294 15.756 12.5743 15.8772 12.7804 16.0875C12.9865 16.2978 13.1019 16.5805 13.1019 16.875C13.1019 17.1695 12.9865 17.4522 12.7804 17.6625C12.5743 17.8728 12.294 17.994 11.9996 18V18Z"
+      fill="#292A2E"
+    />
+  </svg>
+);
+
 const newDevice = (alias: string, purpose: Purpose): DeviceData => {
+  const items = ["iPhone", "MacBook Air", "XPS 13", "YubiKey", "iPad", "Dell"];
+  const colors = [
+    "black",
+    "silver",
+    "gray",
+    "white",
+    "maroon",
+    "red",
+    "purple",
+    "fuchsia",
+  ];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  const item = items[Math.floor(Math.random() * items.length)];
+
   return {
-    alias: alias,
-    pubkey: [0, 1, 2, 3],
+    alias: color + " " + item,
+    pubkey: randomPubkey(),
     key_type: { unknown: null },
     purpose: purpose,
     credential_id: [],
@@ -388,11 +430,39 @@ export class IIConnection {
   public devices: DeviceData[] = [];
 
   add = async (alias: string, purpose: Purpose): Promise<void> => {
-    this.devices.push(newDevice(alias, purpose));
+    const newAlias = alias + `-${this.devices.length}`;
+    console.log("before");
+    console.log(this.devices);
+    this.devices.push(newDevice(newAlias, purpose));
+    console.log("after");
+    console.log(this.devices);
     console.log("New device added");
   };
 
   lookupAll = (): DeviceData[] => {
     return this.devices;
   };
+
+  remove = (publicKey: PublicKey) => {
+    const newDevices = this.devices.filter(
+      (device) => device.pubkey != publicKey
+    );
+    this.devices = newDevices;
+  };
 }
+
+const randomPubkey = (): Array<number> => {
+  return Array.from({ length: 40 }, () => Math.floor(Math.random() * 40));
+};
+
+const aboutLink = (
+  <a id="aboutLink" className="navbar-link" href="/about" target="_blank">
+    About
+  </a>
+);
+
+export const faqLink = (
+  <a id="faqLink" className="navbar-link" href="/faq" target="_blank">
+    FAQ
+  </a>
+);
