@@ -331,7 +331,7 @@ export class IIConnection {
   };
 }
 
-const requestFEDelegation = async (
+export const requestFEDelegation = async (
   identity: SignIdentity
 ): Promise<DelegationIdentity> => {
   const sessionKey = Ed25519KeyIdentity.generate();

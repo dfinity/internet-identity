@@ -9,3 +9,4 @@ delete window.location
 window.location = new URL('http://localhost:8080');
 
 process.env.CANISTER_ID = 'rwlgt-iiaaa-aaaaa-aaaaa-cai';
+process.env.II_ENV = 'development';
