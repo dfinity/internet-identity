@@ -36,7 +36,14 @@ import { Principal } from "@dfinity/principal";
 import { hasOwnProperty } from "../utils/utils";
 import getProofOfWork from "../crypto/pow";
 import { DeviceData } from "../../generated/internet_identity_types";
-import { IIConnection, requestFEDelegation } from "../utils/iiConnection";
+import {
+  baseActor,
+  IC_DERIVATION_PATH,
+  IIConnection,
+  requestFEDelegation,
+} from "../utils/iiConnection";
+import { generate } from "../crypto/mnemonic";
+import { withLoader } from "../components/loader";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
@@ -51,6 +58,7 @@ const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
 
 async function setupTestUser() {
+  // create a new identity
   const testPhrase =
     "script strategy fat bonus minimum elegant art hire vital palace combine vague proud exercise arrow copy media aim sleep soul energy crane amazing rely";
 
@@ -70,17 +78,53 @@ async function setupTestUser() {
   const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
   const pow = getProofOfWork(now_in_ns, Principal.fromText(IDENTITY_CANISTER));
 
-  const response = await actor.register(testDevice, pow);
-  if (hasOwnProperty(response, "registered")) {
-    return response.registered.user_number;
+  const registerResponse = await actor.register(testDevice, pow);
+
+  let anchor;
+  if (hasOwnProperty(registerResponse, "registered")) {
+    anchor = registerResponse.registered.user_number;
   } else {
     throw new Error("Failed to create test user");
   }
+
+  // add a recovery identity
+  const name = "Recovery phrase";
+  const seedPhrase = generate().trim();
+  const recoverIdentity = await fromMnemonicWithoutValidation(
+    seedPhrase,
+    IC_DERIVATION_PATH
+  );
+  await actor.add(anchor, {
+    alias: name,
+    pubkey: Array.from(recoverIdentity.getPublicKey().toDer()),
+    credential_id: [],
+    key_type: { seed_phrase: null },
+    purpose: { recovery: null },
+  });
+
+  return {
+    anchor: registerResponse.registered.user_number,
+    seedPhrase: seedPhrase,
+  };
 }
 
 test.only("Use the test user", async () => {
-  const anchor = await setupTestUser();
-  expect(anchor).toBe(BigInt(10_000));
+  const { anchor, seedPhrase } = await setupTestUser();
+
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.recover();
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForDisplay();
+    await recoveryView.enterIdentityAnchor(anchor.toString());
+    await recoveryView.continue();
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay("testDevice");
+  });
 }, 300_000);
 
 test("_Register new identity and login with it", async () => {
