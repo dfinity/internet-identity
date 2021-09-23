@@ -36,7 +36,7 @@ import { Principal } from "@dfinity/principal";
 import { hasOwnProperty } from "../utils/utils";
 import getProofOfWork from "../crypto/pow";
 import { DeviceData } from "../../generated/internet_identity_types";
-import { IIConnection, requestFEDelegation, } from "../utils/iiConnection";
+import { IIConnection, requestFEDelegation } from "../utils/iiConnection";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
