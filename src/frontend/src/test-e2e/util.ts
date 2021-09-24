@@ -85,7 +85,6 @@ export async function runInBrowserCommon(
   }
 }
 
-
 export interface ScreenConfiguration {
   screenType: "desktop" | "mobile";
   windowSize: string;
