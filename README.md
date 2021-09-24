@@ -121,7 +121,17 @@ into the following issues:
 
 #### Test suites
 
-We have a set of Selenium tests that run through the various flows. To run them locally follow the steps in `.github/workflows/selenium.yml`.
+We have a set of Selenium tests that run through the various flows. To set up a local deployment follow the steps in `.github/workflows/selenium.yml`.
+The tests can be executed by running:
+
+```bash
+npm run test:e2e
+```
+
+Or with a specific screen size e.g.:
+```bash
+npm run test:e2e-desktop
+```
 
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.

@@ -1,56 +1,57 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
-import * as SeleniumStandalone from "selenium-standalone";
-import { ChildProcess } from "selenium-standalone";
+import ChildProc from "child_process";
+
+// mobile resolution is used when env variable SCREEN=mobile is set
+const MOBILE_SCREEN: ScreenConfiguration = {
+  screenType: "mobile",
+  windowSize: "360,640",
+};
+
+// desktop resolution is used when env variable SCREEN=desktop is set
+const DESKTOP_SCREEN: ScreenConfiguration = {
+  screenType: "desktop",
+  windowSize: "1920,1080",
+};
 
 export async function runInBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(true, test);
 }
 
 export async function runInNestedBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(false, test);
 }
 
-export async function startWebdriver(): Promise<ChildProcess | undefined> {
-  let webdriverProcess: ChildProcess | undefined;
-  let retryCount = 0;
-  let error;
-  while (webdriverProcess === undefined && retryCount < 10) {
-    try {
-      error = undefined;
-      webdriverProcess = await SeleniumStandalone.start();
-    } catch (e) {
-      // port may still be used from previous stopped webdriver, try again
-      error = e;
-      retryCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  if (error !== undefined) {
-    console.warn(
-      'selenium could not be started. Make sure you installed the required webdrivers ("npm run install-webdrivers")'
-    );
-    console.error(error);
-  }
-  return webdriverProcess;
-}
-
 export async function runInBrowserCommon(
   outer: boolean,
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
-  let webdriverProcess;
-  if (outer) {
-    webdriverProcess = await startWebdriver();
-  }
+  // parse run configuration from environment variables
+  const runConfig = parseRunConfiguration();
 
   const browser = await remote({
     capabilities: {
-      browserName: "chrome"
+      browserName: "chrome",
+      "goog:chromeOptions": {
+        args: [
+          "--headless",
+          "--disable-gpu",
+          `--window-size=${runConfig.screenConfiguration.windowSize}`,
+        ],
+      },
     },
     automationProtocol: "webdriver",
     path: "/wd/hub",
@@ -65,7 +66,7 @@ export async function runInBrowserCommon(
 
   try {
     // run test
-    await test(browser);
+    await test(browser, runConfig);
   } catch (e) {
     console.log(await browser.getPageSource());
     console.error(e);
@@ -80,9 +81,37 @@ export async function runInBrowserCommon(
     if (outer) {
       // only close outer session
       await browser.deleteSession();
-      webdriverProcess?.kill();
     }
   }
+}
+
+export interface ScreenConfiguration {
+  screenType: "desktop" | "mobile";
+  windowSize: string;
+}
+
+export interface RunConfiguration {
+  screenConfiguration: ScreenConfiguration;
+}
+
+function parseScreen(): ScreenConfiguration {
+  switch (process.env.SCREEN) {
+    case MOBILE_SCREEN.screenType:
+      return MOBILE_SCREEN;
+    case DESKTOP_SCREEN.screenType:
+      return DESKTOP_SCREEN;
+    default:
+      console.log(
+        `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`
+      );
+      return DESKTOP_SCREEN;
+  }
+}
+
+function parseRunConfiguration(): RunConfiguration {
+  return {
+    screenConfiguration: parseScreen(),
+  };
 }
 
 export async function addCustomCommands(
@@ -168,13 +197,15 @@ export async function removeVirtualAuthenticator(
 export class Screenshots {
   private count = 0;
 
-  constructor(private directory: string) {}
+  constructor(private directory: string, private suffix: string) {}
 
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
-    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}.png`);
+    await browser.saveScreenshot(
+      `${this.directory}/${countStr}-${name}-${this.suffix}.png`
+    );
   }
 }
 
@@ -215,4 +246,42 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(1);
   await browser.switchToWindow(handles[0]);
+}
+
+export function setupSeleniumServer(): void {
+  let seleniumServerProc: ChildProc.ChildProcess;
+
+  beforeAll(async () => {
+    console.log("starting selenium-standalone server...");
+    seleniumServerProc = ChildProc.spawn("npx", [
+      "selenium-standalone",
+      "start",
+    ]);
+
+    const promise = new Promise((resolve, reject) => {
+      seleniumServerProc.stdout?.on("data", (data) => {
+        console.log(`selenium-standalone stdout: ${data}`);
+        if (data.toString().indexOf("Selenium started") !== -1) {
+          console.log("selenium-standalone started");
+          resolve(true);
+        }
+      });
+
+      seleniumServerProc.on("error", (err) => {
+        console.error("Failed to start selenium-server: ", err);
+        reject(err);
+      });
+
+      setTimeout(() => {
+        reject("selenium-standalone server startup timeout");
+      }, 30_000);
+    });
+
+    await promise;
+  }, 120_000);
+
+  afterAll(() => {
+    console.log("stopping selenium-standalone server...");
+    seleniumServerProc.kill();
+  });
 }
