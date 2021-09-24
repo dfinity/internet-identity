@@ -46,6 +46,11 @@ jobs:
       - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: Deploy Internet Identity
+        run: |
+          export II_ENV=development
+          dfx deploy --no-wallet --argument '(null)'
+
+      - name: run mocked Internet Identity
         run: MOCK=true npm start &
 
       - name: Deploy whoami canister
