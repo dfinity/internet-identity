@@ -234,7 +234,9 @@ export class Screenshots {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
-    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}-${this.suffix}.png`);
+    await browser.saveScreenshot(
+      `${this.directory}/${countStr}-${name}-${this.suffix}.png`
+    );
   }
 }
 

@@ -217,7 +217,8 @@ test("Screenshots", async () => {
   await runInBrowser(
     async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {
       const screenshots = new Screenshots(
-        "screenshots/", runConfig.screenConfiguration.screenType
+        "screenshots/",
+        runConfig.screenConfiguration.screenType
       );
 
       await addVirtualAuthenticator(browser);
