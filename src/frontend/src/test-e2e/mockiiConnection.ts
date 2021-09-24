@@ -1,8 +1,13 @@
 /* eslint-disable */
-import { LoginResult, RegisterResult, } from "../utils/iiConnection";
+import { LoginResult, RegisterResult } from "../utils/iiConnection";
 import { ActorSubclass, SignIdentity } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
-import { _SERVICE, DeviceData, ProofOfWork, UserNumber, } from "../../generated/internet_identity_types";
+import {
+  _SERVICE,
+  DeviceData,
+  ProofOfWork,
+  UserNumber,
+} from "../../generated/internet_identity_types";
 import {
   IIConnection as OriginalIIConnection,
   requestFEDelegation as originalRequestFEDelegation,
