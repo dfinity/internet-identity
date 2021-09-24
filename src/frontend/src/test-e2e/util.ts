@@ -1,7 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
-import * as SeleniumStandalone from "selenium-standalone";
-import { ChildProcess } from "selenium-standalone";
+import ChildProc from "child_process";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -40,11 +39,6 @@ export async function runInBrowserCommon(
     runConfig: RunConfiguration
   ) => Promise<void>
 ): Promise<void> {
-  let webdriverProcess;
-  if (outer) {
-    webdriverProcess = await startWebdriver();
-  }
-
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
@@ -87,7 +81,6 @@ export async function runInBrowserCommon(
     if (outer) {
       // only close outer session
       await browser.deleteSession();
-      webdriverProcess?.kill();
     }
   }
 }
@@ -277,4 +270,42 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(1);
   await browser.switchToWindow(handles[0]);
+}
+
+export function setupSeleniumServer(): void {
+  let seleniumServerProc: ChildProc.ChildProcess;
+
+  beforeAll(async () => {
+    console.log("starting selenium-standalone server...");
+    seleniumServerProc = ChildProc.spawn("npx", [
+      "selenium-standalone",
+      "start",
+    ]);
+
+    const promise = new Promise((resolve, reject) => {
+      seleniumServerProc.stdout?.on("data", (data) => {
+        console.log(`selenium-standalone stdout: ${data}`);
+        if (data.toString().indexOf("Selenium started") !== -1) {
+          console.log("selenium-standalone started");
+          resolve(true);
+        }
+      });
+
+      seleniumServerProc.on("error", (err) => {
+        console.error("Failed to start selenium-server: ", err);
+        reject(err);
+      });
+
+      setTimeout(() => {
+        reject("selenium-standalone server startup timeout");
+      }, 30_000);
+    });
+
+    await promise;
+  }, 120_000);
+
+  afterAll(() => {
+    console.log("stopping selenium-standalone server...");
+    seleniumServerProc.kill();
+  });
 }
