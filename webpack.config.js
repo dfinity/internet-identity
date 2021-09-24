@@ -12,6 +12,12 @@ try {
   localCanister = require("./.dfx/local/canister_ids.json").internet_identity.local;
 } catch {}
 
+let connectionPath = 'iiConnection.ts'
+
+if(process.env.MOCK){
+  connectionPath = '../test-e2e/mockiiConnection.ts'
+}
+
 /**
  * Generate a webpack configuration for a canister.
  */
@@ -88,6 +94,14 @@ function generateWebpackConfigForCanister(name, info) {
         test: /\.js(\?.*)?$/i,
       }),
       new webpack.IgnorePlugin(/^\.\/wordlists\/(?!english)/, /bip39\/src$/),
+      new webpack.NormalModuleReplacementPlugin(
+        /src\/frontend\/src\/utils\/iiConnection\.ts/,
+        connectionPath
+      ),
+      new webpack.NormalModuleReplacementPlugin(
+        /src\/frontend\/src\/test-e2e\/originaliiConnection/,
+        '../utils/iiConnection.ts'
+      ),
     ],
   };
 }

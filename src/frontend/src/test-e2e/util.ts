@@ -50,10 +50,7 @@ export async function runInBrowserCommon(
 
   const browser = await remote({
     capabilities: {
-      browserName: "chrome",
-      "goog:chromeOptions": {
-        args: ["--headless", "--disable-gpu", "--window-size=1050,1400"],
-      },
+      browserName: "chrome"
     },
     automationProtocol: "webdriver",
     path: "/wd/hub",
