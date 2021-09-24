@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { creationOptions } from "../utils/iiConnection";
 import ReactDOM from "react-dom";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -156,106 +156,91 @@ interface State {
   failure: string | null; // TODO: use this
 }
 
-class AnchorManagement extends React.Component<Props, State> {
-  state = { recoveryDevices: [], authDevices: [], failure: null };
-  public constructor(props: Props) {
-    super(props);
-  }
-  allDevices() {
-    return this.state.authDevices.concat(this.state.recoveryDevices);
-  }
+const AnchorManagement = (props: Props) => {
+  const [state, setState] = useState({
+    recoveryDevices: [],
+    authDevices: [],
+    failure: null,
+  });
+  const allDevices = state.authDevices.concat(state.recoveryDevices);
+  const removeDevice = (pubkey: PublicKey) => {
+    props.connection.remove(pubkey);
+    //this.reloadState(); TODO: this shouldn't be called on every render. Figure out how to use this "on mount".
+    // TODO: This should also clear localStorage and reload in case we remove the current device
+  };
 
-  render() {
-    const removeDevice = (pubkey: PublicKey) => {
-      this.props.connection.remove(pubkey);
-      this.reloadState();
-      // TODO: This should also clear localStorage and reload in case we remove the current device
-    };
+  useEffect(() => {
+    async function fetch() {
+      let devices: DeviceData[];
+      const oldState = state;
+      try {
+        let authDevices = [];
+        let recoveryDevices = [];
+        devices = await props.connection.lookupAll();
+        for (var device of devices) {
+          if (hasOwnProperty(device.purpose, "recovery")) {
+            recoveryDevices.push(device);
+          } else {
+            authDevices.push(device);
+          }
+        }
+        setState(
+          Object.assign({}, state, {
+            authDevices: authDevices,
+            recoveryDevices: recoveryDevices,
+          })
+        );
+      } catch (error) {
+        setState(Object.assign({}, state, { failure: error.toString() }));
+      }
+    }
 
-    return (
-      <div>
-        <style>{style}</style>
-        <div className="container">
-          <h1>Anchor Management</h1>
-          <p>
-            You can view and manage this Identity Anchor and its added devices
-            here.
-          </p>
-          {!hasRecoveryDevice(this.state.recoveryDevices) || recoveryNag()}
-          <label>Identity Anchor</label>
-          <div className="highlightBox">
-            {
-              Number(
-                this.props.userNumber
-              ) /* react struggles to render BigInts */
-            }
-          </div>
+    fetch();
+  });
+
+  return (
+    <div>
+      <style>{style}</style>
+      <div className="container">
+        <h1>Anchor Management</h1>
+        <p>
+          You can view and manage this Identity Anchor and its added devices
+          here.
+        </p>
+        {!hasRecoveryDevice(state.recoveryDevices) || recoveryNag()}
+        <label>Identity Anchor</label>
+        <div className="highlightBox">
+          {Number(props.userNumber) /* react struggles to render BigInts */}
+        </div>
+        <DeviceList
+          devices={state.authDevices}
+          deviceLabel="Added devices"
+          labelAction="ADD NEW DEVICE"
+          addAdditionalDevice={() => {
+            addAdditionalDevice(props.userNumber, props.connection, allDevices);
+            //this.reloadState(); TODO
+          }}
+          removeDevice={removeDevice}
+        ></DeviceList>
+        {hasRecoveryDevice(allDevices) || (
           <DeviceList
-            devices={this.state.authDevices}
-            deviceLabel="Added devices"
-            labelAction="ADD NEW DEVICE"
-            addAdditionalDevice={() => {
-              addAdditionalDevice(
-                this.props.userNumber,
-                this.props.connection,
-                this.allDevices()
-              );
-              this.reloadState();
-            }}
+            devices={state.authDevices}
+            deviceLabel="Recovery mechanisms"
+            labelAction="ADD RECOVERY MECHANISM"
+            addAdditionalDevice={() =>
+              alert("Adding recovery is not supported yet")
+            }
             removeDevice={removeDevice}
           ></DeviceList>
-          {hasRecoveryDevice(this.allDevices()) || (
-            <DeviceList
-              devices={this.state.authDevices}
-              deviceLabel="Recovery mechanisms"
-              labelAction="ADD RECOVERY MECHANISM"
-              addAdditionalDevice={() =>
-                alert("Adding recovery is not supported yet")
-              }
-              removeDevice={removeDevice}
-            ></DeviceList>
-          )}
-          {logoutSection()}
-        </div>
-        <div id="navbar">
-          {aboutLink} &middot; {faqLink}
-        </div>
+        )}
+        {logoutSection()}
       </div>
-    );
-  }
-
-  reloadState() {
-    let devices: DeviceData[];
-    const oldState = this.state;
-    try {
-      let authDevices = [];
-      let recoveryDevices = [];
-      devices = this.props.connection.lookupAll();
-      for (var device of devices) {
-        if (hasOwnProperty(device.purpose, "recovery")) {
-          recoveryDevices.push(device);
-        } else {
-          authDevices.push(device);
-        }
-      }
-      this.setState(
-        Object.assign({}, this.state, {
-          authDevices: authDevices,
-          recoveryDevices: recoveryDevices,
-        })
-      );
-    } catch (error) {
-      this.setState(
-        Object.assign({}, this.state, { failure: error.toString() })
-      );
-    }
-    console.log(this.state);
-  }
-
-  componentDidMount() {
-    this.reloadState();
-  }
-}
+      <div id="navbar">
+        {aboutLink} &middot; {faqLink}
+      </div>
+    </div>
+  );
+};
 
 interface DeviceListProps {
   devices: DeviceData[];
@@ -441,7 +426,7 @@ export class IIConnection {
     console.log("New device added");
   };
 
-  lookupAll = (): DeviceData[] => {
+  lookupAll = async (): Promise<DeviceData[]> => {
     return this.devices;
   };
 
