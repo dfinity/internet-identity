@@ -2,27 +2,55 @@ import { remote } from "webdriverio";
 import { command } from "webdriver";
 import ChildProc from "child_process";
 
+// mobile resolution is used when env variable SCREEN=mobile is set
+const MOBILE_SCREEN: ScreenConfiguration = {
+  screenType: "mobile",
+  windowSize: "360,640",
+};
+
+// desktop resolution is used when env variable SCREEN=desktop is set
+const DESKTOP_SCREEN: ScreenConfiguration = {
+  screenType: "desktop",
+  windowSize: "1920,1080",
+};
+
 export async function runInBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(true, test);
 }
 
 export async function runInNestedBrowser(
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
   await runInBrowserCommon(false, test);
 }
 
 export async function runInBrowserCommon(
   outer: boolean,
-  test: (browser: WebdriverIO.Browser) => Promise<void>
+  test: (
+    browser: WebdriverIO.Browser,
+    runConfig: RunConfiguration
+  ) => Promise<void>
 ): Promise<void> {
+  // parse run configuration from environment variables
+  const runConfig = parseRunConfiguration();
+
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
       "goog:chromeOptions": {
-        args: ["--headless", "--disable-gpu", "--window-size=1050,1400"],
+        args: [
+          "--headless",
+          "--disable-gpu",
+          `--window-size=${runConfig.screenConfiguration.windowSize}`,
+        ],
       },
     },
     automationProtocol: "webdriver",
@@ -38,7 +66,7 @@ export async function runInBrowserCommon(
 
   try {
     // run test
-    await test(browser);
+    await test(browser, runConfig);
   } catch (e) {
     console.log(await browser.getPageSource());
     console.error(e);
@@ -55,6 +83,35 @@ export async function runInBrowserCommon(
       await browser.deleteSession();
     }
   }
+}
+
+export interface ScreenConfiguration {
+  screenType: "desktop" | "mobile";
+  windowSize: string;
+}
+
+export interface RunConfiguration {
+  screenConfiguration: ScreenConfiguration;
+}
+
+function parseScreen(): ScreenConfiguration {
+  switch (process.env.SCREEN) {
+    case MOBILE_SCREEN.screenType:
+      return MOBILE_SCREEN;
+    case DESKTOP_SCREEN.screenType:
+      return DESKTOP_SCREEN;
+    default:
+      console.log(
+        `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`
+      );
+      return DESKTOP_SCREEN;
+  }
+}
+
+function parseRunConfiguration(): RunConfiguration {
+  return {
+    screenConfiguration: parseScreen(),
+  };
 }
 
 export async function addCustomCommands(
@@ -140,13 +197,15 @@ export async function removeVirtualAuthenticator(
 export class Screenshots {
   private count = 0;
 
-  constructor(private directory: string) {}
+  constructor(private directory: string, private suffix: string) {}
 
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
-    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}.png`);
+    await browser.saveScreenshot(
+      `${this.directory}/${countStr}-${name}-${this.suffix}.png`
+    );
   }
 }
 
