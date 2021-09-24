@@ -219,7 +219,7 @@ export function setupSeleniumServer(): void {
     });
 
     await promise;
-  });
+  }, 120_000);
 
   afterAll(() => {
     console.log("stopping selenium-standalone server...");
