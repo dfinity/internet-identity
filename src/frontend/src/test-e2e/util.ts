@@ -1,6 +1,7 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
 import ChildProc from "child_process";
+import { RemoteCapability } from "@wdio/types/build/Capabilities";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -43,16 +44,7 @@ export async function runInBrowserCommon(
   const runConfig = parseRunConfiguration();
 
   const browser = await remote({
-    capabilities: {
-      browserName: "chrome",
-      "goog:chromeOptions": {
-        args: [
-          "--headless",
-          "--disable-gpu",
-          `--window-size=${runConfig.screenConfiguration.windowSize}`,
-        ],
-      },
-    },
+    capabilities: runConfig.browserConfiguration,
     automationProtocol: "webdriver",
     path: "/wd/hub",
     logLevel: "info",
@@ -92,6 +84,7 @@ export interface ScreenConfiguration {
 
 export interface RunConfiguration {
   screenConfiguration: ScreenConfiguration;
+  browserConfiguration: RemoteCapability;
 }
 
 function parseScreen(): ScreenConfiguration {
@@ -108,9 +101,42 @@ function parseScreen(): ScreenConfiguration {
   }
 }
 
+function parseBrowser(screenConfig: ScreenConfiguration): RemoteCapability {
+  const defaultConfig = {
+    browserName: "chrome",
+    "goog:chromeOptions": {
+      args: [
+        "--headless",
+        "--disable-gpu",
+        `--window-size=${screenConfig.windowSize}`,
+      ],
+    },
+  };
+  switch (process.env.BROWSER) {
+    case "chrome-headless":
+      return defaultConfig;
+    case "chrome":
+      return {
+        browserName: "chrome",
+      };
+    case "firefox":
+      return {
+        browserName: "firefox",
+      };
+    case "safari":
+      return {
+        browserName: "safari",
+      };
+    default:
+      return defaultConfig;
+  }
+}
+
 function parseRunConfiguration(): RunConfiguration {
+  const screenConfig = parseScreen();
   return {
     screenConfiguration: parseScreen(),
+    browserConfiguration: parseBrowser(screenConfig),
   };
 }
 

@@ -1,29 +1,31 @@
-import { AuthorizeAppView, DemoAppView, MainView, RecoverView, WelcomeView, } from "./views";
-import { runInBrowser, waitToClose, } from "./util";
+import {
+  AuthorizeAppView,
+  DemoAppView,
+  MainView,
+  RecoverView,
+  WelcomeView,
+} from "./views";
+import { runInBrowser, setupSeleniumServer, waitToClose } from "./util";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
-import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { Principal } from "@dfinity/principal";
 import { hasOwnProperty } from "../utils/utils";
 import getProofOfWork from "../crypto/pow";
 import { DeviceData } from "../../generated/internet_identity_types";
-import { IC_DERIVATION_PATH, IIConnection, requestFEDelegation, } from "../utils/iiConnection";
+import {
+  IC_DERIVATION_PATH,
+  IIConnection,
+  requestFEDelegation,
+} from "../utils/iiConnection";
 import { generate } from "../crypto/mnemonic";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
-const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
-const REPLICA_URL = "http://localhost:8000";
 const II_URL = `http://localhost:8080`;
-const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
-const ABOUT_URL = `http://localhost:8000/about?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8081/";
-
-const DEVICE_NAME1 = "Virtual WebAuthn device";
-const DEVICE_NAME2 = "Other WebAuthn device";
 
 async function setupTestUser() {
   // create a new identity
@@ -75,6 +77,8 @@ async function setupTestUser() {
     seedPhrase: seedPhrase,
   };
 }
+
+setupSeleniumServer();
 
 test("Recover access for test user", async () => {
   const { anchor, seedPhrase } = await setupTestUser();

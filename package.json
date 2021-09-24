@@ -9,9 +9,11 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
     "test": "jest --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "jest --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
+    "test:e2e": "jest --verbose --testPathPattern=\"src/frontend/src/test-e2e/selenium.test.ts\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
+    "test:e2e-chrome": "SCREEN=desktop BROWSER=chrome jest --verbose --testPathPattern=\"src/frontend/src/test-e2e/cross-browser.test.ts\"",
+    "test:e2e-safari": "SCREEN=desktop BROWSER=safari jest --verbose --testPathPattern=\"src/frontend/src/test-e2e/cross-browser.test.ts\"",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
     "format": "prettier --write src/frontend",
     "install-webdrivers": "selenium-standalone install"
