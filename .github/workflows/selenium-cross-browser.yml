@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         rust: [ '1.51.0' ]
-        os: [ ubuntu-latest ]
+        os: [ macos-latest ]
         dfx: [ '0.8.1' ]
         start-flag: [ '', '--emulator' ]
 
@@ -39,7 +39,7 @@ jobs:
         run: |
           export DFX_VERSION=${{ matrix.dfx }}
           echo Install DFX Version: $DFX_VERSION
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo y | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
       - run: npm ci
