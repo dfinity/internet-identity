@@ -85,29 +85,6 @@ export async function runInBrowserCommon(
   }
 }
 
-export async function startWebdriver(): Promise<ChildProcess | undefined> {
-  let webdriverProcess: ChildProcess | undefined;
-  let retryCount = 0;
-  let error;
-  while (webdriverProcess === undefined && retryCount < 10) {
-    try {
-      error = undefined;
-      webdriverProcess = await SeleniumStandalone.start();
-    } catch (e) {
-      // port may still be used from previous stopped webdriver, try again
-      error = e;
-      retryCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  if (error !== undefined) {
-    console.warn(
-      'selenium could not be started. Make sure you installed the required webdrivers ("npm run install-webdrivers")'
-    );
-    console.error(error);
-  }
-  return webdriverProcess;
-}
 
 export interface ScreenConfiguration {
   screenType: "desktop" | "mobile";
