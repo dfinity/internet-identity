@@ -228,13 +228,13 @@ export async function removeVirtualAuthenticator(
 export class Screenshots {
   private count = 0;
 
-  constructor(private directory: string) {}
+  constructor(private directory: string, private suffix: string) {}
 
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
-    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}.png`);
+    await browser.saveScreenshot(`${this.directory}/${countStr}-${name}-${this.suffix}.png`);
   }
 }
 
