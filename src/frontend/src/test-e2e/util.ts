@@ -3,11 +3,13 @@ import { command } from "webdriver";
 import * as SeleniumStandalone from "selenium-standalone";
 import { ChildProcess } from "selenium-standalone";
 
+// mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
   screenType: "mobile",
   windowSize: "360,640",
 };
 
+// desktop resolution is used when env variable SCREEN=desktop is set
 const DESKTOP_SCREEN: ScreenConfiguration = {
   screenType: "desktop",
   windowSize: "1920,1080",
@@ -43,6 +45,7 @@ export async function runInBrowserCommon(
     webdriverProcess = await startWebdriver();
   }
 
+  // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
   const browser = await remote({
@@ -124,9 +127,9 @@ export interface RunConfiguration {
 
 function parseScreen(): ScreenConfiguration {
   switch (process.env.SCREEN) {
-    case "mobile":
+    case MOBILE_SCREEN.screenType:
       return MOBILE_SCREEN;
-    case "desktop":
+    case DESKTOP_SCREEN.screenType:
       return DESKTOP_SCREEN;
     default:
       console.log(
