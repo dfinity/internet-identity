@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { hasOwnProperty } from "../utils/utils";
-import {
-} from "@dfinity/candid";
+import {} from "@dfinity/candid";
 import {
   PublicKey,
   DeviceData,
   Purpose,
 } from "../../generated/internet_identity_types";
-
 
 // The styling of the page
 
@@ -249,7 +247,7 @@ export const renderManage = async (
 // add e.g. _another_ macbook or iPhone.)
 const addAdditionalDevice = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: IIConnection
 ) => {
   const deviceName = "my device";
   await connection.add(deviceName, { authentication: null });
@@ -352,7 +350,7 @@ export class IIConnection {
     return this.devices;
   };
 
-  remove = (publicKey: PublicKey) : void => {
+  remove = (publicKey: PublicKey): void => {
     const newDevices = this.devices.filter(
       (device) => device.pubkey != publicKey
     );
