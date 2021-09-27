@@ -1,73 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { creationOptions } from "../utils/iiConnection";
 import ReactDOM from "react-dom";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { hasOwnProperty } from "../utils/utils";
-import { pickDeviceAlias } from "./addDevicePickAlias";
 import {
-  BinaryBlob,
-  blobFromUint8Array,
-  derBlobFromBlob,
-  DerEncodedBlob,
 } from "@dfinity/candid";
 import {
-  _SERVICE,
   PublicKey,
-  SessionKey,
-  CredentialId,
-  UserNumber,
-  FrontendHostname,
-  Timestamp,
   DeviceData,
-  ProofOfWork,
-  RegisterResponse,
-  GetDelegationResponse,
   Purpose,
-  KeyType,
-  DeviceKey,
 } from "../../generated/internet_identity_types";
 
-// The various error messages we may display
-
-const displayFailedToAddNewDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add new device",
-    message: (
-      <span>
-        We failed to add your new device.
-        <br />
-        If you're trying to add a device that is not attached to this machine
-        try following the instructions at
-        <br />
-        <a
-          target="_blank"
-          href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
-        >
-          https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device
-        </a>
-      </span>
-    ),
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayFailedToAddTheDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add the new device",
-    message:
-      "We failed to add the new device to this Identity Anchor. Please try again",
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayFailedToListDevices = (error: Error) =>
-  displayError({
-    title: "Failed to list your devices",
-    message:
-      "An unexpected error occurred when displaying your devices. Please try again",
-    detail: error.toString(),
-    primaryButton: "Try again",
-  });
 
 // The styling of the page
 
@@ -165,12 +106,10 @@ const AnchorManagement = (props: {
   };
 
   async function fetchDevices() {
-    let devices: DeviceData[];
-
-    let newAuthDevices: DeviceData[] = [];
-    let newRecoveryDevices: DeviceData[] = [];
-    devices = await props.connection.lookupAll();
-    for (var device of devices) {
+    const newAuthDevices: DeviceData[] = [];
+    const newRecoveryDevices: DeviceData[] = [];
+    const devices = await props.connection.lookupAll();
+    for (const device of devices) {
       if (hasOwnProperty(device.purpose, "recovery")) {
         newRecoveryDevices.push(device);
       } else {
@@ -205,7 +144,7 @@ const AnchorManagement = (props: {
           deviceLabel="Added devices"
           labelAction="ADD NEW DEVICE"
           addAdditionalDevice={() => {
-            addAdditionalDevice(props.userNumber, props.connection, allDevices);
+            addAdditionalDevice(props.userNumber, props.connection);
             fetchDevices();
           }}
           removeDevice={(pubkey) => {
@@ -311,7 +250,6 @@ export const renderManage = async (
 const addAdditionalDevice = async (
   userNumber: bigint,
   connection: IIConnection,
-  devices: DeviceData[]
 ) => {
   const deviceName = "my device";
   await connection.add(deviceName, { authentication: null });
@@ -323,8 +261,6 @@ const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
   !devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
 
 // TEMPORARY MOCKS
-
-const displayError = async ({}) => {};
 
 const logoutSection = (alternativeLabel?: string) => (
   <div>
@@ -416,7 +352,7 @@ export class IIConnection {
     return this.devices;
   };
 
-  remove = (publicKey: PublicKey) => {
+  remove = (publicKey: PublicKey) : void => {
     const newDevices = this.devices.filter(
       (device) => device.pubkey != publicKey
     );
