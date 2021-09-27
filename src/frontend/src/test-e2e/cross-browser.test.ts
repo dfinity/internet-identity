@@ -30,7 +30,7 @@ const DEMO_APP_URL = "http://localhost:8081/";
 /**
  * Creates a new user in the II canister. In order for Agent and HttpAgent to work in a nodejs environment,
  * the fetch function needs to be patched. This is usually provided by the browser and doesn't exist in the nodejs
- * runtime environment. It is patched inside mock-fetch.ts
+ * runtime environment. It is patched inside setup-patch.ts
  */
 async function setupTestUser() {
   // create a new identity
