@@ -33,8 +33,8 @@ jobs:
           rustup default ${{ matrix.rust }}
           rustup target add wasm32-unknown-unknown
 
-      # This step hangs on Github actions on Darwin for some reason, that
-      # is why we run this only on Linux for now
+      # for this step to run on macos, "echo y" must be used insted of "yes"
+      # for dfx sdk install script
       - name: Install DFX
         run: |
           export DFX_VERSION=${{ matrix.dfx }}
