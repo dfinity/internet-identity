@@ -27,6 +27,11 @@ const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const II_URL = `http://localhost:8080`;
 const DEMO_APP_URL = "http://localhost:8081/";
 
+/**
+ * Creates a new user in the II canister. In order for Agent and HttpAgent to work in a nodejs environment,
+ * the fetch function needs to be patched. This is usually provided by the browser and doesn't exist in the nodejs
+ * runtime environment. It is patched inside mock-fetch.ts
+ */
 async function setupTestUser() {
   // create a new identity
   const testPhrase =
@@ -99,6 +104,13 @@ test("Recover access for test user", async () => {
   });
 }, 300_000);
 
+/**
+ * For this test to work in browsers other than chromium based (like chrome or edge) -> e.g. safari or firefox,
+ * you need to serve the II frontend using "MOCK=true npm start". This will replace the iiConnection.ts with mockiiConnection.ts
+ * (configured in webpack.config.js using "webpack.NormalModuleReplacementPlugin")
+ *
+ * Another approach would be to e.g. mock the whole "login" function in index.ts.
+ */
 test("Authenticate using mock login", async () => {
   const { anchor } = await setupTestUser();
 
