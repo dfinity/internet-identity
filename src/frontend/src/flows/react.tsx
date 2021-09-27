@@ -145,58 +145,46 @@ const style = `
     color: #387ff7;
   }`;
 
-interface Props {
+const AnchorManagement = (props: {
   userNumber: bigint;
   connection: IIConnection;
-}
+}) => {
+  console.log("I am running.");
 
-interface State {
-  recoveryDevices: DeviceData[];
-  authDevices: DeviceData[];
-  failure: string | null; // TODO: use this
-}
+  const defaultAuthDevices: DeviceData[] = [];
+  const defaultRecoveryDevices: DeviceData[] = [];
 
-const AnchorManagement = (props: Props) => {
-  const [state, setState] = useState({
-    recoveryDevices: [],
-    authDevices: [],
-    failure: null,
-  });
-  const allDevices = state.authDevices.concat(state.recoveryDevices);
+  const [authDevices, setAuthDevices] = useState(defaultAuthDevices);
+  const [recoveryDevices, setRecoveryDevices] = useState(
+    defaultRecoveryDevices
+  );
+  const allDevices = authDevices.concat(recoveryDevices);
+
   const removeDevice = (pubkey: PublicKey) => {
     props.connection.remove(pubkey);
-    //this.reloadState(); TODO: this shouldn't be called on every render. Figure out how to use this "on mount".
-    // TODO: This should also clear localStorage and reload in case we remove the current device
   };
 
-  useEffect(() => {
-    async function fetch() {
-      let devices: DeviceData[];
-      const oldState = state;
-      try {
-        let authDevices = [];
-        let recoveryDevices = [];
-        devices = await props.connection.lookupAll();
-        for (var device of devices) {
-          if (hasOwnProperty(device.purpose, "recovery")) {
-            recoveryDevices.push(device);
-          } else {
-            authDevices.push(device);
-          }
-        }
-        setState(
-          Object.assign({}, state, {
-            authDevices: authDevices,
-            recoveryDevices: recoveryDevices,
-          })
-        );
-      } catch (error) {
-        setState(Object.assign({}, state, { failure: error.toString() }));
+  async function fetchDevices() {
+    let devices: DeviceData[];
+
+    let newAuthDevices: DeviceData[] = [];
+    let newRecoveryDevices: DeviceData[] = [];
+    devices = await props.connection.lookupAll();
+    for (var device of devices) {
+      if (hasOwnProperty(device.purpose, "recovery")) {
+        newRecoveryDevices.push(device);
+      } else {
+        newAuthDevices.push(device);
       }
     }
 
-    fetch();
-  });
+    setAuthDevices(newAuthDevices);
+    setRecoveryDevices(newRecoveryDevices);
+  }
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
 
   return (
     <div>
@@ -207,24 +195,27 @@ const AnchorManagement = (props: Props) => {
           You can view and manage this Identity Anchor and its added devices
           here.
         </p>
-        {!hasRecoveryDevice(state.recoveryDevices) || recoveryNag()}
+        {!hasRecoveryDevice(recoveryDevices) || recoveryNag()}
         <label>Identity Anchor</label>
         <div className="highlightBox">
           {Number(props.userNumber) /* react struggles to render BigInts */}
         </div>
         <DeviceList
-          devices={state.authDevices}
+          devices={authDevices}
           deviceLabel="Added devices"
           labelAction="ADD NEW DEVICE"
           addAdditionalDevice={() => {
             addAdditionalDevice(props.userNumber, props.connection, allDevices);
-            //this.reloadState(); TODO
+            fetchDevices();
           }}
-          removeDevice={removeDevice}
+          removeDevice={(pubkey) => {
+            removeDevice(pubkey);
+            fetchDevices();
+          }}
         ></DeviceList>
         {hasRecoveryDevice(allDevices) || (
           <DeviceList
-            devices={state.authDevices}
+            devices={authDevices}
             deviceLabel="Recovery mechanisms"
             labelAction="ADD RECOVERY MECHANISM"
             addAdditionalDevice={() =>
@@ -418,12 +409,7 @@ export class IIConnection {
 
   add = async (alias: string, purpose: Purpose): Promise<void> => {
     const newAlias = alias + `-${this.devices.length}`;
-    console.log("before");
-    console.log(this.devices);
     this.devices.push(newDevice(newAlias, purpose));
-    console.log("after");
-    console.log(this.devices);
-    console.log("New device added");
   };
 
   lookupAll = async (): Promise<DeviceData[]> => {
