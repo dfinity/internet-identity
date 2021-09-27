@@ -6,7 +6,7 @@
 :company-id: DFINITY
 :sdk-short-name: DFINITY Canister SDK
 
-_Internet Identity_ is a smart contract implemented on the {IC} blockchain. It enables you to authenticate securely and anonymously when you access dapps on the {IC}. To authenticate, one must specify an _Identity Anchor_. For each dapp you authenticate to using an Identity Anchor, based on that Identity Anchor, Internet Identity creates a different _pseudonym_ specific to that dapp. This pseudonym cannot be linked to the Identity Anchor. You can add multiple _authentication methods_, such as security keys or facial recognition on computers or phones, to an Identity Anchor, and you will be able to use each of these authentication methods to authenticate using that Identity Anchor. Also, you can create as many Identity Anchors as you wish.
+_Internet Identity_ is a canister smart contract implemented on the {IC} blockchain. It enables you to authenticate securely and anonymously when you access dapps on the {IC}. To authenticate, one must specify an _Identity Anchor_. For each dapp you authenticate to using an Identity Anchor, based on that Identity Anchor, Internet Identity creates a different _pseudonym_ specific to that dapp. This pseudonym cannot be linked to the Identity Anchor. You can add multiple _authentication methods_, such as security keys or facial recognition on computers or phones, to an Identity Anchor, and you will be able to use each of these authentication methods to authenticate using that Identity Anchor. Also, you can create as many Identity Anchors as you wish.
 
 Unlike most authentication methods, Internet Identity does not require you to set and manage passwords or provide any personal identifying information to dapps or to Internet Identity.
 
