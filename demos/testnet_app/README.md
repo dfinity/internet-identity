@@ -10,3 +10,12 @@ cd demos/testnet_app/
 npm ci
 dfx deploy --network identity
 ```
+
+## Updating DFX
+
+When a new `dfx` version is released, follow these steps:
+
+1. Download the latest DFX executable.
+1. Update the version number in `dfx.json` (`"dfx": "..."`).
+1. Copy the `webpack.config.js` generated from a fresh `dfx new`.
+1. Run `dfx generate` to get the latest candid bindings.
