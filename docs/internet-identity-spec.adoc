@@ -702,15 +702,14 @@ Once the deployment went through, tag the commit with `mainnet-<date-from-propos
 
 ==== Building the canister for the identity testnet
 
-Because we need to fetch the root key for all networks that are not mainnet, we can not use the regular Docker build.
-Instead we build ourselves with the `II_ENV` environment variable set to `development`.
+Because we need to fetch the root key for all networks that are not mainnet, we
+need to build with `II_ENV=development`:
 
 [source,bash]
 ----
 didc encode '(null)' | xxd -r -p > arg.in
-npm ci
-II_ENV=development dfx build --network identity
-cp target/wasm32-unknown-unknown/release/internet_identity.wasm .
+docker build -t internet-identity-development . --build-arg II_ENV=development
+docker run --rm --entrypoint cat internet-identity-development /internet_identity.wasm > internet_identity.wasm
 ----
 
 This will create the Wasm file you want to use for the following deployment steps at `./internet_identity.wasm`.

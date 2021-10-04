@@ -87,7 +87,7 @@ Then open `http://localhost:8080` in your browser. Webpack will reload the page 
 npm run format && npm run lint
 ```
 
-To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
+To customize your canister ID for deployment or particular local development, create a [`.env`](https://www.npmjs.com/package/dotenv) file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
 ```
 CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
