@@ -1,5 +1,6 @@
-.git
-.github
+# These are all the files and directories that are _not_ included in the docker
+# build. They are not used in the docker build and including them would simply
+# invalidate the layer cache.
 backend-tests
 node_modules
 demos
@@ -7,5 +8,10 @@ docs
 dist
 screenshots
 target
-.dfx
 out
+arg.in
+*.wasm
+
+# filter out all "hidden" files and directories
+# (.git, .dfx, .*ignore, etc)
+.*

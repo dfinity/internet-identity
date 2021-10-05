@@ -48,6 +48,8 @@ RUN cargo install ic-cdk-optimizer --version 0.3.1
 COPY . .
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
+ARG II_ENV=production
+
 RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release -j1
