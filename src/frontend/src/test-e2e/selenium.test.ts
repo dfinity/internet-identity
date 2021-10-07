@@ -112,13 +112,9 @@ test("Log into client application, after registration", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    /*
-    on dfx > 0.8.0 the woami container does not respond
-    TODO: this should be fixed asap (https://dfinity.atlassian.net/browse/II-74)
     expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
       principal
     );
-     */
 
     // default value
     const exp = await browser.$("#expiration").getText();

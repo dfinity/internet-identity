@@ -356,8 +356,8 @@ export class DemoAppView extends View {
         return (await whoamiResponseElem.getText()).indexOf("-") !== -1;
       },
       {
-        timeout: 6_000,
-        timeoutMsg: 'expected whoami response to contain "-" for 6s',
+        timeout: 30_000,
+        timeoutMsg: 'expected whoami response to contain "-" within 30s',
       }
     );
     return await whoamiResponseElem.getText();
