@@ -87,7 +87,7 @@ Then open `http://localhost:8080` in your browser. Webpack will reload the page 
 npm run format && npm run lint
 ```
 
-To customize your canister ID for deployment or particular local development, create a `.env` file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
+To customize your canister ID for deployment or particular local development, create a [`.env`](https://www.npmjs.com/package/dotenv) file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
 ```
 CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
@@ -121,7 +121,17 @@ into the following issues:
 
 #### Test suites
 
-We have a set of Selenium tests that run through the various flows. To run them locally follow the steps in `.github/workflows/selenium.yml`.
+We have a set of Selenium tests that run through the various flows. To set up a local deployment follow the steps in `.github/workflows/selenium.yml`.
+The tests can be executed by running:
+
+```bash
+npm run test:e2e
+```
+
+Or with a specific screen size e.g.:
+```bash
+npm run test:e2e-desktop
+```
 
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
