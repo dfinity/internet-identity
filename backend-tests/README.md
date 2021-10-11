@@ -2,15 +2,8 @@ Backend blackbox testing
 ========================
 
 This directory contains a test suite that tests the backend of the Internet
-Identity in a simulated IC environment.
-
-The subdirectory `ic-ref` contains a snapshopt of the repository at
-https://github.com/dfinity-lab/ic-ref, created using `git subtree`. This is
-unmodified, so that changes there can be merged in more easily.
-
-We do not use the `.cabal` file there, but have our own in
-`backend-tests.cabal`, defining just a single executable.
-
+Identity. It uses the [`ic-hs`](https://github.com/dfinity/ic-hs) library to
+run a simulated IC environment in a process.
 
 Setup
 -----
