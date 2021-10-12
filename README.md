@@ -24,7 +24,7 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 ## Software versions
 
-- `dfx` version 0.8.1
+- `dfx` version 0.8.3
 
 - Rust version 1.51
 

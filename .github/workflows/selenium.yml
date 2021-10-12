@@ -13,7 +13,7 @@ jobs:
       matrix:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
-        dfx: [ '0.8.1' ]
+        dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
 
     steps:
