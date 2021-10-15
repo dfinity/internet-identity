@@ -112,20 +112,9 @@ test("Log into client application, after registration", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    /*
-      This is a horrible hack. The 'whoami' canister does not respond
-      when running with the emulator, meaning we had to disable one check
-      in our test suite. It is taking longer than expected to figure out
-      why, so for the time being we make sure to at least run the full
-      test suite when _not_ using the emulator.
-
-      RUN_IN_EMULATOR is set by the GitHub Actions workflow.
-    */
-    if (process.env.RUN_IN_EMULATOR !== "true") {
-      expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
-        principal
-      );
-    }
+    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
+      principal
+    );
 
     // default value
     const exp = await browser.$("#expiration").getText();

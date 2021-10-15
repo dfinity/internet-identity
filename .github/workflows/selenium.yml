@@ -13,7 +13,7 @@ jobs:
       matrix:
         rust: [ '1.51.0' ]
         os: [ ubuntu-latest ]
-        dfx: [ '0.8.1' ]
+        dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
 
     steps:
@@ -67,16 +67,6 @@ jobs:
       - run: rm -v -f screenshots/*.png
       - run: npm test
       - run: |
-          # This is a horrible hack. The 'whoami' canister does not respond
-          # when running with the emulator, meaning we had to disable one check
-          # in our test suite. It is taking longer than expected to figure out
-          # why, so for the time being we make sure to at least run the full
-          # test suite when _not_ using the emulator.
-          if [ '${{ matrix.start-flag }}' == "--emulator" ]
-          then
-            export RUN_IN_EMULATOR=true
-          fi
-
           npm run test:e2e-desktop
           npm run test:e2e-mobile
       - run: dfx stop
