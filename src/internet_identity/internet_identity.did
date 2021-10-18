@@ -100,6 +100,8 @@ type ProofOfWork = record {
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
+  get_num_users: () -> (nat32);
+  set_num_users: (nat32) -> ();
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

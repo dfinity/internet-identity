@@ -292,6 +292,22 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
 }
 
 #[update]
+async fn get_num_users() -> u32 {
+    STATE.with(|s| {
+        let store = s.storage.borrow();
+        store.get_num_users()
+    })
+}
+
+#[update]
+async fn set_num_users(num_users: u32) {
+    STATE.with(|s| {
+        let mut store = s.storage.borrow_mut();
+        store.set_num_users(num_users)
+    })
+}
+
+#[update]
 async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
@@ -862,6 +878,7 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
     ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
 }
 
+// Checks that none of the DeviceData fields exceed their size limit.
 fn check_entry_limits(device_data: &DeviceData) {
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;

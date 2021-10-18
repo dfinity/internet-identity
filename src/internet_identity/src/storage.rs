@@ -138,6 +138,16 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         Some(user_number)
     }
 
+    pub fn get_num_users(&self) -> u32 {
+        self.header.num_users
+    }
+
+    pub fn set_num_users(&mut self, num_users: u32) {
+        self.header.num_users = num_users;
+        self.flush();
+    }
+
+
     /// Writes the data of the specified user to stable memory.
     pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
