@@ -51,14 +51,11 @@ const init = (userNumber: bigint): Promise<string | null> =>
       "warningBadAnchor"
     ) as HTMLParagraphElement;
     inputSeedPhraseInput.oninput = () => {
-      const lun = leadingUserNumber(inputSeedPhraseInput.value);
-      console.log(leadingUserNumber(inputSeedPhraseInput.value));
+      const lun = leadingUserNumber(inputSeedPhraseInput.value.trim());
       if (lun !== null && lun !== userNumber) {
         warningBadAnchor.innerHTML = `<strong>warning</strong><br/>
                     it looks like you are using a seed phrase for anchor <strong>${lun}</strong> but the anchor you are trying to recover is <strong>${userNumber}</strong>
             `;
-
-        console.log("not ok...");
       } else {
         warningBadAnchor.innerHTML = "";
       }
