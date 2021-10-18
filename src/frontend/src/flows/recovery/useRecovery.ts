@@ -53,7 +53,7 @@ const loginWithRecovery = async (
   device: DeviceData
 ): Promise<LoginResult> => {
   if (wantsSeedPhrase(device)) {
-    const seedPhrase = await inputSeedPhrase();
+    const seedPhrase = await inputSeedPhrase(userNumber);
     if (seedPhrase === null) {
       return { kind: "seedPhraseFail" };
     }
