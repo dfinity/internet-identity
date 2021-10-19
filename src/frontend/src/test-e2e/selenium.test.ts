@@ -259,10 +259,10 @@ test("Screenshots", async () => {
       await welcomeView.waitForDisplay(); // no point taking screenshot
       await welcomeView.typeUserNumber(userNumber);
       await welcomeView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.addRecovery();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       await browser.url(II_URL);
