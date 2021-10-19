@@ -52,7 +52,7 @@ const pageContent = (devices: DeviceData[]) => html`
   </style>
   <div class="container">
     <h1>Recovery Mechanism</h1>
-    <p>Add a recovery mechanism to this Identity Anchor.</p>
+    <p>You can use a recovery mechanism to recover your anchor if your other device(s) are lost. We recommend adding one as a seed phrase or portable backup now.</p>
     <div class="recoveryContainer">
       <button
         ?disabled=${hasRecoveryPhrase(devices)}
