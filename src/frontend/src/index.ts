@@ -9,6 +9,7 @@ import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
+import { setupRecovery } from "./flows/recovery/setupRecovery";
 import { IIConnection } from "./utils/iiConnection";
 
 const init = async () => {
@@ -35,7 +36,10 @@ const init = async () => {
   // From here on, the user is authenticated to II.
 
   if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
-    await displaySingleDeviceWarning(userNumber, connection);
+    await setupRecovery(userNumber, connection);
+    if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
+      await displaySingleDeviceWarning(userNumber, connection);
+    }
   }
 
   switch (userIntent.kind) {

@@ -25,7 +25,7 @@ export const FLOWS = {
     await registerView.registerConfirmIdentity();
     const singleDeviceWarningView = new SingleDeviceWarningView(browser);
     await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.continue();
+    await singleDeviceWarningView.addRecovery();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
@@ -42,7 +42,7 @@ export const FLOWS = {
     await welcomeView.login();
     const singleDeviceWarningView = new SingleDeviceWarningView(browser);
     await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.continue();
+    await singleDeviceWarningView.addRecovery();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
