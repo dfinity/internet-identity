@@ -244,7 +244,7 @@ test("Screenshots", async () => {
       const singleDeviceWarningView = new SingleDeviceWarningView(browser);
       await singleDeviceWarningView.waitForDisplay();
       await screenshots.take("single-device-warning", browser);
-      await singleDeviceWarningView.continue();
+      await singleDeviceWarningView.addRecovery();
       const recoveryMethodSelectorView = new RecoveryMethodSelectorView(
         browser
       );
@@ -260,7 +260,7 @@ test("Screenshots", async () => {
       await welcomeView.typeUserNumber(userNumber);
       await welcomeView.login();
       await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
+      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
@@ -274,7 +274,7 @@ test("Screenshots", async () => {
       await screenshots.take("welcome-back", browser);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
+      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
@@ -310,7 +310,7 @@ test("Screenshots", async () => {
         await screenshots.take("new-device-login", browser);
         await welcomeBackView.login();
         await singleDeviceWarningView.waitForDisplay();
-        await singleDeviceWarningView.continue();
+        await singleDeviceWarningView.addRecovery();
         await recoveryMethodSelectorView.waitForDisplay();
         await recoveryMethodSelectorView.skipRecovery();
         const addDeviceView = new AddDeviceView(browser);
@@ -333,7 +333,7 @@ test("Screenshots", async () => {
         await welcomeBackView2.login();
         const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
         await singleDeviceWarningView2.waitForDisplay();
-        await singleDeviceWarningView2.continue();
+        await singleDeviceWarningView2.addRecovery();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
           browser2
         );
@@ -383,7 +383,7 @@ test("Screenshots", async () => {
       expect(userNumber3).toBe(userNumber);
       await welcomeBackView.login();
       await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
+      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
