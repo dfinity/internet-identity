@@ -35,6 +35,10 @@ const init = async () => {
 
   // From here on, the user is authenticated to II.
 
+  // Here, if the user doesn't have any recovery device, we prompt them to add
+  // one. If after returning from the prompt they still haven't added one, then
+  // we display a big warning with full explanation about the risks of having a
+  // single authentication device and not having a recovery device.
   if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
     await setupRecovery(userNumber, connection);
     if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {

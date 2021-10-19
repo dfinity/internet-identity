@@ -62,7 +62,7 @@ const pageContent = () => html`
       Add a recovery mechanism to an Identity Anchor
     </button>
     <button id="displayWarningRemindLater" class="primary">
-      Remind me later
+      Ok, I understand the risks
     </button>
     <div class="spacer"></div>
   </div>
@@ -83,14 +83,12 @@ const init = (userNumber: bigint, connection: IIConnection): Promise<void> =>
       "displayWarningAddRecovery"
     ) as HTMLButtonElement;
     displayWarningAddRecovery.onclick = () => {
-      setupRecovery(userNumber, connection);
-      resolve();
+      setupRecovery(userNumber, connection).then(() => resolve());
     };
     const displayWarningRemindLater = document.getElementById(
       "displayWarningRemindLater"
     ) as HTMLButtonElement;
     displayWarningRemindLater.onclick = () => {
-      setupRecovery(userNumber, connection);
       resolve();
     };
   });
