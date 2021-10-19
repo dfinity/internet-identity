@@ -84,16 +84,27 @@ export class RegisterView extends View {
 export class SingleDeviceWarningView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#displayWarningPrimary")
+      .$("#displayWarningAddRecovery")
       .waitForDisplayed({ timeout: 10_000 });
+    await this.browser
+      .$("#displayWarningRemindLater")
+      .waitForDisplayed({ timeout: 1_000 });
   }
 
-  async continue(): Promise<void> {
+  async addRecovery(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#displayWarningPrimary").click();
+    await this.browser.$("#displayWarningAddRecovery").click();
+  }
+
+  async remindLater(): Promise<void> {
+    // we need to scroll down in case of NOT headless, otherwise the button may not be visible
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    await this.browser.$("#displayWarningRemindLater").click();
   }
 }
 

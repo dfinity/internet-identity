@@ -1,5 +1,7 @@
 import { html, render } from "lit-html";
 import { warningIcon } from "../components/icons";
+import { setupRecovery } from "./recovery/setupRecovery";
+import { IIConnection } from "../utils/iiConnection";
 
 const pageContent = () => html`
   <style>
@@ -56,23 +58,39 @@ const pageContent = () => html`
     <a target="_blank" href="https://dfinity.org/faq/"
       >https://dfinity.org/faq/</a
     >
-    <button id="displayWarningPrimary" class="primary">
+    <button id="displayWarningAddRecovery" class="primary">
       Add a recovery mechanism to an Identity Anchor
+    </button>
+    <button id="displayWarningRemindLater" class="primary">
+      Remind me later
     </button>
     <div class="spacer"></div>
   </div>
 `;
 
-export const displaySingleDeviceWarning = async (): Promise<void> => {
+export const displaySingleDeviceWarning = async (
+  userNumber: bigint,
+  connection: IIConnection
+): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init();
+  return init(userNumber, connection);
 };
 
-const init = (): Promise<void> =>
+const init = (userNumber: bigint, connection: IIConnection): Promise<void> =>
   new Promise((resolve) => {
-    const displayWarningPrimary = document.getElementById(
-      "displayWarningPrimary"
+    const displayWarningAddRecovery = document.getElementById(
+      "displayWarningAddRecovery"
     ) as HTMLButtonElement;
-    displayWarningPrimary.onclick = () => resolve();
+    displayWarningAddRecovery.onclick = () => {
+      setupRecovery(userNumber, connection);
+      resolve();
+    };
+    const displayWarningRemindLater = document.getElementById(
+      "displayWarningRemindLater"
+    ) as HTMLButtonElement;
+    displayWarningRemindLater.onclick = () => {
+      setupRecovery(userNumber, connection);
+      resolve();
+    };
   });
