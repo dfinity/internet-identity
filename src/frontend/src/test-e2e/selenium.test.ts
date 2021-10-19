@@ -241,16 +241,16 @@ test("Screenshots", async () => {
       await registerView.registerIdentityFixup();
       await screenshots.take("register-user-number", browser);
       await registerView.registerConfirmIdentity();
-      const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-      await singleDeviceWarningView.waitForDisplay();
-      await screenshots.take("single-device-warning", browser);
-      await singleDeviceWarningView.addRecovery();
       const recoveryMethodSelectorView = new RecoveryMethodSelectorView(
         browser
       );
       await recoveryMethodSelectorView.waitForDisplay();
       await screenshots.take("recover-method-selector", browser);
       await recoveryMethodSelectorView.skipRecovery();
+      const singleDeviceWarningView = new SingleDeviceWarningView(browser);
+      await singleDeviceWarningView.waitForDisplay();
+      await screenshots.take("single-device-warning", browser);
+      await singleDeviceWarningView.remindLater();
       const mainView = new MainView(browser);
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
       await mainView.fixup();
@@ -331,14 +331,14 @@ test("Screenshots", async () => {
         await welcomeBackView2.fixup();
         await screenshots.take("new-device-login", browser2);
         await welcomeBackView2.login();
-        const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
-        await singleDeviceWarningView2.waitForDisplay();
-        await singleDeviceWarningView2.addRecovery();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
           browser2
         );
         await recoveryMethodSelectorView2.waitForDisplay();
         await recoveryMethodSelectorView2.skipRecovery();
+        const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
+        await singleDeviceWarningView2.waitForDisplay();
+        await singleDeviceWarningView2.remindLater();
         const mainView2 = new MainView(browser2);
         await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
         await mainView2.fixup();
