@@ -335,17 +335,17 @@ const bindRemoveListener = (
       .toDer()
       .equals(pubKey);
 
-    if (sameDevice) {
-      const shouldProceed = confirm(
-        "This will remove your current device and you will be logged out"
-      );
-      if (!shouldProceed) {
-        return;
-      }
-    }
-
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");
+    } else {
+      if (sameDevice) {
+        const shouldProceed = confirm(
+          "This will remove your current device and you will be logged out"
+        );
+        if (!shouldProceed) {
+          return;
+        }
+      }
     }
 
     // Otherwise, remove identity
