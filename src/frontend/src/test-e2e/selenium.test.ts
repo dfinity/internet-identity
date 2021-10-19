@@ -262,7 +262,7 @@ test("Screenshots", async () => {
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
       await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.addRecovery();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       await browser.url(II_URL);
@@ -273,10 +273,10 @@ test("Screenshots", async () => {
       await welcomeBackView.fixup();
       await screenshots.take("welcome-back", browser);
       await welcomeBackView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       // Now the link device flow, using a second browser
@@ -309,10 +309,10 @@ test("Screenshots", async () => {
         await welcomeBackView.fixup();
         await screenshots.take("new-device-login", browser);
         await welcomeBackView.login();
-        await singleDeviceWarningView.waitForDisplay();
-        await singleDeviceWarningView.addRecovery();
         await recoveryMethodSelectorView.waitForDisplay();
         await recoveryMethodSelectorView.skipRecovery();
+        await singleDeviceWarningView.waitForDisplay();
+        await singleDeviceWarningView.remindLater();
         const addDeviceView = new AddDeviceView(browser);
         await addDeviceView.waitForConfirmDisplay();
         await addDeviceView.fixupConfirm();
@@ -382,10 +382,10 @@ test("Screenshots", async () => {
       const userNumber3 = await welcomeBackView.getIdentityAnchor();
       expect(userNumber3).toBe(userNumber);
       await welcomeBackView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.addRecovery();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView.removeDevice(DEVICE_NAME2);
       // No dialog here!
