@@ -1,6 +1,6 @@
 use super::UserNumber;
 use ic_cdk::api::{
-    stable::{stable_grow, stable_read, stable_size, stable_write},
+    stable::{stable64_grow, stable64_read, stable64_size, stable64_write},
     trap,
 };
 use ic_cdk::export::candid;
@@ -8,11 +8,12 @@ use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
 
-const HEADER_SIZE: u32 = 512;
+const HEADER_SIZE: u64 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
-const WASM_PAGE_SIZE: u32 = 65536;
-const STABLE_MEMORY_SIZE: u64 = 1 << 32;
+const WASM_PAGE_SIZE: u64 = 65536;
+const GB: u64 = 1 << 30;
+const STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
 const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
 
@@ -94,7 +95,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     /// Panics if the stable memory is not empty but cannot be
     /// decoded.
     pub fn from_stable_memory() -> Option<Self> {
-        if stable_size() < 1 {
+        if stable64_size() < 1 {
             return None;
         }
 
@@ -105,7 +106,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 &mut header as *mut _ as *mut u8,
                 std::mem::size_of::<Header>(),
             );
-            stable_read(0, slice);
+            stable64_read(0, slice);
         }
 
         if &header.magic != b"IIC" {
@@ -142,19 +143,19 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
-        let buf = candid::ser::encode_one(data).map_err(StorageError::SerializationError)?;
+        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
+        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
 
         if buf.len() > self.value_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
-        let current_size = stable_size();
+        let current_size = stable64_size();
         let pages =
-            (stable_offset + self.header.entry_size as u32 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+            (stable_offset + self.header.entry_size as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         if pages > current_size {
             let pages_to_grow = pages - current_size;
-            let result = stable_grow(pages - current_size);
+            let result = stable64_grow(pages - current_size);
             if result.is_err() {
                 trap(&format!(
                     "failed to grow stable memory by {} pages",
@@ -162,8 +163,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 ))
             }
         }
-        stable_write(stable_offset, &(buf.len() as u16).to_le_bytes());
-        stable_write(stable_offset + std::mem::size_of::<u16>() as u32, &buf);
+        stable64_write(stable_offset, &(buf.len() as u16).to_le_bytes());
+        stable64_write(stable_offset + std::mem::size_of::<u16>() as u64, &buf);
         Ok(())
     }
 
@@ -171,13 +172,13 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number * self.header.entry_size as u32;
-        if stable_offset + self.header.entry_size as u32 > stable_size() * WASM_PAGE_SIZE {
+        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
+        if stable_offset + self.header.entry_size as u64 > stable64_size() * WASM_PAGE_SIZE {
             trap("a record for a valid Identity Anchor is out of stable memory bounds");
         }
 
         let mut buf = vec![0; self.header.entry_size as usize];
-        stable_read(stable_offset, &mut buf);
+        stable64_read(stable_offset, &mut buf);
         let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
@@ -190,15 +191,15 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         }
 
         let data: T =
-            candid::de::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
+            candid::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
 
         Ok(data)
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
     pub fn flush(&self) {
-        if stable_size() < 1 {
-            let result = stable_grow(1);
+        if stable64_size() < 1 {
+            let result = stable64_grow(1);
             if result.is_err() {
                 trap("failed to grow stable memory by 1 page");
             }
@@ -208,7 +209,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 &self.header as *const _ as *const u8,
                 std::mem::size_of::<Header>(),
             );
-            stable_write(0, &slice);
+            stable64_write(0, &slice);
         }
     }
 
@@ -216,7 +217,9 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         self.header.num_users as usize
     }
 
-    pub fn max_users(&self) -> usize {
+
+    /// Returns the maximum number of entries that this storage can fit.
+    pub fn max_entries(&self) -> usize {
         ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE)
             / self.header.entry_size as u64) as usize
     }
@@ -232,7 +235,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 lo, hi
             ));
         }
-        let max_entries = self.max_users() as u64;
+        let max_entries = self.max_entries() as u64;
         if (hi - lo) > max_entries {
             trap(&format!(
                 "set_user_number_range: specified range [{}, {}) is too large for this canister \
