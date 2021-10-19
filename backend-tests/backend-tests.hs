@@ -760,7 +760,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     when should_upgrade $ doUpgrade cid
     s <- queryII cid dummyUserId #stats ()
     -- The storage updates the upper bound on upgrade if it doesn't use the
-    -- full capacity. This is a hack that have to go away when we start using
+    -- full capacity. This is a hack that has to go away when we start using
     -- multiple backend canisters.
     let expected_upper_bound = if should_upgrade then 100 + 3_774_873 else 103
     lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
