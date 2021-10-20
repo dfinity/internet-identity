@@ -1,7 +1,7 @@
 use certified_map::{AsHashTree, RbTree};
 use hashtree::{Hash, HashTree};
 use ic_cdk::api::call::call;
-use ic_cdk::api::stable::stable_size;
+use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -521,7 +521,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )?;
         w.encode_gauge(
             "internet_identity_stable_memory_pages",
-            stable_size() as f64,
+            stable64_size() as f64,
             "Number of stable memory pages used by this canister.",
         )?;
         w.encode_gauge(
