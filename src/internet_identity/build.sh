@@ -11,13 +11,13 @@ TARGET="wasm32-unknown-unknown"
 cargo build --manifest-path "$II_DIR/Cargo.toml" --target $TARGET --release -j1
 
 # keep version in sync with Dockerfile
-cargo install ic-cdk-optimizer --version 0.3.1 --root "$II_DIR"/../../target
+cargo install ic-cdk-optimizer --version 0.3.1
 STATUS=$?
 
 if [ "$STATUS" -eq "0" ]; then
-      "$II_DIR"/../../target/bin/ic-cdk-optimizer \
-      "$II_DIR/../../target/$TARGET/release/internet_identity.wasm" \
-      -o "$II_DIR/../../target/$TARGET/release/internet_identity.wasm"
+  ic-cdk-optimizer \
+    ./target/$TARGET/release/internet_identity.wasm \
+    -o ./target/$TARGET/release/internet_identity.wasm
 
   true
 else
