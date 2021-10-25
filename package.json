@@ -51,7 +51,7 @@
     "webdriverio": "^7.12.1",
     "webpack": "5.45.1",
     "webpack-cli": "4.7.2",
-    "webpack-dev-server": "^3.11.2"
+    "webpack-dev-server": "^4.3.1"
   },
   "dependencies": {
     "@dfinity/agent": "0.9.2",
