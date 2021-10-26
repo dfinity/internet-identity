@@ -37,7 +37,7 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 To run the internet_identity canisters, proceed as follows after cloning the repository
 
 ```bash
-npm install
+npm ci
 dfx start [--clean] [--background]
 ```
 
