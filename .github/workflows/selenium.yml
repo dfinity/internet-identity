@@ -53,6 +53,14 @@ jobs:
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
 
+      # We don't use the canister in the tests, but we want to make sure it
+      # can be built and deployed
+      - name: Deploy testnet_app canister
+        run: |
+          cd demos/testnet_app
+          npm ci
+          dfx deploy --no-wallet
+
       - name: Run demo app
         run: |
           cd demos/sample-javascript/

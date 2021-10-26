@@ -9,12 +9,14 @@ let canisters;
 function initCanisterIds() {
   if(dfx_network = process.env.DFX_NETWORK) {
     network = dfx_network;
-    network_alphanum = network.replace(/[^a-zA-Z0-9]/g, "_"); // replace non-alphanumeric like dfx
-    console.log(`network ${network} (${network_alphanum}) was inferred from environment variable DFX_NETWORK`);
+    console.log(`network was inferred from environment variable DFX_NETWORK`);
   } else {
     network = process.env.NODE_ENV === "production" ? "ic" : "local";
-    console.log(`environment variable DFX_NETWORK not set, inferred network ${network} from node environment`);
+    console.log(`environment variable DFX_NETWORK not set, inferring network from node environment`);
   }
+
+  network_alphanum = network.replace(/[^a-zA-Z0-9]/g, "_"); // replace non-alphanumeric like dfx
+  console.log(`network is '${network}' (${network_alphanum})`);
 
   function getCanisterIds(path) {
     try {
