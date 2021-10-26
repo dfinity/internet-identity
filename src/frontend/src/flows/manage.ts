@@ -340,7 +340,7 @@ const bindRemoveListener = (
     } else {
       if (sameDevice) {
         const shouldProceed = confirm(
-          "This will remove your current device and you will be logged out"
+          "This will remove your current device and you will be logged out."
         );
         if (!shouldProceed) {
           return;
