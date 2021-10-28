@@ -269,9 +269,16 @@ export function setupSeleniumServer(): void {
         }
       });
 
-      //seleniumServerProc.stderr?.on("data", (data) => {
-      //console.log(`selenium-standalone stderr: ${data}`);
-      //});
+      /*
+       * For reasons unclear, printing stderr breaks the tests. It looks like it tries to print after the tests' end, which jest doesn't like:
+       *
+       * Cannot log after tests are done. Did you forget to wait for something async in your test?
+       * 434
+       *     Attempted to log "selenium-standalone stderr: 10:14:50.626 INFO [ActiveSessions$1.onStop]
+      seleniumServerProc.stderr?.on("data", (data) => {
+      console.log(`selenium-standalone stderr: ${data}`);
+      });
+      */
 
       seleniumServerProc.on("error", (err) => {
         console.error("Failed to start selenium-server: ", err);
