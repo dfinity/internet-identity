@@ -259,9 +259,7 @@ export function setupSeleniumServer(): void {
     ]);
 
     const promise = new Promise((resolve, reject) => {
-
       let dat = "";
-
 
       seleniumServerProc.stdout?.on("data", (data) => {
         dat += data;
