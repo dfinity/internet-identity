@@ -256,13 +256,11 @@ export function setupSeleniumServer(): void {
     seleniumServerProc = ChildProc.spawn("npx", [
       "selenium-standalone",
       "start",
+      "--drivers.chrome.version=94.0.4606.81",
     ]);
 
     const promise = new Promise((resolve, reject) => {
-      let dat = "";
-
       seleniumServerProc.stdout?.on("data", (data) => {
-        dat += data;
         console.log(`selenium-standalone stdout: ${data}`);
         if (data.toString().indexOf("Selenium started") !== -1) {
           console.log("selenium-standalone started");
@@ -271,12 +269,7 @@ export function setupSeleniumServer(): void {
       });
 
       seleniumServerProc.stderr?.on("data", (data) => {
-        dat += data;
-        console.log(`selenium-standalone stdout: ${data}`);
-        if (data.toString().indexOf("Selenium started") !== -1) {
-          console.log("selenium-standalone started");
-          resolve(true);
-        }
+        console.log(`selenium-standalone stderr: ${data}`);
       });
 
       seleniumServerProc.on("error", (err) => {
@@ -285,7 +278,7 @@ export function setupSeleniumServer(): void {
       });
 
       setTimeout(() => {
-        reject(`selenium-standalone server startup timeout: ${dat}`);
+        reject(`selenium-standalone server startup timeout`);
       }, 30_000);
     });
 
