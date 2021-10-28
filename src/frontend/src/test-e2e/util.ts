@@ -272,6 +272,15 @@ export function setupSeleniumServer(): void {
         }
       });
 
+      seleniumServerProc.stderr?.on("data", (data) => {
+        dat += data;
+        console.log(`selenium-standalone stdout: ${data}`);
+        if (data.toString().indexOf("Selenium started") !== -1) {
+          console.log("selenium-standalone started");
+          resolve(true);
+        }
+      });
+
       seleniumServerProc.on("error", (err) => {
         console.error("Failed to start selenium-server: ", err);
         reject(err);
