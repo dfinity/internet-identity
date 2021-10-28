@@ -354,7 +354,7 @@ test("Screenshots", async () => {
           }
         );
         expect(await browser2.getAlertText()).toBe(
-          "This will remove your current device and you will be logged out"
+          "This will remove your current device and you will be logged out."
         );
         await browser2.dismissAlert();
         await browser2.deleteSession();
@@ -404,18 +404,8 @@ test("Screenshots", async () => {
       await screenshots.take("after-removal", browser);
 
       await mainView.removeDevice(DEVICE_NAME1);
-      const alertText1 = await browser.getAlertText();
-      expect(alertText1).toBe(
-        "This will remove your current device and you will be logged out"
-      );
-      await browser.acceptAlert();
-
-      await browser.waitUntil(async () => !!(await browser.getAlertText()), {
-        timeout: 1_000,
-        timeoutMsg: "expected alert to be displayed after 1s",
-      });
-      const alertText2 = await browser.getAlertText();
-      expect(alertText2).toBe("You can not remove your last device.");
+      const alertText = await browser.getAlertText();
+      expect(alertText).toBe("You can not remove your last device.");
       await browser.acceptAlert();
 
       // device still present. You can't remove your last device.
