@@ -259,7 +259,12 @@ export function setupSeleniumServer(): void {
     ]);
 
     const promise = new Promise((resolve, reject) => {
+
+      let dat = "";
+
+
       seleniumServerProc.stdout?.on("data", (data) => {
+        dat += data;
         console.log(`selenium-standalone stdout: ${data}`);
         if (data.toString().indexOf("Selenium started") !== -1) {
           console.log("selenium-standalone started");
@@ -273,7 +278,7 @@ export function setupSeleniumServer(): void {
       });
 
       setTimeout(() => {
-        reject("selenium-standalone server startup timeout");
+        reject(`selenium-standalone server startup timeout: ${dat}`);
       }, 30_000);
     });
 
