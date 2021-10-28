@@ -256,7 +256,7 @@ export function setupSeleniumServer(): void {
     seleniumServerProc = ChildProc.spawn("npx", [
       "selenium-standalone",
       "start",
-      "--drivers.chrome.version=94.0.4606.81",
+      "--drivers.chrome.version=94.0.4606.41",
     ]);
 
     const promise = new Promise((resolve, reject) => {

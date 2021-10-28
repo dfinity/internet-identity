@@ -14,7 +14,7 @@
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
     "format": "prettier --write src/frontend",
-    "install-webdrivers": "selenium-standalone install --drivers.chrome.version=94.0.4606.81"
+    "install-webdrivers": "selenium-standalone install --drivers.chrome.version=94.0.4606.41"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",
