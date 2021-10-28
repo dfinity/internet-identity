@@ -256,7 +256,8 @@ export function setupSeleniumServer(): void {
     seleniumServerProc = ChildProc.spawn("npx", [
       "selenium-standalone",
       "start",
-      "--config", "./selenium-standalone.config.js",
+      "--config",
+      "./selenium-standalone.config.js",
     ]);
 
     const promise = new Promise((resolve, reject) => {
@@ -269,7 +270,7 @@ export function setupSeleniumServer(): void {
       });
 
       //seleniumServerProc.stderr?.on("data", (data) => {
-        //console.log(`selenium-standalone stderr: ${data}`);
+      //console.log(`selenium-standalone stderr: ${data}`);
       //});
 
       seleniumServerProc.on("error", (err) => {
