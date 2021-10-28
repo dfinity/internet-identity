@@ -286,7 +286,7 @@ export function setupSeleniumServer(): void {
       });
 
       setTimeout(() => {
-        reject(`selenium-standalone server startup timeout`);
+        reject("selenium-standalone server startup timeout");
       }, 30_000);
     });
 
