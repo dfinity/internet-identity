@@ -30,7 +30,7 @@ const pageContent = () => html`
   <div id="warningContainer" class="container">
     ${warningIcon}
     <h1 id="warningHeading">Warning</h1>
-    <p>It looks like you are using iOS/MacOS.</p>
+    <p>It looks like you are using Safari or iOS.</p>
     <p>
       If you “Clear History and Website Data” via system preferences, all web
       authentication keys will be deleted from this device. This means that with
