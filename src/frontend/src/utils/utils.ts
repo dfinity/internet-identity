@@ -5,3 +5,57 @@ export function hasOwnProperty<
 >(obj: X, prop: Y): obj is X & Record<Y, unknown> {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
+
+// Returns true if we're in Safari or iOS (although technically iOS only has
+// Safari)
+export function iOSOrSafari(): boolean {
+  // This function uses `navigator.platform` and may use `navigator.userAgentData` in the future.
+  // List of values by device so far:
+  //
+  // iPhone 12 Mini, iOS 15.0.2
+  //
+  // Safari
+  // navigator.userAgentData: undefined
+  // navigator.platform: "iPhone"
+  // navigator.userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+  //
+  //
+  // MacBook Pro Intel, MacOS Big Sur 11.6
+  //
+  // Safari
+  // navigator.userAgentData: undefined
+  // navigator.platform: "MacIntel"
+  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
+  //
+  // Chrome
+  // navigator.userAgentData.plaftorm: "macOS"
+  // navigator.platform: "MacIntel"
+  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+  //
+  // Firefox
+  // navigator.userAgentData: undefined
+  // navigator.platform: "MacIntel"
+  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:93.0) Gecko/20100101 Firefox/93.0"
+  //
+  //
+  // MacBook Air M1, MacOS Big Sur 11.6
+  //
+  // Safari
+  // navigator.userAgentData: undefined
+  // navigator.platform: "MacIntel" // yes, I double checked
+  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
+  //
+  // Firefox
+  // navigator.userAgentData: undefined
+  // navigator.platform: "MacIntel" // yes, I double checked
+  //
+  // iPad Pro, iPadOS 15.0.2
+  //
+  // Safari
+  // navigator.userAgentData: undefined
+  // navigator.platform: "iPad"
+  // navigator.userAgent: "Mozilla/5.0 (iPad; CPU OS 15_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+
+  // For details, see https://stackoverflow.com/a/23522755/2716377
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}

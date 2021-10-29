@@ -8,9 +8,7 @@ import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
-import { displaySingleDeviceWarning } from "./flows/displaySingleDeviceWarning";
-import { setupRecovery } from "./flows/recovery/setupRecovery";
-import { IIConnection } from "./utils/iiConnection";
+import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -36,15 +34,8 @@ const init = async () => {
   // From here on, the user is authenticated to II.
 
   // Here, if the user doesn't have any recovery device, we prompt them to add
-  // one. If after returning from the prompt they still haven't added one, then
-  // we display a big warning with full explanation about the risks of having a
-  // single authentication device and not having a recovery device.
-  if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
-    await setupRecovery(userNumber, connection);
-    if ((await IIConnection.lookupRecovery(userNumber)).length === 0) {
-      await displaySingleDeviceWarning(userNumber, connection);
-    }
-  }
+  // one. The exact flow depends on the device they use.
+  await recoveryWizard(userNumber, connection);
 
   switch (userIntent.kind) {
     // Authenticate to a third party service
