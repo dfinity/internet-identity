@@ -203,6 +203,9 @@ export class Screenshots {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
+    // Here we pause for half a second to make sure the browser has had time to
+    // render everything (fonts loaded, etc)
+    await browser.pause(500);
     await browser.saveScreenshot(
       `${this.directory}/${countStr}-${name}-${this.suffix}.png`
     );
