@@ -110,7 +110,7 @@ export class SingleDeviceWarningView extends View {
 
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("#skipRecovery").waitForDisplayed({ timeout: 3_000 });
+    await this.browser.$("#skipRecovery").waitForDisplayed({ timeout: 10_000 });
   }
 
   async useSeedPhrase(): Promise<void> {
