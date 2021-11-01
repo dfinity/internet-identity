@@ -9,8 +9,10 @@ export function hasOwnProperty<
 // Returns true if we're in Safari or iOS (although technically iOS only has
 // Safari)
 export function iOSOrSafari(): boolean {
-  // This function uses `navigator.platform` and may use `navigator.userAgentData` in the future.
-  // List of values by device so far:
+  // List of values of navigator.userAgent, navigator.platform and
+  // navigator.userAgentData by device so far (note: navigator.platform is
+  // deprecated but navigator.userAgentdata is not implemented in many
+  // browsers):
   //
   // iPhone 12 Mini, iOS 15.0.2
   //
