@@ -40,6 +40,9 @@ export const FLOWS = {
     await welcomeView.waitForDisplay();
     await welcomeView.typeUserNumber(userNumber);
     await welcomeView.login();
+    // NOTE: depending on the browser, we issue different warnings. On Safari,
+    // the warning comes before the recovery method selector. Since we only
+    // test on Chrome we always expect the recovery selector first.
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();

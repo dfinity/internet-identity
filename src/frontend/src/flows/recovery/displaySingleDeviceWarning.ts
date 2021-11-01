@@ -32,10 +32,10 @@ const pageContent = () => html`
     <h1 id="warningHeading">Warning</h1>
     <p>
       If you lose all the devices assigned to your Internet Identity anchor,
-      then you will lose access to the anchor, and all associated resources and
-      tokens, unless you have a recovery mechanism setup. This can be an
-      external key fob or a secure seedphrase, which you must make sure is not
-      stolen.
+      then you will <em>lose access</em> to the anchor, and all associated
+      resources and tokens, unless you have a recovery mechanism setup. This can
+      be an external key fob or a secure seedphrase, which you must make sure is
+      not stolen.
     </p>
     <p>
       As a best practice, we recommend you assign multiple devices to an

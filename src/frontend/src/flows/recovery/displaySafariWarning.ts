@@ -33,9 +33,9 @@ const pageContent = () => html`
     <p>It looks like you are using Safari or iOS.</p>
     <p>
       If you “Clear History and Website Data” via system preferences, all web
-      authentication keys will be deleted from this device. This means that with
-      this device you no longer have access to the identity anchor and all
-      associated resources and tokens.
+      authentication keys will be <em>deleted</em> from this device. This means
+      that you will no longer have access to your identity anchor (and all
+      associated resources and tokens) with this device.
     </p>
     <p>
       As a best practice, we recommend you assign multiple devices to an
