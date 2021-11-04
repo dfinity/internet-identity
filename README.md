@@ -28,7 +28,7 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 - Rust version 1.51
 
-- NodeJS (with npm) version TBD
+- NodeJS (with npm) v14
 
 - CMake
 
@@ -132,6 +132,45 @@ Or with a specific screen size e.g.:
 ```bash
 npm run test:e2e-desktop
 ```
+
+#### start replica
+
+``` bash
+$ rm -rf .dfx
+$ dfx start
+```
+
+#### deploy II
+
+``` bash
+$ npm ci
+$ export II_ENV=development
+$ dfx deploy --no-wallet --argument '(null)'
+```
+
+#### deploy the whoami canister
+
+``` bash
+$ cd demos/whoami
+$ rm -rf .dfx
+$ dfx deploy --no-wallet
+```
+
+#### run demo app
+
+```bash
+$ cd demos/sample-javascript
+$ npm ci
+$ npx webpack serve
+```
+
+#### setup webdrivers
+
+```bash
+$ npm run install-webdrivers
+$ npm run test:e2e-desktop
+```
+
 
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
