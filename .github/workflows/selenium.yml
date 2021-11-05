@@ -1,4 +1,4 @@
-name: Selenium and npm tests
+name: e2e tests
 
 on:
   push:
@@ -7,17 +7,17 @@ on:
   pull_request:
 
 jobs:
-  selenium-tests:
-    runs-on: ${{ matrix.os }}
+  e2e:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ '1.51.0' ]
-        os: [ ubuntu-latest ]
-        dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
         device: [ 'desktop', 'mobile' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
+    env:
+      DFX_VERSION: 0.8.3
+      RUSTC_VERSION: 1.51.0
 
     steps:
       - uses: actions/checkout@v2
@@ -32,16 +32,15 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update "$RUSTC_VERSION" --no-self-update
+          rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
 
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
       - name: Install DFX
         run: |
-          export DFX_VERSION=${{ matrix.dfx }}
-          echo Install DFX Version: $DFX_VERSION
+          echo Install DFX Version: "$DFX_VERSION"
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
