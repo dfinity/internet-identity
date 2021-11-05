@@ -75,7 +75,7 @@ jobs:
       - name: install selenium webdrivers
         run: npm run install-webdrivers
 
-      - run: rm -v -f screenshots/*.png
+      - run: rm -v -f screenshots/*-${{ matrix.device }}.png
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
@@ -87,10 +87,10 @@ jobs:
           add: screenshots
           author_name: Screenshot Committer
           author_email: "<nobody@example.com>"
-          message: "Updating selenium screenshots"
-          # do not pull: if this branch is behind, then we might as well let
-          # the pushing fail
-          pull_strategy: "NO-PULL"
+          message: "Update selenium ${{ matrix.device }} screenshots"
+          # --rebase: make sure both the mobile and desktop screenshots can be
+          # uploaded
+          pull: "--rebase"
 
       - name: Archive test logs
         if: ${{ always() }}
