@@ -16,6 +16,8 @@ jobs:
         dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
         device: [ 'desktop', 'mobile' ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v2
