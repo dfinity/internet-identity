@@ -11,9 +11,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: [ '1.51.0' ]
-        ghc: ["8.8.4"]
         os: [ ubuntu-latest, macos-latest ]
+    env:
+      RUSTC_VERSION: 1.51.0
+      GHC_VERSION: 8.8.4
 
     steps:
       - uses: actions/checkout@v2
@@ -31,25 +32,25 @@ jobs:
         with:
           path: |
             ~/.cabal/store
-          key: cabal-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
-          restore-keys: cabal-${{ runner.os }}-${{ matrix.ghc }}-
+          key: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
+          restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update "$RUSTC_VERSION" --no-self-update
+          rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
 
       - uses: actions/setup-haskell@v1.1.3
         with:
-          ghc-version: ${{ matrix.ghc }}
+          ghc-version: ${{ env.GHC_VERSION }}
           cabal-version: "3.2"
 
       - name: Build test runner
         run: |
           cd backend-tests
           cabal update
-          cabal install -w ghc-${{ matrix.ghc }} --overwrite-policy=always  --installdir=$HOME/bin
+          cabal install -w ghc-${{ env.GHC_VERSION }} --overwrite-policy=always  --installdir=$HOME/bin
 
       - name: Create fake assets
         run : |
