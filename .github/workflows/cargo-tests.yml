@@ -11,8 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: [ '1.51.0' ]
         os: [ ubuntu-latest, macos-latest ]
+    env:
+      RUSTC_VERSION: 1.51.0
 
     steps:
       - uses: actions/checkout@v2
@@ -27,8 +28,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update "$RUSTC_VERSION" --no-self-update
+          rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
 
       - name: Create fake assets
