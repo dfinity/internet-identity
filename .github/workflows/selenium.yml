@@ -117,6 +117,10 @@ jobs:
         with:
           name: e2e-screenshots-mobile
 
+      - run: |
+          echo the following screenshots were recovered
+          find ./screenshots -name '*.png' -maxdepth 1 -type f -print0 | sort -z | xargs -r0 shasum -a 256
+
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.4.0
         with:
