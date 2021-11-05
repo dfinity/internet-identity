@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  e2e:
+  tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -79,18 +79,6 @@ jobs:
       - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
 
-      - name: Commit screenshots
-        uses: EndBug/add-and-commit@v7.4.0
-        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
-        with:
-          add: screenshots
-          author_name: Screenshot Committer
-          author_email: "<nobody@example.com>"
-          message: "Update selenium ${{ matrix.device }} screenshots"
-          # --rebase: make sure both the mobile and desktop screenshots can be
-          # uploaded
-          pull: "--rebase"
-
       - name: Archive test logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
@@ -104,3 +92,38 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
           path: screenshots/**/*.png
+
+  # This uploads the screenshots from both the (non-emulated) 'desktop' and
+  # 'mobile' runs.
+  upload-screenshots:
+    runs-on: ubuntu-latest
+
+    # Run after all the tests completed succesfully (and have uploaded their
+    # artifacts)
+    needs: tests
+
+    # Only run on PRs, we don't want to commit new screenshots to master
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v2
+
+      # Download the desktop screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-desktop
+
+      # Download the mobile screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-mobile
+
+      - name: Commit screenshots
+        uses: EndBug/add-and-commit@v7.4.0
+        with:
+          add: screenshots
+          author_name: Screenshot Committer
+          author_email: "<nobody@example.com>"
+          message: "Update selenium ${{ matrix.device }} screenshots"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull: "NO-PULL"
