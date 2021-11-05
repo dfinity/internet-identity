@@ -15,6 +15,7 @@ jobs:
         os: [ ubuntu-latest ]
         dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
+        device: [ 'desktop', 'mobile' ]
 
     steps:
       - uses: actions/checkout@v2
@@ -74,8 +75,7 @@ jobs:
 
       - run: rm -v -f screenshots/*.png
       - run: npm test
-      - run: npm run test:e2e-desktop
-      - run: npm run test:e2e-mobile
+      - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
 
       - name: Commit screenshots
