@@ -80,7 +80,7 @@ jobs:
       - run: dfx stop
 
       - name: Commit screenshots
-        uses: EndBug/add-and-commit@v7.2.0
+        uses: EndBug/add-and-commit@v7.4.0
         if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
         with:
           add: screenshots
@@ -95,12 +95,12 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-test-log ${{ matrix.start-flag }}
+          name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
           path: wdio.log
 
       - name: Archive screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-screenshots ${{ matrix.start-flag }}
+          name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
           path: screenshots/**/*.png
