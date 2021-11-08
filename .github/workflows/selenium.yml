@@ -1,4 +1,4 @@
-name: Selenium and npm tests
+name: e2e tests
 
 on:
   push:
@@ -7,14 +7,17 @@ on:
   pull_request:
 
 jobs:
-  selenium-tests:
-    runs-on: ${{ matrix.os }}
+  tests:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ '1.51.0' ]
-        os: [ ubuntu-latest ]
-        dfx: [ '0.8.3' ]
         start-flag: [ '', '--emulator' ]
+        device: [ 'desktop', 'mobile' ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
+    env:
+      DFX_VERSION: 0.8.3
+      RUSTC_VERSION: 1.51.0
 
     steps:
       - uses: actions/checkout@v2
@@ -29,16 +32,15 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update "$RUSTC_VERSION" --no-self-update
+          rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
 
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
       - name: Install DFX
         run: |
-          export DFX_VERSION=${{ matrix.dfx }}
-          echo Install DFX Version: $DFX_VERSION
+          echo Install DFX Version: "$DFX_VERSION"
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
           echo "$HOME/bin" >> $GITHUB_PATH
 
@@ -72,34 +74,60 @@ jobs:
       - name: install selenium webdrivers
         run: npm run install-webdrivers
 
-      - run: rm -v -f screenshots/*.png
+      - run: rm -v -f screenshots/*-${{ matrix.device }}.png
       - run: npm test
-      - run: npm run test:e2e-desktop
-      - run: npm run test:e2e-mobile
+      - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
-
-      - name: Commit screenshots
-        uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' && matrix.start-flag == ''}}
-        with:
-          add: screenshots
-          author_name: Screenshot Committer
-          author_email: "<nobody@example.com>"
-          message: "Updating selenium screenshots"
-          # do not pull: if this branch is behind, then we might as well let
-          # the pushing fail
-          pull_strategy: "NO-PULL"
 
       - name: Archive test logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-test-log ${{ matrix.start-flag }}
+          name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
           path: wdio.log
 
       - name: Archive screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-screenshots ${{ matrix.start-flag }}
+          name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
           path: screenshots/**/*.png
+
+  # This uploads the screenshots from both the (non-emulated) 'desktop' and
+  # 'mobile' runs.
+  upload-screenshots:
+    runs-on: ubuntu-latest
+
+    # Run after all the tests completed succesfully (and have uploaded their
+    # artifacts)
+    needs: tests
+
+    # Only run on PRs, we don't want to commit new screenshots to master
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v2
+
+      # Download the desktop screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-desktop
+
+      # Download the mobile screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-mobile
+
+      - run: |
+          echo the following screenshots were recovered
+          find ./screenshots -name '*.png' -maxdepth 1 -type f -print0 | sort -z | xargs -r0 shasum -a 256
+
+      - name: Commit screenshots
+        uses: EndBug/add-and-commit@v7.4.0
+        with:
+          add: screenshots
+          author_name: Screenshot Committer
+          author_email: "<nobody@example.com>"
+          message: "Update selenium ${{ matrix.device }} screenshots"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull: "NO-PULL"
