@@ -9,6 +9,8 @@
 If you would like to learn what Internet Identity is, see
 link:https://sdk.dfinity.org/docs/ic-identity-guide/what-is-ic-identity.html[What is Internet Identity?]
 
+If you would like to create an Internet Identity anchor, or manage your devices, go to the link:https://identity.ic0.app[Internet Identity Page].
+
 All currently supported authentication methods follow the _WebAuthn_ standard. The following restrictions apply, however:
 
 * On OS X, authentication using Safari is coupled to your browser profile. If you want to authenticate to a dapp in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>. Note that on iOS, in contrast to OS X, authentication works across browsers.
