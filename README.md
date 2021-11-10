@@ -28,7 +28,7 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 - Rust version 1.51
 
-- NodeJS (with npm) version TBD
+- NodeJS version v14.18.1 (with npm 6.14.15)
 
 - CMake
 
@@ -46,6 +46,11 @@ In a different terminal, run the following command to install the Internet Ident
 ```bash
 II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
+
+Notes:
+- If you get the error `Error: error:0308010C:digital envelope routines::unsupported` with `code: 'ERR_OSSL_EVP_UNSUPPORTED'` you are running into an npm/openssl interoperability bug that you can resolve with: `export NODE_OPTIONS=--openssl-legacy-provider`
+- If you get the error `error[E0463]: can't find crate for 'core'` with `note: the 'wasm32-unknown-unknown' target may not be installed` please run `rustup target add wasm32-unknown-unknown`.
+
 
 Then the canister can be used as
 

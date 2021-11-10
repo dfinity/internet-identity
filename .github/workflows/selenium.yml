@@ -30,6 +30,12 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
 
+      - name: Check npm version
+        run: |
+          set -x
+          npm --version
+          node --version
+
       - name: Install Rust
         run: |
           rustup update "$RUSTC_VERSION" --no-self-update
