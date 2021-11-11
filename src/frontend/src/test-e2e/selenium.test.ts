@@ -241,16 +241,16 @@ test("Screenshots", async () => {
       await registerView.registerIdentityFixup();
       await screenshots.take("register-user-number", browser);
       await registerView.registerConfirmIdentity();
-      const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-      await singleDeviceWarningView.waitForDisplay();
-      await screenshots.take("single-device-warning", browser);
-      await singleDeviceWarningView.continue();
       const recoveryMethodSelectorView = new RecoveryMethodSelectorView(
         browser
       );
       await recoveryMethodSelectorView.waitForDisplay();
       await screenshots.take("recover-method-selector", browser);
       await recoveryMethodSelectorView.skipRecovery();
+      const singleDeviceWarningView = new SingleDeviceWarningView(browser);
+      await singleDeviceWarningView.waitForDisplay();
+      await screenshots.take("single-device-warning", browser);
+      await singleDeviceWarningView.remindLater();
       const mainView = new MainView(browser);
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
       await mainView.fixup();
@@ -259,10 +259,10 @@ test("Screenshots", async () => {
       await welcomeView.waitForDisplay(); // no point taking screenshot
       await welcomeView.typeUserNumber(userNumber);
       await welcomeView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       await browser.url(II_URL);
@@ -273,10 +273,10 @@ test("Screenshots", async () => {
       await welcomeBackView.fixup();
       await screenshots.take("welcome-back", browser);
       await welcomeBackView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       // Now the link device flow, using a second browser
@@ -309,10 +309,10 @@ test("Screenshots", async () => {
         await welcomeBackView.fixup();
         await screenshots.take("new-device-login", browser);
         await welcomeBackView.login();
-        await singleDeviceWarningView.waitForDisplay();
-        await singleDeviceWarningView.continue();
         await recoveryMethodSelectorView.waitForDisplay();
         await recoveryMethodSelectorView.skipRecovery();
+        await singleDeviceWarningView.waitForDisplay();
+        await singleDeviceWarningView.remindLater();
         const addDeviceView = new AddDeviceView(browser);
         await addDeviceView.waitForConfirmDisplay();
         await addDeviceView.fixupConfirm();
@@ -331,14 +331,14 @@ test("Screenshots", async () => {
         await welcomeBackView2.fixup();
         await screenshots.take("new-device-login", browser2);
         await welcomeBackView2.login();
-        const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
-        await singleDeviceWarningView2.waitForDisplay();
-        await singleDeviceWarningView2.continue();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
           browser2
         );
         await recoveryMethodSelectorView2.waitForDisplay();
         await recoveryMethodSelectorView2.skipRecovery();
+        const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
+        await singleDeviceWarningView2.waitForDisplay();
+        await singleDeviceWarningView2.remindLater();
         const mainView2 = new MainView(browser2);
         await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
         await mainView2.fixup();
@@ -382,10 +382,10 @@ test("Screenshots", async () => {
       const userNumber3 = await welcomeBackView.getIdentityAnchor();
       expect(userNumber3).toBe(userNumber);
       await welcomeBackView.login();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.continue();
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView.removeDevice(DEVICE_NAME2);
       // No dialog here!
