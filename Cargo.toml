@@ -7,3 +7,6 @@ members = [
 [profile.release]
 lto = true
 opt-level = 'z'
+
+[patch.crates-io]
+lodepng = { git = 'https://github.com/nmattia/lodepng-rust', branch = 'nm-wasm32'}
