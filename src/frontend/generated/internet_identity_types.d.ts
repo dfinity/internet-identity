@@ -1,4 +1,6 @@
 import type { Principal } from '@dfinity/principal';
+export type CaptchaResponse = { 'png' : string } |
+  { 'error' : null };
 export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -64,6 +66,7 @@ export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
+  'get_captcha' : () => Promise<CaptchaResponse>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
