@@ -49,6 +49,11 @@ type KeyType = variant {
     seed_phrase;
 };
 
+type CaptchaResponse = variant {
+    error;
+    png: text;
+};
+
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
@@ -100,6 +105,7 @@ type ProofOfWork = record {
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
+  get_captcha: () -> (CaptchaResponse) query;
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

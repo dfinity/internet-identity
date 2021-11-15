@@ -21,6 +21,9 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
+use captcha::{gen, Difficulty, Captcha};
+use captcha::filters::{Noise, Wave, Dots};
+
 // 30 mins
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
 // 8 days
@@ -70,6 +73,14 @@ struct DeviceData {
     credential_id: Option<CredentialId>,
     purpose: Purpose,
     key_type: KeyType,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum CaptchaResponse {
+    #[serde(rename = "error")]
+    Error,
+    #[serde(rename = "png")]
+    Png(String)
 }
 
 /// This is an internal version of `DeviceData` primarily useful to provide a
@@ -365,6 +376,29 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
                 ))
             });
     })
+}
+
+#[query]
+fn get_captcha() -> CaptchaResponse {
+    let mut captcha = captcha::Captcha::new();
+    let chars = "2fJU".chars().collect::<Vec<char>>();
+    let captcha = captcha.set_chars(&chars)
+        //.apply_filter(Wave::new(2.0, 20.0).horizontal())
+        //.apply_filter(Wave::new(2.0, 20.0).vertical())
+        .view(1024, 1024);
+
+
+    match captcha.as_base64() {
+        Some(foo) => {
+
+            return CaptchaResponse::Png(foo);
+        }
+        None => {
+            return CaptchaResponse::Error;
+        }
+    }
+    //println!("Supported chars:");
+    //panic!("chars: {}", captcha.supported_chars().iter().collect::<String>());
 }
 
 #[query]

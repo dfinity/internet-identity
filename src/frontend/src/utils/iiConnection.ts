@@ -11,6 +11,7 @@ import {
   PublicKey,
   SessionKey,
   CredentialId,
+  CaptchaResponse,
   UserNumber,
   FrontendHostname,
   Timestamp,
@@ -205,6 +206,10 @@ export class IIConnection {
 
   static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
     return await baseActor.lookup(userNumber);
+  }
+
+  static async getCaptcha() : Promise<CaptchaResponse> {
+      return await baseActor.get_captcha();
   }
 
   static async lookupAuthenticators(
