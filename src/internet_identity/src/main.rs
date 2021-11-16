@@ -16,8 +16,6 @@ use std::convert::TryInto;
 use storage::{Salt, Storage};
 use rand_chacha::rand_core::SeedableRng;
 
-use rand_core::{impls, Error};
-
 mod assets;
 
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -88,25 +86,6 @@ struct DeviceData {
 struct CaptchaResponse {
     png_base64: String,
     challenge_key: ChallengeKey,
-}
-
-
-struct StaticRng();
-
-impl rand_core::RngCore for StaticRng {
-    fn next_u32(&mut self) -> u32 {
-        0
-    }
-    fn next_u64(&mut self) -> u64 {
-        0
-    }
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        impls::fill_bytes_via_next(self, dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        Ok(self.fill_bytes(dest))
-    }
 }
 
 /// This is an internal version of `DeviceData` primarily useful to provide a
