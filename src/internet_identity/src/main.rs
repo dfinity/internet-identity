@@ -14,6 +14,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
+use rand_chacha::rand_core::SeedableRng;
+
+use rand_core::{impls, Error};
 
 mod assets;
 
@@ -21,8 +24,8 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
-use captcha::{gen, Difficulty, Captcha};
-use captcha::filters::{Noise, Wave, Dots};
+//use captcha::{gen, Difficulty, Captcha};
+use captcha::filters::{Wave};
 
 // 30 mins
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
@@ -81,6 +84,25 @@ enum CaptchaResponse {
     Error,
     #[serde(rename = "png")]
     Png(String)
+}
+
+
+struct StaticRng();
+
+impl rand_core::RngCore for StaticRng {
+    fn next_u32(&mut self) -> u32 {
+        0
+    }
+    fn next_u64(&mut self) -> u64 {
+        0
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        impls::fill_bytes_via_next(self, dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
+        Ok(self.fill_bytes(dest))
+    }
 }
 
 /// This is an internal version of `DeviceData` primarily useful to provide a
@@ -379,26 +401,35 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 }
 
 #[query]
-fn get_captcha() -> CaptchaResponse {
-    let mut captcha = captcha::Captcha::new();
-    let chars = "2fJU".chars().collect::<Vec<char>>();
-    let captcha = captcha.set_chars(&chars)
-        //.apply_filter(Wave::new(2.0, 20.0).horizontal())
-        //.apply_filter(Wave::new(2.0, 20.0).vertical())
-        .view(1024, 1024);
+async fn get_captcha() -> CaptchaResponse {
 
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
+    };
+
+    let seed: Salt = res[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+            "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
+            res.len()
+        ));
+    });
+
+    let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
+    let mut captcha = captcha::RngCaptcha::from_rng(rng);
+    let captcha = captcha.add_chars(5)
+        .apply_filter(Wave::new(2.0, 20.0).horizontal())
+        .apply_filter(Wave::new(2.0, 20.0).vertical())
+        .view(220, 120);
 
     match captcha.as_base64() {
         Some(foo) => {
-
             return CaptchaResponse::Png(foo);
         }
         None => {
             return CaptchaResponse::Error;
         }
     }
-    //println!("Supported chars:");
-    //panic!("chars: {}", captcha.supported_chars().iter().collect::<String>());
 }
 
 #[query]
