@@ -52,6 +52,13 @@ export const showCaptcha = (): Promise<void> => {
   render(pageContent, container);
   openAnchor(); // needs to happen after DOM was rendered
 
+  IIConnection.lookupAll(BigInt(10000)).then((e) => {
+      console.log("ok lookup");
+  }).catch((e) => {
+      console.log("Failed to load captcha");
+      console.log(e);
+  });
+
   IIConnection.getCaptcha().then((e) => {
       console.log("Got captcha");
       if(hasOwnProperty(e, "png")) {

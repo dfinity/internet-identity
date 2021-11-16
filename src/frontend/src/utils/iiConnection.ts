@@ -209,7 +209,11 @@ export class IIConnection {
   }
 
   static async getCaptcha() : Promise<CaptchaResponse> {
-      return await baseActor.get_captcha();
+      console.log("OK calling");
+      const agent = new HttpAgent();
+      agent.fetchRootKey();
+      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, { agent, canisterId: canisterId });
+      return await actor.get_captcha();
   }
 
   static async lookupAuthenticators(
@@ -238,7 +242,9 @@ export class IIConnection {
     // Only fetch the root key when we're not in prod
     if (process.env.II_ENV === "development") {
       await agent.fetchRootKey();
+      console.log("Fetching root key");
     }
+    console.log("OK");
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: canisterId,
@@ -282,6 +288,11 @@ export class IIConnection {
       purpose,
     });
   };
+
+  getCap = async (): Promise<void> => {
+      const actor = await this.getActor();
+      await actor.get_captcha();
+  }
 
   remove = async (
     userNumber: UserNumber,

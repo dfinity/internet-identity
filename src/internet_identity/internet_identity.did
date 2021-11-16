@@ -50,7 +50,7 @@ type KeyType = variant {
 };
 
 type CaptchaResponse = variant {
-    error;
+    error: text;
     png: text;
 };
 
@@ -102,9 +102,21 @@ type ProofOfWork = record {
   nonce : nat64;
 };
 
+type ChallengeKey = nat32;
+type Challenge = record {
+    created : Timestamp;
+    chars : text;
+};
+
+type ChallengeResult = record {
+    key : ChallengeKey;
+    chars : text;
+}
+
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
+  create_challenge : () -> (CaptchaResponse);
+  register : (DeviceData, ProofOfWork, ChallengeResult) -> (RegisterResponse);
   get_captcha: () -> (CaptchaResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
