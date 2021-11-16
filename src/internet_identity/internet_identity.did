@@ -49,9 +49,9 @@ type KeyType = variant {
     seed_phrase;
 };
 
-type CaptchaResponse = variant {
-    error: text;
-    png: text;
+type CaptchaResponse = record {
+    png_base64: text;
+    challenge_key: ChallengeKey;
 };
 
 type DeviceData = record {
@@ -117,7 +117,6 @@ service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
   create_challenge : () -> (CaptchaResponse);
   register : (DeviceData, ProofOfWork, ChallengeResult) -> (RegisterResponse);
-  get_captcha: () -> (CaptchaResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

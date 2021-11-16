@@ -39,7 +39,7 @@ const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 
 // How many captcha challenges we keep in memory (at most)
-const MAX_INFLIGHT_CHALLENGES: usize = 2;
+const MAX_INFLIGHT_CHALLENGES: usize = 100;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -83,13 +83,11 @@ struct DeviceData {
     key_type: KeyType,
 }
 
-// TODO: rename to Challenge
+// TODO: rename to ChallengeSomething
 #[derive(Clone, Debug, CandidType, Deserialize)]
-enum CaptchaResponse {
-    #[serde(rename = "error")]
-    Error,
-    #[serde(rename = "png")]
-    Png(String)
+struct CaptchaResponse {
+    png_base64: String,
+    challenge_key: ChallengeKey,
 }
 
 
@@ -448,10 +446,17 @@ async fn create_challenge() -> CaptchaResponse {
 
         // Error out if there are too many inflight challenges
         if inflight_challenges.len() > MAX_INFLIGHT_CHALLENGES {
-            trap("oh god that's too much");
+            trap("too many inflight captchas");
         }
 
         // actually create the challenge
+
+        // first, get the key
+        let mut challenge_key = 0;
+        // TODO: WARNING: very dangerous
+        while inflight_challenges.contains_key(&challenge_key) {
+            challenge_key = challenge_key + 1;
+        }
 
 
         let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
@@ -462,21 +467,15 @@ async fn create_challenge() -> CaptchaResponse {
             .view(220, 120);
 
         let resp = match captcha.as_base64() {
-            Some(foo) => CaptchaResponse::Png(foo),
-            None => CaptchaResponse::Error,
+            Some(png_base64) => CaptchaResponse { png_base64, challenge_key },
+            None => trap("Could not get base64 of captcha"),
         };
 
         // TODO: const-this-up
         let challenge: Challenge = Challenge { created: now, chars: captcha.chars_as_string() };
 
-        let mut k = 0;
-        // TODO: WARNING: very dangerous
-        while inflight_challenges.contains_key(&k) {
-            k = k + 1;
-        }
-
         // Finally insert
-        inflight_challenges.insert(k, challenge);
+        inflight_challenges.insert(challenge_key, challenge);
 
         resp
 
@@ -500,38 +499,6 @@ fn check_challenge(res: ChallengeResult) {
             None =>  trap("nope, no challenge with that key") ,
         }
     })
-}
-
-#[update]
-async fn get_captcha() -> CaptchaResponse {
-
-    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
-    };
-
-    let seed: Salt = res[..].try_into().unwrap_or_else(|_| {
-        trap(&format!(
-            "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
-            res.len()
-        ));
-    });
-
-    let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
-    let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let captcha = captcha.add_chars(5)
-        .apply_filter(Wave::new(2.0, 20.0).horizontal())
-        .apply_filter(Wave::new(2.0, 20.0).vertical())
-        .view(220, 120);
-
-    match captcha.as_base64() {
-        Some(foo) => {
-            return CaptchaResponse::Png(foo);
-        }
-        None => {
-            return CaptchaResponse::Error;
-        }
-    }
 }
 
 #[query]
