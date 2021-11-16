@@ -105,7 +105,7 @@ type ProofOfWork = record {
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
   register : (DeviceData, ProofOfWork) -> (RegisterResponse);
-  get_captcha: () -> (CaptchaResponse) query;
+  get_captcha: () -> (CaptchaResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

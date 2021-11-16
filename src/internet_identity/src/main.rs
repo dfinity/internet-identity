@@ -400,7 +400,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     })
 }
 
-#[query]
+#[update]
 async fn get_captcha() -> CaptchaResponse {
 
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {

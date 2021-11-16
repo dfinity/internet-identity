@@ -83,7 +83,7 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
-    'get_captcha' : IDL.Func([], [CaptchaResponse], ['query']),
+    'get_captcha' : IDL.Func([], [CaptchaResponse], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
