@@ -7,7 +7,6 @@ import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
-import { showCaptcha } from "./flows/showCaptcha";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
@@ -32,19 +31,6 @@ const init = async () => {
   }
 
   const userIntent = intentFromUrl(url);
-
-  await showCaptcha();
-
-  IIConnection.getCaptcha().then((e) => {
-      console.log("Got captcha");
-      console.log(e);
-      if(hasOwnProperty(e, "png")) {
-          console.log(e.png);
-        }
-  }).catch((e) => {
-      console.log("Failed to load captcha");
-      console.log(e);
-  });
 
   // Go through the login flow, potentially creating an anchor.
   const { userNumber, connection } = await login(userIntent);
