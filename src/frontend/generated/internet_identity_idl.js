@@ -23,7 +23,7 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
-  const CaptchaResponse = IDL.Variant({ 'png' : IDL.Text, 'error' : IDL.Null });
+  const CaptchaResponse = IDL.Variant({ 'png' : IDL.Text, 'error' : IDL.Text });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
   const Timestamp = IDL.Nat64;
@@ -73,6 +73,11 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Nat64,
     'timestamp' : Timestamp,
   });
+  const ChallengeKey = IDL.Nat32;
+  const ChallengeResult = IDL.Record({
+    'key' : ChallengeKey,
+    'chars' : IDL.Text,
+  });
   const RegisterResponse = IDL.Variant({
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
@@ -83,6 +88,7 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
+    'create_challenge' : IDL.Func([], [CaptchaResponse], []),
     'get_captcha' : IDL.Func([], [CaptchaResponse], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
@@ -102,7 +108,11 @@ export const idlFactory = ({ IDL }) => {
         [UserKey, Timestamp],
         [],
       ),
-    'register' : IDL.Func([DeviceData, ProofOfWork], [RegisterResponse], []),
+    'register' : IDL.Func(
+        [DeviceData, ProofOfWork, ChallengeResult],
+        [RegisterResponse],
+        [],
+      ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
   });

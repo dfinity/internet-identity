@@ -35,6 +35,11 @@ const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 // 5 mins
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
+// 5 mins
+const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
+
+// How many captcha challenges we keep in memory (at most)
+const MAX_INFLIGHT_CHALLENGES: usize = 2;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -46,7 +51,7 @@ type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = String;
-type Timestamp = u64;
+type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -78,6 +83,7 @@ struct DeviceData {
     key_type: KeyType,
 }
 
+// TODO: rename to Challenge
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum CaptchaResponse {
     #[serde(rename = "error")]
@@ -232,6 +238,8 @@ struct State {
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
+    // TODO: note: we COULD persist this through upgrades
+    inflight_challenges: RefCell<HashMap<ChallengeKey, Challenge>>,
 }
 
 impl Default for State {
@@ -246,10 +254,25 @@ impl Default for State {
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
+            inflight_challenges: RefCell::new(HashMap::new()),
         }
     }
 }
 
+type ChallengeKey = u32;
+
+// "Result" is misleading
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Challenge {
+    created: Timestamp,
+    chars: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct ChallengeResult {
+    chars: String,
+    key: ChallengeKey
+}
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>> = RefCell::new(HashMap::default());
@@ -281,7 +304,8 @@ async fn init_salt() {
 }
 
 #[update]
-async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse {
+async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: ChallengeResult) -> RegisterResponse {
+    check_challenge(challenge_result);
     check_entry_limits(&device_data);
     let now = time() as u64;
     check_proof_of_work(&pow, now);
@@ -397,6 +421,84 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
                     user_number, err
                 ))
             });
+    })
+}
+
+// TODO: should this take a PoW to prevent spam?
+#[update]
+async fn create_challenge() -> CaptchaResponse {
+
+    let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
+    };
+    let seed: Salt = raw_rand[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+                "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
+                raw_rand.len()
+                ));
+    });
+
+    let resp = STATE.with(|s| {
+        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+
+        // Prune old challenges
+        let now = time() as u64;
+        inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
+
+        // Error out if there are too many inflight challenges
+        if inflight_challenges.len() > MAX_INFLIGHT_CHALLENGES {
+            trap("oh god that's too much");
+        }
+
+        // actually create the challenge
+
+
+        let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
+        let mut captcha = captcha::RngCaptcha::from_rng(rng);
+        let captcha = captcha.add_chars(5)
+            .apply_filter(Wave::new(2.0, 20.0).horizontal())
+            .apply_filter(Wave::new(2.0, 20.0).vertical())
+            .view(220, 120);
+
+        let resp = match captcha.as_base64() {
+            Some(foo) => CaptchaResponse::Png(foo),
+            None => CaptchaResponse::Error,
+        };
+
+        // TODO: const-this-up
+        let challenge: Challenge = Challenge { created: now, chars: captcha.chars_as_string() };
+
+        let mut k = 0;
+        // TODO: WARNING: very dangerous
+        while inflight_challenges.contains_key(&k) {
+            k = k + 1;
+        }
+
+        // Finally insert
+        inflight_challenges.insert(k, challenge);
+
+        resp
+
+    });
+
+    resp
+}
+
+// just traps if challenge isn't OK, because when in rome...
+fn check_challenge(res: ChallengeResult) {
+
+    STATE.with(|s| {
+        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+        match inflight_challenges.remove(&res.key) {
+            Some(challenge) => {
+                if res.chars !=  challenge.chars {
+                    trap("BAD ANSWER");
+                }
+
+            },
+            None =>  trap("nope, no challenge with that key") ,
+        }
     })
 }
 

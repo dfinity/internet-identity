@@ -1,6 +1,9 @@
 import type { Principal } from '@dfinity/principal';
 export type CaptchaResponse = { 'png' : string } |
-  { 'error' : null };
+  { 'error' : string };
+export interface Challenge { 'created' : Timestamp, 'chars' : string }
+export type ChallengeKey = number;
+export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
 export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -66,6 +69,7 @@ export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
+  'create_challenge' : () => Promise<CaptchaResponse>,
   'get_captcha' : () => Promise<CaptchaResponse>,
   'get_delegation' : (
       arg_0: UserNumber,
@@ -85,9 +89,11 @@ export interface _SERVICE {
       arg_2: SessionKey,
       arg_3: [] | [bigint],
     ) => Promise<[UserKey, Timestamp]>,
-  'register' : (arg_0: DeviceData, arg_1: ProofOfWork) => Promise<
-      RegisterResponse
-    >,
+  'register' : (
+      arg_0: DeviceData,
+      arg_1: ProofOfWork,
+      arg_2: ChallengeResult,
+    ) => Promise<RegisterResponse>,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
 }
