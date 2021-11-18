@@ -3,23 +3,7 @@ import { ApiResult } from "../utils/iiConnection";
 import { displayUserNumber } from "./displayUserNumber";
 import { setUserNumber } from "../utils/userNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
-import {
-  _SERVICE,
-  PublicKey,
-  SessionKey,
-  CredentialId,
-  CaptchaResponse,
-  UserNumber,
-  FrontendHostname,
-  Timestamp,
-  DeviceData,
-  ProofOfWork,
-  RegisterResponse,
-  GetDelegationResponse,
-  Purpose,
-  KeyType,
-  DeviceKey,
-} from "../../generated/internet_identity_types";
+import { ProofOfWork } from "../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
@@ -27,7 +11,6 @@ import { withLoader } from "../components/loader";
 import {
   IIConnection,
   canisterIdPrincipal,
-  creationOptions,
   ChallengeResult,
 } from "../utils/iiConnection";
 
@@ -48,9 +31,8 @@ const pageContent = html`
 `;
 
 export const confirmRegister = async (
-  canisterIdPrincipal: Principal,
   identity: WebAuthnIdentity,
-  alias: string,
+  alias: string
 ): Promise<LoginResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
@@ -67,10 +49,8 @@ const tryRegister = async (
   const result = await withLoader(async () => {
     console.log("Registering...");
     return IIConnection.register(identity, alias, pow, challengeResult);
-  }
-  );
+  });
   console.log(`Result: ${result.kind}`);
-  console.log(JSON.stringify(result));
   if (result.kind == "loginSuccess") {
     console.log("Result kind was success");
     // Write user number to storage
@@ -86,7 +66,7 @@ const tryRegister = async (
 const init = async (
   canisterIdPrincipal: Principal,
   identity: WebAuthnIdentity,
-  alias: string,
+  alias: string
 ): Promise<LoginResult | null> => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
   IIConnection.createChallenge().then((captchaResp) => {
@@ -116,18 +96,21 @@ const init = async (
     const confirmRegisterButton = document.getElementById(
       "confirmRegisterButton"
     ) as HTMLFormElement;
+    const captchaInput = document.querySelector(
+      "#captchaInput"
+    ) as HTMLFormElement;
     const cancelButton = document.getElementById(
       "cancelButton"
     ) as HTMLButtonElement;
 
-    cancelButton.onclick = (e) => {
+    cancelButton.onclick = () => {
       resolve(null);
     };
     confirmRegisterButton.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const captchaChars = confirmRegisterButton.value;
+      const captchaChars = captchaInput.value;
       const captchaKey = confirmRegisterButton.dataset.captchaKey;
 
       const challengeResult: ChallengeResult = {
@@ -135,11 +118,9 @@ const init = async (
         chars: captchaChars,
       };
       tryRegister(identity, alias, pow, challengeResult).then((e) => {
-          console.log("registration successful");
-          resolve(apiResultToLoginResult(e));
-
+        console.log("registration successful");
+        resolve(apiResultToLoginResult(e));
       });
     };
-  })
-
+  });
 };

@@ -120,8 +120,8 @@ button {
   letter-spacing: 0.005em;
 }
 
-button:hover,
-button:focus,
+button:not([disabled]):hover,
+button:not([disabled]):focus,
 a:focus {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
@@ -150,6 +150,10 @@ label {
 form {
   margin-bottom: 2rem;
   flex-direction: column;
+}
+
+button:disabled.primary {
+  background-color: grey;
 }
 
 button.primary {

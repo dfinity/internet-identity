@@ -1,17 +1,8 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
-import { withLoader } from "../components/loader";
-import {
-  IIConnection,
-  canisterIdPrincipal,
-  creationOptions,
-  ChallengeResult,
-} from "../utils/iiConnection";
-import { setUserNumber } from "../utils/userNumber";
+import { creationOptions } from "../utils/iiConnection";
 import { confirmRegister } from "./confirmRegisterNew";
-import { displayUserNumber } from "./displayUserNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
-import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
@@ -78,11 +69,8 @@ const init = (): Promise<LoginResult | null> =>
           return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
-        // Do PoW before registering.
-        const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-        const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
         const identity = await pendingIdentity;
-        await confirmRegister(canisterIdPrincipal, identity, alias);
+        await confirmRegister(identity, alias);
         console.log("Back to register");
       } catch (err) {
         reject(err);
