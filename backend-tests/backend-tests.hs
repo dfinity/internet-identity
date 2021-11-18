@@ -75,59 +75,11 @@ type IIInterface m = [Candid.candid|
 type UserNumber = nat64;
 type PublicKey = blob;
 type CredentialId = blob;
-type DeviceAlias = text;
 type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
-type Purpose = variant {
-    recovery;
-    authentication;
-};
-type KeyType = variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-};
-
-type DeviceData = record {
-  pubkey : DeviceKey;
-  alias : text;
-  credential_id : opt CredentialId;
-  purpose : Purpose;
-  key_type : KeyType;
-};
-
-type RegisterResponse = variant {
-  registered: record { user_number: UserNumber; };
-  canister_full;
-};
-
-type Delegation = record {
-  pubkey: SessionKey;
-  expiration: Timestamp;
-  targets: opt vec principal;
-};
-type SignedDelegation = record {
-  delegation: Delegation;
-  signature: blob;
-};
-type GetDelegationResponse = variant {
-  signed_delegation: SignedDelegation;
-  no_such_delegation;
-};
-
-type InternetIdentityStats = record {
-  users_registered: nat64;
-  assigned_user_number_range: record { nat64; nat64; };
-};
-
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
-};
 
 type HeaderField = record { text; text; };
 
@@ -147,7 +99,7 @@ type HttpResponse = record {
 
 type StreamingCallbackHttpResponse = record {
   body: blob;
-  token: Token;
+  token: opt Token;
 };
 
 type Token = record {};
@@ -158,15 +110,94 @@ type StreamingStrategy = variant {
     token: Token;
   };
 };
-service : {
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
+
+type Purpose = variant {
+    recovery;
+    authentication;
+};
+
+type KeyType = variant {
+    unknown;
+    platform;
+    cross_platform;
+    seed_phrase;
+};
+
+type CaptchaResponse = record {
+    png_base64: text;
+    challenge_key: ChallengeKey;
+};
+
+type DeviceData = record {
+  pubkey : DeviceKey;
+  alias : text;
+  credential_id : opt CredentialId;
+  purpose: Purpose;
+  key_type: KeyType;
+};
+
+type RegisterResponse = variant {
+  // A new user was successfully registered.
+  registered: record { user_number: UserNumber; };
+  // No more registrations are possible in this instance of the II service canister.
+  canister_full;
+};
+
+type Delegation = record {
+  pubkey: PublicKey;
+  expiration: Timestamp;
+  targets: opt vec principal;
+};
+
+type SignedDelegation = record {
+  delegation: Delegation;
+  signature: blob;
+};
+
+type GetDelegationResponse = variant {
+  // The signed delegation was successfully retrieved.
+  signed_delegation: SignedDelegation;
+
+  // The signature is not ready. Maybe retry by calling `prepare_delegation`
+  no_such_delegation
+};
+
+type InternetIdentityStats = record {
+  users_registered: nat64;
+  assigned_user_number_range: record { nat64; nat64; };
+};
+
+type InternetIdentityInit = record {
+  assigned_user_number_range : record { nat64; nat64; };
+};
+
+type ProofOfWork = record {
+  timestamp : Timestamp;
+  nonce : nat64;
+};
+
+type ChallengeKey = nat32;
+type Challenge = record {
+    created : Timestamp;
+    chars : text;
+};
+
+type ChallengeResult = record {
+    key : ChallengeKey;
+    chars : text;
+}
+
+service : (opt InternetIdentityInit) -> {
+  init_salt: () -> ();
+  create_challenge : () -> (CaptchaResponse);
+  register : (DeviceData, ProofOfWork, ChallengeResult) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
+  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
   http_request: (request: HttpRequest) -> (HttpResponse) query;
