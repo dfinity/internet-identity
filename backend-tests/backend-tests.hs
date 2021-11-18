@@ -185,7 +185,7 @@ type Challenge = record {
 type ChallengeResult = record {
     key : ChallengeKey;
     chars : text;
-}
+};
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
