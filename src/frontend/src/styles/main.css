@@ -137,6 +137,14 @@ img {
   margin: auto;
 }
 
+/* temporary, to work around the img { ... } above */
+#captchaImg {
+  height: 120px;
+  width: 220px;
+  min-width: 0px;
+  max-width: 220px;
+}
+
 ul {
   width: 100%;
   padding: 0;

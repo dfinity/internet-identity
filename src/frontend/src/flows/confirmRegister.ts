@@ -18,7 +18,7 @@ const pageContent = html`
   <div class="container">
     <h1>Confirm new device</h1>
     <form id="confirmForm">
-      <p>Please copy the characters you see below.</p>
+      <p class="loading-captcha-text">Loading captcha...</p>
       <img id="captchaImg" />
       <input id="captchaInput" />
       <p>Please confirm to add your device.</p>
@@ -86,6 +86,10 @@ const init = async (
         "data-captcha-key",
         `${captchaResp.challenge_key}`
       );
+      const loadingCaptchaText = document.querySelector(
+        ".loading-captcha-text"
+      ) as HTMLElement;
+      loadingCaptchaText.innerHTML = "please copy the chars";
     }
   });
   return new Promise((resolve) => {
