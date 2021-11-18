@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { creationOptions } from "../utils/iiConnection";
-import { confirmRegister } from "./confirmRegisterNew";
+import { confirmRegister } from "./confirmRegister";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
