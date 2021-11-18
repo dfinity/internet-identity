@@ -29,13 +29,13 @@ const pageContent = html`
   </div>
 `;
 
-export const confirmRegister = async (
+export const confirmRegister = (
   identity: WebAuthnIdentity,
   alias: string
 ): Promise<LoginResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return await init(canisterIdPrincipal, identity, alias);
+  return init(canisterIdPrincipal, identity, alias);
 };
 
 const tryRegister = (
@@ -96,12 +96,16 @@ const requestCaptcha = () => {
   });
 };
 
-const init = async (
+const init = (
   canisterIdPrincipal: Principal,
   identity: WebAuthnIdentity,
   alias: string
 ): Promise<LoginResult | null> => {
   requestCaptcha();
+
+  // since the index expects to regain control we unfortunately have to wrap
+  // this whole logic in a promise that then resolves (giving control back to
+  // the caller)
   return new Promise((resolve) => {
     // Create a PoW before registering
     const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
