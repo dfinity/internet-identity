@@ -81,13 +81,6 @@ struct DeviceData {
     key_type: KeyType,
 }
 
-// TODO: rename to ChallengeSomething
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct CaptchaResponse {
-    png_base64: String,
-    challenge_key: ChallengeKey,
-}
-
 /// This is an internal version of `DeviceData` primarily useful to provide a
 /// backwards compatible level between older device data stored in stable memory
 /// (that might not contain purpose or key_type) and new ones added.
@@ -238,7 +231,7 @@ impl Default for State {
 
 type ChallengeKey = u32;
 
-// "Result" is misleading
+// The challenges we store and check against
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct Challenge {
     created: Timestamp,
@@ -250,6 +243,15 @@ struct ChallengeResult {
     chars: String,
     key: ChallengeKey
 }
+
+// TODO: rename to ChallengeSomething
+// What we send the user
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct CaptchaResponse {
+    png_base64: String,
+    challenge_key: ChallengeKey,
+}
+
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>> = RefCell::new(HashMap::default());
