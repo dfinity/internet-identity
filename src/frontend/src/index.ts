@@ -10,9 +10,7 @@ import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
-import {
-  IIConnection,
-} from "./utils/iiConnection";
+import { IIConnection } from "./utils/iiConnection";
 
 const init = async () => {
   const url = new URL(document.URL);
