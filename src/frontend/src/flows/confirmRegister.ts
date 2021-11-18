@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { ApiResult } from "../utils/iiConnection";
 import { displayUserNumber } from "./displayUserNumber";
 import { setUserNumber } from "../utils/userNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
@@ -39,31 +38,33 @@ export const confirmRegister = async (
   return await init(canisterIdPrincipal, identity, alias);
 };
 
-const tryRegister = async (
+const tryRegister = (
   identity: WebAuthnIdentity,
   alias: string,
   pow: ProofOfWork,
-  challengeResult: ChallengeResult
-): Promise<ApiResult> => {
-  const result = await withLoader(async () => {
+  challengeResult: ChallengeResult,
+  func: (result: LoginResult) => void
+) => {
+  withLoader(async () => {
     console.log("Registering...");
     return IIConnection.register(identity, alias, pow, challengeResult);
-  });
-  console.log(`Result: ${result.kind}`);
-  if (result.kind == "loginSuccess") {
-    console.log("Result kind was success");
-    // Write user number to storage
-    setUserNumber(result.userNumber);
+  }).then((result) => {
+    console.log(`Result: ${result.kind}`);
+    if (result.kind == "loginSuccess") {
+      console.log("Result kind was success");
+      // Write user number to storage
+      setUserNumber(result.userNumber);
 
-    // Congratulate user
-    await displayUserNumber(result.userNumber);
-  } else if (result.kind == "apiError")  {
-      console.log("Got a bad captcha, retrying");
-      // TODO: shouldn't be apiError but "badCaptcha" or similar
+      // Congratulate user
+      displayUserNumber(result.userNumber).then(() => {
+        func(apiResultToLoginResult(result));
+      });
+    } else {
+      // TODO: should we only get here on specific result.kind? like badCaptcha?
+      console.log("Something didn't work, retrying");
       requestCaptcha();
-  }
-
-  return result;
+    }
+  });
 };
 
 // TODO: disable confirm button
@@ -93,8 +94,6 @@ const requestCaptcha = () => {
       loadingCaptchaText.innerHTML = "please copy the chars";
     }
   });
-
-
 };
 
 const init = async (
@@ -133,10 +132,7 @@ const init = async (
         key: Number(captchaKey),
         chars: captchaChars,
       };
-      tryRegister(identity, alias, pow, challengeResult).then((e) => {
-        console.log("registration successful");
-        resolve(apiResultToLoginResult(e));
-      });
+      tryRegister(identity, alias, pow, challengeResult, resolve);
     };
   });
 };

@@ -24,5 +24,8 @@ const init = (): Promise<void> =>
     const displayUserContinue = document.getElementById(
       "displayUserContinue"
     ) as HTMLButtonElement;
-    displayUserContinue.onclick = () => resolve();
+    displayUserContinue.onclick = () => {
+      console.log("User resolving congratulations");
+      resolve();
+    };
   });
