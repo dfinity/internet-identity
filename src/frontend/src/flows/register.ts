@@ -20,7 +20,7 @@ const pageContent = html`
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please copy the characters you see below.</p>
-      <img id="captchaImg">
+      <img id="captchaImg" />
       <input id="captchaInput" />
       <p>Please provide a name for your device.</p>
       <input id="registerAlias" placeholder="Device name" />
@@ -59,16 +59,21 @@ const init = (): Promise<LoginResult | null> =>
     registerCancel.onclick = () => resolve(null);
 
     IIConnection.createChallenge().then((captchaResp) => {
-        const captchaImg = document.querySelector("#captchaImg");
-        if(captchaImg) {
-            console.log("got captchaImg");
-            captchaImg.setAttribute('src', `data:image/png;base64, ${captchaResp.png_base64}`);
-            const captchaInput = form.querySelector(
-              "#captchaInput"
-            ) as HTMLInputElement;
-            captchaInput.setAttribute("data-captcha-key", `${captchaResp.challenge_key}`);
-        }
-
+      const captchaImg = document.querySelector("#captchaImg");
+      if (captchaImg) {
+        console.log("got captchaImg");
+        captchaImg.setAttribute(
+          "src",
+          `data:image/png;base64, ${captchaResp.png_base64}`
+        );
+        const captchaInput = form.querySelector(
+          "#captchaInput"
+        ) as HTMLInputElement;
+        captchaInput.setAttribute(
+          "data-captcha-key",
+          `${captchaResp.challenge_key}`
+        );
+      }
     });
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -81,9 +86,9 @@ const init = (): Promise<LoginResult | null> =>
       const captchaKey = captchaInput.dataset.captchaKey;
 
       const challengeResult: ChallengeResult = {
-          key: Number(captchaKey),
-          chars: captchaChars,
-      }
+        key: Number(captchaKey),
+        chars: captchaChars,
+      };
 
       const registerAlias = form.querySelector(
         "#registerAlias"

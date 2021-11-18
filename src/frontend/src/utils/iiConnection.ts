@@ -70,7 +70,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";;
+export type { ChallengeResult } from "../../generated/internet_identity_types";
 
 export class IIConnection {
   protected constructor(
@@ -83,7 +83,7 @@ export class IIConnection {
     identity: WebAuthnIdentity,
     alias: string,
     pow: ProofOfWork,
-    challengeResult: ChallengeResult,
+    challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
     let delegationIdentity: DelegationIdentity;
     try {
@@ -110,7 +110,7 @@ export class IIConnection {
           purpose: { authentication: null },
         },
         pow,
-        challengeResult,
+        challengeResult
       );
     } catch (error) {
       return { kind: "apiError", error };
@@ -213,14 +213,17 @@ export class IIConnection {
     return await baseActor.lookup(userNumber);
   }
 
-  static async createChallenge() : Promise<CaptchaResponse> {
-      console.log("OK creating challenge");
-      const agent = new HttpAgent();
-      agent.fetchRootKey();
-      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, { agent, canisterId: canisterId });
-      const challenge = await actor.create_challenge();
-      console.log(challenge);
-      return challenge;
+  static async createChallenge(): Promise<CaptchaResponse> {
+    console.log("OK creating challenge");
+    const agent = new HttpAgent();
+    agent.fetchRootKey();
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId: canisterId,
+    });
+    const challenge = await actor.create_challenge();
+    console.log(challenge);
+    return challenge;
   }
 
   static async lookupAuthenticators(
