@@ -39,7 +39,6 @@ export const confirmRegister = async (
   return await init(canisterIdPrincipal, identity, alias);
 };
 
-// TODO: retry on bad captcha
 const tryRegister = async (
   identity: WebAuthnIdentity,
   alias: string,
@@ -58,16 +57,18 @@ const tryRegister = async (
 
     // Congratulate user
     await displayUserNumber(result.userNumber);
+  } else if (result.kind == "apiError")  {
+      console.log("Got a bad captcha, retrying");
+      // TODO: shouldn't be apiError but "badCaptcha" or similar
+      requestCaptcha();
   }
 
   return result;
 };
 
-const init = async (
-  canisterIdPrincipal: Principal,
-  identity: WebAuthnIdentity,
-  alias: string
-): Promise<LoginResult | null> => {
+// TODO: disable confirm button
+// TODO: add message about loading captcha
+const requestCaptcha = () => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
   IIConnection.createChallenge().then((captchaResp) => {
     const captchaImg = document.querySelector("#captchaImg");
@@ -92,24 +93,35 @@ const init = async (
       loadingCaptchaText.innerHTML = "please copy the chars";
     }
   });
+
+
+};
+
+const init = async (
+  canisterIdPrincipal: Principal,
+  identity: WebAuthnIdentity,
+  alias: string
+): Promise<LoginResult | null> => {
+  requestCaptcha();
   return new Promise((resolve) => {
     // Create a PoW before registering
     const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
     const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
 
-    const confirmRegisterButton = document.getElementById(
-      "confirmRegisterButton"
+    const confirmRegisterButton = document.querySelector(
+      "#confirmRegisterButton"
     ) as HTMLFormElement;
     const captchaInput = document.querySelector(
       "#captchaInput"
     ) as HTMLFormElement;
-    const cancelButton = document.getElementById(
-      "cancelButton"
+    const cancelButton = document.querySelector(
+      "#cancelButton"
     ) as HTMLButtonElement;
 
     cancelButton.onclick = () => {
       resolve(null);
     };
+
     confirmRegisterButton.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
