@@ -8,7 +8,7 @@ run a simulated IC environment in a process.
 Setup
 -----
 
- * Install ghc-8.8.4 and `cabal` (e.g. using https://www.haskell.org/ghcup/)
+ * Install ghc-8.10.4 and `cabal` (e.g. using https://www.haskell.org/ghcup/)
  * Run `cabal build`
 
 Running
