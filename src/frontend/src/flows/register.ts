@@ -8,7 +8,7 @@ import {
   ChallengeResult,
 } from "../utils/iiConnection";
 import { setUserNumber } from "../utils/userNumber";
-import { confirmRegister } from "./confirmRegister";
+import { confirmRegister } from "./confirmRegisterNew";
 import { displayUserNumber } from "./displayUserNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import getProofOfWork from "../crypto/pow";
@@ -19,9 +19,6 @@ const pageContent = html`
   <div class="container">
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
-      <p>Please copy the characters you see below.</p>
-      <img id="captchaImg" />
-      <input id="captchaInput" />
       <p>Please provide a name for your device.</p>
       <input id="registerAlias" placeholder="Device name" />
       <button type="submit" class="primary">Create</button>
@@ -58,37 +55,9 @@ const init = (): Promise<LoginResult | null> =>
 
     registerCancel.onclick = () => resolve(null);
 
-    IIConnection.createChallenge().then((captchaResp) => {
-      const captchaImg = document.querySelector("#captchaImg");
-      if (captchaImg) {
-        console.log("got captchaImg");
-        captchaImg.setAttribute(
-          "src",
-          `data:image/png;base64, ${captchaResp.png_base64}`
-        );
-        const captchaInput = form.querySelector(
-          "#captchaInput"
-        ) as HTMLInputElement;
-        captchaInput.setAttribute(
-          "data-captcha-key",
-          `${captchaResp.challenge_key}`
-        );
-      }
-    });
     form.onsubmit = async (e) => {
       e.preventDefault();
       e.stopPropagation();
-
-      const captchaInput = form.querySelector(
-        "#captchaInput"
-      ) as HTMLInputElement;
-      const captchaChars = captchaInput.value;
-      const captchaKey = captchaInput.dataset.captchaKey;
-
-      const challengeResult: ChallengeResult = {
-        key: Number(captchaKey),
-        chars: captchaChars,
-      };
 
       const registerAlias = form.querySelector(
         "#registerAlias"
@@ -113,18 +82,8 @@ const init = (): Promise<LoginResult | null> =>
         const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
         const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
         const identity = await pendingIdentity;
-        if (await confirmRegister()) {
-          const result = await withLoader(async () =>
-            IIConnection.register(identity, alias, pow, challengeResult)
-          );
-          if (result.kind === "loginSuccess") {
-            setUserNumber(result.userNumber);
-            await displayUserNumber(result.userNumber);
-          }
-          resolve(apiResultToLoginResult(result));
-        } else {
-          resolve(null);
-        }
+        await confirmRegister(canisterIdPrincipal, identity, alias);
+        console.log("Back to register");
       } catch (err) {
         reject(err);
       }
