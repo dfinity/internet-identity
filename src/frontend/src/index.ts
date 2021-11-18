@@ -2,7 +2,6 @@ import "./styles/main.css";
 import { login } from "./flows/login";
 import auth from "./auth";
 import { addDevice } from "./flows/addDevice";
-import { hasOwnProperty } from "./utils/utils";
 import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
@@ -10,7 +9,6 @@ import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { hasRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
-import { IIConnection } from "./utils/iiConnection";
 
 const init = async () => {
   const url = new URL(document.URL);

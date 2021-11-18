@@ -97,7 +97,7 @@ export class IIConnection {
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
     console.log(
-      `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`
+      `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce}, challenge_key=${challengeResult.key}, challenge_chars=${challengeResult.chars})`
     );
     let registerResponse: RegisterResponse;
     try {
