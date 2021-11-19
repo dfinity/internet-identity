@@ -15,8 +15,7 @@ executable backend-tests
 
   other-modules: Prometheus
 
- -- must use aeson >=1.4.7 for ic-hs to build
-  build-depends: aeson >=1.4.7
+  build-depends: aeson
   build-depends: attoparsec
   build-depends: base >=4.12 && <5
   build-depends: base64-bytestring
