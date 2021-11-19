@@ -219,6 +219,10 @@ setCanisterTimeTo cid new_time =
  modify $
   \ic -> ic { canisters = M.adjust (\cs -> cs { time = new_time }) (EntityId cid) (canisters ic) }
 
+resetCanisterRandomness :: M ()
+resetCanisterRandomness =
+ modify $
+  \ic -> ic { rng = mkStdGen 0 }
 
 callManagement :: forall s a b.
   HasCallStack =>
@@ -515,6 +519,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     _ <- callII cid webauthID #register (device1, powAt cid 1)
     callIIRejectWith cid webauthID #register (device1, powAt cid 1, mkChallengeResult) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -529,6 +534,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid 123 []
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     assertStats cid 1
     when should_upgrade $ doUpgrade cid
@@ -536,11 +542,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup (with credential id)" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauth2ID #register (device2, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register add lookup" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callII cid webauthID #add (user_number, device2)
@@ -548,6 +556,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid user_number [device1, device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and add with wrong user" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callIIReject cid webauth2ID #add (user_number, device2)
@@ -555,11 +564,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
     queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation and validate" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
@@ -591,6 +602,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
@@ -601,6 +613,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
@@ -629,6 +642,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withoutUpgrade $ iiTest "get multiple delegations and expire" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
@@ -657,6 +671,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
 
   , withUpgrade $ \should_upgrade -> iiTest "user identities differ" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
@@ -678,6 +693,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       lift $ assertFailure "User identities coincide for different frontends"
 
   , withUpgrade $ \should_upgrade -> iiTest "remove()" $ \cid -> do
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     lookupIs cid user_number [device1]
     callII cid webauthID #add (user_number, device2)
@@ -690,6 +706,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callII cid webauth2ID #remove (user_number, webauth2PK)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number []
+    resetCanisterRandomness
     user_number2 <- callII cid webauthID #register (device1, powAt cid 1, mkChallengeResult) >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     when (user_number == user_number2) $
@@ -700,9 +717,11 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     assertStats cid 0
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     liftIO $ user_number @?= 100
     assertStats cid 1
+    resetCanisterRandomness
     user_number <- callII cid webauthID #register (device1, powAt cid 1, mkChallengeResult) >>= mustGetUserNumber
     liftIO $ user_number @?= 101
     assertStats cid 2
@@ -718,16 +737,19 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     user_number <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     liftIO $ user_number @?= 102
     assertStats cid 3
+    resetCanisterRandomness
     callIIReject cid webauthID #register (device1, powAt cid 0, mkChallengeResult)
     assertStats cid 3
 
   , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #assigned_user_number_range @?= (100, 100)
+    resetCanisterRandomness
     response <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult)
     assertVariant #canister_full response
 
   , withUpgrade $ \should_upgrade -> iiTest "metrics endpoint" $ \cid -> do
+    resetCanisterRandomness
     _ <- callII cid webauth2ID #register (device2, powAt cid 1, mkChallengeResult) >>= mustGetUserNumber
     metrics <- callII cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
 
@@ -736,6 +758,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     when should_upgrade $ doUpgrade cid
 
+    resetCanisterRandomness
     userNumber <- callII cid webauthID #register (device1, powAt cid 0, mkChallengeResult) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
