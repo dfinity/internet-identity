@@ -65,8 +65,8 @@ jobs:
         run: |
           cargo build --target wasm32-unknown-unknown --release
 
-      - name: Run Tests
-        shell: bash
-        run: |
-          cd backend-tests
-          $HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/internet_identity.wasm\
+      #- name: Run Tests
+        #shell: bash
+        #run: |
+          #cd backend-tests
+          #$HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/internet_identity.wasm\
