@@ -443,7 +443,11 @@ powNonceAt cid ts = error $ printf
 powAt ::  Blob -> Word64 -> ProofOfWork
 powAt cid ts = mkPOW ts (powNonceAt cid ts)
 
-lookupIs :: Blob -> Word64 -> [DeviceData] -> M ()
+-- Check that the user has the following device data
+lookupIs
+    :: Blob -- ^ canister ID
+    -> Word64 -- ^ user (anchor) number
+    -> [DeviceData] -> M ()
 lookupIs cid user_number ds = do
   r <- queryII cid dummyUserId #lookup user_number
   liftIO $ r @?= V.fromList ds
