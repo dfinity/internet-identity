@@ -442,10 +442,14 @@ async fn create_challenge() -> CaptchaResponse {
 
         let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
         let mut captcha = captcha::RngCaptcha::from_rng(rng);
-        let captcha = captcha.add_chars(5)
-            .apply_filter(Wave::new(2.0, 20.0).horizontal())
-            .apply_filter(Wave::new(2.0, 20.0).vertical())
-            .view(220, 120);
+        // TODO: use this in production:
+        //let captcha = captcha.add_chars(5)
+            //.apply_filter(Wave::new(2.0, 20.0).horizontal())
+            //.apply_filter(Wave::new(2.0, 20.0).vertical())
+            //.view(220, 120);
+
+        let captcha = captcha.set_chars(&vec!['a']).add_chars(1)
+            .view(10,10);
 
         let resp = match captcha.as_base64() {
             Some(png_base64) => CaptchaResponse { png_base64, challenge_key },
