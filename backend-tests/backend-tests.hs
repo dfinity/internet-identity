@@ -67,85 +67,20 @@ import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
--- We cannot do
--- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
--- just yet, because haskell-candid doesn’t like init arguments to service, so
--- for now we have to copy it
 type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
+type IIType = [Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
--- Names for some of these types. Unfortunately requires copying
+-- Shorter names for some of these types
+-- (we could use them directly, of course)
 
-type DeviceData = [Candid.candidType|
-record {
-  pubkey : blob;
-  alias : text;
-  credential_id : opt blob;
-  purpose: variant {
-    recovery;
-    authentication;
-  };
-  key_type: variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-  };
-}
-  |]
-
-type RegisterResponse = [Candid.candidType|
-variant {
-  registered: record { user_number: nat64; };
-  canister_full;
-}
-  |]
-
-
-type SignedDelegation = [Candid.candidType|
-record {
-  delegation:
-    record {
-      pubkey: blob;
-      expiration: nat64;
-      targets: opt vec principal;
-    };
-  signature: blob;
-}
-  |]
-
-type Delegation = [Candid.candidType|
-  record {
-    pubkey: blob;
-    expiration: nat64;
-    targets: opt vec principal;
-  }
-  |]
-
-
-type InitCandid = [Candid.candidType|
-  record {
-    assigned_user_number_range : record { nat64; nat64; };
-  }
-  |]
-
-type ProofOfWork = [Candid.candidType|record {
-  timestamp : nat64;
-  nonce : nat64;
-}|]
-
-type HttpRequest = [Candid.candidType|record {
-  method : text;
-  url : text;
-  headers : vec record { text; text; };
-  body : blob;
-}|]
-
-type HttpResponse = [Candid.candidType|record {
-  status_code : nat16;
-  headers : vec record { text; text; };
-  body : blob;
-  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: opt record {}; }) query; }; };
-}|]
+type DeviceData = IIType .! "DeviceData"
+type RegisterResponse = IIType .! "RegisterResponse"
+type SignedDelegation = IIType .! "SignedDelegation"
+type Delegation = IIType .! "Delegation"
+type InitCandid = IIType .! "InternetIdentityInit"
+type ProofOfWork = IIType .! "ProofOfWork"
+type HttpRequest = IIType .! "HttpRequest"
+type HttpResponse = IIType .! "HttpResponse"
 
 mkPOW :: Word64 -> Word64 -> ProofOfWork
 mkPOW t n = #timestamp .== t .+ #nonce .== n
