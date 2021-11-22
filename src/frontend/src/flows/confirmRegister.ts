@@ -133,6 +133,11 @@ const init = (
       e.preventDefault();
       e.stopPropagation();
 
+      const loadingCaptchaText = document.querySelector(
+        ".loading-captcha-text"
+      ) as HTMLElement;
+      loadingCaptchaText.innerHTML = "Checking ...";
+
       const captchaChars = captchaInput.value;
       const captchaKey = confirmRegisterButton.dataset.captchaKey;
 
