@@ -44,6 +44,7 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
+export NODE_OPTIONS=--openssl-legacy-provider # Needed if using npm 17 on Ubuntu 20.4 to handle npm ERR_OSSL_EVP_UNSUPPORTED
 II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
