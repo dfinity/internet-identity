@@ -47,7 +47,6 @@ In a different terminal, run the following command to install the Internet Ident
 II_ENV=development dfx deploy --no-wallet --argument '(null)'
 ```
 
-Then the canister can be used as
 
 ```bash
 $ dfx canister call internet_identity init_salt
