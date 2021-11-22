@@ -62,6 +62,10 @@ const tryRegister = (
     } else {
       // TODO: should we only get here on specific result.kind? like badCaptcha?
       console.log("Something didn't work, retrying");
+      const loadingCaptchaText = document.querySelector(
+        ".loading-captcha-text"
+      ) as HTMLElement;
+      loadingCaptchaText.innerHTML = "Something didn't work, please retry";
       requestCaptcha();
     }
   });
