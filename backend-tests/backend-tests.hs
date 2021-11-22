@@ -284,10 +284,12 @@ callIIReject cid user_id l x = do
 
 
 -- Some common devices
-webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthnECDSA "foobar"
+-- NOTE: we write the actual key content here, as opposed to generating it
+-- (e.g. with 'createSecretKeyWebAuthnECDSA'). This ensures the key contents
+-- are stable.
+-- See also: https://github.com/dfinity/ic-hs/issues/59
 webauthPK :: PublicKey
-webauthPK = toPublicKey webauthSK
+webauthPK = "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X lR\190\173]\245, \138\155\FS{\224\166\bGW>[\228\172O\224\142\164\128\&6\208\186\GS*\207\"X \179=\174\184;\201\199}\138\215b\253h\227\234\176\134\132\228c\196\147Q\179\171*\DC4\164\NUL\DC3\131\135"
 webauthID :: EntityId
 webauthID = EntityId $ mkSelfAuthenticatingId webauthPK
 device1 :: DeviceData
@@ -300,6 +302,7 @@ device1 = empty
 
 webauth2SK :: SecretKey
 webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
+-- The content here doesn't matter as long as it's different from webauthPK
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
