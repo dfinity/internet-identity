@@ -71,107 +71,7 @@ import Prometheus hiding (Timestamp)
 -- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 -- just yet, because haskell-candid doesn’t like init arguments to service, so
 -- for now we have to copy it
-type IIInterface m = [Candid.candid|
-type UserNumber = nat64;
-type PublicKey = blob;
-type CredentialId = blob;
-type DeviceAlias = text;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
-type SessionKey = PublicKey;
-type FrontendHostname = text;
-type Timestamp = nat64;
-type Purpose = variant {
-    recovery;
-    authentication;
-};
-type KeyType = variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-};
-
-type DeviceData = record {
-  pubkey : DeviceKey;
-  alias : text;
-  credential_id : opt CredentialId;
-  purpose : Purpose;
-  key_type : KeyType;
-};
-
-type RegisterResponse = variant {
-  registered: record { user_number: UserNumber; };
-  canister_full;
-};
-
-type Delegation = record {
-  pubkey: SessionKey;
-  expiration: Timestamp;
-  targets: opt vec principal;
-};
-type SignedDelegation = record {
-  delegation: Delegation;
-  signature: blob;
-};
-type GetDelegationResponse = variant {
-  signed_delegation: SignedDelegation;
-  no_such_delegation;
-};
-
-type InternetIdentityStats = record {
-  users_registered: nat64;
-  assigned_user_number_range: record { nat64; nat64; };
-};
-
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
-};
-
-type HeaderField = record { text; text; };
-
-type HttpRequest = record {
-  method: text;
-  url: text;
-  headers: vec HeaderField;
-  body: blob;
-};
-
-type HttpResponse = record {
-  status_code: nat16;
-  headers: vec HeaderField;
-  body: blob;
-  streaming_strategy: opt StreamingStrategy;
-};
-
-type StreamingCallbackHttpResponse = record {
-  body: blob;
-  token: Token;
-};
-
-type Token = record {};
-
-type StreamingStrategy = variant {
-  Callback: record {
-    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
-    token: Token;
-  };
-};
-service : {
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
-  add : (UserNumber, DeviceData) -> ();
-  remove : (UserNumber, DeviceKey) -> ();
-  lookup : (UserNumber) -> (vec DeviceData) query;
-  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
-  stats : () -> (InternetIdentityStats) query;
-
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
-  get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
-
-  http_request: (request: HttpRequest) -> (HttpResponse) query;
-}
-  |]
+type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 
 -- Names for some of these types. Unfortunately requires copying
 
@@ -244,7 +144,7 @@ type HttpResponse = [Candid.candidType|record {
   status_code : nat16;
   headers : vec record { text; text; };
   body : blob;
-  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: record {}; }) query; }; };
+  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: opt record {}; }) query; }; };
 }|]
 
 mkPOW :: Word64 -> Word64 -> ProofOfWork
@@ -384,10 +284,12 @@ callIIReject cid user_id l x = do
 
 
 -- Some common devices
-webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthnECDSA "foobar"
+-- NOTE: we write the actual key content here, as opposed to generating it
+-- (e.g. with 'createSecretKeyWebAuthnECDSA'). This ensures the key contents
+-- are stable.
+-- See also: https://github.com/dfinity/ic-hs/issues/59
 webauthPK :: PublicKey
-webauthPK = toPublicKey webauthSK
+webauthPK = "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X lR\190\173]\245, \138\155\FS{\224\166\bGW>[\228\172O\224\142\164\128\&6\208\186\GS*\207\"X \179=\174\184;\201\199}\138\215b\253h\227\234\176\134\132\228c\196\147Q\179\171*\DC4\164\NUL\DC3\131\135"
 webauthID :: EntityId
 webauthID = EntityId $ mkSelfAuthenticatingId webauthPK
 device1 :: DeviceData
@@ -400,6 +302,7 @@ device1 = empty
 
 webauth2SK :: SecretKey
 webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
+-- The content here doesn't matter as long as it's different from webauthPK
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
@@ -429,7 +332,11 @@ powNonceAt cid ts = error $ printf
 powAt ::  Blob -> Word64 -> ProofOfWork
 powAt cid ts = mkPOW ts (powNonceAt cid ts)
 
-lookupIs :: Blob -> Word64 -> [DeviceData] -> M ()
+-- Check that the user has the following device data
+lookupIs
+    :: Blob -- ^ canister ID
+    -> Word64 -- ^ user (anchor) number
+    -> [DeviceData] -> M ()
 lookupIs cid user_number ds = do
   r <- queryII cid dummyUserId #lookup user_number
   liftIO $ r @?= V.fromList ds

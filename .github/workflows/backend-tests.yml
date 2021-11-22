@@ -50,7 +50,10 @@ jobs:
         run: |
           cd backend-tests
           cabal update
-          cabal install -w ghc-${{ env.GHC_VERSION }} --overwrite-policy=always  --installdir=$HOME/bin
+          # we cannot use `cabal install` because the build is performed in
+          # another directory which breaks the relative path used in
+          # backend-tests.hs to internet_identity.did
+          cabal build --with-ghc ghc-${{ env.GHC_VERSION }}
 
       - name: Create fake assets
         run : |
@@ -69,4 +72,4 @@ jobs:
         shell: bash
         run: |
           cd backend-tests
-          $HOME/bin/backend-tests --wasm ../target/wasm32-unknown-unknown/release/internet_identity.wasm\
+          cabal run
