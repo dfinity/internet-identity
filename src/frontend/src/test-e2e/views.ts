@@ -56,6 +56,7 @@ export class RegisterView extends View {
   async confirmRegisterConfirm(): Promise<void> {
     // In tests, the captchas are hard-coded to the following string: "a"
     await this.browser.$("#captchaInput").setValue("a");
+    await this.browser.$("#confirmRegisterButton").waitForEnabled();
     await this.browser.$("#confirmRegisterButton").click();
   }
 
