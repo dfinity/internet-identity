@@ -97,7 +97,7 @@ const requestCaptcha = () => {
       ) as HTMLElement;
       loadingCaptchaText.innerHTML = "please copy the chars";
 
-      confirmRegisterButton.removeAttribute('disabled');
+      confirmRegisterButton.removeAttribute("disabled");
     }
   });
 };
@@ -139,8 +139,7 @@ const init = (
         ".loading-captcha-text"
       ) as HTMLElement;
       loadingCaptchaText.innerHTML = "Checking …";
-      confirmRegisterButton.setAttribute('disabled', '');
-
+      confirmRegisterButton.setAttribute("disabled", "");
 
       const captchaChars = captchaInput.value;
       const captchaKey = confirmRegisterButton.dataset.captchaKey;
