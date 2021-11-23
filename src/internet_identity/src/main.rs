@@ -22,7 +22,7 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
-#[cfg(not(feature = "ic_backend_emulated"))]
+#[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::{Wave};
 
 // 30 mins
@@ -459,7 +459,7 @@ async fn create_challenge() -> CaptchaResponse {
     resp
 }
 
-#[cfg(feature = "ic_backend_emulated")]
+#[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
         let mut captcha = captcha::RngCaptcha::from_rng(rng);
@@ -474,7 +474,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
         return (resp, captcha.chars_as_string());
 }
 
-#[cfg(not(feature = "ic_backend_emulated"))]
+#[cfg(not(feature = "dummy_captcha"))]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
         let mut captcha = captcha::RngCaptcha::from_rng(rng);
