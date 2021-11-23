@@ -8,7 +8,21 @@ npm run build
 II_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
 
-cargo build --manifest-path "$II_DIR/Cargo.toml" --target $TARGET --release -j1
+cargo_build_args=(
+    --manifest-path "$II_DIR/Cargo.toml"
+    --target "$TARGET"
+    --release
+    -j1
+    )
+
+if [ "${USE_DUMMY_CAPTCHA:-}" == "1" ]
+then
+    cargo_build_args+=( --features dummy_captcha )
+fi
+
+echo Running cargo build "${cargo_build_args[@]}"
+
+cargo build "${cargo_build_args[@]}"
 
 # keep version in sync with Dockerfile
 cargo install ic-cdk-optimizer --version 0.3.1 --root "$II_DIR"/../../target

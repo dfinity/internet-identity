@@ -68,6 +68,7 @@ jobs:
       - name: Deploy Internet Identity
         run: |
           export II_ENV=development
+          export USE_DUMMY_CAPTCHA=1
           dfx deploy --no-wallet --argument '(null)'
 
       - name: Deploy whoami canister
