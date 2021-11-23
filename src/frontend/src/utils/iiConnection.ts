@@ -11,7 +11,7 @@ import {
   PublicKey,
   SessionKey,
   CredentialId,
-  CaptchaResponse,
+  Challenge,
   UserNumber,
   FrontendHostname,
   Timestamp,
@@ -213,7 +213,7 @@ export class IIConnection {
     return await baseActor.lookup(userNumber);
   }
 
-  static async createChallenge(): Promise<CaptchaResponse> {
+  static async createChallenge(): Promise<Challenge> {
     console.log("OK creating challenge");
     const agent = new HttpAgent();
     agent.fetchRootKey();

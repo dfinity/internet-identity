@@ -24,7 +24,7 @@ export const idlFactory = ({ IDL }) => {
     'credential_id' : IDL.Opt(CredentialId),
   });
   const ChallengeKey = IDL.Nat32;
-  const CaptchaResponse = IDL.Record({
+  const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
   });
@@ -91,7 +91,7 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
-    'create_challenge' : IDL.Func([], [CaptchaResponse], []),
+    'create_challenge' : IDL.Func([], [Challenge], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],

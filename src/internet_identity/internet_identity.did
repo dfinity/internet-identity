@@ -49,7 +49,7 @@ type KeyType = variant {
     seed_phrase;
 };
 
-type CaptchaResponse = record {
+type Challenge = record {
     png_base64: text;
     challenge_key: ChallengeKey;
 };
@@ -103,10 +103,6 @@ type ProofOfWork = record {
 };
 
 type ChallengeKey = nat32;
-type Challenge = record {
-    created : Timestamp;
-    chars : text;
-};
 
 type ChallengeResult = record {
     key : ChallengeKey;
@@ -115,7 +111,7 @@ type ChallengeResult = record {
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
-  create_challenge : () -> (CaptchaResponse);
+  create_challenge : () -> (Challenge);
   register : (DeviceData, ProofOfWork, ChallengeResult) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();

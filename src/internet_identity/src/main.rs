@@ -212,7 +212,7 @@ struct State {
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // TODO: note: we COULD persist this through upgrades
-    inflight_challenges: RefCell<HashMap<ChallengeKey, Challenge>>,
+    inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
 }
 
 impl Default for State {
@@ -232,26 +232,25 @@ impl Default for State {
     }
 }
 
-type ChallengeKey = u32;
-
 // The challenges we store and check against
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct Challenge {
+struct ChallengeInfo {
     created: Timestamp,
     chars: String,
 }
 
+type ChallengeKey = u32;
+
+// The user's attempt
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct ChallengeResult {
+struct ChallengeAttempt {
     chars: String,
     key: ChallengeKey
 }
 
-// TODO: rename to ChallengeSomething
 // TODO: add response if no more keys
 // What we send the user
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct CaptchaResponse {
+struct Challenge {
     png_base64: String,
     challenge_key: ChallengeKey,
 }
@@ -287,7 +286,7 @@ async fn init_salt() {
 }
 
 #[update]
-async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: ChallengeResult) -> RegisterResponse {
+async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: ChallengeAttempt) -> RegisterResponse {
     check_challenge(challenge_result);
     check_entry_limits(&device_data);
     let now = time() as u64;
@@ -409,7 +408,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
 // TODO: should this take a PoW to prevent spam?
 #[update]
-async fn create_challenge() -> CaptchaResponse {
+async fn create_challenge() -> Challenge {
 
     let rng = make_rng().await;
 
@@ -452,9 +451,9 @@ async fn create_challenge() -> CaptchaResponse {
         let (Base64(png_base64), chars) = create_captcha(rng);
 
         // Finally insert
-        inflight_challenges.insert(challenge_key, Challenge { created: now, chars });
+        inflight_challenges.insert(challenge_key, ChallengeInfo { created: now, chars });
 
-        CaptchaResponse { png_base64, challenge_key }
+        Challenge { png_base64, challenge_key }
 
     });
 
@@ -511,7 +510,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 }
 
 // just traps if challenge isn't OK, because when in rome...
-fn check_challenge(res: ChallengeResult) {
+fn check_challenge(res: ChallengeAttempt) {
 
     STATE.with(|s| {
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();

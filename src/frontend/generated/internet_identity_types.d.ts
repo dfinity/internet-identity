@@ -1,9 +1,8 @@
 import type { Principal } from '@dfinity/principal';
-export interface CaptchaResponse {
+export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
 }
-export interface Challenge { 'created' : Timestamp, 'chars' : string }
 export type ChallengeKey = number;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
 export type CredentialId = Array<number>;
@@ -71,7 +70,7 @@ export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
-  'create_challenge' : () => Promise<CaptchaResponse>,
+  'create_challenge' : () => Promise<Challenge>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
