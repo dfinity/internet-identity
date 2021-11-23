@@ -86,8 +86,6 @@ const requestCaptcha = () => {
       const confirmRegisterButton = form.querySelector(
         "#confirmRegisterButton"
       ) as HTMLFormElement;
-
-      confirmRegisterButton.removeAttribute("disabled");
       confirmRegisterButton.setAttribute(
         "data-captcha-key",
         `${captchaResp.challenge_key}`
@@ -96,8 +94,8 @@ const requestCaptcha = () => {
         ".loading-captcha-text"
       ) as HTMLElement;
       loadingCaptchaText.innerHTML = "please copy the chars";
+      confirmRegisterButton.disabled = false;
 
-      confirmRegisterButton.removeAttribute("disabled");
     }
   });
 };
@@ -139,7 +137,7 @@ const init = (
         ".loading-captcha-text"
       ) as HTMLElement;
       loadingCaptchaText.innerHTML = "Checking …";
-      confirmRegisterButton.setAttribute("disabled", "");
+      confirmRegisterButton.disabled = true;
 
       const captchaChars = captchaInput.value;
       const captchaKey = confirmRegisterButton.dataset.captchaKey;
