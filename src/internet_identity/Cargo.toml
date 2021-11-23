@@ -29,4 +29,6 @@ rand = "0.8.3"
 sha2 = "0.9.1"
 
 [features]
+# the dummy_captcha feature which ensures the captcha string is always "a"
+# (needed for tests)
 dummy_captcha = []

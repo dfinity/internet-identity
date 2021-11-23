@@ -66,6 +66,8 @@ jobs:
 
       - name: Build backend canister
         run: |
+          # we use the dummy_captcha feature which ensures the captcha string
+          # is always "a"
           cargo build --features dummy_captcha --target wasm32-unknown-unknown --release
 
       - name: Run Tests

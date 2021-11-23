@@ -15,6 +15,10 @@ cargo_build_args=(
     -j1
     )
 
+# This enables the "dummy_captcha" feature which makes sure the captcha string
+# is always "a".
+# WARNING: this MUST be opt-in, because we DO NOT want this in production,
+# EVAR.
 if [ "${USE_DUMMY_CAPTCHA:-}" == "1" ]
 then
     cargo_build_args+=( --features dummy_captcha )

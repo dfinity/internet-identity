@@ -68,6 +68,8 @@ jobs:
       - name: Deploy Internet Identity
         run: |
           export II_ENV=development
+          # we use the dummy_captcha feature which ensures the captcha string
+          # is always "a"
           export USE_DUMMY_CAPTCHA=1
           dfx deploy --no-wallet --argument '(null)'
 
