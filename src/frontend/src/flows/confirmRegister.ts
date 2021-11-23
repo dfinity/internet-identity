@@ -95,7 +95,6 @@ const requestCaptcha = () => {
       ) as HTMLElement;
       loadingCaptchaText.innerHTML = "please copy the chars";
       confirmRegisterButton.disabled = false;
-
     }
   });
 };
