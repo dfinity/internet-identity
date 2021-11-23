@@ -238,6 +238,7 @@ struct ChallengeInfo {
     chars: String,
 }
 
+// TODO: should this be a string?
 type ChallengeKey = u32;
 
 // The user's attempt
@@ -517,11 +518,13 @@ fn check_challenge(res: ChallengeAttempt) {
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
                 if res.chars !=  challenge.chars {
-                    trap("BAD ANSWER");
+                    // NOTE: we _could_ show the expected chars here (the key has been
+                    // removed already so the user won't be able to re-submit the answer using that
+                    // key).
+                    trap("CAPTCHA challenge failed");
                 }
-
             },
-            None =>  trap("nope, no challenge with that key") ,
+            None =>  trap("Could not find a CAPTCHA challenge with that key") ,
         }
     })
 }
