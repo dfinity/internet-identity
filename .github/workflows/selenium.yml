@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        start-flag: [ '', '--emulator' ]
+        start-flag: [ '' ]
         device: [ 'desktop', 'mobile' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
