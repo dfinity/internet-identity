@@ -58,7 +58,9 @@ export class RegisterView extends View {
     await this.browser.$("#captchaInput").setValue("a");
     await this.browser
       .$("#confirmRegisterButton")
-      .waitForEnabled({ timeout: 10_000 });
+      // this is a huge timeout because generating the captcha takes a while on
+      // the emulator
+      .waitForEnabled({ timeout: 30_000 });
     await this.browser.$("#confirmRegisterButton").click();
   }
 
