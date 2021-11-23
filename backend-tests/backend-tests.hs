@@ -327,8 +327,8 @@ callIIRejectWith cid user_id l x expectedMessagePattern = do
 -- See also: https://github.com/dfinity/ic-hs/issues/59
 webauth1PK :: PublicKey
 webauth1PK = "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X lR\190\173]\245, \138\155\FS{\224\166\bGW>[\228\172O\224\142\164\128\&6\208\186\GS*\207\"X \179=\174\184;\201\199}\138\215b\253h\227\234\176\134\132\228c\196\147Q\179\171*\DC4\164\NUL\DC3\131\135"
-webauthID :: EntityId
-webauthID = EntityId $ mkSelfAuthenticatingId webauth1PK
+webauth1ID :: EntityId
+webauth1ID = EntityId $ mkSelfAuthenticatingId webauth1PK
 device1 :: DeviceData
 device1 = empty
     .+ #alias .== "device1"
