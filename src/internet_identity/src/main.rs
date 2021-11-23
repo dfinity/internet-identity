@@ -409,6 +409,59 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 #[update]
 async fn create_challenge() -> CaptchaResponse {
 
+    let rng = make_rng().await;
+
+    let resp = STATE.with(|s| {
+        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+
+        // Prune old challenges. This drops all challenges that are older than
+        // CAPTCHA_CHALLENGE_LIFETIME
+        // TODO: test this
+        let now = time() as u64;
+        inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
+
+        // Error out if there are too many inflight challenges
+        // TODO: test this
+        if inflight_challenges.len() >= MAX_INFLIGHT_CHALLENGES {
+            trap("too many inflight captchas");
+        }
+
+        // actually create the challenge
+
+        // first, try to find a key. We've already checked that we have fewer keys than
+        // MAX_INFLIGHT_CHALLENGES but just to make sure we use MAX_INFLIGHT_CHALLENGES as an upper
+        // bound of attempts.
+        let mut challenge_key: Option<u32> = None;
+        let mut attempt: u32 = 0;
+        while attempt < MAX_INFLIGHT_CHALLENGES as u32 {
+            if !inflight_challenges.contains_key(&attempt) {
+                challenge_key = Some(attempt);
+                break;
+            }
+            attempt += 1;
+        }
+
+        let challenge_key = match challenge_key {
+            Some(challenge_key) => challenge_key,
+            None => trap(&format!("Impossible: Could not find a free key for challenge. Size/Capacity: {}/{}", inflight_challenges.len(), MAX_INFLIGHT_CHALLENGES)),
+        };
+
+        // Then we create the CAPTCHA
+        let (Base64(png_base64), chars) = create_captcha(rng);
+
+        // Finally insert
+        inflight_challenges.insert(challenge_key, Challenge { created: now, chars });
+
+        CaptchaResponse { png_base64, challenge_key }
+
+    });
+
+    resp
+}
+
+// Get a random number generator based on 'raw_rand'
+async fn make_rng() -> rand_chacha::ChaCha20Rng {
+
     let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
@@ -420,43 +473,7 @@ async fn create_challenge() -> CaptchaResponse {
                 ));
     });
 
-    let resp = STATE.with(|s| {
-        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
-
-        // Prune old challenges
-        let now = time() as u64;
-        inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
-
-        // Error out if there are too many inflight challenges
-        if inflight_challenges.len() > MAX_INFLIGHT_CHALLENGES {
-            trap("too many inflight captchas");
-        }
-
-        // actually create the challenge
-
-        // first, get the key
-        let mut challenge_key = 0;
-        // TODO: WARNING: very dangerous
-        while inflight_challenges.contains_key(&challenge_key) {
-            challenge_key = challenge_key + 1;
-        }
-
-
-        let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
-        let (Base64(png_base64), chars) = create_captcha(rng);
-        let resp = CaptchaResponse { png_base64, challenge_key };
-
-        // TODO: const-this-up
-        let challenge: Challenge = Challenge { created: now, chars: chars};
-
-        // Finally insert
-        inflight_challenges.insert(challenge_key, challenge);
-
-        resp
-
-    });
-
-    resp
+    rand_chacha::ChaCha20Rng::from_seed(seed)
 }
 
 #[cfg(feature = "dummy_captcha")]
