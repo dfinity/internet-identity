@@ -14,7 +14,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
-use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::rand_core::{SeedableRng, RngCore};
 
 mod assets;
 
@@ -22,7 +22,7 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
-//use captcha::{gen, Difficulty, Captcha};
+#[cfg(not(feature = "ic_backend_emulated"))]
 use captcha::filters::{Wave};
 
 // 30 mins
@@ -51,6 +51,8 @@ type SessionKey = PublicKey;
 type FrontendHostname = String;
 type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
+
+struct Base64(String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum Purpose {
@@ -441,23 +443,11 @@ async fn create_challenge() -> CaptchaResponse {
 
 
         let rng = rand_chacha::ChaCha20Rng::from_seed(seed);
-        let mut captcha = captcha::RngCaptcha::from_rng(rng);
-        // TODO: use this in production:
-        //let captcha = captcha.add_chars(5)
-            //.apply_filter(Wave::new(2.0, 20.0).horizontal())
-            //.apply_filter(Wave::new(2.0, 20.0).vertical())
-            //.view(220, 120);
-
-        let captcha = captcha.set_chars(&vec!['a']).add_chars(1)
-            .view(10,10);
-
-        let resp = match captcha.as_base64() {
-            Some(png_base64) => CaptchaResponse { png_base64, challenge_key },
-            None => trap("Could not get base64 of captcha"),
-        };
+        let (Base64(png_base64), chars) = create_captcha(rng);
+        let resp = CaptchaResponse { png_base64, challenge_key };
 
         // TODO: const-this-up
-        let challenge: Challenge = Challenge { created: now, chars: captcha.chars_as_string() };
+        let challenge: Challenge = Challenge { created: now, chars: chars};
 
         // Finally insert
         inflight_challenges.insert(challenge_key, challenge);
@@ -467,6 +457,38 @@ async fn create_challenge() -> CaptchaResponse {
     });
 
     resp
+}
+
+#[cfg(feature = "ic_backend_emulated")]
+fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+
+        let mut captcha = captcha::RngCaptcha::from_rng(rng);
+        let captcha = captcha.set_chars(&vec!['a']).add_chars(1)
+            .view(10,10);
+
+        let resp = match captcha.as_base64() {
+            Some(png_base64) => Base64(png_base64),
+            None => trap("Could not get base64 of captcha"),
+        };
+
+        return (resp, captcha.chars_as_string());
+}
+
+#[cfg(not(feature = "ic_backend_emulated"))]
+fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+
+        let mut captcha = captcha::RngCaptcha::from_rng(rng);
+        let captcha = captcha.add_chars(5)
+            .apply_filter(Wave::new(2.0, 20.0).horizontal())
+            .apply_filter(Wave::new(2.0, 20.0).vertical())
+            .view(220, 120);
+
+        let resp = match captcha.as_base64() {
+            Some(png_base64) => Base64(png_base64),
+            None => trap("Could not get base64 of captcha"),
+        };
+
+        return (resp, captcha.chars_as_string());
 }
 
 // just traps if challenge isn't OK, because when in rome...

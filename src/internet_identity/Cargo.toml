@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+rand = "0.8.3"
 base64 = "0.13.0"
 certified_map = { path = "../certified_map" }
 cubehash = { path = "../cubehash" }
@@ -27,3 +28,6 @@ rand = "0.8.3"
 
 [build-dependencies]
 sha2 = "0.9.1"
+
+[features]
+ic_backend_emulated = []
