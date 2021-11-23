@@ -137,7 +137,6 @@ type ProofOfWork = [Candid.candidType|record {
 type ChallengeResult = [Candid.candidType|record {
   key : nat32;
   chars: text;
-
 }|]
 
 type HttpRequest = [Candid.candidType|record {
@@ -843,6 +842,9 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       challenge <- callII cid webauthID #create_challenge ()
       pure $ #key .== challenge .! #challenge_key .+ #chars .== T.pack "a"
 
+    -- Go through a challenge request/registration flow for this device.
+    -- NOTE: this (dummily) solves the challenge with the string "a", which is
+    -- returned by the backend when compiled with USE_DUMMY_CAPTCHA.
     register cid webauthID device pow =
       getChallenge cid webauthID >>= callII cid webauthID #register . (device, pow,)
 
