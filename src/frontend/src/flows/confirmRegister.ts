@@ -17,7 +17,7 @@ const pageContent = html`
   <div class="container">
     <h1>Confirm new device</h1>
     <form id="confirmForm">
-      <p class="loading-captcha-text">Loading captcha...</p>
+      <p class="captcha-status-text">…</p>
       <img id="captchaImg" />
       <input id="captchaInput" />
       <p>Please confirm to add your device.</p>
@@ -46,12 +46,9 @@ const tryRegister = (
   func: (result: LoginResult) => void
 ) => {
   withLoader(async () => {
-    console.log("Registering...");
     return IIConnection.register(identity, alias, pow, challengeResult);
   }).then((result) => {
-    console.log(`Result: ${result.kind}`);
     if (result.kind == "loginSuccess") {
-      console.log("Result kind was success");
       // Write user number to storage
       setUserNumber(result.userNumber);
 
@@ -60,25 +57,27 @@ const tryRegister = (
         func(apiResultToLoginResult(result));
       });
     } else {
+      // TODO; here add "badCaptcha". If we see anything else, return result.
       // TODO: should we only get here on specific result.kind? like badCaptcha?
-      console.log("Something didn't work, retrying");
-      const loadingCaptchaText = document.querySelector(
-        ".loading-captcha-text"
+      const captchaStatusText = document.querySelector(
+        ".captcha-status-text"
       ) as HTMLElement;
-      loadingCaptchaText.innerHTML = "Something didn't work, please retry";
+      captchaStatusText.innerHTML = "Something didn't work, please retry";
       requestCaptcha();
     }
   });
 };
 
-// TODO: disable confirm button
 // TODO: add message about loading captcha
 const requestCaptcha = () => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
+  const captchaStatusText = document.querySelector(
+    ".captcha-status-text"
+  ) as HTMLElement;
+  captchaStatusText.innerHTML = "Creating CAPTCHA challenge…";
   IIConnection.createChallenge().then((captchaResp) => {
     const captchaImg = document.querySelector("#captchaImg");
     if (captchaImg) {
-      console.log("got captchaImg");
       captchaImg.setAttribute(
         "src",
         `data:image/png;base64, ${captchaResp.png_base64}`
@@ -90,10 +89,7 @@ const requestCaptcha = () => {
         "data-captcha-key",
         `${captchaResp.challenge_key}`
       );
-      const loadingCaptchaText = document.querySelector(
-        ".loading-captcha-text"
-      ) as HTMLElement;
-      loadingCaptchaText.innerHTML = "please copy the chars";
+      captchaStatusText.innerHTML = "Please type in the characters you see.";
       confirmRegisterButton.disabled = false;
     }
   });
@@ -132,10 +128,10 @@ const init = (
       e.preventDefault();
       e.stopPropagation();
 
-      const loadingCaptchaText = document.querySelector(
-        ".loading-captcha-text"
+      const captchaStatusText = document.querySelector(
+        ".captcha-status-text"
       ) as HTMLElement;
-      loadingCaptchaText.innerHTML = "Checking …";
+      captchaStatusText.innerHTML = "Checking CAPTCHA challenge…";
       confirmRegisterButton.disabled = true;
 
       const captchaChars = captchaInput.value;
