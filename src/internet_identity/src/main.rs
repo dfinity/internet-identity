@@ -154,6 +154,7 @@ enum RegisterResponse {
     Registered { user_number: UserNumber },
     #[serde(rename = "canister_full")]
     CanisterFull,
+    // TODO: add BadCaptcha here
 }
 
 mod hash;
@@ -247,6 +248,7 @@ struct ChallengeResult {
 }
 
 // TODO: rename to ChallengeSomething
+// TODO: add response if no more keys
 // What we send the user
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct CaptchaResponse {
