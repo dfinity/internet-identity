@@ -9,4 +9,4 @@ lto = true
 opt-level = 'z'
 
 [patch.crates-io]
-lodepng = { git = 'https://github.com/nmattia/lodepng-rust', branch = 'nm-wasm32' }
+lodepng = { git = 'https://github.com/nmattia/lodepng-rust', rev = '3619fb04d1b0cce5be4b0ecc1c46710296a1cb95' }

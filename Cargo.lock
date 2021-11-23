@@ -805,7 +805,7 @@ checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
 [[package]]
 name = "lodepng"
 version = "3.4.6"
-source = "git+https://github.com/nmattia/lodepng-rust?branch=nm-wasm32#304bcfc415ffa204ec9e82d5ec535708ed1bcca8"
+source = "git+https://github.com/nmattia/lodepng-rust?rev=3619fb04d1b0cce5be4b0ecc1c46710296a1cb95#3619fb04d1b0cce5be4b0ecc1c46710296a1cb95"
 dependencies = [
  "fallible_collections",
  "flate2",
