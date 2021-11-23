@@ -214,7 +214,6 @@ export class IIConnection {
   }
 
   static async createChallenge(): Promise<Challenge> {
-    console.log("OK creating challenge");
     const agent = new HttpAgent();
     agent.fetchRootKey();
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
@@ -222,7 +221,6 @@ export class IIConnection {
       canisterId: canisterId,
     });
     const challenge = await actor.create_challenge();
-    console.log(challenge);
     return challenge;
   }
 
@@ -252,9 +250,7 @@ export class IIConnection {
     // Only fetch the root key when we're not in prod
     if (process.env.II_ENV === "development") {
       await agent.fetchRootKey();
-      console.log("Fetching root key");
     }
-    console.log("OK");
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: canisterId,

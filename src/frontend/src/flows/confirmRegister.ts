@@ -68,8 +68,8 @@ const tryRegister = (
   });
 };
 
-// TODO: add message about loading captcha
-const requestCaptcha = () => {
+// Request a captcha and, when received, update the DOM elements accordingly.
+const requestCaptcha = (): void => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
   const captchaStatusText = document.querySelector(
     ".captcha-status-text"

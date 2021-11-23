@@ -45,7 +45,6 @@ const init = (): Promise<LoginResult | null> =>
     ) as HTMLButtonElement;
 
     registerCancel.onclick = () => resolve(null);
-
     form.onsubmit = async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -54,10 +53,7 @@ const init = (): Promise<LoginResult | null> =>
         "#registerAlias"
       ) as HTMLInputElement;
       const alias = registerAlias.value;
-
       renderConstructing();
-
-      // WTF is this?
       await tick();
 
       try {
