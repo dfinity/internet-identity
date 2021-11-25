@@ -5,6 +5,7 @@
   "keywords": [],
   "scripts": {
     "start": "II_ENV=development webpack serve",
+    "generate": "npm run generate:types && npm run generate:js",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
