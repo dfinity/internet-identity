@@ -23,6 +23,11 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const Timestamp = IDL.Nat64;
+  const ProofOfWork = IDL.Record({
+    'nonce' : IDL.Nat64,
+    'timestamp' : Timestamp,
+  });
   const ChallengeKey = IDL.Nat32;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -30,7 +35,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
-  const Timestamp = IDL.Nat64;
   const Delegation = IDL.Record({
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
@@ -73,10 +77,6 @@ export const idlFactory = ({ IDL }) => {
     'status_code' : IDL.Nat16,
   });
   const UserKey = PublicKey;
-  const ProofOfWork = IDL.Record({
-    'nonce' : IDL.Nat64,
-    'timestamp' : Timestamp,
-  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -91,7 +91,7 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
-    'create_challenge' : IDL.Func([], [Challenge], []),
+    'create_challenge' : IDL.Func([ProofOfWork], [Challenge], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
@@ -111,7 +111,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'register' : IDL.Func(
-        [DeviceData, ProofOfWork, ChallengeResult],
+        [DeviceData, ChallengeResult],
         [RegisterResponse],
         [],
       ),

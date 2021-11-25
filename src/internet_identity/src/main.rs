@@ -287,11 +287,9 @@ async fn init_salt() {
 }
 
 #[update]
-async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: ChallengeAttempt) -> RegisterResponse {
+async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
     check_challenge(challenge_result);
     check_entry_limits(&device_data);
-    let now = time() as u64;
-    check_proof_of_work(&pow, now);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
         ic_cdk::trap(&format!(
@@ -304,14 +302,6 @@ async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: C
     ensure_salt_set().await;
 
     STATE.with(|s| {
-        let mut nonce_cache = s.nonce_cache.borrow_mut();
-        if nonce_cache.contains(pow.timestamp, pow.nonce) {
-            trap(&format!(
-                "the combination of timestamp {} and nonce {} has already been used",
-                pow.timestamp, pow.nonce,
-            ));
-        }
-        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
 
         let mut store = s.storage.borrow_mut();
@@ -322,7 +312,6 @@ async fn register(device_data: DeviceData, pow: ProofOfWork, challenge_result: C
                     .unwrap_or_else(|err| {
                         trap(&format!("failed to store user device data: {}", err))
                     });
-                nonce_cache.add(pow.timestamp, pow.nonce);
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -407,19 +396,35 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     })
 }
 
-// TODO: should this take a PoW to prevent spam?
 #[update]
-async fn create_challenge() -> Challenge {
+async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
     let rng = make_rng().await;
 
     let resp = STATE.with(|s| {
+        let mut nonce_cache = s.nonce_cache.borrow_mut();
+        if nonce_cache.contains(pow.timestamp, pow.nonce) {
+            trap(&format!(
+                "the combination of timestamp {} and nonce {} has already been used",
+                pow.timestamp, pow.nonce,
+            ));
+        }
+
+        let now = time() as u64;
+
+        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+
+        check_proof_of_work(&pow, now);
+
+        nonce_cache.add(pow.timestamp, pow.nonce);
+
+
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();
 
         // Prune old challenges. This drops all challenges that are older than
         // CAPTCHA_CHALLENGE_LIFETIME
         // TODO: test this
-        let now = time() as u64;
         inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
 
         // Error out if there are too many inflight challenges

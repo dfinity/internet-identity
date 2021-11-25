@@ -41,12 +41,11 @@ export const confirmRegister = (
 const tryRegister = (
   identity: WebAuthnIdentity,
   alias: string,
-  pow: ProofOfWork,
   challengeResult: ChallengeResult,
   func: (result: LoginResult) => void
 ) => {
   withLoader(async () => {
-    return IIConnection.register(identity, alias, pow, challengeResult);
+    return IIConnection.register(identity, alias, challengeResult);
   }).then((result) => {
     if (result.kind == "loginSuccess") {
       // Write user number to storage
@@ -75,24 +74,34 @@ const requestCaptcha = (): void => {
     ".captcha-status-text"
   ) as HTMLElement;
   captchaStatusText.innerHTML = "Creating CAPTCHA challenge…";
-  IIConnection.createChallenge().then((captchaResp) => {
-    const captchaImg = document.querySelector("#captchaImg");
-    if (captchaImg) {
-      captchaImg.setAttribute(
-        "src",
-        `data:image/png;base64, ${captchaResp.png_base64}`
-      );
-      const confirmRegisterButton = form.querySelector(
-        "#confirmRegisterButton"
-      ) as HTMLFormElement;
-      confirmRegisterButton.setAttribute(
-        "data-captcha-key",
-        `${captchaResp.challenge_key}`
-      );
-      captchaStatusText.innerHTML = "Please type in the characters you see.";
-      confirmRegisterButton.disabled = false;
-    }
+
+  // Wrap this in a promise to avoid slowing things down
+  const makePow: Promise<ProofOfWork> = new Promise((resolve) => {
+    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+    resolve(pow);
   });
+
+  makePow
+    .then((pow) => IIConnection.createChallenge(pow))
+    .then((captchaResp) => {
+      const captchaImg = document.querySelector("#captchaImg");
+      if (captchaImg) {
+        captchaImg.setAttribute(
+          "src",
+          `data:image/png;base64, ${captchaResp.png_base64}`
+        );
+        const confirmRegisterButton = form.querySelector(
+          "#confirmRegisterButton"
+        ) as HTMLFormElement;
+        confirmRegisterButton.setAttribute(
+          "data-captcha-key",
+          `${captchaResp.challenge_key}`
+        );
+        captchaStatusText.innerHTML = "Please type in the characters you see.";
+        confirmRegisterButton.disabled = false;
+      }
+    });
 };
 
 const init = (
@@ -106,10 +115,6 @@ const init = (
   // this whole logic in a promise that then resolves (giving control back to
   // the caller)
   return new Promise((resolve) => {
-    // Create a PoW before registering
-    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
-
     const confirmRegisterButton = document.querySelector(
       "#confirmRegisterButton"
     ) as HTMLFormElement;
@@ -141,7 +146,7 @@ const init = (
         key: Number(captchaKey),
         chars: captchaChars,
       };
-      tryRegister(identity, alias, pow, challengeResult, resolve);
+      tryRegister(identity, alias, challengeResult, resolve);
     };
   });
 };

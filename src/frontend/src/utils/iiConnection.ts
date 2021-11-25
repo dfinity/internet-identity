@@ -82,7 +82,6 @@ export class IIConnection {
   static async register(
     identity: WebAuthnIdentity,
     alias: string,
-    pow: ProofOfWork,
     challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
     let delegationIdentity: DelegationIdentity;
@@ -96,9 +95,6 @@ export class IIConnection {
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
-    console.log(
-      `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce}, challenge_key=${challengeResult.key}, challenge_chars=${challengeResult.chars})`
-    );
     let registerResponse: RegisterResponse;
     try {
       registerResponse = await actor.register(
@@ -109,7 +105,7 @@ export class IIConnection {
           key_type: { unknown: null },
           purpose: { authentication: null },
         },
-        pow,
+        //pow,
         challengeResult
       );
     } catch (error) {
@@ -213,14 +209,17 @@ export class IIConnection {
     return await baseActor.lookup(userNumber);
   }
 
-  static async createChallenge(): Promise<Challenge> {
+  static async createChallenge(pow: ProofOfWork): Promise<Challenge> {
     const agent = new HttpAgent();
     agent.fetchRootKey();
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: canisterId,
     });
-    const challenge = await actor.create_challenge();
+    console.log(
+      `createChallenge(ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce} })`
+    );
+    const challenge = await actor.create_challenge(pow);
     return challenge;
   }
 

@@ -14,6 +14,8 @@ Setup
 Running
 -------
 
+TODO: note about dummy captcha build
+
  * Build the top-level directory, build the backend canister (`dfx build internet_identity`)
  * In the present directory, run
    ```

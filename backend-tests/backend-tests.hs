@@ -714,7 +714,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
     liftIO $ user_number @?= 102
     assertStats cid 3
-    getChallenge cid webauth1ID >>= callIIReject cid webauth1ID #register . (device1, powAt cid 0,)
+    callIIReject cid webauth1ID #create_challenge (powAt cid 0)
     assertStats cid 3
 
   , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
@@ -838,15 +838,15 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #wasm_module .== wasm
         .+ #arg .== Candid.encode ()
 
-    getChallenge cid webauthID = do
-      challenge <- callII cid webauthID #create_challenge ()
+    getChallenge cid webauthID pow = do
+      challenge <- callII cid webauthID #create_challenge pow
       pure $ #key .== challenge .! #challenge_key .+ #chars .== T.pack "a"
 
     -- Go through a challenge request/registration flow for this device.
     -- NOTE: this (dummily) solves the challenge with the string "a", which is
     -- returned by the backend when compiled with USE_DUMMY_CAPTCHA.
     register cid webauthID device pow =
-      getChallenge cid webauthID >>= callII cid webauthID #register . (device, pow,)
+      getChallenge cid webauthID pow >>= callII cid webauthID #register . (device,)
 
 asHex :: Blob -> String
 asHex = T.unpack . H.encodeHex . BS.toStrict
