@@ -457,21 +457,40 @@ tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
     return ()
+
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
+
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: w7x7r-cok77-xa could not be authenticated against"
+    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+
   , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work hash check failed"
+    callIIReject cid webauthID #register (device1, invalidPOW)
+
   , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, powAt cid (20*60*1000_000_000))
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work timestamp 1200000000000 is too far in future, current time: 8"
+    callIIReject cid webauthID #register (device1, powAt cid (20*60*1000_000_000))
+
   , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work timestamp 1 is too old, current time: 1200000000002"
     setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIReject cid webauthID #register (device1, powAt cid 1)
+
   , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: the combination of timestamp 1 and nonce 40219 has already been used"
     _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIReject cid webauthID #register (device1, powAt cid 1)
+
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: w7x7r-cok77-xa could not be authenticated."
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -548,6 +567,8 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
+    -- expected failure
+    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: 5pmyt-f2ych-m7sxw-xov2x-6torg-3qbyt-msibp-5jzb2-7kblt-awdr6-sae could not be authenticated."
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
