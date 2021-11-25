@@ -177,14 +177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "certified_map"
-version = "0.1.0"
-dependencies = [
- "hashtree",
- "hex",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -389,17 +381,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-name = "hashtree"
-version = "0.1.0"
-dependencies = [
- "hex",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "sha2",
-]
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -460,6 +441,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-certified-map"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c4c5ba8d3dba5ac73cf005094ad68a6e7f4b23077e24fd2f2ae973d721affdc"
+dependencies = [
+ "serde",
+ "serde_bytes",
+ "sha2",
+]
+
+[[package]]
 name = "ic-types"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -508,13 +500,12 @@ name = "internet_identity"
 version = "0.1.0"
 dependencies = [
  "base64",
- "certified_map",
  "cubehash",
- "hashtree",
  "hex",
  "hex-literal",
  "ic-cdk",
  "ic-cdk-macros",
+ "ic-certified-map",
  "ic-types 0.1.2",
  "rand",
  "serde",

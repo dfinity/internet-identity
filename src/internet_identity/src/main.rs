@@ -1,19 +1,20 @@
-use certified_map::{AsHashTree, RbTree};
-use hashtree::{Hash, HashTree};
+use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::convert::TryInto;
+
 use ic_cdk::api::call::call;
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_certified_map::{labeled, AsHashTree, Hash, HashTree, RbTree};
+use serde::Serialize;
+use serde_bytes::{ByteBuf, Bytes};
+
 use internet_identity::metrics_encoder::MetricsEncoder;
 use internet_identity::nonce_cache::NonceCache;
 use internet_identity::signature_map::SignatureMap;
-use serde::Serialize;
-use serde_bytes::{ByteBuf, Bytes};
-use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::convert::TryInto;
 use storage::{Salt, Storage};
 
 mod assets;
@@ -382,7 +383,7 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 }
 
 #[query]
-fn get_principal(user_number: UserNumber, frontend : FrontendHostname) -> Principal {
+fn get_principal(user_number: UserNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
     STATE.with(|state| {
@@ -538,7 +539,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
         "/metrics" => {
-            let mut writer = MetricsEncoder::new(vec![], time() as i64/ 1_000_000);
+            let mut writer = MetricsEncoder::new(vec![], time() as i64 / 1_000_000);
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
@@ -745,7 +746,7 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
 }
 
 fn update_root_hash(a: &AssetHashes, m: &SignatureMap) {
-    use hashtree::{fork_hash, labeled_hash};
+    use ic_certified_map::{fork_hash, labeled_hash};
 
     let prefixed_root_hash = fork_hash(
         // NB: Labels added in lexicographic order
@@ -782,12 +783,12 @@ fn get_signature(
         ));
     }
 
-    let tree = hashtree::fork(
-        HashTree::Pruned(hashtree::labeled_hash(
+    let tree = ic_certified_map::fork(
+        HashTree::Pruned(ic_certified_map::labeled_hash(
             LABEL_ASSETS,
             &asset_hashes.root_hash(),
         )),
-        hashtree::labeled(&LABEL_SIG[..], witness),
+        labeled(&LABEL_SIG[..], witness),
     );
 
     #[derive(Serialize)]
@@ -826,9 +827,9 @@ fn make_asset_certificate_header(
         trap("data certificate is only available in query calls");
     });
     let witness = asset_hashes.witness(asset_name.as_bytes());
-    let tree = hashtree::fork(
-        hashtree::labeled(LABEL_ASSETS, witness),
-        HashTree::Pruned(hashtree::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+    let tree = ic_certified_map::fork(
+        labeled(LABEL_ASSETS, witness),
+        HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
     );
     let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
     serializer.self_describe().unwrap();
