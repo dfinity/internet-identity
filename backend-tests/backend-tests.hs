@@ -450,9 +450,12 @@ decodeTree s =
     begin (_, TTagged 55799 t) = parseHashTree t
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
-
-
-
+-- | The actual tests.
+-- Note about timing and Proof of Work: all canisters start out with timestamp
+-- 0. ic-hs increments the timestamp whenever the canister steps. This means
+-- that all operations here happen at time ~0, so (unless the canister time is
+-- manually updated as happens in a few tests) a "valid" proof of work is one
+-- that's been found for timestamp =~ 0.
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
