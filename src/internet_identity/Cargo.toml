@@ -5,7 +5,6 @@ edition = "2018"
 
 [dependencies]
 base64 = "0.13.0"
-certified_map = { path = "../certified_map" }
 cubehash = { path = "../cubehash" }
 hex = "0.4"
 ic-cdk = "0.3.2"

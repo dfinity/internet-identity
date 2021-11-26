@@ -212,8 +212,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
-=======
 name = "captcha"
 version = "0.0.8"
 source = "git+https://github.com/nmattia/captcha?branch=nm-set-rng#4751b6fa4e56229c2af5b9a28195ff039551d8e7"
@@ -227,15 +225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "certified_map"
-version = "0.1.0"
-dependencies = [
- "hashtree",
- "hex",
-]
-
-[[package]]
->>>>>>> 9e862d6 (Pull in captcha lib)
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -540,8 +529,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-<<<<<<< HEAD
-=======
 name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -551,18 +538,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashtree"
-version = "0.1.0"
-dependencies = [
- "hex",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "sha2",
-]
-
-[[package]]
->>>>>>> 9e862d6 (Pull in captcha lib)
 name = "hermit-abi"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -706,11 +681,7 @@ name = "internet_identity"
 version = "0.1.0"
 dependencies = [
  "base64",
-<<<<<<< HEAD
-=======
  "captcha",
- "certified_map",
->>>>>>> 9e862d6 (Pull in captcha lib)
  "cubehash",
  "hex",
  "hex-literal",

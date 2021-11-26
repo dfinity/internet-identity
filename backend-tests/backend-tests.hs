@@ -98,6 +98,7 @@ type RegisterResponse = [Candid.candidType|
 variant {
   registered: record { user_number: nat64; };
   canister_full;
+  bad_challenge;
 }
   |]
 
@@ -499,23 +500,24 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    callIIRejectWith cid dummyUserId #register (device1, powAt cid 1, mkChallengeResult) "[a-z0-9-]+ could not be authenticated against"
-  , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    callIIRejectWith cid webauthID #register (device1, invalidPOW, mkChallengeResult) "proof of work hash check failed"
-  , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    callIIRejectWith cid webauthID #register (device1, powAt cid (20*60*1000_000_000)) "proof of work timestamp [0-9]+ is too far in future, current time: [0-9]+"
-  , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
+    let callIIRejectWith' str = \c d m a -> callIIRejectWith c d m a str
+    getChallenge cid dummyUserId (powAt cid 1) >>= callIIRejectWith' "[a-z0-9-]+ could not be authenticated against" cid dummyUserId #register . (device1,)
+  , withoutUpgrade $ iiTest "create_challenge with bad pow fails" $ \cid -> do
+    callIIRejectWith cid webauth1ID #create_challenge invalidPOW "proof of work hash check failed"
+  , withoutUpgrade $ iiTest "create_challenge with future pow fails" $ \cid -> do
+    callIIRejectWith cid webauth1ID #create_challenge (powAt cid (20*60*1000_000_000)) "proof of work timestamp [0-9]+ is too far in future, current time: [0-9]+"
+  , withoutUpgrade $ iiTest "create_challenge with past pow fails" $ \cid -> do
     setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIRejectWith cid webauthID #register (device1, powAt cid 1, mkChallengeResult) "proof of work timestamp [0-9]+ is too old, current time: [0-9]+"
-  , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
-    _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIRejectWith cid webauthID #register (device1, powAt cid 1, mkChallengeResult) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
+    callIIRejectWith cid webauth1ID #create_challenge (powAt cid 1) "proof of work timestamp [0-9]+ is too old, current time: [0-9]+"
+  , withoutUpgrade $ iiTest "create_challenge with repeated pow fails" $ \cid -> do
+    _ <- register cid webauth1ID device1 (powAt cid 1)
+    callIIRejectWith cid webauth1ID #create_challenge (powAt cid 1) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    (_, ts) <- callII cid webauthID #prepare_delegation delegationArgs
+    (_, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
     queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
