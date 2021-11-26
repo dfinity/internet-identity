@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
 import { displayUserNumber } from "./displayUserNumber";
+import { displayError } from "../components/displayError";
 import { setUserNumber } from "../utils/userNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import { ProofOfWork } from "../../generated/internet_identity_types";
@@ -33,8 +34,10 @@ export const confirmRegister = (
   identity: WebAuthnIdentity,
   alias: string
 ): Promise<LoginResult | null> => {
+  console.log("ok, rendering");
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  console.log("ok, rendered");
   return init(canisterIdPrincipal, identity, alias);
 };
 
@@ -56,13 +59,19 @@ const tryRegister = (
         func(apiResultToLoginResult(result));
       });
     } else {
-      // TODO; here add "badCaptcha". If we see anything else, return result.
-      // TODO: should we only get here on specific result.kind? like badCaptcha?
-      const captchaStatusText = document.querySelector(
-        ".captcha-status-text"
-      ) as HTMLElement;
-      captchaStatusText.innerHTML = "Something didn't work, please retry";
-      requestCaptcha();
+      // Currently if something goes wrong we only tell the user that
+      // something went wrong and then reload the page.
+      displayError({
+        title: "Something went wrong",
+        message:
+          "We could not create an identity anchor. You will find the full error message below. Click 'ok' to reload.",
+        primaryButton: "Ok",
+        detail: JSON.stringify(result),
+      })
+        .then(() => {
+          window.location.reload();
+        })
+        .then(() => requestCaptcha());
     }
   });
 };
