@@ -67,6 +67,8 @@ type RegisterResponse = variant {
   registered: record { user_number: UserNumber; };
   // No more registrations are possible in this instance of the II service canister.
   canister_full;
+  // The challenge was not successful.
+  bad_challenge;
 };
 
 type Delegation = record {

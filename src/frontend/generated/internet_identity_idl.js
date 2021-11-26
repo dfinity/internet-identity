@@ -82,6 +82,7 @@ export const idlFactory = ({ IDL }) => {
     'chars' : IDL.Text,
   });
   const RegisterResponse = IDL.Variant({
+    'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });

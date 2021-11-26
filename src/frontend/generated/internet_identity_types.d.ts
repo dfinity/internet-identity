@@ -50,7 +50,8 @@ export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp }
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
-export type RegisterResponse = { 'canister_full' : null } |
+export type RegisterResponse = { 'bad_challenge' : null } |
+  { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
 export type SessionKey = PublicKey;
 export interface SignedDelegation {

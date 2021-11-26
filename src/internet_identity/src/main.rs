@@ -154,7 +154,8 @@ enum RegisterResponse {
     Registered { user_number: UserNumber },
     #[serde(rename = "canister_full")]
     CanisterFull,
-    // TODO: add BadCaptcha here
+    #[serde(rename = "bad_challenge")]
+    BadChallenge,
 }
 
 mod hash;
@@ -288,7 +289,10 @@ async fn init_salt() {
 
 #[update]
 async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
-    check_challenge(challenge_result);
+    if let Err(()) = check_challenge(challenge_result) {
+        return RegisterResponse::BadChallenge;
+    }
+
     check_entry_limits(&device_data);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
@@ -532,20 +536,18 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 }
 
 // just traps if challenge isn't OK, because when in rome...
-fn check_challenge(res: ChallengeAttempt) {
+fn check_challenge(res: ChallengeAttempt) -> Result<(),()> {
 
     STATE.with(|s| {
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
                 if res.chars !=  challenge.chars {
-                    // NOTE: we _could_ show the expected chars here (the key has been
-                    // removed already so the user won't be able to re-submit the answer using that
-                    // key).
-                    trap("CAPTCHA challenge failed");
+                    return Err(());
                 }
+                return Ok(());
             },
-            None =>  trap("Could not find a CAPTCHA challenge with that key") ,
+            None =>  Err(()),
         }
     })
 }

@@ -57,13 +57,16 @@ export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
-  | RegisterNoSpace;
+  | RegisterNoSpace
+  | BadChallenge;
 
 type LoginSuccess = {
   kind: "loginSuccess";
   connection: IIConnection;
   userNumber: bigint;
 };
+
+type BadChallenge = { kind: "badChallenge" };
 type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
 type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
@@ -121,6 +124,8 @@ export class IIConnection {
         connection: new IIConnection(identity, delegationIdentity, actor),
         userNumber,
       };
+    } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
+      return { kind: "badChallenge" };
     } else {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");

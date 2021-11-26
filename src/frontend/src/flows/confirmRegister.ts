@@ -21,7 +21,7 @@ const pageContent = html`
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" />
       <input id="captchaInput" />
-      <p>Please confirm to add your device.</p>
+      <p class="confirm-paragraph">Please confirm to add your device.</p>
       <button type="submit" class="primary" id="confirmRegisterButton" disabled>
         Confirm
       </button>
@@ -58,6 +58,13 @@ const tryRegister = (
       displayUserNumber(result.userNumber).then(() => {
         func(apiResultToLoginResult(result));
       });
+    } else if (result.kind == "badChallenge") {
+      const confirmParagraph = document.querySelector(
+        ".confirm-paragraph"
+      ) as HTMLElement;
+      confirmParagraph.innerHTML =
+        "The value you entered is incorrect. A new challenge is generated.";
+      requestCaptcha();
     } else {
       // Currently if something goes wrong we only tell the user that
       // something went wrong and then reload the page.
@@ -84,6 +91,16 @@ const requestCaptcha = (): void => {
   ) as HTMLElement;
   captchaStatusText.innerHTML = "Creating CAPTCHA challenge…";
 
+  const captchaInput = document.querySelector(
+    "#captchaInput"
+  ) as HTMLFormElement;
+  captchaInput.disabled = true;
+
+  const confirmRegisterButton = form.querySelector(
+    "#confirmRegisterButton"
+  ) as HTMLFormElement;
+  confirmRegisterButton.disabled = true;
+
   // Wrap this in a promise to avoid slowing things down
   const makePow: Promise<ProofOfWork> = new Promise((resolve) => {
     const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
@@ -100,15 +117,14 @@ const requestCaptcha = (): void => {
           "src",
           `data:image/png;base64, ${captchaResp.png_base64}`
         );
-        const confirmRegisterButton = form.querySelector(
-          "#confirmRegisterButton"
-        ) as HTMLFormElement;
         confirmRegisterButton.setAttribute(
           "data-captcha-key",
           `${captchaResp.challenge_key}`
         );
         captchaStatusText.innerHTML = "Please type in the characters you see.";
         confirmRegisterButton.disabled = false;
+        captchaInput.disabled = false;
+        captchaInput.value = "";
       }
     });
 };

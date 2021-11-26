@@ -217,6 +217,14 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
           "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
       };
     }
+    case "badChallenge": {
+      return {
+        tag: "err",
+        title: "Failed to register",
+        message:
+          "Failed to register with Internet Identity, because the challenge wasn't successful",
+      };
+    }
     case "seedPhraseFail": {
       return {
         tag: "err",
