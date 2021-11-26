@@ -1,10 +1,9 @@
-use certified_map::{AsHashTree, RbTree};
-use hashtree::{Hash, HashTree};
 use ic_cdk::api::call::call;
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Func, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use internet_identity::metrics_encoder::MetricsEncoder;
 use internet_identity::nonce_cache::NonceCache;
 use internet_identity::signature_map::SignatureMap;
@@ -745,7 +744,7 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
 }
 
 fn update_root_hash(a: &AssetHashes, m: &SignatureMap) {
-    use hashtree::{fork_hash, labeled_hash};
+    use ic_certified_map::{fork_hash, labeled_hash};
 
     let prefixed_root_hash = fork_hash(
         // NB: Labels added in lexicographic order
@@ -782,12 +781,12 @@ fn get_signature(
         ));
     }
 
-    let tree = hashtree::fork(
-        HashTree::Pruned(hashtree::labeled_hash(
+    let tree = ic_certified_map::fork(
+        HashTree::Pruned(ic_certified_map::labeled_hash(
             LABEL_ASSETS,
             &asset_hashes.root_hash(),
         )),
-        hashtree::labeled(&LABEL_SIG[..], witness),
+        ic_certified_map::labeled(&LABEL_SIG[..], witness),
     );
 
     #[derive(Serialize)]
@@ -826,9 +825,9 @@ fn make_asset_certificate_header(
         trap("data certificate is only available in query calls");
     });
     let witness = asset_hashes.witness(asset_name.as_bytes());
-    let tree = hashtree::fork(
-        hashtree::labeled(LABEL_ASSETS, witness),
-        HashTree::Pruned(hashtree::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+    let tree = ic_certified_map::fork(
+        ic_certified_map::labeled(LABEL_ASSETS, witness),
+        HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
     );
     let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
     serializer.self_describe().unwrap();

@@ -1,5 +1,5 @@
 use super::*;
-use hashtree::Hash;
+use ic_certified_map::Hash;
 use sha2::{Digest, Sha256};
 
 fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
