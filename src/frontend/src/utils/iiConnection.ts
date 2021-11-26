@@ -105,7 +105,6 @@ export class IIConnection {
           key_type: { unknown: null },
           purpose: { authentication: null },
         },
-        //pow,
         challengeResult
       );
     } catch (error) {
