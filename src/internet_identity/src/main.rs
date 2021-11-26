@@ -249,7 +249,6 @@ struct ChallengeAttempt {
     key: ChallengeKey
 }
 
-// TODO: add response if no more keys
 // What we send the user
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct Challenge {

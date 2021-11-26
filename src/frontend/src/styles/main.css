@@ -137,7 +137,6 @@ img {
   margin: auto;
 }
 
-/* temporary, to work around the img { ... } above */
 #captchaImg {
   height: 120px;
   width: 220px;

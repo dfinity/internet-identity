@@ -313,7 +313,7 @@ callIIRejectWith cid user_id l x expectedMessagePattern = do
   r <- submitAndRun $
     CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
   case r of
-    Rejected (_code, msg) -> 
+    Rejected (_code, msg) ->
       if not (msg =~ expectedMessagePattern)
       then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
       else return ()
@@ -500,8 +500,8 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    let callIIRejectWith' str = \c d m a -> callIIRejectWith c d m a str
-    getChallenge cid dummyUserId (powAt cid 1) >>= callIIRejectWith' "[a-z0-9-]+ could not be authenticated against" cid dummyUserId #register . (device1,)
+    challenge <- getChallenge cid dummyUserId (powAt cid 1)
+    callIIRejectWith cid dummyUserId #register (device1, challenge) "[a-z0-9-]+ could not be authenticated against"
   , withoutUpgrade $ iiTest "create_challenge with bad pow fails" $ \cid -> do
     callIIRejectWith cid webauth1ID #create_challenge invalidPOW "proof of work hash check failed"
   , withoutUpgrade $ iiTest "create_challenge with future pow fails" $ \cid -> do

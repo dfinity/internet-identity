@@ -67,7 +67,6 @@ const init = (): Promise<LoginResult | null> =>
         await tick();
         const identity = await pendingIdentity;
         const result = await confirmRegister(identity, alias);
-        console.log("Back to register");
         resolve(result);
       } catch (err) {
         reject(err);
