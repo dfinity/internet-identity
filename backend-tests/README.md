@@ -14,7 +14,6 @@ Setup
 Running
 -------
 
-TODO: note about dummy captcha build
 
  * Build the top-level directory, build the backend canister (`dfx build internet_identity`)
  * In the present directory, run
@@ -29,7 +28,8 @@ By default, this tests the wasm file in
 
     ../target/wasm32-unknown-unknown/release/internet_identity.wasm
 
-to use a different one, pass the `--wasm` flag to `backend-tests`
+to use a different one, pass the `--wasm` flag to `backend-tests`. You will
+need to build with `USE_DUMMY_CAPTCHA` as the tests use a preset CAPTCHA value.
 
 You can select tests to run using `-p`, e.g.
 
