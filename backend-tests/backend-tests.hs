@@ -34,7 +34,7 @@ import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
-import Text.Regex.TDFA ((=~~))
+import Text.Regex.TDFA ((=~), (=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -254,6 +254,21 @@ queryIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "queryIIReject: Unexpected reply"
 
+queryIIRejectExpectingMessage :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String -> M ()
+queryIIRejectExpectingMessage cid user_id l x expectedMessagePattern = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) ->
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "queryIIReject: Unexpected reply"
+
 callII :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -280,6 +295,22 @@ callIIReject cid user_id l x = do
     CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
   case r of
     Rejected _ -> return ()
+    Replied _ -> lift $ assertFailure "callIIReject: Unexpected reply"
+
+callIIRejectExpectingMessage :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String  -> M ()
+callIIRejectExpectingMessage cid user_id l x expectedMessagePattern = do
+  r <- submitAndRun $
+    CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) -> 
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
     Replied _ -> lift $ assertFailure "callIIReject: Unexpected reply"
 
 
@@ -462,41 +493,29 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     doUpgrade cid
 
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: w7x7r-cok77-xa could not be authenticated against"
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIRejectExpectingMessage cid dummyUserId #register (device1, powAt cid 1) "[a-z0-9-]+ could not be authenticated against"
 
   , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work hash check failed"
-    callIIReject cid webauthID #register (device1, invalidPOW)
+    callIIRejectExpectingMessage cid webauthID #register (device1, invalidPOW) "proof of work hash check failed"
 
   , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work timestamp 1200000000000 is too far in future, current time: 8"
-    callIIReject cid webauthID #register (device1, powAt cid (20*60*1000_000_000))
+    callIIRejectExpectingMessage cid webauthID #register (device1, powAt cid (20*60*1000_000_000)) "proof of work timestamp 1200000000000 is too far in future, current time: 8"
 
   , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: proof of work timestamp 1 is too old, current time: 1200000000002"
     setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIReject cid webauthID #register (device1, powAt cid 1)
+    callIIRejectExpectingMessage cid webauthID #register (device1, powAt cid 1) "proof of work timestamp 1 is too old, current time: 1200000000002"
 
   , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: the combination of timestamp 1 and nonce 40219 has already been used"
     _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIReject cid webauthID #register (device1, powAt cid 1)
+    callIIRejectExpectingMessage cid webauthID #register (device1, powAt cid 1) "the combination of timestamp 1 and nonce 40219 has already been used"
 
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: w7x7r-cok77-xa could not be authenticated."
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     (_, ts) <- callII cid webauthID #prepare_delegation delegationArgs
-    queryIIReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+    queryIIRejectExpectingMessage cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
@@ -567,8 +586,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
-    -- expected failure
-    -- canister trapped: EvalTrapError region:0xde47-0xde49 "canister trapped explicitly: 5pmyt-f2ych-m7sxw-xov2x-6torg-3qbyt-msibp-5jzb2-7kblt-awdr6-sae could not be authenticated."
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
@@ -576,7 +593,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    callIIReject cid webauth2ID #prepare_delegation delegationArgs
+    callIIRejectExpectingMessage cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
