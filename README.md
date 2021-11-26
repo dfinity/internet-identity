@@ -142,7 +142,7 @@ We use `eslint` to check the frontend code. You can run it with `npm run lint`, 
 ### Contributing to the backend
 
 The Internet Identity backend is a Wasm canister implemented in Rust and built from the `internet_identity` cargo package (`src/internet_identity`).
-Some canister functionality lives in separate libraries that can also be built to native code to simplify testing, e.g., `src/certified_map`, `src/hashtree`, `src/cubehash`, etc.
+Some canister functionality lives in separate libraries that can also be built to native code to simplify testing, e.g., `src/cubehash`.
 
 Run the following command in the root of the repository to execute the test suites of all the libraries:
 
