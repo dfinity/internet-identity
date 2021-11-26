@@ -135,7 +135,7 @@ type ProofOfWork = [Candid.candidType|record {
 }|]
 
 type ChallengeResult = [Candid.candidType|record {
-  key : nat32;
+  key : text;
   chars: text;
 }|]
 

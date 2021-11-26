@@ -142,10 +142,17 @@ const init = (
       const captchaChars = captchaInput.value;
       const captchaKey = confirmRegisterButton.dataset.captchaKey;
 
+      if (captchaKey === undefined) {
+        console.log("Something went wrong: no captcha key found");
+        requestCaptcha();
+        return;
+      }
+
       const challengeResult: ChallengeResult = {
-        key: Number(captchaKey),
+        key: captchaKey,
         chars: captchaChars,
       };
+
       tryRegister(identity, alias, challengeResult, resolve);
     };
   });

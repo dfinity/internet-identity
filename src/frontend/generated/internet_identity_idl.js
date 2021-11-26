@@ -28,7 +28,7 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Nat64,
     'timestamp' : Timestamp,
   });
-  const ChallengeKey = IDL.Nat32;
+  const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,

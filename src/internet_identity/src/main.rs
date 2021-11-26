@@ -211,7 +211,8 @@ struct State {
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
-    // TODO: note: we COULD persist this through upgrades
+    // note: we COULD persist this through upgrades, although this is currently NOT persisted
+    // through upgrades
     inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
 }
 
@@ -238,8 +239,7 @@ struct ChallengeInfo {
     chars: String,
 }
 
-// TODO: should this be a string?
-type ChallengeKey = u32;
+type ChallengeKey = String;
 
 // The user's attempt
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -399,7 +399,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 #[update]
 async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
-    let rng = make_rng().await;
+    let mut rng = make_rng().await;
 
     let resp = STATE.with(|s| {
         let mut nonce_cache = s.nonce_cache.borrow_mut();
@@ -435,35 +435,51 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
         // actually create the challenge
 
-        // first, try to find a key. We've already checked that we have fewer keys than
-        // MAX_INFLIGHT_CHALLENGES but just to make sure we use MAX_INFLIGHT_CHALLENGES as an upper
-        // bound of attempts.
-        let mut challenge_key: Option<u32> = None;
-        let mut attempt: u32 = 0;
-        while attempt < MAX_INFLIGHT_CHALLENGES as u32 {
-            if !inflight_challenges.contains_key(&attempt) {
-                challenge_key = Some(attempt);
-                break;
+        // First, we try to find a new (unique) challenge key. It's unlikely we'll have collisions
+        // when generating the key, but to err on the safe side we try up to 10 times.
+        const MAX_TRIES: u8= 10;
+
+        for _ in 0..MAX_TRIES {
+            let challenge_key = random_string(&mut rng, 10);
+            if !inflight_challenges.contains_key(&challenge_key) {
+                // Then we create the CAPTCHA
+                let (Base64(png_base64), chars) = create_captcha(rng);
+
+                // Finally insert
+                inflight_challenges.insert(challenge_key.clone(), ChallengeInfo { created: now, chars });
+
+                return Challenge { png_base64, challenge_key }
             }
-            attempt += 1;
         }
 
-        let challenge_key = match challenge_key {
-            Some(challenge_key) => challenge_key,
-            None => trap(&format!("Impossible: Could not find a free key for challenge. Size/Capacity: {}/{}", inflight_challenges.len(), MAX_INFLIGHT_CHALLENGES)),
-        };
-
-        // Then we create the CAPTCHA
-        let (Base64(png_base64), chars) = create_captcha(rng);
-
-        // Finally insert
-        inflight_challenges.insert(challenge_key, ChallengeInfo { created: now, chars });
-
-        Challenge { png_base64, challenge_key }
-
+        trap(&format!("Could not find a new key after {} tries", MAX_TRIES));
     });
 
     resp
+}
+
+// Generate an n-char long string of random characters. The characters are sampled from the rang
+// a-z.
+//
+// NOTE: The 'rand' crate (currently) does not build on wasm32-unknown-unknown so we have to
+// make-do with the RngCore trait (as opposed to Rng), therefore we have to implement this
+// ourselves as opposed to using one of rand's distributions.
+fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
+
+    let mut chars: Vec<u8> = vec![];
+
+    // The range
+    let a: u8 = 'a' as u8;
+    let z: u8 = 'z' as u8;
+
+    // n times, get a random number as u32, then shrink to u8, and finally shrink to the size of
+    // our range. Finally, offset by the start of our range.
+    for _ in 0..n {
+        let next: u8 = rng.next_u32() as u8 % (z - a) + a;
+        chars.push(next);
+    }
+
+    return String::from_utf8_lossy(&chars).to_string();
 }
 
 // Get a random number generator based on 'raw_rand'

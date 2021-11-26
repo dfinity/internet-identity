@@ -102,7 +102,7 @@ type ProofOfWork = record {
   nonce : nat64;
 };
 
-type ChallengeKey = nat32;
+type ChallengeKey = text;
 
 type ChallengeResult = record {
     key : ChallengeKey;

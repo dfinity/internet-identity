@@ -3,7 +3,7 @@ export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
 }
-export type ChallengeKey = number;
+export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
 export type CredentialId = Array<number>;
 export interface Delegation {
