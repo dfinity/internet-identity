@@ -51,7 +51,8 @@ import Codec.Candid (Principal(..))
 import qualified Codec.Candid as Candid
 import qualified Data.Row.Variants as V
 
-import IC.Types
+import IC.Types hiding (PublicKey, Timestamp)
+import qualified IC.Types
 import IC.Ref
 import IC.Management
 import IC.Hash
@@ -68,19 +69,9 @@ import IC.HashTree.CBOR
 import Prometheus hiding (Timestamp)
 
 type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
-type IIType = [Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
--- Shorter names for some of these types
--- (we could use them directly, of course)
-
-type DeviceData = IIType .! "DeviceData"
-type RegisterResponse = IIType .! "RegisterResponse"
-type SignedDelegation = IIType .! "SignedDelegation"
-type Delegation = IIType .! "Delegation"
-type InitCandid = IIType .! "InternetIdentityInit"
-type ProofOfWork = IIType .! "ProofOfWork"
-type HttpRequest = IIType .! "HttpRequest"
-type HttpResponse = IIType .! "HttpResponse"
+-- Pulls in all type definitions as Haskell type aliases
+[Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
 mkPOW :: Word64 -> Word64 -> ProofOfWork
 mkPOW t n = #timestamp .== t .+ #nonce .== n
@@ -132,15 +123,15 @@ submitQuery r = do
     QueryResponse r <- handleQuery t r
     return r
 
-getTimestamp :: M Timestamp
+getTimestamp :: M IC.Types.Timestamp
 getTimestamp = lift $ do
     t <- getPOSIXTime
-    return $ Timestamp $ round (t * 1000_000_000)
+    return $ IC.Types.Timestamp $ round (t * 1000_000_000)
 
 mkRequestId :: IO RequestID
 mkRequestId = BS.toLazyByteString . BS.word64BE <$> randomIO
 
-setCanisterTimeTo :: Blob -> Timestamp -> M ()
+setCanisterTimeTo :: Blob -> IC.Types.Timestamp -> M ()
 setCanisterTimeTo cid new_time =
  modify $
   \ic -> ic { canisters = M.adjust (\cs -> cs { time = new_time }) (EntityId cid) (canisters ic) }
@@ -713,7 +704,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #mode .== V.IsJust #install ()
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
-        .+ #arg .== Candid.encode (Nothing :: Maybe InitCandid) -- default value
+        .+ #arg .== Candid.encode (Nothing :: Maybe InternetIdentityInit) -- default value
       act cid
 
     withUpgrade act = ([act False], [act True])
