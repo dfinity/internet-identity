@@ -37,7 +37,7 @@ const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 
 // How many captcha challenges we keep in memory (at most)
-const MAX_INFLIGHT_CHALLENGES: usize = 100;
+const MAX_INFLIGHT_CHALLENGES: usize = 500;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
