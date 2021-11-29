@@ -1,8 +1,9 @@
 //! Maintains user signatures and expirations.
-use certified_map::{AsHashTree, RbTree};
-use hashtree::{leaf_hash, Hash, HashTree};
+use ic_certified_map::{leaf_hash, AsHashTree, Hash, HashTree, RbTree};
+use std::borrow::Cow;
 use std::collections::BinaryHeap;
 
+#[derive(Default)]
 struct Unit;
 
 impl AsHashTree for Unit {
@@ -10,7 +11,7 @@ impl AsHashTree for Unit {
         leaf_hash(&b""[..])
     }
     fn as_hash_tree(&self) -> HashTree<'_> {
-        HashTree::Leaf(&b""[..])
+        HashTree::Leaf(Cow::from(&b""[..]))
     }
 }
 

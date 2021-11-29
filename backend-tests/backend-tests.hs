@@ -34,7 +34,7 @@ import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
-import Text.Regex.TDFA ((=~~))
+import Text.Regex.TDFA ((=~), (=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -180,6 +180,21 @@ queryIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "queryIIReject: Unexpected reply"
 
+queryIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String -> M ()
+queryIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) ->
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "queryIIRejectWith: Unexpected reply"
+
 callII :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -207,6 +222,22 @@ callIIReject cid user_id l x = do
   case r of
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "callIIReject: Unexpected reply"
+
+callIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String  -> M ()
+callIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitAndRun $
+    CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) -> 
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "callIIRejectWith: Unexpected reply"
 
 
 -- Some common devices
@@ -376,9 +407,12 @@ decodeTree s =
     begin (_, TTagged 55799 t) = parseHashTree t
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
-
-
-
+-- | The actual tests.
+-- Note about timing and Proof of Work: all canisters start out with timestamp
+-- 0. ic-hs increments the timestamp whenever the canister steps. This means
+-- that all operations here happen at time ~0, so (unless the canister time is
+-- manually updated as happens in a few tests) a "valid" proof of work is one
+-- that's been found for timestamp =~ 0.
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
@@ -386,24 +420,24 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    callIIRejectWith cid dummyUserId #register (device1, powAt cid 1) "[a-z0-9-]+ could not be authenticated against"
   , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    callIIRejectWith cid webauthID #register (device1, invalidPOW) "proof of work hash check failed"
   , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, powAt cid (20*60*1000_000_000))
+    callIIRejectWith cid webauthID #register (device1, powAt cid (20*60*1000_000_000)) "proof of work timestamp [0-9]+ is too far in future, current time: [0-9]+"
   , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
     setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIRejectWith cid webauthID #register (device1, powAt cid 1) "proof of work timestamp [0-9]+ is too old, current time: [0-9]+"
   , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
     _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIRejectWith cid webauthID #register (device1, powAt cid 1) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     (_, ts) <- callII cid webauthID #prepare_delegation delegationArgs
-    queryIIReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+    queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
@@ -481,7 +515,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    callIIReject cid webauth2ID #prepare_delegation delegationArgs
+    callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
