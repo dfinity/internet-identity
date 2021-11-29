@@ -222,7 +222,7 @@ export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
         tag: "err",
         title: "Failed to register",
         message:
-          "Failed to register with Internet Identity, because the challenge wasn't successful",
+          "Failed to register with Internet Identity, because the CAPTCHA challenge wasn't successful",
       };
     }
     case "seedPhraseFail": {
