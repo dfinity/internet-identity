@@ -34,10 +34,8 @@ export const confirmRegister = (
   identity: WebAuthnIdentity,
   alias: string
 ): Promise<LoginResult | null> => {
-  console.log("ok, rendering");
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  console.log("ok, rendered");
   return init(canisterIdPrincipal, identity, alias);
 };
 
