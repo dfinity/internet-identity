@@ -534,7 +534,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
         return (resp, captcha.chars_as_string());
 }
 
-// just traps if challenge isn't OK, because when in rome...
+// Check whether the CAPTCHA challenge was solved
 fn check_challenge(res: ChallengeAttempt) -> Result<(),()> {
 
     STATE.with(|s| {
