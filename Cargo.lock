@@ -214,7 +214,7 @@ dependencies = [
 [[package]]
 name = "captcha"
 version = "0.0.8"
-source = "git+https://github.com/nmattia/captcha?branch=nm-set-rng#4751b6fa4e56229c2af5b9a28195ff039551d8e7"
+source = "git+https://github.com/nmattia/captcha?rev=4751b6fa4e56229c2af5b9a28195ff039551d8e7#4751b6fa4e56229c2af5b9a28195ff039551d8e7"
 dependencies = [
  "base64",
  "hound",
@@ -776,7 +776,7 @@ checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
 [[package]]
 name = "lodepng"
 version = "3.4.6"
-source = "git+https://github.com/nmattia/lodepng-rust?rev=3619fb04d1b0cce5be4b0ecc1c46710296a1cb95#3619fb04d1b0cce5be4b0ecc1c46710296a1cb95"
+source = "git+https://github.com/nmattia/lodepng-rust?rev=4056af7276662af352aaf113aa91d2af76655167#4056af7276662af352aaf113aa91d2af76655167"
 dependencies = [
  "fallible_collections",
  "flate2",
