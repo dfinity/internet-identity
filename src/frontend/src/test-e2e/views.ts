@@ -54,6 +54,7 @@ export class RegisterView extends View {
   }
 
   async confirmRegisterConfirm(): Promise<void> {
+    await this.browser.$("#captchaInput").waitForEnabled({ timeout: 30_000 });
     // In tests, the captchas are hard-coded to the following string: "a"
     await this.browser.$("#captchaInput").setValue("a");
     await this.browser
