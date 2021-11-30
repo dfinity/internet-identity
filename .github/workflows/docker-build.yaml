@@ -1,10 +1,11 @@
+# The "official" docker build. This is a pretty long build (~20mn) which we
+# only run on master.
 name: Docker build
 
 on:
   push:
     branches:
       - main
-  pull_request:
 
 jobs:
   docker-build:

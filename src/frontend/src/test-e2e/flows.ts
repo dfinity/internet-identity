@@ -23,12 +23,12 @@ export const FLOWS = {
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.continue();
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
+    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
+    await singleDeviceWarningView.waitForDisplay();
+    await singleDeviceWarningView.remindLater();
     return userNumber;
   },
   login: async (
@@ -40,12 +40,15 @@ export const FLOWS = {
     await welcomeView.waitForDisplay();
     await welcomeView.typeUserNumber(userNumber);
     await welcomeView.login();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.continue();
+    // NOTE: depending on the browser, we issue different warnings. On Safari,
+    // the warning comes before the recovery method selector. Since we only
+    // test on Chrome we always expect the recovery selector first.
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
+    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
+    await singleDeviceWarningView.waitForDisplay();
+    await singleDeviceWarningView.remindLater();
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },

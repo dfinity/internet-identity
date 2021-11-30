@@ -34,7 +34,7 @@ import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
-import Text.Regex.TDFA ((=~~))
+import Text.Regex.TDFA ((=~), (=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -71,107 +71,7 @@ import Prometheus hiding (Timestamp)
 -- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 -- just yet, because haskell-candid doesn’t like init arguments to service, so
 -- for now we have to copy it
-type IIInterface m = [Candid.candid|
-type UserNumber = nat64;
-type PublicKey = blob;
-type CredentialId = blob;
-type DeviceAlias = text;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
-type SessionKey = PublicKey;
-type FrontendHostname = text;
-type Timestamp = nat64;
-type Purpose = variant {
-    recovery;
-    authentication;
-};
-type KeyType = variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-};
-
-type DeviceData = record {
-  pubkey : DeviceKey;
-  alias : text;
-  credential_id : opt CredentialId;
-  purpose : Purpose;
-  key_type : KeyType;
-};
-
-type RegisterResponse = variant {
-  registered: record { user_number: UserNumber; };
-  canister_full;
-};
-
-type Delegation = record {
-  pubkey: SessionKey;
-  expiration: Timestamp;
-  targets: opt vec principal;
-};
-type SignedDelegation = record {
-  delegation: Delegation;
-  signature: blob;
-};
-type GetDelegationResponse = variant {
-  signed_delegation: SignedDelegation;
-  no_such_delegation;
-};
-
-type InternetIdentityStats = record {
-  users_registered: nat64;
-  assigned_user_number_range: record { nat64; nat64; };
-};
-
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
-};
-
-type HeaderField = record { text; text; };
-
-type HttpRequest = record {
-  method: text;
-  url: text;
-  headers: vec HeaderField;
-  body: blob;
-};
-
-type HttpResponse = record {
-  status_code: nat16;
-  headers: vec HeaderField;
-  body: blob;
-  streaming_strategy: opt StreamingStrategy;
-};
-
-type StreamingCallbackHttpResponse = record {
-  body: blob;
-  token: Token;
-};
-
-type Token = record {};
-
-type StreamingStrategy = variant {
-  Callback: record {
-    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
-    token: Token;
-  };
-};
-service : {
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
-  add : (UserNumber, DeviceData) -> ();
-  remove : (UserNumber, DeviceKey) -> ();
-  lookup : (UserNumber) -> (vec DeviceData) query;
-  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
-  stats : () -> (InternetIdentityStats) query;
-
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
-  get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
-
-  http_request: (request: HttpRequest) -> (HttpResponse) query;
-}
-  |]
+type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 
 -- Names for some of these types. Unfortunately requires copying
 
@@ -244,7 +144,7 @@ type HttpResponse = [Candid.candidType|record {
   status_code : nat16;
   headers : vec record { text; text; };
   body : blob;
-  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: record {}; }) query; }; };
+  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: opt record {}; }) query; }; };
 }|]
 
 mkPOW :: Word64 -> Word64 -> ProofOfWork
@@ -354,6 +254,21 @@ queryIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "queryIIReject: Unexpected reply"
 
+queryIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String -> M ()
+queryIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) ->
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "queryIIRejectWith: Unexpected reply"
+
 callII :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -382,12 +297,30 @@ callIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "callIIReject: Unexpected reply"
 
+callIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String  -> M ()
+callIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitAndRun $
+    CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) -> 
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "callIIRejectWith: Unexpected reply"
+
 
 -- Some common devices
-webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthnECDSA "foobar"
+-- NOTE: we write the actual key content here, as opposed to generating it
+-- (e.g. with 'createSecretKeyWebAuthnECDSA'). This ensures the key contents
+-- are stable.
+-- See also: https://github.com/dfinity/ic-hs/issues/59
 webauthPK :: PublicKey
-webauthPK = toPublicKey webauthSK
+webauthPK = "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X lR\190\173]\245, \138\155\FS{\224\166\bGW>[\228\172O\224\142\164\128\&6\208\186\GS*\207\"X \179=\174\184;\201\199}\138\215b\253h\227\234\176\134\132\228c\196\147Q\179\171*\DC4\164\NUL\DC3\131\135"
 webauthID :: EntityId
 webauthID = EntityId $ mkSelfAuthenticatingId webauthPK
 device1 :: DeviceData
@@ -400,6 +333,7 @@ device1 = empty
 
 webauth2SK :: SecretKey
 webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
+-- The content here doesn't matter as long as it's different from webauthPK
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
@@ -429,7 +363,11 @@ powNonceAt cid ts = error $ printf
 powAt ::  Blob -> Word64 -> ProofOfWork
 powAt cid ts = mkPOW ts (powNonceAt cid ts)
 
-lookupIs :: Blob -> Word64 -> [DeviceData] -> M ()
+-- Check that the user has the following device data
+lookupIs
+    :: Blob -- ^ canister ID
+    -> Word64 -- ^ user (anchor) number
+    -> [DeviceData] -> M ()
 lookupIs cid user_number ds = do
   r <- queryII cid dummyUserId #lookup user_number
   liftIO $ r @?= V.fromList ds
@@ -543,9 +481,12 @@ decodeTree s =
     begin (_, TTagged 55799 t) = parseHashTree t
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
-
-
-
+-- | The actual tests.
+-- Note about timing and Proof of Work: all canisters start out with timestamp
+-- 0. ic-hs increments the timestamp whenever the canister steps. This means
+-- that all operations here happen at time ~0, so (unless the canister time is
+-- manually updated as happens in a few tests) a "valid" proof of work is one
+-- that's been found for timestamp =~ 0.
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
@@ -553,24 +494,24 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    callIIRejectWith cid dummyUserId #register (device1, powAt cid 1) "[a-z0-9-]+ could not be authenticated against"
   , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
+    callIIRejectWith cid webauthID #register (device1, invalidPOW) "proof of work hash check failed"
   , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, powAt cid (20*60*1000_000_000))
+    callIIRejectWith cid webauthID #register (device1, powAt cid (20*60*1000_000_000)) "proof of work timestamp [0-9]+ is too far in future, current time: [0-9]+"
   , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
     setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIRejectWith cid webauthID #register (device1, powAt cid 1) "proof of work timestamp [0-9]+ is too old, current time: [0-9]+"
   , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
     _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    callIIRejectWith cid webauthID #register (device1, powAt cid 1) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     (_, ts) <- callII cid webauthID #prepare_delegation delegationArgs
-    queryIIReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+    queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
@@ -648,7 +589,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    callIIReject cid webauth2ID #prepare_delegation delegationArgs
+    callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
     user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber

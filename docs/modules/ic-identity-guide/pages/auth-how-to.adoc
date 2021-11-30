@@ -9,6 +9,8 @@
 If you would like to learn what Internet Identity is, see
 link:https://sdk.dfinity.org/docs/ic-identity-guide/what-is-ic-identity.html[What is Internet Identity?]
 
+If you would like to create an Internet Identity anchor, or manage your devices, go to the link:https://identity.ic0.app[Internet Identity Page].
+
 All currently supported authentication methods follow the _WebAuthn_ standard. The following restrictions apply, however:
 
 * On OS X, authentication using Safari is coupled to your browser profile. If you want to authenticate to a dapp in a different browser, or if you use multiple Safari browser profiles, you have to add the combination of your authentication method and the new browser as a new device. See: <<Add a device,`+Add a device+`>>. Note that on iOS, in contrast to OS X, authentication works across browsers.
@@ -106,18 +108,11 @@ Other workflows can be more complex. For example, to add your phone's unlock met
 
 . Enter the Identity Anchor you'd like to use and and click *Continue*.
 
-. Click *GET STARTED*, or *Continue*, depending on the phone you are using.
-
-. Select *Use this device with screen lock*. 
-+
-You will be asked to unlock the device. 
-+
-
-NOTE: To use the screen lock option, you have to have screen lock activated on your phone. 
+. Follow the instructions on screen for setting up your phone's unlock method (FaceID, TouchID, etc) with Internet Identity.
 
 . Authorize your phone.
 +
-After you’ve unlocked your phone, you will be provided with a URL and a QR code. You must use the URL or QR code in a browser in the computer that has already been authorized. For example, you can copy the URL and email it to yourself, then paste it into a browser on the computer. 
+After you’ve set up the unlock method with II on your phone, you will be provided with a URL and a QR code. You must use the URL or QR code in a browser in the computer that has already been authorized. For example, you can copy the URL and email it to yourself, then paste it into a browser on the computer. 
 . In the browser on the computer that has already been authorized, open the above link, enter your Identity Anchor, click *Authenticate* and authenticate using an existing authentication method.
 . Link your phone to your identity. 
 +
