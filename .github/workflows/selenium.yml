@@ -42,7 +42,20 @@ jobs:
         run: |
           echo Install DFX Version: "$DFX_VERSION"
           yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
-          echo "$HOME/bin" >> $GITHUB_PATH
+
+      # Helps with debugging
+      - name: Show versions
+        run: |
+          echo dfx --version
+          dfx --version
+          echo node --version
+          node --version
+          echo npm --version
+          npm --version
+          echo rustc --version
+          rustc --version
+          echo cargo --version
+          cargo --version
 
       - run: npm ci
       - run: dfx start ${{ matrix.start-flag }} --background
