@@ -201,7 +201,7 @@ export const renderManage = async (
   let devices: DeviceData[];
   try {
     devices = await withLoader(() => IIConnection.lookupAll(userNumber));
-  } catch (error) {
+  } catch (error:any) {
     await displayFailedToListDevices(error);
     return renderManage(userNumber, connection);
   }
@@ -222,7 +222,7 @@ const addAdditionalDevice = async (
     newDevice = await WebAuthnIdentity.create({
       publicKey: creationOptions(devices),
     });
-  } catch (error) {
+  } catch (error:any) {
     await displayFailedToAddNewDevice(error);
     return renderManage(userNumber, connection);
   }
@@ -241,7 +241,7 @@ const addAdditionalDevice = async (
         newDevice.rawId
       )
     );
-  } catch (error) {
+  } catch (error:any) {
     await displayFailedToAddTheDevice(error);
   }
   renderManage(userNumber, connection);
@@ -356,7 +356,7 @@ const bindRemoveListener = (
         location.reload();
       }
       renderManage(userNumber, connection);
-    } catch (err) {
+    } catch (err:any) {
       await displayError({
         title: "Failed to remove the device",
         message:

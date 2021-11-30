@@ -73,7 +73,7 @@ const init = () => {
         identity = await WebAuthnIdentity.create({
           publicKey: creationOptions(existingDevices),
         });
-      } catch (error) {
+      } catch (error:any) {
         await displayError({
           title: "Failed to authenticate",
           message:
