@@ -14,8 +14,7 @@ const pageContent = (userNumber: bigint) => html`
         <div class="nagTitle">Record Your Identity Anchor</div>
         <div class="nagMessage">
           Do <b>NOT</b> forget to save this Identity Anchor. Save a backup on a
-          storage medium and write it down.</br>
-          Note: It is advised to keep Identity Anchors secret in order to stay anonymous.
+          storage medium and write it down.
         </div>
       </div>
     </div>
