@@ -525,12 +525,12 @@ hr {
   border-image-slice: 1;
   outline: none;
   border-image-source: linear-gradient(
-          270.05deg,
-          #29abe2 10.78%,
-          #522785 22.2%,
-          #ed1e79 42.46%,
-          #f15a24 59.41%,
-          #fbb03b 77.09%
+    270.05deg,
+    #29abe2 10.78%,
+    #522785 22.2%,
+    #ed1e79 42.46%,
+    #f15a24 59.41%,
+    #fbb03b 77.09%
   );
 }
 .nagIcon {

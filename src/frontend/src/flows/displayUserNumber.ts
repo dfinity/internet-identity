@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import {warningIcon} from "../components/icons";
+import { warningIcon } from "../components/icons";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
