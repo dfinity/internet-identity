@@ -5,8 +5,8 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Congratulations!</h1>
     <p>
-     Your new Identity Anchor has been created. You will need it later to use
-     Internet Identity or to add additional devices.
+      Your new Identity Anchor has been created. You will need it later to use
+      Internet Identity or to add additional devices.
     </p>
     <div class="nagBox">
       <div class="nagIcon">${warningIcon}</div>
