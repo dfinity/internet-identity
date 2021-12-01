@@ -102,9 +102,7 @@ This section describes the Internet Identity Service from the point of view of a
 
 1. The client application frontend creates a session key pair (e.g., Ed25519).
 2. It installs a `message` event handler on its own `window`.
-3. It loads the url `https://identity.ic0.app/#authorize` in an `<iframe>` or separate tab. Let `identityWindow` be the `Window` object returned from this.
-+
-If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per https://www.w3.org/TR/webauthn-2/#sctn-iframe-guidance[the Web Authentication recommendation].
+3. It loads the url `https://identity.ic0.app/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
 4. In the `identityWindow`, the user logs in, and the `identityWindow` invokes
 +
 --
