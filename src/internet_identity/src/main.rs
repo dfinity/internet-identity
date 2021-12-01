@@ -535,25 +535,24 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
+    let mut default_headers = security_headers();
     match parts[0] {
         "/metrics" => {
             let mut writer = MetricsEncoder::new(vec![], time() as i64/ 1_000_000);
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
+                    let mut headers = vec![
+                        (
+                            "Content-Type".to_string(),
+                            "text/plain; version=0.0.4".to_string(),
+                        ),
+                        ("Content-Length".to_string(), body.len().to_string()),
+                    ];
+                    headers.append(&mut default_headers);
                     HttpResponse {
                         status_code: 200,
-                        headers: vec![
-                            (
-                                "Content-Type".to_string(),
-                                "text/plain; version=0.0.4".to_string(),
-                            ),
-                            ("Content-Length".to_string(), body.len().to_string()),
-                            ("X-Frame-Options".to_string(), "DENY".to_string()),
-                            ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-                            ("Referrer-Policy".to_string(), "no-referrer".to_string()),
-                            ("Permissions-Policy".to_string(), "accelerometer=(),autoplay=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),fullscreen=(),geolocation=(),gyroscope=(),magnetometer=(),microphone=(),midi=(),payment=(),picture-in-picture=(),publickey-credentials-get=(),screen-wake-lock=(),sync-xhr=(self),usb=(),web-share=(),xr-spatial-tracking=()".to_string()),
-                        ],
+                        headers,
                         body: Cow::Owned(ByteBuf::from(body)),
                         streaming_strategy: None,
                     }
@@ -574,11 +573,12 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     probably_an_asset,
                 )
             });
+            default_headers.push(certificate_header);
 
             ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
                 Some((headers, value)) => {
                     let mut headers = headers.clone();
-                    headers.push(certificate_header);
+                    headers.append(&mut default_headers);
 
                     HttpResponse {
                         status_code: 200,
@@ -589,7 +589,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                 }
                 None => HttpResponse {
                     status_code: 404,
-                    headers: vec![certificate_header],
+                    headers: default_headers,
                     body: Cow::Owned(ByteBuf::from(format!(
                         "Asset {} not found.",
                         probably_an_asset
@@ -599,6 +599,38 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             })
         }
     }
+}
+
+fn security_headers() -> Vec<HeaderField> {
+    vec![
+        ("X-Frame-Options".to_string(), "DENY".to_string()),
+        ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+        ("Referrer-Policy".to_string(), "same-origin".to_string()),
+        (
+            "Permissions-Policy".to_string(),
+            "accelerometer=(),\
+         autoplay=(),\
+         camera=(),\
+         display-capture=(),\
+         document-domain=(),\
+         encrypted-media=(),\
+         fullscreen=(),\
+         geolocation=(),\
+         gyroscope=(),\
+         magnetometer=(),\
+         microphone=(),\
+         midi=(),\
+         payment=(),\
+         picture-in-picture=(),\
+         publickey-credentials-get=(self),\
+         screen-wake-lock=(),\
+         sync-xhr=(self),\
+         usb=(),\
+         web-share=(),\
+         xr-spatial-tracking=()"
+                .to_string(),
+        ),
+    ]
 }
 
 #[query]
@@ -615,20 +647,28 @@ fn stats() -> InternetIdentityStats {
 // used both in init and post_upgrade
 fn init_assets() {
     use assets::ContentEncoding;
+    use assets::ContentType;
 
     STATE.with(|s| {
         let mut asset_hashes = s.asset_hashes.borrow_mut();
 
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
-            assets::for_each_asset(|name, encoding, contents, hash| {
+            assets::for_each_asset(|name, encoding, content_type, contents, hash| {
                 asset_hashes.insert(name, *hash);
-                let headers = match encoding {
+                let mut headers = match encoding {
                     ContentEncoding::Identity => vec![],
                     ContentEncoding::GZip => {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
                     }
                 };
+                let content_type = match content_type {
+                    ContentType::HTML => "text/html".to_string(),
+                    ContentType::JS => "text/javascript".to_string(),
+                    ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
+                    ContentType::WEBP => "image/webp".to_string(),
+                };
+                headers.push(("Content-Type".to_string(), content_type));
                 assets.insert(name, (headers, contents));
             });
         });
