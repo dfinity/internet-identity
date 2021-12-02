@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.Vector as V
 import qualified Data.ByteString.Base64.Lazy as Base64
-import           Data.CaseInsensitive  ( CI, mk )
+import           Data.CaseInsensitive  ( CI )
 import qualified Data.CaseInsensitive as CI
 import Control.Monad.Trans
 import Control.Monad.Trans.State
