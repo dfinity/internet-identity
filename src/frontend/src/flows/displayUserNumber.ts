@@ -10,9 +10,12 @@ const pageContent = (userNumber: bigint) => html`
       <div class="nagContent">
         <div class="nagTitle">Record Your Identity Anchor</div>
         <div class="nagMessage">
-          Do not forget to save this Identity Anchor. Save a backup on a storage
+          Please record your new Identity Anchor. Keep a backup on a storage
           medium and write it down. You will need it later to use Internet
-          Identity or to add additional devices.
+          Identity or to add additional devices. If you lose your Identity
+          Anchor, you will no longer be able to use this identity to
+          authenticate to dApps and you will lose access to the associated
+          profiles and data.
         </div>
       </div>
     </div>
