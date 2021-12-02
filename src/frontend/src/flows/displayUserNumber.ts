@@ -14,8 +14,7 @@ const pageContent = (userNumber: bigint) => html`
           medium and write it down. You will need it later to use Internet
           Identity or to add additional devices. If you lose your Identity
           Anchor, you will no longer be able to use this identity to
-          authenticate to dApps and you will lose access to the associated
-          profiles and data.
+          authenticate to dApps.
         </div>
       </div>
     </div>
