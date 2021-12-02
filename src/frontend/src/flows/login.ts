@@ -65,7 +65,7 @@ export const login = async (
     await displayError({
       title: "Something went wrong",
       message:
-        "An unexpected error occured during authentication. Please try again",
+        "An unexpected error occurred during authentication. Please try again",
       detail: err.toString(),
       primaryButton: "Try again",
     });
