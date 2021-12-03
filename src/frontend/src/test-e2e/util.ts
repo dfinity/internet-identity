@@ -295,7 +295,7 @@ export function setupSeleniumServer(): void {
 
   afterAll(() => {
     console.log("stopping selenium-standalone server...");
-    seleniumServerProc.kill('SIGKILL');
+    seleniumServerProc.kill("SIGKILL");
     console.log("killed selenium-standalone server!");
   });
 }
