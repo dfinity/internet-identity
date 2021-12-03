@@ -287,9 +287,16 @@ export function setupSeleniumServer(): void {
         reject(err);
       });
 
+      seleniumServerProc.on('close', (code, sig) => {
+            console.log(`selenium-server closed with code ${code} from sig ${sig}`);
+      });
+
+      seleniumServerProc.on('exit', (code, sig) => {
+            console.log(`selenium-server exited with code ${code} from sig ${sig}`);
+      });
+
       setTimeout(() => {
-        resolve(true);
-        //reject("selenium-standalone server startup timeout");
+        reject("selenium-standalone server startup timeout");
       }, 30_000);
     });
 
@@ -300,5 +307,7 @@ export function setupSeleniumServer(): void {
     console.log("stopping selenium-standalone server...");
     seleniumServerProc.kill();
     console.log("Sent SIGTERM to selenium-standalone server");
+    console.log(`server received SIGNAL: ${seleniumServerProc.killed}`);
+
   });
 }
