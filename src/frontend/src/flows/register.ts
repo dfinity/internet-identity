@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { creationOptions } from "../utils/iiConnection";
-import { confirmRegister } from "./confirmRegister";
+import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
@@ -65,8 +65,11 @@ const init = (): Promise<LoginResult | null> =>
           return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
+        // Kick-start both the captcha creation and the identity
+        const captcha = makeCaptcha();
         const identity = await pendingIdentity;
-        const result = await confirmRegister(identity, alias);
+        await captcha;
+        const result = await confirmRegister(captcha, identity, alias);
         resolve(result);
       } catch (err) {
         reject(err);

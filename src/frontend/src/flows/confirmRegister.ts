@@ -3,7 +3,7 @@ import { displayUserNumber } from "./displayUserNumber";
 import { displayError } from "../components/displayError";
 import { setUserNumber } from "../utils/userNumber";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
-import { ProofOfWork } from "../../generated/internet_identity_types";
+import { Challenge } from "../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
@@ -31,12 +31,13 @@ const pageContent = html`
 `;
 
 export const confirmRegister = (
+  captcha: Promise<Challenge>,
   identity: WebAuthnIdentity,
   alias: string
 ): Promise<LoginResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return init(canisterIdPrincipal, identity, alias);
+  return init(canisterIdPrincipal, identity, alias, captcha);
 };
 
 const tryRegister = (
@@ -82,7 +83,7 @@ const tryRegister = (
 };
 
 // Request a captcha and, when received, update the DOM elements accordingly.
-const requestCaptcha = (): void => {
+const requestCaptcha = (captcha?: Promise<Challenge>): void => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
   const captchaStatusText = document.querySelector(
     ".captcha-status-text"
@@ -99,40 +100,50 @@ const requestCaptcha = (): void => {
   ) as HTMLFormElement;
   confirmRegisterButton.disabled = true;
 
-  // Wrap this in a promise to avoid slowing things down
-  const makePow: Promise<ProofOfWork> = new Promise((resolve) => {
-    const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-    const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
-    resolve(pow);
-  });
+  captcha = captcha || makeCaptcha();
 
-  makePow
-    .then((pow) => IIConnection.createChallenge(pow))
-    .then((captchaResp) => {
-      const captchaImg = document.querySelector("#captchaImg");
-      if (captchaImg) {
-        captchaImg.setAttribute(
-          "src",
-          `data:image/png;base64, ${captchaResp.png_base64}`
-        );
-        confirmRegisterButton.setAttribute(
-          "data-captcha-key",
-          `${captchaResp.challenge_key}`
-        );
-        captchaStatusText.innerHTML = "Please type in the characters you see.";
-        confirmRegisterButton.disabled = false;
-        captchaInput.disabled = false;
-        captchaInput.value = "";
-      }
-    });
+  captcha.then((captchaResp) => {
+    const captchaImg = document.querySelector("#captchaImg");
+    if (captchaImg) {
+      captchaImg.setAttribute(
+        "src",
+        `data:image/png;base64, ${captchaResp.png_base64}`
+      );
+      confirmRegisterButton.setAttribute(
+        "data-captcha-key",
+        `${captchaResp.challenge_key}`
+      );
+      captchaStatusText.innerHTML = "Please type in the characters you see.";
+      confirmRegisterButton.disabled = false;
+      captchaInput.disabled = false;
+      captchaInput.value = "";
+    }
+  });
 };
+
+// This computes a PoW and requests a challenge from the II backend.
+// NOTE: The Proof-of-Work is computed in one go (one run of the event loop) so
+// nothing else will happen during that time. Better have a loading screen
+// shown to the user, or have all buttons disabled, because no other javascript
+// will run for a few seconds.
+export const makeCaptcha = (): Promise<Challenge> =>
+  new Promise((resolve) => {
+    setTimeout(() => {
+      const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
+      const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+      IIConnection.createChallenge(pow).then((cha) => {
+        resolve(cha);
+      });
+    });
+  });
 
 const init = (
   canisterIdPrincipal: Principal,
   identity: WebAuthnIdentity,
-  alias: string
+  alias: string,
+  captcha: Promise<Challenge>
 ): Promise<LoginResult | null> => {
-  requestCaptcha();
+  requestCaptcha(captcha);
 
   // since the index expects to regain control we unfortunately have to wrap
   // this whole logic in a promise that then resolves (giving control back to

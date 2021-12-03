@@ -224,6 +224,7 @@ export class IIConnection {
       `createChallenge(ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce} })`
     );
     const challenge = await actor.create_challenge(pow);
+    console.log("Challenge Created");
     return challenge;
   }
 
