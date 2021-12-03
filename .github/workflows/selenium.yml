@@ -69,7 +69,12 @@ jobs:
         run: npm run install-webdrivers
 
       - run: rm -v -f screenshots/*-${{ matrix.device }}.png
-      - run: npm run test:e2e-${{ matrix.device }}
+      - run: |
+          echo starting tests
+          npm run test:e2e-${{ matrix.device }}
+          echo tests have returned
+          ps aux | grep selenium
+
       - run: dfx stop
 
       - name: Archive test logs
