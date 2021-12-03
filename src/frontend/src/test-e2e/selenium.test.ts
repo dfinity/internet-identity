@@ -48,7 +48,7 @@ const DEVICE_NAME2 = "Other WebAuthn device";
 
 setupSeleniumServer();
 
-test("Register new identity and login with it", async () => {
+test.skip("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
     const welcomeView = new WelcomeView(browser);
@@ -64,7 +64,7 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test("Register new identity and add additional device", async () => {
+test.skip("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -94,7 +94,7 @@ test("Register new identity and add additional device", async () => {
   });
 }, 300_000);
 
-test("Log into client application, after registration", async () => {
+test.skip("Log into client application, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -122,7 +122,7 @@ test("Log into client application, after registration", async () => {
   });
 }, 300_000);
 
-test("Delegation maxTimeToLive: 1 min", async () => {
+test.skip("Delegation maxTimeToLive: 1 min", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -145,7 +145,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
   });
 }, 300_000);
 
-test("Delegation maxTimeToLive: 1 day", async () => {
+test.skip("Delegation maxTimeToLive: 1 day", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -166,7 +166,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
   });
 }, 300_000);
 
-test("Delegation maxTimeToLive: 1 month", async () => {
+test.skip("Delegation maxTimeToLive: 1 month", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -188,7 +188,7 @@ test("Delegation maxTimeToLive: 1 month", async () => {
   });
 }, 300_000);
 
-test("Recover access, after registration", async () => {
+test.skip("Recover access, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -212,7 +212,7 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
-test("Screenshots", async () => {
+test.skip("Screenshots", async () => {
   await runInBrowser(
     async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {
       const screenshots = new Screenshots(
