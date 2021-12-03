@@ -605,29 +605,32 @@ fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+
+        // "Referrer-Policy: no-referrer" would be more strict, but breaks local dev deployment
+        // same-origin is still ok from a security perspective
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
         (
             "Permissions-Policy".to_string(),
             "accelerometer=(),\
-         autoplay=(),\
-         camera=(),\
-         display-capture=(),\
-         document-domain=(),\
-         encrypted-media=(),\
-         fullscreen=(),\
-         geolocation=(),\
-         gyroscope=(),\
-         magnetometer=(),\
-         microphone=(),\
-         midi=(),\
-         payment=(),\
-         picture-in-picture=(),\
-         publickey-credentials-get=(self),\
-         screen-wake-lock=(),\
-         sync-xhr=(self),\
-         usb=(),\
-         web-share=(),\
-         xr-spatial-tracking=()"
+             autoplay=(),\
+             camera=(),\
+             display-capture=(),\
+             document-domain=(),\
+             encrypted-media=(),\
+             fullscreen=(),\
+             geolocation=(),\
+             gyroscope=(),\
+             magnetometer=(),\
+             microphone=(),\
+             midi=(),\
+             payment=(),\
+             picture-in-picture=(),\
+             publickey-credentials-get=(self),\
+             screen-wake-lock=(),\
+             sync-xhr=(self),\
+             usb=(),\
+             web-share=(),\
+             xr-spatial-tracking=()"
                 .to_string(),
         ),
     ]
