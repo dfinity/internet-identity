@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        start-flag: [ '', '--emulator' ]
-        device: [ 'desktop', 'mobile' ]
+        start-flag: [ '']
+        device: [ 'desktop']
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     env:
@@ -65,30 +65,10 @@ jobs:
           export II_ENV=development
           dfx deploy --no-wallet --argument '(null)'
 
-      - name: Deploy whoami canister
-        run: cd demos/whoami && dfx deploy --no-wallet
-
-      # We don't use the canister in the tests, but we want to make sure it
-      # can be built and deployed
-      - name: Deploy testnet_app canister
-        run: |
-          cd demos/testnet_app
-          npm ci
-          dfx deploy --no-wallet
-
-      - name: Run demo app
-        run: |
-          cd demos/sample-javascript/
-          npm ci
-          npm run build
-          npm run develop --no-live-reload --no-devtool &
-          sleep 10 # crude
-
       - name: install selenium webdrivers
         run: npm run install-webdrivers
 
       - run: rm -v -f screenshots/*-${{ matrix.device }}.png
-      - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
 
