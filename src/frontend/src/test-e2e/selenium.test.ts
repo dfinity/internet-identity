@@ -48,7 +48,7 @@ const DEVICE_NAME2 = "Other WebAuthn device";
 
 setupSeleniumServer();
 
-test.skip("Register new identity and login with it", async () => {
+test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
     const welcomeView = new WelcomeView(browser);
