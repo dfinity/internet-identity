@@ -1,0 +1,19 @@
+name: Security audit
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+jobs:
+  audit:
+    name: Rust dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/audit-check@v1
+  eslint:
+    name: Npm dependency audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Audit packages
+      run: git ls-files | grep -E '/package.json$' | xargs -I{} bash -xc 'cd "$(dirname "{}")" && npm audit'
