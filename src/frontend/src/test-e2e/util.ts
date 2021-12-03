@@ -288,13 +288,13 @@ export function setupSeleniumServer(): void {
         reject(err);
       });
 
-      seleniumServerProc.on('close', (code, sig) => {
-            console.log(`selenium-server closed with code ${code} from sig ${sig}`);
-            isDead = true;
+      seleniumServerProc.on("close", (code, sig) => {
+        console.log(`selenium-server closed with code ${code} from sig ${sig}`);
+        isDead = true;
       });
 
-      seleniumServerProc.on('exit', (code, sig) => {
-            console.log(`selenium-server exited with code ${code} from sig ${sig}`);
+      seleniumServerProc.on("exit", (code, sig) => {
+        console.log(`selenium-server exited with code ${code} from sig ${sig}`);
       });
 
       setTimeout(() => {
@@ -311,12 +311,10 @@ export function setupSeleniumServer(): void {
     console.log("Sent SIGTERM to selenium-standalone server");
     console.log(`server received SIGNAL: ${seleniumServerProc.killed}`);
     setTimeout(() => {
-        if(!isDead) {
-            console.log("Checking on server, server is still alive");
-            seleniumServerProc.kill(9);
-        }
-
+      if (!isDead) {
+        console.log("Checking on server, server is still alive");
+        seleniumServerProc.kill(9);
+      }
     }, 3000);
-
   });
 }
