@@ -48,7 +48,7 @@ const DEVICE_NAME2 = "Other WebAuthn device";
 
 setupSeleniumServer();
 
-test("Register new identity and login with it", async () => {
+test.skip("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
     const welcomeView = new WelcomeView(browser);
@@ -64,7 +64,7 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test.skip("Register new identity and add additional device", async () => {
+test("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
