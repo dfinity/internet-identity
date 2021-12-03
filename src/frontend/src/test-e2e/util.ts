@@ -261,6 +261,7 @@ export function setupSeleniumServer(): void {
     ]);
 
     const promise = new Promise((resolve, reject) => {
+      /*
       seleniumServerProc.stdout?.on("data", (data) => {
         console.log(`selenium-standalone stdout: ${data}`);
         if (data.toString().indexOf("Selenium started") !== -1) {
@@ -268,6 +269,7 @@ export function setupSeleniumServer(): void {
           resolve(true);
         }
       });
+      */
 
       /*
        * For reasons unclear, printing stderr breaks the tests. It looks like it tries to print after the tests' end, which jest doesn't like:
