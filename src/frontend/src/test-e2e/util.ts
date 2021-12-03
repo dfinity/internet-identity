@@ -250,6 +250,7 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
 
 export function setupSeleniumServer(): void {
   let seleniumServerProc: ChildProc.ChildProcess;
+  let isDead = false;
 
   beforeAll(async () => {
     console.log("starting selenium-standalone server...");
@@ -289,6 +290,7 @@ export function setupSeleniumServer(): void {
 
       seleniumServerProc.on('close', (code, sig) => {
             console.log(`selenium-server closed with code ${code} from sig ${sig}`);
+            isDead = true;
       });
 
       seleniumServerProc.on('exit', (code, sig) => {
@@ -308,6 +310,13 @@ export function setupSeleniumServer(): void {
     seleniumServerProc.kill();
     console.log("Sent SIGTERM to selenium-standalone server");
     console.log(`server received SIGNAL: ${seleniumServerProc.killed}`);
+    setTimeout(() => {
+        if(!isDead) {
+            console.log("Checking on server, server is still alive");
+            seleniumServerProc.kill(9);
+        }
+
+    }, 3000);
 
   });
 }
