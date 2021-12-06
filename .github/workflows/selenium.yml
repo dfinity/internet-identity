@@ -30,24 +30,24 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
 
-      - name: Install Rust
-        run: |
-          rustup update "$RUSTC_VERSION" --no-self-update
-          rustup default "$RUSTC_VERSION"
-          rustup target add wasm32-unknown-unknown
+      #- name: Install Rust
+        #run: |
+          #rustup update "$RUSTC_VERSION" --no-self-update
+          #rustup default "$RUSTC_VERSION"
+          #rustup target add wasm32-unknown-unknown
 
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
-      - name: Install DFX
-        run: |
-          echo Install DFX Version: "$DFX_VERSION"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+      #- name: Install DFX
+        #run: |
+          #echo Install DFX Version: "$DFX_VERSION"
+          #yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
 
       # Helps with debugging
       - name: Show versions
         run: |
-          echo dfx --version
-          dfx --version
+          #echo dfx --version
+          #dfx --version
           echo node --version
           node --version
           echo npm --version
@@ -57,13 +57,13 @@ jobs:
           echo cargo --version
           cargo --version
 
-      - run: npm ci
-      - run: dfx start ${{ matrix.start-flag }} --background
+      #- run: npm ci
+      #- run: dfx start ${{ matrix.start-flag }} --background
 
-      - name: Deploy Internet Identity
-        run: |
-          export II_ENV=development
-          dfx deploy --no-wallet --argument '(null)'
+      #- name: Deploy Internet Identity
+        #run: |
+          #export II_ENV=development
+          #dfx deploy --no-wallet --argument '(null)'
 
       - name: install selenium webdrivers
         run: npm run install-webdrivers
