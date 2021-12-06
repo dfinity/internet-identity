@@ -581,7 +581,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
                     HttpResponse {
                         status_code: 200,
-                        headers: headers2,
+                        headers,
                         body: Cow::Borrowed(Bytes::new(value)),
                         streaming_strategy: None,
                     }
