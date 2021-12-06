@@ -1,4 +1,4 @@
-name: Cargo tests
+name: Cargo Fmt
 
 on:
   push:
