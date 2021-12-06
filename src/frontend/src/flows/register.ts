@@ -1,16 +1,8 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
-import { withLoader } from "../components/loader";
-import {
-  IIConnection,
-  canisterIdPrincipal,
-  creationOptions,
-} from "../utils/iiConnection";
-import { setUserNumber } from "../utils/userNumber";
-import { confirmRegister } from "./confirmRegister";
-import { displayUserNumber } from "./displayUserNumber";
+import { creationOptions } from "../utils/iiConnection";
+import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
-import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
@@ -73,22 +65,12 @@ const init = (): Promise<LoginResult | null> =>
           return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
-        // Do PoW before registering.
-        const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-        const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+        // Kick-start both the captcha creation and the identity
+        const captcha = makeCaptcha();
         const identity = await pendingIdentity;
-        if (await confirmRegister()) {
-          const result = await withLoader(async () =>
-            IIConnection.register(identity, alias, pow)
-          );
-          if (result.kind === "loginSuccess") {
-            setUserNumber(result.userNumber);
-            await displayUserNumber(result.userNumber);
-          }
-          resolve(apiResultToLoginResult(result));
-        } else {
-          resolve(null);
-        }
+        await captcha;
+        const result = await confirmRegister(captcha, identity, alias);
+        resolve(result);
       } catch (err) {
         reject(err);
       }
