@@ -52,12 +52,12 @@ jobs:
           node --version
           echo npm --version
           npm --version
-          echo rustc --version
-          rustc --version
-          echo cargo --version
-          cargo --version
+          #echo rustc --version
+          #rustc --version
+          #echo cargo --version
+          #cargo --version
 
-      #- run: npm ci
+      - run: npm ci
       #- run: dfx start ${{ matrix.start-flag }} --background
 
       #- name: Deploy Internet Identity
