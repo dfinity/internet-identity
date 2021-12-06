@@ -310,7 +310,7 @@ export function setupSeleniumServer(): void {
     seleniumServerProc.kill(9);
     console.log("Sent SIGTERM to selenium-standalone server");
     console.log(`server received SIGNAL: ${seleniumServerProc.killed}`);
-    process.exit();
+    //process.exit();
     setTimeout(() => {
       if (!isDead) {
         console.log("Checking on server, server is still alive");
