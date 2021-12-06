@@ -217,7 +217,6 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         self.header.num_users as usize
     }
 
-
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
         ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE)

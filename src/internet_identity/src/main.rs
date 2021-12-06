@@ -7,6 +7,7 @@ use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use internet_identity::metrics_encoder::MetricsEncoder;
 use internet_identity::nonce_cache::NonceCache;
 use internet_identity::signature_map::SignatureMap;
+use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
@@ -14,7 +15,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
-use rand_chacha::rand_core::{SeedableRng, RngCore};
 
 mod assets;
 
@@ -23,7 +23,7 @@ const fn secs_to_nanos(secs: u64) -> u64 {
 }
 
 #[cfg(not(feature = "dummy_captcha"))]
-use captcha::filters::{Wave};
+use captcha::filters::Wave;
 
 // 30 mins
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
@@ -246,7 +246,7 @@ type ChallengeKey = String;
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct ChallengeAttempt {
     chars: String,
-    key: ChallengeKey
+    key: ChallengeKey,
 }
 
 // What we send the user
@@ -401,7 +401,6 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
 #[update]
 async fn create_challenge(pow: ProofOfWork) -> Challenge {
-
     let mut rng = make_rng().await;
 
     let resp = STATE.with(|s| {
@@ -422,7 +421,6 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
         nonce_cache.add(pow.timestamp, pow.nonce);
 
-
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();
 
         // Prune old challenges. This drops all challenges that are older than
@@ -440,7 +438,7 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
         // First, we try to find a new (unique) challenge key. It's unlikely we'll have collisions
         // when generating the key, but to err on the safe side we try up to 10 times.
-        const MAX_TRIES: u8= 10;
+        const MAX_TRIES: u8 = 10;
 
         for _ in 0..MAX_TRIES {
             let challenge_key = random_string(&mut rng, 10);
@@ -449,13 +447,25 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
                 let (Base64(png_base64), chars) = create_captcha(rng);
 
                 // Finally insert
-                inflight_challenges.insert(challenge_key.clone(), ChallengeInfo { created: now, chars });
+                inflight_challenges.insert(
+                    challenge_key.clone(),
+                    ChallengeInfo {
+                        created: now,
+                        chars,
+                    },
+                );
 
-                return Challenge { png_base64, challenge_key }
+                return Challenge {
+                    png_base64,
+                    challenge_key,
+                };
             }
         }
 
-        trap(&format!("Could not find a new key after {} tries", MAX_TRIES));
+        trap(&format!(
+            "Could not find a new key after {} tries",
+            MAX_TRIES
+        ));
     });
 
     resp
@@ -468,7 +478,6 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
 // make-do with the RngCore trait (as opposed to Rng), therefore we have to implement this
 // ourselves as opposed to using one of rand's distributions.
 fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
-
     let mut chars: Vec<u8> = vec![];
 
     // The range
@@ -487,7 +496,6 @@ fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
 
 // Get a random number generator based on 'raw_rand'
 async fn make_rng() -> rand_chacha::ChaCha20Rng {
-
     let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
@@ -504,49 +512,46 @@ async fn make_rng() -> rand_chacha::ChaCha20Rng {
 
 #[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+    let mut captcha = captcha::RngCaptcha::from_rng(rng);
+    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(10, 10);
 
-        let mut captcha = captcha::RngCaptcha::from_rng(rng);
-        let captcha = captcha.set_chars(&vec!['a']).add_chars(1)
-            .view(10,10);
+    let resp = match captcha.as_base64() {
+        Some(png_base64) => Base64(png_base64),
+        None => trap("Could not get base64 of captcha"),
+    };
 
-        let resp = match captcha.as_base64() {
-            Some(png_base64) => Base64(png_base64),
-            None => trap("Could not get base64 of captcha"),
-        };
-
-        return (resp, captcha.chars_as_string());
+    return (resp, captcha.chars_as_string());
 }
 
 #[cfg(not(feature = "dummy_captcha"))]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+    let mut captcha = captcha::RngCaptcha::from_rng(rng);
+    let captcha = captcha
+        .add_chars(5)
+        .apply_filter(Wave::new(2.0, 20.0).horizontal())
+        .apply_filter(Wave::new(2.0, 20.0).vertical())
+        .view(220, 120);
 
-        let mut captcha = captcha::RngCaptcha::from_rng(rng);
-        let captcha = captcha.add_chars(5)
-            .apply_filter(Wave::new(2.0, 20.0).horizontal())
-            .apply_filter(Wave::new(2.0, 20.0).vertical())
-            .view(220, 120);
+    let resp = match captcha.as_base64() {
+        Some(png_base64) => Base64(png_base64),
+        None => trap("Could not get base64 of captcha"),
+    };
 
-        let resp = match captcha.as_base64() {
-            Some(png_base64) => Base64(png_base64),
-            None => trap("Could not get base64 of captcha"),
-        };
-
-        return (resp, captcha.chars_as_string());
+    return (resp, captcha.chars_as_string());
 }
 
 // Check whether the CAPTCHA challenge was solved
-fn check_challenge(res: ChallengeAttempt) -> Result<(),()> {
-
+fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     STATE.with(|s| {
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
-                if res.chars !=  challenge.chars {
+                if res.chars != challenge.chars {
                     return Err(());
                 }
                 return Ok(());
-            },
-            None =>  Err(()),
+            }
+            None => Err(()),
         }
     })
 }
@@ -565,7 +570,7 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 }
 
 #[query]
-fn get_principal(user_number: UserNumber, frontend : FrontendHostname) -> Principal {
+fn get_principal(user_number: UserNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
     STATE.with(|state| {
@@ -726,7 +731,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
         "/metrics" => {
-            let mut writer = MetricsEncoder::new(vec![], time() as i64/ 1_000_000);
+            let mut writer = MetricsEncoder::new(vec![], time() as i64 / 1_000_000);
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
