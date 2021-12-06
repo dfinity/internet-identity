@@ -712,6 +712,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             s.last_upgrade_timestamp.get() as f64,
             "The most recent IC time (in nanos) when this canister was successfully upgraded.",
         )?;
+        w.encode_gauge(
+            "internet_identity_inflight_challenges",
+            s.inflight_challenges.borrow().len() as f64,
+            "The number of inflight CAPTCHA challenges",
+        )?;
         Ok(())
     })
 }
