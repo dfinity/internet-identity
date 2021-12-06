@@ -73,3 +73,18 @@ jobs:
         run: |
           cd backend-tests
           cabal run
+
+      - name: Check formatting
+        run: cargo fmt
+      - name: Commit Formatting changes
+        uses: EndBug/add-and-commit@v7.2.0
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          add: src/internet_identity
+          author_name: Formatting Committer
+          author_email: "<nobody@example.com>"
+          message: "Updating rust formatting"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull_strategy: "NO-PULL"
+
