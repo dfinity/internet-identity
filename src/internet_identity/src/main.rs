@@ -535,7 +535,6 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
-    let mut default_headers = security_headers();
     match parts[0] {
         "/metrics" => {
             let mut writer = MetricsEncoder::new(vec![], time() as i64/ 1_000_000);
@@ -549,7 +548,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                         ),
                         ("Content-Length".to_string(), body.len().to_string()),
                     ];
-                    headers.append(&mut default_headers);
+                    headers.append(&mut security_headers());
                     HttpResponse {
                         status_code: 200,
                         headers,
@@ -573,23 +572,23 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     probably_an_asset,
                 )
             });
-            default_headers.push(certificate_header);
+            let mut headers = security_headers();
+            headers.push(certificate_header);
 
             ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
-                Some((headers, value)) => {
-                    let mut headers = headers.clone();
-                    headers.append(&mut default_headers);
+                Some((asset_headers, value)) => {
+                    headers.append(&mut asset_headers.clone());
 
                     HttpResponse {
                         status_code: 200,
-                        headers,
+                        headers: headers2,
                         body: Cow::Borrowed(Bytes::new(value)),
                         streaming_strategy: None,
                     }
                 }
                 None => HttpResponse {
                     status_code: 404,
-                    headers: default_headers,
+                    headers,
                     body: Cow::Owned(ByteBuf::from(format!(
                         "Asset {} not found.",
                         probably_an_asset
@@ -601,6 +600,9 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     }
 }
 
+/// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
+/// These headers enable browser security features (like limit access to platform apis and set
+/// iFrame policies, etc.).
 fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),

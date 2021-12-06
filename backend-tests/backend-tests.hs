@@ -469,28 +469,26 @@ validateSecurityHeaders resp = do
   validateStaticHeader resp "X-Frame-Options" "DENY"
   validateStaticHeader resp "X-Content-Type-Options" "nosniff"
   validateStaticHeader resp "Referrer-Policy" "same-origin"
-  validateStaticHeader resp "Permissions-Policy" $ CI.mk $ T.intercalate "," [
-    "accelerometer=()",
-    "autoplay=()",
-    "camera=()",
-    "display-capture=()",
-    "document-domain=()",
-    "encrypted-media=()",
-    "fullscreen=()",
-    "geolocation=()",
-    "gyroscope=()",
-    "magnetometer=()",
-    "microphone=()",
-    "midi=()",
-    "payment=()",
-    "picture-in-picture=()",
-    "publickey-credentials-get=(self)",
-    "screen-wake-lock=()",
-    "sync-xhr=(self)",
-    "usb=()",
-    "web-share=()",
-    "xr-spatial-tracking=()"
-    ]
+  validateStaticHeader resp "Permissions-Policy" "accelerometer=(),\
+    \autoplay=(),\
+    \camera=(),\
+    \display-capture=(),\
+    \document-domain=(),\
+    \encrypted-media=(),\
+    \fullscreen=(),\
+    \geolocation=(),\
+    \gyroscope=(),\
+    \magnetometer=(),\
+    \microphone=(),\
+    \midi=(),\
+    \payment=(),\
+    \picture-in-picture=(),\
+    \publickey-credentials-get=(self),\
+    \screen-wake-lock=(),\
+    \sync-xhr=(self),\
+    \usb=(),\
+    \web-share=(),\
+    \xr-spatial-tracking=()"
 
 validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
 validateStaticHeader resp headerName expectedValue = do
