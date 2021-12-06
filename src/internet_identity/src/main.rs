@@ -14,12 +14,16 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
+use rand_chacha::rand_core::{SeedableRng, RngCore};
 
 mod assets;
 
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+
+#[cfg(not(feature = "dummy_captcha"))]
+use captcha::filters::{Wave};
 
 // 30 mins
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
@@ -29,6 +33,11 @@ const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 // 5 mins
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
+// 5 mins
+const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
+
+// How many captcha challenges we keep in memory (at most)
+const MAX_INFLIGHT_CHALLENGES: usize = 500;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -40,8 +49,10 @@ type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = String;
-type Timestamp = u64;
+type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
+
+struct Base64(String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum Purpose {
@@ -143,6 +154,8 @@ enum RegisterResponse {
     Registered { user_number: UserNumber },
     #[serde(rename = "canister_full")]
     CanisterFull,
+    #[serde(rename = "bad_challenge")]
+    BadChallenge,
 }
 
 mod hash;
@@ -199,6 +212,9 @@ struct State {
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
+    // note: we COULD persist this through upgrades, although this is currently NOT persisted
+    // through upgrades
+    inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
 }
 
 impl Default for State {
@@ -213,8 +229,31 @@ impl Default for State {
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
+            inflight_challenges: RefCell::new(HashMap::new()),
         }
     }
+}
+
+// The challenges we store and check against
+struct ChallengeInfo {
+    created: Timestamp,
+    chars: String,
+}
+
+type ChallengeKey = String;
+
+// The user's attempt
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct ChallengeAttempt {
+    chars: String,
+    key: ChallengeKey
+}
+
+// What we send the user
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct Challenge {
+    png_base64: String,
+    challenge_key: ChallengeKey,
 }
 
 thread_local! {
@@ -248,10 +287,12 @@ async fn init_salt() {
 }
 
 #[update]
-async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse {
+async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    if let Err(()) = check_challenge(challenge_result) {
+        return RegisterResponse::BadChallenge;
+    }
+
     check_entry_limits(&device_data);
-    let now = time() as u64;
-    check_proof_of_work(&pow, now);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
         ic_cdk::trap(&format!(
@@ -264,14 +305,6 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
     ensure_salt_set().await;
 
     STATE.with(|s| {
-        let mut nonce_cache = s.nonce_cache.borrow_mut();
-        if nonce_cache.contains(pow.timestamp, pow.nonce) {
-            trap(&format!(
-                "the combination of timestamp {} and nonce {} has already been used",
-                pow.timestamp, pow.nonce,
-            ));
-        }
-        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
 
         let mut store = s.storage.borrow_mut();
@@ -282,7 +315,6 @@ async fn register(device_data: DeviceData, pow: ProofOfWork) -> RegisterResponse
                     .unwrap_or_else(|err| {
                         trap(&format!("failed to store user device data: {}", err))
                     });
-                nonce_cache.add(pow.timestamp, pow.nonce);
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -364,6 +396,158 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
                     user_number, err
                 ))
             });
+    })
+}
+
+#[update]
+async fn create_challenge(pow: ProofOfWork) -> Challenge {
+
+    let mut rng = make_rng().await;
+
+    let resp = STATE.with(|s| {
+        let mut nonce_cache = s.nonce_cache.borrow_mut();
+        if nonce_cache.contains(pow.timestamp, pow.nonce) {
+            trap(&format!(
+                "the combination of timestamp {} and nonce {} has already been used",
+                pow.timestamp, pow.nonce,
+            ));
+        }
+
+        let now = time() as u64;
+
+        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+
+        check_proof_of_work(&pow, now);
+
+        nonce_cache.add(pow.timestamp, pow.nonce);
+
+
+        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+
+        // Prune old challenges. This drops all challenges that are older than
+        // CAPTCHA_CHALLENGE_LIFETIME
+        // TODO: test this
+        inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
+
+        // Error out if there are too many inflight challenges
+        // TODO: test this
+        if inflight_challenges.len() >= MAX_INFLIGHT_CHALLENGES {
+            trap("too many inflight captchas");
+        }
+
+        // actually create the challenge
+
+        // First, we try to find a new (unique) challenge key. It's unlikely we'll have collisions
+        // when generating the key, but to err on the safe side we try up to 10 times.
+        const MAX_TRIES: u8= 10;
+
+        for _ in 0..MAX_TRIES {
+            let challenge_key = random_string(&mut rng, 10);
+            if !inflight_challenges.contains_key(&challenge_key) {
+                // Then we create the CAPTCHA
+                let (Base64(png_base64), chars) = create_captcha(rng);
+
+                // Finally insert
+                inflight_challenges.insert(challenge_key.clone(), ChallengeInfo { created: now, chars });
+
+                return Challenge { png_base64, challenge_key }
+            }
+        }
+
+        trap(&format!("Could not find a new key after {} tries", MAX_TRIES));
+    });
+
+    resp
+}
+
+// Generate an n-char long string of random characters. The characters are sampled from the rang
+// a-z.
+//
+// NOTE: The 'rand' crate (currently) does not build on wasm32-unknown-unknown so we have to
+// make-do with the RngCore trait (as opposed to Rng), therefore we have to implement this
+// ourselves as opposed to using one of rand's distributions.
+fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
+
+    let mut chars: Vec<u8> = vec![];
+
+    // The range
+    let a: u8 = 'a' as u8;
+    let z: u8 = 'z' as u8;
+
+    // n times, get a random number as u32, then shrink to u8, and finally shrink to the size of
+    // our range. Finally, offset by the start of our range.
+    for _ in 0..n {
+        let next: u8 = rng.next_u32() as u8 % (z - a) + a;
+        chars.push(next);
+    }
+
+    return String::from_utf8_lossy(&chars).to_string();
+}
+
+// Get a random number generator based on 'raw_rand'
+async fn make_rng() -> rand_chacha::ChaCha20Rng {
+
+    let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
+    };
+    let seed: Salt = raw_rand[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+                "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
+                raw_rand.len()
+                ));
+    });
+
+    rand_chacha::ChaCha20Rng::from_seed(seed)
+}
+
+#[cfg(feature = "dummy_captcha")]
+fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+
+        let mut captcha = captcha::RngCaptcha::from_rng(rng);
+        let captcha = captcha.set_chars(&vec!['a']).add_chars(1)
+            .view(10,10);
+
+        let resp = match captcha.as_base64() {
+            Some(png_base64) => Base64(png_base64),
+            None => trap("Could not get base64 of captcha"),
+        };
+
+        return (resp, captcha.chars_as_string());
+}
+
+#[cfg(not(feature = "dummy_captcha"))]
+fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
+
+        let mut captcha = captcha::RngCaptcha::from_rng(rng);
+        let captcha = captcha.add_chars(5)
+            .apply_filter(Wave::new(2.0, 20.0).horizontal())
+            .apply_filter(Wave::new(2.0, 20.0).vertical())
+            .view(220, 120);
+
+        let resp = match captcha.as_base64() {
+            Some(png_base64) => Base64(png_base64),
+            None => trap("Could not get base64 of captcha"),
+        };
+
+        return (resp, captcha.chars_as_string());
+}
+
+// Check whether the CAPTCHA challenge was solved
+fn check_challenge(res: ChallengeAttempt) -> Result<(),()> {
+
+    STATE.with(|s| {
+        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+        match inflight_challenges.remove(&res.key) {
+            Some(challenge) => {
+                if res.chars !=  challenge.chars {
+                    return Err(());
+                }
+                return Ok(());
+            },
+            None =>  Err(()),
+        }
     })
 }
 
@@ -527,6 +711,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_last_upgrade_timestamp",
             s.last_upgrade_timestamp.get() as f64,
             "The most recent IC time (in nanos) when this canister was successfully upgraded.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_inflight_challenges",
+            s.inflight_challenges.borrow().len() as f64,
+            "The number of inflight CAPTCHA challenges",
         )?;
         Ok(())
     })
