@@ -1,4 +1,4 @@
-name: Cargo tests
+name: Cargo Fmt
 
 on:
   push:
@@ -31,19 +31,20 @@ jobs:
           rustup update "$RUSTC_VERSION" --no-self-update
           rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
+          rustup component add rustfmt
 
-      - name: Create fake assets
-        run : |
-          mkdir dist
-          touch dist/index.html
-          touch dist/index.js
-          touch dist/index.js.gz
-          touch dist/loader.webp
-          touch dist/favicon.ico
-
-      - name: Run Tests
+      - name: Cargo fmt
         shell: bash
         run: |
-          cargo test --all-targets --all-features
-        env:
-          RUST_BACKTRACE: 1
+          cargo fmt
+      - name: Commit Formatting changes
+        uses: EndBug/add-and-commit@v7.2.0
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          add: src/internet_identity
+          author_name: Formatting Committer
+          author_email: "<nobody@example.com>"
+          message: "Updating rust formatting"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull_strategy: "NO-PULL"

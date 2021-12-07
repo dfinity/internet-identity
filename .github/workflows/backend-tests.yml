@@ -13,8 +13,8 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     env:
-      GHC_VERSION: 8.8.4
       RUSTC_VERSION: 1.51.0
+      GHC_VERSION: 8.8.4
 
     steps:
       - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+          key: ${{ runner.os }}-cargo-dummy-captcha-${{ hashFiles('**/Cargo.lock') }}-1
 
       - name: Cache ~/.cabal/store
         uses: actions/cache@v2
@@ -36,9 +36,10 @@ jobs:
           restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
 
       - name: Install Rust
-        uses: ./.github/actions/install-rust/
-        with:
-          rustc_version: ${{ env.RUSTC_VERSION }}
+        run: |
+          rustup update "$RUSTC_VERSION" --no-self-update
+          rustup default "$RUSTC_VERSION"
+          rustup target add wasm32-unknown-unknown
 
       - uses: actions/setup-haskell@v1.1.3
         with:
