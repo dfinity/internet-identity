@@ -6,14 +6,15 @@ on:
       - main
   pull_request:
 
+env:
+  RUSTC_VERSION: 1.51.0
+
 jobs:
   cargo-tests:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
-    env:
-      RUSTC_VERSION: 1.51.0
     steps:
       - uses: actions/checkout@v2
 
@@ -39,8 +40,6 @@ jobs:
           RUST_BACKTRACE: 1
   cargo-fmt:
     runs-on: ubuntu-latest
-    env:
-      RUSTC_VERSION: 1.51.0
     steps:
       - uses: actions/checkout@v2
 
