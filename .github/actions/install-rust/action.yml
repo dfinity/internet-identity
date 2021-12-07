@@ -1,16 +1,8 @@
 name: Install Rust
-on:
-  workflow_call:
-    inputs:
-      os:
-        required: true
-        type: string
-jobs:
-  install-rust:
-    runs-on: ${{ inputs.os }}
-    env:
-      RUSTC_VERSION: 1.51.0
-    steps:
+description: Installs rust
+runs:
+  using: composite
+  steps:
       - uses: actions/checkout@v2
 
       - uses: actions/cache@v2
@@ -22,6 +14,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
 
       - name: Install Rust
+        shell: bash
         run: |
           rustup update "$RUSTC_VERSION" --no-self-update
           rustup default "$RUSTC_VERSION"

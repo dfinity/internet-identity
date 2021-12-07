@@ -13,12 +13,12 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
-      - uses: actions/checkout@v2
-
       - name: Install Rust
-        uses: ./.github/workflows/install-rust.yml
+        uses: ./.github/workflows/action.yml
         with:
           os: ${{ matrix.os }}
+      - uses: actions/checkout@v2
+
 
       - name: Create fake assets
         run : |
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Install Rust
-        uses: ./.github/workflows/install-rust.yml
+        uses: ./.github/workflows/action.yml
         with:
           os: ${{ runner.os }}
 
