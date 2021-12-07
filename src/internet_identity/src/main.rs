@@ -1,3 +1,4 @@
+use assets::ContentType;
 use ic_cdk::api::call::call;
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
@@ -230,6 +231,17 @@ impl Default for State {
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
+        }
+    }
+}
+
+impl ContentType {
+    fn to_mime_type_string(&self) -> String {
+        match self {
+            ContentType::HTML => "text/html".to_string(),
+            ContentType::JS => "text/javascript".to_string(),
+            ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
+            ContentType::WEBP => "image/webp".to_string(),
         }
     }
 }
@@ -796,6 +808,7 @@ fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+        ("Strict-Transport-Security".to_string(), "max-age=31536000 ; includeSubDomains".to_string()),
 
         // "Referrer-Policy: no-referrer" would be more strict, but breaks local dev deployment
         // same-origin is still ok from a security perspective
@@ -803,24 +816,45 @@ fn security_headers() -> Vec<HeaderField> {
         (
             "Permissions-Policy".to_string(),
             "accelerometer=(),\
+             ambient-light-sensor=(),\
              autoplay=(),\
+             battery=(),\
              camera=(),\
+             clipboard-read=(),\
+             clipboard-write=(),\
+             conversion-measurement=(),\
+             cross-origin-isolated=(),\
              display-capture=(),\
              document-domain=(),\
              encrypted-media=(),\
+             execution-while-not-rendered=(),\
+             execution-while-out-of-viewport=(),\
+             focus-without-user-activation=(),\
              fullscreen=(),\
+             gamepad=(),\
              geolocation=(),\
              gyroscope=(),\
+             hid=(),\
+             idle-detection=(),\
+             interest-cohort=(),\
+             keyboard-map=(),\
              magnetometer=(),\
              microphone=(),\
              midi=(),\
+             navigation-override=(),\
              payment=(),\
              picture-in-picture=(),\
              publickey-credentials-get=(self),\
              screen-wake-lock=(),\
+             serial=(),\
+             speaker-selection=(),\
+             sync-script=(),\
              sync-xhr=(self),\
+             trust-token-redemption=(),\
              usb=(),\
+             vertical-scroll=(),\
              web-share=(),\
+             window-placement=(),\
              xr-spatial-tracking=()"
                 .to_string(),
         ),
@@ -841,7 +875,6 @@ fn stats() -> InternetIdentityStats {
 // used both in init and post_upgrade
 fn init_assets() {
     use assets::ContentEncoding;
-    use assets::ContentType;
 
     STATE.with(|s| {
         let mut asset_hashes = s.asset_hashes.borrow_mut();
@@ -856,13 +889,7 @@ fn init_assets() {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
                     }
                 };
-                let content_type = match content_type {
-                    ContentType::HTML => "text/html".to_string(),
-                    ContentType::JS => "text/javascript".to_string(),
-                    ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
-                    ContentType::WEBP => "image/webp".to_string(),
-                };
-                headers.push(("Content-Type".to_string(), content_type));
+                headers.push(("Content-Type".to_string(), content_type.to_mime_type_string()));
                 assets.insert(name, (headers, contents));
             });
         });
