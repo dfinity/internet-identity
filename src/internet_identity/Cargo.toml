@@ -16,6 +16,11 @@ serde_bytes = "0.11"
 serde_cbor = "0.11"
 serde_with = "1.6.2"
 sha2 = "0.9.1"
+rand_core = "0.5.1"
+rand_chacha = "0.2.2"
+#  We need a custom captcha that allows using custom RNGs
+#  https://github.com/dfinity/internet-identity/issues/472
+captcha = { git = 'https://github.com/nmattia/captcha', rev = '4751b6fa4e56229c2af5b9a28195ff039551d8e7' }
 
 [dev-dependencies]
 hex-literal = "0.2.1"
@@ -23,3 +28,8 @@ rand = "0.8.3"
 
 [build-dependencies]
 sha2 = "0.9.1"
+
+[features]
+# the dummy_captcha feature which ensures the captcha string is always "a"
+# (needed for tests)
+dummy_captcha = []
