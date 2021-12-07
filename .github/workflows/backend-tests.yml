@@ -14,6 +14,7 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
     env:
       GHC_VERSION: 8.8.4
+      RUSTC_VERSION: 1.51.0
 
     steps:
       - uses: actions/checkout@v2
@@ -29,7 +30,7 @@ jobs:
       - name: Install Rust
         uses: ./.github/actions/install-rust/
         with:
-          os: ${{ runner.os }}
+          rustc_version: ${{ env.RUSTC_VERSION }}
 
       - uses: actions/setup-haskell@v1.1.3
         with:

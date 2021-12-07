@@ -16,6 +16,7 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     env:
+      RUSTC_VERSION: 1.51.0
       DFX_VERSION: 0.8.3
 
     steps:
@@ -24,7 +25,7 @@ jobs:
       - name: Install Rust
         uses: ./.github/actions/install-rust/
         with:
-          os: ${{ matrix.os }}
+          rustc_version: ${{ env.RUSTC_VERSION }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2

@@ -1,5 +1,9 @@
 name: Install Rust
 description: Installs rust
+inputs:
+  rustc_version:
+    description: 'Rust toolchain version'
+    required: true
 runs:
   using: composite
   steps:

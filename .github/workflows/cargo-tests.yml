@@ -12,13 +12,15 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
+    env:
+      RUSTC_VERSION: 1.51.0
     steps:
       - uses: actions/checkout@v2
 
       - name: Install Rust
         uses: ./.github/actions/install-rust/
         with:
-          os: ${{ matrix.os }}
+          rustc_version: ${{ env.RUSTC_VERSION }}
 
       - name: Create fake assets
         run : |
@@ -37,13 +39,15 @@ jobs:
           RUST_BACKTRACE: 1
   cargo-fmt:
     runs-on: ubuntu-latest
+    env:
+      RUSTC_VERSION: 1.51.0
     steps:
       - uses: actions/checkout@v2
 
       - name: Install Rust
         uses: ./.github/actions/install-rust/
         with:
-          os: ${{ runner.os }}
+          rustc_version: ${{ env.RUSTC_VERSION }}
 
       - name: Cargo fmt
         shell: bash
