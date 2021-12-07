@@ -27,7 +27,7 @@ jobs:
           restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
 
       - name: Install Rust
-        uses: ./.github/workflows/install-rust/action.yml
+        uses: ./.github/workflows/install-rust/
         with:
           os: ${{ runner.os }}
 

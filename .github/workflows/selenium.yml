@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Install Rust
-        uses: ./.github/workflows/install-rust/action.yml
+        uses: ./.github/workflows/install-rust/
         with:
           os: ${{ matrix.os }}
 
