@@ -1,3 +1,4 @@
+use assets::ContentType;
 use ic_cdk::api::call::call;
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
@@ -230,6 +231,17 @@ impl Default for State {
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
+        }
+    }
+}
+
+impl ContentType {
+    fn to_mime_type_string(&self) -> String {
+        match self {
+            ContentType::HTML => "text/html".to_string(),
+            ContentType::JS => "text/javascript".to_string(),
+            ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
+            ContentType::WEBP => "image/webp".to_string(),
         }
     }
 }
@@ -735,15 +747,17 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             match encode_metrics(&mut writer) {
                 Ok(()) => {
                     let body = writer.into_inner();
+                    let mut headers = vec![
+                        (
+                            "Content-Type".to_string(),
+                            "text/plain; version=0.0.4".to_string(),
+                        ),
+                        ("Content-Length".to_string(), body.len().to_string()),
+                    ];
+                    headers.append(&mut security_headers());
                     HttpResponse {
                         status_code: 200,
-                        headers: vec![
-                            (
-                                "Content-Type".to_string(),
-                                "text/plain; version=0.0.4".to_string(),
-                            ),
-                            ("Content-Length".to_string(), body.len().to_string()),
-                        ],
+                        headers,
                         body: Cow::Owned(ByteBuf::from(body)),
                         streaming_strategy: None,
                     }
@@ -764,11 +778,12 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     probably_an_asset,
                 )
             });
+            let mut headers = security_headers();
+            headers.push(certificate_header);
 
             ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
-                Some((headers, value)) => {
-                    let mut headers = headers.clone();
-                    headers.push(certificate_header);
+                Some((asset_headers, value)) => {
+                    headers.append(&mut asset_headers.clone());
 
                     HttpResponse {
                         status_code: 200,
@@ -779,7 +794,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                 }
                 None => HttpResponse {
                     status_code: 404,
-                    headers: vec![certificate_header],
+                    headers,
                     body: Cow::Owned(ByteBuf::from(format!(
                         "Asset {} not found.",
                         probably_an_asset
@@ -789,6 +804,66 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             })
         }
     }
+}
+
+/// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
+/// These headers enable browser security features (like limit access to platform apis and set
+/// iFrame policies, etc.).
+fn security_headers() -> Vec<HeaderField> {
+    vec![
+        ("X-Frame-Options".to_string(), "DENY".to_string()),
+        ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+        ("Strict-Transport-Security".to_string(), "max-age=31536000 ; includeSubDomains".to_string()),
+
+        // "Referrer-Policy: no-referrer" would be more strict, but breaks local dev deployment
+        // same-origin is still ok from a security perspective
+        ("Referrer-Policy".to_string(), "same-origin".to_string()),
+        (
+            "Permissions-Policy".to_string(),
+            "accelerometer=(),\
+             ambient-light-sensor=(),\
+             autoplay=(),\
+             battery=(),\
+             camera=(),\
+             clipboard-read=(),\
+             clipboard-write=(),\
+             conversion-measurement=(),\
+             cross-origin-isolated=(),\
+             display-capture=(),\
+             document-domain=(),\
+             encrypted-media=(),\
+             execution-while-not-rendered=(),\
+             execution-while-out-of-viewport=(),\
+             focus-without-user-activation=(),\
+             fullscreen=(),\
+             gamepad=(),\
+             geolocation=(),\
+             gyroscope=(),\
+             hid=(),\
+             idle-detection=(),\
+             interest-cohort=(),\
+             keyboard-map=(),\
+             magnetometer=(),\
+             microphone=(),\
+             midi=(),\
+             navigation-override=(),\
+             payment=(),\
+             picture-in-picture=(),\
+             publickey-credentials-get=(self),\
+             screen-wake-lock=(),\
+             serial=(),\
+             speaker-selection=(),\
+             sync-script=(),\
+             sync-xhr=(self),\
+             trust-token-redemption=(),\
+             usb=(),\
+             vertical-scroll=(),\
+             web-share=(),\
+             window-placement=(),\
+             xr-spatial-tracking=()"
+                .to_string(),
+        ),
+    ]
 }
 
 #[query]
@@ -811,14 +886,15 @@ fn init_assets() {
 
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
-            assets::for_each_asset(|name, encoding, contents, hash| {
+            assets::for_each_asset(|name, encoding, content_type, contents, hash| {
                 asset_hashes.insert(name, *hash);
-                let headers = match encoding {
+                let mut headers = match encoding {
                     ContentEncoding::Identity => vec![],
                     ContentEncoding::GZip => {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
                     }
                 };
+                headers.push(("Content-Type".to_string(), content_type.to_mime_type_string()));
                 assets.insert(name, (headers, contents));
             });
         });
