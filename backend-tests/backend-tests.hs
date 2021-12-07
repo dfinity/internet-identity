@@ -54,7 +54,8 @@ import Codec.Candid (Principal(..))
 import qualified Codec.Candid as Candid
 import qualified Data.Row.Variants as V
 
-import IC.Types
+import IC.Types hiding (PublicKey, Timestamp)
+import qualified IC.Types
 import IC.Ref
 import IC.Management
 import IC.Hash
@@ -70,91 +71,10 @@ import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
--- We cannot do
--- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
--- just yet, because haskell-candid doesn’t like init arguments to service, so
--- for now we have to copy it
 type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 
--- Names for some of these types. Unfortunately requires copying
-
-type DeviceData = [Candid.candidType|
-record {
-  pubkey : blob;
-  alias : text;
-  credential_id : opt blob;
-  purpose: variant {
-    recovery;
-    authentication;
-  };
-  key_type: variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-  };
-}
-  |]
-
-type RegisterResponse = [Candid.candidType|
-variant {
-  registered: record { user_number: nat64; };
-  canister_full;
-  bad_challenge;
-}
-  |]
-
-
-type SignedDelegation = [Candid.candidType|
-record {
-  delegation:
-    record {
-      pubkey: blob;
-      expiration: nat64;
-      targets: opt vec principal;
-    };
-  signature: blob;
-}
-  |]
-
-type Delegation = [Candid.candidType|
-  record {
-    pubkey: blob;
-    expiration: nat64;
-    targets: opt vec principal;
-  }
-  |]
-
-
-type InitCandid = [Candid.candidType|
-  record {
-    assigned_user_number_range : record { nat64; nat64; };
-  }
-  |]
-
-type ProofOfWork = [Candid.candidType|record {
-  timestamp : nat64;
-  nonce : nat64;
-}|]
-
-type ChallengeResult = [Candid.candidType|record {
-  key : text;
-  chars: text;
-}|]
-
-type HttpRequest = [Candid.candidType|record {
-  method : text;
-  url : text;
-  headers : vec record { text; text; };
-  body : blob;
-}|]
-
-type HttpResponse = [Candid.candidType|record {
-  status_code : nat16;
-  headers : vec record { text; text; };
-  body : blob;
-  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: opt record {}; }) query; }; };
-}|]
+-- Pulls in all type definitions as Haskell type aliases
+[Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
 mkPOW :: Word64 -> Word64 -> ProofOfWork
 mkPOW t n = #timestamp .== t .+ #nonce .== n
@@ -206,15 +126,15 @@ submitQuery r = do
     QueryResponse r <- handleQuery t r
     return r
 
-getTimestamp :: M Timestamp
+getTimestamp :: M IC.Types.Timestamp
 getTimestamp = lift $ do
     t <- getPOSIXTime
-    return $ Timestamp $ round (t * 1000_000_000)
+    return $ IC.Types.Timestamp $ round (t * 1000_000_000)
 
 mkRequestId :: IO RequestID
 mkRequestId = BS.toLazyByteString . BS.word64BE <$> randomIO
 
-setCanisterTimeTo :: Blob -> Timestamp -> M ()
+setCanisterTimeTo :: Blob -> IC.Types.Timestamp -> M ()
 setCanisterTimeTo cid new_time =
  modify $
   \ic -> ic { canisters = M.adjust (\cs -> cs { time = new_time }) (EntityId cid) (canisters ic) }
@@ -877,7 +797,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #mode .== V.IsJust #install ()
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
-        .+ #arg .== Candid.encode (Nothing :: Maybe InitCandid) -- default value
+        .+ #arg .== Candid.encode (Nothing :: Maybe InternetIdentityInit) -- default value
       act cid
 
     withUpgrade act = ([act False], [act True])
