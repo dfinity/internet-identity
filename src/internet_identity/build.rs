@@ -35,7 +35,6 @@ fn main() -> Result<(), String> {
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
-
         // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
         (
             "/faq",

@@ -813,8 +813,10 @@ fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-        ("Strict-Transport-Security".to_string(), "max-age=31536000 ; includeSubDomains".to_string()),
-
+        (
+            "Strict-Transport-Security".to_string(),
+            "max-age=31536000 ; includeSubDomains".to_string(),
+        ),
         // "Referrer-Policy: no-referrer" would be more strict, but breaks local dev deployment
         // same-origin is still ok from a security perspective
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
@@ -894,7 +896,10 @@ fn init_assets() {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
                     }
                 };
-                headers.push(("Content-Type".to_string(), content_type.to_mime_type_string()));
+                headers.push((
+                    "Content-Type".to_string(),
+                    content_type.to_mime_type_string(),
+                ));
                 assets.insert(name, (headers, contents));
             });
         });
