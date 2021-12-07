@@ -22,24 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/cache@v2
+      - name: Install Rust
+        uses: ./.github/workflows/install-rust.yml
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
+          os: ${{ matrix.os }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
           node-version: 14.x
-
-      - name: Install Rust
-        run: |
-          rustup update "$RUSTC_VERSION" --no-self-update
-          rustup default "$RUSTC_VERSION"
-          rustup target add wasm32-unknown-unknown
 
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
