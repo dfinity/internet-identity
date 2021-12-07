@@ -21,6 +21,7 @@ executable backend-tests
   build-depends: base64-bytestring
   build-depends: bytestring
   build-depends: candid
+  build-depends: case-insensitive
   build-depends: cborg
   build-depends: containers
   build-depends: hex-text

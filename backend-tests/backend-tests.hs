@@ -25,6 +25,8 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.Vector as V
 import qualified Data.ByteString.Base64.Lazy as Base64
+import           Data.CaseInsensitive  ( CI )
+import qualified Data.CaseInsensitive as CI
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Codec.CBOR.Term
@@ -388,6 +390,61 @@ validateHttpResponse cid asset resp = do
 
     _ -> lift $ assertFailure $ "Could not parse header: " <> show h
 
+validateSecurityHeaders :: HasCallStack => HttpResponse -> M ()
+validateSecurityHeaders resp = do
+  validateStaticHeader resp "X-Frame-Options" "DENY"
+  validateStaticHeader resp "X-Content-Type-Options" "nosniff"
+  validateStaticHeader resp "Referrer-Policy" "same-origin"
+  validateStaticHeader resp "Permissions-Policy" "accelerometer=(),\
+    \ambient-light-sensor=(),\
+    \autoplay=(),\
+    \battery=(),\
+    \camera=(),\
+    \clipboard-read=(),\
+    \clipboard-write=(),\
+    \conversion-measurement=(),\
+    \cross-origin-isolated=(),\
+    \display-capture=(),\
+    \document-domain=(),\
+    \encrypted-media=(),\
+    \execution-while-not-rendered=(),\
+    \execution-while-out-of-viewport=(),\
+    \focus-without-user-activation=(),\
+    \fullscreen=(),\
+    \gamepad=(),\
+    \geolocation=(),\
+    \gyroscope=(),\
+    \hid=(),\
+    \idle-detection=(),\
+    \interest-cohort=(),\
+    \keyboard-map=(),\
+    \magnetometer=(),\
+    \microphone=(),\
+    \midi=(),\
+    \navigation-override=(),\
+    \payment=(),\
+    \picture-in-picture=(),\
+    \publickey-credentials-get=(self),\
+    \screen-wake-lock=(),\
+    \serial=(),\
+    \speaker-selection=(),\
+    \sync-script=(),\
+    \sync-xhr=(self),\
+    \trust-token-redemption=(),\
+    \usb=(),\
+    \vertical-scroll=(),\
+    \web-share=(),\
+    \window-placement=(),\
+    \xr-spatial-tracking=()"
+
+validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
+validateStaticHeader resp headerName expectedValue = do
+  h <- case [ CI.mk v | (name, v) <- V.toList (resp .! #headers), CI.mk name == headerName ] of
+    [] -> lift $ assertFailure $ printf "header not found: " ++ show headerName
+    [h] -> return h
+    _ -> lift $ assertFailure $ printf "header duplicated: " ++ show headerName
+  unless (h == expectedValue) (liftIO $ assertFailure $  printf "Unexpected value of header %s: got %s instead of %s" (show headerName) (show h) (show expectedValue))
+
 assertRightS :: MonadIO m  => Either String a -> m a
 assertRightS (Left e) = liftIO $ assertFailure e
 assertRightS (Right x) = pure x
@@ -670,6 +727,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       when should_upgrade $ doUpgrade cid
       r <- queryII cid dummyUserId #http_request (httpGet asset)
       validateHttpResponse cid asset r
+      validateSecurityHeaders r
     | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /does-not-exist"
     ]
 
