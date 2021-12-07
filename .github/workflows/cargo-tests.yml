@@ -72,7 +72,6 @@ jobs:
           rustup component add rustfmt
 
       - name: Cargo fmt
-        shell: bash
         run: |
           cargo fmt
       - name: Commit Formatting changes
