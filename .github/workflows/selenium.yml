@@ -30,6 +30,11 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
 
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+
       - name: Install Rust
         run: |
           rustup update "$RUSTC_VERSION" --no-self-update
@@ -63,6 +68,9 @@ jobs:
       - name: Deploy Internet Identity
         run: |
           export II_ENV=development
+          # we use the dummy_captcha feature which ensures the captcha string
+          # is always "a"
+          export USE_DUMMY_CAPTCHA=1
           dfx deploy --no-wallet --argument '(null)'
 
       - name: Deploy whoami canister

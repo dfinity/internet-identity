@@ -120,8 +120,8 @@ button {
   letter-spacing: 0.005em;
 }
 
-button:hover,
-button:focus,
+button:not([disabled]):hover,
+button:not([disabled]):focus,
 a:focus {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
@@ -137,6 +137,13 @@ img {
   margin: auto;
 }
 
+#captchaImg {
+  height: 120px;
+  width: 220px;
+  min-width: 0px;
+  max-width: 220px;
+}
+
 ul {
   width: 100%;
   padding: 0;
@@ -150,6 +157,10 @@ label {
 form {
   margin-bottom: 2rem;
   flex-direction: column;
+}
+
+button:disabled.primary {
+  background-color: grey;
 }
 
 button.primary {
@@ -510,4 +521,50 @@ hr {
 .about__compatibility-flexchild {
   min-width: 1rem;
   padding: 1rem;
+}
+
+.nagBox {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  box-sizing: border-box;
+  border-style: double;
+  border-width: 2px;
+  border-radius: 4px;
+  border-image-slice: 1;
+  outline: none;
+  border-image-source: linear-gradient(
+    270.05deg,
+    #29abe2 10.78%,
+    #522785 22.2%,
+    #ed1e79 42.46%,
+    #f15a24 59.41%,
+    #fbb03b 77.09%
+  );
+}
+.nagIcon {
+  align-self: flex-start;
+}
+
+.nagContent {
+  display: flex;
+  flex-direction: column;
+}
+.nagTitle {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.nagMessage {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+.nagButton {
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+  width: fit-content;
+  align-self: flex-end;
+  margin: 0;
 }
