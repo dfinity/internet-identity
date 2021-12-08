@@ -13,12 +13,11 @@
     <div id="loaderContainer"></div>
     <!--
     Note: we cannot use a normal script tag like this
-
-    <script src="index.js" integrity="sha256-QKc0t+gyMRWWDNty0lxQKWpPz18K4pD8q3S0YoeQMdo=" defer></script>
-
+        <script src="index.js" integrity="sha256-QKc0t+gyMRWWDNty0lxQKWpPz18K4pD8q3S0YoeQMdo=" defer></script>
     because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
 
-    DO NOT MODIFY! (or if you do, update the CSP hash)
+    DO NOT MODIFY THE INLINE SCRIPT CONTENT!
+    (or if you do, update the CSP hash)
     -->
     <script>
         const scripts = [ 'index.js'];

@@ -814,17 +814,16 @@ fn security_headers() -> Vec<HeaderField> {
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
 
-        // Note: trusted types cannot be used -> FF issue
+        // Note: trusted types cannot be used due to firefox not supporting SRI.
+        // See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
         (
             "Content-Security-Policy".to_string(),
-            "object-src 'none';\
+            "default-src 'none';\
+             img-src 'self';\
              script-src 'sha256-Jv0sAUkSG6MPh2x4LKtLcTk/t4cxuu/fPen13STeEsw=' 'unsafe-inline' 'strict-dynamic' https: http:;\
              base-uri 'none';\
-             default-src 'self';\
-             child-src 'none';\
              frame-ancestors 'none';\
              form-action 'none';\
-
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
              style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
              font-src https://fonts.gstatic.com"
