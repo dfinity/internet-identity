@@ -437,6 +437,7 @@ validateSecurityHeaders resp = do
     \window-placement=(),\
     \xr-spatial-tracking=()"
   validateHeaderMatches resp "Content-Security-Policy" "^default-src 'none';\
+    \connect-src 'self';\
     \img-src 'self' data:;\
     \script-src 'sha256-[a-zA-Z0-9\\/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:;\
     \base-uri 'none';\
