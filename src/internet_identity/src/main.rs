@@ -813,6 +813,23 @@ fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+
+        // Note: trusted types cannot be used -> FF issue
+        (
+            "Content-Security-Policy".to_string(),
+            "object-src 'none';\
+             script-src 'sha256-Jv0sAUkSG6MPh2x4LKtLcTk/t4cxuu/fPen13STeEsw=' 'unsafe-inline' 'strict-dynamic' https: http:;\
+             base-uri 'none';\
+             default-src 'self';\
+             child-src 'none';\
+             frame-ancestors 'none';\
+             form-action 'none';\
+
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+             style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
+             font-src https://fonts.gstatic.com"
+                .to_string()
+        ),
         (
             "Strict-Transport-Security".to_string(),
             "max-age=31536000 ; includeSubDomains".to_string(),
