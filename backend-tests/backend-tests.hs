@@ -395,15 +395,6 @@ validateSecurityHeaders resp = do
   validateStaticHeader resp "X-Frame-Options" "DENY"
   validateStaticHeader resp "X-Content-Type-Options" "nosniff"
   validateStaticHeader resp "Referrer-Policy" "same-origin"
-  validateStaticHeader resp "Content-Security-Policy" "default-src 'none';\
-    \img-src 'self';\
-    \script-src 'sha256-Jv0sAUkSG6MPh2x4LKtLcTk/t4cxuu/fPen13STeEsw=' 'unsafe-inline' 'strict-dynamic' https: http:;\
-    \base-uri 'none';\
-    \frame-ancestors 'none';\
-    \form-action 'none';\
-    \style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-    \style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
-    \font-src https://fonts.gstatic.com"
   validateStaticHeader resp "Permissions-Policy" "accelerometer=(),\
     \ambient-light-sensor=(),\
     \autoplay=(),\
@@ -445,6 +436,15 @@ validateSecurityHeaders resp = do
     \web-share=(),\
     \window-placement=(),\
     \xr-spatial-tracking=()"
+  validateHeaderMatches resp "Content-Security-Policy" "^default-src 'none';\
+    \img-src 'self';\
+    \script-src 'sha256-[a-zA-Z0-9\\/=+]+' 'unsafe-inline' 'strict-dynamic' https: http:;\
+    \base-uri 'none';\
+    \frame-ancestors 'none';\
+    \form-action 'none';\
+    \style-src 'self' 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \style-src-elem 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \font-src https:\\/\\/fonts\\.gstatic\\.com$"
 
 validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
 validateStaticHeader resp headerName expectedValue = do
