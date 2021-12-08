@@ -820,7 +820,7 @@ fn security_headers() -> Vec<HeaderField> {
             "Content-Security-Policy".to_string(),
             "default-src 'none';\
              img-src 'self';\
-             script-src 'sha256-Jv0sAUkSG6MPh2x4LKtLcTk/t4cxuu/fPen13STeEsw=' 'unsafe-inline' 'strict-dynamic' https: http:;\
+             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'strict-dynamic' https: http:;\
              base-uri 'none';\
              frame-ancestors 'none';\
              form-action 'none';\
