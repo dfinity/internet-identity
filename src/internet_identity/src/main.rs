@@ -764,7 +764,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                 }
                 Err(err) => HttpResponse {
                     status_code: 500,
-                    headers: vec![],
+                    headers: security_headers(),
                     body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {}", err))),
                     streaming_strategy: None,
                 },
