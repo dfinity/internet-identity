@@ -815,13 +815,20 @@ fn security_headers() -> Vec<HeaderField> {
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
 
         // Note: trusted types cannot be used due to firefox not supporting SRI.
-        // See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
+        // See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+        //
+        // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for bls signatures.
+        // There is currently no other way to allow execution of WebAssembly modules with CSP.
+        // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
+        //
+        // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
+        // by modern browsers.
         (
             "Content-Security-Policy".to_string(),
             "default-src 'none';\
              connect-src 'self';\
              img-src 'self' data:;\
-             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:;\
+             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
              frame-ancestors 'none';\
              form-action 'none';\
