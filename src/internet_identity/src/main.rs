@@ -814,10 +814,16 @@ fn security_headers() -> Vec<HeaderField> {
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
 
-        // Note: trusted types cannot be used due to firefox not supporting SRI.
-        // See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+        // Content Security Policy
+        // General overview: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+        // Additional resources: https://csp.withgoogle.com/docs/index.html and https://csp-evaluator.withgoogle.com/
         //
-        // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for bls signatures.
+        // The sha256 hash matches the inline script in index.html. This inline script is a workaround
+        // for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
+        // This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+        //
+        // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
+        // validation of bls signatures.
         // There is currently no other way to allow execution of WebAssembly modules with CSP.
         // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md and
         // https://dfinity.atlassian.net/browse/FOLLOW-383.
@@ -835,7 +841,8 @@ fn security_headers() -> Vec<HeaderField> {
              form-action 'none';\
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
              style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
-             font-src https://fonts.gstatic.com"
+             font-src https://fonts.gstatic.com;\
+             upgrade-insecure-requests;"
                 .to_string()
         ),
         (
