@@ -815,8 +815,6 @@ fn security_headers() -> Vec<HeaderField> {
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
 
         // Content Security Policy
-        // General overview: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
-        // Additional resources: https://csp.withgoogle.com/docs/index.html and https://csp-evaluator.withgoogle.com/
         //
         // The sha256 hash matches the inline script in index.html. This inline script is a workaround
         // for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
