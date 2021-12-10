@@ -9,6 +9,7 @@ import { navbar } from "../components/navbar";
 import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 
+const PROD_ORIGIN = "https://identity.ic0.app";
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
@@ -50,12 +51,15 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     <button type="button" id="loginButton" class="primary">Authenticate</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
-      : html`<div class="textLink" id="registerSection">
-            New?
-            <button id="registerButton" class="linkStyle">
-              Create an Internet Identity Anchor.
-            </button>
-          </div>
+      : html`${window.origin === PROD_ORIGIN ||
+          process.env.II_ENV === "development"
+            ? html`<div class="textLink" id="registerSection">
+                New?
+                <button id="registerButton" class="linkStyle">
+                  Create an Internet Identity Anchor.
+                </button>
+              </div>`
+            : html``}
           <div class="textLink">
             Already have an anchor
             <button id="addNewDeviceButton" class="linkStyle">
@@ -106,17 +110,19 @@ const initRegister = (
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
-  registerButton.onclick = () => {
-    register()
-      .then((res) => {
-        if (res === null) {
-          window.location.reload();
-        } else {
-          resolve(res);
-        }
-      })
-      .catch(reject);
-  };
+  if (registerButton !== null) {
+    registerButton.onclick = () => {
+      register()
+        .then((res) => {
+          if (res === null) {
+            window.location.reload();
+          } else {
+            resolve(res);
+          }
+        })
+        .catch(reject);
+    };
+  }
 };
 
 const initRecovery = () => {
