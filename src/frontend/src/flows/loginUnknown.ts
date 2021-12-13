@@ -8,6 +8,7 @@ import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { navbar } from "../components/navbar";
 import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
+import {registerDisabled} from "./registerDisabled";
 
 const PROD_ORIGIN = "https://identity.ic0.app";
 const pageContent = (userIntent: UserIntent) => html` <style>
@@ -51,15 +52,12 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     <button type="button" id="loginButton" class="primary">Authenticate</button>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
-      : html`${window.origin === PROD_ORIGIN ||
-          process.env.II_ENV === "development"
-            ? html`<div class="textLink" id="registerSection">
-                New?
-                <button id="registerButton" class="linkStyle">
-                  Create an Internet Identity Anchor.
-                </button>
-              </div>`
-            : html``}
+      : html`<div class="textLink" id="registerSection">
+          New?
+          <button id="registerButton" class="linkStyle">
+            Create an Internet Identity Anchor.
+          </button>
+        </div>
           <div class="textLink">
             Already have an anchor
             <button id="addNewDeviceButton" class="linkStyle">
@@ -103,6 +101,10 @@ export const loginUnknown = async (
   });
 };
 
+function isRegistrationAllowed() {
+  return window.origin === PROD_ORIGIN || process.env.II_ENV !== "development";
+}
+
 const initRegister = (
   resolve: (res: LoginResult) => void,
   reject: (err: Error) => void
@@ -112,15 +114,14 @@ const initRegister = (
   ) as HTMLButtonElement;
   if (registerButton !== null) {
     registerButton.onclick = () => {
-      register()
-        .then((res) => {
-          if (res === null) {
-            window.location.reload();
-          } else {
-            resolve(res);
-          }
-        })
-        .catch(reject);
+      const prom = isRegistrationAllowed() ? register() : registerDisabled();
+      prom.then((res) => {
+        if (res === null) {
+          window.location.reload();
+        } else {
+          resolve(res);
+        }
+      }).catch(reject);
     };
   }
 };
