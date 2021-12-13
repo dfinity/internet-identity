@@ -88,7 +88,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
-      } catch (error:any) {
+      } catch (error: any) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await displayError({
           title: "Failed to add the device",

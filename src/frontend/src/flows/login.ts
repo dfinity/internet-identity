@@ -61,7 +61,7 @@ export const login = async (
         return login(userIntent);
       }
     }
-  } catch (err:any) {
+  } catch (err: any) {
     await displayError({
       title: "Something went wrong",
       message:
