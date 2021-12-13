@@ -10,7 +10,6 @@ import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
 import {registerDisabled} from "./registerDisabled";
 
-const PROD_ORIGIN = "https://identity.ic0.app";
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
@@ -102,7 +101,7 @@ export const loginUnknown = async (
 };
 
 function isRegistrationAllowed() {
-  return window.origin === PROD_ORIGIN || process.env.II_ENV !== "development";
+  return window.origin.match(/^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/)  || process.env.II_ENV === "development";
 }
 
 const initRegister = (
