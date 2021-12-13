@@ -8,7 +8,7 @@ import { addDeviceUserNumber } from "./addDeviceUserNumber";
 import { navbar } from "../components/navbar";
 import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
 import { useRecovery } from "./recovery/useRecovery";
-import {registerDisabled} from "./registerDisabled";
+import { registerDisabled } from "./registerDisabled";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -52,11 +52,11 @@ const pageContent = (userIntent: UserIntent) => html` <style>
     ${userIntent.kind === "addDevice"
       ? html`<div class="spacer"></div>`
       : html`<div class="textLink" id="registerSection">
-          New?
-          <button id="registerButton" class="linkStyle">
-            Create an Internet Identity Anchor.
-          </button>
-        </div>
+            New?
+            <button id="registerButton" class="linkStyle">
+              Create an Internet Identity Anchor.
+            </button>
+          </div>
           <div class="textLink">
             Already have an anchor
             <button id="addNewDeviceButton" class="linkStyle">
@@ -101,7 +101,11 @@ export const loginUnknown = async (
 };
 
 function isRegistrationAllowed() {
-  return /^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/.test(window.origin) || process.env.II_ENV === "development";
+  return (
+    /^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/.test(
+      window.origin
+    ) || process.env.II_ENV === "development"
+  );
 }
 
 const initRegister = (
@@ -114,13 +118,15 @@ const initRegister = (
   if (registerButton !== null) {
     registerButton.onclick = () => {
       const prom = isRegistrationAllowed() ? register() : registerDisabled();
-      prom.then((res) => {
-        if (res === null) {
-          window.location.reload();
-        } else {
-          resolve(res);
-        }
-      }).catch(reject);
+      prom
+        .then((res) => {
+          if (res === null) {
+            window.location.reload();
+          } else {
+            resolve(res);
+          }
+        })
+        .catch(reject);
     };
   }
 };

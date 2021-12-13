@@ -1,7 +1,7 @@
-import {html, render} from "lit-html";
-import {initLogout, logoutSection} from "../components/logout";
-import {warningIcon} from "../components/icons";
-import {LoginResult} from "./loginUnknown";
+import { html, render } from "lit-html";
+import { initLogout, logoutSection } from "../components/logout";
+import { warningIcon } from "../components/icons";
+import { LoginResult } from "./loginUnknown";
 
 const pageContent = html`
   <div class="container">
@@ -12,12 +12,14 @@ const pageContent = html`
         <div class="nagTitle">Registration Disabled</div>
         <div class="nagMessage">
           <p>
-            You are <b>not</b> browsing on <a href="https://identity.ic0.app">https://identity.ic0.app</a>.
-            For security reasons creation of new Internet Identity anchors is disabled
-            on this origin.
+            You are <b>not</b> browsing on
+            <a href="https://identity.ic0.app">https://identity.ic0.app</a>. For
+            security reasons creation of new Internet Identity anchors is
+            disabled on this origin.
           </p>
-          Please switch to <a href="https://identity.ic0.app">https://identity.ic0.app</a> to register a new Internet Identity
-          anchor.
+          Please switch to
+          <a href="https://identity.ic0.app">https://identity.ic0.app</a> to
+          register a new Internet Identity anchor.
         </div>
       </div>
     </div>
