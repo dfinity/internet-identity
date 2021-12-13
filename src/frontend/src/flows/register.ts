@@ -62,16 +62,18 @@ const init = (): Promise<LoginResult | null> =>
         });
         await tick();
         // Kick-start both the captcha creation and the identity
-        const captcha = makeCaptcha();
-        pendingIdentity
-          .catch((error) => {
+        Promise.all([
+          makeCaptcha(),
+          pendingIdentity.catch((error) => {
             resolve(apiResultToLoginResult({ kind: "authFail", error }));
             // We can never get here, but TS doesn't understand that
             return 0 as unknown as WebAuthnIdentity;
-          })
-          .then((identity) => {
-            confirmRegister(captcha, identity, alias).then(resolve);
-          });
+          }),
+        ]).then(([captcha, identity]) => {
+          confirmRegister(Promise.resolve(captcha), identity, alias).then(
+            resolve
+          );
+        });
       } catch (err) {
         reject(err);
       }
