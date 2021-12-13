@@ -61,12 +61,12 @@ export const login = async (
         return login(userIntent);
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     await displayError({
       title: "Something went wrong",
       message:
         "An unexpected error occurred during authentication. Please try again",
-      detail: err,
+      detail: err.toString(),
       primaryButton: "Try again",
     });
     window.location.reload();

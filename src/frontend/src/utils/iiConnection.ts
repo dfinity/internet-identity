@@ -90,7 +90,7 @@ export class IIConnection {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);
-    } catch (error) {
+    } catch (error: any) {
       return { kind: "authFail", error };
     }
 
@@ -110,7 +110,7 @@ export class IIConnection {
         },
         challengeResult
       );
-    } catch (error) {
+    } catch (error: any) {
       return { kind: "apiError", error };
     }
 
@@ -136,7 +136,7 @@ export class IIConnection {
     let devices: DeviceData[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
-    } catch (e) {
+    } catch (e: any) {
       return {
         kind: "apiError",
         error: e,
@@ -165,7 +165,7 @@ export class IIConnection {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
-    } catch (e) {
+    } catch (e: any) {
       return { kind: "authFail", error: e };
     }
 
