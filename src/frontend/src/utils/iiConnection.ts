@@ -11,6 +11,7 @@ import {
   PublicKey,
   SessionKey,
   CredentialId,
+  Challenge,
   UserNumber,
   FrontendHostname,
   Timestamp,
@@ -21,6 +22,7 @@ import {
   Purpose,
   KeyType,
   DeviceKey,
+  ChallengeResult,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -55,18 +57,23 @@ export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
-  | RegisterNoSpace;
+  | RegisterNoSpace
+  | BadChallenge;
 
 type LoginSuccess = {
   kind: "loginSuccess";
   connection: IIConnection;
   userNumber: bigint;
 };
+
+type BadChallenge = { kind: "badChallenge" };
 type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
 type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
+
+export type { ChallengeResult } from "../../generated/internet_identity_types";
 
 export class IIConnection {
   protected constructor(
@@ -78,7 +85,7 @@ export class IIConnection {
   static async register(
     identity: WebAuthnIdentity,
     alias: string,
-    pow: ProofOfWork
+    challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
     let delegationIdentity: DelegationIdentity;
     try {
@@ -91,9 +98,6 @@ export class IIConnection {
     const credential_id = Array.from(identity.rawId);
     const pubkey = Array.from(identity.getPublicKey().toDer());
 
-    console.log(
-      `register(DeviceData { alias=${alias}, pubkey=${pubkey}, credential_id=${credential_id} }, ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce})`
-    );
     let registerResponse: RegisterResponse;
     try {
       registerResponse = await actor.register(
@@ -104,7 +108,7 @@ export class IIConnection {
           key_type: { unknown: null },
           purpose: { authentication: null },
         },
-        pow
+        challengeResult
       );
     } catch (error: any) {
       return { kind: "apiError", error };
@@ -120,6 +124,8 @@ export class IIConnection {
         connection: new IIConnection(identity, delegationIdentity, actor),
         userNumber,
       };
+    } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
+      return { kind: "badChallenge" };
     } else {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");
@@ -205,6 +211,21 @@ export class IIConnection {
 
   static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
     return await baseActor.lookup(userNumber);
+  }
+
+  static async createChallenge(pow: ProofOfWork): Promise<Challenge> {
+    const agent = new HttpAgent();
+    agent.fetchRootKey();
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId: canisterId,
+    });
+    console.log(
+      `createChallenge(ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce} })`
+    );
+    const challenge = await actor.create_challenge(pow);
+    console.log("Challenge Created");
+    return challenge;
   }
 
   static async lookupAuthenticators(

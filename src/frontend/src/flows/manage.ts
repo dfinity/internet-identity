@@ -57,50 +57,6 @@ const displayFailedToListDevices = (error: Error) =>
 // The styling of the page
 
 const style = () => html`<style>
-  .nagBox {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    margin-bottom: 2rem;
-    box-sizing: border-box;
-    border-style: double;
-    border-width: 2px;
-    border-radius: 4px;
-    border-image-slice: 1;
-    outline: none;
-    border-image-source: linear-gradient(
-      270.05deg,
-      #29abe2 10.78%,
-      #522785 22.2%,
-      #ed1e79 42.46%,
-      #f15a24 59.41%,
-      #fbb03b 77.09%
-    );
-  }
-  .nagIcon {
-    align-self: flex-start;
-  }
-  .recoveryNag {
-    display: flex;
-    flex-direction: column;
-  }
-  .recoveryNagTitle {
-    font-weight: 600;
-    font-size: 1.1rem;
-  }
-  .recoveryNagMessage {
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
-    font-size: 1rem;
-  }
-  .recoveryNagButton {
-    padding: 0.2rem 0.4rem;
-    border-radius: 2px;
-    width: fit-content;
-    align-self: flex-end;
-    margin: 0;
-  }
   .labelWithAction {
     margin-top: 1rem;
     display: flex;
@@ -179,12 +135,12 @@ const deviceListItem = (alias: string) => html`
 const recoveryNag = () => html`
   <div class="nagBox">
     <div class="nagIcon">${warningIcon}</div>
-    <div class="recoveryNag">
-      <div class="recoveryNagTitle">Recovery Mechanism</div>
-      <div class="recoveryNagMessage">
+    <div class="nagContent">
+      <div class="nagTitle">Recovery Mechanism</div>
+      <div class="nagMessage">
         Add a recovery mechanism to help protect this Identity Anchor.
       </div>
-      <button id="addRecovery" class="primary recoveryNagButton">
+      <button id="addRecovery" class="primary nagButton">
         Add Recovery Key
       </button>
     </div>

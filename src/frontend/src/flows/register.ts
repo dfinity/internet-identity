@@ -1,16 +1,9 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
-import { withLoader } from "../components/loader";
-import {
-  IIConnection,
-  canisterIdPrincipal,
-  creationOptions,
-} from "../utils/iiConnection";
-import { setUserNumber } from "../utils/userNumber";
-import { confirmRegister } from "./confirmRegister";
-import { displayUserNumber } from "./displayUserNumber";
+import { creationOptions } from "../utils/iiConnection";
+import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
-import getProofOfWork from "../crypto/pow";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
@@ -67,28 +60,20 @@ const init = (): Promise<LoginResult | null> =>
       try {
         const pendingIdentity = WebAuthnIdentity.create({
           publicKey: creationOptions(),
-        }).catch((error) => {
-          resolve(apiResultToLoginResult({ kind: "authFail", error }));
-          // We can never get here, but TS doesn't understand that
-          return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
-        // Do PoW before registering.
-        const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-        const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
-        const identity = await pendingIdentity;
-        if (await confirmRegister()) {
-          const result = await withLoader(async () =>
-            IIConnection.register(identity, alias, pow)
-          );
-          if (result.kind === "loginSuccess") {
-            setUserNumber(result.userNumber);
-            await displayUserNumber(result.userNumber);
-          }
-          resolve(apiResultToLoginResult(result));
-        } else {
-          resolve(null);
-        }
+        // Kick-start both the captcha creation and the identity
+        Promise.all([makeCaptcha(), pendingIdentity])
+          .catch((error) => {
+            resolve(apiResultToLoginResult({ kind: "authFail", error }));
+            // We can never get here, but TS doesn't understand that
+            return 0 as unknown as [Challenge, WebAuthnIdentity];
+          })
+          .then(([captcha, identity]) => {
+            confirmRegister(Promise.resolve(captcha), identity, alias).then(
+              resolve
+            );
+          });
       } catch (err) {
         reject(err);
       }
