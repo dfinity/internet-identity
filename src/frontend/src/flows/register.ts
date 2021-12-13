@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
 import { creationOptions } from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
@@ -59,18 +60,20 @@ const init = (): Promise<LoginResult | null> =>
       try {
         const pendingIdentity = WebAuthnIdentity.create({
           publicKey: creationOptions(),
-        }).catch((error) => {
-          resolve(apiResultToLoginResult({ kind: "authFail", error }));
-          // We can never get here, but TS doesn't understand that
-          return 0 as unknown as WebAuthnIdentity;
         });
         await tick();
         // Kick-start both the captcha creation and the identity
-        const captcha = makeCaptcha();
-        const identity = await pendingIdentity;
-        await captcha;
-        const result = await confirmRegister(captcha, identity, alias);
-        resolve(result);
+        Promise.all([makeCaptcha(), pendingIdentity])
+          .catch((error) => {
+            resolve(apiResultToLoginResult({ kind: "authFail", error }));
+            // We can never get here, but TS doesn't understand that
+            return 0 as unknown as [Challenge, WebAuthnIdentity];
+          })
+          .then(([captcha, identity]) => {
+            confirmRegister(Promise.resolve(captcha), identity, alias).then(
+              resolve
+            );
+          });
       } catch (err) {
         reject(err);
       }
