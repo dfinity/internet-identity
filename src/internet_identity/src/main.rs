@@ -823,8 +823,7 @@ fn security_headers() -> Vec<HeaderField> {
         // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
         // validation of bls signatures.
         // There is currently no other way to allow execution of WebAssembly modules with CSP.
-        // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md and
-        // https://dfinity.atlassian.net/browse/FOLLOW-383.
+        // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
         //
         // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
         // by modern browsers.
