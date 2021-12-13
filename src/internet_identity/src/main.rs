@@ -813,6 +813,39 @@ fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+
+        // Content Security Policy
+        //
+        // The sha256 hash matches the inline script in index.html. This inline script is a workaround
+        // for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
+        // This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+        //
+        // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
+        // validation of bls signatures.
+        // There is currently no other way to allow execution of WebAssembly modules with CSP.
+        // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
+        //
+        // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
+        // by modern browsers.
+        //
+        // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
+        // application. Adding hashes would require a big restructuring of the application and build
+        // infrastructure.
+        (
+            "Content-Security-Policy".to_string(),
+            "default-src 'none';\
+             connect-src 'self';\
+             img-src 'self' data:;\
+             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+             base-uri 'none';\
+             frame-ancestors 'none';\
+             form-action 'none';\
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+             style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
+             font-src https://fonts.gstatic.com;\
+             upgrade-insecure-requests;"
+                .to_string()
+        ),
         (
             "Strict-Transport-Security".to_string(),
             "max-age=31536000 ; includeSubDomains".to_string(),
