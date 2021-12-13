@@ -828,6 +828,10 @@ fn security_headers() -> Vec<HeaderField> {
         //
         // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
         // by modern browsers.
+        //
+        // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
+        // application. Adding hashes would require a big restructuring of the application and build
+        // infrastructure.
         (
             "Content-Security-Policy".to_string(),
             "default-src 'none';\
