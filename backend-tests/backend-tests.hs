@@ -436,6 +436,17 @@ validateSecurityHeaders resp = do
     \web-share=(),\
     \window-placement=(),\
     \xr-spatial-tracking=()"
+  validateHeaderMatches resp "Content-Security-Policy" "^default-src 'none';\
+    \connect-src 'self';\
+    \img-src 'self' data:;\
+    \script-src 'sha256-[a-zA-Z0-9\\/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+    \base-uri 'none';\
+    \frame-ancestors 'none';\
+    \form-action 'none';\
+    \style-src 'self' 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \style-src-elem 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \font-src https:\\/\\/fonts\\.gstatic\\.com;\
+    \upgrade-insecure-requests;$"
 
 validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
 validateStaticHeader resp headerName expectedValue = do
@@ -444,6 +455,14 @@ validateStaticHeader resp headerName expectedValue = do
     [h] -> return h
     _ -> lift $ assertFailure $ printf "header duplicated: " ++ show headerName
   unless (h == expectedValue) (liftIO $ assertFailure $  printf "Unexpected value of header %s: got %s instead of %s" (show headerName) (show h) (show expectedValue))
+
+validateHeaderMatches :: HasCallStack => HttpResponse -> CI T.Text -> T.Text -> M ()
+validateHeaderMatches resp headerName expectedValue = do
+  h <- case [ v | (name, v) <- V.toList (resp .! #headers), CI.mk name == headerName ] of
+    [] -> lift $ assertFailure $ printf "header not found: " ++ show headerName
+    [h] -> return h
+    _ -> lift $ assertFailure $ printf "header duplicated: " ++ show headerName
+  unless (h =~ expectedValue) (liftIO $ assertFailure $  printf "Value %s of header %s does not match expected pattern %s" (show headerName) (show h) (show expectedValue))
 
 assertRightS :: MonadIO m  => Either String a -> m a
 assertRightS (Left e) = liftIO $ assertFailure e
