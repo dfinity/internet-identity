@@ -101,7 +101,7 @@ export const loginUnknown = async (
 };
 
 function isRegistrationAllowed() {
-  return window.origin.match(/^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/)  || process.env.II_ENV === "development";
+  return /^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/.test(window.origin) || process.env.II_ENV === "development";
 }
 
 const initRegister = (
