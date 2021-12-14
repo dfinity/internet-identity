@@ -54,7 +54,9 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
-RUN mkdir -p src/internet_identity/src && touch src/internet_identity/src/lib.rs
+# NOTE: we make the timestamp of src/lib.rs very old so that cargo knows to
+# rebuild the real file when we copy it
+RUN mkdir -p src/internet_identity/src && touch -t 197001010000 src/internet_identity/src/lib.rs
 RUN cargo build --target wasm32-unknown-unknown --release -j1
 
 # copy the actual code
