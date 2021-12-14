@@ -115,20 +115,18 @@ const initRegister = (
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
-  if (registerButton !== null) {
-    registerButton.onclick = () => {
-      const prom = isRegistrationAllowed() ? register() : registerDisabled();
-      prom
-        .then((res) => {
-          if (res === null) {
-            window.location.reload();
-          } else {
-            resolve(res);
-          }
-        })
-        .catch(reject);
-    };
-  }
+  registerButton.onclick = () => {
+    const result = isRegistrationAllowed() ? register() : registerDisabled();
+    result
+      .then((res) => {
+        if (res === null) {
+          window.location.reload();
+        } else {
+          resolve(res);
+        }
+      })
+      .catch(reject);
+  };
 };
 
 const initRecovery = () => {

@@ -1,7 +1,6 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../components/logout";
 import { warningIcon } from "../components/icons";
-import { LoginResult } from "./loginUnknown";
 
 const pageContent = html`
   <div class="container">
@@ -12,14 +11,20 @@ const pageContent = html`
         <div class="nagTitle">Registration Disabled</div>
         <div class="nagMessage">
           <p>
-            You are <b>not</b> browsing on
+            You are <b>not</b> browsing this website on the expected URL:
             <a href="https://identity.ic0.app">https://identity.ic0.app</a>. For
             security reasons creation of new Internet Identity anchors is
             disabled on this origin.
           </p>
-          Please switch to
-          <a href="https://identity.ic0.app">https://identity.ic0.app</a> to
-          register a new Internet Identity anchor.
+          <p>
+            Please switch to
+            <a href="https://identity.ic0.app">https://identity.ic0.app</a> to
+            register a new Internet Identity anchor.
+          </p>
+          <p>
+            If you were redirected here by another website, please inform the
+            developers. This is most likely a bug.
+          </p>
         </div>
       </div>
     </div>
