@@ -47,6 +47,18 @@ ENV CARGO_HOME=/cargo \
 # (keep version in sync with src/internet_identity/build.sh)
 RUN cargo install ic-cdk-optimizer --version 0.3.1
 
+# warm up the cache. Since cargo doesn't have a flag to only build the
+# dependecies, we copy all the files (Cargo.toml, Cargo.lock, vendored deps)
+# _except_ for the actual internet identity code, which we replace with a dummy.
+COPY Cargo.lock .
+COPY Cargo.toml .
+COPY src/cubehash src/cubehash
+COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
+RUN mkdir -p src/internet_identity/src && touch src/internet_identity/src/lib.rs
+RUN cargo build --target wasm32-unknown-unknown --release -j1
+
+# copy the actual code
+RUN rm -rf src
 COPY . .
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
