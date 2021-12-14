@@ -56,6 +56,7 @@ RUN npm ci
 RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release -j1
 RUN sha256sum dist/*
+RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
 RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
 RUN cp /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm .
 RUN sha256sum internet_identity.wasm
