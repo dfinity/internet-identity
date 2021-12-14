@@ -5,7 +5,9 @@
 #
 # and find the .wasmfile in out/
 
-FROM ubuntu:20.10
+# The docker image. To update, run `docker pull ubuntu` locally, and update the
+# sha256:... accordingly.
+FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322
 
 ARG rust_version=1.51.0
 ENV NODE_VERSION=14.15.4
