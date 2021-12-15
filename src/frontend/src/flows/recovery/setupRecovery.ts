@@ -30,7 +30,7 @@ export const setupRecovery = async (
           recoverIdentity = await WebAuthnIdentity.create({
             publicKey: creationOptions(devices, "cross-platform"),
           });
-        } catch (err) {
+        } catch (err: any) {
           await displayError({
             title: "Authentication failure",
             message:
@@ -71,7 +71,7 @@ export const setupRecovery = async (
         await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     await displayError({
       title: "Failed to set up recovery",
       message: "We failed to set up recovery for this Identity Anchor.",
