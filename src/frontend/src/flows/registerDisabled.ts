@@ -23,7 +23,11 @@ const pageContent = html`
           </p>
           <p>
             If you were redirected here by another website, please inform the
-            developers. This is most likely a bug.
+            developers. More information is provided
+            <a
+              href="https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694"
+              >here</a
+            >.
           </p>
         </div>
       </div>
