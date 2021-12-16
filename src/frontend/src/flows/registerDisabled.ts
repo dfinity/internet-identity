@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { initLogout, logoutSection } from "../components/logout";
 import { warningIcon } from "../components/icons";
 
 const pageContent = html`
@@ -33,7 +32,6 @@ const pageContent = html`
       </div>
     </div>
     <button id="deviceAliasCancel">Cancel</button>
-    ${logoutSection()}
   </div>
 `;
 
@@ -45,7 +43,6 @@ export const registerDisabled = async (): Promise<null> => {
 
 const init = (): Promise<null> =>
   new Promise((resolve) => {
-    initLogout();
     const deviceAliasCancel = document.getElementById(
       "deviceAliasCancel"
     ) as HTMLButtonElement;

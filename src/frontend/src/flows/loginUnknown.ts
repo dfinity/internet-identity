@@ -100,11 +100,13 @@ export const loginUnknown = async (
   });
 };
 
+/** Check that the current origin is not the explicit canister id or a raw url.
+ *  Explanation why we need to do this:
+ *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
+ **/
 function isRegistrationAllowed() {
-  return (
-    /^(https:\/\/identity\.ic0\.app$)|(https:\/\/[a-zA-Z0-9-]+\.[a-z]+\.dfinity\.network$)/.test(
-      window.origin
-    ) || process.env.II_ENV === "development"
+  return !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
+    window.origin
   );
 }
 
