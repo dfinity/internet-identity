@@ -58,12 +58,13 @@ const init = (): Promise<LoginResult | null> =>
       await tick();
 
       try {
-        const pendingIdentity = WebAuthnIdentity.create({
-          publicKey: creationOptions(),
-        });
-        await tick();
         // Kick-start both the captcha creation and the identity
-        Promise.all([makeCaptcha(), pendingIdentity])
+        Promise.all([
+          makeCaptcha(),
+          WebAuthnIdentity.create({
+            publicKey: creationOptions(),
+          }),
+        ])
           .catch((error) => {
             resolve(apiResultToLoginResult({ kind: "authFail", error }));
             // We can never get here, but TS doesn't understand that
