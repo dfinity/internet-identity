@@ -369,6 +369,23 @@ const requestFEDelegation = async (
   return DelegationIdentity.fromDelegation(sessionKey, chain);
 };
 
+// The options sent to the browser when creating the credentials.
+// Credentials (key pair) creation is signed with a private key that is unique per device
+// model, as an "attestation" that the credentials were created with a FIDO
+// device. In II we discard this attestation because we only care about the key
+// pair that was created and that we use later. Discarding the attestation
+// means we do not have to care about attestation checking security concerns
+// like setting a server-generated, random challenge.
+//
+// Algorithm -7, ECDSA_WITH_SHA256, is specified. The reason is that the
+// generated (ECDSA) key pair is used later directly to sign messages to the
+// IC -- the "assertion" -- so we must use a signing algorithm supported by the
+// IC:
+//  * https://smartcontracts.org/docs/interface-spec/index.html#signatures
+//
+// For more information on attestation vs assertion (credentials.create vs
+// credentials.get), see
+//  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: DeviceData[] = [],
   authenticatorAttachment?: AuthenticatorAttachment
