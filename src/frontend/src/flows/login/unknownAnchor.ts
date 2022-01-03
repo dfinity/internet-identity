@@ -1,18 +1,15 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../utils/iiConnection";
-import { parseUserNumber, setUserNumber } from "../utils/userNumber";
-import { withLoader } from "../components/loader";
-import { register } from "./register";
-import { icLogo } from "../components/icons";
-import { addDeviceUserNumber } from "./addDeviceUserNumber";
-import { navbar } from "../components/navbar";
-import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
-import { useRecovery } from "./recovery/useRecovery";
-import { registerDisabled } from "./registerDisabled";
-import {
-  apiResultToLoginFlowResult,
-  LoginFlowResult,
-} from "./login/flowResult";
+import { IIConnection } from "../../utils/iiConnection";
+import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
+import { withLoader } from "../../components/loader";
+import { register } from "../register";
+import { icLogo } from "../../components/icons";
+import { addDeviceUserNumber } from "../addDeviceUserNumber";
+import { navbar } from "../../components/navbar";
+import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
+import { useRecovery } from "../recovery/useRecovery";
+import { registerDisabled } from "../registerDisabled";
+import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -76,7 +73,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   </div>
   ${navbar}`;
 
-export const loginUnknown = async (
+export const loginUnknownAnchor = async (
   userIntent: UserIntent
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
