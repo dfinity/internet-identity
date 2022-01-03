@@ -2,7 +2,7 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
 import { IIConnection, LoginResult } from "../../utils/iiConnection";
 import { hasOwnProperty } from "../../utils/utils";
-import { apiResultToLoginFlowResult } from "../loginUnknown";
+import { apiResultToLoginFlowResult } from "../login/flowResult";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";
 import { inputSeedPhrase } from "./inputSeedPhrase";

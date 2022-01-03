@@ -7,11 +7,11 @@ import { logoutSection, initLogout } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
 import { authenticateIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
+import { loginUnknown } from "./loginUnknown";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
-  loginUnknown,
-} from "./loginUnknown";
+} from "./login/flowResult";
 import { useRecovery } from "./recovery/useRecovery";
 
 const pageContent = (

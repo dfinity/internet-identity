@@ -3,7 +3,10 @@ import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
 import { creationOptions } from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
-import { apiResultToLoginFlowResult, LoginFlowResult } from "./loginUnknown";
+import {
+  apiResultToLoginFlowResult,
+  LoginFlowResult,
+} from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
