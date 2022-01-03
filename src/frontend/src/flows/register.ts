@@ -3,7 +3,7 @@ import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
 import { creationOptions } from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
-import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
+import { apiResultToLoginFlowResult, LoginFlowResult } from "./loginUnknown";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
@@ -27,7 +27,7 @@ const constructingContent = html`
   </div>
 `;
 
-export const register = async (): Promise<LoginResult | null> => {
+export const register = async (): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init();
@@ -38,7 +38,7 @@ const renderConstructing = () => {
   render(constructingContent, container);
 };
 
-const init = (): Promise<LoginResult | null> =>
+const init = (): Promise<LoginFlowResult | null> =>
   new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
@@ -66,7 +66,7 @@ const init = (): Promise<LoginResult | null> =>
           }),
         ])
           .catch((error) => {
-            resolve(apiResultToLoginResult({ kind: "authFail", error }));
+            resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
             // We can never get here, but TS doesn't understand that
             return 0 as unknown as [Challenge, WebAuthnIdentity];
           })

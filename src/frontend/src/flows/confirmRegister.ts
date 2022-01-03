@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { displayUserNumber } from "./displayUserNumber";
 import { displayError } from "../components/displayError";
 import { setUserNumber } from "../utils/userNumber";
-import { apiResultToLoginResult, LoginResult } from "./loginUnknown";
+import { apiResultToLoginFlowResult, LoginFlowResult } from "./loginUnknown";
 import { Challenge } from "../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
@@ -34,7 +34,7 @@ export const confirmRegister = (
   captcha: Promise<Challenge>,
   identity: WebAuthnIdentity,
   alias: string
-): Promise<LoginResult | null> => {
+): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init(canisterIdPrincipal, identity, alias, captcha);
@@ -44,7 +44,7 @@ const tryRegister = (
   identity: WebAuthnIdentity,
   alias: string,
   challengeResult: ChallengeResult,
-  func: (result: LoginResult) => void
+  func: (result: LoginFlowResult) => void
 ) => {
   withLoader(async () => {
     return IIConnection.register(identity, alias, challengeResult);
@@ -55,7 +55,7 @@ const tryRegister = (
 
       // Congratulate user
       displayUserNumber(result.userNumber).then(() => {
-        func(apiResultToLoginResult(result));
+        func(apiResultToLoginFlowResult(result));
       });
     } else if (result.kind == "badChallenge") {
       const confirmParagraph = document.querySelector(
@@ -142,7 +142,7 @@ const init = (
   identity: WebAuthnIdentity,
   alias: string,
   captcha: Promise<Challenge>
-): Promise<LoginResult | null> => {
+): Promise<LoginFlowResult | null> => {
   requestCaptcha(captcha);
 
   // since the index expects to regain control we unfortunately have to wrap

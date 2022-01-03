@@ -8,8 +8,8 @@ import { IIConnection } from "../utils/iiConnection";
 import { authenticateIntent, UserIntent } from "../utils/userIntent";
 import { getUserNumber } from "../utils/userNumber";
 import {
-  apiResultToLoginResult,
-  LoginResult,
+  apiResultToLoginFlowResult,
+  LoginFlowResult,
   loginUnknown,
 } from "./loginUnknown";
 import { useRecovery } from "./recovery/useRecovery";
@@ -74,7 +74,7 @@ export const login = async (
   }
 };
 
-const tryLogin = async (userIntent: UserIntent): Promise<LoginResult> => {
+const tryLogin = async (userIntent: UserIntent): Promise<LoginFlowResult> => {
   const userNumber = getUserNumber();
   if (userNumber === undefined) {
     return loginUnknown(userIntent);
@@ -88,7 +88,7 @@ const tryLogin = async (userIntent: UserIntent): Promise<LoginResult> => {
 const init = async (
   userNumber: bigint,
   userIntent: UserIntent
-): Promise<LoginResult> => {
+): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
@@ -100,7 +100,7 @@ const init = async (
       ev.preventDefault();
       ev.stopPropagation();
       const result = await withLoader(() => IIConnection.login(userNumber));
-      resolve(apiResultToLoginResult(result));
+      resolve(apiResultToLoginFlowResult(result));
     };
 
     loginDifferentButton.onclick = async (ev) => {

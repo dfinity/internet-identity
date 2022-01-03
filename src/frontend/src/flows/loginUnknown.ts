@@ -72,7 +72,7 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   </div>
   ${navbar}`;
 
-export type LoginResult =
+export type LoginFlowResult =
   | {
       tag: "ok";
       userNumber: bigint;
@@ -87,7 +87,7 @@ export type LoginResult =
 
 export const loginUnknown = async (
   userIntent: UserIntent
-): Promise<LoginResult> => {
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userIntent), container);
   return new Promise((resolve, reject) => {
@@ -111,7 +111,7 @@ function isRegistrationAllowed() {
 }
 
 const initRegister = (
-  resolve: (res: LoginResult) => void,
+  resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
   const registerButton = document.getElementById(
@@ -138,7 +138,7 @@ const initRecovery = () => {
   recoverButton.onclick = () => useRecovery();
 };
 
-const initLogin = (resolve: (res: LoginResult) => void) => {
+const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -167,7 +167,7 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
-    resolve(apiResultToLoginResult(result));
+    resolve(apiResultToLoginFlowResult(result));
   };
 };
 
@@ -186,7 +186,7 @@ const initLinkDevice = () => {
   };
 };
 
-export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
+export const apiResultToLoginFlowResult = (result: ApiResult): LoginFlowResult => {
   switch (result.kind) {
     case "loginSuccess": {
       return {
