@@ -861,7 +861,7 @@ fn security_headers() -> Vec<HeaderField> {
              battery=(),\
              camera=(),\
              clipboard-read=(),\
-             clipboard-write=(),\
+             clipboard-write=(self),\
              conversion-measurement=(),\
              cross-origin-isolated=(),\
              display-capture=(),\
