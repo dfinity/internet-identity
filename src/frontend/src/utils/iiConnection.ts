@@ -90,8 +90,15 @@ export class IIConnection {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);
-    } catch (error: any) {
-      return { kind: "authFail", error };
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "authFail", error };
+      } else {
+        return {
+          kind: "authFail",
+          error: new Error("Unknown error when requesting delegation"),
+        };
+      }
     }
 
     const actor = await IIConnection.createActor(delegationIdentity);
@@ -110,8 +117,15 @@ export class IIConnection {
         },
         challengeResult
       );
-    } catch (error: any) {
-      return { kind: "apiError", error };
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
     }
 
     if (hasOwnProperty(registerResponse, "canister_full")) {
@@ -136,11 +150,15 @@ export class IIConnection {
     let devices: DeviceData[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
-    } catch (e: any) {
-      return {
-        kind: "apiError",
-        error: e,
-      };
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        return { kind: "apiError", error: e };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when looking up authenticators"),
+        };
+      }
     }
 
     if (devices.length === 0) {
@@ -165,8 +183,15 @@ export class IIConnection {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
-    } catch (e: any) {
-      return { kind: "authFail", error: e };
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        return { kind: "authFail", error: e };
+      } else {
+        return {
+          kind: "authFail",
+          error: new Error("Unknown error when requesting delegation"),
+        };
+      }
     }
 
     const actor = await IIConnection.createActor(delegationIdentity);

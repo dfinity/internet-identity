@@ -11,6 +11,7 @@ import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber } from "../utils/userNumber";
+import { unknownToString } from "../utils/utils";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
 
@@ -88,13 +89,13 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await displayError({
           title: "Failed to add the device",
           message:
             "Something went wrong when adding the new device. Please try again",
-          detail: error.toString(),
+          detail: unknownToString(error, "Unknown error type"),
           primaryButton: "Back to Authenticate",
         });
         window.location.reload();

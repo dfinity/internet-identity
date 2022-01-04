@@ -15,7 +15,7 @@ import { displayError } from "../components/displayError";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
-import { hasOwnProperty } from "../utils/utils";
+import { hasOwnProperty, unknownToString } from "../utils/utils";
 
 // The various error messages we may display
 
@@ -157,8 +157,10 @@ export const renderManage = async (
   let devices: DeviceData[];
   try {
     devices = await withLoader(() => IIConnection.lookupAll(userNumber));
-  } catch (error: any) {
-    await displayFailedToListDevices(error);
+  } catch (error: unknown) {
+    await displayFailedToListDevices(
+      error instanceof Error ? error : unknownError()
+    );
     return renderManage(userNumber, connection);
   }
   render(pageContent(userNumber, devices), container);
@@ -178,8 +180,10 @@ const addAdditionalDevice = async (
     newDevice = await WebAuthnIdentity.create({
       publicKey: creationOptions(devices),
     });
-  } catch (error: any) {
-    await displayFailedToAddNewDevice(error);
+  } catch (error: unknown) {
+    await displayFailedToAddNewDevice(
+      error instanceof Error ? error : unknownError()
+    );
     return renderManage(userNumber, connection);
   }
   const deviceName = await pickDeviceAlias();
@@ -197,8 +201,10 @@ const addAdditionalDevice = async (
         newDevice.rawId
       )
     );
-  } catch (error: any) {
-    await displayFailedToAddTheDevice(error);
+  } catch (error: unknown) {
+    await displayFailedToAddTheDevice(
+      error instanceof Error ? error : unknownError()
+    );
   }
   renderManage(userNumber, connection);
 };
@@ -312,12 +318,12 @@ const bindRemoveListener = (
         location.reload();
       }
       renderManage(userNumber, connection);
-    } catch (err: any) {
+    } catch (err: unknown) {
       await displayError({
         title: "Failed to remove the device",
         message:
           "An unexpected error occured when trying to remove the device. Please try again",
-        detail: err.toString(),
+        detail: unknownToString(err, "Unknown error"),
         primaryButton: "Back to Manage",
       });
       renderManage(userNumber, connection);
@@ -328,3 +334,7 @@ const bindRemoveListener = (
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
   !devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
+
+const unknownError = (): Error => {
+  return new Error("Unknown error");
+};
