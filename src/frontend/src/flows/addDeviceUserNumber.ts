@@ -8,6 +8,7 @@ import { html, render } from "lit-html";
 import { DeviceData } from "../../generated/internet_identity_types";
 import { displayError } from "../components/displayError";
 import { creationOptions, IIConnection } from "../utils/iiConnection";
+import { unknownToString } from "../utils/utils";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
 
@@ -73,12 +74,18 @@ const init = () => {
         identity = await WebAuthnIdentity.create({
           publicKey: creationOptions(existingDevices),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        let message: string;
+        if (error instanceof Error && "message" in error) {
+          message = error.message;
+        } else {
+          message = unknownToString(error, "Unknown error");
+        }
         await displayError({
           title: "Failed to authenticate",
           message:
             "We failed to collect the necessary information from your security device.",
-          detail: error.message,
+          detail: message,
           primaryButton: "Try again",
         });
         return addDeviceUserNumber(userNumber);
