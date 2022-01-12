@@ -9,7 +9,7 @@ cubehash = { path = "../cubehash" }
 hex = "0.4"
 ic-cdk = "0.3.2"
 ic-cdk-macros = "0.3"
-ic-certified-map = { git = "git://github.com/dfinity/cdk-rs", rev = "129d1a8c595525c6f4c54e73bafa779143e568ce" }
+ic-certified-map = { git = "https://github.com/dfinity/cdk-rs.git", rev = "129d1a8c595525c6f4c54e73bafa779143e568ce" }
 ic-types = "0.1.1"
 serde = "1"
 serde_bytes = "0.11"
