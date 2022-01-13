@@ -1,16 +1,16 @@
-import {
-  blobFromUint8Array,
-  blobToHex,
-  derBlobFromBlob,
-} from "@dfinity/candid";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { DeviceData } from "../../generated/internet_identity_types";
 import { displayError } from "../components/displayError";
-import { creationOptions, IIConnection } from "../utils/iiConnection";
+import {
+  bufferEqual,
+  creationOptions,
+  IIConnection,
+} from "../utils/iiConnection";
 import { unknownToString } from "../utils/utils";
 import { parseUserNumber, setUserNumber } from "../utils/userNumber";
 import { displayAddDeviceLink } from "./displayAddDeviceLink";
+import { toHexString } from "@dfinity/identity/lib/cjs/buffer";
 
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
@@ -91,11 +91,11 @@ const init = () => {
         return addDeviceUserNumber(userNumber);
       }
       const publicKey = identity.getPublicKey().toDer();
-      const rawId = blobToHex(identity.rawId);
+      const rawId = toHexString(identity.rawId);
 
       const url = new URL(location.toString());
       url.pathname = "/";
-      url.hash = `#device=${userNumber};${blobToHex(publicKey)};${rawId}`;
+      url.hash = `#device=${userNumber};${toHexString(publicKey)};${rawId}`;
       const link = encodeURI(url.toString());
 
       displayAddDeviceLink(link);
@@ -104,9 +104,7 @@ const init = () => {
         try {
           const devices = await IIConnection.lookupAuthenticators(userNumber);
           const matchedDevice = devices.find((deviceData) =>
-            derBlobFromBlob(
-              blobFromUint8Array(Buffer.from(deviceData.pubkey))
-            ).equals(publicKey)
+            bufferEqual(new Uint8Array(deviceData.pubkey).buffer, publicKey)
           );
           if (matchedDevice !== undefined) {
             window.clearInterval(loginInterval);
