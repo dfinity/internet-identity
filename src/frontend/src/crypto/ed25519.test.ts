@@ -1,6 +1,6 @@
 import { Ed25519PublicKey } from "@dfinity/identity";
 import * as ed25519 from "./ed25519";
-import {fromHexString} from "@dfinity/identity/lib/cjs/buffer";
+import { fromHexString } from "@dfinity/identity/lib/cjs/buffer";
 
 type TestVector = {
   seed: string;
@@ -76,7 +76,9 @@ test("derive Ed25519 via SLIP 0010", async () => {
       );
 
       const keyPair = identity.getKeyPair();
-      expect(keyPair.secretKey.slice(0, 32)).toEqual(new Uint8Array(expectedPrivateKey));
+      expect(keyPair.secretKey.slice(0, 32)).toEqual(
+        new Uint8Array(expectedPrivateKey)
+      );
       expect(keyPair.publicKey.toDer()).toEqual(
         Ed25519PublicKey.fromRaw(expectedPublicKey).toDer()
       );
