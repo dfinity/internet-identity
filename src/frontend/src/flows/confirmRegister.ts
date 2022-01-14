@@ -67,20 +67,26 @@ const tryRegister = (
       confirmParagraph.innerHTML =
         "The value you entered is incorrect. A new challenge is generated.";
       requestCaptcha();
-    } else {
-      // Currently if something goes wrong we only tell the user that
+    } else if (result.kind == "registerNoSpace") {
+      // Currently, if something goes wrong we only tell the user that
       // something went wrong and then reload the page.
+      displayError({
+        title: "No Space Left",
+        message:
+          "We could not create an identity anchor because Internet Identity is at maximum capacity. Click 'ok' to reload.",
+        primaryButton: "Ok",
+      }).then(() => {window.location.reload();})
+    } else {
       displayError({
         title: "Something went wrong",
         message:
           "We could not create an identity anchor. You will find the full error message below. Click 'ok' to reload.",
         primaryButton: "Ok",
-        detail: JSON.stringify(result),
+        detail: JSON.stringify(result.error, Object.getOwnPropertyNames(result.error)),
       })
         .then(() => {
           window.location.reload();
-        })
-        .then(() => requestCaptcha());
+        });
     }
   });
 };
