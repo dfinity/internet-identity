@@ -239,12 +239,7 @@ export class IIConnection {
   }
 
   static async createChallenge(pow: ProofOfWork): Promise<Challenge> {
-    const agent = new HttpAgent();
-    agent.fetchRootKey();
-    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-      agent,
-      canisterId: canisterId,
-    });
+    const actor = await this.createActor();
     console.log(
       `createChallenge(ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce} })`
     );
@@ -270,9 +265,8 @@ export class IIConnection {
   }
 
   // Create an actor representing the backend
-
   static async createActor(
-    delegationIdentity: DelegationIdentity
+    delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
