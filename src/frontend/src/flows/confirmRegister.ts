@@ -75,18 +75,22 @@ const tryRegister = (
         message:
           "We could not create an identity anchor because Internet Identity is at maximum capacity. Click 'ok' to reload.",
         primaryButton: "Ok",
-      }).then(() => {window.location.reload();})
+      }).then(() => {
+        window.location.reload();
+      });
     } else {
       displayError({
         title: "Something went wrong",
         message:
           "We could not create an identity anchor. You will find the full error message below. Click 'ok' to reload.",
         primaryButton: "Ok",
-        detail: JSON.stringify(result.error, Object.getOwnPropertyNames(result.error)),
-      })
-        .then(() => {
-          window.location.reload();
-        });
+        detail: JSON.stringify(
+          result.error,
+          Object.getOwnPropertyNames(result.error)
+        ),
+      }).then(() => {
+        window.location.reload();
+      });
     }
   });
 };
