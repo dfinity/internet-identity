@@ -40,6 +40,7 @@ footer {
 .powered-by-link {
   padding: 0.5em;
   display: inline-block;
+  transition: background 0.2s;
 }
 
 .powered-by-link:hover,
