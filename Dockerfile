@@ -47,20 +47,19 @@ ENV CARGO_HOME=/cargo \
 # (keep version in sync with src/internet_identity/build.sh)
 RUN cargo install ic-cdk-optimizer --version 0.3.1
 
-# warm up the cache. Since cargo doesn't have a flag to only build the
-# dependecies, we copy all the files (Cargo.toml, Cargo.lock, vendored deps)
-# _except_ for the actual internet identity code, which we replace with a dummy.
+# Pre-build all cargo dependencies. Because cargo doesn't have a build option
+# to build only the dependecies, we pretend that our project is a simple, empty
+# `lib.rs`. Then we remove the dummy source files to make sure cargo rebuild
+# everything once the actual source code is COPYed (and e.g. doesn't trip on
+# timestamps being older)
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
-# NOTE: we make the timestamp of src/lib.rs very old so that cargo knows to
-# rebuild the real file when we copy it
-RUN mkdir -p src/internet_identity/src && touch -t 197001010000 src/internet_identity/src/lib.rs
-RUN cargo build --target wasm32-unknown-unknown --release -j1
+RUN mkdir -p src/internet_identity/src && touch src/internet_identity/src/lib.rs && cargo build --target wasm32-unknown-unknown --release -j1 && rm -rf src
 
-# copy the actual code
-RUN rm -rf src
+FROM deps as build
+
 COPY . .
 
 ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
