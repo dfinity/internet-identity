@@ -1,5 +1,6 @@
 import { render, html } from "lit-html";
 import { navbar } from "../../components/navbar";
+import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
 import { logoutSection, initLogout } from "../../components/logout";
@@ -35,9 +36,9 @@ const pageContent = (
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    ${logoutSection("Clear Identity Anchor from browser")}
+    ${logoutSection("Clear Identity Anchor from browser")} ${navbar}
   </div>
-  ${navbar}`;
+  ${footer}`;
 
 export const loginKnownAnchor = async (
   userIntent: UserIntent,

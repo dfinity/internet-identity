@@ -7,8 +7,8 @@ import {
 } from "@dfinity/candid";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
-import { aboutLink } from "../components/aboutLink";
-import { faqLink } from "../components/faqLink";
+import { navbar } from "../components/navbar";
+import { footer } from "../components/footer";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
@@ -93,10 +93,8 @@ const style = () => html`<style>
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-const pageContent = (
-  userNumber: bigint,
-  devices: DeviceData[]
-) => html` ${style()}
+const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
+  ${style()}
   <div class="container">
     <h1>Anchor Management</h1>
     <p>
@@ -123,9 +121,10 @@ const pageContent = (
           </div>
           <div id="recoveryList"></div>
         `}
-    ${logoutSection()}
+    ${logoutSection()} ${navbar}
   </div>
-  <div id="navbar">${aboutLink} &middot; ${faqLink}</div>`;
+  ${footer}
+`;
 
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
