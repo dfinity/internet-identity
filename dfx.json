@@ -4,8 +4,7 @@
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "target/wasm32-unknown-unknown/release/internet_identity.wasm",
-      "build": "src/internet_identity/build.sh",
-      "source": ["dist"]
+      "build": "src/internet_identity/build.sh"
     }
   },
   "defaults": {
