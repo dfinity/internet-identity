@@ -2,9 +2,6 @@ name: Cargo tests
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
 
 jobs:
   cargo-tests:
