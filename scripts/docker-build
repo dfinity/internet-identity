@@ -1,6 +1,6 @@
 #/usr/bin/env bash
 # vim: ft=bash
-# Build internet-identity.wasm inside docker. This outputs a single file, internet-identity.wasm,
+# Build internet_identity.wasm inside docker. This outputs a single file, internet_identity.wasm,
 # in the top-level directory.
 
 set -euo pipefail
