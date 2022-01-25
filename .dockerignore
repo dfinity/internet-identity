@@ -10,6 +10,7 @@ screenshots
 target
 out
 arg.in
+Dockerfile
 *.wasm
 
 # filter out all "hidden" files and directories

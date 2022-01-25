@@ -7,7 +7,7 @@
 
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
-FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322
+FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
 
 ARG rust_version=1.51.0
 ENV NODE_VERSION=14.15.4
@@ -70,6 +70,8 @@ RUN npm run build
 RUN cargo build --target wasm32-unknown-unknown --release -j1
 RUN sha256sum dist/*
 RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
-RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
-RUN cp /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm .
-RUN sha256sum internet_identity.wasm
+RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /internet_identity.wasm
+RUN sha256sum /internet_identity.wasm
+
+FROM scratch AS scratch
+COPY --from=build /internet_identity.wasm /
