@@ -6,6 +6,7 @@ import { register } from "../register";
 import { icLogo } from "../../components/icons";
 import { addDeviceUserNumber } from "../addDeviceUserNumber";
 import { navbar } from "../../components/navbar";
+import { footer } from "../../components/footer";
 import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
 import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
@@ -70,8 +71,9 @@ const pageContent = (userIntent: UserIntent) => html` <style>
               and want to recover?
             </button>
           </div>`}
+    ${navbar}
   </div>
-  ${navbar}`;
+  ${footer}`;
 
 export const loginUnknownAnchor = async (
   userIntent: UserIntent
