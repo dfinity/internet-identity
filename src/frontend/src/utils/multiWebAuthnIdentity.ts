@@ -7,18 +7,19 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
-import { PublicKey, SignIdentity } from "@dfinity/agent";
 import {
-  BinaryBlob,
-  blobFromUint8Array,
-  DerEncodedBlob,
-} from "@dfinity/candid";
+  DerEncodedPublicKey,
+  PublicKey,
+  Signature,
+  SignIdentity,
+} from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
+import { bufferEqual } from "./iiConnection";
 
-export type CredentialId = BinaryBlob;
+export type CredentialId = ArrayBuffer;
 export type CredentialData = {
-  pubkey: DerEncodedBlob;
+  pubkey: DerEncodedPublicKey;
   credentialId: CredentialId;
 };
 
@@ -52,7 +53,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     }
   }
 
-  public async sign(blob: BinaryBlob): Promise<BinaryBlob> {
+  public async sign(blob: ArrayBuffer): Promise<Signature> {
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
@@ -65,9 +66,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     })) as PublicKeyCredential;
 
     this.credentialData.forEach((cd) => {
-      if (
-        cd.credentialId.equals(blobFromUint8Array(Buffer.from(result.rawId)))
-      ) {
+      if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
         const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
         // would be nice if WebAuthnIdentity had a directly usable constructor
         this._actualIdentity = WebAuthnIdentity.fromJSON(
@@ -85,25 +84,18 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     }
 
     const response = result.response as AuthenticatorAssertionResponse;
-    if (
-      response.signature instanceof ArrayBuffer &&
-      response.authenticatorData instanceof ArrayBuffer
-    ) {
-      const cbor = borc.encode(
-        new borc.Tagged(55799, {
-          authenticator_data: new Uint8Array(response.authenticatorData),
-          client_data_json: new TextDecoder().decode(response.clientDataJSON),
-          signature: new Uint8Array(response.signature),
-        })
-      );
-      // eslint-disable-next-line
-      if (!cbor) {
-        throw new Error("failed to encode cbor");
-      }
-      return blobFromUint8Array(new Uint8Array(cbor));
-    } else {
-      throw new Error("Invalid response from WebAuthn.");
+    const cbor = borc.encode(
+      new borc.Tagged(55799, {
+        authenticator_data: new Uint8Array(response.authenticatorData),
+        client_data_json: new TextDecoder().decode(response.clientDataJSON),
+        signature: new Uint8Array(response.signature),
+      })
+    );
+    // eslint-disable-next-line
+    if (!cbor) {
+      throw new Error("failed to encode cbor");
     }
+    return new Uint8Array(cbor).buffer as Signature;
   }
 }
 

@@ -1,10 +1,9 @@
 import { render, html } from "lit-html";
-import { creationOptions, IIConnection } from "../utils/iiConnection";
 import {
-  derBlobFromBlob,
-  blobFromUint8Array,
-  DerEncodedBlob,
-} from "@dfinity/candid";
+  bufferEqual,
+  creationOptions,
+  IIConnection,
+} from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
@@ -16,6 +15,7 @@ import { pickDeviceAlias } from "./addDevicePickAlias";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 
 // The various error messages we may display
 
@@ -288,13 +288,12 @@ const bindRemoveListener = (
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const pubKey: DerEncodedBlob = derBlobFromBlob(
-      blobFromUint8Array(new Uint8Array(publicKey))
+    const pubKey: DerEncodedPublicKey = new Uint8Array(publicKey)
+      .buffer as DerEncodedPublicKey;
+    const sameDevice = bufferEqual(
+      connection.identity.getPublicKey().toDer(),
+      pubKey
     );
-    const sameDevice = connection.identity
-      .getPublicKey()
-      .toDer()
-      .equals(pubKey);
 
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");

@@ -1,6 +1,6 @@
-import { blobFromHex } from "@dfinity/candid";
 import { Ed25519PublicKey } from "@dfinity/identity";
 import * as ed25519 from "./ed25519";
+import { fromHexString } from "@dfinity/identity/lib/cjs/buffer";
 
 type TestVector = {
   seed: string;
@@ -65,20 +65,22 @@ const testVectorsSLIP10 = [
 
 test("derive Ed25519 via SLIP 0010", async () => {
   await Promise.all(
-    testVectorsSLIP10.map(async (testVector, i) => {
-      const seedBlob = blobFromHex(testVector.seed);
-      const expectedPrivateKey = blobFromHex(testVector.privateKey);
-      const expectedPublicKey = blobFromHex(testVector.publicKey);
+    testVectorsSLIP10.map(async (testVector: TestVector, i) => {
+      const seedBlob = fromHexString(testVector.seed);
+      const expectedPrivateKey = fromHexString(testVector.privateKey);
+      const expectedPublicKey = fromHexString(testVector.publicKey);
 
       let identity = await ed25519.fromSeedWithSlip0010(
-        seedBlob,
+        new Uint8Array(seedBlob),
         testVector.derivationPath
       );
 
       const keyPair = identity.getKeyPair();
-      expect(keyPair.secretKey.slice(0, 32)).toEqual(expectedPrivateKey);
-      expect(keyPair.publicKey).toEqual(
-        Ed25519PublicKey.fromRaw(expectedPublicKey)
+      expect(keyPair.secretKey.slice(0, 32)).toEqual(
+        new Uint8Array(expectedPrivateKey)
+      );
+      expect(keyPair.publicKey.toDer()).toEqual(
+        Ed25519PublicKey.fromRaw(expectedPublicKey).toDer()
       );
     })
   );
