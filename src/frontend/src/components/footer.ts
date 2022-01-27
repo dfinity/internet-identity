@@ -6,6 +6,6 @@ export const footer = html`<footer>
     aria-label="DFINITY homepage"
     href="https://dfinity.org"
     target="_blank"
-    ><img src="/ic-badge-default.svg" alt="Powered by Internet Computer"
+    ><img src="/ic-badge.svg" alt="Built on Crypto | Internet Computer"
   /></a>
 </footer>`;
