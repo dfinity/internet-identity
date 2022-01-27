@@ -64,9 +64,10 @@ const init = (): Promise<LoginFlowResult | null> =>
         // Kick-start both the captcha creation and the identity
         Promise.all([
           makeCaptcha(),
-          WebAuthnIdentity.create({
-            publicKey: creationOptions(),
-          }),
+          WebAuthnIdentity.fromJSON('{"publicKey":"a5010203262001215820b6709fcb207d6e65fc8e8e4ed839fb2bda5a61f5d28275dcbfbd53050a64ab422258206d02a86accc3147673bd16f06266da200bf6895e436f0f36e495c44a9a5b1148","rawId":"01dd0f531c92533840240531ac6b79edf56462179db27412c621f989b3d8c4384f5461bc866feb1ded12b3ff36253c333e27c3acba761281f6257691a3606de428cd8a5f6fec8e3b20d54ff9bbb4d26749c87593"}'),
+          //WebAuthnIdentity.create({
+            //publicKey: creationOptions(),
+          //}),
         ])
           .catch((error) => {
             resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
@@ -74,6 +75,8 @@ const init = (): Promise<LoginFlowResult | null> =>
             return 0 as unknown as [Challenge, WebAuthnIdentity];
           })
           .then(([captcha, identity]) => {
+              console.log("Got identity");
+              console.log(JSON.stringify(identity.toJSON()));
             confirmRegister(Promise.resolve(captcha), identity, alias).then(
               resolve
             );
