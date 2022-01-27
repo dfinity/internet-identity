@@ -1,4 +1,4 @@
-#/usr/bin/env bash
+#!/usr/bin/env bash
 # vim: ft=bash
 # Build internet_identity.wasm inside docker. This outputs a single file, internet_identity.wasm,
 # in the top-level directory.

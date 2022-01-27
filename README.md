@@ -11,8 +11,7 @@ can validate that we really deploy what we claim to deploy.
 We try to achieve some level of reproducibility using a Dockerized build
 environment. The following steps _should_ build the official Wasm image
 
-    docker build -t internet-identity-service .
-    docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+    ./scripts/docker-build
     sha256sum internet_identity.wasm
 
 The resulting `internet_identity.wasm` is ready for deployment as
