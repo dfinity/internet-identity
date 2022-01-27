@@ -747,7 +747,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       r <- queryII cid dummyUserId #http_request (httpGet asset)
       validateHttpResponse cid asset r
       validateSecurityHeaders r
-    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /does-not-exist"
+    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /ic-badge.svg /does-not-exist"
     ]
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do

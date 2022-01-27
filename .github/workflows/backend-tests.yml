@@ -60,6 +60,7 @@ jobs:
           touch dist/index.js.gz
           touch dist/loader.webp
           touch dist/favicon.ico
+          touch dist/ic-badge.svg
 
       - name: Build backend canister
         run: |
