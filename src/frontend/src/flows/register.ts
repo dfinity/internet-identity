@@ -11,15 +11,6 @@ import {
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
-const toHexString = (bytes: Uint8Array) =>
-  bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
-
-function fromHexString(hexString: string): ArrayBuffer {
-      return new Uint8Array((hexString.match(/.{1,2}/g) ?? []).map(byte => parseInt(byte, 16))).buffer;
-  }
-
-
-
 const pageContent = html`
   <div class="container">
     <h1>Create a new Internet Identity Anchor</h1>
