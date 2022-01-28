@@ -4,7 +4,10 @@ import {
   DerEncodedPublicKey,
   HttpAgent,
   SignIdentity,
+  Signature,
 } from "@dfinity/agent";
+import * as agent from "@dfinity/agent";
+
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
@@ -57,6 +60,16 @@ export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   canisterId,
 });
 
+export class AlmostSignIdentity extends Ed25519KeyIdentity {
+    public readonly rawId: ArrayBuffer;
+
+    public constructor(rawId: ArrayBuffer, skey: ArrayBuffer) {
+        let keypair = Ed25519KeyIdentity.fromSecretKey(skey).getKeyPair();
+        super(keypair.publicKey, keypair.secretKey);
+        this.rawId = rawId;
+    }
+}
+
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
@@ -96,7 +109,7 @@ export class IIConnection {
   ) {}
 
   static async register(
-    identity: WebAuthnIdentity,
+    identity: SignIdentity,
     alias: string,
     challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
@@ -115,7 +128,6 @@ export class IIConnection {
     }
 
     const actor = await IIConnection.createActor(delegationIdentity);
-    const credential_id = Array.from(new Uint8Array(identity.rawId));
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
 
     let registerResponse: RegisterResponse;
@@ -124,7 +136,7 @@ export class IIConnection {
         {
           alias,
           pubkey,
-          credential_id: [credential_id],
+          credential_id: [],
           key_type: { unknown: null },
           purpose: { authentication: null },
         },
@@ -185,14 +197,12 @@ export class IIConnection {
     userNumber: bigint,
     devices: DeviceData[]
   ): Promise<LoginResult> {
-    const multiIdent = MultiWebAuthnIdentity.fromCredentials(
-      devices.flatMap((device) =>
-        device.credential_id.map((credentialId: CredentialId) => ({
-          pubkey: derFromPubkey(device.pubkey),
-          credentialId: Buffer.from(credentialId),
-        }))
-      )
-    );
+
+    let bytes = new Uint8Array(32);
+    let skey = tweetnacl.sign.keyPair.fromSeed(bytes).secretKey;
+
+    // not a multi ident anymore of course
+    let multiIdent = Ed25519KeyIdentity.fromSecretKey(skey);
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(multiIdent);
@@ -214,7 +224,7 @@ export class IIConnection {
       userNumber,
       connection: new IIConnection(
         // eslint-disable-next-line
-        multiIdent._actualIdentity!,
+        multiIdent,
         delegationIdentity,
         actor
       ),

@@ -7,6 +7,7 @@ import {
   LoginFlowResult,
 } from "./login/flowResult";
 import { Challenge } from "../../generated/internet_identity_types";
+import { SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
@@ -35,7 +36,7 @@ const pageContent = html`
 
 export const confirmRegister = (
   captcha: Promise<Challenge>,
-  identity: WebAuthnIdentity,
+  identity: SignIdentity,
   alias: string
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -44,7 +45,7 @@ export const confirmRegister = (
 };
 
 const tryRegister = (
-  identity: WebAuthnIdentity,
+  identity: SignIdentity,
   alias: string,
   challengeResult: ChallengeResult,
   func: (result: LoginFlowResult) => void
@@ -152,7 +153,7 @@ export const makeCaptcha = (): Promise<Challenge> =>
 
 const init = (
   canisterIdPrincipal: Principal,
-  identity: WebAuthnIdentity,
+  identity: SignIdentity,
   alias: string,
   captcha: Promise<Challenge>
 ): Promise<LoginFlowResult | null> => {
