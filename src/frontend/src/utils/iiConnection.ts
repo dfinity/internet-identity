@@ -4,7 +4,9 @@ import {
   DerEncodedPublicKey,
   HttpAgent,
   SignIdentity,
+  Signature,
 } from "@dfinity/agent";
+import * as agent from "@dfinity/agent";
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
@@ -35,6 +37,34 @@ import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
+
+/* An identity with an ID */
+export class IdentifiableIdentity extends SignIdentity {
+
+    private _sign: (blob: ArrayBuffer) => Promise<Signature>;
+    private _getPublicKey: () => agent.PublicKey;
+
+    public readonly rawId: ArrayBuffer;
+
+    public constructor(base: SignIdentity, rawId: ArrayBuffer) {
+        super();
+        this._sign = base.sign;
+        this._getPublicKey = base.getPublicKey;
+        this.rawId = rawId;
+    }
+
+    public static fromWebAuthnIdentity(base: WebAuthnIdentity) {
+        return new IdentifiableIdentity(base, base.rawId);
+    }
+
+    sign(blob: ArrayBuffer): Promise<Signature> {
+        return this._sign(blob);
+    }
+
+    getPublicKey(): agent.PublicKey {
+        return this._getPublicKey();
+    }
+}
 
 // eslint-disable-next-line
 const canisterId: string = process.env.CANISTER_ID!;
@@ -83,7 +113,7 @@ export class IIConnection {
   ) {}
 
   static async register(
-    identity: WebAuthnIdentity,
+    identity: IdentifiableIdentity,
     alias: string,
     challengeResult: ChallengeResult
   ): Promise<RegisterResult> {

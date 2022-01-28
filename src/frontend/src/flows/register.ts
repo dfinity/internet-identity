@@ -1,7 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
-import { creationOptions } from "../utils/iiConnection";
+import { IdentifiableIdentity, creationOptions } from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import {
   apiResultToLoginFlowResult,
@@ -74,7 +74,7 @@ const init = (): Promise<LoginFlowResult | null> =>
             return 0 as unknown as [Challenge, WebAuthnIdentity];
           })
           .then(([captcha, identity]) => {
-            confirmRegister(Promise.resolve(captcha), identity, alias).then(
+            confirmRegister(Promise.resolve(captcha), IdentifiableIdentity.fromWebAuthnIdentity(identity), alias).then(
               resolve
             );
           });
