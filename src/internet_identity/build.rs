@@ -16,6 +16,7 @@ pub enum ContentType {
     JS,
     ICO,
     WEBP,
+    SVG,
 }
 
 fn hash_file(path: &str) -> [u8; 32] {
@@ -72,6 +73,12 @@ fn main() -> Result<(), String> {
             ContentEncoding::Identity,
             ContentType::ICO,
         ),
+        (
+            "/ic-badge.svg",
+            "../../dist/ic-badge.svg",
+            ContentEncoding::Identity,
+            ContentType::SVG,
+        ),
     ];
 
     for (_, path, _, _) in asset_rel_paths.iter() {
@@ -101,7 +108,8 @@ pub enum ContentType {{
     HTML,
     JS,
     ICO,
-    WEBP
+    WEBP,
+    SVG
 }}
 
 pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentType, &'static [u8], &[u8; 32])) {{

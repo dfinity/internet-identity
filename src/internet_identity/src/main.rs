@@ -242,6 +242,7 @@ impl ContentType {
             ContentType::JS => "text/javascript".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
+            ContentType::SVG => "image/svg+xml".to_string(),
         }
     }
 }
