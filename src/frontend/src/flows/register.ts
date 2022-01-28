@@ -61,15 +61,12 @@ const init = (): Promise<LoginFlowResult | null> =>
       renderConstructing();
       await tick();
 
-      let bytes = new Uint8Array(32);
-      let skey = tweetnacl.sign.keyPair.fromSeed(bytes).secretKey;
-      let rawId = bytes;
 
       try {
         // Kick-start both the captcha creation and the identity
         Promise.all([
           makeCaptcha(),
-          Ed25519KeyIdentity.fromSecretKey(skey),
+          Ed25519KeyIdentity.fromSecretKey(tweetnacl.sign.keyPair.fromSeed(new Uint8Array(32)).secretKey),
         ])
           .catch((error) => {
             resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
@@ -77,11 +74,9 @@ const init = (): Promise<LoginFlowResult | null> =>
             return 0 as unknown as [Challenge, Ed25519KeyIdentity];
           })
           .then(([captcha, identity]) => {
-              console.log("Got identity");
-              console.log(JSON.stringify(identity.toJSON()));
-              confirmRegister(Promise.resolve(captcha), identity, alias).then(
-                  resolve
-              );
+            confirmRegister(Promise.resolve(captcha), identity, alias).then(
+              resolve
+            );
           });
       } catch (err) {
         reject(err);

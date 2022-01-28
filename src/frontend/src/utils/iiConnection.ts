@@ -6,8 +6,6 @@ import {
   SignIdentity,
   Signature,
 } from "@dfinity/agent";
-import * as agent from "@dfinity/agent";
-
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
