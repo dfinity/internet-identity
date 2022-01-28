@@ -60,16 +60,6 @@ export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   canisterId,
 });
 
-export class AlmostSignIdentity extends Ed25519KeyIdentity {
-    public readonly rawId: ArrayBuffer;
-
-    public constructor(rawId: ArrayBuffer, skey: ArrayBuffer) {
-        let keypair = Ed25519KeyIdentity.fromSecretKey(skey).getKeyPair();
-        super(keypair.publicKey, keypair.secretKey);
-        this.rawId = rawId;
-    }
-}
-
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;

@@ -79,7 +79,6 @@ const init = (): Promise<LoginFlowResult | null> =>
         Promise.all([
           makeCaptcha(),
           Ed25519KeyIdentity.fromSecretKey(skey),
-          //new AlmostSignIdentity(rawId, skey),
         ])
           .catch((error) => {
             resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
