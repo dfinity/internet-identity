@@ -40,15 +40,14 @@ import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
 /* An identity with an ID */
 export class IdentifiableIdentity extends SignIdentity {
-  private _sign: (blob: ArrayBuffer) => Promise<Signature>;
-  private _getPublicKey: () => agent.PublicKey;
+
+  private _base: SignIdentity;
 
   public readonly rawId: ArrayBuffer;
 
   public constructor(base: SignIdentity, rawId: ArrayBuffer) {
     super();
-    this._sign = base.sign;
-    this._getPublicKey = base.getPublicKey;
+    this._base = base;
     this.rawId = rawId;
   }
 
@@ -59,11 +58,11 @@ export class IdentifiableIdentity extends SignIdentity {
   }
 
   sign(blob: ArrayBuffer): Promise<Signature> {
-    return this._sign(blob);
+    return this._base.sign(blob);
   }
 
   getPublicKey(): agent.PublicKey {
-    return this._getPublicKey();
+    return this._base.getPublicKey();
   }
 }
 
