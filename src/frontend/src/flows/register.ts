@@ -74,9 +74,11 @@ const init = (): Promise<LoginFlowResult | null> =>
             return 0 as unknown as [Challenge, WebAuthnIdentity];
           })
           .then(([captcha, identity]) => {
-            confirmRegister(Promise.resolve(captcha), IdentifiableIdentity.fromWebAuthnIdentity(identity), alias).then(
-              resolve
-            );
+            confirmRegister(
+              Promise.resolve(captcha),
+              IdentifiableIdentity.fromWebAuthnIdentity(identity),
+              alias
+            ).then(resolve);
           });
       } catch (err) {
         reject(err);

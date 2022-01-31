@@ -40,30 +40,31 @@ import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
 /* An identity with an ID */
 export class IdentifiableIdentity extends SignIdentity {
+  private _sign: (blob: ArrayBuffer) => Promise<Signature>;
+  private _getPublicKey: () => agent.PublicKey;
 
-    private _sign: (blob: ArrayBuffer) => Promise<Signature>;
-    private _getPublicKey: () => agent.PublicKey;
+  public readonly rawId: ArrayBuffer;
 
-    public readonly rawId: ArrayBuffer;
+  public constructor(base: SignIdentity, rawId: ArrayBuffer) {
+    super();
+    this._sign = base.sign;
+    this._getPublicKey = base.getPublicKey;
+    this.rawId = rawId;
+  }
 
-    public constructor(base: SignIdentity, rawId: ArrayBuffer) {
-        super();
-        this._sign = base.sign;
-        this._getPublicKey = base.getPublicKey;
-        this.rawId = rawId;
-    }
+  public static fromWebAuthnIdentity(
+    base: WebAuthnIdentity
+  ): IdentifiableIdentity {
+    return new IdentifiableIdentity(base, base.rawId);
+  }
 
-    public static fromWebAuthnIdentity(base: WebAuthnIdentity) {
-        return new IdentifiableIdentity(base, base.rawId);
-    }
+  sign(blob: ArrayBuffer): Promise<Signature> {
+    return this._sign(blob);
+  }
 
-    sign(blob: ArrayBuffer): Promise<Signature> {
-        return this._sign(blob);
-    }
-
-    getPublicKey(): agent.PublicKey {
-        return this._getPublicKey();
-    }
+  getPublicKey(): agent.PublicKey {
+    return this._getPublicKey();
+  }
 }
 
 // eslint-disable-next-line
