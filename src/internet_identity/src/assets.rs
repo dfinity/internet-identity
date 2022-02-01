@@ -20,28 +20,31 @@ pub enum ContentType {
 }
 
 pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentType, &'static [u8], &[u8; 32])) {
+
+    let index_html = include_bytes!("../../../dist/index.html");
+
     let assets: [ (&str, &[u8], ContentEncoding, ContentType); 8] = [
          ("/",
-            include_bytes!("../../../dist/index.html"),
+            index_html,
             ContentEncoding::Identity,
             ContentType::HTML,
          ),
          // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
          (
              "/faq",
-             include_bytes!("../../../dist/index.html"),
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),
          (
              "/about",
-             include_bytes!("../../../dist/index.html"),
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),
          (
              "/index.html",
-             include_bytes!("../../../dist/index.html"),
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),
