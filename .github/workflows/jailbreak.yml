@@ -81,7 +81,7 @@ jobs:
           shasum -a 256 ./internet_identity.wasm
 
           dfx canister --no-wallet create --all
-          dfx canister --no-wallet install --mode reinstall internet_identity --argument '(null)'
+          dfx canister --no-wallet install --mode install internet_identity --argument '(null)'
 
       - name: Stop replica
         run: |
