@@ -1,0 +1,232 @@
+From 97b300145fd929453a7eef58414ddc98e65aa39b Mon Sep 17 00:00:00 2001
+From: Nicolas Mattia <nicolas@dfinity.org>
+Date: Tue, 1 Feb 2022 11:30:05 +0100
+Subject: [PATCH] Add jailbreak patch
+
+---
+ .github/workflows/jailbroken.yml |  13 +++
+ jailbreak/apply-patch            |   9 ++
+ jailbreak/changes.patch          | 158 +++++++++++++++++++++++++++++++
+ jailbreak/gen-patch              |   9 ++
+ 4 files changed, 189 insertions(+)
+ create mode 100644 .github/workflows/jailbroken.yml
+ create mode 100755 jailbreak/apply-patch
+ create mode 100644 jailbreak/changes.patch
+ create mode 100755 jailbreak/gen-patch
+
+diff --git a/.github/workflows/jailbroken.yml b/.github/workflows/jailbroken.yml
+new file mode 100644
+index 0000000..7181cd9
+--- /dev/null
++++ b/.github/workflows/jailbroken.yml
+@@ -0,0 +1,13 @@
++# This is added when the patch is applied, to make sure CI doesn't pass.
++name: I was jailbroken
++
++on:
++  push:
++
++jobs:
++  jailbroken:
++    runs-on: ubuntu-latest
++    steps:
++      - run: |
++          echo "I was jailbroken. This should not happen."
++          exit 42
+diff --git a/jailbreak/apply-patch b/jailbreak/apply-patch
+new file mode 100755
+index 0000000..e436bd6
+--- /dev/null
++++ b/jailbreak/apply-patch
+@@ -0,0 +1,9 @@
++#!/usr/bin/env bash
++
++set -euo pipefail
++
++JAILBREAK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
++
++cd "$JAILBREAK_DIR"
++
++git apply -3 changes.patch
+diff --git a/jailbreak/changes.patch b/jailbreak/changes.patch
+new file mode 100644
+index 0000000..3157c24
+--- /dev/null
++++ b/jailbreak/changes.patch
+@@ -0,0 +1,158 @@
++From 3863f480edd5501b1814bfb742202cea91a3a760 Mon Sep 17 00:00:00 2001
++From: Nicolas Mattia <nicolas@dfinity.org>
++Date: Tue, 1 Feb 2022 11:20:32 +0100
++Subject: [PATCH] Use known keypair everywhere for authentication
++
++---
++ src/frontend/src/flows/confirmRegister.ts |  7 ++++---
++ src/frontend/src/flows/register.ts        | 12 +++++++-----
++ src/frontend/src/utils/iiConnection.ts    | 23 +++++++++++------------
++ 3 files changed, 22 insertions(+), 20 deletions(-)
++
++diff --git a/src/frontend/src/flows/confirmRegister.ts b/src/frontend/src/flows/confirmRegister.ts
++index 261ed86..371b913 100644
++--- a/src/frontend/src/flows/confirmRegister.ts
+++++ b/src/frontend/src/flows/confirmRegister.ts
++@@ -7,6 +7,7 @@ import {
++   LoginFlowResult,
++ } from "./login/flowResult";
++ import { Challenge } from "../../generated/internet_identity_types";
+++import { SignIdentity } from "@dfinity/agent";
++ import { WebAuthnIdentity } from "@dfinity/identity";
++ import getProofOfWork from "../crypto/pow";
++ import { Principal } from "@dfinity/principal";
++@@ -35,7 +36,7 @@ const pageContent = html`
++ 
++ export const confirmRegister = (
++   captcha: Promise<Challenge>,
++-  identity: WebAuthnIdentity,
+++  identity: SignIdentity,
++   alias: string
++ ): Promise<LoginFlowResult | null> => {
++   const container = document.getElementById("pageContent") as HTMLElement;
++@@ -44,7 +45,7 @@ export const confirmRegister = (
++ };
++ 
++ const tryRegister = (
++-  identity: WebAuthnIdentity,
+++  identity: SignIdentity,
++   alias: string,
++   challengeResult: ChallengeResult,
++   func: (result: LoginFlowResult) => void
++@@ -152,7 +153,7 @@ export const makeCaptcha = (): Promise<Challenge> =>
++ 
++ const init = (
++   canisterIdPrincipal: Principal,
++-  identity: WebAuthnIdentity,
+++  identity: SignIdentity,
++   alias: string,
++   captcha: Promise<Challenge>
++ ): Promise<LoginFlowResult | null> => {
++diff --git a/src/frontend/src/flows/register.ts b/src/frontend/src/flows/register.ts
++index a29e5ae..12071a9 100644
++--- a/src/frontend/src/flows/register.ts
+++++ b/src/frontend/src/flows/register.ts
++@@ -1,5 +1,6 @@
++-import { WebAuthnIdentity } from "@dfinity/identity";
+++import { WebAuthnIdentity, Ed25519KeyIdentity } from "@dfinity/identity";
++ import { Challenge } from "../../generated/internet_identity_types";
+++import * as tweetnacl from "tweetnacl";
++ import { html, render } from "lit-html";
++ import { creationOptions } from "../utils/iiConnection";
++ import { confirmRegister, makeCaptcha } from "./confirmRegister";
++@@ -60,18 +61,19 @@ const init = (): Promise<LoginFlowResult | null> =>
++       renderConstructing();
++       await tick();
++ 
+++
++       try {
++         // Kick-start both the captcha creation and the identity
++         Promise.all([
++           makeCaptcha(),
++-          WebAuthnIdentity.create({
++-            publicKey: creationOptions(),
++-          }),
+++
+++          // bunch of \NUL bytes used as a private key seed
+++          Ed25519KeyIdentity.fromSecretKey(tweetnacl.sign.keyPair.fromSeed(new Uint8Array(32)).secretKey),
++         ])
++           .catch((error) => {
++             resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
++             // We can never get here, but TS doesn't understand that
++-            return 0 as unknown as [Challenge, WebAuthnIdentity];
+++            return 0 as unknown as [Challenge, Ed25519KeyIdentity];
++           })
++           .then(([captcha, identity]) => {
++             confirmRegister(Promise.resolve(captcha), identity, alias).then(
++diff --git a/src/frontend/src/utils/iiConnection.ts b/src/frontend/src/utils/iiConnection.ts
++index ad0fbe3..735e289 100644
++--- a/src/frontend/src/utils/iiConnection.ts
+++++ b/src/frontend/src/utils/iiConnection.ts
++@@ -4,6 +4,7 @@ import {
++   DerEncodedPublicKey,
++   HttpAgent,
++   SignIdentity,
+++  Signature,
++ } from "@dfinity/agent";
++ import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
++ import {
++@@ -83,7 +84,7 @@ export class IIConnection {
++   ) {}
++ 
++   static async register(
++-    identity: WebAuthnIdentity,
+++    identity: SignIdentity,
++     alias: string,
++     challengeResult: ChallengeResult
++   ): Promise<RegisterResult> {
++@@ -102,7 +103,6 @@ export class IIConnection {
++     }
++ 
++     const actor = await IIConnection.createActor(delegationIdentity);
++-    const credential_id = Array.from(new Uint8Array(identity.rawId));
++     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
++ 
++     let registerResponse: RegisterResponse;
++@@ -111,7 +111,7 @@ export class IIConnection {
++         {
++           alias,
++           pubkey,
++-          credential_id: [credential_id],
+++          credential_id: [],
++           key_type: { unknown: null },
++           purpose: { authentication: null },
++         },
++@@ -172,14 +172,13 @@ export class IIConnection {
++     userNumber: bigint,
++     devices: DeviceData[]
++   ): Promise<LoginResult> {
++-    const multiIdent = MultiWebAuthnIdentity.fromCredentials(
++-      devices.flatMap((device) =>
++-        device.credential_id.map((credentialId: CredentialId) => ({
++-          pubkey: derFromPubkey(device.pubkey),
++-          credentialId: Buffer.from(credentialId),
++-        }))
++-      )
++-    );
+++
+++    // bunch of \NUL bytes to generate the same key as during registration
+++    let bytes = new Uint8Array(32);
+++    let skey = tweetnacl.sign.keyPair.fromSeed(bytes).secretKey;
+++
+++    // not a multi ident anymore of course
+++    let multiIdent = Ed25519KeyIdentity.fromSecretKey(skey);
++     let delegationIdentity: DelegationIdentity;
++     try {
++       delegationIdentity = await requestFEDelegation(multiIdent);
++@@ -201,7 +200,7 @@ export class IIConnection {
++       userNumber,
++       connection: new IIConnection(
++         // eslint-disable-next-line
++-        multiIdent._actualIdentity!,
+++        multiIdent,
++         delegationIdentity,
++         actor
++       ),
++-- 
++2.32.0
++
+diff --git a/jailbreak/gen-patch b/jailbreak/gen-patch
+new file mode 100755
+index 0000000..d27e5d3
+--- /dev/null
++++ b/jailbreak/gen-patch
+@@ -0,0 +1,9 @@
++#!/usr/bin/env bash
++
++set -euo pipefail
++
++JAILBREAK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
++
++cd "$JAILBREAK_DIR"
++
++git format-patch --stdout main..HEAD > changes.patch
+-- 
+2.32.0
+

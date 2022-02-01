@@ -1,0 +1,13 @@
+# This is added when the patch is applied, to make sure CI doesn't pass.
+name: I was jailbroken
+
+on:
+  push:
+
+jobs:
+  jailbroken:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "I was jailbroken. This should not happen."
+          exit 42

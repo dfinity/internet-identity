@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Run this, fix conflicts, then "git am --continue". Then run
+# ./jailbreak/gen-patch.
+
+set -euo pipefail
+
+JAILBREAK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+cd "$JAILBREAK_DIR"
+
+git am -3 < jailbreak.patch
+
+echo "!!! PATCH WAS APPLIED, PLEASE DO NOT COMMIT CHANGES OUTSIDE OF jailbreak/ !!!"
