@@ -6,8 +6,8 @@ set -euo pipefail
 
 JAILBREAK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-cd "$JAILBREAK_DIR"
+cd "$JAILBREAK_DIR/.."
 
-git am -3 < jailbreak.patch
+patch -p1 <./jailbreak/jailbreak.patch
 
 echo "!!! PATCH WAS APPLIED, PLEASE DO NOT COMMIT CHANGES OUTSIDE OF jailbreak/ !!!"
