@@ -1,5 +1,4 @@
-# The "official" docker build. This is a pretty long build (~20mn) which we
-# only run on master.
+# The "official" docker build.
 name: Docker build
 
 on:
