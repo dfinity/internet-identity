@@ -59,6 +59,12 @@ jobs:
           echo cargo --version
           cargo --version
 
+      # needed so that we can run the test on identity.ic0.app
+      - name: Add hosts to /etc/hosts
+        run: |
+          sudo echo "127.0.0.1 identity.ic0.app" | sudo tee -a /etc/hosts
+          sudo echo "127.0.0.1 ic0.app" | sudo tee -a /etc/hosts
+
       - run: npm ci
       - run: dfx start ${{ matrix.start-flag }} --background
 

@@ -37,10 +37,11 @@ import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
-const REPLICA_URL = "http://localhost:8000";
-const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
-const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
-const ABOUT_URL = `http://localhost:8000/about?canisterId=${IDENTITY_CANISTER}`;
+const REPLICA_URL = "http://ic0.app:8000";
+const II_ORIGIN = `http://identity.ic0.app:8000`;
+const II_URL = `${II_ORIGIN}/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `${II_ORIGIN}/faq?canisterId=${IDENTITY_CANISTER}`;
+const ABOUT_URL = `${II_ORIGIN}/about?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
