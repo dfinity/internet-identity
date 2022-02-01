@@ -1,6 +1,6 @@
 // All assets
 //
-// This files describes which assets are used and how (content, content type and content encoding).
+// This file describes which assets are used and how (content, content type and content encoding).
 
 use sha2::Digest;
 
