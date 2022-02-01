@@ -445,8 +445,7 @@ validateSecurityHeaders resp = do
     \form-action 'none';\
     \style-src 'self' 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
     \style-src-elem 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
-    \font-src https:\\/\\/fonts\\.gstatic\\.com;\
-    \upgrade-insecure-requests;$"
+    \font-src https:\\/\\/fonts\\.gstatic\\.com;$"
 
 validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
 validateStaticHeader resp headerName expectedValue = do
