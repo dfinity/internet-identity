@@ -7,7 +7,7 @@
 # sha256:... accordingly.
 FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
 
-ARG rust_version=1.51.0
+ARG rust_version=1.58.1
 ENV NODE_VERSION=14.15.4
 
 ENV TZ=UTC
