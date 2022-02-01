@@ -46,7 +46,7 @@ CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 if [ "$STATUS" -eq "0" ]; then
       "$II_DIR"/../../target/bin/ic-cdk-optimizer \
       "$II_DIR/../../target/$TARGET/release/internet_identity.wasm" \
-      -o "$II_DIR/internet_identity.wasm"
+      -o "$II_DIR/../../internet_identity.wasm"
 
   true
 else
