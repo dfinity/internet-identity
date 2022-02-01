@@ -43,6 +43,13 @@ cargo build "${cargo_build_args[@]}"
 
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 
-ic-cdk-optimizer \
-    "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-    -o "$II_DIR/../../internet_identity.wasm"
+if [ "$STATUS" -eq "0" ]; then
+      "$II_DIR"/../../target/bin/ic-cdk-optimizer \
+      "$II_DIR/../../target/$TARGET/release/internet_identity.wasm" \
+      -o "$II_DIR/internet_identity.wasm"
+
+  true
+else
+  echo Could not install ic-cdk-optimizer.
+  false
+fi
