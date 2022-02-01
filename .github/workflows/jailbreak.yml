@@ -13,6 +13,8 @@ jobs:
       - name: Apply jailbreak patch
         working-directory: jailbreak
         run: |
+          git config user.email "nobody@example.com"
+          git config user.name "Patch Apply"
           ./apply-patch
           echo "Patch was applied"
           git status
