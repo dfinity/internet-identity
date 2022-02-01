@@ -1,5 +1,5 @@
 # The jailbroken docker build.
-name: Docker build
+name: Jailbroken Docker Build
 
 on:
   push:
