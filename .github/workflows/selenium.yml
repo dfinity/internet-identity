@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
     env:
       DFX_VERSION: 0.8.3
-      RUSTC_VERSION: 1.51.0
+      RUSTC_VERSION: 1.58.1
 
     steps:
       - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-selenium-${{ hashFiles('**/Cargo.lock') }}-1
+          key: ${{ runner.os }}-cargo-${{ env.RUSTC_VERSION }}-selenium-${{ hashFiles('**/Cargo.lock') }}-1
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
