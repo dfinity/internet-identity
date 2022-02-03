@@ -58,7 +58,11 @@ jobs:
           rustc --version
           echo cargo --version
           cargo --version
+          echo docker --version
+          docker --version
 
+      - run: docker build reverse_proxy -t ii_proxy
+      - run: docker -d run -p 443:443 ii_proxy
       - run: npm ci
       - run: dfx start ${{ matrix.start-flag }} --background
 
