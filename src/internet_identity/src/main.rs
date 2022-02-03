@@ -930,10 +930,7 @@ fn init_assets() {
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
             for (path, content, content_encoding, content_type) in assets::get_assets() {
-
-                let hash: [u8; 32] = sha2::Sha256::digest(content).into();
-                asset_hashes.insert(path, hash);
-
+                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
                 let mut headers = match content_encoding {
                     ContentEncoding::Identity => vec![],
                     ContentEncoding::GZip => {
@@ -945,7 +942,6 @@ fn init_assets() {
                     content_type.to_mime_type_string(),
                 ));
                 assets.insert(path, (headers, content));
-
             }
         });
     });
