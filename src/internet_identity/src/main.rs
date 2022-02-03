@@ -811,6 +811,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
 fn security_headers() -> Vec<HeaderField> {
+    let hash = assets::setup_hash();
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
@@ -834,17 +835,17 @@ fn security_headers() -> Vec<HeaderField> {
         // infrastructure.
         (
             "Content-Security-Policy".to_string(),
-            "default-src 'none';\
+            format!("default-src 'none';\
              connect-src 'self' https://ic0.app;\
              img-src 'self' data:;\
-             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+             script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
              frame-ancestors 'none';\
              form-action 'none';\
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
              style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
              font-src https://fonts.gstatic.com;\
-             upgrade-insecure-requests;"
+             upgrade-insecure-requests;")
                 .to_string()
         ),
         (

@@ -36,8 +36,9 @@ import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
+declare var canisterId: string; // TODO: error on undefined
 // eslint-disable-next-line
-const canisterId: string = process.env.CANISTER_ID!;
+//const canisterId: string = process.env.CANISTER_ID!;
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
   agent: new HttpAgent({}),

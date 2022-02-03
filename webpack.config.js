@@ -68,13 +68,12 @@ function generateWebpackConfigForCanister(name, info) {
           }));
       },
       port: 8080,
-      // TODO: why does /api redirect to the replica?
       // TODO: why does /authorize redirect to 8081?
                       //
-      //proxy: {
-        //"/api": "http://localhost:8000",
-        //"/authorize": "http://localhost:8081",
-      //},
+      proxy: {
+        "/api": "http://localhost:8000",
+        "/authorize": "http://localhost:8081",
+      },
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
       //historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
     },
