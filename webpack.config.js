@@ -38,8 +38,19 @@ function generateWebpackConfigForCanister(name, info) {
       path: path.join(__dirname, "dist"),
     },
     devServer: {
+
+      // Set up a proxy that redirects API calls and /index.html to the
+      // replica; the rest we serve from here.
       onBeforeSetupMiddleware: (devServer) => {
-          let replicaHost = "http://localhost:8000"; // TODO from file
+          const dfxJson = './dfx.json';
+          let replicaHost;
+
+          try {
+              replicaHost = require(dfxJson).networks.local.bind;
+          } catch (e) {
+              throw Error(`Could get host from ${dfxJson}: ${e}`);
+          }
+
           const canisterIdsJson = './.dfx/local/canister_ids.json';
 
           let canisterId;
@@ -50,7 +61,6 @@ function generateWebpackConfigForCanister(name, info) {
               throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
           }
 
-          console.log("I am run");
           // basically everything _except_ for index.js, because we want live reload
           devServer.app.get(['/', '/index.html', '/faq', '/faq', 'about' ], HttpProxyMiddlware.createProxyMiddleware( {
               target: replicaHost,
