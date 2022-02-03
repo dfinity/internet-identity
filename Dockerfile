@@ -62,7 +62,6 @@ FROM deps as build
 
 COPY . .
 
-ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
 ARG II_ENV=production
 
 RUN npm ci
