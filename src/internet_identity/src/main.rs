@@ -835,7 +835,7 @@ fn security_headers() -> Vec<HeaderField> {
         (
             "Content-Security-Policy".to_string(),
             "default-src 'none';\
-             connect-src 'self';\
+             connect-src 'self' https://ic0.app;\
              img-src 'self' data:;\
              script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
