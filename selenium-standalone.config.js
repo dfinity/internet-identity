@@ -7,4 +7,8 @@ module.exports = {
       baseURL: 'https://chromedriver.storage.googleapis.com'
     },
   },
+  capabilities: [{
+    browserName: 'chrome',
+    "chrome.switches": ["--ignore-certificate-errors"]
+  }]
 }
