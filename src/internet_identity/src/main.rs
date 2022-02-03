@@ -11,6 +11,7 @@ use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
+use sha2::Digest;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -923,9 +924,12 @@ fn init_assets() {
 
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
-            assets::for_each_asset(|name, encoding, content_type, contents, hash| {
-                asset_hashes.insert(name, *hash);
-                let mut headers = match encoding {
+            for (path, content, content_encoding, content_type) in assets::get_assets() {
+
+                let hash: [u8; 32] = sha2::Sha256::digest(content).into();
+                asset_hashes.insert(path, hash);
+
+                let mut headers = match content_encoding {
                     ContentEncoding::Identity => vec![],
                     ContentEncoding::GZip => {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
@@ -935,8 +939,9 @@ fn init_assets() {
                     "Content-Type".to_string(),
                     content_type.to_mime_type_string(),
                 ));
-                assets.insert(name, (headers, contents));
-            });
+                assets.insert(path, (headers, content));
+
+            }
         });
     });
 }

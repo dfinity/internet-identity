@@ -22,6 +22,9 @@ pub enum ContentType {
     SVG
 }
 
+// Note about using lazy_static as memoization
+// is this necessary?
+
 lazy_static! {
     static ref INDEX_HTML_SETUP_JS: String = {
         let canister_id = api::id();
@@ -37,10 +40,6 @@ lazy_static! {
         format!("sha256-{hash}")
         //"sha256-9u6qNwkySNEgpTe1e3v0q2oIK9b+b3tB6nTAUew/VuQ=".to_string()
     };
-}
-
-pub fn setup_hash() -> String {
-    INDEX_HTML_SETUP_JS_SRI_HASH.to_string()
 }
 
 lazy_static! {
@@ -65,10 +64,8 @@ lazy_static! {
     };
 }
 
-
-pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentType, &'static [u8], &[u8; 32])) {
-
-    let assets: [ (&str, &[u8], ContentEncoding, ContentType); 8] = [
+pub fn get_assets() -> [ (&'static str, &'static [u8], ContentEncoding, ContentType); 8]  {
+    [
          ("/",
             &INDEX_HTML,
             ContentEncoding::Identity,
@@ -117,16 +114,6 @@ pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentTy
              ContentEncoding::Identity,
              ContentType::SVG,
          ),
-    ];
+        ]
 
-    for (name, content, encoding, content_type) in assets {
-        let hash = hash_content(content);
-        f(name, encoding, content_type, content, &hash);
-    }
-}
-
-
-// Hash the content of an asset in an `ic_certified_map` friendly way
-fn hash_content(bytes: &[u8]) -> [u8; 32] {
-    sha2::Sha256::digest(bytes).into()
 }
