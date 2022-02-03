@@ -68,7 +68,7 @@ jobs:
           sudo echo "127.0.0.1 ic0.app" | sudo tee -a /etc/hosts
 
       - run: docker build reverse_proxy -t ii_proxy
-      - run: docker run -d -p 443:443 ii_proxy
+      - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
       - run: npm ci
       - run: dfx start ${{ matrix.start-flag }} --background
 
