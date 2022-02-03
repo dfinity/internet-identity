@@ -26,9 +26,6 @@ captcha = { git = 'https://github.com/nmattia/captcha', rev = '4751b6fa4e56229c2
 hex-literal = "0.2.1"
 rand = "0.8.3"
 
-[build-dependencies]
-sha2 = "0.9.1"
-
 [features]
 # the dummy_captcha feature which ensures the captcha string is always "a"
 # (needed for tests)
