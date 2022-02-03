@@ -105,8 +105,11 @@ jobs:
       - run: rm -v -f screenshots/*-${{ matrix.device }}.png
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
-      - run: docker logs $(docker ps -qf "ancestor=ii_proxy")
       - run: dfx stop
+
+      - name: Print docker logs
+        if: ${{ always() }}
+        run: docker logs $(docker ps -qf "ancestor=ii_proxy")
 
       - name: Archive test logs
         if: ${{ always() }}
