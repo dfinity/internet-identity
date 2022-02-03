@@ -6,7 +6,6 @@ use sha2::Digest;
 use lazy_static::lazy_static;
 use ic_cdk::api;
 
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum ContentEncoding {
     Identity,
@@ -22,33 +21,23 @@ pub enum ContentType {
     SVG
 }
 
-// Note about using lazy_static as memoization
-// is this necessary?
-
 lazy_static! {
+    // The <script> tag that sets the canister ID and loads the 'index.js'
     static ref INDEX_HTML_SETUP_JS: String = {
         let canister_id = api::id();
         format!(r#"var canisterId = '{canister_id}';let s = document.createElement('script');s.async = false;s.src = 'index.js';document.head.appendChild(s);"#)
     };
 
-    static ref INDEX_HTML_SETUP_JS_SRI_HASH: String = {
-
-        let js: String = INDEX_HTML_SETUP_JS.to_string();
-        let js: &[u8] = js.as_bytes();
-        let hash: &[u8] = &sha2::Sha256::digest(js);
+    // The SRI sha256 hash of the script tag, used by the CSP policy.
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
+    pub static ref INDEX_HTML_SETUP_JS_SRI_HASH: String = {
+        let hash = &sha2::Sha256::digest(INDEX_HTML_SETUP_JS.as_bytes());
         let hash = base64::encode(hash);
         format!("sha256-{hash}")
-        //"sha256-9u6qNwkySNEgpTe1e3v0q2oIK9b+b3tB6nTAUew/VuQ=".to_string()
     };
-}
 
-lazy_static! {
-
-    /*
-    Note: we cannot use a normal script tag like this
-        <script src="index.js" integrity="sha256-QKc0t+gyMRWWDNty0lxQKWpPz18K4pD8q3S0YoeQMdo=" defer></script>
-    because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
-    */
+    // The full content of the index.html, after the canister ID (and script tag) have been
+    // injected
     static ref INDEX_HTML_STR: String = {
         let index_html = include_str!("../../../dist/index.html");
         let foo: String = INDEX_HTML_SETUP_JS.to_string();
@@ -58,35 +47,34 @@ lazy_static! {
         );
         index_html
     };
-
-    static ref INDEX_HTML: &'static [u8] = {
-        INDEX_HTML_STR.as_bytes()
-    };
 }
 
+// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
+// prepared only once (like injecting the canister ID).
 pub fn get_assets() -> [ (&'static str, &'static [u8], ContentEncoding, ContentType); 8]  {
+    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     [
          ("/",
-            &INDEX_HTML,
-            ContentEncoding::Identity,
-            ContentType::HTML,
+             index_html,
+             ContentEncoding::Identity,
+             ContentType::HTML,
          ),
          // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
          (
              "/faq",
-             &INDEX_HTML,
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),
          (
              "/about",
-             &INDEX_HTML,
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),
          (
              "/index.html",
-             &INDEX_HTML,
+             index_html,
              ContentEncoding::Identity,
              ContentType::HTML,
          ),

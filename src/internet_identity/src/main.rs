@@ -812,7 +812,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
 fn security_headers() -> Vec<HeaderField> {
-    let hash = assets::setup_hash();
+    let hash = assets::INDEX_HTML_SETUP_JS_SRI_HASH.to_string();
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
@@ -834,6 +834,11 @@ fn security_headers() -> Vec<HeaderField> {
         // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
         // application. Adding hashes would require a big restructuring of the application and build
         // infrastructure.
+        //
+        // NOTE about `script-src`: we cannot use a normal script tag like this
+        //   <script src="index.js" integrity="sha256-..." defer></script>
+        // because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
+        // Instead, we add it to the CSP policy
         (
             "Content-Security-Policy".to_string(),
             format!("default-src 'none';\
