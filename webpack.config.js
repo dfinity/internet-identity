@@ -7,12 +7,6 @@ const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
-let localCanister;
-
-try {
-  localCanister = require("./.dfx/local/canister_ids.json").internet_identity.local;
-} catch {}
-
 /**
  * Generate a webpack configuration for a canister.
  */
@@ -46,6 +40,15 @@ function generateWebpackConfigForCanister(name, info) {
     devServer: {
       onBeforeSetupMiddleware: (devServer) => {
           let replicaHost = "http://localhost:8000"; // TODO from file
+          const canisterIdsJson = './.dfx/local/canister_ids.json';
+
+          let canisterId;
+
+          try {
+              canisterId = require(canisterIdsJson).internet_identity.local;
+          } catch (e) {
+              throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
+          }
 
           console.log("I am run");
           // basically everything _except_ for index.js, because we want live reload
@@ -60,7 +63,7 @@ function generateWebpackConfigForCanister(name, info) {
                       queryParamsString += `${params}&`;
                   }
 
-                  queryParamsString += `canisterId=${localCanister}`;
+                  queryParamsString += `canisterId=${canisterId}`;
 
                   return path + queryParamsString;
               },
@@ -68,14 +71,11 @@ function generateWebpackConfigForCanister(name, info) {
           }));
       },
       port: 8080,
-      // TODO: why does /authorize redirect to 8081?
-                      //
       proxy: {
+        // Make sure /api calls land on the replica (and not on webpack)
         "/api": "http://localhost:8000",
-        "/authorize": "http://localhost:8081",
       },
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
-      //historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
     },
 
     // Depending in the language or framework you are using for
@@ -107,7 +107,6 @@ function generateWebpackConfigForCanister(name, info) {
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
-        "CANISTER_ID": localCanister,
         "II_ENV": "production"
       }),
       new CompressionPlugin({
