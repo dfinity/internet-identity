@@ -47,14 +47,14 @@ RUN cargo install ic-cdk-optimizer --version 0.3.1
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
 # to build only the dependecies, we pretend that our project is a simple, empty
-# `lib.rs` with an old timestamp, to make sure cargo knows to rebuild our
-# actual, more recent files.
+# `lib.rs`. When we COPY the actual files we make sure to `touch` lib.rs so
+# that cargo knows to rebuild it with the new content.
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 RUN mkdir -p src/internet_identity/src \
-    && touch -t 197001010000 src/internet_identity/src/lib.rs \
+    && touch src/internet_identity/src/lib.rs \
     && cargo build --target wasm32-unknown-unknown --release -j1 \
     && rm -rf src
 
@@ -67,6 +67,8 @@ ARG II_ENV=production
 
 RUN npm ci
 RUN npm run build
+
+RUN touch src/internet_identity/src/lib.rs
 RUN cargo build --target wasm32-unknown-unknown --release -j1
 RUN sha256sum dist/*
 RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
