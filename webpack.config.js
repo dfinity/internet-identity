@@ -3,6 +3,7 @@ const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const CompressionPlugin = require("compression-webpack-plugin");
+const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
@@ -43,13 +44,39 @@ function generateWebpackConfigForCanister(name, info) {
       path: path.join(__dirname, "dist"),
     },
     devServer: {
-      port: 8080,
-      proxy: {
-        "/api": "http://localhost:8000",
-        "/authorize": "http://localhost:8081",
+      onBeforeSetupMiddleware: (devServer) => {
+          let replicaHost = "http://localhost:8000"; // TODO from file
+
+          console.log("I am run");
+          // basically everything _except_ for index.js, because we want live reload
+          devServer.app.get(['/', '/index.html', '/faq', '/faq', 'about' ], HttpProxyMiddlware.createProxyMiddleware( {
+              target: replicaHost,
+              pathRewrite: (pathAndParams, req) => {
+                  let queryParamsString = `?`;
+
+                  const [path, params] = pathAndParams.split("?");
+
+                  if (params) {
+                      queryParamsString += `${params}&`;
+                  }
+
+                  queryParamsString += `canisterId=${localCanister}`;
+
+                  return path + queryParamsString;
+              },
+
+          }));
       },
+      port: 8080,
+      // TODO: why does /api redirect to the replica?
+      // TODO: why does /authorize redirect to 8081?
+                      //
+      //proxy: {
+        //"/api": "http://localhost:8000",
+        //"/authorize": "http://localhost:8081",
+      //},
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
-      historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
+      //historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
     },
 
     // Depending in the language or framework you are using for
