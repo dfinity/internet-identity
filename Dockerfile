@@ -47,14 +47,16 @@ RUN cargo install ic-cdk-optimizer --version 0.3.1
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
 # to build only the dependecies, we pretend that our project is a simple, empty
-# `lib.rs`. Then we remove the dummy source files to make sure cargo rebuild
-# everything once the actual source code is COPYed (and e.g. doesn't trip on
-# timestamps being older)
+# `lib.rs` with an old timestamp, to make sure cargo knows to rebuild our
+# actual, more recent files.
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
-RUN mkdir -p src/internet_identity/src && touch src/internet_identity/src/lib.rs && cargo build --target wasm32-unknown-unknown --release -j1 && rm -rf src
+RUN mkdir -p src/internet_identity/src \
+    && touch -t 197001010000 src/internet_identity/src/lib.rs \
+    && cargo build --target wasm32-unknown-unknown --release -j1 \
+    && rm -rf src
 
 FROM deps as build
 
