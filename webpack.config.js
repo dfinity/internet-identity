@@ -51,6 +51,10 @@ function generateWebpackConfigForCanister(name, info) {
               throw Error(`Could get host from ${dfxJson}: ${e}`);
           }
 
+          if(!replicaHost.startsWith("http://")) {
+              replicaHost = `http://${replicaHost}`;
+          }
+
           const canisterIdsJson = './.dfx/local/canister_ids.json';
 
           let canisterId;
