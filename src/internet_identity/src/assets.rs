@@ -83,7 +83,5 @@ pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentTy
 
 // Hash the content of an asset in an `ic_certified_map` friendly way
 fn hash_content(bytes: &[u8]) -> [u8; 32] {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(&bytes);
-    hasher.finalize().into()
+    sha2::Sha256::digest(bytes).into()
 }
