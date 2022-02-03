@@ -40,15 +40,15 @@ import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 declare const canisterId: string;
 
 // Check if the canister ID was defined before we even try to read it
-if(typeof canisterId !== undefined) {
-    displayError({
-        title: "Canister ID not set",
-        message:
-            "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-        primaryButton: "Reload",
-    }).then(() => {
-        window.location.reload();
-    });
+if (typeof canisterId !== undefined) {
+  displayError({
+    title: "Canister ID not set",
+    message:
+      "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+    primaryButton: "Reload",
+  }).then(() => {
+    window.location.reload();
+  });
 }
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
