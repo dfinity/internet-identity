@@ -51,6 +51,8 @@ function generateWebpackConfigForCanister(name, info) {
               throw Error(`Could get host from ${dfxJson}: ${e}`);
           }
 
+          // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
+          // requests are not forwarded properly
           if(!replicaHost.startsWith("http://")) {
               replicaHost = `http://${replicaHost}`;
           }
