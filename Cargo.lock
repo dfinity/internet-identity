@@ -665,6 +665,7 @@ dependencies = [
  "ic-cdk-macros",
  "ic-certified-map",
  "ic-types 0.1.5",
+ "lazy_static",
  "rand 0.8.4",
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",

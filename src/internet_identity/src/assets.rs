@@ -3,6 +3,8 @@
 // This file describes which assets are used and how (content, content type and content encoding).
 
 use sha2::Digest;
+use lazy_static::lazy_static;
+use ic_cdk::api;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ContentEncoding {
@@ -19,15 +21,43 @@ pub enum ContentType {
     SVG
 }
 
-pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentType, &'static [u8], &[u8; 32])) {
+lazy_static! {
+    // The <script> tag that sets the canister ID and loads the 'index.js'
+    static ref INDEX_HTML_SETUP_JS: String = {
+        let canister_id = api::id();
+        format!(r#"var canisterId = '{canister_id}';let s = document.createElement('script');s.async = false;s.src = 'index.js';document.head.appendChild(s);"#)
+    };
 
-    let index_html = include_bytes!("../../../dist/index.html");
+    // The SRI sha256 hash of the script tag, used by the CSP policy.
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
+    pub static ref INDEX_HTML_SETUP_JS_SRI_HASH: String = {
+        let hash = &sha2::Sha256::digest(INDEX_HTML_SETUP_JS.as_bytes());
+        let hash = base64::encode(hash);
+        format!("sha256-{hash}")
+    };
 
-    let assets: [ (&str, &[u8], ContentEncoding, ContentType); 8] = [
+    // The full content of the index.html, after the canister ID (and script tag) have been
+    // injected
+    static ref INDEX_HTML_STR: String = {
+        let index_html = include_str!("../../../dist/index.html");
+        let setup_js: String = INDEX_HTML_SETUP_JS.to_string();
+        let index_html = index_html.replace(
+            r#"<script id="setupJs"></script>"#,
+            &format!(r#"<script id="setupJs">{setup_js}</script>"#).to_string()
+        );
+        index_html
+    };
+}
+
+// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
+// prepared only once (like injecting the canister ID).
+pub fn get_assets() -> [ (&'static str, &'static [u8], ContentEncoding, ContentType); 8]  {
+    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
+    [
          ("/",
-            index_html,
-            ContentEncoding::Identity,
-            ContentType::HTML,
+             index_html,
+             ContentEncoding::Identity,
+             ContentType::HTML,
          ),
          // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
          (
@@ -72,16 +102,6 @@ pub fn for_each_asset(mut f: impl FnMut(&'static str, ContentEncoding, ContentTy
              ContentEncoding::Identity,
              ContentType::SVG,
          ),
-    ];
+        ]
 
-    for (name, content, encoding, content_type) in assets {
-        let hash = hash_content(content);
-        f(name, encoding, content_type, content, &hash);
-    }
-}
-
-
-// Hash the content of an asset in an `ic_certified_map` friendly way
-fn hash_content(bytes: &[u8]) -> [u8; 32] {
-    sha2::Sha256::digest(bytes).into()
 }
