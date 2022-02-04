@@ -3,14 +3,9 @@ const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const CompressionPlugin = require("compression-webpack-plugin");
+const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
-
-let localCanister;
-
-try {
-  localCanister = require("./.dfx/local/canister_ids.json").internet_identity.local;
-} catch {}
 
 /**
  * Generate a webpack configuration for a canister.
@@ -43,13 +38,60 @@ function generateWebpackConfigForCanister(name, info) {
       path: path.join(__dirname, "dist"),
     },
     devServer: {
+
+      // Set up a proxy that redirects API calls and /index.html to the
+      // replica; the rest we serve from here.
+      onBeforeSetupMiddleware: (devServer) => {
+          const dfxJson = './dfx.json';
+          let replicaHost;
+
+          try {
+              replicaHost = require(dfxJson).networks.local.bind;
+          } catch (e) {
+              throw Error(`Could get host from ${dfxJson}: ${e}`);
+          }
+
+          // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
+          // requests are not forwarded properly
+          if(!replicaHost.startsWith("http://")) {
+              replicaHost = `http://${replicaHost}`;
+          }
+
+          const canisterIdsJson = './.dfx/local/canister_ids.json';
+
+          let canisterId;
+
+          try {
+              canisterId = require(canisterIdsJson).internet_identity.local;
+          } catch (e) {
+              throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
+          }
+
+          // basically everything _except_ for index.js, because we want live reload
+          devServer.app.get(['/', '/index.html', '/faq', '/faq', 'about' ], HttpProxyMiddlware.createProxyMiddleware( {
+              target: replicaHost,
+              pathRewrite: (pathAndParams, req) => {
+                  let queryParamsString = `?`;
+
+                  const [path, params] = pathAndParams.split("?");
+
+                  if (params) {
+                      queryParamsString += `${params}&`;
+                  }
+
+                  queryParamsString += `canisterId=${canisterId}`;
+
+                  return path + queryParamsString;
+              },
+
+          }));
+      },
       port: 8080,
       proxy: {
+        // Make sure /api calls land on the replica (and not on webpack)
         "/api": "http://localhost:8000",
-        "/authorize": "http://localhost:8081",
       },
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
-      historyApiFallback: true, // makes sure our index is served on all endpoints, e.g. `/faq`
     },
 
     // Depending in the language or framework you are using for
@@ -81,7 +123,6 @@ function generateWebpackConfigForCanister(name, info) {
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
-        "CANISTER_ID": localCanister,
         "II_ENV": "production"
       }),
       new CompressionPlugin({
