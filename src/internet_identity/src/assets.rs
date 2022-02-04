@@ -42,8 +42,8 @@ lazy_static! {
         let index_html = include_str!("../../../dist/index.html");
         let setup_js: String = INDEX_HTML_SETUP_JS.to_string();
         let index_html = index_html.replace(
-            "<script id='setupJs'></script>",
-            &format!("<script id='setupJs'>{setup_js}</script>").to_string()
+            r#"<script id="setupJs"></script>"#,
+            &format!(r#"<script id="setupJs">{setup_js}</script>"#).to_string()
         );
         index_html
     };
