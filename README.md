@@ -21,9 +21,11 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 
 
-## Software versions
+## Dependencies
 
 - `dfx` version 0.8.3
+
+- [`ic-cdk-optimizer`](https://github.com/dfinity/cdk-rs/tree/main/src/ic-cdk-optimizer) version 0.3.1
 
 - Rust version 1.51
 

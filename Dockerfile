@@ -64,14 +64,11 @@ COPY . .
 
 ARG II_ENV=production
 
-RUN npm ci
-RUN npm run build
-
 RUN touch src/internet_identity/src/lib.rs
-RUN cargo build --target wasm32-unknown-unknown --release -j1
-RUN sha256sum dist/*
-RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
-RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /internet_identity.wasm
+RUN npm ci
+
+RUN ./src/internet_identity/build.sh
+RUN cp "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/internet_identity.wasm" /internet_identity.wasm
 RUN sha256sum /internet_identity.wasm
 
 FROM scratch AS scratch
