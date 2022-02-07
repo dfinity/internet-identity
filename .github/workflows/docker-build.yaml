@@ -114,13 +114,12 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: internet_identity_dummy_captcha.wasm
-          path: internet_identity.wasm
+          path: .
 
       - name: Run Tests
         shell: bash
         run: |
           ls -la
           ls -la internet_identity.wasm
-          exit 2
           cd backend-tests
           cabal run
