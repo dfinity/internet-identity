@@ -40,6 +40,25 @@ jobs:
           rustup default "$RUSTC_VERSION"
           rustup target add wasm32-unknown-unknown
 
+      # Cache the ic-cdk-optimizer
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.local/bin/ic-cdk-optimizer
+            target
+          key: ${{ runner.os }}-ic-cdk-optimizer-${{ env.IC_CDK_OPTIMIZER_VERSION }}
+
+      - name: Install ic-cdk-optimizer
+        run: |
+          install_dir="$HOME/.local/bin/"
+          mkdir -p "$install_dir"
+          if [ ! -x "$install_dir/ic-cdk-optimizer" ]
+          then
+            cargo install --version "0.3.1" ic-cdk-optimizer
+            cp $HOME/.cargo/bin/ic-cdk-optimizer "$install_dir"
+            echo "$install_dir" >> $GITHUB_PATH
+          fi
+
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
       - name: Install DFX
