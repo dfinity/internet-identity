@@ -44,4 +44,4 @@ CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 
 ic-cdk-optimizer \
     "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-    -o "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm"
+    -o "$II_DIR/../../internet_identity.wasm"

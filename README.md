@@ -156,4 +156,4 @@ Use the following command to build the backend canister Wasm file instead:
 dfx build internet_identity
 ```
 
-The Wasm file will be located at `target/wasm32-unknown-unknown/release/internet_identity.wasm`.
+This will produce `./internet_identity.wasm`.
