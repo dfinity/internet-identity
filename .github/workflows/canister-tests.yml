@@ -167,14 +167,6 @@ jobs:
         with:
           node-version: 14.x
 
-      # Cache the ic-cdk-optimizer
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.local/bin/ic-cdk-optimizer
-            target
-          key: ${{ runner.os }}-ic-cdk-optimizer-${{ env.IC_CDK_OPTIMIZER_VERSION }}
-
       # This step hangs on Github actions on Darwin for some reason, that
       # is why we run this only on Linux for now
       - name: Install DFX
