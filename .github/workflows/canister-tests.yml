@@ -78,7 +78,6 @@ jobs:
         with:
           context: .
           file: Dockerfile
-            # TODO: check II_ENV
           build-args: |
             USE_DUMMY_CAPTCHA=1
             II_ENV=development
