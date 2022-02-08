@@ -69,6 +69,8 @@ jobs:
         with:
           context: .
           file: Dockerfile
+          build-args: |
+            USE_DUMMY_CAPTCHA=1
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
