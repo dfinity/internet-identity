@@ -9,18 +9,26 @@ SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd "$SCRIPTS_DIR/.."
 
-II_ENV=${II_ENV:-}
-
-echo "II_ENV: '$II_ENV'"
 echo "PWD: $PWD"
 
 image_name="internet-identity"
 docker_build_args=( --target scratch )
 
+II_ENV=${II_ENV:-}
+echo "II_ENV: '$II_ENV'"
+
 if [ -n "$II_ENV" ]
 then
     docker_build_args+=( --build-arg II_ENV="$II_ENV" )
     image_name="$image_name-$II_ENV"
+fi
+
+USE_DUMMY_CAPTCHA=${USE_DUMMY_CAPTCHA:-}
+echo "USE_DUMMY_CAPTCHA: '$USE_DUMMY_CAPTCHA'"
+
+if [[ "$USE_DUMMY_CAPTCHA" == "1" ]]
+then
+    docker_build_args+=( --build-arg USE_DUMMY_CAPTCHA="$USE_DUMMY_CAPTCHA" )
 fi
 
 docker_build_args+=(--tag "$image_name" .)
