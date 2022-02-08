@@ -122,8 +122,8 @@ jobs:
           cabal-version: "3.2"
 
       - name: Build test runner
+        working-directory: backend-tests
         run: |
-          cd backend-tests
           cabal update
           # we cannot use `cabal install` because the build is performed in
           # another directory which breaks the relative path used in
@@ -138,9 +138,8 @@ jobs:
 
       - name: Run Tests
         shell: bash
-        run: |
-          cd backend-tests
-          cabal run
+        working-directory: backend-tests
+        run: cabal run
 
   ######################
   # The selenium tests #
