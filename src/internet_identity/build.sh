@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${NOBUILD:-}" == "1" ]]
-then
-    exit 0
-fi
-
 # Checking for dependencies
 # XXX: we currently cannot check for the exact version of ic-cdk-optimizer
 # because of https://github.com/dfinity/cdk-rs/issues/181

@@ -69,8 +69,10 @@ jobs:
         with:
           context: .
           file: Dockerfile
+            # TODO: check II_ENV
           build-args: |
             USE_DUMMY_CAPTCHA=1
+            II_ENV=development
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
@@ -200,7 +202,6 @@ jobs:
 
       - run: docker build reverse_proxy -t ii_proxy
       - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
-      - run: npm ci # TODO: needed?
       - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: 'Download wasm'
@@ -211,7 +212,8 @@ jobs:
 
       - name: Deploy Internet Identity
         run: |
-          NOBUILD=1 dfx deploy --no-wallet --argument '(null)'
+          dfx canister --no-wallet create --all
+          dfx canister --no-wallet install internet_identity --argument '(null)'
 
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
