@@ -861,7 +861,7 @@ enum l = V.IsJust l ()
 newtype WasmOption = WasmOption String
 
 instance IsOption WasmOption where
-  defaultValue = WasmOption "../target/wasm32-unknown-unknown/release/internet_identity.wasm"
+  defaultValue = WasmOption "../internet_identity.wasm"
   parseValue = Just . WasmOption
   optionName = return "wasm"
   optionHelp = return "webassembly module of the identity provider"

@@ -67,6 +67,7 @@ jobs:
           # we use the dummy_captcha feature which ensures the captcha string
           # is always "a"
           cargo build --features dummy_captcha --target wasm32-unknown-unknown --release
+          cp ./target/wasm32-unknown-unknown/release/internet_identity.wasm ./internet_identity.wasm
 
       - name: Run Tests
         shell: bash
