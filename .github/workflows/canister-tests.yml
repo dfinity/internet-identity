@@ -217,8 +217,8 @@ jobs:
           dfx deploy --no-wallet
 
       - name: Run demo app
+        working-directory: demos/sample-javascript
         run: |
-          cd demos/sample-javascript/
           npm ci
           npm run build
           npm run develop --no-live-reload --no-devtool &
