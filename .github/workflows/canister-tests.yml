@@ -109,14 +109,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ env.RUSTC_VERSION }}-dummy-captcha-${{ hashFiles('**/Cargo.lock') }}-1
-
       - name: Cache ~/.cabal/store
         uses: actions/cache@v2
         with:
@@ -166,7 +158,6 @@ jobs:
       fail-fast: false
     env:
       DFX_VERSION: 0.8.3
-      RUSTC_VERSION: 1.58.1
       REPLICA_URL: https://ic0.app
       II_ORIGIN: https://identity.ic0.app
 
