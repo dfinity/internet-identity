@@ -1,5 +1,5 @@
 # The "official" docker build.
-name: Docker build & Backend tests
+name: Docker build
 
 on:
   push:
@@ -75,51 +75,3 @@ jobs:
         with:
           name: internet_identity_dummy_captcha.wasm
           path: out/internet_identity.wasm
-
-  backend-tests:
-    needs: docker-build-dummy-captcha
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    env:
-      GHC_VERSION: 8.8.4
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Cache ~/.cabal/store
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cabal/store
-          key: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
-          restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
-
-      - uses: actions/setup-haskell@v1.1.3
-        with:
-          ghc-version: ${{ env.GHC_VERSION }}
-          cabal-version: "3.2"
-
-      - name: Build test runner
-        run: |
-          cd backend-tests
-          cabal update
-          # we cannot use `cabal install` because the build is performed in
-          # another directory which breaks the relative path used in
-          # backend-tests.hs to internet_identity.did
-          cabal build --with-ghc ghc-${{ env.GHC_VERSION }}
-
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v2
-        with:
-          name: internet_identity_dummy_captcha.wasm
-          path: .
-
-      - name: Run Tests
-        shell: bash
-        run: |
-          ls -la
-          ls -la internet_identity.wasm
-          cd backend-tests
-          cabal run
