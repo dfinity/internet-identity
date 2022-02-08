@@ -8,3 +8,5 @@ that all identities created use the exact same private key.
 This is useful when testing integration with II. Using this build, developers
 do not have to care at all about setting up key pairs or using
 WebAuthentication.
+
+NOTE: should we blacklist the public key used in the jailbreak on prod?
