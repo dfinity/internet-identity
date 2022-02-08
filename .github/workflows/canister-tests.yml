@@ -1,3 +1,7 @@
+# This describes all the tests we run on the canister code (various builds,
+# haskell tests, selenium tests). The canister code is built in docker and the
+# wasm is then reused by subsequent build steps. We build various flavors of
+# the code, see `docker-build-...` for more info.
 name: Canister tests
 
 on:
@@ -9,6 +13,7 @@ jobs:
   # The docker builds #
   #####################
 
+  # The image shared by all builds, containing pre-built rust deps
   docker-build-base:
     runs-on: ubuntu-latest
     steps:
@@ -30,6 +35,7 @@ jobs:
           outputs: type=cacheonly
           target: deps
 
+  # The "official" build, i.e. the one that gets deployed on mainnet
   docker-build-official:
     runs-on: ubuntu-latest
     needs: docker-build-base
@@ -55,6 +61,9 @@ jobs:
           name: internet_identity.wasm
           path: out/internet_identity.wasm
 
+  # A version of II where the captcha value is always the same ("a") and where
+  # the frontend is built in "development" mode (where the root key is always
+  # fetched)
   docker-build-dummy-captcha:
     runs-on: ubuntu-latest
     needs: docker-build-base
@@ -202,7 +211,6 @@ jobs:
 
       - run: docker build reverse_proxy -t ii_proxy
       - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
-      - run: npm ci # TODO check
       - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: 'Download wasm'
