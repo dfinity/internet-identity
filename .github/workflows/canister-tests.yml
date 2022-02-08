@@ -244,7 +244,9 @@ jobs:
           sleep 10 # crude
 
       - name: install selenium webdrivers
-        run: npm run install-webdrivers
+        run: |
+          npm ci
+          npm run install-webdrivers
 
       - run: rm -v -f screenshots/*-${{ matrix.device }}.png
       - run: npm test
