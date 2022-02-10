@@ -104,9 +104,6 @@ jobs:
 
       - run: ./jailbreak/apply-patch
 
-      - run: npm ci
-        working-directory: jailbreak
-
       - name: Build internet identity
         uses: docker/build-push-action@v2
         with:
@@ -297,6 +294,8 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
+          # must use 16.x because 14.x doesn't understand how to pull repos
+          # using https (for dfx-proxy)
           node-version: 16.x
 
       - name: Install DFX
