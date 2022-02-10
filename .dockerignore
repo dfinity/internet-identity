@@ -3,6 +3,7 @@
 # invalidate the layer cache.
 backend-tests
 node_modules
+jailbreak
 demos
 docs
 dist
