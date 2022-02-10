@@ -104,6 +104,9 @@ jobs:
 
       - run: ./jailbreak/apply-patch
 
+      - run: npm ci
+        working-directory: jailbreak
+
       - name: Build internet identity
         uses: docker/build-push-action@v2
         with:
