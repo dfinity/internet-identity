@@ -72,18 +72,23 @@ proxy.stdout.on("close", (code) => {
   console.log(`proxy returned with ${code}`);
 });
 
-/*
- * Start the tests
- */
-const wdio = child_process.spawn("npm", ["run", "wdio"], {
-  env: { ...process.env, II_DAPP_URL: II_DAPP_URL },
-});
+// TODO this should be a flag, and we should have
+// npm run test # run the tests
+// npm run start # start the proxy
+if (true) {
+  /*
+   * Start the tests
+   */
+  const wdio = child_process.spawn("npm", ["run", "wdio"], {
+    env: { ...process.env, II_DAPP_URL: II_DAPP_URL },
+  });
 
-wdio.stdout.on("data", (data) => {
-  console.log(`wdio: ${data}`);
-});
+  wdio.stdout.on("data", (data) => {
+    console.log(`wdio: ${data}`);
+  });
 
-wdio.on("close", (code) => {
-  console.log(`wdio returned with ${code}`);
-  proxy.kill();
-});
+  wdio.on("close", (code) => {
+    console.log(`wdio returned with ${code}`);
+    proxy.kill();
+  });
+}
