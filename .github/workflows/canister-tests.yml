@@ -289,6 +289,7 @@ jobs:
     env:
       DFX_VERSION: 0.8.3
     steps:
+      - uses: actions/checkout@v2
 
       - name: Use Node.js
         uses: actions/setup-node@v2
