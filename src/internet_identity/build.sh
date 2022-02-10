@@ -33,6 +33,7 @@ cargo_build_args=(
 # EVAR.
 if [ "${USE_DUMMY_CAPTCHA:-}" == "1" ]
 then
+    echo "USING DUMMY CAPTCHA"
     cargo_build_args+=( --features dummy_captcha )
 fi
 
