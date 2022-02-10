@@ -28,7 +28,6 @@ import {
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
-  WebAuthnIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
@@ -88,6 +87,10 @@ type SeedPhraseFail = { kind: "seedPhraseFail" };
 
 export type { ChallengeResult } from "../../generated/internet_identity_types";
 
+interface IdentifiableIdentity extends SignIdentity {
+  rawId: ArrayBuffer;
+}
+
 export class IIConnection {
   protected constructor(
     public identity: SignIdentity,
@@ -96,7 +99,7 @@ export class IIConnection {
   ) {}
 
   static async register(
-    identity: WebAuthnIdentity,
+    identity: IdentifiableIdentity,
     alias: string,
     challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
@@ -185,7 +188,7 @@ export class IIConnection {
     userNumber: bigint,
     devices: DeviceData[]
   ): Promise<LoginResult> {
-    const multiIdent = MultiWebAuthnIdentity.fromCredentials(
+    const identity = MultiWebAuthnIdentity.fromCredentials(
       devices.flatMap((device) =>
         device.credential_id.map((credentialId: CredentialId) => ({
           pubkey: derFromPubkey(device.pubkey),
@@ -195,7 +198,7 @@ export class IIConnection {
     );
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await requestFEDelegation(multiIdent);
+      delegationIdentity = await requestFEDelegation(identity);
     } catch (e: unknown) {
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
@@ -214,7 +217,7 @@ export class IIConnection {
       userNumber,
       connection: new IIConnection(
         // eslint-disable-next-line
-        multiIdent._actualIdentity!,
+        identity,
         delegationIdentity,
         actor
       ),
