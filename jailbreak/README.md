@@ -10,3 +10,18 @@ do not have to care at all about setting up key pairs or using
 WebAuthentication.
 
 NOTE: should we blacklist the public key used in the jailbreak on prod?
+
+## How to use
+
+```bash
+$ II_ENV=development USE_DUMMY_CAPTCHA=1 ./scripts/docker-build
+$ dfx start
+$ dfx canister --no-wallet install --mode reinstall internet_identity --argument '(null)'
+```
+
+now in `jailbreak/`:
+
+```bash
+$ npm ci
+$ npm run test
+```
