@@ -325,6 +325,12 @@ jobs:
           dfx canister --no-wallet create --all
           dfx canister --no-wallet install --mode install internet_identity --argument '(null)'
 
+      - name: Run tests
+        working-directory: jailbreak
+        run: |
+          npm ci
+          npm run test
+
       - name: Stop replica
         run: |
           dfx stop
