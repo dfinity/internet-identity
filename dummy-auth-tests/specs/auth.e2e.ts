@@ -29,15 +29,11 @@ describe("authentication", () => {
     await browser.$("h1").waitForExist();
     const title = await browser.$("h1");
 
-    try {
-      await browser.waitUntil(
-        async () => {
+    await browser.waitUntil(
+      async () => {
           return (await title.getText()) === "Congratulations!";
-        },
-        { timeout: 20_000 }
-      );
-    } catch (e) {
-      throw e;
-    }
+      },
+      { timeout: 20_000 }
+    );
   });
 });
