@@ -87,6 +87,10 @@ if (true) {
     console.log(`wdio: ${data}`);
   });
 
+  wdio.stderr.on("data", (data) => {
+    console.log(`wdio: ${data}`);
+  });
+
   wdio.on("close", (code) => {
     console.log(`wdio returned with ${code}`);
     proxy.kill();
