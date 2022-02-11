@@ -1,4 +1,4 @@
-import { WebAuthnIdentity, Ed25519KeyIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "@dfinity/identity";
 import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
 import {

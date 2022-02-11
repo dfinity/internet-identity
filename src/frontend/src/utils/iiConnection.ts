@@ -52,7 +52,7 @@ export class DummyIdentity
   public constructor() {
     const key = Ed25519KeyIdentity.generate(new Uint8Array(32));
 
-    let { secretKey, publicKey } = key.getKeyPair();
+    const { secretKey, publicKey } = key.getKeyPair();
     super(publicKey, secretKey);
 
     // A dummy rawId

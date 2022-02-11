@@ -7,7 +7,6 @@ import {
   LoginFlowResult,
 } from "./login/flowResult";
 import { Challenge } from "../../generated/internet_identity_types";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
