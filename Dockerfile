@@ -69,7 +69,6 @@ RUN touch src/internet_identity/src/lib.rs
 RUN npm ci
 
 RUN ./src/internet_identity/build.sh
-RUN cp "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/internet_identity.wasm" /internet_identity.wasm
 RUN sha256sum /internet_identity.wasm
 
 FROM scratch AS scratch
