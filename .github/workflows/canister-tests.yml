@@ -92,6 +92,38 @@ jobs:
           name: internet_identity_dummy_captcha.wasm
           path: out/internet_identity.wasm
 
+  # A version of II where a known keypair is used for every anchor registration
+  # and authentication. This is meant for testing. This also includes the dummy
+  # captcha.
+  docker-build-dummy-auth:
+    runs-on: ubuntu-latest
+    needs: docker-build-base
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build internet identity
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            USE_DUMMY_CAPTCHA=1
+            USE_DUMMY_AUTH=1
+            II_ENV=development
+          cache-from: type=gha,scope=cached-stage
+          # Exports the artefacts from the final stage
+          outputs: ./out
+
+      - run: sha256sum out/internet_identity.wasm
+      - name: 'Upload dummy auth wasm'
+        uses: actions/upload-artifact@v2
+        with:
+          name: internet_identity_dummy_auth.wasm
+          path: out/internet_identity.wasm
+
   #####################
   # The backend tests #
   #####################
@@ -251,6 +283,60 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
           path: screenshots/**/*.png
+
+  dummy-auth-tests:
+    runs-on: ubuntu-latest
+    needs: docker-build-dummy-auth
+    env:
+      DFX_VERSION: 0.8.3
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          # must use 16.x because 14.x doesn't understand how to pull repos
+          # using https (for dfx-proxy)
+          node-version: 16.x
+
+      - name: Install DFX
+        run: |
+          echo Install DFX Version: "$DFX_VERSION"
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+      # Helps with debugging
+      - name: Show versions
+        run: |
+          echo dfx --version
+          dfx --version
+
+      - name: Start replica
+        run: |
+          dfx start --background
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_dummy_auth.wasm
+          path: .
+
+      - name: Deploy II
+        run: |
+          echo installing
+          shasum -a 256 ./internet_identity.wasm
+
+          dfx canister --no-wallet create --all
+          dfx canister --no-wallet install --mode install internet_identity --argument '(null)'
+
+      - name: Run tests
+        working-directory: dummy-auth-tests
+        run: |
+          npm ci
+          npm run test
+
+      - name: Stop replica
+        run: |
+          dfx stop
 
   # This uploads the screenshots from both the (non-emulated) 'desktop' and
   # 'mobile' runs.

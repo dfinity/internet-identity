@@ -64,6 +64,7 @@ COPY . .
 
 ARG II_ENV=production
 ARG USE_DUMMY_CAPTCHA=
+ARG USE_DUMMY_AUTH=
 
 RUN touch src/internet_identity/src/lib.rs
 RUN npm ci

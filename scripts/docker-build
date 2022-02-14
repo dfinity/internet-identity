@@ -31,6 +31,14 @@ then
     docker_build_args+=( --build-arg USE_DUMMY_CAPTCHA="$USE_DUMMY_CAPTCHA" )
 fi
 
+USE_DUMMY_AUTH=${USE_DUMMY_AUTH:-}
+echo "USE_DUMMY_AUTH: '$USE_DUMMY_AUTH'"
+
+if [[ "$USE_DUMMY_AUTH" == "1" ]]
+then
+    docker_build_args+=( --build-arg USE_DUMMY_AUTH="$USE_DUMMY_AUTH" )
+fi
+
 docker_build_args+=(--tag "$image_name" .)
 
 echo "The following image name will be used: $image_name"

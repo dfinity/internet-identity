@@ -38,6 +38,28 @@ import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 
 declare const canisterId: string;
 
+/*
+ * A (dummy) identity that always uses the same keypair. The secret key is
+ * generated with a 32-byte \NUL seed.
+ * This identity must not be used in production.
+ */
+export class DummyIdentity
+  extends Ed25519KeyIdentity
+  implements IdentifiableIdentity
+{
+  public rawId: ArrayBuffer;
+
+  public constructor() {
+    const key = Ed25519KeyIdentity.generate(new Uint8Array(32));
+
+    const { secretKey, publicKey } = key.getKeyPair();
+    super(publicKey, secretKey);
+
+    // A dummy rawId
+    this.rawId = new Uint8Array(32);
+  }
+}
+
 // Check if the canister ID was defined before we even try to read it
 if (typeof canisterId !== undefined) {
   displayError({
@@ -87,7 +109,7 @@ type SeedPhraseFail = { kind: "seedPhraseFail" };
 
 export type { ChallengeResult } from "../../generated/internet_identity_types";
 
-interface IdentifiableIdentity extends SignIdentity {
+export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
 }
 
@@ -188,14 +210,21 @@ export class IIConnection {
     userNumber: bigint,
     devices: DeviceData[]
   ): Promise<LoginResult> {
-    const identity = MultiWebAuthnIdentity.fromCredentials(
-      devices.flatMap((device) =>
-        device.credential_id.map((credentialId: CredentialId) => ({
-          pubkey: derFromPubkey(device.pubkey),
-          credentialId: Buffer.from(credentialId),
-        }))
-      )
-    );
+    /* Recover the Identity (i.e. key pair) used when creating the anchor.
+     * If "USE_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * that is used in the register flow.
+     */
+    const identity =
+      process.env.USE_DUMMY_AUTH === "1"
+        ? new DummyIdentity()
+        : MultiWebAuthnIdentity.fromCredentials(
+            devices.flatMap((device) =>
+              device.credential_id.map((credentialId: CredentialId) => ({
+                pubkey: derFromPubkey(device.pubkey),
+                credentialId: Buffer.from(credentialId),
+              }))
+            )
+          );
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);

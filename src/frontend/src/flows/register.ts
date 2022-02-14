@@ -1,7 +1,11 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { Challenge } from "../../generated/internet_identity_types";
 import { html, render } from "lit-html";
-import { creationOptions } from "../utils/iiConnection";
+import {
+  IdentifiableIdentity,
+  DummyIdentity,
+  creationOptions,
+} from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import {
   apiResultToLoginFlowResult,
@@ -60,18 +64,27 @@ const init = (): Promise<LoginFlowResult | null> =>
       renderConstructing();
       await tick();
 
+      /* The Identity (i.e. key pair) used when creating the anchor.
+       * If "USE_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
+       */
+      const createIdentity =
+        process.env.USE_DUMMY_AUTH === "1"
+          ? () => Promise.resolve(new DummyIdentity())
+          : () =>
+              WebAuthnIdentity.create({
+                publicKey: creationOptions(),
+              });
+
       try {
         // Kick-start both the captcha creation and the identity
         Promise.all([
           makeCaptcha(),
-          WebAuthnIdentity.create({
-            publicKey: creationOptions(),
-          }),
+          createIdentity() as Promise<IdentifiableIdentity>,
         ])
           .catch((error) => {
             resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
             // We can never get here, but TS doesn't understand that
-            return 0 as unknown as [Challenge, WebAuthnIdentity];
+            return 0 as unknown as [Challenge, IdentifiableIdentity];
           })
           .then(([captcha, identity]) => {
             confirmRegister(Promise.resolve(captcha), identity, alias).then(
