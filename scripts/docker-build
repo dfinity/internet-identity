@@ -35,39 +35,14 @@ docker_build_args+=(--tag "$image_name" .)
 
 echo "The following image name will be used: $image_name"
 
+tmp_outdir=$(mktemp -d)
+
 set -x
-docker build "${docker_build_args[@]}"
+DOCKER_BUILDKIT=1 docker build "${docker_build_args[@]}" --output "$tmp_outdir"
 set +x
 
-# use no-op as a command, doesn't matter since the container is never run
-container_id=$(docker create "$image_name" no-op)
+echo "Copying build output from $tmp_outdir to $PWD"
+cp "$tmp_outdir/internet_identity.wasm" .
 
-echo "created container with id $container_id"
-
-success=true
-
-copy() {
-    local container_id="$1"
-    local container_path="$2"
-    local local_path="$3"
-
-    if docker cp $container_id:/"$container_path" "$local_path"
-    then
-        echo "$container_path -> $local_path (from container $container_id)"
-        return 0
-    else
-        echo "could not copy $container_path from container $container_id"
-        return 1
-    fi
-}
-
-copy "$container_id" "internet_identity.wasm" "internet_identity.wasm" || success=false
-
-if [[ $success = true ]]
-then
-    echo "Removing container $container_id"
-    docker rm --volumes "$container_id"
-else
-    echo "container is left for inspection, once done run:"
-    echo "  docker rm -v $container_id"
-fi
+echo "Removing $tmp_outdir"
+rm -rf "$tmp_outdir"
