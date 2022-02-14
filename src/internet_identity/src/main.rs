@@ -527,7 +527,7 @@ async fn make_rng() -> rand_chacha::ChaCha20Rng {
 #[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
     let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(10, 10);
+    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(96,48);
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
