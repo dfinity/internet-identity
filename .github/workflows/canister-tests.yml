@@ -92,7 +92,9 @@ jobs:
           name: internet_identity_dummy_captcha.wasm
           path: out/internet_identity.wasm
 
-  # TODO: document
+  # A version of II where a known keypair is used for every anchor registration
+  # and authentication. This is meant for testing. This also includes the dummy
+  # captcha.
   docker-build-dummy-auth:
     runs-on: ubuntu-latest
     needs: docker-build-base
