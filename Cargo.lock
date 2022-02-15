@@ -197,7 +197,7 @@ dependencies = [
 [[package]]
 name = "captcha"
 version = "0.0.8"
-source = "git+https://github.com/nmattia/captcha?rev=4751b6fa4e56229c2af5b9a28195ff039551d8e7#4751b6fa4e56229c2af5b9a28195ff039551d8e7"
+source = "git+https://github.com/nmattia/captcha?rev=1c80a11b24f7ca090e43032dd45ea5c88f027221#1c80a11b24f7ca090e43032dd45ea5c88f027221"
 dependencies = [
  "base64",
  "hound",
