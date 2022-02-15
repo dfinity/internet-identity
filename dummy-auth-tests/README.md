@@ -1,6 +1,6 @@
 # Internet Identity with dummy auth
 
-These are the tests run against the `USE_DUMMY_AUTH=1` build of Internet
+These are the tests run against the `II_DUMMY_AUTH=1` build of Internet
 Identity.
 
 ⚠️ This build should never, ever land in production! ⚠️
@@ -19,7 +19,7 @@ TODO:
 In the top-level directory:
 
 ```bash
-$ II_ENV=development USE_DUMMY_CAPTCHA=1 USE_DUMMY_AUTH=1 ./scripts/docker-build
+$ II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
 $ dfx start
 $ dfx canister --no-wallet install --mode reinstall internet_identity --argument '(null)'
 ```

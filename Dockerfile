@@ -62,9 +62,9 @@ FROM deps as build
 
 COPY . .
 
-ARG II_ENV=production
-ARG USE_DUMMY_CAPTCHA=
-ARG USE_DUMMY_AUTH=
+ARG II_FETCH_ROOT_KEY=
+ARG II_DUMMY_CAPTCHA=
+ARG II_DUMMY_AUTH=
 
 RUN touch src/internet_identity/src/lib.rs
 RUN npm ci

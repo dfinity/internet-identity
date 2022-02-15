@@ -211,11 +211,11 @@ export class IIConnection {
     devices: DeviceData[]
   ): Promise<LoginResult> {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
-     * If "USE_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
     const identity =
-      process.env.USE_DUMMY_AUTH === "1"
+      process.env.II_DUMMY_AUTH === "1"
         ? new DummyIdentity()
         : MultiWebAuthnIdentity.fromCredentials(
             devices.flatMap((device) =>
@@ -319,7 +319,7 @@ export class IIConnection {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
     // Only fetch the root key when we're not in prod
-    if (process.env.II_ENV === "development") {
+    if (process.env.II_FETCH_ROOT_KEY === "1") {
       await agent.fetchRootKey();
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {

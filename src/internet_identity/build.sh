@@ -31,7 +31,7 @@ cargo_build_args=(
 # is always "a".
 # WARNING: this MUST be opt-in, because we DO NOT want this in production,
 # EVAR.
-if [ "${USE_DUMMY_CAPTCHA:-}" == "1" ]
+if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
 then
     echo "USING DUMMY CAPTCHA"
     cargo_build_args+=( --features dummy_captcha )

@@ -123,8 +123,8 @@ function generateWebpackConfigForCanister(name, info) {
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
-        "II_ENV": "production",
-        "USE_DUMMY_AUTH": "0"
+        "II_FETCH_ROOT_KEY": "0",
+        "II_DUMMY_AUTH": "0"
       }),
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,

@@ -843,7 +843,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     -- Go through a challenge request/registration flow for this device.
     -- NOTE: this (dummily) solves the challenge with the string "a", which is
-    -- returned by the backend when compiled with USE_DUMMY_CAPTCHA.
+    -- returned by the backend when compiled with II_DUMMY_CAPTCHA.
     register cid webauthID device pow =
       getChallenge cid webauthID pow >>= callII cid webauthID #register . (device,)
 
