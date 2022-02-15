@@ -261,7 +261,7 @@ jobs:
           npm ci
           npm run install-webdrivers
 
-      - run: rm -v -f screenshots/*-${{ matrix.device }}.png
+      - run: rm -v -f screenshots/*.png
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
@@ -356,11 +356,13 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: e2e-screenshots-desktop
+          path: screenshots
 
       # Download the mobile screenshots artifacts
       - uses: actions/download-artifact@v2
         with:
           name: e2e-screenshots-mobile
+          path: screenshots
 
       - run: |
           echo the following screenshots were recovered
