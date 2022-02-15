@@ -65,10 +65,10 @@ const init = (): Promise<LoginFlowResult | null> =>
       await tick();
 
       /* The Identity (i.e. key pair) used when creating the anchor.
-       * If "USE_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
+       * If "II_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
        */
       const createIdentity =
-        process.env.USE_DUMMY_AUTH === "1"
+        process.env.II_DUMMY_AUTH === "1"
           ? () => Promise.resolve(new DummyIdentity())
           : () =>
               WebAuthnIdentity.create({

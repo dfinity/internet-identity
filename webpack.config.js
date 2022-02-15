@@ -124,7 +124,7 @@ function generateWebpackConfigForCanister(name, info) {
       }),
       new webpack.EnvironmentPlugin({
         "II_ENV": "production",
-        "USE_DUMMY_AUTH": "0"
+        "II_DUMMY_AUTH": "0"
       }),
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,

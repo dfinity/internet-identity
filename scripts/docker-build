@@ -23,20 +23,20 @@ then
     image_name="$image_name-$II_ENV"
 fi
 
-USE_DUMMY_CAPTCHA=${USE_DUMMY_CAPTCHA:-}
-echo "USE_DUMMY_CAPTCHA: '$USE_DUMMY_CAPTCHA'"
+II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-}
+echo "II_DUMMY_CAPTCHA: '$II_DUMMY_CAPTCHA'"
 
-if [[ "$USE_DUMMY_CAPTCHA" == "1" ]]
+if [[ "$II_DUMMY_CAPTCHA" == "1" ]]
 then
-    docker_build_args+=( --build-arg USE_DUMMY_CAPTCHA="$USE_DUMMY_CAPTCHA" )
+    docker_build_args+=( --build-arg II_DUMMY_CAPTCHA="$II_DUMMY_CAPTCHA" )
 fi
 
-USE_DUMMY_AUTH=${USE_DUMMY_AUTH:-}
-echo "USE_DUMMY_AUTH: '$USE_DUMMY_AUTH'"
+II_DUMMY_AUTH=${II_DUMMY_AUTH:-}
+echo "II_DUMMY_AUTH: '$II_DUMMY_AUTH'"
 
-if [[ "$USE_DUMMY_AUTH" == "1" ]]
+if [[ "$II_DUMMY_AUTH" == "1" ]]
 then
-    docker_build_args+=( --build-arg USE_DUMMY_AUTH="$USE_DUMMY_AUTH" )
+    docker_build_args+=( --build-arg II_DUMMY_AUTH="$II_DUMMY_AUTH" )
 fi
 
 docker_build_args+=(--tag "$image_name" .)

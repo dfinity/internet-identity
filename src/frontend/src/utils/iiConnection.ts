@@ -211,11 +211,11 @@ export class IIConnection {
     devices: DeviceData[]
   ): Promise<LoginResult> {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
-     * If "USE_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
     const identity =
-      process.env.USE_DUMMY_AUTH === "1"
+      process.env.II_DUMMY_AUTH === "1"
         ? new DummyIdentity()
         : MultiWebAuthnIdentity.fromCredentials(
             devices.flatMap((device) =>
