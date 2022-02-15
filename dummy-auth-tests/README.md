@@ -19,7 +19,7 @@ TODO:
 In the top-level directory:
 
 ```bash
-$ II_ENV=development II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
+$ II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
 $ dfx start
 $ dfx canister --no-wallet install --mode reinstall internet_identity --argument '(null)'
 ```

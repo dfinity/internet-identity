@@ -319,7 +319,7 @@ export class IIConnection {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
     // Only fetch the root key when we're not in prod
-    if (process.env.II_ENV === "development") {
+    if (process.env.II_FETCH_ROOT_KEY === "1") {
       await agent.fetchRootKey();
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {

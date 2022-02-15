@@ -62,7 +62,7 @@ jobs:
           path: out/internet_identity.wasm
 
   # A version of II where the captcha value is always the same ("a") and where
-  # the frontend is built in "development" mode (where the root key is always
+  # the frontend is built with "II_FETCH_ROOT_KEY" (where the root key is always
   # fetched)
   docker-build-dummy-captcha:
     runs-on: ubuntu-latest
@@ -80,7 +80,7 @@ jobs:
           file: Dockerfile
           build-args: |
             II_DUMMY_CAPTCHA=1
-            II_ENV=development
+            II_FETCH_ROOT_KEY=1
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
@@ -112,7 +112,7 @@ jobs:
           build-args: |
             II_DUMMY_CAPTCHA=1
             II_DUMMY_AUTH=1
-            II_ENV=development
+            II_FETCH_ROOT_KEY=1
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out

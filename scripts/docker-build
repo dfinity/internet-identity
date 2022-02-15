@@ -14,13 +14,13 @@ echo "PWD: $PWD"
 image_name="internet-identity"
 docker_build_args=( --target scratch )
 
-II_ENV=${II_ENV:-}
-echo "II_ENV: '$II_ENV'"
+II_FETCH_ROOT_KEY=${II_FETCH_ROOT_KEY:-}
+echo "II_FETCH_ROOT_KEY: '$II_FETCH_ROOT_KEY'"
 
-if [ -n "$II_ENV" ]
+if [[ "$II_FETCH_ROOT_KEY" == "1" ]]
 then
-    docker_build_args+=( --build-arg II_ENV="$II_ENV" )
-    image_name="$image_name-$II_ENV"
+    docker_build_args+=( --build-arg II_FETCH_ROOT_KEY="$II_FETCH_ROOT_KEY" )
+    image_name="$image_name-fetchrootkey"
 fi
 
 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-}
@@ -29,6 +29,7 @@ echo "II_DUMMY_CAPTCHA: '$II_DUMMY_CAPTCHA'"
 if [[ "$II_DUMMY_CAPTCHA" == "1" ]]
 then
     docker_build_args+=( --build-arg II_DUMMY_CAPTCHA="$II_DUMMY_CAPTCHA" )
+    image_name="$image_name-dummycaptcha"
 fi
 
 II_DUMMY_AUTH=${II_DUMMY_AUTH:-}
@@ -37,6 +38,7 @@ echo "II_DUMMY_AUTH: '$II_DUMMY_AUTH'"
 if [[ "$II_DUMMY_AUTH" == "1" ]]
 then
     docker_build_args+=( --build-arg II_DUMMY_AUTH="$II_DUMMY_AUTH" )
+    image_name="$image_name-dummyauth"
 fi
 
 docker_build_args+=(--tag "$image_name" .)
