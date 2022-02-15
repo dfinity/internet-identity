@@ -526,8 +526,8 @@ async fn make_rng() -> rand_chacha::ChaCha20Rng {
 
 #[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
-    let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(96,48);
+    let mut captcha = captcha::RngCaptcha::from_opts(rng, 96, 48);
+    let captcha = captcha.set_chars(&vec!['a']).add_chars(1);
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
@@ -539,12 +539,11 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
 #[cfg(not(feature = "dummy_captcha"))]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
-    let mut captcha = captcha::RngCaptcha::from_rng(rng);
+    let mut captcha = captcha::RngCaptcha::from_opts(rng, 220, 120);
     let captcha = captcha
         .add_chars(5)
         .apply_filter(Wave::new(2.0, 20.0).horizontal())
-        .apply_filter(Wave::new(2.0, 20.0).vertical())
-        .view(220, 120);
+        .apply_filter(Wave::new(2.0, 20.0).vertical());
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
