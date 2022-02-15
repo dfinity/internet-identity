@@ -21,7 +21,7 @@ rand_core = "0.5.1"
 rand_chacha = "0.2.2"
 #  We need a custom captcha that allows using custom RNGs
 #  https://github.com/dfinity/internet-identity/issues/472
-captcha = { git = 'https://github.com/nmattia/captcha', rev = '1c80a11b24f7ca090e43032dd45ea5c88f027221' }
+captcha = { git = 'https://github.com/nmattia/captcha', rev = 'a77d7e3bfbc4795bda7ed273cfbb80b25bcc6ede' }
 
 [dev-dependencies]
 hex-literal = "0.2.1"
