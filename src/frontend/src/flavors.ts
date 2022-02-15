@@ -1,36 +1,70 @@
 import { render, html } from "lit-html";
 
 export const flavors = {
-    FETCH_ROOT_KEY: process.env.II_FETCH_ROOT_KEY === "1",
-    DUMMY_AUTH: process.env.II_DUMMY_AUTH === "1",
-    DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
+  FETCH_ROOT_KEY: process.env.II_FETCH_ROOT_KEY === "1",
+  DUMMY_AUTH: process.env.II_DUMMY_AUTH === "1",
+  DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
 };
 
 export const anyFlavors = () => {
-    return Object.values(flavors).indexOf(true) >= 0;
-}
+  return Object.values(flavors).indexOf(true) >= 0;
+};
 
 export const showWarningOnFlavors = () => {
-    if(anyFlavors()) {
-        showWarning();
-    }
-}
+  if (anyFlavors()) {
+    showWarning();
+  }
+};
 
 export const showWarning = () => {
-    let container = document.createElement("div");
+  let container = document.createElement("div");
+  container.className = "flavors-warning-container";
+  let red = "#A8201A";
+  let white = "#E2EFDE";
 
-    let warning = html`
-    <div
-        class="flavors-warning"
-        style="background: red; width: 100vw; position: fixed; top: 0; padding: 0 1em;"
-        >
-        This Internet Identity is insecure because it was built with flavors
-        <a style="display: inline-block; margin: 0 1em;" href="https://github.com/dfinity/internet-identity#build-flavors">more</a>
-        <a style="display: inline-block; margin: 0 1em;" href="#" onclick=${() => { container.remove(); }}">close</a>
-    </div>
-    `;
+  let warning = html`
+    <style>
+      .flavors-warning-container {
+        background: ${red};
+        color: ${white};
+        width: 100vw;
+        position: fixed;
+        top: 0;
+        padding: 0.5em 1em;
+        text-align: center;
+      }
 
-    render(warning, container);
+      .flavors-warning-btn {
+        display: inline-block;
+        margin: 0 1em;
+        border-radius: 4px;
+        border: ${white} solid 1px;
+        padding: 0.2em 0.4em;
+        text-decoration: none;
+      }
 
-    document.body.appendChild(container);
+      .flavors-warning-btn:link,
+      .flavors-warning-btn:visited {
+        color: ${white};
+      }
+
+      .flavors-warning-btn:hover,
+      .flavors-warning-btn:focus {
+        background: ${white};
+        color: ${red};
+      }
+    </style>
+    This Internet Identity is insecure because it was built with flavors
+    <a
+      class="flavors-warning-btn"
+      target="_blank"
+      rel="noopener noreferrer"
+      href="https://github.com/dfinity/internet-identity#build-flavors"
+      >more</a
+    >
+  `;
+
+  render(warning, container);
+
+  document.body.appendChild(container);
 };
