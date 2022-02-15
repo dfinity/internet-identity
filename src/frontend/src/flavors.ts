@@ -36,7 +36,7 @@ export const showWarning = () => {
 
       .flavors-warning-btn {
         display: inline-block;
-        margin: 0 1em;
+        margin-left: 1em;
         border-radius: 4px;
         border: ${white} solid 1px;
         padding: 0.2em 0.4em;
@@ -62,9 +62,18 @@ export const showWarning = () => {
       href="https://github.com/dfinity/internet-identity#build-flavors"
       >more</a
     >
+    <a class="flavors-warning-btn flavors-warning-btn-close" href="#">close</a>
   `;
 
   render(warning, container);
+
+  // We can't inline this due to CSP
+  const closeBtn = container.querySelector(".flavors-warning-btn-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      container.remove();
+    });
+  }
 
   document.body.appendChild(container);
 };
