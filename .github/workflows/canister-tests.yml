@@ -347,8 +347,8 @@ jobs:
     # artifacts)
     needs: selenium
 
-    # Only run on PRs, we don't want to commit new screenshots to master
-    if: ${{ github.event_name == 'pull_request' }}
+    # We don't want to commit new screenshots to main
+    if: ${{ github.ref != 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v2
 
