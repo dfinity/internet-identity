@@ -241,7 +241,7 @@ export async function waitForFlavorsWarning(
 ): Promise<WebdriverIO.Element> {
     const closeBtn = await browser
       .$(".flavors-warning-btn-close");
-    await closeBtn.waitForDisplayed({ timeout: 10_000 });
+    await closeBtn.waitForDisplayed();
     return closeBtn;
 }
 

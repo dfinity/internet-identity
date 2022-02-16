@@ -199,7 +199,6 @@ test("Recover access, after registration", async () => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
-
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
