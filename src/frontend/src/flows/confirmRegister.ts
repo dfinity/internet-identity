@@ -10,6 +10,7 @@ import { Challenge } from "../../generated/internet_identity_types";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
+import { flavors } from "../flavors";
 import {
   IdentifiableIdentity,
   IIConnection,
@@ -143,7 +144,9 @@ export const makeCaptcha = (): Promise<Challenge> =>
   new Promise((resolve) => {
     setTimeout(() => {
       const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-      const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+      const pow = flavors.DUMMY_POW
+        ? { timestamp: BigInt(0), nonce: BigInt(0) }
+        : getProofOfWork(now_in_ns, canisterIdPrincipal);
       IIConnection.createChallenge(pow).then((cha) => {
         resolve(cha);
       });
