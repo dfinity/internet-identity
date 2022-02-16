@@ -292,7 +292,6 @@ test("Screenshots", async () => {
       await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
         await addVirtualAuthenticator(browser2);
         await browser2.url(II_URL);
-        await closeFlavorsWarning(browser);
         const welcomeView2 = new WelcomeView(browser2);
         await welcomeView2.waitForDisplay();
         await welcomeView2.typeUserNumber(userNumber);
