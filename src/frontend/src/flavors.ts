@@ -1,3 +1,6 @@
+// Contains code related to the "build flavors". Flavors should be accessed
+// from the `flavors` object below. This file also contains helper functions
+// for displaying a banner if flavors are enabled.
 import { render, html } from "lit-html";
 
 export const flavors = {
