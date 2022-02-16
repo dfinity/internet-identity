@@ -181,6 +181,10 @@ $ II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
 
 The flavors are described below:
 
+<!-- NOTE: If you add a flavor here, add it to 'flavors.ts' in the frontend
+codebase too, even if the flavor only impacts the canister code and not the
+frontend. -->
+
 | Environment variable | Description |
 | --- | --- |
 | `II_FETCH_ROOT_KEY` | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |

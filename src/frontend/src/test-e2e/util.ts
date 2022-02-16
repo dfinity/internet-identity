@@ -236,6 +236,19 @@ export async function switchToPopup(
   await addVirtualAuthenticator(browser);
 }
 
+export async function removeFlavorsWarning(
+  browser: WebdriverIO.Browser
+): Promise<void> {
+    const warningContainer = await browser.$(".flavors-warning-container");
+    await warningContainer.waitForDisplayed();
+    browser.execute(() => {
+        const warningContainer = document.querySelector('.flavors-warning-container');
+        if(warningContainer) {
+            warningContainer.remove();
+        }
+    });
+}
+
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
