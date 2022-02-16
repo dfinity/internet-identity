@@ -70,7 +70,8 @@ export const showWarning = (): void => {
   // We can't inline this due to CSP
   const closeBtn = container.querySelector(".flavors-warning-btn-close");
   if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault(); // make sure we don't actually redirect to '#'
       container.remove();
     });
   }
