@@ -9,7 +9,7 @@ export const flavors = {
   DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
 };
 
-export const anyFlavors = () : boolean => {
+export const anyFlavors = (): boolean => {
   return Object.values(flavors).indexOf(true) >= 0;
 };
 
@@ -57,7 +57,7 @@ export const showWarning = (): void => {
         color: ${red};
       }
     </style>
-    This Internet Identity is insecure because it was built with flavors
+    This is an insecure development version of Internet Identity.
     <a
       class="flavors-warning-btn"
       target="_blank"

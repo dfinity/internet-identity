@@ -454,7 +454,6 @@ test("Screenshots", async () => {
       await waitForFonts(browser);
       const welcomeView3 = new WelcomeView(browser);
       await screenshots.take("flavors-warning", browser);
-
     }
   );
 }, 400_000);
