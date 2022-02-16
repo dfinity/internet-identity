@@ -6,23 +6,23 @@ export const flavors = {
   DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
 };
 
-export const anyFlavors = () => {
+export const anyFlavors = () : boolean => {
   return Object.values(flavors).indexOf(true) >= 0;
 };
 
-export const showWarningOnFlavors = () => {
+export const showWarningOnFlavors = (): void => {
   if (anyFlavors()) {
     showWarning();
   }
 };
 
-export const showWarning = () => {
-  let container = document.createElement("div");
+export const showWarning = (): void => {
+  const container = document.createElement("div");
   container.className = "flavors-warning-container";
-  let red = "#A8201A";
-  let white = "#E2EFDE";
+  const red = "#A8201A";
+  const white = "#E2EFDE";
 
-  let warning = html`
+  const warning = html`
     <style>
       .flavors-warning-container {
         background: ${red};
