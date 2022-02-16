@@ -236,6 +236,22 @@ export async function switchToPopup(
   await addVirtualAuthenticator(browser);
 }
 
+export async function waitForFlavorsWarning(
+  browser: WebdriverIO.Browser
+): Promise<WebdriverIO.Element> {
+    const closeBtn = await browser
+      .$(".flavors-warning-btn-close");
+    await closeBtn.waitForDisplayed({ timeout: 10_000 });
+    return closeBtn;
+}
+
+export async function closeFlavorsWarning(
+  browser: WebdriverIO.Browser
+): Promise<void> {
+    const closeBtn = await waitForFlavorsWarning(browser);
+    closeBtn.click();
+}
+
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
