@@ -436,6 +436,15 @@ test("Screenshots", async () => {
       await faqView.openQuestion("lost-device");
       await faqView.waitForDisplay();
       await screenshots.take("faq-open", browser);
+
+      // Flavors warning banner
+      await browser.url("about:blank");
+      await browser.url(II_URL);
+      await waitForFonts(browser);
+      const welcomeView3 = new WelcomeView(browser);
+      await welcomeView3.waitForFlavorsWarningClose();
+      await screenshots.take("flavors-warning", browser);
+
     }
   );
 }, 400_000);

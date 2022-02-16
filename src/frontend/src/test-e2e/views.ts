@@ -7,6 +7,15 @@ export class WelcomeView extends View {
     await this.browser
       .$("#registerUserNumber")
       .waitForDisplayed({ timeout: 10_000 });
+    const closeBtn = await this.waitForFlavorsWarningClose();
+    closeBtn.click();
+  }
+
+  async waitForFlavorsWarningClose(): Promise<WebdriverIO.Element> {
+    const closeBtn = await this.browser
+      .$(".flavors-warning-btn-close");
+    await closeBtn.waitForDisplayed({ timeout: 10_000 });
+    return closeBtn;
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
