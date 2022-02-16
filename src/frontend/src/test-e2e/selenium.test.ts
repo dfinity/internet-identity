@@ -339,6 +339,7 @@ test("Screenshots", async () => {
         const welcomeBackView2 = new WelcomeBackView(browser2);
         await welcomeBackView2.waitForDisplay();
         await welcomeBackView2.fixup();
+        await closeFlavorsWarning(browser2);
         await screenshots.take("new-device-login", browser2);
         await welcomeBackView2.login();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
