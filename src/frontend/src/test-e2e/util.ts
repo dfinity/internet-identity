@@ -236,19 +236,17 @@ export async function switchToPopup(
   await addVirtualAuthenticator(browser);
 }
 
-export async function waitForFlavorsWarning(
-  browser: WebdriverIO.Browser
-): Promise<WebdriverIO.Element> {
-  const closeBtn = await browser.$(".flavors-warning-btn-close");
-  await closeBtn.waitForDisplayed();
-  return closeBtn;
-}
-
-export async function closeFlavorsWarning(
+export async function removeFlavorsWarning(
   browser: WebdriverIO.Browser
 ): Promise<void> {
-  const closeBtn = await waitForFlavorsWarning(browser);
-  closeBtn.click();
+    const warningContainer = await browser.$(".flavors-warning-container");
+    await warningContainer.waitForDisplayed();
+    browser.execute(() => {
+        const warningContainer = document.querySelector('.flavors-warning-container');
+        if(warningContainer) {
+            warningContainer.remove();
+        }
+    });
 }
 
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {

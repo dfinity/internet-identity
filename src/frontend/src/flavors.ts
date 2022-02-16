@@ -31,8 +31,6 @@ export const showWarning = (): void => {
         background: ${red};
         color: ${white};
         width: 100vw;
-        position: fixed;
-        top: 0;
         padding: 0.5em 1em;
         text-align: center;
       }
@@ -65,19 +63,8 @@ export const showWarning = (): void => {
       href="https://github.com/dfinity/internet-identity#build-flavors"
       >more</a
     >
-    <a class="flavors-warning-btn flavors-warning-btn-close" href="#">close</a>
   `;
 
   render(warning, container);
-
-  // We can't inline this due to CSP
-  const closeBtn = container.querySelector(".flavors-warning-btn-close");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", (e) => {
-      e.preventDefault(); // make sure we don't actually redirect to '#'
-      container.remove();
-    });
-  }
-
-  document.body.appendChild(container);
+  document.body.prepend(container);
 };
