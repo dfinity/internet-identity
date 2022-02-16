@@ -1230,6 +1230,10 @@ fn check_frontend_length(frontend: &FrontendHostname) {
     }
 }
 
+#[cfg(feature = "dummy_pow")]
+fn check_proof_of_work(_pow: &ProofOfWork, _now: Timestamp) {}
+
+#[cfg(not(feature = "dummy_pow"))]
 fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
     use cubehash::CubeHash;
 

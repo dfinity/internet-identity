@@ -37,6 +37,15 @@ then
     cargo_build_args+=( --features dummy_captcha )
 fi
 
+# This enables the "dummy_pow" feature which skips the PoW checks altogether.
+# WARNING: this MUST be opt-in, because we DO NOT want this in production,
+# EVAR.
+if [ "${II_DUMMY_POW:-}" == "1" ]
+then
+    echo "USING DUMMY POW"
+    cargo_build_args+=( --features dummy_pow )
+fi
+
 echo Running cargo build "${cargo_build_args[@]}"
 
 cargo build "${cargo_build_args[@]}"
