@@ -35,93 +35,60 @@ jobs:
           outputs: type=cacheonly
           target: deps
 
-  # The "official" build, i.e. the one that gets deployed on mainnet
-  docker-build-official:
+  docker-build:
     runs-on: ubuntu-latest
     needs: docker-build-base
+    strategy:
+      matrix:
+        include:
+          # The production build
+          - name: internet_identity_production.wasm
+            II_FETCH_ROOT_KEY: 0
+            II_DUMMY_AUTH: 0
+            II_DUMMY_CAPTCHA: 0
+            II_DUMMY_POW: 0
+
+          # No captcha and fetching the root key, used in (our) tests, backend and
+          # selenium.
+          - name: internet_identity_test.wasm
+            II_FETCH_ROOT_KEY: 1
+            II_DUMMY_AUTH: 0
+            II_DUMMY_CAPTCHA: 1
+            II_DUMMY_POW: 0
+
+          # Everything disabled, used by third party developers who only care
+          # about the login flow
+          - name: internet_identity_dev.wasm
+            II_FETCH_ROOT_KEY: 1
+            II_DUMMY_AUTH: 1
+            II_DUMMY_CAPTCHA: 1
+            II_DUMMY_POW: 1
+
     steps:
       - uses: actions/checkout@v2
 
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Build internet identity
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: Dockerfile
-          cache-from: type=gha,scope=cached-stage
-          # Exports the artefacts from the final stage
-          outputs: ./out
-
-      - run: sha256sum out/internet_identity.wasm
-      - name: 'Upload official wasm'
-        uses: actions/upload-artifact@v2
-        with:
-          name: internet_identity.wasm
-          path: out/internet_identity.wasm
-
-  # A version of II where the captcha value is always the same ("a") and where
-  # the frontend is built with "II_FETCH_ROOT_KEY" (where the root key is always
-  # fetched)
-  docker-build-dummy-captcha:
-    runs-on: ubuntu-latest
-    needs: docker-build-base
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Build internet identity
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: Dockerfile
-          build-args: |
-            II_DUMMY_CAPTCHA=1
-            II_FETCH_ROOT_KEY=1
-          cache-from: type=gha,scope=cached-stage
-          # Exports the artefacts from the final stage
-          outputs: ./out
-
-      - run: sha256sum out/internet_identity.wasm
-      - name: 'Upload dummy captcha wasm'
-        uses: actions/upload-artifact@v2
-        with:
-          name: internet_identity_dummy_captcha.wasm
-          path: out/internet_identity.wasm
-
-  # A version of II where a known keypair is used for every anchor registration
-  # and authentication. This is meant for testing. This also includes the dummy
-  # captcha.
-  docker-build-dummy-auth:
-    runs-on: ubuntu-latest
-    needs: docker-build-base
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Build internet identity
+      - name: Build ${{ matrix.name }}
         uses: docker/build-push-action@v2
         with:
           context: .
           file: Dockerfile
           build-args: |
-            II_DUMMY_CAPTCHA=1
-            II_DUMMY_AUTH=1
-            II_FETCH_ROOT_KEY=1
+            II_FETCH_ROOT_KEY=${{ matrix.II_FETCH_ROOT_KEY }}
+            II_DUMMY_POW=${{ matrix.II_DUMMY_POW }}
+            II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
+            II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
 
       - run: sha256sum out/internet_identity.wasm
-      - name: 'Upload dummy auth wasm'
+      - name: 'Upload ${{ matrix.name }}'
         uses: actions/upload-artifact@v2
         with:
-          name: internet_identity_dummy_auth.wasm
+          name: ${{ matrix.name }}
           path: out/internet_identity.wasm
 
   #####################
@@ -130,7 +97,7 @@ jobs:
 
   backend:
     runs-on: ${{ matrix.os }}
-    needs: docker-build-dummy-captcha
+    needs: docker-build
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
@@ -165,7 +132,7 @@ jobs:
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
         with:
-          name: internet_identity_dummy_captcha.wasm
+          name: internet_identity_test.wasm
           path: .
 
       - name: Run Tests
@@ -179,7 +146,7 @@ jobs:
 
   selenium:
     runs-on: ubuntu-latest
-    needs: docker-build-dummy-captcha
+    needs: docker-build
     strategy:
       matrix:
         start-flag: [ '', '--emulator' ]
@@ -229,7 +196,7 @@ jobs:
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
         with:
-          name: internet_identity_dummy_captcha.wasm
+          name: internet_identity_test.wasm
           path: .
 
       - name: Deploy Internet Identity
@@ -286,7 +253,7 @@ jobs:
 
   dummy-auth-tests:
     runs-on: ubuntu-latest
-    needs: docker-build-dummy-auth
+    needs: docker-build
     env:
       DFX_VERSION: 0.8.3
     steps:
@@ -317,7 +284,7 @@ jobs:
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
         with:
-          name: internet_identity_dummy_auth.wasm
+          name: internet_identity_dev.wasm
           path: .
 
       - name: Deploy II
