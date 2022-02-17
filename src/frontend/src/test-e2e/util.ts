@@ -241,7 +241,7 @@ export async function removeFlavorsWarning(
 ): Promise<void> {
     const warningContainer = await browser.$(".flavors-warning-container");
     await warningContainer.waitForDisplayed();
-    browser.execute(() => {
+    await browser.execute(() => {
         const warningContainer = document.querySelector('.flavors-warning-container');
         if(warningContainer) {
             warningContainer.remove();
