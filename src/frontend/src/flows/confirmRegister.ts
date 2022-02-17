@@ -7,11 +7,12 @@ import {
   LoginFlowResult,
 } from "./login/flowResult";
 import { Challenge } from "../../generated/internet_identity_types";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import getProofOfWork from "../crypto/pow";
 import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
+import { flavors } from "../flavors";
 import {
+  IdentifiableIdentity,
   IIConnection,
   canisterIdPrincipal,
   ChallengeResult,
@@ -35,7 +36,7 @@ const pageContent = html`
 
 export const confirmRegister = (
   captcha: Promise<Challenge>,
-  identity: WebAuthnIdentity,
+  identity: IdentifiableIdentity,
   alias: string
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -44,7 +45,7 @@ export const confirmRegister = (
 };
 
 const tryRegister = (
-  identity: WebAuthnIdentity,
+  identity: IdentifiableIdentity,
   alias: string,
   challengeResult: ChallengeResult,
   func: (result: LoginFlowResult) => void
@@ -67,20 +68,30 @@ const tryRegister = (
       confirmParagraph.innerHTML =
         "The value you entered is incorrect. A new challenge is generated.";
       requestCaptcha();
-    } else {
-      // Currently if something goes wrong we only tell the user that
+    } else if (result.kind == "registerNoSpace") {
+      // Currently, if something goes wrong we only tell the user that
       // something went wrong and then reload the page.
+      displayError({
+        title: "No Space Left",
+        message:
+          "We could not create an identity anchor because Internet Identity is at maximum capacity. Click 'ok' to reload.",
+        primaryButton: "Ok",
+      }).then(() => {
+        window.location.reload();
+      });
+    } else {
       displayError({
         title: "Something went wrong",
         message:
           "We could not create an identity anchor. You will find the full error message below. Click 'ok' to reload.",
         primaryButton: "Ok",
-        detail: JSON.stringify(result),
-      })
-        .then(() => {
-          window.location.reload();
-        })
-        .then(() => requestCaptcha());
+        detail: JSON.stringify(
+          result.error,
+          Object.getOwnPropertyNames(result.error)
+        ),
+      }).then(() => {
+        window.location.reload();
+      });
     }
   });
 };
@@ -133,7 +144,9 @@ export const makeCaptcha = (): Promise<Challenge> =>
   new Promise((resolve) => {
     setTimeout(() => {
       const now_in_ns = BigInt(Date.now()) * BigInt(1000000);
-      const pow = getProofOfWork(now_in_ns, canisterIdPrincipal);
+      const pow = flavors.DUMMY_POW
+        ? { timestamp: BigInt(0), nonce: BigInt(0) }
+        : getProofOfWork(now_in_ns, canisterIdPrincipal);
       IIConnection.createChallenge(pow).then((cha) => {
         resolve(cha);
       });
@@ -142,7 +155,7 @@ export const makeCaptcha = (): Promise<Challenge> =>
 
 const init = (
   canisterIdPrincipal: Principal,
-  identity: WebAuthnIdentity,
+  identity: IdentifiableIdentity,
   alias: string,
   captcha: Promise<Challenge>
 ): Promise<LoginFlowResult | null> => {

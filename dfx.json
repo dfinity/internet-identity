@@ -3,9 +3,8 @@
     "internet_identity": {
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
-      "wasm": "target/wasm32-unknown-unknown/release/internet_identity.wasm",
-      "build": "src/internet_identity/build.sh",
-      "source": ["dist"]
+      "wasm": "internet_identity.wasm",
+      "build": "src/internet_identity/build.sh"
     }
   },
   "defaults": {
@@ -15,7 +14,7 @@
   },
   "networks": {
     "local": {
-      "bind": "127.0.0.1:8000",
+      "bind": "0.0.0.0:8000",
       "type": "ephemeral"
     },
     "identity": {

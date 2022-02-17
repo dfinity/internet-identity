@@ -48,6 +48,7 @@ export async function runInBrowserCommon(
       "goog:chromeOptions": {
         args: [
           "--headless",
+          "--ignore-certificate-errors", // allow self-signed certificates
           "--disable-gpu",
           `--window-size=${runConfig.screenConfiguration.windowSize}`,
         ],
@@ -233,6 +234,19 @@ export async function switchToPopup(
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
   await addVirtualAuthenticator(browser);
+}
+
+export async function removeFlavorsWarning(
+  browser: WebdriverIO.Browser
+): Promise<void> {
+    const warningContainer = await browser.$(".flavors-warning-container");
+    await warningContainer.waitForDisplayed();
+    await browser.execute(() => {
+        const warningContainer = document.querySelector('.flavors-warning-container');
+        if(warningContainer) {
+            warningContainer.remove();
+        }
+    });
 }
 
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {

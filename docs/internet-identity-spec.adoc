@@ -630,8 +630,7 @@ For installation or upgrade, you should build it the “official” way.
 In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-docker build -t internet-identity-service .
-docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+./scripts/docker-build
 ----
 
 The resulting `internet_identity.wasm` is ready for deployment on `mainnet`.
@@ -703,13 +702,12 @@ Once the deployment went through, tag the commit with `mainnet-<date-from-propos
 ==== Building the canister for the identity testnet
 
 Because we need to fetch the root key for all networks that are not mainnet, we
-need to build with `II_ENV=development`:
+need to build with `II_FETCH_ROOT_KEY=1`:
 
 [source,bash]
 ----
 didc encode '(null)' | xxd -r -p > arg.in
-docker build -t internet-identity-development . --build-arg II_ENV=development
-docker run --rm --entrypoint cat internet-identity-development /internet_identity.wasm > internet_identity.wasm
+II_FETCH_ROOT_KEY=1 ./scripts/docker-build
 ----
 
 This will create the Wasm file you want to use for the following deployment steps at `./internet_identity.wasm`.

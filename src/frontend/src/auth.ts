@@ -1,4 +1,3 @@
-import { blobFromUint8Array } from "@dfinity/candid";
 import { Principal } from "@dfinity/principal";
 import {
   FrontendHostname,
@@ -100,7 +99,7 @@ async function handleAuthRequest(
   }
 
   return await withLoader(async () => {
-    const sessionKey = Array.from(blobFromUint8Array(request.sessionPublicKey));
+    const sessionKey = Array.from(request.sessionPublicKey);
     const prepRes = await connection.prepareDelegation(
       userNumber,
       hostname,

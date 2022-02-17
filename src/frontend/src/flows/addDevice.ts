@@ -1,9 +1,3 @@
-import {
-  BinaryBlob,
-  blobFromHex,
-  derBlobFromBlob,
-  DerEncodedBlob,
-} from "@dfinity/candid";
 import { render, html } from "lit-html";
 import { displayError } from "../components/displayError";
 import { warningIcon } from "../components/icons";
@@ -11,8 +5,11 @@ import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { IIConnection } from "../utils/iiConnection";
 import { parseUserNumber } from "../utils/userNumber";
+import { unknownToString } from "../utils/utils";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { successfullyAddedDevice } from "./successfulDeviceAddition";
+import { DerEncodedPublicKey } from "@dfinity/agent";
+import { fromHexString } from "@dfinity/identity/lib/cjs/buffer";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
@@ -88,13 +85,13 @@ const init = (userNumber: bigint, connection: IIConnection) => {
         );
         clearHash();
         successfullyAddedDevice(deviceName, userNumber, connection);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If anything goes wrong, or the user cancels we do _not_ want to add the device.
         await displayError({
           title: "Failed to add the device",
           message:
             "Something went wrong when adding the new device. Please try again",
-          detail: error.toString(),
+          detail: unknownToString(error, "Unknown error type"),
           primaryButton: "Back to Authenticate",
         });
         window.location.reload();
@@ -116,8 +113,8 @@ const parseNewDeviceParam = (
   param: string
 ): {
   userNumber: bigint;
-  publicKey: DerEncodedBlob;
-  rawId?: BinaryBlob;
+  publicKey: DerEncodedPublicKey;
+  rawId?: ArrayBuffer;
 } | null => {
   const segments = param.split(";");
   if (!(segments.length === 2 || segments.length === 3)) {
@@ -127,8 +124,8 @@ const parseNewDeviceParam = (
   if (userNumber === null) {
     return null;
   }
-  const publicKey = derBlobFromBlob(blobFromHex(segments[1]));
-  const rawId = segments[2] !== "" ? blobFromHex(segments[2]) : undefined;
+  const publicKey = fromHexString(segments[1]) as DerEncodedPublicKey;
+  const rawId = segments[2] !== "" ? fromHexString(segments[2]) : undefined;
   return { userNumber, publicKey, rawId };
 };
 

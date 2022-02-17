@@ -1,0 +1,347 @@
+# This describes all the tests we run on the canister code (various builds,
+# haskell tests, selenium tests). The canister code is built in docker and the
+# wasm is then reused by subsequent build steps. We build various flavors of
+# the code, see `docker-build-...` for more info.
+name: Canister tests
+
+on:
+  push:
+
+jobs:
+
+  #####################
+  # The docker builds #
+  #####################
+
+  # The image shared by all builds, containing pre-built rust deps
+  docker-build-base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # We use buildx and its GitHub Actions caching support `type=gha`. For
+      # more information, see
+      # https://github.com/docker/build-push-action/issues/539
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build base Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile
+          cache-from: type=gha,scope=cached-stage
+          cache-to: type=gha,scope=cached-stage,mode=max
+          outputs: type=cacheonly
+          target: deps
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: docker-build-base
+    strategy:
+      matrix:
+        include:
+          # The production build
+          - name: internet_identity_production.wasm
+            II_FETCH_ROOT_KEY: 0
+            II_DUMMY_AUTH: 0
+            II_DUMMY_CAPTCHA: 0
+            II_DUMMY_POW: 0
+
+          # No captcha and fetching the root key, used in (our) tests, backend and
+          # selenium.
+          - name: internet_identity_test.wasm
+            II_FETCH_ROOT_KEY: 1
+            II_DUMMY_AUTH: 0
+            II_DUMMY_CAPTCHA: 1
+            II_DUMMY_POW: 0
+
+          # Everything disabled, used by third party developers who only care
+          # about the login flow
+          - name: internet_identity_dev.wasm
+            II_FETCH_ROOT_KEY: 1
+            II_DUMMY_AUTH: 1
+            II_DUMMY_CAPTCHA: 1
+            II_DUMMY_POW: 1
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build ${{ matrix.name }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            II_FETCH_ROOT_KEY=${{ matrix.II_FETCH_ROOT_KEY }}
+            II_DUMMY_POW=${{ matrix.II_DUMMY_POW }}
+            II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
+            II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
+          cache-from: type=gha,scope=cached-stage
+          # Exports the artefacts from the final stage
+          outputs: ./out
+
+      - run: sha256sum out/internet_identity.wasm
+      - name: 'Upload ${{ matrix.name }}'
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.name }}
+          path: out/internet_identity.wasm
+
+  #####################
+  # The backend tests #
+  #####################
+
+  backend:
+    runs-on: ${{ matrix.os }}
+    needs: docker-build
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    env:
+      GHC_VERSION: 8.8.4
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache ~/.cabal/store
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cabal/store
+          key: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
+          restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
+
+      - uses: actions/setup-haskell@v1.1.3
+        with:
+          ghc-version: ${{ env.GHC_VERSION }}
+          cabal-version: "3.2"
+
+      - name: Build test runner
+        working-directory: backend-tests
+        run: |
+          cabal update
+          # we cannot use `cabal install` because the build is performed in
+          # another directory which breaks the relative path used in
+          # backend-tests.hs to internet_identity.did
+          cabal build --with-ghc ghc-${{ env.GHC_VERSION }}
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_test.wasm
+          path: .
+
+      - name: Run Tests
+        shell: bash
+        working-directory: backend-tests
+        run: cabal run
+
+  ######################
+  # The selenium tests #
+  ######################
+
+  selenium:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    strategy:
+      matrix:
+        start-flag: [ '', '--emulator' ]
+        device: [ 'desktop', 'mobile' ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
+    env:
+      DFX_VERSION: 0.8.3
+      REPLICA_URL: https://ic0.app
+      II_ORIGIN: https://identity.ic0.app
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+
+      # This step hangs on Github actions on Darwin for some reason, that
+      # is why we run this only on Linux for now
+      - name: Install DFX
+        run: |
+          echo Install DFX Version: "$DFX_VERSION"
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+      # Helps with debugging
+      - name: Show versions
+        run: |
+          echo dfx --version
+          dfx --version
+          echo node --version
+          node --version
+          echo docker --version
+          docker --version
+
+      # needed so that we can run the test on identity.ic0.app
+      - name: Add hosts to /etc/hosts
+        run: |
+          sudo echo "127.0.0.1 identity.ic0.app" | sudo tee -a /etc/hosts
+          sudo echo "127.0.0.1 ic0.app" | sudo tee -a /etc/hosts
+
+      - run: docker build reverse_proxy -t ii_proxy
+      - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
+      - run: dfx start ${{ matrix.start-flag }} --background
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_test.wasm
+          path: .
+
+      - name: Deploy Internet Identity
+        run: |
+          dfx canister --no-wallet create --all
+          dfx canister --no-wallet install internet_identity --argument '(null)'
+
+      - name: Deploy whoami canister
+        run: cd demos/whoami && dfx deploy --no-wallet
+
+      # We don't use the canister in the tests, but we want to make sure it
+      # can be built and deployed
+      - name: Deploy testnet_app canister
+        run: |
+          cd demos/testnet_app
+          npm ci
+          dfx deploy --no-wallet
+
+      - name: Run demo app
+        working-directory: demos/sample-javascript
+        run: |
+          npm ci
+          npm run build
+          npm run develop --no-live-reload --no-devtool &
+          sleep 10 # crude
+
+      - name: install selenium webdrivers
+        run: |
+          npm ci
+          npm run install-webdrivers
+
+      - run: rm -v -f screenshots/*.png
+      - run: npm test
+      - run: npm run test:e2e-${{ matrix.device }}
+      - run: dfx stop
+
+      - name: Print docker logs
+        if: ${{ always() }}
+        run: docker logs $(docker ps -qf "ancestor=ii_proxy")
+
+      - name: Archive test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
+          path: wdio.log
+
+      - name: Archive screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
+          path: screenshots/**/*.png
+
+  dummy-auth-tests:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    env:
+      DFX_VERSION: 0.8.3
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          # must use 16.x because 14.x doesn't understand how to pull repos
+          # using https (for dfx-proxy)
+          node-version: 16.x
+
+      - name: Install DFX
+        run: |
+          echo Install DFX Version: "$DFX_VERSION"
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+      # Helps with debugging
+      - name: Show versions
+        run: |
+          echo dfx --version
+          dfx --version
+
+      - name: Start replica
+        run: |
+          dfx start --background
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_dev.wasm
+          path: .
+
+      - name: Deploy II
+        run: |
+          echo installing
+          shasum -a 256 ./internet_identity.wasm
+
+          dfx canister --no-wallet create --all
+          dfx canister --no-wallet install --mode install internet_identity --argument '(null)'
+
+      - name: Run tests
+        working-directory: dummy-auth-tests
+        run: |
+          npm ci
+          npm run test
+
+      - name: Stop replica
+        run: |
+          dfx stop
+
+  # This uploads the screenshots from both the (non-emulated) 'desktop' and
+  # 'mobile' runs.
+  upload-screenshots:
+    runs-on: ubuntu-latest
+
+    # Run after all the tests completed succesfully (and have uploaded their
+    # artifacts)
+    needs: selenium
+
+    # We don't want to commit new screenshots to main
+    if: ${{ github.ref != 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v2
+
+      # Download the desktop screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-desktop
+          path: screenshots
+
+      # Download the mobile screenshots artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-screenshots-mobile
+          path: screenshots
+
+      - run: |
+          echo the following screenshots were recovered
+          find ./screenshots -name '*.png' -maxdepth 1 -type f -print0 | sort -z | xargs -r0 shasum -a 256
+
+      - name: Commit screenshots
+        uses: EndBug/add-and-commit@v7.4.0
+        with:
+          add: screenshots
+          author_name: Screenshot Committer
+          author_email: "<nobody@example.com>"
+          message: "Update selenium ${{ matrix.device }} screenshots"
+          # do not pull: if this branch is behind, then we might as well let
+          # the pushing fail
+          pull: "NO-PULL"

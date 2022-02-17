@@ -11,6 +11,7 @@ use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
+use sha2::Digest;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -242,6 +243,7 @@ impl ContentType {
             ContentType::JS => "text/javascript".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
+            ContentType::SVG => "image/svg+xml".to_string(),
         }
     }
 }
@@ -525,7 +527,7 @@ async fn make_rng() -> rand_chacha::ChaCha20Rng {
 #[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
     let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(10, 10);
+    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(96,48);
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
@@ -810,6 +812,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
 fn security_headers() -> Vec<HeaderField> {
+    let hash = assets::INDEX_HTML_SETUP_JS_SRI_HASH.to_string();
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
@@ -831,19 +834,24 @@ fn security_headers() -> Vec<HeaderField> {
         // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
         // application. Adding hashes would require a big restructuring of the application and build
         // infrastructure.
+        //
+        // NOTE about `script-src`: we cannot use a normal script tag like this
+        //   <script src="index.js" integrity="sha256-..." defer></script>
+        // because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
+        // Instead, we add it to the CSP policy
         (
             "Content-Security-Policy".to_string(),
-            "default-src 'none';\
-             connect-src 'self';\
+            format!("default-src 'none';\
+             connect-src 'self' https://ic0.app;\
              img-src 'self' data:;\
-             script-src 'sha256-syYd+YuWeLD80uCtKwbaGoGom63a0pZE5KqgtA7W1d8=' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+             script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
              frame-ancestors 'none';\
              form-action 'none';\
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
              style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
              font-src https://fonts.gstatic.com;\
-             upgrade-insecure-requests;"
+             upgrade-insecure-requests;")
                 .to_string()
         ),
         (
@@ -921,9 +929,9 @@ fn init_assets() {
 
         ASSETS.with(|a| {
             let mut assets = a.borrow_mut();
-            assets::for_each_asset(|name, encoding, content_type, contents, hash| {
-                asset_hashes.insert(name, *hash);
-                let mut headers = match encoding {
+            for (path, content, content_encoding, content_type) in assets::get_assets() {
+                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
+                let mut headers = match content_encoding {
                     ContentEncoding::Identity => vec![],
                     ContentEncoding::GZip => {
                         vec![("Content-Encoding".to_string(), "gzip".to_string())]
@@ -933,8 +941,8 @@ fn init_assets() {
                     "Content-Type".to_string(),
                     content_type.to_mime_type_string(),
                 ));
-                assets.insert(name, (headers, contents));
-            });
+                assets.insert(path, (headers, content));
+            }
         });
     });
 }
@@ -1222,6 +1230,10 @@ fn check_frontend_length(frontend: &FrontendHostname) {
     }
 }
 
+#[cfg(feature = "dummy_pow")]
+fn check_proof_of_work(_pow: &ProofOfWork, _now: Timestamp) {}
+
+#[cfg(not(feature = "dummy_pow"))]
 fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
     use cubehash::CubeHash;
 

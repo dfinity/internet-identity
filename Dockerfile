@@ -1,15 +1,13 @@
 # Use this with
 #
 #  docker build -t internet-identity .
-#  docker run --rm --entrypoint cat internet-identity /internet_identity.wasm > internet_identity.wasm
+#  or use ./scripts/docker-build
 #
-# and find the .wasmfile in out/
-
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
-FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322
+FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
 
-ARG rust_version=1.51.0
+ARG rust_version=1.58.1
 ENV NODE_VERSION=14.15.4
 
 ENV TZ=UTC
@@ -47,30 +45,33 @@ ENV CARGO_HOME=/cargo \
 # (keep version in sync with src/internet_identity/build.sh)
 RUN cargo install ic-cdk-optimizer --version 0.3.1
 
-# warm up the cache. Since cargo doesn't have a flag to only build the
-# dependecies, we copy all the files (Cargo.toml, Cargo.lock, vendored deps)
-# _except_ for the actual internet identity code, which we replace with a dummy.
+# Pre-build all cargo dependencies. Because cargo doesn't have a build option
+# to build only the dependecies, we pretend that our project is a simple, empty
+# `lib.rs`. When we COPY the actual files we make sure to `touch` lib.rs so
+# that cargo knows to rebuild it with the new content.
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
-# NOTE: we make the timestamp of src/lib.rs very old so that cargo knows to
-# rebuild the real file when we copy it
-RUN mkdir -p src/internet_identity/src && touch -t 197001010000 src/internet_identity/src/lib.rs
-RUN cargo build --target wasm32-unknown-unknown --release -j1
+RUN mkdir -p src/internet_identity/src \
+    && touch src/internet_identity/src/lib.rs \
+    && cargo build --target wasm32-unknown-unknown --release -j1 \
+    && rm -rf src
 
-# copy the actual code
-RUN rm -rf src
+FROM deps as build
+
 COPY . .
 
-ENV CANISTER_ID=rdmx6-jaaaa-aaaaa-aaadq-cai
-ARG II_ENV=production
+ARG II_FETCH_ROOT_KEY=
+ARG II_DUMMY_CAPTCHA=
+ARG II_DUMMY_AUTH=
+ARG II_DUMMY_POW=
 
+RUN touch src/internet_identity/src/lib.rs
 RUN npm ci
-RUN npm run build
-RUN cargo build --target wasm32-unknown-unknown --release -j1
-RUN sha256sum dist/*
-RUN sha256sum /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
-RUN ic-cdk-optimizer /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm -o /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm
-RUN cp /cargo_target/wasm32-unknown-unknown/release/internet_identity.wasm .
-RUN sha256sum internet_identity.wasm
+
+RUN ./src/internet_identity/build.sh
+RUN sha256sum /internet_identity.wasm
+
+FROM scratch AS scratch
+COPY --from=build /internet_identity.wasm /

@@ -2,6 +2,7 @@ import { displayError } from "../../components/displayError";
 import { IIConnection } from "../../utils/iiConnection";
 import { UserIntent } from "../../utils/userIntent";
 import { getUserNumber } from "../../utils/userNumber";
+import { unknownToString } from "../../utils/utils";
 import { loginUnknownAnchor } from "../login/unknownAnchor";
 import { loginKnownAnchor } from "../login/knownAnchor";
 import { LoginFlowResult } from ".././login/flowResult";
@@ -26,12 +27,12 @@ export const login = async (
         return login(userIntent);
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     await displayError({
       title: "Something went wrong",
       message:
         "An unexpected error occurred during authentication. Please try again",
-      detail: err.toString(),
+      detail: unknownToString(err, "Unknown error"),
       primaryButton: "Try again",
     });
     window.location.reload();

@@ -6,6 +6,26 @@ export function hasOwnProperty<
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
+// Turns an 'unknown' into a string, if possible, otherwise use the default
+// `def` parameter.
+export function unknownToString(obj: unknown, def: string): string {
+  // Only booleans, numbers and strings _may_ not be objects, so first we try
+  // Object's toString, and if not we go through the remaining types.
+  if (obj instanceof Object) {
+    return obj.toString();
+  } else if (typeof obj === "string") {
+    return obj;
+  } else if (typeof obj === "number") {
+    return obj.toString();
+  } else if (typeof obj === "boolean") {
+    return obj.toString();
+  }
+
+  // Only "null" and "undefined" do not have 'toString', though typescript
+  // doesn't know that.
+  return def;
+}
+
 // Returns true if we're in Safari or iOS (although technically iOS only has
 // Safari)
 export function iOSOrSafari(): boolean {

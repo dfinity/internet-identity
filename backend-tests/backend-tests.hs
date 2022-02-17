@@ -437,7 +437,7 @@ validateSecurityHeaders resp = do
     \window-placement=(),\
     \xr-spatial-tracking=()"
   validateHeaderMatches resp "Content-Security-Policy" "^default-src 'none';\
-    \connect-src 'self';\
+    \connect-src 'self' https://ic0.app;\
     \img-src 'self' data:;\
     \script-src 'sha256-[a-zA-Z0-9\\/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
     \base-uri 'none';\
@@ -747,7 +747,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       r <- queryII cid dummyUserId #http_request (httpGet asset)
       validateHttpResponse cid asset r
       validateSecurityHeaders r
-    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /does-not-exist"
+    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /ic-badge.svg /does-not-exist"
     ]
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
@@ -843,7 +843,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     -- Go through a challenge request/registration flow for this device.
     -- NOTE: this (dummily) solves the challenge with the string "a", which is
-    -- returned by the backend when compiled with USE_DUMMY_CAPTCHA.
+    -- returned by the backend when compiled with II_DUMMY_CAPTCHA.
     register cid webauthID device pow =
       getChallenge cid webauthID pow >>= callII cid webauthID #register . (device,)
 
@@ -861,7 +861,7 @@ enum l = V.IsJust l ()
 newtype WasmOption = WasmOption String
 
 instance IsOption WasmOption where
-  defaultValue = WasmOption "../target/wasm32-unknown-unknown/release/internet_identity.wasm"
+  defaultValue = WasmOption "../internet_identity.wasm"
   parseValue = Just . WasmOption
   optionName = return "wasm"
   optionHelp = return "webassembly module of the identity provider"

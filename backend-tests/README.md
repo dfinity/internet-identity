@@ -26,11 +26,11 @@ Options
 
 By default, this tests the wasm file in
 
-    ../target/wasm32-unknown-unknown/release/internet_identity.wasm
+    ../internet_identity.wasm
 
 to use a different one, pass the `--wasm` flag to `backend-tests`. The tests
 use a preset CAPTCHA value, so you will need to build with the following
-environment variable: `USE_DUMMY_CAPTCHA=1`.
+environment variable: `II_DUMMY_CAPTCHA=1`.
 
 You can select tests to run using `-p`, e.g.
 

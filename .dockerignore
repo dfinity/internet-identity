@@ -10,7 +10,9 @@ screenshots
 target
 out
 arg.in
+Dockerfile
 *.wasm
+*.swp
 
 # filter out all "hidden" files and directories
 # (.git, .dfx, .*ignore, etc)

@@ -5,14 +5,15 @@ documentation.
 
 ## Official build
 
+**NOTE:** You can customize the build by using [build flavors](#build-flavors).
+
 The official build should ideally be reproducible, so that independent parties
 can validate that we really deploy what we claim to deploy.
 
 We try to achieve some level of reproducibility using a Dockerized build
 environment. The following steps _should_ build the official Wasm image
 
-    docker build -t internet-identity-service .
-    docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+    ./scripts/docker-build
     sha256sum internet_identity.wasm
 
 The resulting `internet_identity.wasm` is ready for deployment as
@@ -22,9 +23,11 @@ Our CI also performs these steps; you can compare the SHA256 with the output the
 
 
 
-## Software versions
+## Dependencies
 
 - `dfx` version 0.8.3
+
+- [`ic-cdk-optimizer`](https://github.com/dfinity/cdk-rs/tree/main/src/ic-cdk-optimizer) version 0.3.1
 
 - Rust version 1.51
 
@@ -44,7 +47,7 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-II_ENV=development dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
 ```
 
 Then the canister can be used as
@@ -71,7 +74,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-II_ENV=development dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
 ```
 
 To serve the frontend locally via webpack (recommended during development), run
@@ -85,11 +88,6 @@ Then open `http://localhost:8080` in your browser. Webpack will reload the page 
 
 ```bash
 npm run format && npm run lint
-```
-
-To customize your canister ID for deployment or particular local development, create a [`.env`](https://www.npmjs.com/package/dotenv) file in the root of the project and add a `CANISTER_ID` attribute. It should look something like
-```
-CANISTER_ID=rrkah-fqaaa-aaaaa-aaaaq-cai
 ```
 
 Finally, to test workflows like authentication from a client application, you start the sample app:
@@ -160,4 +158,36 @@ Use the following command to build the backend canister Wasm file instead:
 dfx build internet_identity
 ```
 
-The Wasm file will be located at `target/wasm32-unknown-unknown/release/internet_identity.wasm`.
+This will produce `./internet_identity.wasm`.
+
+## Build flavors
+
+The Internet Identity build can be customized to include "flavors" that are
+useful when developing and testing.
+
+⚠️ These options should only ever be used during development as they effectively poke security holes in Internet Identity ⚠️
+
+These options can be used both in the "contributing" workflows above (frontend, backend) and
+in the docker build. The flavors are enabled by setting the corresponding
+environment variable to `1`. Any other string, as well as not setting the
+environment variable, will disable the flavor.
+
+For instance:
+
+``` bash
+$ II_FETCH_ROOT_KEY=1 dfx build
+$ II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
+```
+
+The flavors are described below:
+
+<!-- NOTE: If you add a flavor here, add it to 'flavors.ts' in the frontend
+codebase too, even if the flavor only impacts the canister code and not the
+frontend. -->
+
+| Environment variable | Description |
+| --- | --- |
+| `II_FETCH_ROOT_KEY` | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |
+| `II_DUMMY_CAPTCHA` | When enabled, the CAPTCHA challenge (sent by the canister code to the frontend code) is always the known string `"a"`. This is useful for automated testing. |
+| `II_DUMMY_POW` | When enabled, the canister code will not check the correctness of the Proof Of Work anymore, and the frontend code will also send a dummy Proof Of Work. This is useful for automated testing and for speeding up the frontend code.<br/>**NOTE**: This flavor is not tested on CI. |
+| `II_DUMMY_AUTH` | When enabled, the frontend code will use a known, stable private key for registering anchors and authenticating. This means that all anchors will have the same public key(s). In particular this bypasses the WebAuthn flows (TouchID, Windows Hello, etc), which simplifies automated testing. |
