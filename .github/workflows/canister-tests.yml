@@ -41,8 +41,8 @@ jobs:
     strategy:
       matrix:
         include:
-          # The official build
-          - name: internet_identity_official.wasm
+          # The production build
+          - name: internet_identity_production.wasm
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_AUTH: 0
             II_DUMMY_CAPTCHA: 0
