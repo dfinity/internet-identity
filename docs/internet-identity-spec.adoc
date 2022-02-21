@@ -71,12 +71,12 @@ A user account is identified by a unique _Identity Anchor_, a smallish natural n
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
 Computer.
 
-A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://smartcontracts.org/docs/interface-spec/index.html#id-classes[_self-authenticating id_] of the form
 ....
 user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02` (29 bytes)
 ....
 
-that is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+that is derived from a https://smartcontracts.org/docs/interface-spec/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 ....
@@ -89,7 +89,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://smartcontracts.org/docs/interface-spec/index.html#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
 The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
@@ -149,7 +149,7 @@ where
    userPublicKey: Uint8Array;
  }
 +
-where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://smartcontracts.org/docs/interface-spec/index.html#authentication[_authentication on the IC_].
 9. It could also receive a failure message of the following type
 +
  interface InternetIdentityAuthResponse {
@@ -324,7 +324,7 @@ Since this cannot be done during `canister_init` (no calls from canister init), 
 
 === Why we do not use `canister_inspect_message`
 
-The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see https://docs.dfinity.systems/public/#system-api-inspect-message[the interface spec]). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
+The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see https://smartcontracts.org/docs/interface-spec/index.html#system-api-inspect-message[the interface spec]). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
 
 It seems that this implies that we should use `canister_inspect_message` to reject messages that would, for example, not pass authentication.
 
