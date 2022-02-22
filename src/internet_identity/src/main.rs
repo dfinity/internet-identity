@@ -349,10 +349,15 @@ fn clean_expired_device_reg_mode_flags(
             }
         }
         if let Some(expiration) = device_reg_mode_expirations.pop() {
-            // only remove the user from device registration mode if the user has note refreshed
-            // device registration mode in the meantime.
-            if users_in_device_reg_mode.get(&expiration.user_number) <= expiration.expires_at {
-                users_in_device_reg_mode.remove(&expiration.user_number);
+            match users_in_device_reg_mode.get(&expiration.user_number) {
+                Some(timestamp) => {
+                    // only remove the user from device registration mode if the user has note refreshed
+                    // device registration mode in the meantime.
+                    if *timestamp <= expiration.expires_at {
+                        users_in_device_reg_mode.remove(&expiration.user_number);
+                    }
+                }
+                None => {}
             }
         }
     }
