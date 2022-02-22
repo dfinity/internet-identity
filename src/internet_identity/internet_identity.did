@@ -71,6 +71,17 @@ type RegisterResponse = variant {
   bad_challenge;
 };
 
+type AddTentativeDeviceResponse = variant {
+  // The device was tentatively added.
+  added_tentatively: record { pin: text; };
+  // Device registration mode disabled for this user.
+  device_registration_mode_disabled;
+  // Device already exists on this user.
+  device_already_added;
+  // There is another device already added tentatively
+  tentative_device_already_exists;
+};
+
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -123,6 +134,7 @@ service : (opt InternetIdentityInit) -> {
 
   enable_registration_mode : (UserNumber) -> (Timestamp);
   disable_registration_mode : (UserNumber) -> ();
+  add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse)
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;

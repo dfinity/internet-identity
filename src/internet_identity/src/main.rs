@@ -15,6 +15,7 @@ use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
+use std::os::macos::raw::stat;
 use storage::{Salt, Storage};
 
 mod assets;
@@ -183,6 +184,18 @@ enum RegisterResponse {
     BadChallenge,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum AddTentativeDeviceResponse {
+    #[serde(rename = "added_tentatively")]
+    AddedTentatively { pin: String },
+    #[serde(rename = "device_registration_mode_disabled")]
+    DeviceRegistrationModeDisabled,
+    #[serde(rename = "device_already_added")]
+    DeviceAlreadyAdded,
+    #[serde(rename = "tentative_device_already_exists")]
+    TentativeDeviceAlreadyExists,
+}
+
 mod hash;
 mod storage;
 
@@ -212,6 +225,8 @@ struct State {
     registration_mode: RefCell<HashMap<UserNumber, Timestamp>>,
     // Heap of users in reg mode sorted by expiration
     registration_expirations: RefCell<BinaryHeap<RegModeExpiration>>,
+    // map of tentatively added devices, max 1 per user
+    tentative_devices: RefCell<HashMap<UserNumber, DeviceData>>,
 }
 
 impl Default for State {
@@ -317,7 +332,22 @@ fn enable_registration_mode(user_number: UserNumber) -> Timestamp {
 }
 
 #[update]
-fn disable_registration_mode(user_number: UserNumber)  {
+fn disable_registration_mode(user_number: UserNumber) {
+    let now = time();
+    STATE.with(|state| {
+        trap_if_user_not_authenticated(state, user_number);
+
+        let mut users_in_reg_mode = state.registration_mode.borrow_mut();
+        let mut reg_mode_expirations = state.registration_expirations.borrow_mut();
+        clean_expired_registrations(&mut users_in_reg_mode, &mut reg_mode_expirations, now);
+
+        users_in_reg_mode.remove(&user_number);
+        state.tentative_devices.borrow_mut().remove(&user_number);
+    })
+}
+
+#[update]
+fn add_tentative_device(user_number: UserNumber, device_data: DeviceData) {
     let now = time();
     STATE.with(|state| {
         trap_if_user_not_authenticated(state, user_number);
