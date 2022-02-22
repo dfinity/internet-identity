@@ -12,7 +12,8 @@ use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
 use storage::{Salt, Storage};
 
@@ -36,9 +37,12 @@ const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
+// 10 mins
+const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(600);
 
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
+const MAX_REG_MODE_CLEAN_UP: usize = 100;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -122,6 +126,26 @@ impl From<DeviceDataInternal> for DeviceData {
     }
 }
 
+#[derive(PartialEq, Eq)]
+struct RegModeExpiration {
+    expires_at: u64,
+    user_number: UserNumber,
+}
+
+impl PartialOrd<Self> for RegModeExpiration {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for RegModeExpiration {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // BinaryHeap is a max heap, but we want expired entries
+        // first, hence the inversed order.
+        other.expires_at.cmp(&self.expires_at)
+    }
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct ProofOfWork {
     timestamp: Timestamp,
@@ -184,6 +208,10 @@ struct State {
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
     // through upgrades
     inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
+    // Contains all identity anchors with registration enabled
+    registration_mode: RefCell<HashMap<UserNumber, Timestamp>>,
+    // Heap of users in reg mode sorted by expiration
+    registration_expirations: RefCell<BinaryHeap<RegModeExpiration>>,
 }
 
 impl Default for State {
@@ -199,6 +227,8 @@ impl Default for State {
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
+            registration_mode: RefCell::new(HashMap::new()),
+            registration_expirations: RefCell::new(BinaryHeap::new()),
         }
     }
 }
@@ -253,6 +283,68 @@ async fn init_salt() {
         let mut store = s.storage.borrow_mut();
         store.update_salt(salt); // update_salt() traps if salt has already been set
     });
+}
+
+#[update]
+fn enable_registration_mode(user_number: UserNumber) -> Timestamp {
+    let now = time();
+    STATE.with(|state| {
+        trap_if_user_not_authenticated(state, user_number);
+
+        let mut users_in_reg_mode = state.registration_mode.borrow_mut();
+        let mut reg_mode_expirations = state.registration_expirations.borrow_mut();
+        clean_expired_registrations(&mut users_in_reg_mode, &mut reg_mode_expirations, now);
+
+        if let Some(timestamp) = users_in_reg_mode.get(&user_number) {
+            if timestamp - now < secs_to_nanos(10) {
+                // do nothing if the last refresh of the registration mode was less than 10 seconds ago
+                // this is a soft rate limit that ensures that one user can have at most 60 expiration timestamps in the expiration heap
+                return *timestamp;
+            }
+        }
+
+        let expiration = time() + REGISTRATION_MODE_DURATION;
+        let reg_mode_expiration = RegModeExpiration {
+            user_number,
+            expires_at: expiration,
+        };
+
+        users_in_reg_mode.insert(user_number, reg_mode_expiration.expires_at);
+        reg_mode_expirations.push(reg_mode_expiration);
+
+        expiration
+    })
+}
+
+#[update]
+fn disable_registration_mode(user_number: UserNumber)  {
+    let now = time();
+    STATE.with(|state| {
+        trap_if_user_not_authenticated(state, user_number);
+
+        let mut users_in_reg_mode = state.registration_mode.borrow_mut();
+        let mut reg_mode_expirations = state.registration_expirations.borrow_mut();
+        clean_expired_registrations(&mut users_in_reg_mode, &mut reg_mode_expirations, now);
+
+        users_in_reg_mode.remove(&user_number);
+    })
+}
+
+fn clean_expired_registrations(
+    users_in_reg_mode: &mut HashMap<UserNumber, Timestamp>,
+    reg_mode_expirations: &mut BinaryHeap<RegModeExpiration>,
+    now: u64,
+) {
+    for _ in 0..MAX_REG_MODE_CLEAN_UP {
+        if let Some(expiration) = reg_mode_expirations.peek() {
+            if expiration.expires_at > now {
+                return; // nothing to prune
+            }
+        }
+        if let Some(expiration) = reg_mode_expirations.pop() {
+            users_in_reg_mode.remove(&expiration.user_number);
+        }
+    }
 }
 
 #[update]
@@ -866,6 +958,22 @@ fn prune_expired_signatures(asset_hashes: &AssetHashes, sigs: &mut SignatureMap)
     if num_pruned > 0 {
         update_root_hash(asset_hashes, sigs);
     }
+}
+
+// Checks if the caller is authenticated against any of the public keys belonging
+// to the provided user_number and traps if not.
+fn trap_if_user_not_authenticated(state: &State, user_number: UserNumber) {
+    let entries = state
+        .storage
+        .borrow()
+        .read(user_number)
+        .unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey))
 }
 
 // Checks if the caller is authenticated against any of the public keys provided

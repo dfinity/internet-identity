@@ -121,6 +121,9 @@ service : (opt InternetIdentityInit) -> {
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
+  enable_registration_mode : (UserNumber) -> (Timestamp);
+  disable_registration_mode : (UserNumber) -> ();
+
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
