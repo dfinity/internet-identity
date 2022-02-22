@@ -2,7 +2,6 @@ use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
-use std::os::macos::raw::stat;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
@@ -246,7 +245,7 @@ impl Default for State {
             inflight_challenges: RefCell::new(HashMap::new()),
             users_in_device_reg_mode: RefCell::new(HashMap::new()),
             device_reg_mode_expirations: RefCell::new(BinaryHeap::new()),
-            tentative_devices: RefCell::new(HashMap::new())
+            tentative_devices: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -354,11 +353,40 @@ fn disable_device_registration_mode(user_number: UserNumber) {
 }
 
 #[update]
-fn add_tentative_device(user_number: UserNumber, device_data: DeviceData) {
+async fn add_tentative_device(
+    user_number: UserNumber,
+    device_data: DeviceData,
+) -> AddTentativeDeviceResponse {
+    let pin = generate_pin().await;
+
+    match check_tentative_device_reg_prerequisites(user_number, device_data) {
+        Ok(_) => AddTentativeDeviceResponse::AddedTentatively { // TODO: Actually add device
+            pin,
+        },
+        Err(err) => err,
+    }
+}
+
+async fn generate_pin() -> String {
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res, )) => res,
+        Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
+    };
+    let rand = u32::from_be_bytes(res[..4].try_into().unwrap_or_else(|foo| {
+        trap(&format!(
+            "expected raw randomness to be at least 4 bytes, got {}",
+            res.len()
+        ))
+    }));
+    (rand % 1_000_000).to_string()
+}
+
+fn check_tentative_device_reg_prerequisites(
+    user_number: UserNumber,
+    device_data: DeviceData,
+) -> Result<(), AddTentativeDeviceResponse> {
     let now = time();
     STATE.with(|state| {
-        trap_if_user_not_authenticated(state, user_number);
-
         let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
         let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
         clean_expired_device_reg_mode_flags(
@@ -367,7 +395,39 @@ fn add_tentative_device(user_number: UserNumber, device_data: DeviceData) {
             now,
         );
 
-        users_in_device_reg_mode.remove(&user_number);
+        match users_in_device_reg_mode.get(&user_number) {
+            None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
+            Some(expiration) => {
+                if *expiration < now {
+                    // if this happens device_reg_mode_expirations got too big
+                    // TODO: do we need a metric for this?
+                    return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
+                }
+            }
+        }
+
+        if state.tentative_devices.borrow().get(&user_number).is_some() {
+            // some tentative device already exists
+            return Err(AddTentativeDeviceResponse::TentativeDeviceAlreadyExists);
+        }
+
+        let existing_devices = state
+            .storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to read device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        for existing_device in existing_devices {
+            if existing_device.pubkey == device_data.pubkey {
+                return Err(AddTentativeDeviceResponse::DeviceAlreadyAdded);
+            }
+        }
+        Ok(())
     })
 }
 
