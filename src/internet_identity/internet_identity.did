@@ -132,8 +132,8 @@ service : (opt InternetIdentityInit) -> {
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
-  enable_registration_mode : (UserNumber) -> (Timestamp);
-  disable_registration_mode : (UserNumber) -> ();
+  enable_device_registration_mode : (UserNumber) -> (Timestamp);
+  disable_device_registration_mode : (UserNumber) -> ();
   add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse)
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
