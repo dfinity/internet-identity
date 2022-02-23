@@ -144,14 +144,14 @@ service : (opt InternetIdentityInit) -> {
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
-  get_anchor_info : (UserNumber) -> IdentityAnchorInfo;
+  get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
   enable_device_registration_mode : (UserNumber) -> (Timestamp);
   disable_device_registration_mode : (UserNumber) -> ();
   add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse);
-  verify_tentative_device : (UserNumber, pin: text);
+  verify_tentative_device : (UserNumber, pin: text) -> (VerifyTentativeDeviceResponse);
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
