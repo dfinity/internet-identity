@@ -372,12 +372,7 @@ async fn generate_pin() -> String {
         Ok((res, )) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
     };
-    let rand = u32::from_be_bytes(res[..4].try_into().unwrap_or_else(|foo| {
-        trap(&format!(
-            "expected raw randomness to be at least 4 bytes, got {}",
-            res.len()
-        ))
-    }));
+    let rand = u32::from_be_bytes(res[..4].try_into().unwrap());
     (rand % 1_000_000).to_string()
 }
 
