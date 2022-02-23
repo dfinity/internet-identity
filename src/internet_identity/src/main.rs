@@ -226,8 +226,8 @@ struct State {
     users_in_device_reg_mode: RefCell<HashMap<UserNumber, Timestamp>>,
     // heap of users in device registration mode sorted by closest expiration
     device_reg_mode_expirations: RefCell<BinaryHeap<DeviceRegModeExpiration>>,
-    // map of tentatively added devices, max 1 per user
-    tentative_devices: RefCell<HashMap<UserNumber, DeviceData>>,
+    // map of tentatively added devices and corresponding pin, max 1 per user
+    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, String)>>,
 }
 
 impl Default for State {
@@ -307,15 +307,9 @@ fn enable_device_registration_mode(user_number: UserNumber) -> Timestamp {
     let now = time();
     STATE.with(|state| {
         trap_if_user_not_authenticated(state, user_number);
+        clean_expired_device_reg_mode_flags(state);
 
         let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
-        let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
-        clean_expired_device_reg_mode_flags(
-            &mut users_in_device_reg_mode,
-            &mut device_reg_mode_expirations,
-            now,
-        );
-
         let expiration = now + REGISTRATION_MODE_DURATION;
         if let Some(timestamp) = users_in_device_reg_mode.get(&user_number) {
             if expiration - timestamp < secs_to_nanos(10) {
@@ -326,7 +320,7 @@ fn enable_device_registration_mode(user_number: UserNumber) -> Timestamp {
         }
 
         users_in_device_reg_mode.insert(user_number, expiration);
-        device_reg_mode_expirations.push(DeviceRegModeExpiration {
+        state.device_reg_mode_expirations.borrow_mut().push(DeviceRegModeExpiration {
             user_number,
             expires_at: expiration,
         });
@@ -336,19 +330,12 @@ fn enable_device_registration_mode(user_number: UserNumber) -> Timestamp {
 
 #[update]
 fn disable_device_registration_mode(user_number: UserNumber) {
-    let now = time();
     STATE.with(|state| {
         trap_if_user_not_authenticated(state, user_number);
+        clean_expired_device_reg_mode_flags(state);
 
-        let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
-        let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
-        clean_expired_device_reg_mode_flags(
-            &mut users_in_device_reg_mode,
-            &mut device_reg_mode_expirations,
-            now,
-        );
-
-        users_in_device_reg_mode.remove(&user_number);
+        state.users_in_device_reg_mode.borrow_mut().remove(&user_number);
+        state.tentative_devices.borrow_mut().remove(&user_number);
     })
 }
 
@@ -359,17 +346,23 @@ async fn add_tentative_device(
 ) -> AddTentativeDeviceResponse {
     let pin = generate_pin().await;
 
-    match check_tentative_device_reg_prerequisites(user_number, device_data) {
-        Ok(_) => AddTentativeDeviceResponse::AddedTentatively { // TODO: Actually add device
-            pin,
-        },
+    match check_tentative_device_reg_prerequisites(user_number, &device_data) {
+        Ok(_) => {
+            STATE.with(|state| {
+                state
+                    .tentative_devices
+                    .borrow_mut()
+                    .insert(user_number, (device_data, pin.clone()))
+            });
+            AddTentativeDeviceResponse::AddedTentatively { pin }
+        }
         Err(err) => err,
     }
 }
 
 async fn generate_pin() -> String {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res, )) => res,
+        Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
     };
     let rand = u32::from_be_bytes(res[..4].try_into().unwrap());
@@ -378,22 +371,15 @@ async fn generate_pin() -> String {
 
 fn check_tentative_device_reg_prerequisites(
     user_number: UserNumber,
-    device_data: DeviceData,
+    device_data: &DeviceData,
 ) -> Result<(), AddTentativeDeviceResponse> {
-    let now = time();
     STATE.with(|state| {
-        let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
-        let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
-        clean_expired_device_reg_mode_flags(
-            &mut users_in_device_reg_mode,
-            &mut device_reg_mode_expirations,
-            now,
-        );
+        clean_expired_device_reg_mode_flags(state);
 
-        match users_in_device_reg_mode.get(&user_number) {
+        match state.users_in_device_reg_mode.borrow_mut().get(&user_number) {
             None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
             Some(expiration) => {
-                if *expiration < now {
+                if *expiration < time() {
                     // if this happens device_reg_mode_expirations got too big
                     // TODO: do we need a metric for this?
                     return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
@@ -426,11 +412,11 @@ fn check_tentative_device_reg_prerequisites(
     })
 }
 
-fn clean_expired_device_reg_mode_flags(
-    users_in_device_reg_mode: &mut HashMap<UserNumber, Timestamp>,
-    device_reg_mode_expirations: &mut BinaryHeap<DeviceRegModeExpiration>,
-    now: u64,
-) {
+fn clean_expired_device_reg_mode_flags(state: &State) {
+    let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
+    let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
+    let now = time();
+
     for _ in 0..MAX_REG_MODE_CLEAN_UP {
         if let Some(expiration) = device_reg_mode_expirations.peek() {
             if expiration.expires_at > now {
@@ -444,6 +430,10 @@ fn clean_expired_device_reg_mode_flags(
                     // device registration mode in the meantime.
                     if *timestamp <= expiration.expires_at {
                         users_in_device_reg_mode.remove(&expiration.user_number);
+                        state
+                            .tentative_devices
+                            .borrow_mut()
+                            .remove(&expiration.user_number);
                     }
                 }
                 None => {}
