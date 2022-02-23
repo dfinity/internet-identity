@@ -5,8 +5,8 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
-use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::api::call::call;
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
@@ -208,6 +208,13 @@ enum VerifyTentativeDeviceResponse {
     WrongPinRetry,
     #[serde(rename = "wrong_pin")]
     WrongPin,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct IdentityAnchorInfo {
+    devices: Vec<DeviceData>,
+    tentative_device: Option<DeviceData>,
+    device_registration_mode: Option<Timestamp>,
 }
 
 mod hash;
@@ -799,6 +806,36 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
             .into_iter()
             .map(DeviceData::from)
             .collect()
+    })
+}
+
+#[update]  // this is an update because queries are not (yet) certified
+fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
+    STATE.with(|state| {
+        clean_expired_device_reg_mode_flags(state);
+
+        let devices = state
+            .storage
+            .borrow()
+            .read(user_number)
+            .unwrap_or_default()
+            .into_iter()
+            .map(DeviceData::from)
+            .collect();
+
+        IdentityAnchorInfo {
+            devices,
+            tentative_device: state
+                .tentative_devices
+                .borrow()
+                .get(&user_number)
+                .map(|(device, _, _)| device.clone()),
+            device_registration_mode: state
+                .users_in_device_reg_mode
+                .borrow()
+                .get(&user_number)
+                .map(|t| *t),
+        }
     })
 }
 
