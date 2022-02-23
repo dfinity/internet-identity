@@ -214,7 +214,7 @@ enum VerifyTentativeDeviceResponse {
 struct IdentityAnchorInfo {
     devices: Vec<DeviceData>,
     tentative_device: Option<DeviceData>,
-    device_registration_mode: Option<Timestamp>,
+    device_registration_mode_expiration: Option<Timestamp>,
 }
 
 mod hash;
@@ -809,9 +809,10 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     })
 }
 
-#[update]  // this is an update because queries are not (yet) certified
+#[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
     STATE.with(|state| {
+        trap_if_user_not_authenticated(state, user_number);
         clean_expired_device_reg_mode_flags(state);
 
         let devices = state
@@ -823,18 +824,31 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
             .map(DeviceData::from)
             .collect();
 
-        IdentityAnchorInfo {
-            devices,
-            tentative_device: state
-                .tentative_devices
-                .borrow()
-                .get(&user_number)
-                .map(|(device, _, _)| device.clone()),
-            device_registration_mode: state
-                .users_in_device_reg_mode
-                .borrow()
-                .get(&user_number)
-                .map(|t| *t),
+        let device_registration_mode_expiration = state
+            .users_in_device_reg_mode
+            .borrow()
+            .get(&user_number)
+            .map(|t| *t);
+
+        match device_registration_mode_expiration {
+            Some(expiration) if expiration > time() => {
+                let tentative_device = state
+                    .tentative_devices
+                    .borrow()
+                    .get(&user_number)
+                    .map(|(device, _, _)| device.clone());
+
+                IdentityAnchorInfo {
+                    devices,
+                    tentative_device,
+                    device_registration_mode_expiration,
+                }
+            }
+            None | Some(_) => IdentityAnchorInfo {
+                devices,
+                tentative_device: None,
+                device_registration_mode_expiration: None,
+            },
         }
     })
 }
