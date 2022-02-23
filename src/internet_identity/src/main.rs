@@ -5,8 +5,8 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
-use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use ic_cdk::api::call::call;
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
@@ -45,6 +45,7 @@ const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(600);
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
 const MAX_REG_MODE_CLEAN_UP: usize = 100;
+const MAX_DEVICE_REGISTRATION_ATTEMPTS: usize = 3;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -58,6 +59,8 @@ type SessionKey = PublicKey;
 type FrontendHostname = String;
 type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
+type Pin = String;
+type FailedAttemptsCounter = usize;
 
 struct Base64(String);
 
@@ -188,13 +191,23 @@ enum RegisterResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
-    AddedTentatively { pin: String },
+    AddedTentatively { pin: Pin },
     #[serde(rename = "device_registration_mode_disabled")]
     DeviceRegistrationModeDisabled,
     #[serde(rename = "device_already_added")]
     DeviceAlreadyAdded,
     #[serde(rename = "tentative_device_already_exists")]
     TentativeDeviceAlreadyExists,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+enum VerifyTentativeDeviceResponse {
+    #[serde(rename = "verified")]
+    Verified,
+    #[serde(rename = "wrong_pin_retry")]
+    WrongPinRetry,
+    #[serde(rename = "wrong_pin")]
+    WrongPin,
 }
 
 mod hash;
@@ -226,8 +239,9 @@ struct State {
     users_in_device_reg_mode: RefCell<HashMap<UserNumber, Timestamp>>,
     // heap of users in device registration mode sorted by closest expiration
     device_reg_mode_expirations: RefCell<BinaryHeap<DeviceRegModeExpiration>>,
-    // map of tentatively added devices and corresponding pin, max 1 per user
-    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, String)>>,
+    // map of tentatively added devices with corresponding pin and failed attempts counter
+    // max 1 per user
+    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, Pin, FailedAttemptsCounter)>>,
 }
 
 impl Default for State {
@@ -320,10 +334,13 @@ fn enable_device_registration_mode(user_number: UserNumber) -> Timestamp {
         }
 
         users_in_device_reg_mode.insert(user_number, expiration);
-        state.device_reg_mode_expirations.borrow_mut().push(DeviceRegModeExpiration {
-            user_number,
-            expires_at: expiration,
-        });
+        state
+            .device_reg_mode_expirations
+            .borrow_mut()
+            .push(DeviceRegModeExpiration {
+                user_number,
+                expires_at: expiration,
+            });
         expiration
     })
 }
@@ -334,7 +351,10 @@ fn disable_device_registration_mode(user_number: UserNumber) {
         trap_if_user_not_authenticated(state, user_number);
         clean_expired_device_reg_mode_flags(state);
 
-        state.users_in_device_reg_mode.borrow_mut().remove(&user_number);
+        state
+            .users_in_device_reg_mode
+            .borrow_mut()
+            .remove(&user_number);
         state.tentative_devices.borrow_mut().remove(&user_number);
     })
 }
@@ -352,7 +372,7 @@ async fn add_tentative_device(
                 state
                     .tentative_devices
                     .borrow_mut()
-                    .insert(user_number, (device_data, pin.clone()))
+                    .insert(user_number, (device_data, pin.clone(), 0))
             });
             AddTentativeDeviceResponse::AddedTentatively { pin }
         }
@@ -363,25 +383,57 @@ async fn add_tentative_device(
 #[update]
 async fn verify_tentative_device(
     user_number: UserNumber,
-    device_data: DeviceData,
-) -> AddTentativeDeviceResponse {
-    let pin = generate_pin().await;
-
-    match check_tentative_device_reg_prerequisites(user_number, &device_data) {
-        Ok(_) => {
-            STATE.with(|state| {
-                state
-                    .tentative_devices
-                    .borrow_mut()
-                    .insert(user_number, (device_data, pin.clone()))
-            });
-            AddTentativeDeviceResponse::AddedTentatively { pin }
+    user_pin: Pin,
+) -> VerifyTentativeDeviceResponse {
+    match check_add_tentative_device_prerequisites(user_number, user_pin) {
+        Ok(device) => {
+            add(user_number, device).await;
+            VerifyTentativeDeviceResponse::Verified
         }
         Err(err) => err,
     }
 }
 
-async fn generate_pin() -> String {
+fn check_add_tentative_device_prerequisites(
+    user_number: UserNumber,
+    user_pin: Pin,
+) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
+    STATE.with(|state| {
+        trap_if_user_not_authenticated(state, user_number);
+        clean_expired_device_reg_mode_flags(state);
+
+        if !state
+            .users_in_device_reg_mode
+            .borrow()
+            .contains_key(&user_number)
+        {
+            trap("device registration mode not enabled");
+        }
+
+        let mut tentative_devices = state.tentative_devices.borrow_mut();
+        match tentative_devices.remove(&user_number) {
+            None => trap("no tentative device to verify"),
+            Some((device, pin, mut failed_attempts)) => {
+                if user_pin != pin {
+                    if failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS {
+                        // disable device registration mode
+                        state
+                            .users_in_device_reg_mode
+                            .borrow_mut()
+                            .remove(&user_number);
+                        return Err(VerifyTentativeDeviceResponse::WrongPin);
+                    }
+                    failed_attempts = failed_attempts + 1;
+                    tentative_devices.insert(user_number, (device, pin, failed_attempts));
+                    return Err(VerifyTentativeDeviceResponse::WrongPinRetry);
+                }
+                Ok(device)
+            }
+        }
+    })
+}
+
+async fn generate_pin() -> Pin {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
@@ -397,7 +449,11 @@ fn check_tentative_device_reg_prerequisites(
     STATE.with(|state| {
         clean_expired_device_reg_mode_flags(state);
 
-        match state.users_in_device_reg_mode.borrow_mut().get(&user_number) {
+        match state
+            .users_in_device_reg_mode
+            .borrow_mut()
+            .get(&user_number)
+        {
             None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
             Some(expiration) => {
                 if *expiration < time() {
