@@ -360,6 +360,27 @@ async fn add_tentative_device(
     }
 }
 
+#[update]
+async fn verify_tentative_device(
+    user_number: UserNumber,
+    device_data: DeviceData,
+) -> AddTentativeDeviceResponse {
+    let pin = generate_pin().await;
+
+    match check_tentative_device_reg_prerequisites(user_number, &device_data) {
+        Ok(_) => {
+            STATE.with(|state| {
+                state
+                    .tentative_devices
+                    .borrow_mut()
+                    .insert(user_number, (device_data, pin.clone()))
+            });
+            AddTentativeDeviceResponse::AddedTentatively { pin }
+        }
+        Err(err) => err,
+    }
+}
+
 async fn generate_pin() -> String {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,

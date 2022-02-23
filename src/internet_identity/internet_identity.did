@@ -82,6 +82,15 @@ type AddTentativeDeviceResponse = variant {
   tentative_device_already_exists;
 };
 
+type VerifyTentativeDeviceResponse = variant {
+  // The device was successfully verified.
+  verified;
+  // Wrong pin entered. Retry with correct pin.
+  wrong_pin_retry;
+  // Wrong pin entered. No retries.
+  wrong_pin;
+};
+
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -134,7 +143,8 @@ service : (opt InternetIdentityInit) -> {
 
   enable_device_registration_mode : (UserNumber) -> (Timestamp);
   disable_device_registration_mode : (UserNumber) -> ();
-  add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse)
+  add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse);
+  verify_tentative_device : (UserNumber, pin: text);
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
