@@ -23,6 +23,12 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const AddTentativeDeviceResponse = IDL.Variant({
+    'device_registration_mode_disabled' : IDL.Null,
+    'tentative_device_already_exists' : IDL.Null,
+    'device_already_added' : IDL.Null,
+    'added_tentatively' : IDL.Record({ 'pin' : IDL.Text }),
+  });
   const Timestamp = IDL.Nat64;
   const ProofOfWork = IDL.Record({
     'nonce' : IDL.Nat64,
@@ -32,6 +38,11 @@ export const idlFactory = ({ IDL }) => {
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
+  });
+  const IdentityAnchorInfo = IDL.Record({
+    'tentative_device' : IDL.Opt(DeviceData),
+    'device_registration_mode_expiration' : IDL.Opt(Timestamp),
+    'devices' : IDL.Vec(DeviceData),
   });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
@@ -90,9 +101,22 @@ export const idlFactory = ({ IDL }) => {
     'users_registered' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
+  const VerifyTentativeDeviceResponse = IDL.Variant({
+    'verified' : IDL.Null,
+    'wrong_pin' : IDL.Null,
+    'wrong_pin_retry' : IDL.Null,
+  });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
+    'add_tentative_device' : IDL.Func(
+        [UserNumber, DeviceData],
+        [AddTentativeDeviceResponse],
+        [],
+      ),
     'create_challenge' : IDL.Func([ProofOfWork], [Challenge], []),
+    'disable_device_registration_mode' : IDL.Func([UserNumber], [], []),
+    'enable_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
+    'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
@@ -118,6 +142,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
+    'verify_tentative_device' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [VerifyTentativeDeviceResponse],
+        [],
+      ),
   });
 };
 export const init = ({ IDL }) => {

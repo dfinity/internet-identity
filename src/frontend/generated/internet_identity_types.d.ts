@@ -1,4 +1,10 @@
 import type { Principal } from '@dfinity/principal';
+export type AddTentativeDeviceResponse = {
+    'device_registration_mode_disabled' : null
+  } |
+  { 'tentative_device_already_exists' : null } |
+  { 'device_already_added' : null } |
+  { 'added_tentatively' : { 'pin' : string } };
 export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
@@ -35,6 +41,11 @@ export interface HttpResponse {
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
+export interface IdentityAnchorInfo {
+  'tentative_device' : [] | [DeviceData],
+  'device_registration_mode_expiration' : [] | [Timestamp],
+  'devices' : Array<DeviceData>,
+}
 export interface InternetIdentityInit {
   'assigned_user_number_range' : [bigint, bigint],
 }
@@ -69,9 +80,20 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
+export type VerifyTentativeDeviceResponse = { 'verified' : null } |
+  { 'wrong_pin' : null } |
+  { 'wrong_pin_retry' : null };
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
+  'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<
+      AddTentativeDeviceResponse
+    >,
   'create_challenge' : (arg_0: ProofOfWork) => Promise<Challenge>,
+  'disable_device_registration_mode' : (arg_0: UserNumber) => Promise<
+      undefined
+    >,
+  'enable_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
+  'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
@@ -95,4 +117,7 @@ export interface _SERVICE {
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
+  'verify_tentative_device' : (arg_0: UserNumber, arg_1: string) => Promise<
+      VerifyTentativeDeviceResponse
+    >,
 }

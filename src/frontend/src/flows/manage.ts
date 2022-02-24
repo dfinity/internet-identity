@@ -1,7 +1,6 @@
 import { render, html } from "lit-html";
 import {
   bufferEqual,
-  creationOptions,
   IIConnection,
 } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
@@ -11,31 +10,14 @@ import { footer } from "../components/footer";
 import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
-import { pickDeviceAlias } from "./addDevicePickAlias";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
+import {chooseDeviceAddFlow} from "./add-device/chooseDeviceAddFlow";
+import {addLocalDevice} from "./add-device/addLocalDevice";
+import {pollForTentativeDevice} from "./add-device/pollForTentativeDevice";
 
 // The various error messages we may display
-
-const displayFailedToAddNewDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add new device",
-    message: html`
-      We failed to add your new device.<br />
-      If you're trying to add a device that is not attached to this machine try
-      following the instructions at<br />
-      <a
-        target="_blank"
-        href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
-        >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
-      >
-    `,
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
 const displayFailedToAddTheDevice = (error: Error) =>
   displayError({
     title: "Failed to add the new device",
@@ -56,36 +38,39 @@ const displayFailedToListDevices = (error: Error) =>
 
 // The styling of the page
 
-const style = () => html`<style>
-  .labelWithAction {
-    margin-top: 1rem;
-    display: flex;
-    justify-content: space-between;
-  }
+const style = () => html`
+  <style>
+    .labelWithAction {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: space-between;
+    }
 
-  .labelWithAction label {
-    margin: 0;
-  }
+    .labelWithAction label {
+      margin: 0;
+    }
 
-  .labelAction {
-    padding: 0;
-    border: none;
-    display: inline;
-    width: auto;
-    margin: 0;
-    cursor: pointer;
-    color: #387ff7;
-    font-size: 12px;
-    font-family: "Montserrat", sans-serif;
-    text-align: right;
-    font-weight: 600;
-  }
-  .labelAction::before {
-    content: "+";
-    margin-right: 3px;
-    color: #387ff7;
-  }
-</style> `;
+    .labelAction {
+      padding: 0;
+      border: none;
+      display: inline;
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+      color: #387ff7;
+      font-size: 12px;
+      font-family: "Montserrat", sans-serif;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    .labelAction::before {
+      content: "+";
+      margin-right: 3px;
+      color: #387ff7;
+    }
+  </style>
+`;
 
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
@@ -155,7 +140,11 @@ export const renderManage = async (
 
   let devices: DeviceData[];
   try {
-    devices = await withLoader(() => IIConnection.lookupAll(userNumber));
+    const anchorInfo = await withLoader(() =>
+      connection.lookupAnchorInfo(userNumber)
+    );
+    console.log(anchorInfo);
+    devices = anchorInfo.devices;
   } catch (error: unknown) {
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
@@ -164,48 +153,6 @@ export const renderManage = async (
   }
   render(pageContent(userNumber, devices), container);
   init(userNumber, connection, devices);
-};
-
-// Add a new device (i.e. a device connected to the device the user is
-// currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
-// add e.g. _another_ macbook or iPhone.)
-const addAdditionalDevice = async (
-  userNumber: bigint,
-  connection: IIConnection,
-  devices: DeviceData[]
-) => {
-  let newDevice: WebAuthnIdentity;
-  try {
-    newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices),
-    });
-  } catch (error: unknown) {
-    await displayFailedToAddNewDevice(
-      error instanceof Error ? error : unknownError()
-    );
-    return renderManage(userNumber, connection);
-  }
-  const deviceName = await pickDeviceAlias();
-  if (deviceName === null) {
-    return renderManage(userNumber, connection);
-  }
-  try {
-    await withLoader(() =>
-      connection.add(
-        userNumber,
-        deviceName,
-        { unknown: null },
-        { authentication: null },
-        newDevice.getPublicKey().toDer(),
-        newDevice.rawId
-      )
-    );
-  } catch (error: unknown) {
-    await displayFailedToAddTheDevice(
-      error instanceof Error ? error : unknownError()
-    );
-  }
-  renderManage(userNumber, connection);
 };
 
 // Initializes the management page.
@@ -223,9 +170,23 @@ const init = async (
   const addAdditionalDeviceButton = document.querySelector(
     "#addAdditionalDevice"
   ) as HTMLButtonElement;
-
-  addAdditionalDeviceButton.onclick = () =>
-    addAdditionalDevice(userNumber, connection, devices);
+  addAdditionalDeviceButton.onclick = async () => {
+    const nextAction = await chooseDeviceAddFlow();
+    if(nextAction === null) {
+      await renderManage(userNumber, connection);
+      return;
+    }
+    switch (nextAction) {
+      case "local": {
+        await addLocalDevice(userNumber, connection, devices);
+        return;
+      }
+      case "remote": {
+        await pollForTentativeDevice(userNumber, connection);
+        return;
+      }
+    }
+  }
 
   // Add recovery
   const setupRecoveryButton = document.querySelector(

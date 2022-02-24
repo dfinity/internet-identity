@@ -23,6 +23,7 @@ import {
   KeyType,
   DeviceKey,
   ChallengeResult,
+  IdentityAnchorInfo,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -348,6 +349,20 @@ export class IIConnection {
 
     return this.actor;
   }
+
+  lookupAnchorInfo = async (
+    userNumber: UserNumber
+  ): Promise<IdentityAnchorInfo> => {
+    const actor = await this.getActor();
+    return await actor.get_anchor_info(userNumber);
+  };
+
+  enableDeviceRegistrationMode = async (
+    userNumber: UserNumber
+  ): Promise<Timestamp> => {
+    const actor = await this.getActor();
+    return await actor.enable_device_registration_mode(userNumber);
+  };
 
   add = async (
     userNumber: UserNumber,
