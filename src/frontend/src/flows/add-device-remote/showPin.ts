@@ -1,14 +1,15 @@
-import {html, render} from "lit-html";
-import {IIConnection} from "../../utils/iiConnection";
-import {CredentialId} from "../../../generated/internet_identity_types";
-import {setUserNumber} from "../../utils/userNumber";
+import { html, render } from "lit-html";
+import { IIConnection } from "../../utils/iiConnection";
+import { CredentialId } from "../../../generated/internet_identity_types";
+import { setUserNumber } from "../../utils/userNumber";
 
 const pageContent = (userNumber: bigint, pin: string) => html`
   <div class="container">
     <h1>Device Added Tentatively</h1>
     <p>
-      This device was added tentatively to the Identity Anchor ${userNumber}. Log in on an existing device and verify
-      this device using the PIN below. The page will automatically refresh when this device was verified.
+      This device was added tentatively to the Identity Anchor ${userNumber}.
+      Log in on an existing device and verify this device using the PIN below.
+      The page will automatically refresh when this device was verified.
     </p>
     <label>Device Verification PIN:</label>
     <div class="highlightBox">${pin}</div>
@@ -17,17 +18,22 @@ const pageContent = (userNumber: bigint, pin: string) => html`
 `;
 
 export const showPin = async (
-  userNumber: bigint, pin: string, credentialToBeVerified: CredentialId
+  userNumber: bigint,
+  pin: string,
+  credentialToBeVerified: CredentialId
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, pin), container);
   return init(userNumber, credentialToBeVerified);
 };
 
-const init = async (userNumber: bigint, credentialToBeVerified: CredentialId): Promise<void> => {
+const init = async (
+  userNumber: bigint,
+  credentialToBeVerified: CredentialId
+): Promise<void> => {
   const pollingHandler = window.setInterval(async () => {
     const deviceData = await IIConnection.lookupAuthenticators(userNumber);
-    deviceData.forEach(device => {
+    deviceData.forEach((device) => {
       if (device.credential_id.length !== 1) {
         console.log("invalid credential id");
         return;
@@ -39,7 +45,7 @@ const init = async (userNumber: bigint, credentialToBeVerified: CredentialId): P
         // TODO L2-309: do this without reload
         window.location.reload();
       }
-    })
+    });
   }, 2000);
 
   const cancelButton = document.getElementById(
@@ -53,7 +59,10 @@ const init = async (userNumber: bigint, credentialToBeVerified: CredentialId): P
   };
 };
 
-function credentialIdEqual(credentialId1: CredentialId, credentialId2: CredentialId): boolean {
+function credentialIdEqual(
+  credentialId1: CredentialId,
+  credentialId2: CredentialId
+): boolean {
   if (credentialId1.length !== credentialId2.length) {
     return false;
   }

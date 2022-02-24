@@ -25,6 +25,7 @@ import {
   SessionKey,
   Timestamp,
   UserNumber,
+  VerifyTentativeDeviceResponse,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -396,6 +397,21 @@ export class IIConnection {
   ): Promise<Timestamp> => {
     const actor = await this.getActor();
     return await actor.enable_device_registration_mode(userNumber);
+  };
+
+  disableDeviceRegistrationMode = async (
+    userNumber: UserNumber
+  ): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.disable_device_registration_mode(userNumber);
+  };
+
+  verifyTentativeDevice = async (
+    userNumber: UserNumber,
+    pin: string
+  ): Promise<VerifyTentativeDeviceResponse> => {
+    const actor = await this.getActor();
+    return await actor.verify_tentative_device(userNumber, pin);
   };
 
   add = async (

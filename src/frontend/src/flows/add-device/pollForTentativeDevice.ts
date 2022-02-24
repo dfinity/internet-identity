@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { IIConnection } from "../../utils/iiConnection";
 import { renderManage } from "../manage";
 import { withLoader } from "../../components/loader";
+import { verifyDevice } from "./verifyTentativeDevice";
 
 const pageContent = () => html`
   <div class="container">
@@ -40,7 +41,7 @@ function startPolling(connection: IIConnection, userNumber: bigint): number {
     if (userInfo.tentative_device.length === 1) {
       const tentative_device = userInfo.tentative_device[0];
       window.clearInterval(pollingHandle);
-      console.log("clearing interval, tentative device: " + tentative_device);
+      await verifyDevice(userNumber, tentative_device, connection);
     }
   }, 2000);
   return pollingHandle;
@@ -49,12 +50,14 @@ function startPolling(connection: IIConnection, userNumber: bigint): number {
 const init = (userNumber: bigint, connection: IIConnection) => {
   const pollingHandle = startPolling(connection, userNumber);
 
-  const displayUserContinue = document.getElementById(
+  const cancelButton = document.getElementById(
     "cancelAddRemoteDevice"
   ) as HTMLButtonElement;
-  displayUserContinue.onclick = async () => {
+  cancelButton.onclick = async () => {
     window.clearInterval(pollingHandle);
-    console.log("clearing interval due to cancel");
+    await withLoader(() =>
+      connection.disableDeviceRegistrationMode(userNumber)
+    );
     await renderManage(userNumber, connection);
   };
 };

@@ -1,5 +1,8 @@
-import {html, render} from "lit-html";
-import {addTentativeDevice, TentativeDeviceInfo} from "./registerTentativeDevice";
+import { html, render } from "lit-html";
+import {
+  addTentativeDevice,
+  TentativeDeviceInfo,
+} from "./registerTentativeDevice";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
