@@ -1,6 +1,5 @@
-import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
-import { TentativeDeviceInfo } from "./registerTentativeDevice";
+import {html, render} from "lit-html";
+import {addTentativeDevice, TentativeDeviceInfo} from "./registerTentativeDevice";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
@@ -44,9 +43,6 @@ const init = async (
   ) as HTMLButtonElement;
 
   retryButton.onclick = async () => {
-    const result = await IIConnection.addTentativeDevice(
-      ...tentativeDeviceInfo
-    );
-    console.log(result);
+    await addTentativeDevice(tentativeDeviceInfo);
   };
 };
