@@ -4,13 +4,13 @@ import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { register } from "../register";
 import { icLogo } from "../../components/icons";
-import { addDeviceUserNumber } from "../addDeviceUserNumber";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
 import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
+import { addDeviceUserNumber } from "../add-device-remote/addRemoteDevice";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -166,12 +166,12 @@ const initLinkDevice = () => {
     "addNewDeviceButton"
   ) as HTMLButtonElement;
 
-  addNewDeviceButton.onclick = () => {
+  addNewDeviceButton.onclick = async () => {
     const userNumberInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    addDeviceUserNumber(userNumber);
+    await addDeviceUserNumber(userNumber);
   };
 };

@@ -1,8 +1,5 @@
 import { render, html } from "lit-html";
-import {
-  bufferEqual,
-  IIConnection,
-} from "../utils/iiConnection";
+import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
@@ -13,9 +10,9 @@ import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import {chooseDeviceAddFlow} from "./add-device/chooseDeviceAddFlow";
-import {addLocalDevice} from "./add-device/addLocalDevice";
-import {pollForTentativeDevice} from "./add-device/pollForTentativeDevice";
+import { chooseDeviceAddFlow } from "./add-device/chooseDeviceAddFlow";
+import { addLocalDevice } from "./add-device/addLocalDevice";
+import { pollForTentativeDevice } from "./add-device/pollForTentativeDevice";
 
 // The various error messages we may display
 const displayFailedToAddTheDevice = (error: Error) =>
@@ -172,7 +169,7 @@ const init = async (
   ) as HTMLButtonElement;
   addAdditionalDeviceButton.onclick = async () => {
     const nextAction = await chooseDeviceAddFlow();
-    if(nextAction === null) {
+    if (nextAction === null) {
       await renderManage(userNumber, connection);
       return;
     }
@@ -186,7 +183,7 @@ const init = async (
         return;
       }
     }
-  }
+  };
 
   // Add recovery
   const setupRecoveryButton = document.querySelector(

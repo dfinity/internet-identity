@@ -1,26 +1,26 @@
 // Add a new device (i.e. a device connected to the device the user is
 // currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
 // add e.g. _another_ macbook or iPhone.)
-import {creationOptions, IIConnection} from "../../utils/iiConnection";
-import {DeviceData} from "../../../generated/internet_identity_types";
-import {WebAuthnIdentity} from "@dfinity/identity";
-import {pickDeviceAlias} from "../addDevicePickAlias";
-import {withLoader} from "../../components/loader";
-import {renderManage} from "../manage";
-import {displayError} from "../../components/displayError";
-import {html} from "lit-html";
+import { creationOptions, IIConnection } from "../../utils/iiConnection";
+import { DeviceData } from "../../../generated/internet_identity_types";
+import { WebAuthnIdentity } from "@dfinity/identity";
+import { pickDeviceAlias } from "../addDevicePickAlias";
+import { withLoader } from "../../components/loader";
+import { renderManage } from "../manage";
+import { displayError } from "../../components/displayError";
+import { html } from "lit-html";
 
 const displayFailedToAddNewDevice = (error: Error) =>
   displayError({
     title: "Failed to add new device",
     message: html`
-      We failed to add your new device.<br/>
+      We failed to add your new device.<br />
       If you're trying to add a device that is not attached to this machine try
-      following the instructions at<br/>
+      following the instructions at<br />
       <a
-          target="_blank"
-          href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
-      >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
+        target="_blank"
+        href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
+        >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
       >
     `,
     detail: error.message,
@@ -61,8 +61,8 @@ export const addLocalDevice = async (
       connection.add(
         userNumber,
         deviceName,
-        {unknown: null},
-        {authentication: null},
+        { unknown: null },
+        { authentication: null },
         newDevice.getPublicKey().toDer(),
         newDevice.rawId
       )
