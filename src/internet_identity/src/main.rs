@@ -416,6 +416,7 @@ fn check_add_tentative_device_prerequisites(
             None => trap("no tentative device to verify"),
             Some((device, pin, mut failed_attempts)) => {
                 if user_pin != pin {
+                    failed_attempts = failed_attempts + 1;
                     if failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS {
                         // disable device registration mode
                         state
@@ -424,7 +425,6 @@ fn check_add_tentative_device_prerequisites(
                             .remove(&user_number);
                         return Err(VerifyTentativeDeviceResponse::WrongPin);
                     }
-                    failed_attempts = failed_attempts + 1;
                     tentative_devices.insert(user_number, (device, pin, failed_attempts));
                     return Err(VerifyTentativeDeviceResponse::WrongPinRetry);
                 }
