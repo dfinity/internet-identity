@@ -3,7 +3,7 @@ import {
   addTentativeDevice,
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
-import {Principal} from "@dfinity/principal";
+import { Principal } from "@dfinity/principal";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">

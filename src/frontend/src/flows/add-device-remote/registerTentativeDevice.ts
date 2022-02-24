@@ -7,7 +7,7 @@ import { KeyType, Purpose } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { showPin } from "./showPin";
 import { withLoader } from "../../components/loader";
-import {Principal} from "@dfinity/principal";
+import { Principal } from "@dfinity/principal";
 
 const pageContent = () => html`
   <div class="container">

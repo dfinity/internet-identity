@@ -1,10 +1,15 @@
-import {html, render} from "lit-html";
-import {IIConnection} from "../../utils/iiConnection";
-import {CredentialId} from "../../../generated/internet_identity_types";
-import {setUserNumber} from "../../utils/userNumber";
-import {Principal} from "@dfinity/principal";
+import { html, render } from "lit-html";
+import { IIConnection } from "../../utils/iiConnection";
+import { CredentialId } from "../../../generated/internet_identity_types";
+import { setUserNumber } from "../../utils/userNumber";
+import { Principal } from "@dfinity/principal";
 
-const pageContent = (userNumber: bigint, alias: string, publicKey: string, pin: string) => html`
+const pageContent = (
+  userNumber: bigint,
+  alias: string,
+  publicKey: string,
+  pin: string
+) => html`
   <div class="container">
     <h1>Device Added Tentatively</h1>
     <p>
