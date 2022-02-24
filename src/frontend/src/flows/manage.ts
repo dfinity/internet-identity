@@ -1,28 +1,18 @@
-import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../utils/iiConnection";
-import { withLoader } from "../components/loader";
-import { initLogout, logoutSection } from "../components/logout";
-import { navbar } from "../components/navbar";
-import { footer } from "../components/footer";
-import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
-import { closeIcon, warningIcon } from "../components/icons";
-import { displayError } from "../components/displayError";
-import { setupRecovery } from "./recovery/setupRecovery";
-import { hasOwnProperty, unknownToString } from "../utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { chooseDeviceAddFlow } from "./add-device/chooseDeviceAddFlow";
-import { addLocalDevice } from "./add-device/addLocalDevice";
-import { pollForTentativeDevice } from "./add-device/pollForTentativeDevice";
-
-// The various error messages we may display
-const displayFailedToAddTheDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add the new device",
-    message:
-      "We failed to add the new device to this Identity Anchor. Please try again",
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
+import {html, render} from "lit-html";
+import {bufferEqual, IIConnection} from "../utils/iiConnection";
+import {withLoader} from "../components/loader";
+import {initLogout, logoutSection} from "../components/logout";
+import {navbar} from "../components/navbar";
+import {footer} from "../components/footer";
+import {DeviceData, IdentityAnchorInfo, PublicKey} from "../../generated/internet_identity_types";
+import {closeIcon, warningIcon} from "../components/icons";
+import {displayError} from "../components/displayError";
+import {setupRecovery} from "./recovery/setupRecovery";
+import {hasOwnProperty, unknownToString} from "../utils/utils";
+import {DerEncodedPublicKey} from "@dfinity/agent";
+import {chooseDeviceAddFlow} from "./add-device/chooseDeviceAddFlow";
+import {addLocalDevice} from "./add-device/addLocalDevice";
+import {pollForTentativeDevice} from "./add-device/pollForTentativeDevice";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -93,8 +83,8 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     </div>
     <div id="deviceList"></div>
     ${hasRecoveryDevice(devices)
-      ? undefined
-      : html`
+        ? undefined
+        : html`
           <div class="labelWithAction">
             <label id="deviceLabel">Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
@@ -135,21 +125,26 @@ export const renderManage = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  let devices: DeviceData[];
+
+  let anchorInfo: IdentityAnchorInfo;
   try {
-    const anchorInfo = await withLoader(() =>
+    anchorInfo = await withLoader(() =>
       connection.lookupAnchorInfo(userNumber)
     );
-    console.log(anchorInfo);
-    devices = anchorInfo.devices;
   } catch (error: unknown) {
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
     );
     return renderManage(userNumber, connection);
   }
-  render(pageContent(userNumber, devices), container);
-  init(userNumber, connection, devices);
+  if (anchorInfo.device_registration_mode_expiration.length !== 0) {
+    // we are actually in a device registration process
+    await pollForTentativeDevice(userNumber, connection);
+  } else {
+    render(pageContent(userNumber, anchorInfo.devices), container);
+    init(userNumber, connection, anchorInfo.devices);
+  }
+
 };
 
 // Initializes the management page.
