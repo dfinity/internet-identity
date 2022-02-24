@@ -7,6 +7,7 @@ import { KeyType, Purpose } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { showPin } from "./showPin";
 import { withLoader } from "../../components/loader";
+import {Principal} from "@dfinity/principal";
 
 const pageContent = () => html`
   <div class="container">
@@ -43,7 +44,8 @@ export type TentativeDeviceInfo = [
 ];
 
 export const addTentativeDevice = async (
-  tentativeDeviceInfo: TentativeDeviceInfo
+  tentativeDeviceInfo: TentativeDeviceInfo,
+  principal: Principal
 ): Promise<void> => {
   const result = await withLoader(() =>
     IIConnection.addTentativeDevice(...tentativeDeviceInfo)
@@ -52,11 +54,13 @@ export const addTentativeDevice = async (
   if (hasOwnProperty(result, "added_tentatively")) {
     await showPin(
       tentativeDeviceInfo[0],
+      tentativeDeviceInfo[1],
+      principal,
       result.added_tentatively.pin,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
   } else if (hasOwnProperty(result, "device_registration_mode_disabled")) {
-    await deviceRegistrationDisabledInfo(tentativeDeviceInfo);
+    await deviceRegistrationDisabledInfo(tentativeDeviceInfo, principal);
   } else if (hasOwnProperty(result, "tentative_device_already_exists")) {
     console.log("tentative_device_already_exists");
   } else if (hasOwnProperty(result, "device_already_added")) {
@@ -111,6 +115,6 @@ const init = (userNumber: bigint) => {
       newDevice.getPublicKey().toDer(),
       newDevice.rawId,
     ];
-    await addTentativeDevice(tentativeDeviceInfo);
+    await addTentativeDevice(tentativeDeviceInfo, newDevice.getPrincipal());
   };
 };

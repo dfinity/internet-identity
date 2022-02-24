@@ -1,9 +1,10 @@
-import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
-import { CredentialId } from "../../../generated/internet_identity_types";
-import { setUserNumber } from "../../utils/userNumber";
+import {html, render} from "lit-html";
+import {IIConnection} from "../../utils/iiConnection";
+import {CredentialId} from "../../../generated/internet_identity_types";
+import {setUserNumber} from "../../utils/userNumber";
+import {Principal} from "@dfinity/principal";
 
-const pageContent = (userNumber: bigint, pin: string) => html`
+const pageContent = (userNumber: bigint, alias: string, publicKey: string, pin: string) => html`
   <div class="container">
     <h1>Device Added Tentatively</h1>
     <p>
@@ -11,6 +12,10 @@ const pageContent = (userNumber: bigint, pin: string) => html`
       Log in on an existing device and verify this device using the PIN below.
       The page will automatically refresh when this device was verified.
     </p>
+    <label>Alias</label>
+    <div class="highlightBox">${alias}</div>
+    <label>Public Key</label>
+    <div class="highlightBox">${publicKey}</div>
     <label>Device Verification PIN:</label>
     <div class="highlightBox">${pin}</div>
     <button id="showPinCancel">Cancel</button>
@@ -19,11 +24,13 @@ const pageContent = (userNumber: bigint, pin: string) => html`
 
 export const showPin = async (
   userNumber: bigint,
+  alias: string,
+  principal: Principal,
   pin: string,
   credentialToBeVerified: CredentialId
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber, pin), container);
+  render(pageContent(userNumber, alias, principal.toString(), pin), container);
   return init(userNumber, credentialToBeVerified);
 };
 
