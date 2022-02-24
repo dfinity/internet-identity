@@ -5,7 +5,7 @@ import {
   HttpAgent,
   SignIdentity,
 } from "@dfinity/agent";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import {idlFactory as internet_identity_idl} from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
   PublicKey,
@@ -23,20 +23,20 @@ import {
   KeyType,
   DeviceKey,
   ChallengeResult,
-  IdentityAnchorInfo,
+  IdentityAnchorInfo, VerifyTentativeDeviceResponse,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { hasOwnProperty } from "./utils";
+import {Principal} from "@dfinity/principal";
+import {MultiWebAuthnIdentity} from "./multiWebAuthnIdentity";
+import {hasOwnProperty} from "./utils";
 import * as tweetnacl from "tweetnacl";
-import { displayError } from "../components/displayError";
-import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
-import { flavors } from "../flavors";
+import {displayError} from "../components/displayError";
+import {fromMnemonicWithoutValidation} from "../crypto/ed25519";
+import {flavors} from "../flavors";
 
 declare const canisterId: string;
 
@@ -47,14 +47,13 @@ declare const canisterId: string;
  */
 export class DummyIdentity
   extends Ed25519KeyIdentity
-  implements IdentifiableIdentity
-{
+  implements IdentifiableIdentity {
   public rawId: ArrayBuffer;
 
   public constructor() {
     const key = Ed25519KeyIdentity.generate(new Uint8Array(32));
 
-    const { secretKey, publicKey } = key.getKeyPair();
+    const {secretKey, publicKey} = key.getKeyPair();
     super(publicKey, secretKey);
 
     // A dummy rawId
@@ -109,7 +108,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type {ChallengeResult} from "../../generated/internet_identity_types";
 
 export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
@@ -120,7 +119,8 @@ export class IIConnection {
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public actor?: ActorSubclass<_SERVICE>
-  ) {}
+  ) {
+  }
 
   static async register(
     identity: IdentifiableIdentity,
@@ -132,7 +132,7 @@ export class IIConnection {
       delegationIdentity = await requestFEDelegation(identity);
     } catch (error: unknown) {
       if (error instanceof Error) {
-        return { kind: "authFail", error };
+        return {kind: "authFail", error};
       } else {
         return {
           kind: "authFail",
@@ -152,14 +152,14 @@ export class IIConnection {
           alias,
           pubkey,
           credential_id: [credential_id],
-          key_type: { unknown: null },
-          purpose: { authentication: null },
+          key_type: {unknown: null},
+          purpose: {authentication: null},
         },
         challengeResult
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
-        return { kind: "apiError", error };
+        return {kind: "apiError", error};
       } else {
         return {
           kind: "apiError",
@@ -169,7 +169,7 @@ export class IIConnection {
     }
 
     if (hasOwnProperty(registerResponse, "canister_full")) {
-      return { kind: "registerNoSpace" };
+      return {kind: "registerNoSpace"};
     } else if (hasOwnProperty(registerResponse, "registered")) {
       const userNumber = registerResponse["registered"].user_number;
       console.log(`registered Identity Anchor ${userNumber}`);
@@ -179,7 +179,7 @@ export class IIConnection {
         userNumber,
       };
     } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
-      return { kind: "badChallenge" };
+      return {kind: "badChallenge"};
     } else {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");
@@ -192,7 +192,7 @@ export class IIConnection {
       devices = await this.lookupAuthenticators(userNumber);
     } catch (e: unknown) {
       if (e instanceof Error) {
-        return { kind: "apiError", error: e };
+        return {kind: "apiError", error: e};
       } else {
         return {
           kind: "apiError",
@@ -202,7 +202,7 @@ export class IIConnection {
     }
 
     if (devices.length === 0) {
-      return { kind: "unknownUser", userNumber };
+      return {kind: "unknownUser", userNumber};
     }
 
     return this.fromWebauthnDevices(userNumber, devices);
@@ -220,19 +220,19 @@ export class IIConnection {
       process.env.II_DUMMY_AUTH === "1"
         ? new DummyIdentity()
         : MultiWebAuthnIdentity.fromCredentials(
-            devices.flatMap((device) =>
-              device.credential_id.map((credentialId: CredentialId) => ({
-                pubkey: derFromPubkey(device.pubkey),
-                credentialId: Buffer.from(credentialId),
-              }))
-            )
-          );
+          devices.flatMap((device) =>
+            device.credential_id.map((credentialId: CredentialId) => ({
+              pubkey: derFromPubkey(device.pubkey),
+              credentialId: Buffer.from(credentialId),
+            }))
+          )
+        );
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);
     } catch (e: unknown) {
       if (e instanceof Error) {
-        return { kind: "authFail", error: e };
+        return {kind: "authFail", error: e};
       } else {
         return {
           kind: "authFail",
@@ -318,7 +318,7 @@ export class IIConnection {
   static async createActor(
     delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> {
-    const agent = new HttpAgent({ identity: delegationIdentity });
+    const agent = new HttpAgent({identity: delegationIdentity});
 
     // Only fetch the root key when we're not in prod
     if (flavors.FETCH_ROOT_KEY) {
@@ -332,7 +332,7 @@ export class IIConnection {
   }
 
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
-    for (const { delegation } of this.delegationIdentity.getDelegation()
+    for (const {delegation} of this.delegationIdentity.getDelegation()
       .delegations) {
       // prettier-ignore
       if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
@@ -362,6 +362,20 @@ export class IIConnection {
   ): Promise<Timestamp> => {
     const actor = await this.getActor();
     return await actor.enable_device_registration_mode(userNumber);
+  };
+
+  disableDeviceRegistrationMode = async (
+    userNumber: UserNumber
+  ): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.disable_device_registration_mode(userNumber);
+  };
+
+  verifyTentativeDevice = async (
+    userNumber: UserNumber, pin: string
+  ): Promise<VerifyTentativeDeviceResponse> => {
+    const actor = await this.getActor();
+    return await actor.verify_tentative_device(userNumber, pin);
   };
 
   add = async (
@@ -484,9 +498,9 @@ export const creationOptions = (
       device.credential_id.length === 0
         ? []
         : {
-            id: new Uint8Array(device.credential_id[0]),
-            type: "public-key",
-          }
+          id: new Uint8Array(device.credential_id[0]),
+          type: "public-key",
+        }
     ),
     challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
     pubKeyCredParams: [
