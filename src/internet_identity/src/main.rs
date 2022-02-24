@@ -394,6 +394,7 @@ async fn verify_tentative_device(
 ) -> VerifyTentativeDeviceResponse {
     match check_add_tentative_device_prerequisites(user_number, user_pin) {
         Ok(device) => {
+            disable_device_registration_mode(user_number);
             add(user_number, device).await;
             VerifyTentativeDeviceResponse::Verified
         }
