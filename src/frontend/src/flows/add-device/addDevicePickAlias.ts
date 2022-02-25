@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { initLogout, logoutSection } from "../components/logout";
+import { initLogout, logoutSection } from "../../components/logout";
 
 const pageContent = () => html`
   <div class="container">

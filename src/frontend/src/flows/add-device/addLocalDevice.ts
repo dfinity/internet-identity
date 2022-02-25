@@ -4,7 +4,7 @@
 import { creationOptions, IIConnection } from "../../utils/iiConnection";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { pickDeviceAlias } from "../addDevicePickAlias";
+import { pickDeviceAlias } from "./addDevicePickAlias";
 import { withLoader } from "../../components/loader";
 import { renderManage } from "../manage";
 import { displayError } from "../../components/displayError";

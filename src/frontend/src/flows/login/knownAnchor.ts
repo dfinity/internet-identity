@@ -5,18 +5,11 @@ import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
 import { logoutSection, initLogout } from "../../components/logout";
 import { IIConnection } from "../../utils/iiConnection";
-import { authenticateIntent, UserIntent } from "../../utils/userIntent";
-import { loginUnknownAnchor } from "../login/unknownAnchor";
-import {
-  apiResultToLoginFlowResult,
-  LoginFlowResult,
-} from ".././login/flowResult";
-import { useRecovery } from ".././recovery/useRecovery";
+import { loginUnknownAnchor } from "./unknownAnchor";
+import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
+import { useRecovery } from "../recovery/useRecovery";
 
-const pageContent = (
-  userNumber: bigint,
-  userIntent: UserIntent
-) => html` <style>
+const pageContent = (userNumber: bigint) => html` <style>
     .spacer {
       height: 2rem;
     }
@@ -24,7 +17,7 @@ const pageContent = (
   <div class="container">
     ${icLogo}
     <h1>Welcome back!</h1>
-    <p>${authenticateIntent(userIntent)}.</p>
+    <p>Authenticate using Internet Identity.</p>
     <div class="highlightBox">${userNumber}</div>
     <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>
@@ -41,18 +34,14 @@ const pageContent = (
   ${footer}`;
 
 export const loginKnownAnchor = async (
-  userIntent: UserIntent,
   userNumber: bigint
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber, userIntent), container);
-  return init(userNumber, userIntent);
+  render(pageContent(userNumber), container);
+  return init(userNumber);
 };
 
-const init = async (
-  userNumber: bigint,
-  userIntent: UserIntent
-): Promise<LoginFlowResult> => {
+const init = async (userNumber: bigint): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
@@ -70,7 +59,7 @@ const init = async (
     loginDifferentButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      resolve(await loginUnknownAnchor(userIntent));
+      resolve(await loginUnknownAnchor());
     };
     const recoverButton = document.getElementById(
       "recoverButton"
