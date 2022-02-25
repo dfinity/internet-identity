@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 
 const pageContent = () => html`
