@@ -1,21 +1,22 @@
-import {render, html} from "lit-html";
+import { render, html } from "lit-html";
+import { bufferEqual, IIConnection } from "../utils/iiConnection";
+import { withLoader } from "../components/loader";
+import { initLogout, logoutSection } from "../components/logout";
+import { navbar } from "../components/navbar";
+import { footer } from "../components/footer";
 import {
-  bufferEqual,
-  IIConnection,
-} from "../utils/iiConnection";
-import {withLoader} from "../components/loader";
-import {initLogout, logoutSection} from "../components/logout";
-import {navbar} from "../components/navbar";
-import {footer} from "../components/footer";
-import {DeviceData, IdentityAnchorInfo, PublicKey} from "../../generated/internet_identity_types";
-import {closeIcon, warningIcon} from "../components/icons";
-import {displayError} from "../components/displayError";
-import {setupRecovery} from "./recovery/setupRecovery";
-import {hasOwnProperty, unknownToString} from "../utils/utils";
-import {DerEncodedPublicKey} from "@dfinity/agent";
-import {chooseDeviceAddFlow} from "./add-device/chooseDeviceAddFlow";
-import {addLocalDevice} from "./add-device/addLocalDevice";
-import {pollForTentativeDevice} from "./add-device/pollForTentativeDevice";
+  DeviceData,
+  IdentityAnchorInfo,
+  PublicKey,
+} from "../../generated/internet_identity_types";
+import { closeIcon, warningIcon } from "../components/icons";
+import { displayError } from "../components/displayError";
+import { setupRecovery } from "./recovery/setupRecovery";
+import { hasOwnProperty, unknownToString } from "../utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
+import { chooseDeviceAddFlow } from "./add-device/chooseDeviceAddFlow";
+import { addLocalDevice } from "./add-device/addLocalDevice";
+import { pollForTentativeDevice } from "./add-device/pollForTentativeDevice";
 
 // The various error messages we may display
 const displayFailedToAddTheDevice = (error: Error) =>
@@ -96,8 +97,8 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     </div>
     <div id="deviceList"></div>
     ${hasRecoveryDevice(devices)
-        ? undefined
-        : html`
+      ? undefined
+      : html`
           <div class="labelWithAction">
             <label id="deviceLabel">Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
@@ -138,7 +139,6 @@ export const renderManage = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-
   let anchorInfo: IdentityAnchorInfo;
   try {
     anchorInfo = await withLoader(() =>
@@ -157,7 +157,6 @@ export const renderManage = async (
     render(pageContent(userNumber, anchorInfo.devices), container);
     init(userNumber, connection, anchorInfo.devices);
   }
-
 };
 
 // Initializes the management page.
@@ -191,7 +190,7 @@ const init = async (
         return;
       }
     }
-  }
+  };
 
   // Add recovery
   const setupRecoveryButton = document.querySelector(

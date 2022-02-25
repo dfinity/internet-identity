@@ -239,14 +239,16 @@ export async function switchToPopup(
 export async function removeFlavorsWarning(
   browser: WebdriverIO.Browser
 ): Promise<void> {
-    const warningContainer = await browser.$(".flavors-warning-container");
-    await warningContainer.waitForDisplayed();
-    await browser.execute(() => {
-        const warningContainer = document.querySelector('.flavors-warning-container');
-        if(warningContainer) {
-            warningContainer.remove();
-        }
-    });
+  const warningContainer = await browser.$(".flavors-warning-container");
+  await warningContainer.waitForDisplayed();
+  await browser.execute(() => {
+    const warningContainer = document.querySelector(
+      ".flavors-warning-container"
+    );
+    if (warningContainer) {
+      warningContainer.remove();
+    }
+  });
 }
 
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {

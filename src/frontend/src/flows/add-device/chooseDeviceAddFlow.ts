@@ -50,21 +50,21 @@ const pageContent = () => html`
       or by binding a remote device to this identity anchor.
     </p>
     <div class="recoveryContainer">
-      <button
-        class="recoveryOption"
-        id="local"
-      >
+      <button class="recoveryOption" id="local">
         <span class="recoveryIcon">${seedPhraseIcon}</span>
         <div class="recoveryTitle">Local Device</div>
-        <div class="recoveryDescription">Add a new authentication mechanism available on <i>this device</i> (e.g. YubiKey, Fingerprint, FaceID).</div>
+        <div class="recoveryDescription">
+          Add a new authentication mechanism available on
+          <i>this device</i> (e.g. YubiKey, Fingerprint, FaceID).
+        </div>
       </button>
-      <button
-        class="recoveryOption"
-        id="remote"
-      >
+      <button class="recoveryOption" id="remote">
         <span class="recoveryIcon">${securityKeyIcon}</span>
         <div class="recoveryTitle">Remote Device</div>
-        <div class="recoveryDescription">Add a new authentication mechanism available on <i>another device</i> (e.g. a YubiKey, Fingerprint, FaceID).</div>
+        <div class="recoveryDescription">
+          Add a new authentication mechanism available on
+          <i>another device</i> (e.g. a YubiKey, Fingerprint, FaceID).
+        </div>
       </button>
     </div>
     <button id="cancelAddDevice" class="linkStyle">Cancel</button>
