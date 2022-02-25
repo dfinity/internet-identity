@@ -837,6 +837,7 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
             .collect();
 
         let device_registration_mode_expiration = state
+            .device_registrations
             .users_in_device_reg_mode
             .borrow()
             .get(&user_number)
@@ -845,6 +846,7 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
         match device_registration_mode_expiration {
             Some(expiration) if expiration > time() => {
                 let tentative_device = state
+                    .device_registrations
                     .tentative_devices
                     .borrow()
                     .get(&user_number)
