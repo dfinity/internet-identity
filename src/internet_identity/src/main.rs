@@ -39,8 +39,8 @@ const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
-// 10 mins
-const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(600);
+// 15 mins
+const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
 
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
@@ -585,12 +585,7 @@ async fn create_challenge(pow: ProofOfWork) -> Challenge {
 
     let resp = STATE.with(|s| {
         let mut nonce_cache = s.nonce_cache.borrow_mut();
-        if nonce_cache.contains(pow.timestamp, pow.nonce) {
-            trap(&format!(
-                "the combination of timestamp {} and nonce {} has already been used",
-                pow.timestamp, pow.nonce,
-            ));
-        }
+        check_nonce_cache(&pow, &nonce_cache);
 
         let now = time() as u64;
 
@@ -1148,6 +1143,19 @@ fn check_frontend_length(frontend: &FrontendHostname) {
         trap(&format!(
             "frontend hostname {} exceeds the limit of {} bytes",
             n, FRONTEND_HOSTNAME_LIMIT,
+        ));
+    }
+}
+
+#[cfg(feature = "dummy_pow")]
+fn check_nonce_cache(_pow: &ProofOfWork, _nonce_cache: &NonceCache) {}
+
+#[cfg(not(feature = "dummy_pow"))]
+fn check_nonce_cache(pow: &ProofOfWork, nonce_cache: &NonceCache) {
+    if nonce_cache.contains(pow.timestamp, pow.nonce) {
+        trap(&format!(
+            "the combination of timestamp {} and nonce {} has already been used",
+            pow.timestamp, pow.nonce,
         ));
     }
 }
