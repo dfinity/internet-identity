@@ -213,6 +213,16 @@ struct InternetIdentityInit {
 
 type AssetHashes = RbTree<&'static str, Hash>;
 
+#[derive(Default)]
+struct DeviceRegistrationData {
+    // contains all identity anchors with device registration enabled
+    users_in_device_reg_mode: RefCell<HashMap<UserNumber, Timestamp>>,
+    // heap of users in device registration mode sorted by closest expiration
+    device_reg_mode_expirations: RefCell<BinaryHeap<DeviceRegModeExpiration>>,
+    // map of tentatively added devices and corresponding pin, max 1 per user
+    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, String)>>,
+}
+
 struct State {
     nonce_cache: RefCell<NonceCache>,
     storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
@@ -222,12 +232,8 @@ struct State {
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
     // through upgrades
     inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
-    // contains all identity anchors with device registration enabled
-    users_in_device_reg_mode: RefCell<HashMap<UserNumber, Timestamp>>,
-    // heap of users in device registration mode sorted by closest expiration
-    device_reg_mode_expirations: RefCell<BinaryHeap<DeviceRegModeExpiration>>,
-    // map of tentatively added devices and corresponding pin, max 1 per user
-    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, String)>>,
+    // tentative device registrations, not persisted across updates
+    device_registrations: DeviceRegistrationData,
 }
 
 impl Default for State {
@@ -243,9 +249,7 @@ impl Default for State {
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
-            users_in_device_reg_mode: RefCell::new(HashMap::new()),
-            device_reg_mode_expirations: RefCell::new(BinaryHeap::new()),
-            tentative_devices: RefCell::new(HashMap::new()),
+            device_registrations: DeviceRegistrationData::default(),
         }
     }
 }
@@ -304,27 +308,30 @@ async fn init_salt() {
 
 #[update]
 fn enable_device_registration_mode(user_number: UserNumber) -> Timestamp {
-    let now = time();
     STATE.with(|state| {
         trap_if_user_not_authenticated(state, user_number);
         clean_expired_device_reg_mode_flags(state);
 
-        let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
-        let expiration = now + REGISTRATION_MODE_DURATION;
-        if let Some(timestamp) = users_in_device_reg_mode.get(&user_number) {
-            if expiration - timestamp < secs_to_nanos(10) {
-                // do nothing if the last refresh of the registration mode was less than 10 seconds ago
-                // this is a soft rate limit that ensures that one user can have at most 60 expiration timestamps in the expiration heap
-                return *timestamp;
+        let mut users_in_device_reg_mode = state
+            .device_registrations
+            .users_in_device_reg_mode
+            .borrow_mut();
+        match users_in_device_reg_mode.get(&user_number) {
+            Some(timestamp) => *timestamp, // already enabled, just return the existing expiration
+            None => {
+                let expiration = time() + REGISTRATION_MODE_DURATION;
+                users_in_device_reg_mode.insert(user_number, expiration);
+                state
+                    .device_registrations
+                    .device_reg_mode_expirations
+                    .borrow_mut()
+                    .push(DeviceRegModeExpiration {
+                        user_number,
+                        expires_at: expiration,
+                    });
+                expiration
             }
         }
-
-        users_in_device_reg_mode.insert(user_number, expiration);
-        state.device_reg_mode_expirations.borrow_mut().push(DeviceRegModeExpiration {
-            user_number,
-            expires_at: expiration,
-        });
-        expiration
     })
 }
 
@@ -334,8 +341,16 @@ fn disable_device_registration_mode(user_number: UserNumber) {
         trap_if_user_not_authenticated(state, user_number);
         clean_expired_device_reg_mode_flags(state);
 
-        state.users_in_device_reg_mode.borrow_mut().remove(&user_number);
-        state.tentative_devices.borrow_mut().remove(&user_number);
+        state
+            .device_registrations
+            .users_in_device_reg_mode
+            .borrow_mut()
+            .remove(&user_number);
+        state
+            .device_registrations
+            .tentative_devices
+            .borrow_mut()
+            .remove(&user_number);
     })
 }
 
@@ -350,6 +365,7 @@ async fn add_tentative_device(
         Ok(_) => {
             STATE.with(|state| {
                 state
+                    .device_registrations
                     .tentative_devices
                     .borrow_mut()
                     .insert(user_number, (device_data, pin.clone()))
@@ -376,7 +392,12 @@ fn check_tentative_device_reg_prerequisites(
     STATE.with(|state| {
         clean_expired_device_reg_mode_flags(state);
 
-        match state.users_in_device_reg_mode.borrow_mut().get(&user_number) {
+        match state
+            .device_registrations
+            .users_in_device_reg_mode
+            .borrow_mut()
+            .get(&user_number)
+        {
             None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
             Some(expiration) => {
                 if *expiration < time() {
@@ -387,7 +408,13 @@ fn check_tentative_device_reg_prerequisites(
             }
         }
 
-        if state.tentative_devices.borrow().get(&user_number).is_some() {
+        if state
+            .device_registrations
+            .tentative_devices
+            .borrow()
+            .get(&user_number)
+            .is_some()
+        {
             // some tentative device already exists
             return Err(AddTentativeDeviceResponse::TentativeDeviceAlreadyExists);
         }
@@ -413,8 +440,14 @@ fn check_tentative_device_reg_prerequisites(
 }
 
 fn clean_expired_device_reg_mode_flags(state: &State) {
-    let mut users_in_device_reg_mode = state.users_in_device_reg_mode.borrow_mut();
-    let mut device_reg_mode_expirations = state.device_reg_mode_expirations.borrow_mut();
+    let mut users_in_device_reg_mode = state
+        .device_registrations
+        .users_in_device_reg_mode
+        .borrow_mut();
+    let mut device_reg_mode_expirations = state
+        .device_registrations
+        .device_reg_mode_expirations
+        .borrow_mut();
     let now = time();
 
     for _ in 0..MAX_REG_MODE_CLEAN_UP {
@@ -425,18 +458,10 @@ fn clean_expired_device_reg_mode_flags(state: &State) {
         }
         if let Some(expiration) = device_reg_mode_expirations.pop() {
             match users_in_device_reg_mode.get(&expiration.user_number) {
-                Some(timestamp) => {
-                    // only remove the user from device registration mode if the user
-                    // has not refreshed device registration mode in the meantime.
-                    if *timestamp <= now {
-                        users_in_device_reg_mode.remove(&expiration.user_number);
-                        state
-                            .tentative_devices
-                            .borrow_mut()
-                            .remove(&expiration.user_number);
-                    }
+                Some(_) => {
+                    users_in_device_reg_mode.remove(&expiration.user_number);
                 }
-                None => {}
+                None => {} // this happens if the user finishes or cancels the process before the timeout
             }
         }
     }
