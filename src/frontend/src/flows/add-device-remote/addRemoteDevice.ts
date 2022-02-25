@@ -8,6 +8,9 @@ const pageContent = (userNumber: bigint | null) => html`
     <p>
       Please provide the Identity Anchor to which you want to add your device.
     </p>
+    <div id="invalidAnchorMessage" class="error-message">
+      Please enter a valid Identity Anchor.
+    </div>
     <input
       type="text"
       id="addDeviceUserNumber"
@@ -19,7 +22,7 @@ const pageContent = (userNumber: bigint | null) => html`
   </div>
 `;
 
-export const addDeviceUserNumber = async (
+export const addRemoteDevice = async (
   userNumber: bigint | null
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -55,9 +58,17 @@ const init = () => {
   continueButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
+      const errorMessage = document.getElementById(
+        "invalidAnchorMessage"
+      ) as HTMLDivElement;
+      errorMessage.style.visibility = "hidden";
       userNumberInput.classList.toggle("errored", false);
       await registerTentativeDevice(userNumber);
     } else {
+      const errorMessage = document.getElementById(
+        "invalidAnchorMessage"
+      ) as HTMLDivElement;
+      errorMessage.style.visibility = "visible";
       userNumberInput.classList.toggle("errored", true);
       userNumberInput.placeholder = "Please enter your Identity Anchor first";
     }

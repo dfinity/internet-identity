@@ -10,7 +10,7 @@ import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
 import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
-import { addDeviceUserNumber } from "../add-device-remote/addRemoteDevice";
+import { addRemoteDevice } from "../add-device-remote/addRemoteDevice";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -172,6 +172,6 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    await addDeviceUserNumber(userNumber);
+    await addRemoteDevice(userNumber);
   };
 };
