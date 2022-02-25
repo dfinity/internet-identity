@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { parseUserNumber } from "../../utils/userNumber";
 import { registerTentativeDevice } from "./registerTentativeDevice";
+import { toggleErrorMessage } from "../../utils/errorHelper";
 
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
@@ -8,7 +9,7 @@ const pageContent = (userNumber: bigint | null) => html`
     <p>
       Please provide the Identity Anchor to which you want to add your device.
     </p>
-    <div id="invalidAnchorMessage" class="error-message">
+    <div id="invalidAnchorMessage" class="error-message-hidden">
       Please enter a valid Identity Anchor.
     </div>
     <input
@@ -58,18 +59,10 @@ const init = () => {
   continueButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
-      const errorMessage = document.getElementById(
-        "invalidAnchorMessage"
-      ) as HTMLDivElement;
-      errorMessage.style.visibility = "hidden";
-      userNumberInput.classList.toggle("errored", false);
+      toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", false);
       await registerTentativeDevice(userNumber);
     } else {
-      const errorMessage = document.getElementById(
-        "invalidAnchorMessage"
-      ) as HTMLDivElement;
-      errorMessage.style.visibility = "visible";
-      userNumberInput.classList.toggle("errored", true);
+      toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", true);
       userNumberInput.placeholder = "Please enter your Identity Anchor first";
     }
   };

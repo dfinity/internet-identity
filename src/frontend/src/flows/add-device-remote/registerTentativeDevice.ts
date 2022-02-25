@@ -8,11 +8,17 @@ import { hasOwnProperty } from "../../utils/utils";
 import { showPin } from "./showPin";
 import { withLoader } from "../../components/loader";
 import { Principal } from "@dfinity/principal";
+import { toggleErrorMessage } from "../../utils/errorHelper";
+import { displayError } from "../../components/displayError";
+import { login } from "../login/login";
 
 const pageContent = () => html`
   <div class="container">
     <h1>New device</h1>
     <p>Please provide an alias for this device.</p>
+    <div id="invalidAliasMessage" class="error-message-hidden">
+      The device alias must not be empty.
+    </div>
     <input
       type="text"
       id="tentativeDeviceAlias"
@@ -98,13 +104,24 @@ const init = (userNumber: bigint) => {
   };
 
   continueButton.onclick = async () => {
+    if (aliasInput.value === "") {
+      toggleErrorMessage("tentativeDeviceAlias", "invalidAliasMessage", true);
+      return;
+    }
+
     let newDevice: WebAuthnIdentity;
     try {
       newDevice = await WebAuthnIdentity.create({
         publicKey: creationOptions(),
       });
     } catch (error: unknown) {
-      console.log(error);
+      await displayError({
+        title: "Something went wrong",
+        message: "Unable to register new WebAuthn Device.",
+        detail: "error: " + error,
+        primaryButton: "Continue",
+      });
+      await login();
       return;
     }
     const tentativeDeviceInfo: TentativeDeviceInfo = [

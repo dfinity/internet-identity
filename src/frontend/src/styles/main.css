@@ -49,7 +49,8 @@ footer {
   border-radius: 0.3em;
 }
 
-p {
+p,
+ol {
   line-height: 22px;
   color: var(--grey-700);
   font-size: 1rem;
@@ -84,9 +85,16 @@ input.errored::placeholder {
   color: var(--flamingo-500);
 }
 
+.error-message-hidden {
+  visibility: hidden;
+  height: 0;
+  margin: 0;
+}
+
 .error-message {
   color: var(--flamingo-500);
-  visibility: hidden;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
 }
 
 textarea {

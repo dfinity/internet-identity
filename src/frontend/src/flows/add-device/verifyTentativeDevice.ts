@@ -6,6 +6,7 @@ import { hasOwnProperty } from "../../utils/utils";
 import { displayError } from "../../components/displayError";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
+import { toggleErrorMessage } from "../../utils/errorHelper";
 
 const pageContent = (alias: string, publicKey: string) => html`
   <div class="container">
@@ -15,7 +16,7 @@ const pageContent = (alias: string, publicKey: string) => html`
     <div class="highlightBox">${alias}</div>
     <label>Public Key</label>
     <div class="highlightBox">${publicKey}</div>
-    <div id="wrongPinMessage" class="error-message">
+    <div id="wrongPinMessage" class="error-message-hidden">
       The entered PIN was invalid. Please try again.
     </div>
     <input id="tentativeDevicePin" placeholder="PIN" />
@@ -70,18 +71,10 @@ const init = (userNumber: bigint, connection: IIConnection) => {
     );
 
     if (hasOwnProperty(result, "verified")) {
-      const errorMessage = document.getElementById(
-        "wrongPinMessage"
-      ) as HTMLDivElement;
-      errorMessage.style.visibility = "hidden";
-      pinInput.classList.toggle("errored", false);
+      toggleErrorMessage("tentativeDevicePin", "wrongPinMessage", false);
       await renderManage(userNumber, connection);
     } else if (hasOwnProperty(result, "wrong_pin_retry")) {
-      const errorMessage = document.getElementById(
-        "wrongPinMessage"
-      ) as HTMLDivElement;
-      errorMessage.style.visibility = "visible";
-      pinInput.classList.toggle("errored", true);
+      toggleErrorMessage("tentativeDevicePin", "wrongPinMessage", true);
     } else if (hasOwnProperty(result, "wrong_pin")) {
       await displayError({
         title: "Too Many Wrong Pins Entered",
