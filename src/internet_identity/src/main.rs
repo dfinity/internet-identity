@@ -39,8 +39,8 @@ const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
-// 10 mins
-const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(600);
+// 15 mins
+const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
 
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
