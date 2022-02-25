@@ -15,7 +15,10 @@ const pageContent = (alias: string, publicKey: string) => html`
     <div class="highlightBox">${alias}</div>
     <label>Public Key</label>
     <div class="highlightBox">${publicKey}</div>
-    <input id="tentativeDevicePin" placeholder="PIN" type="password" />
+    <div id="wrongPinMessage" class="error-message">
+      The entered PIN was invalid. Please try again.
+    </div>
+    <input id="tentativeDevicePin" placeholder="PIN" />
     <button id="verifyDevice" class="primary">Verify Device</button>
     <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>
   </div>
@@ -67,9 +70,17 @@ const init = (userNumber: bigint, connection: IIConnection) => {
     );
 
     if (hasOwnProperty(result, "verified")) {
+      const errorMessage = document.getElementById(
+        "wrongPinMessage"
+      ) as HTMLDivElement;
+      errorMessage.style.visibility = "hidden";
       pinInput.classList.toggle("errored", false);
       await renderManage(userNumber, connection);
     } else if (hasOwnProperty(result, "wrong_pin_retry")) {
+      const errorMessage = document.getElementById(
+        "wrongPinMessage"
+      ) as HTMLDivElement;
+      errorMessage.style.visibility = "visible";
       pinInput.classList.toggle("errored", true);
     } else if (hasOwnProperty(result, "wrong_pin")) {
       await displayError({

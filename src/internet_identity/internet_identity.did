@@ -135,7 +135,7 @@ type IdentityAnchorInfo = record {
     devices : vec DeviceData;
     tentative_device : opt DeviceData;
     device_registration_mode_expiration: opt Timestamp;
-}
+};
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();

@@ -84,6 +84,11 @@ input.errored::placeholder {
   color: var(--flamingo-500);
 }
 
+.error-message {
+  color: var(--flamingo-500);
+  visibility: hidden;
+}
+
 textarea {
   width: 100%;
   height: 6rem;
