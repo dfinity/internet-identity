@@ -70,7 +70,7 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test("Register new identity and add additional device", async () => {
+test.skip("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);

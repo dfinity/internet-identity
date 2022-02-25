@@ -18,16 +18,6 @@ import { chooseDeviceAddFlow } from "./add-device/chooseDeviceAddFlow";
 import { addLocalDevice } from "./add-device/addLocalDevice";
 import { pollForTentativeDevice } from "./add-device/pollForTentativeDevice";
 
-// The various error messages we may display
-const displayFailedToAddTheDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add the new device",
-    message:
-      "We failed to add the new device to this Identity Anchor. Please try again",
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
 const displayFailedToListDevices = (error: Error) =>
   displayError({
     title: "Failed to list your devices",
