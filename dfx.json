@@ -18,11 +18,15 @@
       "type": "ephemeral"
     },
     "identity": {
-      "providers": ["http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080"],
+      "providers": [
+        "http://[2a00:fb01:400:42:5000:f7ff:fe46:2a71]:8080"
+      ],
       "type": "persistent"
     },
-    "mainnet": {
-      "providers": ["https://identity.ic0.app"],
+    "nnsdapp": {
+      "providers": [
+        "http://[2a00:fb01:400:42:5000:d1ff:fefe:987e]:8080"
+      ],
       "type": "persistent"
     }
   },
