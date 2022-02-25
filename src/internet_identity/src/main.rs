@@ -392,8 +392,8 @@ fn check_tentative_device_reg_prerequisites(
     STATE.with(|state| {
         clean_expired_device_reg_mode_flags(state);
 
-        match state
-            .device_registrations
+        let device_registrations = &state.device_registrations;
+        match device_registrations
             .users_in_device_reg_mode
             .borrow_mut()
             .get(&user_number)
@@ -408,8 +408,7 @@ fn check_tentative_device_reg_prerequisites(
             }
         }
 
-        if state
-            .device_registrations
+        if device_registrations
             .tentative_devices
             .borrow()
             .get(&user_number)
