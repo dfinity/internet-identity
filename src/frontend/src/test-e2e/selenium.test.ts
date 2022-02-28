@@ -218,7 +218,7 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
-test.skip("Screenshots", async () => {
+test("Screenshots", async () => {
   await runInBrowser(
     async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {
       const screenshots = new Screenshots(
@@ -287,89 +287,89 @@ test.skip("Screenshots", async () => {
       await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
-      // Now the link device flow, using a second browser
-      await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
-        await addVirtualAuthenticator(browser2);
-        await browser2.url(II_URL);
-        await removeFlavorsWarning(browser2);
-        const welcomeView2 = new WelcomeView(browser2);
-        await welcomeView2.waitForDisplay();
-        await welcomeView2.typeUserNumber(userNumber);
-        await welcomeView2.addDevice();
-        const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
-        await addIdentityAnchorView2.waitForDisplay();
-        await addIdentityAnchorView2.fixup();
-        await screenshots.take("new-device-user-number", browser2);
-        await addIdentityAnchorView2.continue(userNumber);
-        const addDeviceView2 = new AddDeviceView(browser2);
-        await addDeviceView2.waitForDisplay();
-
-        const link = await addDeviceView2.getLinkText();
-        console.log("The add device link is", link);
-        await addDeviceView2.fixup();
-        await screenshots.take("new-device", browser2);
-
-        // Log in with previous browser again
-        await browser.url("about:blank");
-        await browser.url(link);
-        await removeFlavorsWarning(browser);
-        await waitForFonts(browser);
-        const welcomeBackView = new WelcomeBackView(browser);
-        await welcomeBackView.waitForDisplay();
-        await welcomeBackView.fixup();
-        await screenshots.take("new-device-login", browser);
-        await welcomeBackView.login();
-        await recoveryMethodSelectorView.waitForDisplay();
-        await recoveryMethodSelectorView.skipRecovery();
-        await singleDeviceWarningView.waitForDisplay();
-        await singleDeviceWarningView.remindLater();
-        const addDeviceView = new AddDeviceView(browser);
-        await addDeviceView.waitForConfirmDisplay();
-        await addDeviceView.fixupConfirm();
-        await screenshots.take("new-device-confirm", browser);
-        await addDeviceView.confirm();
-        await addDeviceView.waitForAliasDisplay();
-        await screenshots.take("new-device-alias", browser);
-        await addDeviceView.addDeviceAlias(DEVICE_NAME2);
-        await addDeviceView.addDeviceAliasContinue();
-        await addDeviceView.waitForAddDeviceSuccess();
-        await screenshots.take("new-device-done", browser);
-
-        // Back to other browser, should be a welcome view now
-        const welcomeBackView2 = new WelcomeBackView(browser2);
-        await welcomeBackView2.waitForDisplay();
-        await welcomeBackView2.fixup();
-        await removeFlavorsWarning(browser2);
-        await screenshots.take("new-device-login", browser2);
-        await welcomeBackView2.login();
-        const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
-          browser2
-        );
-        await recoveryMethodSelectorView2.waitForDisplay();
-        await recoveryMethodSelectorView2.skipRecovery();
-        const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
-        await singleDeviceWarningView2.waitForDisplay();
-        await singleDeviceWarningView2.remindLater();
-        const mainView2 = new MainView(browser2);
-        await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
-        await mainView2.fixup();
-        await screenshots.take("new-device-listed", browser2);
-
-        // Try to remove current device
-        await mainView2.removeDevice(DEVICE_NAME2);
-        await browser2.waitUntil(
-          async () => !!(await browser2.getAlertText()),
-          {
-            timeout: 1_000,
-            timeoutMsg: "expected alert to be displayed after 1s",
-          }
-        );
-        expect(await browser2.getAlertText()).toBe(
-          "This will remove your current device and you will be logged out."
-        );
-        await browser2.dismissAlert();
-        await browser2.deleteSession();
-      });
+      // // Now the link device flow, using a second browser
+      // await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      //   await addVirtualAuthenticator(browser2);
+      //   await browser2.url(II_URL);
+      //   await removeFlavorsWarning(browser2);
+      //   const welcomeView2 = new WelcomeView(browser2);
+      //   await welcomeView2.waitForDisplay();
+      //   await welcomeView2.typeUserNumber(userNumber);
+      //   await welcomeView2.addDevice();
+      //   const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
+      //   await addIdentityAnchorView2.waitForDisplay();
+      //   await addIdentityAnchorView2.fixup();
+      //   await screenshots.take("new-device-user-number", browser2);
+      //   await addIdentityAnchorView2.continue(userNumber);
+      //   const addDeviceView2 = new AddDeviceView(browser2);
+      //   await addDeviceView2.waitForDisplay();
+      //
+      //   const link = await addDeviceView2.getLinkText();
+      //   console.log("The add device link is", link);
+      //   await addDeviceView2.fixup();
+      //   await screenshots.take("new-device", browser2);
+      //
+      //   // Log in with previous browser again
+      //   await browser.url("about:blank");
+      //   await browser.url(link);
+      //   await removeFlavorsWarning(browser);
+      //   await waitForFonts(browser);
+      //   const welcomeBackView = new WelcomeBackView(browser);
+      //   await welcomeBackView.waitForDisplay();
+      //   await welcomeBackView.fixup();
+      //   await screenshots.take("new-device-login", browser);
+      //   await welcomeBackView.login();
+      //   await recoveryMethodSelectorView.waitForDisplay();
+      //   await recoveryMethodSelectorView.skipRecovery();
+      //   await singleDeviceWarningView.waitForDisplay();
+      //   await singleDeviceWarningView.remindLater();
+      //   const addDeviceView = new AddDeviceView(browser);
+      //   await addDeviceView.waitForConfirmDisplay();
+      //   await addDeviceView.fixupConfirm();
+      //   await screenshots.take("new-device-confirm", browser);
+      //   await addDeviceView.confirm();
+      //   await addDeviceView.waitForAliasDisplay();
+      //   await screenshots.take("new-device-alias", browser);
+      //   await addDeviceView.addDeviceAlias(DEVICE_NAME2);
+      //   await addDeviceView.addDeviceAliasContinue();
+      //   await addDeviceView.waitForAddDeviceSuccess();
+      //   await screenshots.take("new-device-done", browser);
+      //
+      //   // Back to other browser, should be a welcome view now
+      //   const welcomeBackView2 = new WelcomeBackView(browser2);
+      //   await welcomeBackView2.waitForDisplay();
+      //   await welcomeBackView2.fixup();
+      //   await removeFlavorsWarning(browser2);
+      //   await screenshots.take("new-device-login", browser2);
+      //   await welcomeBackView2.login();
+      //   const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
+      //     browser2
+      //   );
+      //   await recoveryMethodSelectorView2.waitForDisplay();
+      //   await recoveryMethodSelectorView2.skipRecovery();
+      //   const singleDeviceWarningView2 = new SingleDeviceWarningView(browser2);
+      //   await singleDeviceWarningView2.waitForDisplay();
+      //   await singleDeviceWarningView2.remindLater();
+      //   const mainView2 = new MainView(browser2);
+      //   await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
+      //   await mainView2.fixup();
+      //   await screenshots.take("new-device-listed", browser2);
+      //
+      //   // Try to remove current device
+      //   await mainView2.removeDevice(DEVICE_NAME2);
+      //   await browser2.waitUntil(
+      //     async () => !!(await browser2.getAlertText()),
+      //     {
+      //       timeout: 1_000,
+      //       timeoutMsg: "expected alert to be displayed after 1s",
+      //     }
+      //   );
+      //   expect(await browser2.getAlertText()).toBe(
+      //     "This will remove your current device and you will be logged out."
+      //   );
+      //   await browser2.dismissAlert();
+      //   await browser2.deleteSession();
+      // });
 
       // About page
       await browser.url("about:blank");
@@ -389,41 +389,41 @@ test.skip("Screenshots", async () => {
       await aboutViewLegacy.waitForDisplay();
       await screenshots.take("about-legacy", browser);
 
-      // Test device removal
-      await browser.url(II_URL);
-      await removeFlavorsWarning(browser);
-      await welcomeBackView.waitForDisplay();
-      const userNumber3 = await welcomeBackView.getIdentityAnchor();
-      expect(userNumber3).toBe(userNumber);
-      await welcomeBackView.login();
-      await recoveryMethodSelectorView.waitForDisplay();
-      await recoveryMethodSelectorView.skipRecovery();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.remindLater();
-      await mainView.waitForDeviceDisplay(DEVICE_NAME2);
-      await mainView.removeDevice(DEVICE_NAME2);
-      // No dialog here!
-      await browser.waitUntil(
-        async () => {
-          const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
-          return !(await device2.isDisplayed());
-        },
-        {
-          timeout: 10_000,
-          timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
-        }
-      );
-      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-      await mainView.fixup();
-      await screenshots.take("after-removal", browser);
+      // // Test device removal
+      // await browser.url(II_URL);
+      // await removeFlavorsWarning(browser);
+      // await welcomeBackView.waitForDisplay();
+      // const userNumber3 = await welcomeBackView.getIdentityAnchor();
+      // expect(userNumber3).toBe(userNumber);
+      // await welcomeBackView.login();
+      // await recoveryMethodSelectorView.waitForDisplay();
+      // await recoveryMethodSelectorView.skipRecovery();
+      // await singleDeviceWarningView.waitForDisplay();
+      // await singleDeviceWarningView.remindLater();
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+      // await mainView.removeDevice(DEVICE_NAME2);
+      // // No dialog here!
+      // await browser.waitUntil(
+      //   async () => {
+      //     const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
+      //     return !(await device2.isDisplayed());
+      //   },
+      //   {
+      //     timeout: 10_000,
+      //     timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
+      //   }
+      // );
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+      // await mainView.fixup();
+      // await screenshots.take("after-removal", browser);
 
-      await mainView.removeDevice(DEVICE_NAME1);
-      const alertText = await browser.getAlertText();
-      expect(alertText).toBe("You can not remove your last device.");
-      await browser.acceptAlert();
-
-      // device still present. You can't remove your last device.
-      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+      // await mainView.removeDevice(DEVICE_NAME1);
+      // const alertText = await browser.getAlertText();
+      // expect(alertText).toBe("You can not remove your last device.");
+      // await browser.acceptAlert();
+      //
+      // // device still present. You can't remove your last device.
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       // Compatibility notice page
       await browser.url("about:blank");
