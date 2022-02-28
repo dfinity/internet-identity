@@ -194,8 +194,6 @@ enum AddTentativeDeviceResponse {
     AddedTentatively { pin: Pin },
     #[serde(rename = "device_registration_mode_disabled")]
     DeviceRegistrationModeDisabled,
-    #[serde(rename = "device_already_added")]
-    DeviceAlreadyAdded,
     #[serde(rename = "tentative_device_already_exists")]
     TentativeDeviceAlreadyExists,
 }
@@ -493,24 +491,6 @@ fn check_tentative_device_reg_prerequisites(
         {
             // some tentative device already exists
             return Err(AddTentativeDeviceResponse::TentativeDeviceAlreadyExists);
-        }
-
-        let existing_devices = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-
-        let tentative_principal = Principal::self_authenticating(&device_data.pubkey);
-        for existing_device in existing_devices {
-            if Principal::self_authenticating(existing_device.pubkey) == tentative_principal {
-                return Err(AddTentativeDeviceResponse::DeviceAlreadyAdded);
-            }
         }
         Ok(())
     })
