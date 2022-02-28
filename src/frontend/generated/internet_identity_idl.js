@@ -26,7 +26,6 @@ export const idlFactory = ({ IDL }) => {
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_disabled' : IDL.Null,
     'tentative_device_already_exists' : IDL.Null,
-    'device_already_added' : IDL.Null,
     'added_tentatively' : IDL.Record({ 'pin' : IDL.Text }),
   });
   const Timestamp = IDL.Nat64;
