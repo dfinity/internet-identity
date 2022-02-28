@@ -417,13 +417,13 @@ test("Screenshots", async () => {
       // await mainView.fixup();
       // await screenshots.take("after-removal", browser);
 
-      await mainView.removeDevice(DEVICE_NAME1);
-      const alertText = await browser.getAlertText();
-      expect(alertText).toBe("You can not remove your last device.");
-      await browser.acceptAlert();
-
-      // device still present. You can't remove your last device.
-      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+      // await mainView.removeDevice(DEVICE_NAME1);
+      // const alertText = await browser.getAlertText();
+      // expect(alertText).toBe("You can not remove your last device.");
+      // await browser.acceptAlert();
+      //
+      // // device still present. You can't remove your last device.
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       // Compatibility notice page
       await browser.url("about:blank");
