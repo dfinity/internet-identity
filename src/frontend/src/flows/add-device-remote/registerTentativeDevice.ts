@@ -8,6 +8,7 @@ import { hasOwnProperty } from "../../utils/utils";
 import { showPin } from "./showPin";
 import { withLoader } from "../../components/loader";
 import { Principal } from "@dfinity/principal";
+import { displayError } from "../../components/displayError";
 
 const pageContent = () => html`
   <div class="container">
@@ -63,8 +64,6 @@ export const addTentativeDevice = async (
     await deviceRegistrationDisabledInfo(tentativeDeviceInfo, principal);
   } else if (hasOwnProperty(result, "tentative_device_already_exists")) {
     console.log("tentative_device_already_exists");
-  } else if (hasOwnProperty(result, "device_already_added")) {
-    console.log("device_already_added");
   } else {
     throw new Error(
       "unknown tentative device registration result: " + JSON.stringify(result)
@@ -72,7 +71,10 @@ export const addTentativeDevice = async (
   }
 };
 
-const init = (userNumber: bigint) => {
+const init = async (userNumber: bigint) => {
+  const existingAuthenticators = await withLoader(() =>
+    IIConnection.lookupAuthenticators(userNumber)
+  );
   const cancelButton = document.getElementById(
     "registerTentativeDeviceCancel"
   ) as HTMLButtonElement;
@@ -101,10 +103,17 @@ const init = (userNumber: bigint) => {
     let newDevice: WebAuthnIdentity;
     try {
       newDevice = await WebAuthnIdentity.create({
-        publicKey: creationOptions(),
+        publicKey: creationOptions(existingAuthenticators),
       });
     } catch (error: unknown) {
-      console.log(error);
+      await displayError({
+        title: "Error adding new device",
+        message: "This device could not be added.",
+        detail: error instanceof Error ? error.message : JSON.stringify(error),
+        primaryButton: "Ok",
+      });
+      // TODO L2-309: Try to do this without reload
+      window.location.reload();
       return;
     }
     const tentativeDeviceInfo: TentativeDeviceInfo = [
