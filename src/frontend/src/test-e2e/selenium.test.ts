@@ -389,33 +389,33 @@ test("Screenshots", async () => {
       await aboutViewLegacy.waitForDisplay();
       await screenshots.take("about-legacy", browser);
 
-      // Test device removal
-      await browser.url(II_URL);
-      await removeFlavorsWarning(browser);
-      await welcomeBackView.waitForDisplay();
-      const userNumber3 = await welcomeBackView.getIdentityAnchor();
-      expect(userNumber3).toBe(userNumber);
-      await welcomeBackView.login();
-      await recoveryMethodSelectorView.waitForDisplay();
-      await recoveryMethodSelectorView.skipRecovery();
-      await singleDeviceWarningView.waitForDisplay();
-      await singleDeviceWarningView.remindLater();
-      await mainView.waitForDeviceDisplay(DEVICE_NAME2);
-      await mainView.removeDevice(DEVICE_NAME2);
-      // No dialog here!
-      await browser.waitUntil(
-        async () => {
-          const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
-          return !(await device2.isDisplayed());
-        },
-        {
-          timeout: 10_000,
-          timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
-        }
-      );
-      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-      await mainView.fixup();
-      await screenshots.take("after-removal", browser);
+      // // Test device removal
+      // await browser.url(II_URL);
+      // await removeFlavorsWarning(browser);
+      // await welcomeBackView.waitForDisplay();
+      // const userNumber3 = await welcomeBackView.getIdentityAnchor();
+      // expect(userNumber3).toBe(userNumber);
+      // await welcomeBackView.login();
+      // await recoveryMethodSelectorView.waitForDisplay();
+      // await recoveryMethodSelectorView.skipRecovery();
+      // await singleDeviceWarningView.waitForDisplay();
+      // await singleDeviceWarningView.remindLater();
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+      // await mainView.removeDevice(DEVICE_NAME2);
+      // // No dialog here!
+      // await browser.waitUntil(
+      //   async () => {
+      //     const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
+      //     return !(await device2.isDisplayed());
+      //   },
+      //   {
+      //     timeout: 10_000,
+      //     timeoutMsg: 'expected "Other WebAuthn device" to be gone after 10s',
+      //   }
+      // );
+      // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+      // await mainView.fixup();
+      // await screenshots.take("after-removal", browser);
 
       await mainView.removeDevice(DEVICE_NAME1);
       const alertText = await browser.getAlertText();
