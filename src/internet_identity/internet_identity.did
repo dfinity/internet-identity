@@ -76,8 +76,6 @@ type AddTentativeDeviceResponse = variant {
   added_tentatively: record { pin: text; };
   // Device registration mode disabled for this user.
   device_registration_mode_disabled;
-  // Device already exists on this user.
-  device_already_added;
   // There is another device already added tentatively
   tentative_device_already_exists;
 };
