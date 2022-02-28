@@ -5,8 +5,8 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
-use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use ic_cdk::api::call::call;
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
@@ -499,8 +499,9 @@ fn check_tentative_device_reg_prerequisites(
                 ))
             });
 
+        let tentative_principal = Principal::self_authenticating(&device_data.pubkey);
         for existing_device in existing_devices {
-            if existing_device.pubkey == device_data.pubkey {
+            if Principal::self_authenticating(existing_device.pubkey) == tentative_principal {
                 return Err(AddTentativeDeviceResponse::DeviceAlreadyAdded);
             }
         }
