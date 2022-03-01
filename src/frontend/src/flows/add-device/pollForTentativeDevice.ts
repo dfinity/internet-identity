@@ -9,7 +9,7 @@ import {
   setupCountdown,
 } from "../../utils/countdown";
 
-const pageContent = (endTimestamp: bigint) => html`
+const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
   <div class="container">
     <h1>Add New Remote Device</h1>
     <p>
@@ -19,7 +19,8 @@ const pageContent = (endTimestamp: bigint) => html`
     <ol>
       <li>Open <b>https://identity.ic0.app</b> on your remote machine</li>
       <li>Chose <b>Already have an anchor but using a new device?</b></li>
-      <li>Follow the instructions displayed on your remote machine</li>
+      <li>Enter your Identity Anchor (${userNumber})</li>
+      <li>Enter an alias for your new device</li>
     </ol>
     <p>
       Time remaining:
@@ -48,7 +49,7 @@ export const pollForTentativeDevice = async (
       );
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
-      render(pageContent(timestamp), container);
+      render(pageContent(userNumber, timestamp), container);
       init(userNumber, timestamp, connection);
     }
   });

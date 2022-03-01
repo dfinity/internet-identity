@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { securityKeyIcon } from "../../components/icons";
+import { securityKeyIcon, warningIcon } from "../../components/icons";
 
 const pageContent = () => html`
   <style>
@@ -40,6 +40,26 @@ const pageContent = () => html`
   </style>
   <div class="container">
     <h1>Add New Device</h1>
+    <div class="warnBox">
+      <div class="warnIcon">${warningIcon}</div>
+      <div class="warnContent">
+        <div class="warnTitle">Security Warning</div>
+        <div class="warnMessage">
+          <p>
+            You are in the process of adding a new device. Any device added here
+            will have <b>full control over your identity</b>. Only continue the
+            process if you want to add a new device that you
+            <i>personally own</i>.
+          </p>
+          <p>
+            <b>
+              Do not continue if you were prompted to do this by any other
+              website than https://identity.ic0.app!
+            </b>
+          </p>
+        </div>
+      </div>
+    </div>
     <p>
       Is the device you want to add attached to the machine you are currently
       using?

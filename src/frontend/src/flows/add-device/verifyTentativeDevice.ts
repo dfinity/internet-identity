@@ -8,7 +8,7 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
-import {warningIcon} from "../../components/icons";
+import { warningIcon } from "../../components/icons";
 
 const pageContent = (
   alias: string,
@@ -22,12 +22,19 @@ const pageContent = (
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-          This will add the shown device to your Identity Anchor giving it full control over your identity. Only enter a PIN here if you are sure that this is your device.
+          This will add the shown device to your Identity Anchor. When verified,
+          it will have <b>full control over your identity</b>. Only enter a PIN
+          here if you are sure that you <i>personally own</i> this device.
           <ul>
-            <li>Enter only PINs that were displayed on <b>https://identity.ic0.app</b>.</li>
-            <li>Do <b>not</b> enter PINs that you received any other way.</li>
-            <li>Make sure that the information displayed matches the information on your other machine.</li>
-            <li>The alias <b>must</b> match the value you entered yourself.</li>
+            <li>
+              Enter only PINs that were displayed on
+              <b>https://identity.ic0.app</b>. Do <b>not</b> enter PINs that you
+              received any other way.
+            </li>
+            <li>
+              The values displayed here <b>must</b> match the information shown
+              on your other machine.
+            </li>
           </ul>
         </div>
       </div>
@@ -37,10 +44,10 @@ const pageContent = (
     <div class="highlightBox">${alias}</div>
     <label>Public Key</label>
     <div class="highlightBox">${publicKey}</div>
+    <label>Device Verification PIN</label>
     <div id="wrongPinMessage" class="error-message-hidden">
       The entered PIN was invalid. Please try again.
     </div>
-    <label>Device Verification PIN</label>
     <input id="tentativeDevicePin" placeholder="PIN" />
     <p>
       Time remaining:
@@ -103,6 +110,11 @@ const init = (
   };
 
   verifyButton.onclick = async () => {
+    if (pinInput.value === "") {
+      pinInput.placeholder = "Please enter a PIN fist";
+      pinInput.classList.toggle("errored", true);
+      return;
+    }
     const result = await withLoader(() =>
       connection.verifyTentativeDevice(userNumber, pinInput.value)
     );
