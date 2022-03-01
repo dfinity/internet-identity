@@ -19,6 +19,7 @@ const pageContent = (alias: string, publicKey: string) => html`
     <div id="wrongPinMessage" class="error-message-hidden">
       The entered PIN was invalid. Please try again.
     </div>
+    <label>PIN</label>
     <input id="tentativeDevicePin" placeholder="PIN" />
     <button id="verifyDevice" class="primary">Verify Device</button>
     <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>

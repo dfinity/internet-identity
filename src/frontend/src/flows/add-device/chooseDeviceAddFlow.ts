@@ -1,21 +1,17 @@
 import { html, render } from "lit-html";
-import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
+import { securityKeyIcon} from "../../components/icons";
 
 const pageContent = () => html`
   <style>
-    #skipRecovery {
-      margin-top: 3.5rem;
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    .recoveryContainer {
+    .flowChoiceContainer {
       display: flex;
       gap: 1rem;
       margin-top: 1rem;
     }
-    .recoveryOption {
+    .flowOption {
       display: flex;
       flex-direction: column;
+      justify-content: flex-start;
       align-items: center;
       border: 1px solid gray;
       border-radius: 4px;
@@ -25,19 +21,19 @@ const pageContent = () => html`
       font-size: 1.2rem;
       margin-bottom: 2rem;
     }
-    .recoveryOption:disabled:hover,
-    .recoveryOption:disabled:focus {
+    .flowOption:hover,
+    .flowOption:focus {
       outline: none;
       box-shadow: none;
     }
-    .recoveryIcon {
+    .flowIcon {
       height: 52px;
     }
-    .recoveryTitle {
+    .flowOptionTitle {
       font-weight: 500;
       margin: 0.5rem;
     }
-    .recoveryDescription {
+    .flowOptionDescription {
       text-align: center;
       font-size: 1rem;
     }
@@ -45,24 +41,21 @@ const pageContent = () => html`
   <div class="container">
     <h1>Add New Device</h1>
     <p>
-      You can add new authentication devices either by using them on this device
-      or by binding a remote device to this identity anchor.
+      Is the device you want to add attached to the machine your currently using?
     </p>
-    <div class="recoveryContainer">
-      <button class="recoveryOption" id="local">
-        <span class="recoveryIcon">${seedPhraseIcon}</span>
-        <div class="recoveryTitle">Local Device</div>
-        <div class="recoveryDescription">
-          Add a new authentication mechanism available on
-          <i>this device</i> (e.g. YubiKey, Fingerprint, FaceID).
+    <div class="flowChoiceContainer">
+      <button class="flowOption" id="local">
+        <span class="flowIcon">${securityKeyIcon}</span>
+        <div class="flowOptionTitle">Yes: Local Device</div>
+        <div class="flowOptionDescription">
+          Add a new device attached to <i>this machine</i>.
         </div>
       </button>
-      <button class="recoveryOption" id="remote">
-        <span class="recoveryIcon">${securityKeyIcon}</span>
-        <div class="recoveryTitle">Remote Device</div>
-        <div class="recoveryDescription">
-          Add a new authentication mechanism available on
-          <i>another device</i> (e.g. a YubiKey, Fingerprint, FaceID).
+      <button class="flowOption" id="remote">
+        <span class="flowIcon">${securityKeyIcon}</span>
+        <div class="flowOptionTitle">No: Remote Device</div>
+        <div class="flowOptionDescription">
+          Add a new device attached to <i>another machine</i>.
         </div>
       </button>
     </div>
@@ -86,10 +79,10 @@ const init = (): Promise<DeviceAddFlow | null> =>
     const remoteDeviceFlow = document.getElementById(
       "remote"
     ) as HTMLButtonElement;
-    const skipRecovery = document.getElementById(
+    const cancel = document.getElementById(
       "cancelAddDevice"
     ) as HTMLButtonElement;
     localDeviceFlow.onclick = () => resolve("local");
     remoteDeviceFlow.onclick = () => resolve("remote");
-    skipRecovery.onclick = () => resolve(null);
+    cancel.onclick = () => resolve(null);
   });

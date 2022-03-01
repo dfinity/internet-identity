@@ -8,21 +8,11 @@ import { pickDeviceAlias } from "./addDevicePickAlias";
 import { withLoader } from "../../components/loader";
 import { renderManage } from "../manage";
 import { displayError } from "../../components/displayError";
-import { html } from "lit-html";
 
 const displayFailedToAddNewDevice = (error: Error) =>
   displayError({
     title: "Failed to add new device",
-    message: html`
-      We failed to add your new device.<br />
-      If you're trying to add a device that is not attached to this machine try
-      following the instructions at<br />
-      <a
-        target="_blank"
-        href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
-        >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
-      >
-    `,
+    message: "We failed to add your new device.",
     detail: error.message,
     primaryButton: "Back to manage",
   });

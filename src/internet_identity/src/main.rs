@@ -5,8 +5,8 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
-use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::api::call::call;
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
@@ -380,7 +380,7 @@ async fn add_tentative_device(
 ) -> AddTentativeDeviceResponse {
     let pin = generate_pin().await;
 
-    match check_tentative_device_reg_prerequisites(user_number, &device_data) {
+    match check_tentative_device_reg_prerequisites(user_number) {
         Ok(_) => {
             STATE.with(|state| {
                 state
@@ -462,7 +462,6 @@ async fn generate_pin() -> Pin {
 
 fn check_tentative_device_reg_prerequisites(
     user_number: UserNumber,
-    device_data: &DeviceData,
 ) -> Result<(), AddTentativeDeviceResponse> {
     STATE.with(|state| {
         clean_expired_device_reg_mode_flags(state);
