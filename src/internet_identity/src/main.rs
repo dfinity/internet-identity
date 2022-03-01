@@ -191,7 +191,7 @@ enum RegisterResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
-    AddedTentatively { pin: Pin },
+    AddedTentatively { pin: Pin, device_registration_timeout: Timestamp },
     #[serde(rename = "device_registration_mode_disabled")]
     DeviceRegistrationModeDisabled,
     #[serde(rename = "tentative_device_already_exists")]
@@ -381,7 +381,7 @@ async fn add_tentative_device(
     let pin = generate_pin().await;
 
     match check_tentative_device_reg_prerequisites(user_number) {
-        Ok(_) => {
+        Ok(device_registration_timeout) => {
             STATE.with(|state| {
                 state
                     .device_registrations
@@ -389,7 +389,7 @@ async fn add_tentative_device(
                     .borrow_mut()
                     .insert(user_number, (device_data, pin.clone(), 0))
             });
-            AddTentativeDeviceResponse::AddedTentatively { pin }
+            AddTentativeDeviceResponse::AddedTentatively { pin, device_registration_timeout }
         }
         Err(err) => err,
     }
@@ -462,26 +462,11 @@ async fn generate_pin() -> Pin {
 
 fn check_tentative_device_reg_prerequisites(
     user_number: UserNumber,
-) -> Result<(), AddTentativeDeviceResponse> {
+) -> Result<Timestamp, AddTentativeDeviceResponse> {
     STATE.with(|state| {
         clean_expired_device_reg_mode_flags(state);
 
         let device_registrations = &state.device_registrations;
-        match device_registrations
-            .users_in_device_reg_mode
-            .borrow_mut()
-            .get(&user_number)
-        {
-            None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
-            Some(expiration) => {
-                if *expiration < time() {
-                    // if this happens device_reg_mode_expirations got too big
-                    // TODO: do we need a metric for this?
-                    return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
-                }
-            }
-        }
-
         if device_registrations
             .tentative_devices
             .borrow()
@@ -491,7 +476,21 @@ fn check_tentative_device_reg_prerequisites(
             // some tentative device already exists
             return Err(AddTentativeDeviceResponse::TentativeDeviceAlreadyExists);
         }
-        Ok(())
+
+        match device_registrations
+            .users_in_device_reg_mode
+            .borrow_mut()
+            .get(&user_number)
+        {
+            None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
+            Some(expiration) if *expiration <= time() => {
+                    // if this happens device_reg_mode_expirations got too big
+                    // TODO: do we need a metric for this?
+                    return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
+
+            },
+            Some(expiration) => Ok(*expiration)
+        }
     })
 }
 

@@ -3,7 +3,12 @@ export type AddTentativeDeviceResponse = {
     'device_registration_mode_disabled' : null
   } |
   { 'tentative_device_already_exists' : null } |
-  { 'added_tentatively' : { 'pin' : string } };
+  {
+    'added_tentatively' : {
+      'pin' : string,
+      'device_registration_timeout' : Timestamp,
+    }
+  };
 export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,

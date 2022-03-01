@@ -61,7 +61,7 @@ export const addTentativeDevice = async (
       tentativeDeviceInfo[0],
       tentativeDeviceInfo[1],
       principal,
-      result.added_tentatively.pin,
+      result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
   } else if (hasOwnProperty(result, "device_registration_mode_disabled")) {

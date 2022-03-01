@@ -7,9 +7,13 @@ import { displayError } from "../../components/displayError";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../utils/errorHelper";
-import {formatRemainingTime, setupCountdown} from "../../utils/countdown";
+import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
 
-const pageContent = (alias: string, publicKey: string, endTimestamp: bigint) => html`
+const pageContent = (
+  alias: string,
+  publicKey: string,
+  endTimestamp: bigint
+) => html`
   <div class="container">
     <h1>Verify New Device</h1>
     <p>Verify that this is your device:</p>
@@ -20,9 +24,12 @@ const pageContent = (alias: string, publicKey: string, endTimestamp: bigint) => 
     <div id="wrongPinMessage" class="error-message-hidden">
       The entered PIN was invalid. Please try again.
     </div>
-    <label>PIN</label>
+    <label>Device Verification PIN</label>
     <input id="tentativeDevicePin" placeholder="PIN" />
-    <p>Time remaining: <span id="timer">${formatRemainingTime(endTimestamp)}</span></p>
+    <p>
+      Time remaining:
+      <span id="timer">${formatRemainingTime(endTimestamp)}</span>
+    </p>
     <button id="verifyDevice" class="primary">Verify Device</button>
     <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>
   </div>
@@ -38,12 +45,21 @@ export const verifyDevice = async (
   const principal = Principal.selfAuthenticating(
     new Uint8Array(tentativeDevice.pubkey)
   ).toString();
-  render(pageContent(tentativeDevice.alias, principal, endTimestamp), container);
+  render(
+    pageContent(tentativeDevice.alias, principal, endTimestamp),
+    container
+  );
   init(userNumber, connection, endTimestamp);
 };
 
-const init = (userNumber: bigint, connection: IIConnection, endTimestamp: bigint) => {
-  const countdown = setupCountdown(endTimestamp, () => renderManage(userNumber, connection));
+const init = (
+  userNumber: bigint,
+  connection: IIConnection,
+  endTimestamp: bigint
+) => {
+  const countdown = setupCountdown(endTimestamp, () =>
+    renderManage(userNumber, connection)
+  );
   const cancelButton = document.getElementById(
     "cancelVerifyDevice"
   ) as HTMLButtonElement;

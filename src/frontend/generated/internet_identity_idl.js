@@ -23,12 +23,15 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_disabled' : IDL.Null,
     'tentative_device_already_exists' : IDL.Null,
-    'added_tentatively' : IDL.Record({ 'pin' : IDL.Text }),
+    'added_tentatively' : IDL.Record({
+      'pin' : IDL.Text,
+      'device_registration_timeout' : Timestamp,
+    }),
   });
-  const Timestamp = IDL.Nat64;
   const ProofOfWork = IDL.Record({
     'nonce' : IDL.Nat64,
     'timestamp' : Timestamp,

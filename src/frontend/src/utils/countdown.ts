@@ -1,5 +1,5 @@
-import {render} from "lit-html";
-import {displayError} from "../components/displayError";
+import { render } from "lit-html";
+import { displayError } from "../components/displayError";
 
 export class Countdown {
   private timeoutHandle;
@@ -59,7 +59,7 @@ export const setupCountdown = (
 };
 
 export function formatRemainingTime(endTimestamp: bigint): string {
-  const [minRemaining, secondsRemaining] = calculateTimeRemaining(endTimestamp)
+  const [minRemaining, secondsRemaining] = calculateTimeRemaining(endTimestamp);
   return `${minRemaining}:${secondsRemaining}`;
 }
 

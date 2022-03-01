@@ -73,7 +73,7 @@ type RegisterResponse = variant {
 
 type AddTentativeDeviceResponse = variant {
   // The device was tentatively added.
-  added_tentatively: record { pin: text; };
+  added_tentatively: record { pin: text; device_registration_timeout: Timestamp;};
   // Device registration mode disabled for this user.
   device_registration_mode_disabled;
   // There is another device already added tentatively
