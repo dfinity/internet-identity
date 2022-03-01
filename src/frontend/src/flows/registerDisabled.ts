@@ -4,11 +4,11 @@ import { warningIcon } from "../components/icons";
 const pageContent = html`
   <div class="container">
     <h1>Create a new Internet Identity Anchor</h1>
-    <div class="nagBox">
-      <div class="nagIcon">${warningIcon}</div>
-      <div class="nagContent">
-        <div class="nagTitle">Registration Disabled</div>
-        <div class="nagMessage">
+    <div class="warnBox">
+      <div class="warnIcon">${warningIcon}</div>
+      <div class="warnContent">
+        <div class="warnTitle">Registration Disabled</div>
+        <div class="warnMessage">
           <p>
             You are <b>not</b> browsing this website on the expected URL:
             <a href="https://identity.ic0.app">https://identity.ic0.app</a>. For

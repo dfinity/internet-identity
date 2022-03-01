@@ -108,14 +108,14 @@ const deviceListItem = (alias: string) => html`
 `;
 
 const recoveryNag = () => html`
-  <div class="nagBox">
-    <div class="nagIcon">${warningIcon}</div>
-    <div class="nagContent">
-      <div class="nagTitle">Recovery Mechanism</div>
-      <div class="nagMessage">
+  <div class="warnBox">
+    <div class="warnIcon">${warningIcon}</div>
+    <div class="warnContent">
+      <div class="warnTitle">Recovery Mechanism</div>
+      <div class="warnMessage">
         Add a recovery mechanism to help protect this Identity Anchor.
       </div>
-      <button id="addRecovery" class="primary nagButton">
+      <button id="addRecovery" class="primary warnButton">
         Add Recovery Key
       </button>
     </div>

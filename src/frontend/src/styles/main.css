@@ -561,7 +561,7 @@ nav {
   padding: 1rem;
 }
 
-.nagBox {
+.warnBox {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -582,24 +582,24 @@ nav {
     #fbb03b 77.09%
   );
 }
-.nagIcon {
+.warnIcon {
   align-self: flex-start;
 }
 
-.nagContent {
+.warnContent {
   display: flex;
   flex-direction: column;
 }
-.nagTitle {
+.warnTitle {
   font-weight: 600;
   font-size: 1.1rem;
 }
-.nagMessage {
+.warnMessage {
   margin-top: 0.5rem;
   margin-bottom: 1rem;
   font-size: 1rem;
 }
-.nagButton {
+.warnButton {
   padding: 0.2rem 0.4rem;
   border-radius: 2px;
   width: fit-content;

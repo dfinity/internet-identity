@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { securityKeyIcon} from "../../components/icons";
+import { securityKeyIcon } from "../../components/icons";
 
 const pageContent = () => html`
   <style>
@@ -41,7 +41,8 @@ const pageContent = () => html`
   <div class="container">
     <h1>Add New Device</h1>
     <p>
-      Is the device you want to add attached to the machine your currently using?
+      Is the device you want to add attached to the machine you are currently
+      using?
     </p>
     <div class="flowChoiceContainer">
       <button class="flowOption" id="local">
