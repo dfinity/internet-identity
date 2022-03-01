@@ -8,6 +8,7 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
+import {warningIcon} from "../../components/icons";
 
 const pageContent = (
   alias: string,
@@ -16,6 +17,21 @@ const pageContent = (
 ) => html`
   <div class="container">
     <h1>Verify New Device</h1>
+    <div class="warnBox">
+      <div class="warnIcon">${warningIcon}</div>
+      <div class="warnContent">
+        <div class="warnTitle">Security Warning</div>
+        <div class="warnMessage">
+          This will add the shown device to your Identity Anchor giving it full control over your identity. Only enter a PIN here if you are sure that this is your device.
+          <ul>
+            <li>Enter only PINs that were displayed on <b>https://identity.ic0.app</b>.</li>
+            <li>Do <b>not</b> enter PINs that you received any other way.</li>
+            <li>Make sure that the information displayed matches the information on your other machine.</li>
+            <li>The alias <b>must</b> match the value you entered yourself.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
     <p>Verify that this is your device:</p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>

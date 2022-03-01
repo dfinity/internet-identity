@@ -77,17 +77,15 @@ const init = async (
   const pollingHandler = window.setInterval(async () => {
     const deviceData = await IIConnection.lookupAuthenticators(userNumber);
     deviceData.forEach((device) => {
-      if (device.credential_id.length !== 1) {
-        console.log("invalid credential id");
-        return;
-      }
-      const credentialId = device.credential_id[0];
-      if (credentialIdEqual(credentialId, credentialToBeVerified)) {
-        setUserNumber(userNumber);
-        countdown.stop();
-        window.clearInterval(pollingHandler);
-        // TODO L2-309: do this without reload
-        window.location.reload();
+      if (device.credential_id.length === 1) {
+        const credentialId = device.credential_id[0];
+        if (credentialIdEqual(credentialId, credentialToBeVerified)) {
+          setUserNumber(userNumber);
+          countdown.stop();
+          window.clearInterval(pollingHandler);
+          // TODO L2-309: do this without reload
+          window.location.reload();
+        }
       }
     });
   }, 2000);
