@@ -1,9 +1,10 @@
-import { env } from "process";
+import {render} from "lit-html";
+import {displayError} from "../components/displayError";
 
 export class Countdown {
   private timeoutHandle;
   private expected;
-  private endTimestamp;
+  private readonly endTimestamp;
 
   constructor(
     private updateFunc: () => void,
@@ -27,7 +28,6 @@ export class Countdown {
       return;
     }
     const drift = now - this.expected;
-    console.log("step drift: " + drift);
     this.updateFunc();
     this.expected += this.interval;
     this.timeoutHandle = window.setTimeout(
@@ -36,3 +36,43 @@ export class Countdown {
     );
   }
 }
+
+export const setupCountdown = (
+  timestamp: bigint,
+  continueFunc: () => Promise<void>
+): Countdown => {
+  const timer = document.getElementById("timer") as HTMLElement;
+  return new Countdown(
+    () => render(formatRemainingTime(timestamp), timer),
+    1000,
+    async () => {
+      await displayError({
+        title: "Timeout reached",
+        message:
+          "The timeout has been reached. For security reasons, the add device process has been aborted.",
+        primaryButton: "Ok",
+      });
+      await continueFunc;
+    },
+    timestamp
+  );
+};
+
+export function formatRemainingTime(endTimestamp: bigint): string {
+  const [minRemaining, secondsRemaining] = calculateTimeRemaining(endTimestamp)
+  return `${minRemaining}:${secondsRemaining}`;
+}
+
+const calculateTimeRemaining = (
+  expirationTimestamp: bigint
+): [string, string] => {
+  const now = new Date().getTime();
+  const diffSeconds =
+    (Number(expirationTimestamp / BigInt("1000000")) - now) / 1000;
+  return [
+    Math.floor(diffSeconds / 60).toString(),
+    Math.floor(diffSeconds % 60)
+      .toString()
+      .padStart(2, "0"),
+  ];
+};

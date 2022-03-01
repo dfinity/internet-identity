@@ -1,12 +1,11 @@
-import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
-import { renderManage } from "../manage";
-import { withLoader } from "../../components/loader";
-import { verifyDevice } from "./verifyTentativeDevice";
-import { Countdown } from "../../utils/countdown";
-import { displayError } from "../../components/displayError";
+import {html, render} from "lit-html";
+import {IIConnection} from "../../utils/iiConnection";
+import {renderManage} from "../manage";
+import {withLoader} from "../../components/loader";
+import {verifyDevice} from "./verifyTentativeDevice";
+import {Countdown, formatRemainingTime, setupCountdown} from "../../utils/countdown";
 
-const pageContent = (minRemaining: string, secondsRemaining: string) => html`
+const pageContent = (endTimestamp: bigint) => html`
   <div class="container">
     <h1>Add New Remote Device</h1>
     <p>
@@ -18,7 +17,7 @@ const pageContent = (minRemaining: string, secondsRemaining: string) => html`
       <li>Chose <b>Already have an anchor but using a new device?</b></li>
       <li>Follow the instructions displayed on your remote machine</li>
     </ol>
-    <p id="timer">Time remaining: ${minRemaining}:${secondsRemaining}</p>
+    <p>Time remaining: <span id="timer">${formatRemainingTime(endTimestamp)}</span></p>
     <button id="cancelAddRemoteDevice" class="linkStyle">Cancel</button>
   </div>
 `;
@@ -30,7 +29,7 @@ export const pollForTentativeDevice = async (
   await withLoader(async () => {
     const timestamp = await connection.enableDeviceRegistrationMode(userNumber);
     const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(...calculateTimeRemaining(timestamp)), container);
+    render(pageContent(timestamp), container);
     init(userNumber, timestamp, connection);
   });
 };
@@ -38,49 +37,27 @@ export const pollForTentativeDevice = async (
 const startPolling = (
   connection: IIConnection,
   userNumber: bigint,
-  timerUpdate: Countdown
-): number => {
+  timerUpdate: Countdown,
+  endTimestamp: bigint): number => {
   const pollingHandle = window.setInterval(async () => {
     const userInfo = await connection.lookupAnchorInfo(userNumber);
     if (userInfo.tentative_device.length === 1) {
       const tentative_device = userInfo.tentative_device[0];
       window.clearInterval(pollingHandle);
       timerUpdate.stop();
-      await verifyDevice(userNumber, tentative_device, connection);
+      await verifyDevice(userNumber, tentative_device, endTimestamp, connection);
     }
   }, 2000);
   return pollingHandle;
 };
 
-const setupCountdown = (
-  connection: IIConnection,
-  userNumber: bigint,
-  timestamp: bigint
-): Countdown => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  return new Countdown(
-    () => render(pageContent(...calculateTimeRemaining(timestamp)), container),
-    1000,
-    async () => {
-      await displayError({
-        title: "Timeout reached",
-        message:
-          "The timeout has been reached. For security reasons, the add device process has been aborted.",
-        primaryButton: "Back to manage",
-      });
-      await renderManage(userNumber, connection);
-    },
-    timestamp
-  );
-};
-
 const init = (
   userNumber: bigint,
-  timestamp: bigint,
+  endTimestamp: bigint,
   connection: IIConnection
 ) => {
-  const countdown = setupCountdown(connection, userNumber, timestamp);
-  const pollingHandle = startPolling(connection, userNumber, countdown);
+  const countdown = setupCountdown(endTimestamp, () => renderManage(userNumber, connection));
+  const pollingHandle = startPolling(connection, userNumber, countdown, endTimestamp);
 
   const cancelButton = document.getElementById(
     "cancelAddRemoteDevice"
@@ -93,18 +70,4 @@ const init = (
     );
     await renderManage(userNumber, connection);
   };
-};
-
-const calculateTimeRemaining = (
-  expirationTimestamp: bigint
-): [string, string] => {
-  const now = new Date().getTime();
-  const diffSeconds =
-    (Number(expirationTimestamp / BigInt("1000000")) - now) / 1000;
-  return [
-    Math.floor(diffSeconds / 60).toString(),
-    Math.floor(diffSeconds % 60)
-      .toString()
-      .padStart(2, "0"),
-  ];
 };

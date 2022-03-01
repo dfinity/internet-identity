@@ -7,8 +7,9 @@ import { displayError } from "../../components/displayError";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../utils/errorHelper";
+import {formatRemainingTime, setupCountdown} from "../../utils/countdown";
 
-const pageContent = (alias: string, publicKey: string) => html`
+const pageContent = (alias: string, publicKey: string, endTimestamp: bigint) => html`
   <div class="container">
     <h1>Verify New Device</h1>
     <p>Verify that this is your device:</p>
@@ -21,6 +22,7 @@ const pageContent = (alias: string, publicKey: string) => html`
     </div>
     <label>PIN</label>
     <input id="tentativeDevicePin" placeholder="PIN" />
+    <p>Time remaining: <span id="timer">${formatRemainingTime(endTimestamp)}</span></p>
     <button id="verifyDevice" class="primary">Verify Device</button>
     <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>
   </div>
@@ -29,22 +31,24 @@ const pageContent = (alias: string, publicKey: string) => html`
 export const verifyDevice = async (
   userNumber: bigint,
   tentativeDevice: DeviceData,
+  endTimestamp: bigint,
   connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   const principal = Principal.selfAuthenticating(
     new Uint8Array(tentativeDevice.pubkey)
   ).toString();
-  render(pageContent(tentativeDevice.alias, principal), container);
-
-  init(userNumber, connection);
+  render(pageContent(tentativeDevice.alias, principal, endTimestamp), container);
+  init(userNumber, connection, endTimestamp);
 };
 
-const init = (userNumber: bigint, connection: IIConnection) => {
+const init = (userNumber: bigint, connection: IIConnection, endTimestamp: bigint) => {
+  const countdown = setupCountdown(endTimestamp, () => renderManage(userNumber, connection));
   const cancelButton = document.getElementById(
     "cancelVerifyDevice"
   ) as HTMLButtonElement;
   cancelButton.onclick = async () => {
+    countdown.stop();
     await withLoader(() =>
       connection.disableDeviceRegistrationMode(userNumber)
     );
@@ -72,6 +76,7 @@ const init = (userNumber: bigint, connection: IIConnection) => {
     );
 
     if (hasOwnProperty(result, "verified")) {
+      countdown.stop();
       toggleErrorMessage("tentativeDevicePin", "wrongPinMessage", false);
       await renderManage(userNumber, connection);
     } else if (hasOwnProperty(result, "wrong_pin_retry")) {
