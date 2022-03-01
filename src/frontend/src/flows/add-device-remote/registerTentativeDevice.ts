@@ -13,7 +13,7 @@ import { displayError } from "../../components/displayError";
 
 const pageContent = () => html`
   <div class="container">
-    <h1>New device</h1>
+    <h1>New Device</h1>
     <p>Please provide an alias for this device.</p>
     <div id="invalidAliasMessage" class="error-message-hidden">
       The device alias must not be empty.

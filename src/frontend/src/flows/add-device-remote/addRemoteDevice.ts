@@ -5,7 +5,7 @@ import { toggleErrorMessage } from "../../utils/errorHelper";
 
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
-    <h1>New device</h1>
+    <h1>New Device</h1>
     <p>
       Please provide the Identity Anchor to which you want to add your device.
     </p>

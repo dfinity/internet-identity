@@ -19,9 +19,9 @@ const displayFailedToAddNewDevice = (error: Error) =>
 
 const displayFailedToAddTheDevice = (error: Error) =>
   displayError({
-    title: "Failed to add the new device",
+    title: "Failed to add new device",
     message:
-      "We failed to add the new device to this Identity Anchor. Please try again",
+      "We failed to add the new device to this Identity Anchor. Please try again.",
     detail: error.message,
     primaryButton: "Back to manage",
   });
