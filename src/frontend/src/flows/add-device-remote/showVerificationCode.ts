@@ -9,7 +9,7 @@ import { Principal } from "@dfinity/principal";
 import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
 
 export type TentativeRegistrationInfo = {
-  pin: string;
+  verification_code: string;
   device_registration_timeout: Timestamp;
 };
 const pageContent = (
@@ -21,16 +21,17 @@ const pageContent = (
   <div class="container">
     <h1>Device Added Tentatively</h1>
     <p>
-      This device was added tentatively to the Identity Anchor ${userNumber}.
-      Log in on an existing device and verify this device using the PIN below.
-      The page will automatically refresh when this device was verified.
+      This device was added tentatively to the Identity Anchor
+      <b>${userNumber}</b>. Log in on an existing device and verify this device
+      using the PIN below. After successful verification this page will
+      automatically refresh.
     </p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
-    <label>Public Key</label>
-    <div class="highlightBox">${publicKey}</div>
-    <label>Device Verification PIN</label>
-    <div class="highlightBox">${tentativeRegistrationInfo.pin}</div>
+    <label>Device Verification Code</label>
+    <div class="highlightBox">
+      ${tentativeRegistrationInfo.verification_code}
+    </div>
     <p>
       Time remaining:
       <span id="timer"
@@ -39,10 +40,10 @@ const pageContent = (
         )}</span
       >
     </p>
-    <button id="showPinCancel">Cancel</button>
+    <button id="showCodeCancel">Cancel</button>
   </div>
 `;
-export const showPin = async (
+export const showVerificationCode = async (
   userNumber: bigint,
   alias: string,
   principal: Principal,
@@ -91,7 +92,7 @@ const init = async (
   }, 2000);
 
   const cancelButton = document.getElementById(
-    "showPinCancel"
+    "showCodeCancel"
   ) as HTMLButtonElement;
 
   cancelButton.onclick = () => {

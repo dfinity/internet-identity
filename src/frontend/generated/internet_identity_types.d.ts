@@ -5,7 +5,7 @@ export type AddTentativeDeviceResponse = {
   { 'tentative_device_already_exists' : null } |
   {
     'added_tentatively' : {
-      'pin' : string,
+      'verification_code' : string,
       'device_registration_timeout' : Timestamp,
     }
   };
@@ -84,9 +84,9 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
-export type VerifyTentativeDeviceResponse = { 'verified' : null } |
-  { 'wrong_pin' : null } |
-  { 'wrong_pin_retry' : null };
+export type VerifyTentativeDeviceResponse = { 'wrong_code_retry' : null } |
+  { 'verified' : null } |
+  { 'wrong_code' : null };
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
   'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<

@@ -28,7 +28,7 @@ export const idlFactory = ({ IDL }) => {
     'device_registration_mode_disabled' : IDL.Null,
     'tentative_device_already_exists' : IDL.Null,
     'added_tentatively' : IDL.Record({
-      'pin' : IDL.Text,
+      'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
     }),
   });
@@ -104,9 +104,9 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
+    'wrong_code_retry' : IDL.Null,
     'verified' : IDL.Null,
-    'wrong_pin' : IDL.Null,
-    'wrong_pin_retry' : IDL.Null,
+    'wrong_code' : IDL.Null,
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),

@@ -5,7 +5,7 @@ import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { KeyType, Purpose } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
-import { showPin } from "./showPin";
+import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../components/loader";
 import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../utils/errorHelper";
@@ -57,7 +57,7 @@ export const addTentativeDevice = async (
   );
 
   if (hasOwnProperty(result, "added_tentatively")) {
-    await showPin(
+    await showVerificationCode(
       tentativeDeviceInfo[0],
       tentativeDeviceInfo[1],
       principal,
@@ -67,7 +67,14 @@ export const addTentativeDevice = async (
   } else if (hasOwnProperty(result, "device_registration_mode_disabled")) {
     await deviceRegistrationDisabledInfo(tentativeDeviceInfo, principal);
   } else if (hasOwnProperty(result, "tentative_device_already_exists")) {
-    console.log("tentative_device_already_exists");
+    await displayError({
+      title: "Tentative Device Already Exists",
+      message:
+        'The "add device" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the "add device" process.',
+      primaryButton: "Ok",
+    });
+    // TODO L2-309: Try to do this without reload
+    window.location.reload();
   } else {
     throw new Error(
       "unknown tentative device registration result: " + JSON.stringify(result)

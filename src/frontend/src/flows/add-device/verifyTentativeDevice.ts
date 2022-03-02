@@ -22,33 +22,28 @@ const pageContent = (
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-          This will add the shown device to your Identity Anchor. When verified,
-          it will have <b>full control over your identity</b>. Only enter a PIN
-          here if you are sure that you <i>personally own</i> this device.
-          <ul>
-            <li>
-              Enter only PINs that were displayed on
-              <b>https://identity.ic0.app</b>. Do <b>not</b> enter PINs that you
-              received any other way.
-            </li>
-            <li>
-              The values displayed here <b>must</b> match the information shown
-              on your other machine.
-            </li>
-          </ul>
+          <p>
+            This will add the shown device to your Identity Anchor. When
+            verified, it will have <b>full control over your identity</b>. Only
+            enter a PIN here if you are sure that you <i>personally own</i> this
+            device.
+          </p>
+          <p>
+            Enter only PINs that were displayed on
+            <b>https://identity.ic0.app</b>. Do <b>not</b> enter PINs that you
+            received any other way.
+          </p>
         </div>
       </div>
     </div>
     <p>Verify that this is your device:</p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
-    <label>Public Key</label>
-    <div class="highlightBox">${publicKey}</div>
-    <label>Device Verification PIN</label>
-    <div id="wrongPinMessage" class="error-message-hidden">
-      The entered PIN was invalid. Please try again.
+    <label>Device Verification Code</label>
+    <div id="wrongCodeMessage" class="error-message-hidden">
+      The entered verification code was invalid. Please try again.
     </div>
-    <input id="tentativeDevicePin" placeholder="PIN" />
+    <input id="tentativeDeviceCode" placeholder="Verification Code" />
     <p>
       Time remaining:
       <span id="timer">${formatRemainingTime(endTimestamp)}</span>
@@ -95,7 +90,7 @@ const init = (
   };
 
   const pinInput = document.getElementById(
-    "tentativeDevicePin"
+    "tentativeDeviceCode"
   ) as HTMLInputElement;
   const verifyButton = document.getElementById(
     "verifyDevice"
@@ -121,15 +116,15 @@ const init = (
 
     if (hasOwnProperty(result, "verified")) {
       countdown.stop();
-      toggleErrorMessage("tentativeDevicePin", "wrongPinMessage", false);
+      toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
       await renderManage(userNumber, connection);
-    } else if (hasOwnProperty(result, "wrong_pin_retry")) {
-      toggleErrorMessage("tentativeDevicePin", "wrongPinMessage", true);
-    } else if (hasOwnProperty(result, "wrong_pin")) {
+    } else if (hasOwnProperty(result, "wrong_code_retry")) {
+      toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
+    } else if (hasOwnProperty(result, "wrong_code")) {
       await displayError({
-        title: "Too Many Wrong Pins Entered",
+        title: "Too Many Wrong Verification Codes Entered",
         message:
-          "Adding the device has been aborted due to too many invalid pin entries.",
+          "Adding the device has been aborted due to too many invalid code entries.",
         primaryButton: "Continue",
       });
       await renderManage(userNumber, connection);

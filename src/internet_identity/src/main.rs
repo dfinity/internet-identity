@@ -59,7 +59,7 @@ type SessionKey = PublicKey;
 type FrontendHostname = String;
 type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
-type Pin = String;
+type DeviceVerificationCode = String;
 type FailedAttemptsCounter = usize;
 
 struct Base64(String);
@@ -191,7 +191,10 @@ enum RegisterResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
-    AddedTentatively { pin: Pin, device_registration_timeout: Timestamp },
+    AddedTentatively {
+        verification_code: DeviceVerificationCode,
+        device_registration_timeout: Timestamp,
+    },
     #[serde(rename = "device_registration_mode_disabled")]
     DeviceRegistrationModeDisabled,
     #[serde(rename = "tentative_device_already_exists")]
@@ -202,10 +205,10 @@ enum AddTentativeDeviceResponse {
 enum VerifyTentativeDeviceResponse {
     #[serde(rename = "verified")]
     Verified,
-    #[serde(rename = "wrong_pin_retry")]
-    WrongPinRetry,
-    #[serde(rename = "wrong_pin")]
-    WrongPin,
+    #[serde(rename = "wrong_code_retry")]
+    WrongCodeRetry,
+    #[serde(rename = "wrong_code")]
+    WrongCode,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -239,7 +242,8 @@ struct DeviceRegistrationData {
     device_reg_mode_expirations: RefCell<BinaryHeap<DeviceRegModeExpiration>>,
     // map of tentatively added devices with corresponding pin and failed attempts counter
     // max 1 per user
-    tentative_devices: RefCell<HashMap<UserNumber, (DeviceData, Pin, FailedAttemptsCounter)>>,
+    tentative_devices:
+        RefCell<HashMap<UserNumber, (DeviceData, DeviceVerificationCode, FailedAttemptsCounter)>>,
 }
 
 struct State {
@@ -378,7 +382,7 @@ async fn add_tentative_device(
     user_number: UserNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    let pin = generate_pin().await;
+    let verification_code = generate_device_verification_code().await;
 
     match check_tentative_device_reg_prerequisites(user_number) {
         Ok(device_registration_timeout) => {
@@ -387,9 +391,12 @@ async fn add_tentative_device(
                     .device_registrations
                     .tentative_devices
                     .borrow_mut()
-                    .insert(user_number, (device_data, pin.clone(), 0))
+                    .insert(user_number, (device_data, verification_code.clone(), 0))
             });
-            AddTentativeDeviceResponse::AddedTentatively { pin, device_registration_timeout }
+            AddTentativeDeviceResponse::AddedTentatively {
+                verification_code,
+                device_registration_timeout,
+            }
         }
         Err(err) => err,
     }
@@ -398,9 +405,9 @@ async fn add_tentative_device(
 #[update]
 async fn verify_tentative_device(
     user_number: UserNumber,
-    user_pin: Pin,
+    user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    match check_add_tentative_device_prerequisites(user_number, user_pin) {
+    match check_add_tentative_device_prerequisites(user_number, user_verification_code) {
         Ok(device) => {
             disable_device_registration_mode(user_number);
             add(user_number, device).await;
@@ -412,7 +419,7 @@ async fn verify_tentative_device(
 
 fn check_add_tentative_device_prerequisites(
     user_number: UserNumber,
-    user_pin: Pin,
+    user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
     STATE.with(|state| {
         trap_if_user_not_authenticated(state, user_number);
@@ -430,8 +437,8 @@ fn check_add_tentative_device_prerequisites(
         let mut tentative_devices = state.device_registrations.tentative_devices.borrow_mut();
         match tentative_devices.remove(&user_number) {
             None => trap("no tentative device to verify"),
-            Some((device, pin, mut failed_attempts)) => {
-                if user_pin != pin {
+            Some((device, verification_code, mut failed_attempts)) => {
+                if user_verification_code != verification_code {
                     failed_attempts = failed_attempts + 1;
                     if failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS {
                         // disable device registration mode
@@ -440,10 +447,11 @@ fn check_add_tentative_device_prerequisites(
                             .users_in_device_reg_mode
                             .borrow_mut()
                             .remove(&user_number);
-                        return Err(VerifyTentativeDeviceResponse::WrongPin);
+                        return Err(VerifyTentativeDeviceResponse::WrongCode);
                     }
-                    tentative_devices.insert(user_number, (device, pin, failed_attempts));
-                    return Err(VerifyTentativeDeviceResponse::WrongPinRetry);
+                    tentative_devices
+                        .insert(user_number, (device, verification_code, failed_attempts));
+                    return Err(VerifyTentativeDeviceResponse::WrongCodeRetry);
                 }
                 Ok(device)
             }
@@ -451,7 +459,7 @@ fn check_add_tentative_device_prerequisites(
     })
 }
 
-async fn generate_pin() -> Pin {
+async fn generate_device_verification_code() -> DeviceVerificationCode {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
@@ -484,12 +492,11 @@ fn check_tentative_device_reg_prerequisites(
         {
             None => return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled),
             Some(expiration) if *expiration <= time() => {
-                    // if this happens device_reg_mode_expirations got too big
-                    // TODO: do we need a metric for this?
-                    return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
-
-            },
-            Some(expiration) => Ok(*expiration)
+                // if this happens device_reg_mode_expirations got too big
+                // TODO: do we need a metric for this?
+                return Err(AddTentativeDeviceResponse::DeviceRegistrationModeDisabled);
+            }
+            Some(expiration) => Ok(*expiration),
         }
     })
 }
