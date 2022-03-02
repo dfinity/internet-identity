@@ -9,13 +9,16 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Device Registration Disabled</h1>
     <p>
-      Device registration is disabled for the Identity Anchor ${userNumber}. To
-      enable device registration do the following:
+      Device registration is disabled for the Identity Anchor
+      <b>${userNumber}</b>. To enable device registration do the following:
     </p>
     <ol>
-      <li>Log in on an existing device</li>
-      <li>Click "Add new device"</li>
-      <li>Click "Remote Device"</li>
+      <li>
+        Log in with Identity Anchor <b>${userNumber}</b> on an
+        <b>existing device</b>
+      </li>
+      <li>Click <b>Add new device</b></li>
+      <li>Chose <b>Remote Device</b></li>
     </ol>
     <button id="deviceRegModeDisabledRetry" class="primary">Retry</button>
     <button id="deviceRegModeDisabledCancel">Cancel</button>

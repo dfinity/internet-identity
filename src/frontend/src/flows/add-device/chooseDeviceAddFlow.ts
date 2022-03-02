@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import {
-  laptopIcon,
   networkIcon,
+  securityKeyIcon,
   warningIcon,
 } from "../../components/icons";
 
@@ -65,12 +65,12 @@ const pageContent = () => html`
       </div>
     </div>
     <p>
-      Is the device you want to add available on this machine (local device) or a
-      different one (remote device)?
+      Is the device you want to add available on this machine (local device) or
+      on a different one (remote device)?
     </p>
     <div class="flowChoiceContainer">
       <button class="flowOption" id="local">
-        <span class="flowIcon">${laptopIcon}</span>
+        <span class="flowIcon">${securityKeyIcon}</span>
         <div class="flowOptionTitle">Local Device</div>
         <div class="flowOptionDescription">
           Add a new device available on <i>this machine</i>.
