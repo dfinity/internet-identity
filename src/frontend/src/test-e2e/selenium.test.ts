@@ -2,15 +2,16 @@ import {
   AboutView,
   AddDeviceAliasView,
   AddDeviceFlowSelectorView,
-  AddDeviceView,
   AddIdentityAnchorView,
   AddRemoteDeviceAliasView,
+  AddRemoteDeviceInstructionsView,
   AddRemoteDeviceVerificationCodeView,
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
   FAQView,
   MainView,
+  NotInRegistrationModeView,
   RecoverView,
   RecoveryMethodSelectorView,
   RegisterView,
@@ -21,17 +22,17 @@ import {
 } from "./views";
 import { FLOWS } from "./flows";
 import {
-  Screenshots,
   addVirtualAuthenticator,
   removeFlavorsWarning,
   removeVirtualAuthenticator,
+  RunConfiguration,
   runInBrowser,
   runInNestedBrowser,
+  Screenshots,
+  setupSeleniumServer,
   switchToPopup,
   waitForFonts,
   waitToClose,
-  setupSeleniumServer,
-  RunConfiguration,
 } from "./util";
 
 // Read canister ids from the corresponding dfx files.
@@ -140,6 +141,63 @@ test("Register new identity and add additional remote device", async () => {
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
 
+      // browser 1 again
+      const verificationView = await new VerifyRemoteDeviceView(browser);
+      await verificationView.waitForDisplay();
+      await verificationView.enterVerificationCode(code);
+      await verificationView.continue();
+
+      await browser2.deleteSession();
+    });
+
+    await mainView.waitForDisplay();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+  });
+}, 300_000);
+
+test("Register new identity and add additional remote device starting on new device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      await addVirtualAuthenticator(browser2);
+      await browser2.url(II_URL);
+      const welcomeView2 = new WelcomeView(browser2);
+      await welcomeView2.waitForDisplay();
+      await welcomeView2.addDevice();
+      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
+      await addIdentityAnchorView2.waitForDisplay();
+      await addIdentityAnchorView2.continue(userNumber);
+      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
+      await addRemoteDeviceView.waitForDisplay();
+      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
+      await addRemoteDeviceView.continue();
+
+      const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
+      await notInRegistrationModeView.waitForDisplay();
+
+      // browser 1 again
+      await mainView.addAdditionalDevice();
+      const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
+      await addDeviceFlowView.waitForDisplay();
+      await addDeviceFlowView.selectRemoteDevice();
+
+      const addRemoteDeviceInstructionsView =
+        new AddRemoteDeviceInstructionsView(browser);
+      await addRemoteDeviceInstructionsView.waitForDisplay();
+
+      // browser 2 again
+      await notInRegistrationModeView.retry();
+      const verificationCodeView =
+        await new AddRemoteDeviceVerificationCodeView(browser2);
+      await verificationCodeView.waitForDisplay();
+      const code = await verificationCodeView.getVerificationCode();
+
+      // browser 1 again
       const verificationView = await new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
