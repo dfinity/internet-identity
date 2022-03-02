@@ -206,6 +206,22 @@ export class AddDeviceAliasView extends View {
   }
 }
 
+export class AddDeviceMethodSelectorView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#cancelAddDevice")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async selectLocalDevice(): Promise<void> {
+    await this.browser.$("#local").click();
+  }
+
+  async selectRemoteDevice(): Promise<void> {
+    await this.browser.$("#remote").click();
+  }
+}
+
 export class AuthorizeAppView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser

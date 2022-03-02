@@ -25,13 +25,13 @@ const pageContent = (
           <p>
             This will add the shown device to your Identity Anchor. When
             verified, it will have <b>full control over your identity</b>. Only
-            enter a verification code here if you are sure that you <i>personally own</i> this
-            device.
+            enter a verification code here if you are sure that you
+            <i>personally own</i> this device.
           </p>
           <p>
             Enter only codes that were displayed on
-            <b>https://identity.ic0.app</b>. Do <b>not</b> enter verification codes that you
-            received any other way.
+            <b>https://identity.ic0.app</b>. Do <b>not</b> enter verification
+            codes that you received any other way.
           </p>
         </div>
       </div>

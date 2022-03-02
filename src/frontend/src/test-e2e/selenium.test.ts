@@ -1,6 +1,7 @@
 import {
   AboutView,
   AddDeviceAliasView,
+  AddDeviceMethodSelectorView,
   AddDeviceView,
   AddIdentityAnchorView,
   AuthorizeAppView,
@@ -70,7 +71,7 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test.skip("Register new identity and add additional device", async () => {
+test("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -84,6 +85,12 @@ test.skip("Register new identity and add additional device", async () => {
     await removeVirtualAuthenticator(browser, firstAuthenticator);
     await addVirtualAuthenticator(browser);
     await mainView.addAdditionalDevice();
+
+    const addDeviceMethodSelectionView = new AddDeviceMethodSelectorView(
+      browser
+    );
+    await addDeviceMethodSelectionView.waitForDisplay();
+    await addDeviceMethodSelectionView.selectLocalDevice();
 
     const addDeviceAliasView = new AddDeviceAliasView(browser);
     await addDeviceAliasView.waitForDisplay();
