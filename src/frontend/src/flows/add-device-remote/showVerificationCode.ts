@@ -29,7 +29,7 @@ const pageContent = (
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
     <label>Device Verification Code</label>
-    <div class="highlightBox">
+    <div id="verificationCode" class="highlightBox">
       ${tentativeRegistrationInfo.verification_code}
     </div>
     <p>

@@ -206,7 +206,7 @@ export class AddDeviceAliasView extends View {
   }
 }
 
-export class AddDeviceMethodSelectorView extends View {
+export class AddDeviceFlowSelectorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#cancelAddDevice")
@@ -219,6 +219,48 @@ export class AddDeviceMethodSelectorView extends View {
 
   async selectRemoteDevice(): Promise<void> {
     await this.browser.$("#remote").click();
+  }
+}
+
+export class AddRemoteDeviceAliasView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#registerTentativeDeviceContinue")
+      .waitForDisplayed({ timeout: 3_000 });
+  }
+
+  async selectAlias(alias: string): Promise<void> {
+    await this.browser.$("#tentativeDeviceAlias").setValue(alias);
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#registerTentativeDeviceContinue").click();
+  }
+}
+
+export class AddRemoteDeviceVerificationCodeView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#verificationCode")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async getVerificationCode(): Promise<string> {
+    return await this.browser.$("#verificationCode").getText();
+  }
+}
+
+export class VerifyRemoteDeviceView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser.$("#verifyDevice").waitForDisplayed({ timeout: 3_000 });
+  }
+
+  async enterVerificationCode(code: string): Promise<void> {
+    await this.browser.$("#tentativeDeviceCode").setValue(code);
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#verifyDevice").click();
   }
 }
 
