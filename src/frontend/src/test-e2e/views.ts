@@ -226,7 +226,7 @@ export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#registerTentativeDeviceContinue")
-      .waitForDisplayed({ timeout: 3_000 });
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async selectAlias(alias: string): Promise<void> {
@@ -254,7 +254,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#cancelAddRemoteDevice")
-      .waitForDisplayed({ timeout: 3_000 });
+      .waitForDisplayed({ timeout: 5_000 });
   }
 }
 
@@ -272,7 +272,7 @@ export class AddRemoteDeviceVerificationCodeView extends View {
 
 export class VerifyRemoteDeviceView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("#verifyDevice").waitForDisplayed({ timeout: 3_000 });
+    await this.browser.$("#verifyDevice").waitForDisplayed({ timeout: 5_000 });
   }
 
   async enterVerificationCode(code: string): Promise<void> {
