@@ -25,12 +25,12 @@ const pageContent = (
           <p>
             This will add the shown device to your Identity Anchor. When
             verified, it will have <b>full control over your identity</b>. Only
-            enter a PIN here if you are sure that you <i>personally own</i> this
+            enter a verification code here if you are sure that you <i>personally own</i> this
             device.
           </p>
           <p>
-            Enter only PINs that were displayed on
-            <b>https://identity.ic0.app</b>. Do <b>not</b> enter PINs that you
+            Enter only codes that were displayed on
+            <b>https://identity.ic0.app</b>. Do <b>not</b> enter verification codes that you
             received any other way.
           </p>
         </div>
@@ -106,7 +106,7 @@ const init = (
 
   verifyButton.onclick = async () => {
     if (pinInput.value === "") {
-      pinInput.placeholder = "Please enter a PIN fist";
+      pinInput.placeholder = "Please enter verification code";
       pinInput.classList.toggle("errored", true);
       return;
     }

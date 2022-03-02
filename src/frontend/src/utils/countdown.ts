@@ -47,9 +47,9 @@ export const setupCountdown = (
     1000,
     async () => {
       await displayError({
-        title: "Timeout reached",
+        title: "Timeout Reached",
         message:
-          "The timeout has been reached. For security reasons, the add device process has been aborted.",
+          "The timeout has been reached. For security reasons the \"add device\" process has been aborted.",
         primaryButton: "Ok",
       });
       await continueFunc;
