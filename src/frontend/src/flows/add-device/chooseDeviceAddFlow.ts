@@ -1,5 +1,9 @@
 import { html, render } from "lit-html";
-import { securityKeyIcon, warningIcon } from "../../components/icons";
+import {
+  laptopIcon,
+  networkIcon,
+  warningIcon,
+} from "../../components/icons";
 
 const pageContent = () => html`
   <style>
@@ -61,22 +65,22 @@ const pageContent = () => html`
       </div>
     </div>
     <p>
-      Is the device you want to add attached to the machine you are currently
-      using?
+      Is the device you want to add available on this machine (local device) or a
+      different one (remote device)?
     </p>
     <div class="flowChoiceContainer">
       <button class="flowOption" id="local">
-        <span class="flowIcon">${securityKeyIcon}</span>
-        <div class="flowOptionTitle">Yes: Local Device</div>
+        <span class="flowIcon">${laptopIcon}</span>
+        <div class="flowOptionTitle">Local Device</div>
         <div class="flowOptionDescription">
-          Add a new device attached to <i>this machine</i>.
+          Add a new device available on <i>this machine</i>.
         </div>
       </button>
       <button class="flowOption" id="remote">
-        <span class="flowIcon">${securityKeyIcon}</span>
-        <div class="flowOptionTitle">No: Remote Device</div>
+        <span class="flowIcon">${networkIcon}</span>
+        <div class="flowOptionTitle">Remote Device</div>
         <div class="flowOptionDescription">
-          Add a new device attached to <i>another machine</i>.
+          Add a new device available on <i>another machine</i>.
         </div>
       </button>
     </div>
