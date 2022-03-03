@@ -411,7 +411,6 @@ test("Screenshots", async () => {
       await addRemoteDeviceInstructionsView.cancel();
       await mainView.waitForDisplay();
 
-
       // Now the link device flow, using a second browser
       await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
         await addVirtualAuthenticator(browser2);
@@ -428,9 +427,14 @@ test("Screenshots", async () => {
         await screenshots.take("new-device-alias", browser2);
         await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
         await addRemoteDeviceView.continue();
-        const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
+        const notInRegistrationModeView = new NotInRegistrationModeView(
+          browser2
+        );
         await notInRegistrationModeView.waitForDisplay();
-        await screenshots.take("new-device-registration-mode-disabled-instructions", browser2);
+        await screenshots.take(
+          "new-device-registration-mode-disabled-instructions",
+          browser2
+        );
 
         // browser 1 again
         await mainView.addAdditionalDevice();
