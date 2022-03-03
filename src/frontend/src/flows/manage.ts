@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { render, html } from "lit-html";
 import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
@@ -29,39 +29,34 @@ const displayFailedToListDevices = (error: Error) =>
 
 // The styling of the page
 
-const style = () => html`
-  <style>
-    .labelWithAction {
-      margin-top: 1rem;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .labelWithAction label {
-      margin: 0;
-    }
-
-    .labelAction {
-      padding: 0;
-      border: none;
-      display: inline;
-      width: auto;
-      margin: 0;
-      cursor: pointer;
-      color: #387ff7;
-      font-size: 12px;
-      font-family: "Montserrat", sans-serif;
-      text-align: right;
-      font-weight: 600;
-    }
-
-    .labelAction::before {
-      content: "+";
-      margin-right: 3px;
-      color: #387ff7;
-    }
-  </style>
-`;
+const style = () => html`<style>
+  .labelWithAction {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .labelWithAction label {
+    margin: 0;
+  }
+  .labelAction {
+    padding: 0;
+    border: none;
+    display: inline;
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+    color: #387ff7;
+    font-size: 12px;
+    font-family: "Montserrat", sans-serif;
+    text-align: right;
+    font-weight: 600;
+  }
+  .labelAction::before {
+    content: "+";
+    margin-right: 3px;
+    color: #387ff7;
+  }
+</style> `;
 
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
