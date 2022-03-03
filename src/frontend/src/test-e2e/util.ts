@@ -285,9 +285,11 @@ export function setupSeleniumServer(): void {
         }
       });
 
+      /*
       seleniumServerProc.stderr.on("data", (data) => {
         console.log(`selenium-standalone stderr: ${data}`);
       });
+      */
 
 
       /*
