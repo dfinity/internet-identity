@@ -256,6 +256,10 @@ export class AddRemoteDeviceInstructionsView extends View {
       .$("#cancelAddRemoteDevice")
       .waitForDisplayed({ timeout: 10_000 });
   }
+
+  async cancel(): Promise<void> {
+    await this.browser.$("#cancelAddRemoteDevice").click();
+  }
 }
 
 export class AddRemoteDeviceVerificationCodeView extends View {

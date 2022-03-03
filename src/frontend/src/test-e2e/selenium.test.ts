@@ -401,7 +401,15 @@ test("Screenshots", async () => {
 
       const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
       await addDeviceFlowView.waitForDisplay();
+      await screenshots.take("new-device-flow-selection", browser);
       await addDeviceFlowView.selectRemoteDevice();
+      const addRemoteDeviceInstructionsView =
+        new AddRemoteDeviceInstructionsView(browser);
+      await addRemoteDeviceInstructionsView.waitForDisplay();
+      await screenshots.take("new-device-instructions", browser);
+      await addRemoteDeviceInstructionsView.cancel();
+      await mainView.waitForDisplay();
+
 
       // Now the link device flow, using a second browser
       await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
@@ -412,20 +420,35 @@ test("Screenshots", async () => {
         await welcomeView2.addDevice();
         const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
         await addIdentityAnchorView2.waitForDisplay();
+        await screenshots.take("new-device-user-number", browser2);
         await addIdentityAnchorView2.continue(userNumber);
         const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
         await addRemoteDeviceView.waitForDisplay();
+        await screenshots.take("new-device-alias", browser2);
         await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
         await addRemoteDeviceView.continue();
+        const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
+        await notInRegistrationModeView.waitForDisplay();
+        await screenshots.take("new-device-registration-mode-disabled-instructions", browser2);
 
+        // browser 1 again
+        await mainView.addAdditionalDevice();
+        await addDeviceFlowView.waitForDisplay();
+        await addDeviceFlowView.selectRemoteDevice();
+        await addRemoteDeviceInstructionsView.waitForDisplay();
+
+        // browser 2 again
+        await notInRegistrationModeView.retry();
         const verificationCodeView =
           await new AddRemoteDeviceVerificationCodeView(browser2);
         await verificationCodeView.waitForDisplay();
+        await screenshots.take("new-device-show-verification-code", browser2);
         const code = await verificationCodeView.getVerificationCode();
 
         // browser 1 again
         const verificationView = await new VerifyRemoteDeviceView(browser);
         await verificationView.waitForDisplay();
+        await screenshots.take("new-device-enter-verification-code", browser);
         await verificationView.enterVerificationCode(code);
         await verificationView.continue();
 
