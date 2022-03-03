@@ -153,7 +153,7 @@ export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("//h1[string()='Anchor Management']")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -254,7 +254,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#cancelAddRemoteDevice")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 10_000 });
   }
 }
 
