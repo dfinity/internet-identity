@@ -285,6 +285,11 @@ export function setupSeleniumServer(): void {
         }
       });
 
+      seleniumServerProc.stderr.on("data", (data) => {
+        console.log(`selenium-standalone stderr: ${data}`);
+      });
+
+
       /*
        * For reasons unclear, printing stderr breaks the tests. It looks like it tries to print after the tests' end, which jest doesn't like:
        *

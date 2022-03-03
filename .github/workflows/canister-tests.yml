@@ -230,6 +230,7 @@ jobs:
 
       - run: rm -v -f screenshots/*.png
       - run: npm test
+      - run: selenium-standalone start --config ./selenium-standalone.config.js &
       - run: npm run test:e2e-${{ matrix.device }}
       - run: dfx stop
 
