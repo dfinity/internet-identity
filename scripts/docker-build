@@ -32,7 +32,6 @@ function check_flavor() {
 check_flavor "fetchrootkey" "II_FETCH_ROOT_KEY"
 check_flavor "dummycaptcha" "II_DUMMY_CAPTCHA"
 check_flavor "dummyauth" "II_DUMMY_AUTH"
-check_flavor "dummypow" "II_DUMMY_POW"
 
 docker_build_args+=(--tag "$image_name" .)
 
