@@ -289,6 +289,12 @@ export class AddRemoteDeviceVerificationCodeView extends View {
       elem,
       "--:--"
     );
+    const codeElem = await this.browser.$("#verificationCode");
+    await this.browser.execute(
+      "arguments[0].innerText = arguments[1];",
+      codeElem,
+      "123456"
+    );
   }
 }
 

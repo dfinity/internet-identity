@@ -417,6 +417,7 @@ test("Screenshots", async () => {
         await browser2.url(II_URL);
         const welcomeView2 = new WelcomeView(browser2);
         await welcomeView2.waitForDisplay();
+        await removeFlavorsWarning(browser2);
         await welcomeView2.addDevice();
         const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
         await addIdentityAnchorView2.waitForDisplay();
@@ -447,9 +448,9 @@ test("Screenshots", async () => {
         const verificationCodeView =
           await new AddRemoteDeviceVerificationCodeView(browser2);
         await verificationCodeView.waitForDisplay();
+        const code = await verificationCodeView.getVerificationCode();
         await verificationCodeView.fixup();
         await screenshots.take("new-device-show-verification-code", browser2);
-        const code = await verificationCodeView.getVerificationCode();
 
         // browser 1 again
         const verificationView = await new VerifyRemoteDeviceView(browser);
