@@ -260,6 +260,15 @@ export class AddRemoteDeviceInstructionsView extends View {
   async cancel(): Promise<void> {
     await this.browser.$("#cancelAddRemoteDevice").click();
   }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
+  }
 }
 
 export class AddRemoteDeviceVerificationCodeView extends View {
@@ -271,6 +280,15 @@ export class AddRemoteDeviceVerificationCodeView extends View {
 
   async getVerificationCode(): Promise<string> {
     return await this.browser.$("#verificationCode").getText();
+  }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
   }
 }
 
@@ -285,6 +303,15 @@ export class VerifyRemoteDeviceView extends View {
 
   async continue(): Promise<void> {
     await this.browser.$("#verifyDevice").click();
+  }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
   }
 }
 

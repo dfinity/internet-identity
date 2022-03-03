@@ -406,6 +406,7 @@ test("Screenshots", async () => {
       const addRemoteDeviceInstructionsView =
         new AddRemoteDeviceInstructionsView(browser);
       await addRemoteDeviceInstructionsView.waitForDisplay();
+      await addRemoteDeviceInstructionsView.fixup();
       await screenshots.take("new-device-instructions", browser);
       await addRemoteDeviceInstructionsView.cancel();
       await mainView.waitForDisplay();
@@ -442,12 +443,14 @@ test("Screenshots", async () => {
         const verificationCodeView =
           await new AddRemoteDeviceVerificationCodeView(browser2);
         await verificationCodeView.waitForDisplay();
+        await verificationCodeView.fixup();
         await screenshots.take("new-device-show-verification-code", browser2);
         const code = await verificationCodeView.getVerificationCode();
 
         // browser 1 again
         const verificationView = await new VerifyRemoteDeviceView(browser);
         await verificationView.waitForDisplay();
+        await verificationView.fixup();
         await screenshots.take("new-device-enter-verification-code", browser);
         await verificationView.enterVerificationCode(code);
         await verificationView.continue();
