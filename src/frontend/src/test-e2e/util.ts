@@ -301,6 +301,14 @@ export function setupSeleniumServer(): void {
         reject(err);
       });
 
+      seleniumServerProc.on("exit", (code, signal) => {
+        console.log(`selenium-standalone exited with ${code} (${signal})`);
+      });
+
+      seleniumServerProc.on("close", (code, signal) => {
+        console.log(`selenium-standalone closed with ${code} (${signal})`);
+      });
+
       setTimeout(() => {
         reject("selenium-standalone server startup timeout");
       }, 30_000);
