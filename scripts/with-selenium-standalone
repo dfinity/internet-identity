@@ -7,7 +7,7 @@
 #   ./scripts/with-selenium-standalone <subcommand> ...
 #
 # After starting selenium-standalone, we wait for it to output a specific message
-# ("Selenium start"), after which we know selenium itself was started. At this point
+# ("Selenium started"), after which we know selenium itself was started. At this point
 # we can start the subcommand.
 #
 
@@ -53,5 +53,8 @@ then
     rm "$sout"
 
 else
-    echo could not start ss
+    echo "Could not start selenium-standalone server"
+    echo "$sout"
+    echo "$serr"
+    exit 1
 fi
