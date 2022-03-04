@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+#
+# A script that starts and stops selenium-standalone.
+#
+# Usage:
+#
+#   ./scripts/with-selenium-standalone <subcommand> ...
+#
+# After starting selenium-standalone, we wait for it to output a specific message
+# ("Selenium start"), after which we know selenium itself was started. At this point
+# we can start the subcommand.
+#
 
 selenium_standalone_args=("start" "--config" "./selenium-standalone.config.js")
 
