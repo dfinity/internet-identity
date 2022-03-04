@@ -6,7 +6,6 @@ use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
-use internet_identity::nonce_cache::NonceCache;
 use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
@@ -32,8 +31,6 @@ const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
 const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
 // 1 min
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
-// 5 mins
-const POW_NONCE_LIFETIME: u64 = secs_to_nanos(300);
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 
@@ -123,12 +120,6 @@ impl From<DeviceDataInternal> for DeviceData {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-struct ProofOfWork {
-    timestamp: Timestamp,
-    nonce: u64,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
 struct Delegation {
     pubkey: PublicKey,
     expiration: Timestamp,
@@ -176,7 +167,6 @@ struct InternetIdentityInit {
 type AssetHashes = RbTree<&'static str, Hash>;
 
 struct State {
-    nonce_cache: RefCell<NonceCache>,
     storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
@@ -190,7 +180,6 @@ impl Default for State {
     fn default() -> Self {
         const FIRST_USER_ID: UserNumber = 10_000;
         Self {
-            nonce_cache: RefCell::new(NonceCache::default()),
             storage: RefCell::new(Storage::new((
                 FIRST_USER_ID,
                 FIRST_USER_ID.saturating_add(storage::DEFAULT_RANGE_SIZE),
@@ -369,23 +358,15 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 }
 
 #[update]
-async fn create_challenge(pow: ProofOfWork) -> Challenge {
+async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
 
     let resp = STATE.with(|s| {
-        let mut nonce_cache = s.nonce_cache.borrow_mut();
-        check_nonce_cache(&pow, &nonce_cache);
-
-        let now = time() as u64;
-
-        nonce_cache.prune_expired(now.saturating_sub(POW_NONCE_LIFETIME));
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
 
-        check_proof_of_work(&pow, now);
-
-        nonce_cache.add(pow.timestamp, pow.nonce);
-
         let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+
+        let now = time() as u64;
 
         // Prune old challenges. This drops all challenges that are older than
         // CAPTCHA_CHALLENGE_LIFETIME
@@ -917,58 +898,6 @@ fn check_frontend_length(frontend: &FrontendHostname) {
             "frontend hostname {} exceeds the limit of {} bytes",
             n, FRONTEND_HOSTNAME_LIMIT,
         ));
-    }
-}
-
-#[cfg(feature = "dummy_pow")]
-fn check_nonce_cache(_pow: &ProofOfWork, _nonce_cache: &NonceCache) {}
-
-#[cfg(not(feature = "dummy_pow"))]
-fn check_nonce_cache(pow: &ProofOfWork, nonce_cache: &NonceCache) {
-    if nonce_cache.contains(pow.timestamp, pow.nonce) {
-        trap(&format!(
-            "the combination of timestamp {} and nonce {} has already been used",
-            pow.timestamp, pow.nonce,
-        ));
-    }
-}
-
-#[cfg(feature = "dummy_pow")]
-fn check_proof_of_work(_pow: &ProofOfWork, _now: Timestamp) {}
-
-#[cfg(not(feature = "dummy_pow"))]
-fn check_proof_of_work(pow: &ProofOfWork, now: Timestamp) {
-    use cubehash::CubeHash;
-
-    const DIFFICULTY: usize = 2;
-
-    if pow.timestamp < now.saturating_sub(POW_NONCE_LIFETIME) {
-        trap(&format!(
-            "proof of work timestamp {} is too old, current time: {}",
-            pow.timestamp, now
-        ));
-    }
-    if pow.timestamp > now.saturating_add(POW_NONCE_LIFETIME) {
-        trap(&format!(
-            "proof of work timestamp {} is too far in future, current time: {}",
-            pow.timestamp, now
-        ));
-    }
-
-    let mut hasher = CubeHash::new();
-    let domain = b"ic-proof-of-work";
-    hasher.update(&[domain.len() as u8]);
-    hasher.update(&domain[..]);
-    hasher.update(&pow.timestamp.to_le_bytes());
-    hasher.update(&pow.nonce.to_le_bytes());
-
-    let id = ic_cdk::api::id();
-    hasher.update(&[id.as_slice().len() as u8]);
-    hasher.update(id.as_slice());
-
-    let hash = hasher.finalize();
-    if !hash[0..DIFFICULTY].iter().all(|b| *b == 0) {
-        trap("proof of work hash check failed");
     }
 }
 

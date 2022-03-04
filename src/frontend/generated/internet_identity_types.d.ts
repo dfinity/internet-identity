@@ -46,7 +46,6 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp }
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
@@ -71,7 +70,7 @@ export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
-  'create_challenge' : (arg_0: ProofOfWork) => Promise<Challenge>,
+  'create_challenge' : () => Promise<Challenge>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
