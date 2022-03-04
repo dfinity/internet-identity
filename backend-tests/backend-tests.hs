@@ -519,18 +519,18 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     (_, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
     queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
-  , withoutUpgrade $ iiTest "enable registration mode" $ \cid -> do
+  , withoutUpgrade $ iiTest "enter registration mode" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    expiration <- callII cid webauth1ID #enable_device_registration_mode user_number
+    expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     lift $ expiration @?= 900000000022
 
-  , withoutUpgrade $ iiTest "reject enable registration mode with wrong caller" $ \cid -> do
+  , withoutUpgrade $ iiTest "reject enter registration mode with wrong caller" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    callIIRejectWith cid webauth2ID #enable_device_registration_mode user_number "foo"
+    callIIRejectWith cid webauth2ID #enter_device_registration_mode user_number "foo"
 
   , withoutUpgrade $ iiTest "register remote device" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    expiration <- callII cid webauth1ID #enable_device_registration_mode user_number
+    expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     lift $ expiration @?= response .! #device_registration_timeout
     let verification_code = response .! #verification_code
@@ -539,7 +539,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withoutUpgrade $ iiTest "should return tentative device" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    expiration <- callII cid webauth1ID #enable_device_registration_mode user_number
+    expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     anchor_info <- callII cid webauth1ID #get_anchor_info user_number
     lift $ anchor_info .! #devices @?= V.fromList [device1]
@@ -553,14 +553,14 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withoutUpgrade $ iiTest "reject tentative device if registration mode is disabled again" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    _ <- callII cid webauth1ID #enable_device_registration_mode user_number
-    _ <- callII cid webauth1ID #disable_device_registration_mode user_number
+    _ <- callII cid webauth1ID #enter_device_registration_mode user_number
+    _ <- callII cid webauth1ID #exit_device_registration_mode user_number
     V.IsJust (V.Label :: Label "device_registration_mode_disabled") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
  
   , withoutUpgrade $ iiTest "reject tentative device if registration mode is expired" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    expiration <- callII cid webauth1ID #enable_device_registration_mode user_number
+    expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     lift $ expiration @?= response .! #device_registration_timeout
     let verification_code = response .! #verification_code
@@ -569,12 +569,16 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
   , withoutUpgrade $ iiTest "reject wrong code on verify remote device" $ \cid -> do
     user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
-    _ <- callII cid webauth1ID #enable_device_registration_mode user_number
+    _ <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
-    V.IsJust (V.Label :: Label "wrong_code_retry") _ <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
-    V.IsJust (V.Label :: Label "wrong_code_retry") _ <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
-    V.IsJust (V.Label :: Label "wrong_code") _ <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
-    callIIRejectWith cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code) "device registration mode not enabled"
+    V.IsJust (V.Label :: Label "wrong_code") try1_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
+    lift $ try1_result .! #retries_left @?= 2
+    V.IsJust (V.Label :: Label "wrong_code") try2_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
+    lift $ try2_result .! #retries_left @?= 1
+    V.IsJust (V.Label :: Label "wrong_code") try3_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
+    lift $ try3_result .! #retries_left @?= 0
+    V.IsJust (V.Label :: Label "wrong_code") try4_result <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
+    lift $ try4_result .! #retries_left @?= 0
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0

@@ -84,7 +84,7 @@ const init = (
   cancelButton.onclick = async () => {
     countdown.stop();
     await withLoader(() =>
-      connection.disableDeviceRegistrationMode(userNumber)
+      connection.exitDeviceRegistrationMode(userNumber)
     );
     await renderManage(userNumber, connection);
   };
@@ -118,9 +118,9 @@ const init = (
       countdown.stop();
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
       await renderManage(userNumber, connection);
-    } else if (hasOwnProperty(result, "wrong_code_retry")) {
+    } else if (hasOwnProperty(result, "wrong_code") && result.wrong_code.retries_left > 0) {
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
-    } else if (hasOwnProperty(result, "wrong_code")) {
+    } else {
       await displayError({
         title: "Too Many Wrong Verification Codes Entered",
         message:

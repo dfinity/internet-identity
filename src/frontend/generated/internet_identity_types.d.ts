@@ -1,8 +1,8 @@
 import type { Principal } from '@dfinity/principal';
 export type AddTentativeDeviceResponse = {
-    'device_registration_mode_disabled' : null
+    'device_registration_mode_off' : null
   } |
-  { 'tentative_device_already_exists' : null } |
+  { 'another_device_tentatively_added' : null } |
   {
     'added_tentatively' : {
       'verification_code' : string,
@@ -84,19 +84,16 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
-export type VerifyTentativeDeviceResponse = { 'wrong_code_retry' : null } |
-  { 'verified' : null } |
-  { 'wrong_code' : null };
+export type VerifyTentativeDeviceResponse = { 'verified' : null } |
+  { 'wrong_code' : { 'retries_left' : number } };
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
   'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<
       AddTentativeDeviceResponse
     >,
   'create_challenge' : (arg_0: ProofOfWork) => Promise<Challenge>,
-  'disable_device_registration_mode' : (arg_0: UserNumber) => Promise<
-      undefined
-    >,
-  'enable_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
+  'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
+  'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,

@@ -36,7 +36,7 @@ export const pollForTentativeDevice = async (
 ): Promise<void> => {
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
-      connection.enableDeviceRegistrationMode(userNumber),
+      connection.enterDeviceRegistrationMode(userNumber),
       connection.lookupAnchorInfo(userNumber),
     ]);
     if (userInfo.tentative_device.length === 1) {
@@ -100,7 +100,7 @@ const init = (
     window.clearInterval(pollingHandle);
     countdown.stop();
     await withLoader(() =>
-      connection.disableDeviceRegistrationMode(userNumber)
+      connection.exitDeviceRegistrationMode(userNumber)
     );
     await renderManage(userNumber, connection);
   };

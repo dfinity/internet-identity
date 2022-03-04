@@ -74,19 +74,17 @@ type RegisterResponse = variant {
 type AddTentativeDeviceResponse = variant {
   // The device was tentatively added.
   added_tentatively: record { verification_code: text; device_registration_timeout: Timestamp;};
-  // Device registration mode disabled for this user.
-  device_registration_mode_disabled;
+  // Device registration mode is off.
+  device_registration_mode_off;
   // There is another device already added tentatively
-  tentative_device_already_exists;
+  another_device_tentatively_added;
 };
 
 type VerifyTentativeDeviceResponse = variant {
   // The device was successfully verified.
   verified;
   // Wrong verification code entered. Retry with correct code.
-  wrong_code_retry;
-  // Wrong verification code entered. No retries.
-  wrong_code;
+  wrong_code: record { retries_left: nat8};
 };
 
 type Delegation = record {
@@ -146,8 +144,8 @@ service : (opt InternetIdentityInit) -> {
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
 
-  enable_device_registration_mode : (UserNumber) -> (Timestamp);
-  disable_device_registration_mode : (UserNumber) -> ();
+  enter_device_registration_mode : (UserNumber) -> (Timestamp);
+  exit_device_registration_mode : (UserNumber) -> ();
   add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse);
   verify_tentative_device : (UserNumber, verification_code: text) -> (VerifyTentativeDeviceResponse);
 

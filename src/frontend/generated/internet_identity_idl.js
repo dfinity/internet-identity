@@ -25,8 +25,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
-    'device_registration_mode_disabled' : IDL.Null,
-    'tentative_device_already_exists' : IDL.Null,
+    'device_registration_mode_off' : IDL.Null,
+    'another_device_tentatively_added' : IDL.Null,
     'added_tentatively' : IDL.Record({
       'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
@@ -104,9 +104,8 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
-    'wrong_code_retry' : IDL.Null,
     'verified' : IDL.Null,
-    'wrong_code' : IDL.Null,
+    'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -116,8 +115,8 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'create_challenge' : IDL.Func([ProofOfWork], [Challenge], []),
-    'disable_device_registration_mode' : IDL.Func([UserNumber], [], []),
-    'enable_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
+    'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
+    'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],

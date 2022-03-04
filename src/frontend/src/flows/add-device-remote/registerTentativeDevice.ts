@@ -64,9 +64,9 @@ export const addTentativeDevice = async (
       result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
-  } else if (hasOwnProperty(result, "device_registration_mode_disabled")) {
+  } else if (hasOwnProperty(result, "device_registration_mode_off")) {
     await deviceRegistrationDisabledInfo(tentativeDeviceInfo, principal);
-  } else if (hasOwnProperty(result, "tentative_device_already_exists")) {
+  } else if (hasOwnProperty(result, "another_device_tentatively_added")) {
     await displayError({
       title: "Tentative Device Already Exists",
       message:

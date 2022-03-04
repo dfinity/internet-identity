@@ -392,18 +392,18 @@ export class IIConnection {
     return await actor.get_anchor_info(userNumber);
   };
 
-  enableDeviceRegistrationMode = async (
+  enterDeviceRegistrationMode = async (
     userNumber: UserNumber
   ): Promise<Timestamp> => {
     const actor = await this.getActor();
-    return await actor.enable_device_registration_mode(userNumber);
+    return await actor.enter_device_registration_mode(userNumber);
   };
 
-  disableDeviceRegistrationMode = async (
+  exitDeviceRegistrationMode = async (
     userNumber: UserNumber
   ): Promise<void> => {
     const actor = await this.getActor();
-    return await actor.disable_device_registration_mode(userNumber);
+    return await actor.exit_device_registration_mode(userNumber);
   };
 
   verifyTentativeDevice = async (
