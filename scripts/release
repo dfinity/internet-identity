@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+// vim: set ft=ts
+
+const { httpPost } = require('./http.js');
+
+const main = (args) => {
+
+    if (args.length != 0) {
+        abort();
+    }
+
+    const tagName = getTag();
+
+    console.log(`Using tag '${tagName}' for release`);
+
+    httpPost({"this is": "query"}).then((data) => {
+        console.log(data);
+    });
+}
+
+const abort = () => {
+    console.log("ABORT");
+    console.log("USage: figure it out");
+    process.exit(1);
+}
+
+const getTag = () => {
+    const TAG_REF_PREFIX = "refs/tags/";
+
+    let githubRef = process.env["GITHUB_REF"];
+
+    if(!githubRef.startsWith(TAG_REF_PREFIX)){
+        console.log(`Expecting tag, found ref ${githubRef}`);
+        abort();
+    }
+
+    return githubRef.slice(TAG_REF_PREFIX.length);
+}
+
+let args = process.argv.slice(2); // All args except exe names
+
+main(args);
