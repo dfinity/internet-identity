@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+selenium_standalone_args=("start" "--config" "./selenium-standalone.config.js")
+
+echo "selenium-standalone" "${selenium_standalone_args[@]}"
+
+sout=$(mktemp)
+serr=$(mktemp)
+
+if selenium-standalone "${selenium_standalone_args[@]}" \
+    2> $serr \
+    > $sout \
+    &
+then
+    pid=$!
+    echo "selenium-standalone started with pid $pid"
+
+    attempts=0
+    while grep -q 'Selenium started' "$sout"
+    do
+        attempts=$((attempts+1))
+        if [ $attempts -le 5 ]
+        then
+            echo "selenium-standalone is not ready yet, retrying ($attempts)"
+            sleep 1
+        else
+            echo "selenium-standalone didn't start successfully"
+            kill "$pid"
+            echo "logs can be found here:"
+            echo "$sout"
+            echo "$serr"
+            exit 1
+        fi
+    done
+
+    echo "selenium standalone is running"
+
+    "$@"
+
+    kill "$pid"
+    touch "$serr" && rm "$serr"
+    rm "$sout"
+
+else
+    echo could not start ss
+fi
