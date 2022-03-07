@@ -99,9 +99,7 @@ const init = (
   cancelButton.onclick = async () => {
     window.clearInterval(pollingHandle);
     countdown.stop();
-    await withLoader(() =>
-      connection.exitDeviceRegistrationMode(userNumber)
-    );
+    await withLoader(() => connection.exitDeviceRegistrationMode(userNumber));
     await renderManage(userNumber, connection);
   };
 };
