@@ -5,7 +5,6 @@ import {
   Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { setUserNumber } from "../../../utils/userNumber";
-import { Principal } from "@dfinity/principal";
 import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
 
 export type TentativeRegistrationInfo = {
@@ -15,7 +14,6 @@ export type TentativeRegistrationInfo = {
 const pageContent = (
   userNumber: bigint,
   alias: string,
-  publicKey: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
   <div class="container">
@@ -46,20 +44,11 @@ const pageContent = (
 export const showVerificationCode = async (
   userNumber: bigint,
   alias: string,
-  principal: Principal,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
   credentialToBeVerified: CredentialId
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(
-    pageContent(
-      userNumber,
-      alias,
-      principal.toString(),
-      tentativeRegistrationInfo
-    ),
-    container
-  );
+  render(pageContent(userNumber, alias, tentativeRegistrationInfo), container);
   return init(
     userNumber,
     tentativeRegistrationInfo.device_registration_timeout,

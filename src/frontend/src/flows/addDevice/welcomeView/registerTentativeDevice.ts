@@ -10,7 +10,6 @@ import {
 import { hasOwnProperty } from "../../../utils/utils";
 import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
-import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 
@@ -52,8 +51,7 @@ export type TentativeDeviceInfo = [
 ];
 
 export const addTentativeDevice = async (
-  tentativeDeviceInfo: TentativeDeviceInfo,
-  principal: Principal
+  tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const result = await withLoader(() =>
     IIConnection.addTentativeDevice(...tentativeDeviceInfo)
@@ -63,12 +61,11 @@ export const addTentativeDevice = async (
     await showVerificationCode(
       tentativeDeviceInfo[0],
       tentativeDeviceInfo[1],
-      principal,
       result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
   } else if (hasOwnProperty(result, "device_registration_mode_off")) {
-    await deviceRegistrationDisabledInfo(tentativeDeviceInfo, principal);
+    await deviceRegistrationDisabledInfo(tentativeDeviceInfo);
   } else if (hasOwnProperty(result, "another_device_tentatively_added")) {
     await displayError({
       title: "Tentative Device Already Exists",
@@ -143,6 +140,6 @@ const init = async (userNumber: bigint) => {
       newDevice.getPublicKey().toDer(),
       newDevice.rawId,
     ];
-    await addTentativeDevice(tentativeDeviceInfo, newDevice.getPrincipal());
+    await addTentativeDevice(tentativeDeviceInfo);
   };
 };

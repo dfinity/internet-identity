@@ -5,16 +5,11 @@ import { renderManage } from "../../manage";
 import { hasOwnProperty } from "../../../utils/utils";
 import { displayError } from "../../../components/displayError";
 import { DeviceData } from "../../../../generated/internet_identity_types";
-import { Principal } from "@dfinity/principal";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
 import { warningIcon } from "../../../components/icons";
 
-const pageContent = (
-  alias: string,
-  publicKey: string,
-  endTimestamp: bigint
-) => html`
+const pageContent = (alias: string, endTimestamp: bigint) => html`
   <div class="container">
     <h1>Verify New Device</h1>
     <div class="warnBox">
@@ -63,13 +58,7 @@ export const verifyDevice = async (
   connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const principal = Principal.selfAuthenticating(
-    new Uint8Array(tentativeDevice.pubkey)
-  ).toString();
-  render(
-    pageContent(tentativeDevice.alias, principal, endTimestamp),
-    container
-  );
+  render(pageContent(tentativeDevice.alias, endTimestamp), container);
   init(userNumber, connection, endTimestamp);
 };
 

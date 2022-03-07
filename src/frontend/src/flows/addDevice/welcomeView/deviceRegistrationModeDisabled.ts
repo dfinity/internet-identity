@@ -3,7 +3,6 @@ import {
   addTentativeDevice,
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
-import { Principal } from "@dfinity/principal";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
@@ -37,17 +36,15 @@ const pageContent = (userNumber: bigint) => html`
 `;
 
 export const deviceRegistrationDisabledInfo = async (
-  tentativeDeviceInfo: TentativeDeviceInfo,
-  principal: Principal
+  tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDeviceInfo[0]), container);
-  return init(tentativeDeviceInfo, principal);
+  return init(tentativeDeviceInfo);
 };
 
 const init = async (
-  tentativeDeviceInfo: TentativeDeviceInfo,
-  principal: Principal
+  tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const cancelButton = document.getElementById(
     "deviceRegModeDisabledCancel"
@@ -63,6 +60,6 @@ const init = async (
   ) as HTMLButtonElement;
 
   retryButton.onclick = async () => {
-    await addTentativeDevice(tentativeDeviceInfo, principal);
+    await addTentativeDevice(tentativeDeviceInfo);
   };
 };
