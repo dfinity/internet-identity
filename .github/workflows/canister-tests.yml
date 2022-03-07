@@ -341,3 +341,17 @@ jobs:
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
           pull: "NO-PULL"
+
+  # This ... releases
+  release:
+    runs-on: ubuntu-latest
+
+    # Only run on release tags
+    if: startsWith(github.ref, 'refs/tags/release-')
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: ./scripts/release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
