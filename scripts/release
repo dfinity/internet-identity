@@ -17,6 +17,7 @@ function need_cmd() {
 
 # GitHub Helpers
 
+# needs repo/public_repo
 function check_token() {
     if [ -z "${GITHUB_TOKEN:-}" ]
     then
@@ -31,15 +32,23 @@ function gh() {
     then
         path="https://api.github.com/${path#"/"}"
     fi
-
     shift
-    if ! curl --silent --fail \
+
+    local output=$(mktemp)
+    local http_code
+    http_code=$(curl -w '%{http_code}' -o "$output" --silent  \
             --header "accept: application/vnd.github.v3+json" \
             --header "authorization: token $GITHUB_TOKEN" \
             "$path" \
-            "$@"
+            "$@")
+    if [[ $http_code == 2* ]]
     then
-        >&2 echo "Failed request to '$path' with '$@'"
+        cat "$output"
+        rm "$output"
+    else
+        >&2 echo "Failed ($?) request to '$path' with '$@'"
+        cat "$output" | >&2 jq
+        rm "$output"
         exit 1
     fi
 }
@@ -63,7 +72,7 @@ function gh_post_tgz() {
 # Actual release function
 
 function do_release() {
-    local res; res=$(jq -n '{ tag_name: "nm-this-is-a-test" }' | gh_post_json /repos/dfinity/internet-identity/releases)
+    local res; res=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' | gh_post_json /repos/dfinity/internet-identity/releases)
 
     local release_id; release_id=$(echo "$res" | jq -cMr '.id')
     local html_url; html_url="$(echo "$res" | jq -cMr '.html_url')"
@@ -122,6 +131,13 @@ do
 done
 
 check_token
+
+if [ -z "$tag_name" ]
+then
+    echo no tag name
+    usage
+    exit 1
+fi
 
 need_cmd "curl"
 need_cmd "jq"

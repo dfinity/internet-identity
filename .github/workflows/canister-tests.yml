@@ -352,6 +352,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - run: ./scripts/release
+      - run: ./scripts/release --tag ${{ github.ref }}
         env:
+          # populated by GitHub Actions
+          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
