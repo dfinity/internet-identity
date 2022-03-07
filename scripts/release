@@ -36,6 +36,7 @@ function gh() {
 
     local output=$(mktemp)
     local http_code
+    # NOTE: cannot use `--fail-with-body` because it's not available on GHA
     http_code=$(curl -w '%{http_code}' -o "$output" --silent  \
             --header "accept: application/vnd.github.v3+json" \
             --header "authorization: token $GITHUB_TOKEN" \
