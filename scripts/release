@@ -16,8 +16,9 @@ function need_cmd() {
 }
 
 # GitHub Helpers
+# https://docs.github.com/en/rest/reference/releases#list-releases
 
-# needs repo/public_repo
+# token needs repo/public_repo scope
 function check_token() {
     if [ -z "${GITHUB_TOKEN:-}" ]
     then
@@ -42,6 +43,7 @@ function gh() {
             --header "authorization: token $GITHUB_TOKEN" \
             "$path" \
             "$@")
+
     if [[ $http_code == 2* ]]
     then
         cat "$output"
@@ -64,19 +66,20 @@ function gh_post_json() {
 
 function gh_post_tgz() {
     local path="$1"
-    shift
+    local filename="$2"
+    shift; shift
     gh "$path" --header "content-type: application/gzip" \
-        --data-binary @- \
+        --data-binary "@$filename" \
         "$@"
 }
 
 # Actual release function
 
 function do_release() {
-    local res; res=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' | gh_post_json /repos/dfinity/internet-identity/releases)
+    local release_json; release_json=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' | gh_post_json /repos/dfinity/internet-identity/releases)
 
-    local release_id; release_id=$(echo "$res" | jq -cMr '.id')
-    local html_url; html_url="$(echo "$res" | jq -cMr '.html_url')"
+    local release_id; release_id=$(echo "$release_json" | jq -cMr '.id')
+    local html_url; html_url="$(echo "$release_json" | jq -cMr '.html_url')"
 
     echo "created release $release_id ($html_url)"
 
@@ -89,8 +92,10 @@ function do_release() {
         do
             filename=$(basename "$filename")
             echo -n " - $filename"
-            local upload_url; upload_url=$(echo "$res" | jq -cMr '.upload_url' | sed "s/{.*}/?name=$filename/")
-            res=$(cat "$filename" | gh_post_tgz "$upload_url")
+            echo "$release_json" | jq
+            local upload_url; upload_url=$(echo "$release_json" | jq -cMr '.upload_url' | sed "s/{.*}/?name=$filename/")
+            echo "upload url: $upload_url"
+            gh_post_tgz "$upload_url" "$filename" >/dev/null
             echo " (done)"
         done
     fi
