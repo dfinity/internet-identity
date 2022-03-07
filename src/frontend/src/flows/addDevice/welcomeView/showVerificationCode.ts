@@ -23,8 +23,8 @@ const pageContent = (
     <p>
       This device was added tentatively to the Identity Anchor
       <b>${userNumber}</b>. Log in on an existing device and verify this device
-      using the verification code below. After successful verification this page will
-      automatically refresh.
+      using the verification code below. After successful verification this page
+      will automatically refresh.
     </p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>

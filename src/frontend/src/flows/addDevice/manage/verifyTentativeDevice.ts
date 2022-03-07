@@ -1,14 +1,14 @@
-import {html, render} from "lit-html";
-import {IIConnection} from "../../../utils/iiConnection";
-import {withLoader} from "../../../components/loader";
-import {renderManage} from "../../manage";
-import {hasOwnProperty} from "../../../utils/utils";
-import {displayError} from "../../../components/displayError";
-import {DeviceData} from "../../../../generated/internet_identity_types";
-import {Principal} from "@dfinity/principal";
-import {toggleErrorMessage} from "../../../utils/errorHelper";
-import {formatRemainingTime, setupCountdown} from "../../../utils/countdown";
-import {warningIcon} from "../../../components/icons";
+import { html, render } from "lit-html";
+import { IIConnection } from "../../../utils/iiConnection";
+import { withLoader } from "../../../components/loader";
+import { renderManage } from "../../manage";
+import { hasOwnProperty } from "../../../utils/utils";
+import { displayError } from "../../../components/displayError";
+import { DeviceData } from "../../../../generated/internet_identity_types";
+import { Principal } from "@dfinity/principal";
+import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
+import { warningIcon } from "../../../components/icons";
 
 const pageContent = (
   alias: string,
@@ -22,9 +22,9 @@ const pageContent = (
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-          Verifying will add the shown device to your Identity Anchor. It will have <b>full control over your identity</b>. Only
-          enter a verification code here if you are sure that you
-          <i>personally own</i> this device.
+          Verifying will add the shown device to your Identity Anchor. It will
+          have <b>full control over your identity</b>. Only enter a verification
+          code here if you are sure that you <i>personally own</i> this device.
         </div>
       </div>
     </div>
@@ -46,7 +46,7 @@ const pageContent = (
     <div id="wrongCodeMessage" class="error-message-hidden">
       The entered verification code was invalid. Please try again.
     </div>
-    <input id="tentativeDeviceCode" placeholder="Verification Code"/>
+    <input id="tentativeDeviceCode" placeholder="Verification Code" />
     <p>
       Time remaining:
       <span id="timer">${formatRemainingTime(endTimestamp)}</span>

@@ -17,18 +17,28 @@ const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
       <b>${userNumber}</b>. Please follow these steps to add your new device:
     </p>
     <ol class="instruction-steps">
-      <li>On your <i>new</i> device:<br> Open <b>https://identity.ic0.app</b></li>
       <li>
-        On your <i>new</i> device:<br> Chose
+        On your <i>new</i> device:<br />
+        Open <b>https://identity.ic0.app</b>
+      </li>
+      <li>
+        On your <i>new</i> device:<br />
+        Chose
         <b>Already have an anchor but using a new device?</b>
       </li>
       <li>
-        On your <i>new</i> device:<br> Enter your Identity Anchor
+        On your <i>new</i> device:<br />
+        Enter your Identity Anchor
         <b>${userNumber}</b>
       </li>
-      <li>On your <i>new</i> device:<br> Choose an alias for your new device</li>
+      <li>
+        On your <i>new</i> device:<br />
+        Choose an alias for your new device
+      </li>
     </ol>
-    <p>This page will automatically refresh after completing the above steps.</p>
+    <p>
+      This page will automatically refresh after completing the above steps.
+    </p>
     <p>
       Time remaining:
       <span id="timer">${formatRemainingTime(endTimestamp)}</span>

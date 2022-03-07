@@ -14,9 +14,9 @@ import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import {pollForTentativeDevice} from "./addDevice/manage/pollForTentativeDevice";
-import {chooseDeviceAddFlow} from "./addDevice/manage";
-import {addLocalDevice} from "./addDevice/manage/addLocalDevice";
+import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
+import { chooseDeviceAddFlow } from "./addDevice/manage";
+import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({

@@ -14,13 +14,22 @@ const pageContent = (userNumber: bigint) => html`
     </p>
     <ol class="instruction-steps">
       <li>
-        On an <i>existing</i> device:<br> Log into
-        <b>https://identity.ic0.app</b> with Identity Anchor
+        On an <i>existing</i> device:<br />
+        Log into <b>https://identity.ic0.app</b> with Identity Anchor
         <b>${userNumber}</b>
       </li>
-      <li>On an <i>existing</i> device:<br> Click <b>Add new device</b></li>
-      <li>On an <i>existing</i> device:<br> Chose <b>Remote Device</b></li>
-      <li>On <i>this</i> device:<br> Press <b>Retry</b></li>
+      <li>
+        On an <i>existing</i> device:<br />
+        Click <b>Add new device</b>
+      </li>
+      <li>
+        On an <i>existing</i> device:<br />
+        Chose <b>Remote Device</b>
+      </li>
+      <li>
+        On <i>this</i> device:<br />
+        Press <b>Retry</b>
+      </li>
     </ol>
     <button id="deviceRegModeDisabledRetry" class="primary">Retry</button>
     <button id="deviceRegModeDisabledCancel">Cancel</button>

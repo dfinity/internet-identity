@@ -1,4 +1,4 @@
-import {html, render} from "lit-html";
+import { html, render } from "lit-html";
 import {
   networkIcon,
   securityKeyIcon,
@@ -49,10 +49,10 @@ const pageContent = () => html`
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-            You are in the process of adding a new device. Any device added here
-            will have <b>full control over your identity</b>. Only continue the
-            process if you want to add a new device that you
-            <i>personally own</i>.
+          You are in the process of adding a new device. Any device added here
+          will have <b>full control over your identity</b>. Only continue the
+          process if you want to add a new device that you
+          <i>personally own</i>.
         </div>
       </div>
     </div>
@@ -61,8 +61,8 @@ const pageContent = () => html`
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-          Do not continue if you were prompted to do this by any other
-          website than <b>https://identity.ic0.app</b>!
+          Do not continue if you were prompted to do this by any other website
+          than <b>https://identity.ic0.app</b>!
         </div>
       </div>
     </div>
