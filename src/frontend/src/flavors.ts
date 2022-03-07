@@ -30,7 +30,8 @@ export const showWarning = (): void => {
       .flavors-warning-container {
         background: ${razzmatazz};
         color: ${white};
-        width: 100vw;
+        width: 100%;
+        box-sizing: border-box;
         padding: 0.5em 1em;
         margin: 0 0 1rem;
         text-align: center;
