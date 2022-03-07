@@ -7,20 +7,20 @@ import { Principal } from "@dfinity/principal";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="container">
-    <h1>Device Registration Disabled</h1>
+    <h1>Device Registration Not Enabled</h1>
     <p>
       Device registration is not enabled for the Identity Anchor
       <b>${userNumber}</b>. To enable device registration do the following:
     </p>
     <ol class="instruction-steps">
       <li>
-        On an <i>existing</i> device: Log into
+        On an <i>existing</i> device:<br> Log into
         <b>https://identity.ic0.app</b> with Identity Anchor
         <b>${userNumber}</b>
       </li>
-      <li>On an <i>existing</i> device: Click <b>Add new device</b></li>
-      <li>On an <i>existing</i> device: Chose <b>Remote Device</b></li>
-      <li>On <i>this</i> device: Press <b>Retry</b></li>
+      <li>On an <i>existing</i> device:<br> Click <b>Add new device</b></li>
+      <li>On an <i>existing</i> device:<br> Chose <b>Remote Device</b></li>
+      <li>On <i>this</i> device:<br> Press <b>Retry</b></li>
     </ol>
     <button id="deviceRegModeDisabledRetry" class="primary">Retry</button>
     <button id="deviceRegModeDisabledCancel">Cancel</button>

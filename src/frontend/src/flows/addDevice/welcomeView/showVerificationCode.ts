@@ -19,11 +19,11 @@ const pageContent = (
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
   <div class="container">
-    <h1>Device Added Tentatively</h1>
+    <h1>Device Verification Required</h1>
     <p>
       This device was added tentatively to the Identity Anchor
       <b>${userNumber}</b>. Log in on an existing device and verify this device
-      using the PIN below. After successful verification this page will
+      using the verification code below. After successful verification this page will
       automatically refresh.
     </p>
     <label>Alias</label>
