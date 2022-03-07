@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+declare -a filenames=( )
+declare tag_name
+
+function usage() {
+    echo "USAGE:"
+}
+
+function need_cmd() {
+    if ! command -v "$1" >/dev/null
+    then
+        echo "please install $1"
+    fi
+}
+
+# GitHub Helpers
+
+function check_token() {
+    if [ -z "${GITHUB_TOKEN:-}" ]
+    then
+        echo "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token"
+        exit 1
+    fi
+}
+
+function gh() {
+    local path=$1
+    if [[ $path != https://* ]]
+    then
+        path="https://api.github.com/${path#"/"}"
+    fi
+
+    shift
+    if ! curl --silent --fail \
+            --header "accept: application/vnd.github.v3+json" \
+            --header "authorization: token $GITHUB_TOKEN" \
+            "$path" \
+            "$@"
+    then
+        >&2 echo "Failed request to '$path' with '$@'"
+        exit 1
+    fi
+}
+
+function gh_post_json() {
+    local path="$1"
+    shift
+    gh "$path" --header "content-type: application/json" \
+        --data-binary @- \
+        "$@"
+}
+
+function gh_post_tgz() {
+    local path="$1"
+    shift
+    gh "$path" --header "content-type: application/gzip" \
+        --data-binary @- \
+        "$@"
+}
+
+# Actual release function
+
+function do_release() {
+    local res; res=$(jq -n '{ tag_name: "nm-this-is-a-test" }' | gh_post_json /repos/dfinity/internet-identity/releases)
+
+    local release_id; release_id=$(echo "$res" | jq -cMr '.id')
+    local html_url; html_url="$(echo "$res" | jq -cMr '.html_url')"
+
+    echo "created release $release_id ($html_url)"
+
+    if [ ${#filenames[@]} -eq 0 ]
+    then
+        echo "no files to upload"
+    else
+        echo "uploading assets"
+        for filename in "${filenames[@]}"
+        do
+            filename=$(basename "$filename")
+            echo -n " - $filename"
+            local upload_url; upload_url=$(echo "$res" | jq -cMr '.upload_url' | sed "s/{.*}/?name=$filename/")
+            res=$(cat "$filename" | gh_post_tgz "$upload_url")
+            echo " (done)"
+        done
+    fi
+
+    echo "done creating release"
+    echo "  $html_url"
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            usage
+            exit 0
+            ;;
+        --tag)
+            echo "$@"
+            tag_name="${2:?missing value for '--tag'}"
+            shift; # shift past --tag and value
+            shift;
+            echo "$@"
+            ;;
+        --)
+            shift
+            for filename in "$@"
+            do
+                filenames+=( "$filename" )
+                shift
+            done
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+check_token
+
+need_cmd "curl"
+need_cmd "jq"
+
+do_release
