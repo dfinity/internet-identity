@@ -9,7 +9,7 @@ import { footer } from "../../components/footer";
 import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
-import { addRemoteDevice } from "../add-device-remote/addRemoteDevice";
+import { addRemoteDevice } from "../addDevice/welcomeView";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {

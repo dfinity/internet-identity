@@ -1,26 +1,32 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
-import { renderManage } from "../manage";
-import { withLoader } from "../../components/loader";
+import { IIConnection } from "../../../utils/iiConnection";
+import { renderManage } from "../../manage";
+import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";
 import {
   Countdown,
   formatRemainingTime,
   setupCountdown,
-} from "../../utils/countdown";
+} from "../../../utils/countdown";
 
 const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
   <div class="container">
     <h1>Add New Remote Device</h1>
     <p>
-      Device registration process started for Identity Anchor
+      Device registration mode enabled for Identity Anchor
       <b>${userNumber}</b>. Please follow these steps to add your new device:
     </p>
-    <ol>
-      <li>Open <b>https://identity.ic0.app</b> on your remote machine</li>
-      <li>Chose <b>Already have an anchor but using a new device?</b></li>
-      <li>Enter your Identity Anchor: <b>${userNumber}</b></li>
-      <li>Enter an alias for your new device</li>
+    <ol class="instruction-steps">
+      <li>On your <i>new device</i>: Open <b>https://identity.ic0.app</b></li>
+      <li>
+        On your <i>new device</i>: Chose
+        <b>Already have an anchor but using a new device?</b>
+      </li>
+      <li>
+        On your <i>new device</i>: Enter your Identity Anchor
+        <b>${userNumber}</b>
+      </li>
+      <li>On your <i>new device</i>: Choose an alias for your new device</li>
     </ol>
     <p>
       Time remaining:

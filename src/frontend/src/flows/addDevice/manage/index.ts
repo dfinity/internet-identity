@@ -3,7 +3,7 @@ import {
   networkIcon,
   securityKeyIcon,
   warningIcon,
-} from "../../components/icons";
+} from "../../../components/icons";
 
 const pageContent = () => html`
   <style>

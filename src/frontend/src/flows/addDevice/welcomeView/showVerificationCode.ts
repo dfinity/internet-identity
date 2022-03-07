@@ -1,12 +1,12 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { IIConnection } from "../../../utils/iiConnection";
 import {
   CredentialId,
   Timestamp,
-} from "../../../generated/internet_identity_types";
-import { setUserNumber } from "../../utils/userNumber";
+} from "../../../../generated/internet_identity_types";
+import { setUserNumber } from "../../../utils/userNumber";
 import { Principal } from "@dfinity/principal";
-import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
+import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
 
 export type TentativeRegistrationInfo = {
   verification_code: string;

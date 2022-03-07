@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
-import { parseUserNumber } from "../../utils/userNumber";
+import { parseUserNumber } from "../../../utils/userNumber";
 import { registerTentativeDevice } from "./registerTentativeDevice";
-import { toggleErrorMessage } from "../../utils/errorHelper";
+import { toggleErrorMessage } from "../../../utils/errorHelper";
 
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
@@ -37,7 +37,7 @@ const init = () => {
   ) as HTMLButtonElement;
 
   cancelButton.onclick = () => {
-    // TODO L2-309: Try to do this without reload
+    // TODO L2-309: do this without reload
     window.location.reload();
   };
 

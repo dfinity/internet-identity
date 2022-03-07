@@ -1,14 +1,14 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
-import { withLoader } from "../../components/loader";
-import { renderManage } from "../manage";
-import { hasOwnProperty } from "../../utils/utils";
-import { displayError } from "../../components/displayError";
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { IIConnection } from "../../../utils/iiConnection";
+import { withLoader } from "../../../components/loader";
+import { renderManage } from "../../manage";
+import { hasOwnProperty } from "../../../utils/utils";
+import { displayError } from "../../../components/displayError";
+import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
-import { toggleErrorMessage } from "../../utils/errorHelper";
-import { formatRemainingTime, setupCountdown } from "../../utils/countdown";
-import { warningIcon } from "../../components/icons";
+import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
+import { warningIcon } from "../../../components/icons";
 
 const pageContent = (
   alias: string,

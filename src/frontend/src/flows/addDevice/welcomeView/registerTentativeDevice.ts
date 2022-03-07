@@ -1,15 +1,18 @@
 import { html, render } from "lit-html";
-import { creationOptions, IIConnection } from "../../utils/iiConnection";
+import { creationOptions, IIConnection } from "../../../utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { KeyType, Purpose } from "../../../generated/internet_identity_types";
-import { hasOwnProperty } from "../../utils/utils";
+import {
+  KeyType,
+  Purpose,
+} from "../../../../generated/internet_identity_types";
+import { hasOwnProperty } from "../../../utils/utils";
 import { showVerificationCode } from "./showVerificationCode";
-import { withLoader } from "../../components/loader";
+import { withLoader } from "../../../components/loader";
 import { Principal } from "@dfinity/principal";
-import { toggleErrorMessage } from "../../utils/errorHelper";
-import { displayError } from "../../components/displayError";
+import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { displayError } from "../../../components/displayError";
 
 const pageContent = () => html`
   <div class="container">
@@ -73,7 +76,7 @@ export const addTentativeDevice = async (
         'The "add device" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the "add device" process.',
       primaryButton: "Ok",
     });
-    // TODO L2-309: Try to do this without reload
+    // TODO L2-309: do this without reload
     window.location.reload();
   } else {
     throw new Error(
@@ -91,7 +94,7 @@ const init = async (userNumber: bigint) => {
   ) as HTMLButtonElement;
 
   cancelButton.onclick = () => {
-    // TODO L2-309: Try to do this without reload
+    // TODO L2-309: do this without reload
     window.location.reload();
   };
 
@@ -128,7 +131,7 @@ const init = async (userNumber: bigint) => {
         detail: error instanceof Error ? error.message : JSON.stringify(error),
         primaryButton: "Ok",
       });
-      // TODO L2-309: Try to do this without reload
+      // TODO L2-309: do this without reload
       window.location.reload();
       return;
     }

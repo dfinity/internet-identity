@@ -50,7 +50,7 @@ footer {
 }
 
 p,
-ol {
+.instruction-steps {
   line-height: 22px;
   color: var(--grey-700);
   font-size: 1rem;

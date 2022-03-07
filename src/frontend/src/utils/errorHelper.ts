@@ -1,3 +1,9 @@
+/**
+ * Toggles the CSS classes on error message element and the input element to either show or hide error information.
+ * @param inputElementId id of the input element
+ * @param errorMessageId id of the error message element
+ * @param show Boolean flag whether the error information should be shown or not
+ */
 export function toggleErrorMessage(
   inputElementId: string,
   errorMessageId: string,
