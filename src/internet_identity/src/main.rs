@@ -16,7 +16,6 @@ use AddTentativeDeviceResponse::DeviceRegistrationModeOff;
 
 use crate::AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
 use assets::ContentType;
-use internet_identity::nonce_cache::NonceCache;
 use internet_identity::signature_map::SignatureMap;
 use storage::{Salt, Storage};
 use TentativeDeviceRegistrationState::DeviceTentativelyAdded;
