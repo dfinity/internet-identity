@@ -115,11 +115,6 @@ type InternetIdentityInit = record {
   assigned_user_number_range : record { nat64; nat64; };
 };
 
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
-};
-
 type ChallengeKey = text;
 
 type ChallengeResult = record {
@@ -135,7 +130,7 @@ type IdentityAnchorInfo = record {
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
-  create_challenge : (ProofOfWork) -> (Challenge);
+  create_challenge : () -> (Challenge);
   register : (DeviceData, ChallengeResult) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();

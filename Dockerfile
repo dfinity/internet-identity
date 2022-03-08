@@ -65,7 +65,6 @@ COPY . .
 ARG II_FETCH_ROOT_KEY=
 ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
-ARG II_DUMMY_POW=
 
 RUN touch src/internet_identity/src/lib.rs
 RUN npm ci

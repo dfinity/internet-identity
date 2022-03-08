@@ -18,7 +18,6 @@ import {
   GetDelegationResponse,
   IdentityAnchorInfo,
   KeyType,
-  ProofOfWork,
   PublicKey,
   Purpose,
   RegisterResponse,
@@ -301,12 +300,9 @@ export class IIConnection {
     return await actor.lookup(userNumber);
   }
 
-  static async createChallenge(pow: ProofOfWork): Promise<Challenge> {
+  static async createChallenge(): Promise<Challenge> {
     const actor = await this.createActor();
-    console.log(
-      `createChallenge(ProofOfWork { timestamp=${pow.timestamp}, nonce=${pow.nonce} })`
-    );
-    const challenge = await actor.create_challenge(pow);
+    const challenge = await actor.create_challenge();
     console.log("Challenge Created");
     return challenge;
   }

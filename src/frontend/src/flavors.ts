@@ -7,7 +7,6 @@ export const flavors = {
   FETCH_ROOT_KEY: process.env.II_FETCH_ROOT_KEY === "1",
   DUMMY_AUTH: process.env.II_DUMMY_AUTH === "1",
   DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
-  DUMMY_POW: process.env.II_DUMMY_POW === "1",
 };
 
 export const anyFlavors = (): boolean => {
@@ -23,16 +22,18 @@ export const showWarningOnFlavors = (): void => {
 export const showWarning = (): void => {
   const container = document.createElement("div");
   container.className = "flavors-warning-container";
-  const red = "#A8201A";
-  const white = "#E2EFDE";
+  const razzmatazz = "#ED1E79";
+  const white = "#FFFFFF";
 
   const warning = html`
     <style>
       .flavors-warning-container {
-        background: ${red};
+        background: ${razzmatazz};
         color: ${white};
-        width: 100vw;
+        width: 100%;
+        box-sizing: border-box;
         padding: 0.5em 1em;
+        margin: 0 0 1rem;
         text-align: center;
       }
 
@@ -53,7 +54,7 @@ export const showWarning = (): void => {
       .flavors-warning-btn:hover,
       .flavors-warning-btn:focus {
         background: ${white};
-        color: ${red};
+        color: ${razzmatazz};
       }
     </style>
     This is an insecure development version of Internet Identity.

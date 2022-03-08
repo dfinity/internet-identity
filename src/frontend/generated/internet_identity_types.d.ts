@@ -61,7 +61,6 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp }
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
@@ -91,7 +90,7 @@ export interface _SERVICE {
   'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<
       AddTentativeDeviceResponse
     >,
-  'create_challenge' : (arg_0: ProofOfWork) => Promise<Challenge>,
+  'create_challenge' : () => Promise<Challenge>,
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,

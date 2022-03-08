@@ -76,9 +76,6 @@ type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identi
 -- Pulls in all type definitions as Haskell type aliases
 [Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
-mkPOW :: Word64 -> Word64 -> ProofOfWork
-mkPOW t n = #timestamp .== t .+ #nonce .== n
-
 httpGet :: String -> HttpRequest
 httpGet url = #method .== T.pack "GET"
   .+ #url .== T.pack url
@@ -277,23 +274,6 @@ device2 = empty
 anonymousID :: EntityId
 anonymousID = EntityId "\x04"
 
--- Various proof of work values
-invalidPOW :: ProofOfWork
-invalidPOW = mkPOW 0 0
-
--- Hardcoded solutions for the POW puzzle
-powNonceAt :: Blob -> Word64 -> Word64
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 0 = 57583
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 1 = 40219
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 1200000000000 = 104906
-powNonceAt cid ts = error $ printf
-    "No proof of work on record. Please run\nnpx ts-node pow.ts %s %d\nand add to this table as\npowNonceAt %s %d = <paste number here>"
-    (asHex cid) ts
-    (show cid) ts
-
-powAt ::  Blob -> Word64 -> ProofOfWork
-powAt cid ts = mkPOW ts (powNonceAt cid ts)
-
 -- Check that the user has the following device data
 lookupIs
     :: Blob -- ^ canister ID
@@ -487,11 +467,6 @@ decodeTree s =
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
 -- | The actual tests.
--- Note about timing and Proof of Work: all canisters start out with timestamp
--- 0. ic-hs increments the timestamp whenever the canister steps. This means
--- that all operations here happen at time ~0, so (unless the canister time is
--- manually updated as happens in a few tests) a "valid" proof of work is one
--- that's been found for timestamp =~ 0.
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
@@ -499,20 +474,10 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    challenge <- getChallenge cid dummyUserId (powAt cid 1)
+    challenge <- getChallenge cid dummyUserId
     callIIRejectWith cid dummyUserId #register (device1, challenge) "[a-z0-9-]+ could not be authenticated against"
-  , withoutUpgrade $ iiTest "create_challenge with bad pow fails" $ \cid -> do
-    callIIRejectWith cid webauth1ID #create_challenge invalidPOW "proof of work hash check failed"
-  , withoutUpgrade $ iiTest "create_challenge with future pow fails" $ \cid -> do
-    callIIRejectWith cid webauth1ID #create_challenge (powAt cid (20*60*1000_000_000)) "proof of work timestamp [0-9]+ is too far in future, current time: [0-9]+"
-  , withoutUpgrade $ iiTest "create_challenge with past pow fails" $ \cid -> do
-    setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIRejectWith cid webauth1ID #create_challenge (powAt cid 1) "proof of work timestamp [0-9]+ is too old, current time: [0-9]+"
-  , withoutUpgrade $ iiTest "create_challenge with repeated pow fails" $ \cid -> do
-    _ <- register cid webauth1ID device1 (powAt cid 1)
-    callIIRejectWith cid webauth1ID #create_challenge (powAt cid 1) "the combination of timestamp [0-9]+ and nonce [0-9]+ has already been used"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
@@ -520,12 +485,12 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withoutUpgrade $ iiTest "enter registration mode" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     lift $ expiration @?= 900000000022
 
   , withoutUpgrade $ iiTest "reject enter registration mode with wrong caller" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     callIIRejectWith cid webauth2ID #enter_device_registration_mode user_number "[a-z0-9-]+ could not be authenticated"
 
   , withoutUpgrade $ iiTest "register remote device" $ \cid -> do
@@ -538,7 +503,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid user_number [device1, device2]
 
   , withoutUpgrade $ iiTest "should return tentative device" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     anchor_info <- callII cid webauth1ID #get_anchor_info user_number
@@ -547,19 +512,19 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ anchor_info .! #device_registration_mode_expiration @?= Just expiration
 
   , withoutUpgrade $ iiTest "reject tentative device if not in registration mode" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
 
   , withoutUpgrade $ iiTest "reject tentative device if registration mode is disabled again" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     _ <- callII cid webauth1ID #enter_device_registration_mode user_number
     _ <- callII cid webauth1ID #exit_device_registration_mode user_number
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
  
   , withoutUpgrade $ iiTest "reject tentative device if registration mode is expired" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     lift $ expiration @?= response .! #device_registration_timeout
@@ -568,7 +533,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ result .! #retries_left @?= 0
 
   , withoutUpgrade $ iiTest "reject wrong code on verify remote device" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     _ <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     V.IsJust (V.Label :: Label "wrong_code") try1_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
@@ -587,38 +552,38 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid 123 []
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     assertStats cid 1
     when should_upgrade $ doUpgrade cid
     assertStats cid 1
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup (with credential id)" $ \cid -> do
-    user_number <- register cid webauth2ID device2 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth2ID device2 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register add lookup" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callII cid webauth1ID #add (user_number, device2)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device1, device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and add with wrong user" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callIIReject cid webauth2ID #add (user_number, device2)
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
     queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation and validate" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -649,7 +614,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
 
@@ -659,7 +624,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -687,7 +652,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
 
   , withoutUpgrade $ iiTest "get multiple delegations and expire" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -715,7 +680,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
 
   , withUpgrade $ \should_upgrade -> iiTest "user identities differ" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
@@ -736,7 +701,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       lift $ assertFailure "User identities coincide for different frontends"
 
   , withUpgrade $ \should_upgrade -> iiTest "remove()" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     lookupIs cid user_number [device1]
     callII cid webauth1ID #add (user_number, device2)
     lookupIs cid user_number [device1, device2]
@@ -748,7 +713,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callII cid webauth2ID #remove (user_number, webauth2PK)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number []
-    user_number2 <- register cid webauth1ID device1 (powAt cid 1) >>= mustGetUserNumber
+    user_number2 <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     when (user_number == user_number2) $
       lift $ assertFailure "Identity Anchor re-used"
@@ -758,10 +723,10 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     assertStats cid 0
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 100
     assertStats cid 1
-    user_number <- register cid webauth1ID device1 (powAt cid 1) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 101
     assertStats cid 2
 
@@ -773,20 +738,18 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let expected_upper_bound = if should_upgrade then 100 + 3_774_873 else 103
     lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
 
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 102
-    assertStats cid 3
-    callIIReject cid webauth1ID #create_challenge (powAt cid 0)
     assertStats cid 3
 
   , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #assigned_user_number_range @?= (100, 100)
-    response <- register cid webauth1ID device1 (powAt cid 0)
+    response <- register cid webauth1ID device1
     assertVariant #canister_full response
 
   , withUpgrade $ \should_upgrade -> iiTest "metrics endpoint" $ \cid -> do
-    _ <- register cid webauth2ID device2 (powAt cid 1) >>= mustGetUserNumber
+    _ <- register cid webauth2ID device2 >>= mustGetUserNumber
     metrics <- callII cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
 
     assertMetric metrics "internet_identity_user_count" 1.0
@@ -794,7 +757,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     when should_upgrade $ doUpgrade cid
 
-    userNumber <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    userNumber <- register cid webauth1ID device1 >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
@@ -901,15 +864,15 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #wasm_module .== wasm
         .+ #arg .== Candid.encode ()
 
-    getChallenge cid webauthID pow = do
-      challenge <- callII cid webauthID #create_challenge pow
+    getChallenge cid webauthID = do
+      challenge <- callII cid webauthID #create_challenge ()
       pure $ #key .== challenge .! #challenge_key .+ #chars .== T.pack "a"
 
     -- Go through a challenge request/registration flow for this device.
     -- NOTE: this (dummily) solves the challenge with the string "a", which is
     -- returned by the backend when compiled with II_DUMMY_CAPTCHA.
-    register cid webauthID device pow =
-      getChallenge cid webauthID pow >>= callII cid webauthID #register . (device,)
+    register cid webauthID device =
+      getChallenge cid webauthID >>= callII cid webauthID #register . (device,)
 
 asHex :: Blob -> String
 asHex = T.unpack . H.encodeHex . BS.toStrict

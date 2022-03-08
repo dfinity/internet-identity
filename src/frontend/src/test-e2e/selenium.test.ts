@@ -29,7 +29,6 @@ import {
   runInBrowser,
   runInNestedBrowser,
   Screenshots,
-  setupSeleniumServer,
   switchToPopup,
   waitForFonts,
   waitToClose,
@@ -56,8 +55,6 @@ const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
-
-setupSeleniumServer();
 
 test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

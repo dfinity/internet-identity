@@ -23,7 +23,6 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
-  const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'another_device_tentatively_added' : IDL.Null,
@@ -31,10 +30,6 @@ export const idlFactory = ({ IDL }) => {
       'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
     }),
-  });
-  const ProofOfWork = IDL.Record({
-    'nonce' : IDL.Nat64,
-    'timestamp' : Timestamp,
   });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
@@ -48,6 +43,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
+  const Timestamp = IDL.Nat64;
   const Delegation = IDL.Record({
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
@@ -114,7 +110,7 @@ export const idlFactory = ({ IDL }) => {
         [AddTentativeDeviceResponse],
         [],
       ),
-    'create_challenge' : IDL.Func([ProofOfWork], [Challenge], []),
+    'create_challenge' : IDL.Func([], [Challenge], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
