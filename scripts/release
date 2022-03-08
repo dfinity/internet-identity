@@ -29,13 +29,13 @@ function check_token() {
 
 function gh() {
     local path=$1
+    shift
     if [[ $path != https://* ]]
     then
         path="https://api.github.com/${path#"/"}"
     fi
-    shift
 
-    local output=$(mktemp)
+    local output; output=$(mktemp)
     local http_code
     # NOTE: cannot use `--fail-with-body` because it's not available on GHA
     http_code=$(curl -w '%{http_code}' -o "$output" --silent  \
@@ -49,8 +49,8 @@ function gh() {
         cat "$output"
         rm "$output"
     else
-        >&2 echo "Failed ($?) request to '$path' with '$@'"
-        cat "$output" | >&2 jq
+        >&2 echo "Failed ($?) request to '$path' with '$*'"
+        >&2 jq <"$output"
         rm "$output"
         exit 1
     fi
@@ -76,7 +76,9 @@ function gh_post_tgz() {
 # Actual release function
 
 function do_release() {
-    local release_json; release_json=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' | gh_post_json /repos/dfinity/internet-identity/releases)
+    local release_json
+    release_json=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' \
+        | gh_post_json /repos/dfinity/internet-identity/releases)
 
     local release_id; release_id=$(echo "$release_json" | jq -cMr '.id')
     local html_url; html_url="$(echo "$release_json" | jq -cMr '.html_url')"

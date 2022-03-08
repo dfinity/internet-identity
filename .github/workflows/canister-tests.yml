@@ -87,7 +87,8 @@ jobs:
         with:
           # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
-          # path is the name used as the file to upload, and the created when downloaded
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
           path: ${{ matrix.name }}
 
   #####################
@@ -137,7 +138,7 @@ jobs:
       - name: Run Tests
         shell: bash
         working-directory: backend-tests
-        run: mv internet_identity_test.wasm internet_identity.wasm && cabal run
+        run: mv ../internet_identity_test.wasm ../internet_identity.wasm && cabal run
 
   ######################
   # The selenium tests #
