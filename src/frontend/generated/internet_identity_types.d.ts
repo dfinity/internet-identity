@@ -29,6 +29,10 @@ export interface DeviceData {
   'credential_id' : [] | [CredentialId],
 }
 export type DeviceKey = PublicKey;
+export interface DeviceRegistrationInfo {
+  'tentative_device' : [] | [DeviceData],
+  'expiration' : [] | [Timestamp],
+}
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
@@ -46,9 +50,8 @@ export interface HttpResponse {
   'status_code' : number,
 }
 export interface IdentityAnchorInfo {
-  'tentative_device' : [] | [DeviceData],
-  'device_registration_mode_expiration' : [] | [Timestamp],
   'devices' : Array<DeviceData>,
+  'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface InternetIdentityInit {
   'assigned_user_number_range' : [bigint, bigint],

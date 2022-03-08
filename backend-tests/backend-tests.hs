@@ -494,12 +494,20 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     callIIRejectWith cid webauth2ID #enter_device_registration_mode user_number "[a-z0-9-]+ could not be authenticated"
 
   , withoutUpgrade $ iiTest "register remote device" $ \cid -> do
-    user_number <- register cid webauth1ID device1 (powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     lift $ expiration @?= response .! #device_registration_timeout
-    let verification_code = response .! #verification_code
-    V.IsJust (V.Label :: Label "verified") _ <- callII cid webauth1ID #verify_tentative_device (user_number, verification_code)
+    V.IsJust (V.Label :: Label "verified") _ <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
+    lookupIs cid user_number [device1, device2]
+
+  , withoutUpgrade $ iiTest "register remote device after failed verification attempt" $ \cid -> do
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
+    _ <- callII cid webauth1ID #enter_device_registration_mode user_number
+    V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
+    V.IsJust (V.Label :: Label "wrong_code") try1_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
+    lift $ try1_result .! #retries_left @?= 2
+    V.IsJust (V.Label :: Label "verified") _ <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
     lookupIs cid user_number [device1, device2]
 
   , withoutUpgrade $ iiTest "should return tentative device" $ \cid -> do
@@ -508,22 +516,25 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     V.IsJust (V.Label :: Label "added_tentatively") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     anchor_info <- callII cid webauth1ID #get_anchor_info user_number
     lift $ anchor_info .! #devices @?= V.fromList [device1]
-    lift $ anchor_info .! #tentative_device @?= Just device2
-    lift $ anchor_info .! #device_registration_mode_expiration @?= Just expiration
+    case anchor_info .! #device_registration of
+      Just registration_info -> do
+        lift $ registration_info .! #expiration @?= expiration
+        lift $ registration_info .! #tentative_device @?= Just device2
+      Nothing -> liftIO $ assertFailure $ printf "expected registration_info to be present"
 
   , withoutUpgrade $ iiTest "reject tentative device if not in registration mode" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
 
-  , withoutUpgrade $ iiTest "reject tentative device if registration mode is disabled again" $ \cid -> do
+  , withoutUpgrade $ iiTest "reject tentative device after exiting registration mode" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     _ <- callII cid webauth1ID #enter_device_registration_mode user_number
     _ <- callII cid webauth1ID #exit_device_registration_mode user_number
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
  
-  , withoutUpgrade $ iiTest "reject tentative device if registration mode is expired" $ \cid -> do
+  , withoutUpgrade $ iiTest "reject device verification if registration mode is expired" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)

@@ -122,10 +122,14 @@ type ChallengeResult = record {
     chars : text;
 };
 
+type DeviceRegistrationInfo = record {
+    tentative_device : opt DeviceData;
+    expiration: Timestamp;
+};
+
 type IdentityAnchorInfo = record {
     devices : vec DeviceData;
-    tentative_device : opt DeviceData;
-    device_registration_mode_expiration: opt Timestamp;
+    device_registration: opt DeviceRegistrationInfo;
 };
 
 service : (opt InternetIdentityInit) -> {

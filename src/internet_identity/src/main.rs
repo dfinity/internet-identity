@@ -4,26 +4,26 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
-use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use ic_cdk::api::call::call;
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
+
+use AddTentativeDeviceResponse::AddedTentatively;
+use AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
 use AddTentativeDeviceResponse::DeviceRegistrationModeOff;
-
-use crate::AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
 use assets::ContentType;
+use assets::init_assets;
+use http::{HeaderField, HttpRequest, HttpResponse};
 use internet_identity::signature_map::SignatureMap;
+use RegistrationState::DeviceRegistrationModeActive;
+use RegistrationState::DeviceTentativelyAdded;
 use storage::{Salt, Storage};
-use TentativeDeviceRegistrationState::DeviceTentativelyAdded;
 use VerifyTentativeDeviceResponse::WrongCode;
-
-use crate::assets::init_assets;
-use crate::http::{HeaderField, HttpRequest, HttpResponse};
-use crate::TentativeDeviceRegistrationState::DeviceRegistrationModeActive;
 
 mod assets;
 mod http;
@@ -38,13 +38,14 @@ const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
 const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(8 * 24 * 60 * 60);
 // 1 min
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
+
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
-// 15 mins
-const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
-
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
+
+// 15 mins
+const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
 // How many users can be in registration mode simultaneously
 const MAX_USERS_IN_REGISTRATION_MODE: usize = 10_000;
 // How many verification attempts are given for a tentative device
@@ -187,10 +188,15 @@ enum VerifyTentativeDeviceResponse {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
+struct DeviceRegistrationInfo {
+    expiration: Timestamp,
+    tentative_device: Option<DeviceData>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
 struct IdentityAnchorInfo {
     devices: Vec<DeviceData>,
-    tentative_device: Option<DeviceData>,
-    device_registration_mode_expiration: Option<Timestamp>,
+    device_registration: Option<DeviceRegistrationInfo>,
 }
 
 mod hash;
@@ -209,12 +215,15 @@ struct InternetIdentityInit {
 
 type AssetHashes = RbTree<&'static str, Hash>;
 
-enum TentativeDeviceRegistrationState {
-    DeviceRegistrationModeActive {
-        expiration: Timestamp,
-    },
+struct TentativeDeviceRegistration {
+    expiration: Timestamp,
+    state: RegistrationState,
+}
+
+/// Registration state of new devices added using the two step device add flow
+enum RegistrationState {
+    DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
-        expiration: Timestamp,
         tentative_device: DeviceData,
         verification_code: DeviceVerificationCode,
         failed_attempts: FailedAttemptsCounter,
@@ -231,7 +240,7 @@ struct State {
     inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
     // tentative device registrations, not persisted across updates
     // if a user number is present in this map then registration mode is active until expiration
-    tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistrationState>>,
+    tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
 }
 
 impl Default for State {
@@ -303,6 +312,8 @@ async fn init_salt() {
     });
 }
 
+/// Enables device registration mode for the given user and returns the expiration timestamp (when it will be disabled again).
+/// If the device registration mode is already active it will just return the expiration timestamp again.
 #[update]
 fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
     STATE.with(|state| {
@@ -319,21 +330,22 @@ fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         prune_expired_tentative_device_registrations(state);
-
         if state.tentative_device_registrations.borrow().len() >= MAX_USERS_IN_REGISTRATION_MODE {
             trap("too many users in device registration mode");
         }
 
         let mut device_registration_state = state.tentative_device_registrations.borrow_mut();
         match device_registration_state.get(&user_number) {
-            Some(
-                DeviceTentativelyAdded { expiration, .. }
-                | DeviceRegistrationModeActive { expiration },
-            ) => *expiration, // already enabled, just return the existing expiration
+            Some(TentativeDeviceRegistration { expiration, .. }) => *expiration, // already enabled, just return the existing expiration
             None => {
                 let expiration = time() + REGISTRATION_MODE_DURATION;
-                device_registration_state
-                    .insert(user_number, DeviceRegistrationModeActive { expiration });
+                device_registration_state.insert(
+                    user_number,
+                    TentativeDeviceRegistration {
+                        expiration,
+                        state: DeviceRegistrationModeActive,
+                    },
+                );
                 expiration
             }
         }
@@ -369,28 +381,37 @@ async fn add_tentative_device(
     user_number: UserNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    let verification_code = generate_device_verification_code().await;
+    let verification_code = new_verification_code().await;
+    let now = time();
 
-    match check_tentative_device_registration_prerequisites(user_number) {
-        Ok(device_registration_timeout) => {
-            STATE.with(|state| {
-                state.tentative_device_registrations.borrow_mut().insert(
-                    user_number,
-                    DeviceTentativelyAdded {
-                        expiration: device_registration_timeout,
-                        tentative_device: device_data,
-                        verification_code: verification_code.clone(),
-                        failed_attempts: 0,
-                    },
-                )
-            });
-            AddTentativeDeviceResponse::AddedTentatively {
-                verification_code,
-                device_registration_timeout,
+    STATE.with(|state| {
+        prune_expired_tentative_device_registrations(state);
+
+        let mut tentative_registrations = state.tentative_device_registrations.borrow_mut();
+        let registration = tentative_registrations.get_mut(&user_number);
+
+        match registration {
+            None => DeviceRegistrationModeOff,
+            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
+                DeviceRegistrationModeOff
+            }
+            Some(TentativeDeviceRegistration {
+                state: DeviceTentativelyAdded { .. },
+                ..
+            }) => AnotherDeviceTentativelyAdded,
+            Some(mut registration) => {
+                registration.state = DeviceTentativelyAdded {
+                    tentative_device: device_data,
+                    failed_attempts: 0,
+                    verification_code: verification_code.clone(),
+                };
+                AddedTentatively {
+                    device_registration_timeout: registration.expiration,
+                    verification_code,
+                }
             }
         }
-        Err(err) => err,
-    }
+    })
 }
 
 #[update]
@@ -398,7 +419,7 @@ async fn verify_tentative_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    match check_tentative_device_code_counting_failed_attempts(user_number, user_verification_code) {
+    match get_verified_device(user_number, user_verification_code) {
         Ok(device) => {
             add(user_number, device).await;
             VerifyTentativeDeviceResponse::Verified
@@ -407,56 +428,52 @@ async fn verify_tentative_device(
     }
 }
 
-/// Checks the device verification pin for a tentative device.
+/// Checks the device verification code for a tentative device.
 /// If valid, returns the device to be added and exits device registration mode
 /// If invalid, returns the appropriate error to send to the client and increases failed attempts. Exits device registration mode if there are no retries left.
-fn check_tentative_device_code_counting_failed_attempts(
+fn get_verified_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+    STATE.with(|s| {
+        let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        prune_expired_tentative_device_registrations(state);
+        prune_expired_tentative_device_registrations(s);
 
-        let mut device_registration_state = state.tentative_device_registrations.borrow_mut();
-        match device_registration_state.remove(&user_number) {
-            None | Some(DeviceRegistrationModeActive { .. }) => Err(WrongCode { retries_left: 0 }),
-            Some(DeviceTentativelyAdded {
-                expiration,
-                tentative_device,
+        let mut device_registration_state = s.tentative_device_registrations.borrow_mut();
+        let mut tentative_registration = device_registration_state
+            .remove(&user_number)
+            .ok_or(WrongCode { retries_left: 0 })?;
+
+        match tentative_registration.state {
+            DeviceRegistrationModeActive => Err(WrongCode { retries_left: 0 }),
+            DeviceTentativelyAdded {
+                failed_attempts,
                 verification_code,
-                mut failed_attempts,
-            }) => {
+                tentative_device,
+            } => {
                 if user_verification_code == verification_code {
                     return Ok(tentative_device);
                 }
 
-                failed_attempts = failed_attempts + 1;
+                let failed_attempts = failed_attempts + 1;
                 if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
+                    tentative_registration.state = DeviceTentativelyAdded {
+                        failed_attempts,
+                        tentative_device,
+                        verification_code,
+                    };
                     // reinsert because retries are allowed
-                    device_registration_state.insert(
-                        user_number,
-                        DeviceTentativelyAdded {
-                            expiration,
-                            tentative_device,
-                            verification_code,
-                            failed_attempts,
-                        },
-                    );
+                    device_registration_state.insert(user_number, tentative_registration);
                 }
                 return Err(WrongCode {
-                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts) as u8,
+                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
                 });
             }
         }
@@ -464,7 +481,7 @@ fn check_tentative_device_code_counting_failed_attempts(
 }
 
 /// Return a decimal representation of a random `u32` to be used as verification code
-async fn generate_device_verification_code() -> DeviceVerificationCode {
+async fn new_verification_code() -> DeviceVerificationCode {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
@@ -480,31 +497,14 @@ async fn generate_device_verification_code() -> DeviceVerificationCode {
     format!("{:06}", (rand % 1_000_000))
 }
 
-fn check_tentative_device_registration_prerequisites(
-    user_number: UserNumber,
-) -> Result<Timestamp, AddTentativeDeviceResponse> {
-    STATE.with(|state| {
-        prune_expired_tentative_device_registrations(state);
-
-        match state
-            .tentative_device_registrations
-            .borrow()
-            .get(&user_number)
-        {
-            None => return Err(DeviceRegistrationModeOff),
-            Some(DeviceTentativelyAdded { .. }) => Err(AnotherDeviceTentativelyAdded),
-            Some(DeviceRegistrationModeActive { expiration }) => Ok(*expiration),
-        }
-    })
-}
-
+/// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
 fn prune_expired_tentative_device_registrations(state: &State) {
+    let now = time();
     state
         .tentative_device_registrations
         .borrow_mut()
-        .retain(|_, value| match value {
-            DeviceRegistrationModeActive { expiration }
-            | DeviceTentativelyAdded { expiration, .. } => *expiration > time(),
+        .retain(|_, value| match &value {
+            TentativeDeviceRegistration { expiration, .. } => expiration > &now,
         });
 }
 
@@ -793,37 +793,38 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
             });
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        let devices = entries
-            .into_iter()
-            .map(DeviceData::from)
-            .collect();
-
+        let devices = entries.into_iter().map(DeviceData::from).collect();
         let now = time();
         match state
             .tentative_device_registrations
             .borrow()
             .get(&user_number)
         {
-            Some(DeviceTentativelyAdded {
+            Some(TentativeDeviceRegistration {
                 expiration,
-                tentative_device,
-                ..
+                state:
+                    DeviceTentativelyAdded {
+                        tentative_device, ..
+                    },
             }) if *expiration > now => IdentityAnchorInfo {
                 devices,
-                tentative_device: Some(tentative_device.clone()),
-                device_registration_mode_expiration: Some(*expiration),
+                device_registration: Some(DeviceRegistrationInfo {
+                    expiration: *expiration,
+                    tentative_device: Some(tentative_device.clone()),
+                }),
             },
-            Some(DeviceRegistrationModeActive { expiration }) if *expiration > now => {
+            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
                 IdentityAnchorInfo {
                     devices,
-                    tentative_device: None,
-                    device_registration_mode_expiration: Some(*expiration),
+                    device_registration: Some(DeviceRegistrationInfo {
+                        expiration: *expiration,
+                        tentative_device: None,
+                    }),
                 }
             }
             None | Some(_) => IdentityAnchorInfo {
                 devices,
-                tentative_device: None,
-                device_registration_mode_expiration: None,
+                device_registration: None,
             },
         }
     })

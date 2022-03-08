@@ -61,7 +61,7 @@ const pageContent = () => html`
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
-          Do not continue if you were prompted to do this by any other website
+          Do not continue if you were prompted to do this by any website other
           than <b>https://identity.ic0.app</b>!
         </div>
       </div>

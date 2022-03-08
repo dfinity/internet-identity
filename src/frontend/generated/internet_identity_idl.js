@@ -23,6 +23,7 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'another_device_tentatively_added' : IDL.Null,
@@ -36,14 +37,16 @@ export const idlFactory = ({ IDL }) => {
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
   });
-  const IdentityAnchorInfo = IDL.Record({
+  const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
-    'device_registration_mode_expiration' : IDL.Opt(Timestamp),
+    'expiration' : IDL.Opt(Timestamp),
+  });
+  const IdentityAnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceData),
+    'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
-  const Timestamp = IDL.Nat64;
   const Delegation = IDL.Record({
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),

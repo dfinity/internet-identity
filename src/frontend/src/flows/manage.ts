@@ -135,7 +135,7 @@ export const renderManage = async (
     );
     return renderManage(userNumber, connection);
   }
-  if (anchorInfo.device_registration_mode_expiration.length !== 0) {
+  if (anchorInfo.device_registration.length !== 0) {
     // we are actually in a device registration process
     await pollForTentativeDevice(userNumber, connection);
   } else {
