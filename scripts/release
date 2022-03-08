@@ -21,6 +21,9 @@ Usage:
 Options:
   --tag TAG     specify the tag to release
 
+Environment:
+  GITHUB_TOKEN  (required) Personal Access Token for GitHub
+
 EOF
 }
 
