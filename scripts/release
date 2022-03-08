@@ -4,8 +4,31 @@ set -euo pipefail
 declare -a filenames=( )
 declare tag_name
 
+function title() {
+    echo "Release Internet Identity"
+}
+
 function usage() {
-    echo "USAGE:"
+    cat << EOF
+Usage:
+  release --tag TAG [-- FILE...]
+
+Options:
+  --tag TAG     specify the tag to release
+EOF
+}
+
+function help() {
+    cat << EOF
+
+
+Any files specified after '--' will be uploaded as release assets.
+
+NOTE: This does not generate release notes. A link will be displayed when the
+release is created. Visit that link to write release notes and click "Auto-generate release notes"
+to add contributions and commit information.
+EOF
+
 }
 
 function need_cmd() {
@@ -112,7 +135,9 @@ while [[ $# -gt 0 ]]
 do
     case $1 in
         --help)
+            title
             usage
+            help
             exit 0
             ;;
         --tag)
@@ -133,6 +158,8 @@ do
         *)
             echo "ERROR: unknown argument $1"
             usage
+            echo
+            echo "Use 'release --help' for more information."
             exit 1
             ;;
     esac
