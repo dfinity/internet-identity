@@ -1,14 +1,17 @@
-import {html, render} from "lit-html";
-import {IIConnection} from "../../../utils/iiConnection";
-import {renderManage} from "../../manage";
-import {withLoader} from "../../../components/loader";
-import {verifyDevice} from "./verifyTentativeDevice";
+import { html, render } from "lit-html";
+import { IIConnection } from "../../../utils/iiConnection";
+import { renderManage } from "../../manage";
+import { withLoader } from "../../../components/loader";
+import { verifyDevice } from "./verifyTentativeDevice";
 import {
   Countdown,
   formatRemainingTime,
   setupCountdown,
 } from "../../../utils/countdown";
-import {DeviceData, IdentityAnchorInfo} from "../../../../generated/internet_identity_types";
+import {
+  DeviceData,
+  IdentityAnchorInfo,
+} from "../../../../generated/internet_identity_types";
 
 const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
   <div class="container">
@@ -19,21 +22,21 @@ const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
     </p>
     <ol class="instruction-steps">
       <li>
-        On your <i>new</i> device:<br/>
+        On your <i>new</i> device:<br />
         Open <b>https://identity.ic0.app</b>
       </li>
       <li>
-        On your <i>new</i> device:<br/>
+        On your <i>new</i> device:<br />
         Chose
         <b>Already have an anchor but using a new device?</b>
       </li>
       <li>
-        On your <i>new</i> device:<br/>
+        On your <i>new</i> device:<br />
         Enter your Identity Anchor
         <b>${userNumber}</b>
       </li>
       <li>
-        On your <i>new</i> device:<br/>
+        On your <i>new</i> device:<br />
         Choose an alias for your new device
       </li>
     </ol>
@@ -60,12 +63,7 @@ export const pollForTentativeDevice = async (
     const tentative_device = getTentativeDevice(userInfo);
     if (tentative_device !== undefined) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(
-        userNumber,
-        tentative_device,
-        timestamp,
-        connection
-      );
+      await verifyDevice(userNumber, tentative_device, timestamp, connection);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
       render(pageContent(userNumber, timestamp), container);
@@ -123,9 +121,14 @@ const init = (
   };
 };
 
-const getTentativeDevice = (userInfo: IdentityAnchorInfo): DeviceData | undefined => {
-  if (userInfo.device_registration.length === 1 && userInfo.device_registration[0].tentative_device.length === 1) {
-    return userInfo.device_registration[0].tentative_device[0]
+const getTentativeDevice = (
+  userInfo: IdentityAnchorInfo
+): DeviceData | undefined => {
+  if (
+    userInfo.device_registration.length === 1 &&
+    userInfo.device_registration[0].tentative_device.length === 1
+  ) {
+    return userInfo.device_registration[0].tentative_device[0];
   }
   return undefined;
-}
+};
