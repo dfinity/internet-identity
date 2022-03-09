@@ -81,11 +81,15 @@ jobs:
           outputs: ./out
 
       - run: sha256sum out/internet_identity.wasm
+      - run: mv out/internet_identity.wasm ${{ matrix.name }}
       - name: 'Upload ${{ matrix.name }}'
         uses: actions/upload-artifact@v2
         with:
+          # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
-          path: out/internet_identity.wasm
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ${{ matrix.name }}
 
   #####################
   # The backend tests #
@@ -134,7 +138,7 @@ jobs:
       - name: Run Tests
         shell: bash
         working-directory: backend-tests
-        run: cabal run
+        run: mv ../internet_identity_test.wasm ../internet_identity.wasm && cabal run
 
   ######################
   # The selenium tests #
@@ -197,6 +201,7 @@ jobs:
 
       - name: Deploy Internet Identity
         run: |
+          mv internet_identity_test.wasm internet_identity.wasm
           dfx canister --no-wallet create --all
           dfx canister --no-wallet install internet_identity --argument '(null)'
 
@@ -286,6 +291,7 @@ jobs:
       - name: Deploy II
         run: |
           echo installing
+          mv ./internet_identity_dev.wasm ./internet_identity.wasm
           shasum -a 256 ./internet_identity.wasm
 
           dfx canister --no-wallet create --all
@@ -341,3 +347,44 @@ jobs:
           # do not pull: if this branch is behind, then we might as well let
           # the pushing fail
           pull: "NO-PULL"
+
+  # This ... releases
+  release:
+    runs-on: ubuntu-latest
+
+    # Only run on release tags
+    if: startsWith(github.ref, 'refs/tags/release-')
+
+    needs: docker-build
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_test.wasm
+          path: .
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_dev.wasm
+          path: .
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_production.wasm
+          path: .
+
+      - run: |
+          ./scripts/release --tag ${{ github.ref }} -- \
+            internet_identity_test.wasm \
+            internet_identity_dev.wasm \
+            internet_identity_production.wasm
+
+        env:
+          # populated by GitHub Actions
+          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
