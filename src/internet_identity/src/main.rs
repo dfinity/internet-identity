@@ -1,29 +1,25 @@
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::convert::TryInto;
-
-#[cfg(not(feature = "dummy_captcha"))]
-use captcha::filters::Wave;
-use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use crate::assets::init_assets;
+use crate::http::{HeaderField, HttpRequest, HttpResponse};
+use crate::AddTentativeDeviceResponse::AddedTentatively;
+use crate::AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
+use crate::AddTentativeDeviceResponse::DeviceRegistrationModeOff;
+use crate::RegistrationState::DeviceRegistrationModeActive;
+use crate::RegistrationState::DeviceTentativelyAdded;
+use crate::VerifyTentativeDeviceResponse::WrongCode;
+use assets::ContentType;
 use ic_cdk::api::call::call;
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
+use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
-
-use AddTentativeDeviceResponse::AddedTentatively;
-use AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
-use AddTentativeDeviceResponse::DeviceRegistrationModeOff;
-use assets::ContentType;
-use assets::init_assets;
-use http::{HeaderField, HttpRequest, HttpResponse};
-use internet_identity::signature_map::SignatureMap;
-use RegistrationState::DeviceRegistrationModeActive;
-use RegistrationState::DeviceTentativelyAdded;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::convert::TryInto;
 use storage::{Salt, Storage};
-use VerifyTentativeDeviceResponse::WrongCode;
 
 mod assets;
 mod http;
@@ -31,6 +27,9 @@ mod http;
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+
+#[cfg(not(feature = "dummy_captcha"))]
+use captcha::filters::Wave;
 
 // 30 mins
 const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
