@@ -31,7 +31,7 @@ export interface DeviceData {
 export type DeviceKey = PublicKey;
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
-  'expiration' : [] | [Timestamp],
+  'expiration' : Timestamp,
 }
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |

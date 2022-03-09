@@ -39,7 +39,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
-    'expiration' : IDL.Opt(Timestamp),
+    'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceData),
