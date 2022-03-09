@@ -1,6 +1,6 @@
-// Add a new device (i.e. a device connected to the device the user is
+// Add a new device (i.e. a device connected to the browser the user is
 // currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
-// add e.g. _another_ macbook or iPhone.)
+// add e.g. _another_ browser, macbook or iPhone.)
 import { creationOptions, IIConnection } from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -9,15 +9,7 @@ import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { displayError } from "../../../components/displayError";
 
-const displayFailedToAddNewDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add new device",
-    message: "We failed to add your new device.",
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayFailedToAddTheDevice = (error: Error) =>
+const displayFailedToAddDevice = (error: Error) =>
   displayError({
     title: "Failed to add new device",
     message:
@@ -37,13 +29,14 @@ export const addLocalDevice = async (
       publicKey: creationOptions(devices),
     });
   } catch (error: unknown) {
-    await displayFailedToAddNewDevice(
+    await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
     return renderManage(userNumber, connection);
   }
   const deviceName = await pickDeviceAlias();
   if (deviceName === null) {
+    // user clicked "cancel", so we go back to "manage"
     return renderManage(userNumber, connection);
   }
   try {
@@ -58,7 +51,7 @@ export const addLocalDevice = async (
       )
     );
   } catch (error: unknown) {
-    await displayFailedToAddTheDevice(
+    await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
   }
