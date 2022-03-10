@@ -1,8 +1,6 @@
 use crate::assets::init_assets;
 use crate::http::{HeaderField, HttpRequest, HttpResponse};
-use crate::AddTentativeDeviceResponse::{
-    AddedTentatively, AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff,
-};
+use crate::AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
 use crate::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
@@ -393,9 +391,9 @@ async fn add_tentative_device(
         let registration = tentative_registrations.get_mut(&user_number);
 
         match registration {
-            None => DeviceRegistrationModeOff,
+            None => AddTentativeDeviceResponse::DeviceRegistrationModeOff,
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
-                DeviceRegistrationModeOff
+                AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
             Some(TentativeDeviceRegistration {
                 state: DeviceTentativelyAdded { .. },
@@ -451,7 +449,7 @@ fn get_verified_device(
         let mut device_registration_state = s.tentative_device_registrations.borrow_mut();
         let mut tentative_registration = device_registration_state
             .remove(&user_number)
-            .ok_or(DeviceRegistrationModeOff)?;
+            .ok_or(VerifyTentativeDeviceResponse::DeviceRegistrationModeOff)?;
 
         match tentative_registration.state {
             DeviceRegistrationModeActive => Err(NoDeviceToVerify),
