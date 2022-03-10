@@ -113,6 +113,22 @@ const init = (
       result.wrong_code.retries_left > 0
     ) {
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
+    } else if (hasOwnProperty(result, "device_registration_mode_off")) {
+      await displayError({
+        title: "Device Registration Not Enabled",
+        message:
+          "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
+        primaryButton: "Continue",
+      });
+      await renderManage(userNumber, connection);
+    } else if (hasOwnProperty(result, "no_device_to_verify")) {
+      await displayError({
+        title: "No Device To Verify",
+        message:
+          "Verification not possible because the device is no longer in a state to be verified.",
+        primaryButton: "Continue",
+      });
+      await renderManage(userNumber, connection);
     } else {
       await displayError({
         title: "Too Many Wrong Verification Codes Entered",

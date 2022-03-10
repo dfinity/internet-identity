@@ -86,8 +86,12 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
-export type VerifyTentativeDeviceResponse = { 'verified' : null } |
-  { 'wrong_code' : { 'retries_left' : number } };
+export type VerifyTentativeDeviceResponse = {
+    'device_registration_mode_off' : null
+  } |
+  { 'verified' : null } |
+  { 'wrong_code' : { 'retries_left' : number } } |
+  { 'no_device_to_verify' : null };
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
   'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<

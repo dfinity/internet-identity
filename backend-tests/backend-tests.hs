@@ -540,8 +540,14 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     V.IsJust (V.Label :: Label "added_tentatively") response <- callII cid anonymousID #add_tentative_device (user_number, device2)
     lift $ expiration @?= response .! #device_registration_timeout
     setCanisterTimeTo cid (fromIntegral expiration) -- registration mode is expired at time expiration
-    V.IsJust (V.Label :: Label "wrong_code") result <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
-    lift $ result .! #retries_left @?= 0
+    V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
+    pure ()
+  
+  , withoutUpgrade $ iiTest "reject device verification if there is no tentative device" $ \cid -> do
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
+    _ <- callII cid webauth1ID #enter_device_registration_mode user_number
+    V.IsJust (V.Label :: Label "no_device_to_verify") _ <- callII cid webauth1ID #verify_tentative_device (user_number, "any_code")
+    pure ()
 
   , withoutUpgrade $ iiTest "reject wrong code on verify remote device" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
@@ -553,8 +559,8 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ try2_result .! #retries_left @?= 1
     V.IsJust (V.Label :: Label "wrong_code") try3_result <- callII cid webauth1ID #verify_tentative_device (user_number, "wrong_code")
     lift $ try3_result .! #retries_left @?= 0
-    V.IsJust (V.Label :: Label "wrong_code") try4_result <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
-    lift $ try4_result .! #retries_left @?= 0
+    V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
+    pure ()
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0

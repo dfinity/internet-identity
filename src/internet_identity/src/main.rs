@@ -1,11 +1,10 @@
 use crate::assets::init_assets;
 use crate::http::{HeaderField, HttpRequest, HttpResponse};
-use crate::AddTentativeDeviceResponse::AddedTentatively;
-use crate::AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded;
-use crate::AddTentativeDeviceResponse::DeviceRegistrationModeOff;
-use crate::RegistrationState::DeviceRegistrationModeActive;
-use crate::RegistrationState::DeviceTentativelyAdded;
-use crate::VerifyTentativeDeviceResponse::WrongCode;
+use crate::AddTentativeDeviceResponse::{
+    AddedTentatively, AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff,
+};
+use crate::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
+use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
 use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
@@ -184,6 +183,10 @@ enum VerifyTentativeDeviceResponse {
     Verified,
     #[serde(rename = "wrong_code")]
     WrongCode { retries_left: u8 },
+    #[serde(rename = "device_registration_mode_off")]
+    DeviceRegistrationModeOff,
+    #[serde(rename = "no_device_to_verify")]
+    NoDeviceToVerify,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -448,10 +451,10 @@ fn get_verified_device(
         let mut device_registration_state = s.tentative_device_registrations.borrow_mut();
         let mut tentative_registration = device_registration_state
             .remove(&user_number)
-            .ok_or(WrongCode { retries_left: 0 })?;
+            .ok_or(DeviceRegistrationModeOff)?;
 
         match tentative_registration.state {
-            DeviceRegistrationModeActive => Err(WrongCode { retries_left: 0 }),
+            DeviceRegistrationModeActive => Err(NoDeviceToVerify),
             DeviceTentativelyAdded {
                 failed_attempts,
                 verification_code,

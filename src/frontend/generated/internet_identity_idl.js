@@ -103,8 +103,10 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
+    'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
+    'no_device_to_verify' : IDL.Null,
   });
   return IDL.Service({
     'add' : IDL.Func([UserNumber, DeviceData], [], []),

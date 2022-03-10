@@ -74,7 +74,7 @@ type RegisterResponse = variant {
 type AddTentativeDeviceResponse = variant {
   // The device was tentatively added.
   added_tentatively: record { verification_code: text; device_registration_timeout: Timestamp;};
-  // Device registration mode is off.
+  // Device registration mode is off, either due to timeout or because it was never enabled.
   device_registration_mode_off;
   // There is another device already added tentatively
   another_device_tentatively_added;
@@ -85,6 +85,10 @@ type VerifyTentativeDeviceResponse = variant {
   verified;
   // Wrong verification code entered. Retry with correct code.
   wrong_code: record { retries_left: nat8};
+  // Device registration mode is off, either due to timeout or because it was never enabled.
+  device_registration_mode_off;
+  // There is no tentative device to be verified.
+  no_device_to_verify;
 };
 
 type Delegation = record {
