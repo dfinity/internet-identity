@@ -1,10 +1,14 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection, } from "../utils/iiConnection";
+import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
 import { footer } from "../components/footer";
-import { DeviceData, IdentityAnchorInfo, PublicKey } from "../../generated/internet_identity_types";
+import {
+  DeviceData,
+  IdentityAnchorInfo,
+  PublicKey,
+} from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
