@@ -102,6 +102,7 @@ const init = async (
   startPolling(userNumber, credentialToBeVerified, countdown.isStopped).then(
     (verified) => {
       if (verified) {
+        countdown.stop();
         setUserNumber(userNumber);
         // TODO L2-309: do this without reload
         window.location.reload();
