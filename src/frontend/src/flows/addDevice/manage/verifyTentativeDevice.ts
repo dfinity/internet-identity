@@ -50,6 +50,13 @@ const pageContent = (alias: string) => html`
   </div>
 `;
 
+/**
+ * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.
+ * @param userNumber anchor of the authenticated user
+ * @param tentativeDevice the tentative device to be verified
+ * @param endTimestamp timestamp when the registration mode expires
+ * @param connection authenticated II connection
+ */
 export const verifyDevice = async (
   userNumber: bigint,
   tentativeDevice: DeviceData,
@@ -68,17 +75,17 @@ const init = (
 ) => {
   const countdown = setupCountdown(
     endTimestamp,
-    document.getElementById("timer") as HTMLElement
+    document.getElementById("timer") as HTMLElement,
+    async () => {
+      await displayError({
+        title: "Timeout Reached",
+        message:
+          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+        primaryButton: "Ok",
+      });
+      await renderManage(userNumber, connection);
+    }
   );
-  countdown.start(async () => {
-    await displayError({
-      title: "Timeout Reached",
-      message:
-        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-      primaryButton: "Ok",
-    });
-    await renderManage(userNumber, connection);
-  });
 
   const cancelButton = document.getElementById(
     "cancelVerifyDevice"

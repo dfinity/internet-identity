@@ -5,7 +5,7 @@ import {
   Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { setUserNumber } from "../../../utils/userNumber";
-import { Countdown, setupCountdown } from "../../../utils/countdown";
+import { setupCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 
 export type TentativeRegistrationInfo = {
@@ -61,25 +61,23 @@ export const showVerificationCode = async (
 function startPolling(
   userNumber: bigint,
   credentialToBeVerified: Array<number>,
-  countdown: Countdown
-) {
-  const pollingHandle = window.setInterval(async () => {
-    const deviceData = await IIConnection.lookupAuthenticators(userNumber);
-    deviceData.forEach((device) => {
+  shouldStop: () => boolean
+): Promise<boolean> {
+  return IIConnection.lookupAuthenticators(userNumber).then((deviceData) => {
+    if (shouldStop()) {
+      return false;
+    }
+    for (const device of deviceData) {
       if (device.credential_id.length === 1) {
         const credentialId = device.credential_id[0];
 
         if (credentialIdEqual(credentialId, credentialToBeVerified)) {
-          setUserNumber(userNumber);
-          countdown.stop();
-          window.clearInterval(pollingHandle);
-          // TODO L2-309: do this without reload
-          window.location.reload();
+          return true;
         }
       }
-    });
-  }, 3000);
-  return pollingHandle;
+    }
+    return startPolling(userNumber, credentialToBeVerified, shouldStop);
+  });
 }
 
 const init = async (
@@ -89,25 +87,27 @@ const init = async (
 ): Promise<void> => {
   const countdown = setupCountdown(
     endTimestamp,
-    document.getElementById("timer") as HTMLElement
+    document.getElementById("timer") as HTMLElement,
+    async () => {
+      await displayError({
+        title: "Timeout Reached",
+        message:
+          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+        primaryButton: "Ok",
+      });
+      // TODO L2-309: do this without reload
+      window.location.reload();
+    }
   );
-  const pollingHandle = startPolling(
-    userNumber,
-    credentialToBeVerified,
-    countdown
+  startPolling(userNumber, credentialToBeVerified, countdown.isStopped).then(
+    (verified) => {
+      if (verified) {
+        setUserNumber(userNumber);
+        // TODO L2-309: do this without reload
+        window.location.reload();
+      }
+    }
   );
-
-  countdown.start(async () => {
-    window.clearInterval(pollingHandle);
-    await displayError({
-      title: "Timeout Reached",
-      message:
-        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-      primaryButton: "Ok",
-    });
-    // TODO L2-309: do this without reload
-    window.location.reload();
-  });
 
   const cancelButton = document.getElementById(
     "showCodeCancel"
@@ -115,7 +115,6 @@ const init = async (
 
   cancelButton.onclick = () => {
     countdown.stop();
-    window.clearInterval(pollingHandle);
     // TODO L2-309: do this without reload
     window.location.reload();
   };

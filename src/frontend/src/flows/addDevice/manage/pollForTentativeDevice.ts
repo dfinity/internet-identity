@@ -3,7 +3,7 @@ import { IIConnection } from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";
-import { Countdown, setupCountdown } from "../../../utils/countdown";
+import { setupCountdown } from "../../../utils/countdown";
 import {
   DeviceData,
   IdentityAnchorInfo,
@@ -46,6 +46,11 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
+/**
+ * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
+ * @param userNumber anchor of the authenticated user
+ * @param connection authenticated II connection
+ */
 export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: IIConnection
@@ -67,27 +72,21 @@ export const pollForTentativeDevice = async (
   });
 };
 
-const startPolling = (
+const startPolling = async (
   connection: IIConnection,
   userNumber: bigint,
-  timerUpdate: Countdown,
-  endTimestamp: bigint
-): number => {
-  const pollingHandle = window.setInterval(async () => {
-    const userInfo = await connection.getAnchorInfo(userNumber);
-    const tentative_device = getTentativeDevice(userInfo);
-    if (tentative_device) {
-      window.clearInterval(pollingHandle);
-      timerUpdate.stop();
-      await verifyDevice(
-        userNumber,
-        tentative_device,
-        endTimestamp,
-        connection
-      );
+  shouldStop: () => boolean
+): Promise<DeviceData | null> => {
+  return connection.getAnchorInfo(userNumber).then((response) => {
+    if (shouldStop()) {
+      return null;
     }
-  }, 3000);
-  return pollingHandle;
+    const tentative_device = getTentativeDevice(response);
+    if (tentative_device) {
+      return tentative_device;
+    }
+    return startPolling(connection, userNumber, shouldStop);
+  });
 };
 
 const init = (
@@ -97,30 +96,31 @@ const init = (
 ) => {
   const countdown = setupCountdown(
     endTimestamp,
-    document.getElementById("timer") as HTMLElement
+    document.getElementById("timer") as HTMLElement,
+    async () => {
+      await displayError({
+        title: "Timeout Reached",
+        message:
+          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+        primaryButton: "Ok",
+      });
+      await renderManage(userNumber, connection);
+    }
   );
-  const pollingHandle = startPolling(
-    connection,
-    userNumber,
-    countdown,
-    endTimestamp
+
+  startPolling(connection, userNumber, countdown.isStopped).then(
+    async (device) => {
+      if (device) {
+        countdown.stop();
+        await verifyDevice(userNumber, device, endTimestamp, connection);
+      }
+    }
   );
-  countdown.start(async () => {
-    window.clearInterval(pollingHandle);
-    await displayError({
-      title: "Timeout Reached",
-      message:
-        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-      primaryButton: "Ok",
-    });
-    await renderManage(userNumber, connection);
-  });
 
   const cancelButton = document.getElementById(
     "cancelAddRemoteDevice"
   ) as HTMLButtonElement;
   cancelButton.onclick = async () => {
-    window.clearInterval(pollingHandle);
     countdown.stop();
     await withLoader(() => connection.exitDeviceRegistrationMode(userNumber));
     await renderManage(userNumber, connection);

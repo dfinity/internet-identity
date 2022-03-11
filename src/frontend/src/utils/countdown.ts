@@ -10,34 +10,38 @@ export class Countdown {
   private timeoutHandle: number | undefined;
   private expected;
   private readonly endTimestamp;
-  private timeoutFunc: (() => Promise<void>) | undefined;
 
   /**
-   * Constructs a new Countdown. To start the countdown, {@link Countdown.start} has to be called.
+   * Constructs a new Countdown and starts it immediately.
    * @param updateFunc Callback to be called approximately every second until endTimestamp is reached.
    * @param endTimestamp timestamp (in nanoseconds) when the countdown should end.
-   */
-  constructor(private updateFunc: () => void, endTimestamp: bigint) {
-    this.expected = Date.now() + this.interval;
-    this.endTimestamp = Number(endTimestamp / BigInt("1000000"));
-  }
-
-  /**
-   * Starts the countdown. When the timout is reached, the given callback is called (if any).
    * @param timeoutFunc Optional callback function to be called when the timeout is reached.
    */
-  public start(timeoutFunc?: () => Promise<void>): void {
-    this.timeoutFunc = timeoutFunc;
+  constructor(
+    private updateFunc: () => void,
+    endTimestamp: bigint,
+    private timeoutFunc?: () => Promise<void>
+  ) {
+    this.expected = Date.now() + this.interval;
+    this.endTimestamp = Number(endTimestamp / BigInt("1000000"));
     this.timeoutHandle = window.setTimeout(() => this.step()); // execute the first step immediately
   }
 
   /**
-   * Stops the countdown. When the timout is reached, the given callback is called (if any).
+   * Stops the countdown. The timout callback is not called.
    */
   public stop(): void {
     if (this.timeoutHandle !== undefined) {
       window.clearTimeout(this.timeoutHandle);
+      this.timeoutHandle = undefined;
     }
+  }
+
+  /**
+   * @return boolean whether the countdown is stopped (either because {@link stop} was called or because the timeout was reached).
+   */
+  public isStopped(): boolean {
+    return this.timeoutHandle !== undefined;
   }
 
   private async step() {
@@ -63,15 +67,18 @@ export class Countdown {
  * Note: this function will not yet start the countdown. To {@link Countdown.start} the countdown start() has to be called on the returned object.
  * @param endTimestamp timestamp (in nanoseconds) when the countdown should end
  * @param timerElement element to update with the remaining time in mm:ss format.
+ * @param timeoutFunc Optional callback function to be called when the timeout is reached.
  * @return the initialized {@link Countdown}
  */
 export const setupCountdown = (
   endTimestamp: bigint,
-  timerElement: HTMLElement
+  timerElement: HTMLElement,
+  timeoutFunc?: () => Promise<void>
 ): Countdown => {
   return new Countdown(
     () => render(formatRemainingTime(endTimestamp), timerElement),
-    endTimestamp
+    endTimestamp,
+    timeoutFunc
   );
 };
 
