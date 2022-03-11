@@ -159,6 +159,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             s.inflight_challenges.borrow().len() as f64,
             "The number of inflight CAPTCHA challenges",
         )?;
+        w.encode_gauge(
+            "internet_identity_users_in_registration_mode",
+            s.tentative_device_registrations.borrow().len() as f64,
+            "The number of users in registration mode",
+        )?;
         Ok(())
     })
 }

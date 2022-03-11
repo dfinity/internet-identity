@@ -771,6 +771,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     assertMetric metrics "internet_identity_user_count" 1.0
     assertMetric metrics "internet_identity_signature_count" 0.0
+    assertMetric metrics "internet_identity_users_in_registration_mode" 0.0
 
     when should_upgrade $ doUpgrade cid
 
@@ -779,11 +780,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
     _ <- callII cid webauth1ID #prepare_delegation delegationArgs
+    _ <- callII cid webauth1ID #enter_device_registration_mode userNumber
 
     metrics <- callII cid webauth1ID #http_request (httpGet "/metrics") >>= mustParseMetrics
 
     assertMetric metrics "internet_identity_user_count" 2.0
     assertMetric metrics "internet_identity_signature_count" 1.0
+    assertMetric metrics "internet_identity_users_in_registration_mode" 1.0
 
   , withUpgrade $ \should_upgrade -> testGroup "HTTP Assets"
     [ iiTest asset $ \cid -> do
