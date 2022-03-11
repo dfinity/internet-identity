@@ -108,12 +108,14 @@ const init = (
     }
   );
 
-  poll(connection, userNumber, countdown.hasStopped).then(async (device) => {
-    if (!countdown.hasStopped() && device) {
-      countdown.stop();
-      await verifyDevice(userNumber, device, endTimestamp, connection);
+  poll(connection, userNumber, () => countdown.hasStopped()).then(
+    async (device) => {
+      if (!countdown.hasStopped() && device) {
+        countdown.stop();
+        await verifyDevice(userNumber, device, endTimestamp, connection);
+      }
     }
-  });
+  );
 
   const cancelButton = document.getElementById(
     "cancelAddRemoteDevice"

@@ -41,7 +41,7 @@ export class Countdown {
    * @return boolean whether the countdown is stopped (either because {@link stop} was called or because the timeout was reached).
    */
   public hasStopped(): boolean {
-    return this.timeoutHandle !== undefined;
+    return this.timeoutHandle === undefined;
   }
 
   private step() {

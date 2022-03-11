@@ -99,7 +99,7 @@ const init = async (
       window.location.reload();
     }
   );
-  poll(userNumber, credentialToBeVerified, countdown.hasStopped).then(
+  poll(userNumber, credentialToBeVerified, () => countdown.hasStopped()).then(
     (verified) => {
       if (verified) {
         countdown.stop();
