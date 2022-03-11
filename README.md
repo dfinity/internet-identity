@@ -98,6 +98,7 @@ Finally, to test workflows like authentication from a client application, you st
 
 ```bash
 cd demos/sample-javascript
+npm ci
 npm run develop
 ```
 
