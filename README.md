@@ -1,5 +1,9 @@
 # Internet Identity Service
 
+[![Canister tests](https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml)
+[![Cargo tests](https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml)
+[![Frontend checks and lints](https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml)
+
 See `./docs/internet-identity-spec.adoc` for a details specification and technical
 documentation.
 
@@ -94,6 +98,7 @@ Finally, to test workflows like authentication from a client application, you st
 
 ```bash
 cd demos/sample-javascript
+npm ci
 npm run develop
 ```
 
