@@ -1,4 +1,10 @@
 import type { Principal } from '@dfinity/principal';
+export interface Challenge {
+  'png_base64' : string,
+  'challenge_key' : ChallengeKey,
+}
+export type ChallengeKey = string;
+export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
 export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -40,11 +46,11 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export interface ProofOfWork { 'nonce' : bigint, 'timestamp' : Timestamp }
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
-export type RegisterResponse = { 'canister_full' : null } |
+export type RegisterResponse = { 'bad_challenge' : null } |
+  { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
@@ -64,6 +70,7 @@ export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export interface _SERVICE {
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
+  'create_challenge' : () => Promise<Challenge>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
@@ -82,7 +89,7 @@ export interface _SERVICE {
       arg_2: SessionKey,
       arg_3: [] | [bigint],
     ) => Promise<[UserKey, Timestamp]>,
-  'register' : (arg_0: DeviceData, arg_1: ProofOfWork) => Promise<
+  'register' : (arg_0: DeviceData, arg_1: ChallengeResult) => Promise<
       RegisterResponse
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,

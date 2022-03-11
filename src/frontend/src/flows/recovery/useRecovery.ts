@@ -2,7 +2,7 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
 import { IIConnection, LoginResult } from "../../utils/iiConnection";
 import { hasOwnProperty } from "../../utils/utils";
-import { apiResultToLoginResult } from "../loginUnknown";
+import { apiResultToLoginFlowResult } from "../login/flowResult";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";
 import { inputSeedPhrase } from "./inputSeedPhrase";
@@ -33,16 +33,16 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
       ? recoveryDevices[0]
       : await pickRecoveryDevice(recoveryDevices);
 
-  const loginResult = apiResultToLoginResult(
+  const logiFlowResult = apiResultToLoginFlowResult(
     await loginWithRecovery(userNumber, recoveryDevice)
   );
-  switch (loginResult.tag) {
+  switch (logiFlowResult.tag) {
     case "ok": {
-      return renderManage(loginResult.userNumber, loginResult.connection);
+      return renderManage(logiFlowResult.userNumber, logiFlowResult.connection);
     }
     case "err": {
       // TODO Display a recovery specific error
-      await displayError({ ...loginResult, primaryButton: "Try again" });
+      await displayError({ ...logiFlowResult, primaryButton: "Try again" });
       return useRecovery();
     }
   }

@@ -7,6 +7,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -24,6 +25,8 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.Vector as V
 import qualified Data.ByteString.Base64.Lazy as Base64
+import           Data.CaseInsensitive  ( CI )
+import qualified Data.CaseInsensitive as CI
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Codec.CBOR.Term
@@ -34,7 +37,7 @@ import Data.Word
 import Control.Monad.Random.Lazy
 import Data.Time.Clock.POSIX
 import Text.Printf
-import Text.Regex.TDFA ((=~~))
+import Text.Regex.TDFA ((=~), (=~~))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -51,7 +54,8 @@ import Codec.Candid (Principal(..))
 import qualified Codec.Candid as Candid
 import qualified Data.Row.Variants as V
 
-import IC.Types
+import IC.Types hiding (PublicKey, Timestamp)
+import qualified IC.Types
 import IC.Ref
 import IC.Management
 import IC.Hash
@@ -67,188 +71,10 @@ import IC.HashTree.CBOR
 
 import Prometheus hiding (Timestamp)
 
--- We cannot do
--- type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
--- just yet, because haskell-candid doesn’t like init arguments to service, so
--- for now we have to copy it
-type IIInterface m = [Candid.candid|
-type UserNumber = nat64;
-type PublicKey = blob;
-type CredentialId = blob;
-type DeviceAlias = text;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
-type SessionKey = PublicKey;
-type FrontendHostname = text;
-type Timestamp = nat64;
-type Purpose = variant {
-    recovery;
-    authentication;
-};
-type KeyType = variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-};
+type IIInterface m = [Candid.candidFile|../src/internet_identity/internet_identity.did|]
 
-type DeviceData = record {
-  pubkey : DeviceKey;
-  alias : text;
-  credential_id : opt CredentialId;
-  purpose : Purpose;
-  key_type : KeyType;
-};
-
-type RegisterResponse = variant {
-  registered: record { user_number: UserNumber; };
-  canister_full;
-};
-
-type Delegation = record {
-  pubkey: SessionKey;
-  expiration: Timestamp;
-  targets: opt vec principal;
-};
-type SignedDelegation = record {
-  delegation: Delegation;
-  signature: blob;
-};
-type GetDelegationResponse = variant {
-  signed_delegation: SignedDelegation;
-  no_such_delegation;
-};
-
-type InternetIdentityStats = record {
-  users_registered: nat64;
-  assigned_user_number_range: record { nat64; nat64; };
-};
-
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
-};
-
-type HeaderField = record { text; text; };
-
-type HttpRequest = record {
-  method: text;
-  url: text;
-  headers: vec HeaderField;
-  body: blob;
-};
-
-type HttpResponse = record {
-  status_code: nat16;
-  headers: vec HeaderField;
-  body: blob;
-  streaming_strategy: opt StreamingStrategy;
-};
-
-type StreamingCallbackHttpResponse = record {
-  body: blob;
-  token: Token;
-};
-
-type Token = record {};
-
-type StreamingStrategy = variant {
-  Callback: record {
-    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
-    token: Token;
-  };
-};
-service : {
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
-  add : (UserNumber, DeviceData) -> ();
-  remove : (UserNumber, DeviceKey) -> ();
-  lookup : (UserNumber) -> (vec DeviceData) query;
-  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
-  stats : () -> (InternetIdentityStats) query;
-
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, opt nat64) -> (UserKey, Timestamp);
-  get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
-
-  http_request: (request: HttpRequest) -> (HttpResponse) query;
-}
-  |]
-
--- Names for some of these types. Unfortunately requires copying
-
-type DeviceData = [Candid.candidType|
-record {
-  pubkey : blob;
-  alias : text;
-  credential_id : opt blob;
-  purpose: variant {
-    recovery;
-    authentication;
-  };
-  key_type: variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-  };
-}
-  |]
-
-type RegisterResponse = [Candid.candidType|
-variant {
-  registered: record { user_number: nat64; };
-  canister_full;
-}
-  |]
-
-
-type SignedDelegation = [Candid.candidType|
-record {
-  delegation:
-    record {
-      pubkey: blob;
-      expiration: nat64;
-      targets: opt vec principal;
-    };
-  signature: blob;
-}
-  |]
-
-type Delegation = [Candid.candidType|
-  record {
-    pubkey: blob;
-    expiration: nat64;
-    targets: opt vec principal;
-  }
-  |]
-
-
-type InitCandid = [Candid.candidType|
-  record {
-    assigned_user_number_range : record { nat64; nat64; };
-  }
-  |]
-
-type ProofOfWork = [Candid.candidType|record {
-  timestamp : nat64;
-  nonce : nat64;
-}|]
-
-type HttpRequest = [Candid.candidType|record {
-  method : text;
-  url : text;
-  headers : vec record { text; text; };
-  body : blob;
-}|]
-
-type HttpResponse = [Candid.candidType|record {
-  status_code : nat16;
-  headers : vec record { text; text; };
-  body : blob;
-  streaming_strategy : opt variant { Callback: record { token: record {}; callback: func (record {}) -> (record { body: blob; token: record {}; }) query; }; };
-}|]
-
-mkPOW :: Word64 -> Word64 -> ProofOfWork
-mkPOW t n = #timestamp .== t .+ #nonce .== n
+-- Pulls in all type definitions as Haskell type aliases
+[Candid.candidDefsFile|../src/internet_identity/internet_identity.did|]
 
 httpGet :: String -> HttpRequest
 httpGet url = #method .== T.pack "GET"
@@ -297,19 +123,18 @@ submitQuery r = do
     QueryResponse r <- handleQuery t r
     return r
 
-getTimestamp :: M Timestamp
+getTimestamp :: M IC.Types.Timestamp
 getTimestamp = lift $ do
     t <- getPOSIXTime
-    return $ Timestamp $ round (t * 1000_000_000)
+    return $ IC.Types.Timestamp $ round (t * 1000_000_000)
 
 mkRequestId :: IO RequestID
 mkRequestId = BS.toLazyByteString . BS.word64BE <$> randomIO
 
-setCanisterTimeTo :: Blob -> Timestamp -> M ()
+setCanisterTimeTo :: Blob -> IC.Types.Timestamp -> M ()
 setCanisterTimeTo cid new_time =
  modify $
   \ic -> ic { canisters = M.adjust (\cs -> cs { time = new_time }) (EntityId cid) (canisters ic) }
-
 
 callManagement :: forall s a b.
   HasCallStack =>
@@ -354,6 +179,21 @@ queryIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "queryIIReject: Unexpected reply"
 
+queryIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String -> M ()
+queryIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitQuery $ QueryRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) ->
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "queryIIRejectWith: Unexpected reply"
+
 callII :: forall s a b.
   HasCallStack =>
   KnownSymbol s =>
@@ -382,24 +222,43 @@ callIIReject cid user_id l x = do
     Rejected _ -> return ()
     Replied _ -> lift $ assertFailure "callIIReject: Unexpected reply"
 
+callIIRejectWith :: forall s a b.
+  HasCallStack =>
+  KnownSymbol s =>
+  (a -> IO b) ~ (IIInterface IO .! s) =>
+  Candid.CandidArg a =>
+  BS.ByteString -> EntityId -> Label s -> a -> String  -> M ()
+callIIRejectWith cid user_id l x expectedMessagePattern = do
+  r <- submitAndRun $
+    CallRequest (EntityId cid) user_id (symbolVal l) (Candid.encode x)
+  case r of
+    Rejected (_code, msg) ->
+      if not (msg =~ expectedMessagePattern)
+      then liftIO $ assertFailure $ printf "expected error matching %s, got: %s" (show expectedMessagePattern) (show msg)
+      else return ()
+    Replied _ -> lift $ assertFailure "callIIRejectWith: Unexpected reply"
+
 
 -- Some common devices
-webauthSK :: SecretKey
-webauthSK = createSecretKeyWebAuthnECDSA "foobar"
-webauthPK :: PublicKey
-webauthPK = toPublicKey webauthSK
-webauthID :: EntityId
-webauthID = EntityId $ mkSelfAuthenticatingId webauthPK
+-- NOTE: we write the actual key content here, as opposed to generating it
+-- (e.g. with 'createSecretKeyWebAuthnECDSA'). This ensures the key contents
+-- are stable.
+-- See also: https://github.com/dfinity/ic-hs/issues/59
+webauth1PK :: PublicKey
+webauth1PK = "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X lR\190\173]\245, \138\155\FS{\224\166\bGW>[\228\172O\224\142\164\128\&6\208\186\GS*\207\"X \179=\174\184;\201\199}\138\215b\253h\227\234\176\134\132\228c\196\147Q\179\171*\DC4\164\NUL\DC3\131\135"
+webauth1ID :: EntityId
+webauth1ID = EntityId $ mkSelfAuthenticatingId webauth1PK
 device1 :: DeviceData
 device1 = empty
     .+ #alias .== "device1"
-    .+ #pubkey .== webauthPK
+    .+ #pubkey .== webauth1PK
     .+ #credential_id .== Nothing
     .+ #purpose .== enum #authentication
     .+ #key_type .== enum #cross_platform
 
 webauth2SK :: SecretKey
 webauth2SK = createSecretKeyWebAuthnRSA "foobar2"
+-- The content here doesn't matter as long as it's different from webauth1PK
 webauth2PK = toPublicKey webauth2SK
 webauth2PK :: PublicKey
 webauth2ID :: EntityId
@@ -412,24 +271,11 @@ device2 = empty
     .+ #purpose .== enum #authentication
     .+ #key_type .== enum #platform
 
--- Various proof of work values
-invalidPOW :: ProofOfWork
-invalidPOW = mkPOW 0 0
-
--- Hardcoded solutions for the POW puzzle
-powNonceAt :: Blob -> Word64 -> Word64
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 0 = 57583
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 1 = 40219
-powNonceAt "\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\SOH" 1200000000000 = 104906
-powNonceAt cid ts = error $ printf
-    "No proof of work on record. Please run\nnpx ts-node pow.ts %s %d\nand add to this table as\npowNonceAt %s %d = <paste number here>"
-    (asHex cid) ts
-    (show cid) ts
-
-powAt ::  Blob -> Word64 -> ProofOfWork
-powAt cid ts = mkPOW ts (powNonceAt cid ts)
-
-lookupIs :: Blob -> Word64 -> [DeviceData] -> M ()
+-- Check that the user has the following device data
+lookupIs
+    :: Blob -- ^ canister ID
+    -> Word64 -- ^ user (anchor) number
+    -> [DeviceData] -> M ()
 lookupIs cid user_number ds = do
   r <- queryII cid dummyUserId #lookup user_number
   liftIO $ r @?= V.fromList ds
@@ -438,8 +284,8 @@ addTS :: (a, b, c, d) -> e -> (a, b, c, e)
 addTS (a,b,c, _) ts = (a,b,c,ts)
 
 getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
-getAndValidate cid sessionPK userPK webauthID delegationArgs ts = do
-  sd <- queryII cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
+getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts = do
+  sd <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") sd -> return sd
     V.IsJust (V.Label :: Label "no_such_delegation") () ->
         liftIO $ assertFailure "Got unexpected no_such_delegation"
@@ -454,8 +300,8 @@ getAndValidate cid sessionPK userPK webauthID delegationArgs ts = do
     Right () -> return ()
 
 getButNotThere :: HasCallStack => Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
-getButNotThere cid webauthID delegationArgs ts = do
-  queryII cid webauthID #get_delegation (addTS delegationArgs ts) >>= \case
+getButNotThere cid webauth1ID delegationArgs ts = do
+  queryII cid webauth1ID #get_delegation (addTS delegationArgs ts) >>= \case
     V.IsJust (V.Label :: Label "signed_delegation") _ ->
         liftIO $ assertFailure "Unexpected delegation"
     V.IsJust (V.Label :: Label "no_such_delegation") () -> return ()
@@ -524,6 +370,80 @@ validateHttpResponse cid asset resp = do
 
     _ -> lift $ assertFailure $ "Could not parse header: " <> show h
 
+validateSecurityHeaders :: HasCallStack => HttpResponse -> M ()
+validateSecurityHeaders resp = do
+  validateStaticHeader resp "X-Frame-Options" "DENY"
+  validateStaticHeader resp "X-Content-Type-Options" "nosniff"
+  validateStaticHeader resp "Referrer-Policy" "same-origin"
+  validateStaticHeader resp "Permissions-Policy" "accelerometer=(),\
+    \ambient-light-sensor=(),\
+    \autoplay=(),\
+    \battery=(),\
+    \camera=(),\
+    \clipboard-read=(),\
+    \clipboard-write=(self),\
+    \conversion-measurement=(),\
+    \cross-origin-isolated=(),\
+    \display-capture=(),\
+    \document-domain=(),\
+    \encrypted-media=(),\
+    \execution-while-not-rendered=(),\
+    \execution-while-out-of-viewport=(),\
+    \focus-without-user-activation=(),\
+    \fullscreen=(),\
+    \gamepad=(),\
+    \geolocation=(),\
+    \gyroscope=(),\
+    \hid=(),\
+    \idle-detection=(),\
+    \interest-cohort=(),\
+    \keyboard-map=(),\
+    \magnetometer=(),\
+    \microphone=(),\
+    \midi=(),\
+    \navigation-override=(),\
+    \payment=(),\
+    \picture-in-picture=(),\
+    \publickey-credentials-get=(self),\
+    \screen-wake-lock=(),\
+    \serial=(),\
+    \speaker-selection=(),\
+    \sync-script=(),\
+    \sync-xhr=(self),\
+    \trust-token-redemption=(),\
+    \usb=(),\
+    \vertical-scroll=(),\
+    \web-share=(),\
+    \window-placement=(),\
+    \xr-spatial-tracking=()"
+  validateHeaderMatches resp "Content-Security-Policy" "^default-src 'none';\
+    \connect-src 'self' https://ic0.app;\
+    \img-src 'self' data:;\
+    \script-src 'sha256-[a-zA-Z0-9\\/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+    \base-uri 'none';\
+    \frame-ancestors 'none';\
+    \form-action 'none';\
+    \style-src 'self' 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \style-src-elem 'unsafe-inline' https:\\/\\/fonts\\.googleapis\\.com;\
+    \font-src https:\\/\\/fonts\\.gstatic\\.com;\
+    \upgrade-insecure-requests;$"
+
+validateStaticHeader :: HasCallStack => HttpResponse -> CI T.Text -> CI T.Text -> M ()
+validateStaticHeader resp headerName expectedValue = do
+  h <- case [ CI.mk v | (name, v) <- V.toList (resp .! #headers), CI.mk name == headerName ] of
+    [] -> lift $ assertFailure $ printf "header not found: " ++ show headerName
+    [h] -> return h
+    _ -> lift $ assertFailure $ printf "header duplicated: " ++ show headerName
+  unless (h == expectedValue) (liftIO $ assertFailure $  printf "Unexpected value of header %s: got %s instead of %s" (show headerName) (show h) (show expectedValue))
+
+validateHeaderMatches :: HasCallStack => HttpResponse -> CI T.Text -> T.Text -> M ()
+validateHeaderMatches resp headerName expectedValue = do
+  h <- case [ v | (name, v) <- V.toList (resp .! #headers), CI.mk name == headerName ] of
+    [] -> lift $ assertFailure $ printf "header not found: " ++ show headerName
+    [h] -> return h
+    _ -> lift $ assertFailure $ printf "header duplicated: " ++ show headerName
+  unless (h =~ expectedValue) (liftIO $ assertFailure $  printf "Value %s of header %s does not match expected pattern %s" (show headerName) (show h) (show expectedValue))
+
 assertRightS :: MonadIO m  => Either String a -> m a
 assertRightS (Left e) = liftIO $ assertFailure e
 assertRightS (Right x) = pure x
@@ -543,9 +463,7 @@ decodeTree s =
     begin (_, TTagged 55799 t) = parseHashTree t
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
-
-
-
+-- | The actual tests.
 tests :: FilePath -> TestTree
 tests wasm_file = testGroup "Tests" $ upgradeGroups $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
@@ -553,24 +471,15 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
   , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
-  , withoutUpgrade $ iiTest "register with bad pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, invalidPOW)
-  , withoutUpgrade $ iiTest "register with future pow fails" $ \cid -> do
-    callIIReject cid dummyUserId #register (device1, powAt cid (20*60*1000_000_000))
-  , withoutUpgrade $ iiTest "register with past pow fails" $ \cid -> do
-    setCanisterTimeTo cid (20*60*1000_000_000)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
-  , withoutUpgrade $ iiTest "register with repeated pow fails" $ \cid -> do
-    _ <- callII cid webauthID #register (device1, powAt cid 1)
-    callIIReject cid dummyUserId #register (device1, powAt cid 1)
+    challenge <- getChallenge cid dummyUserId
+    callIIRejectWith cid dummyUserId #register (device1, challenge) "[a-z0-9-]+ could not be authenticated against"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    (_, ts) <- callII cid webauthID #prepare_delegation delegationArgs
-    queryIIReject cid dummyUserId #get_delegation (addTS delegationArgs ts)
+    (_, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
@@ -579,58 +488,58 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid 123 []
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     assertStats cid 1
     when should_upgrade $ doUpgrade cid
     assertStats cid 1
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and lookup (with credential id)" $ \cid -> do
-    user_number <- callII cid webauth2ID #register (device2, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth2ID device2 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register add lookup" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
-    callII cid webauthID #add (user_number, device2)
+    callII cid webauth1ID #add (user_number, device2)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device1, device2]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and add with wrong user" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     callIIReject cid webauth2ID #add (user_number, device2)
     lookupIs cid user_number [device1]
 
   , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
     queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation and validate" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- prepare delegation
-    (userPK, ts) <- callII cid webauthID #prepare_delegation delegationArgs
+    (userPK, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
     ts <- if should_upgrade
       then do
         doUpgrade cid
         -- after upgrade, no signature is available
         V.IsJust (V.Label :: Label "no_such_delegation") ()
-          <- queryII cid webauthID #get_delegation (addTS delegationArgs ts)
+          <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts)
         -- so request it again
-        (userPK', ts') <- callII cid webauthID #prepare_delegation delegationArgs
+        (userPK', ts') <- callII cid webauth1ID #prepare_delegation delegationArgs
         lift $ userPK' @?= userPK
         return ts'
       else return ts
 
     V.IsJust (V.Label :: Label "signed_delegation") sd
-      <- queryII cid webauthID #get_delegation (addTS delegationArgs ts)
+      <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts)
     let delegation = sd .! #delegation
     let sig = sd .! #signature
     lift $ delegation .! #pubkey @?= sessionPK
@@ -641,106 +550,106 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       Right () -> return ()
 
   , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ do
       doUpgrade cid
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    callIIReject cid webauth2ID #prepare_delegation delegationArgs
+    callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
 
   , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- request a few delegations
-    (userPK, ts1) <- callII cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    (userPK, ts1) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
 
-    (userPK, ts2) <- callII cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
+    (userPK, ts2) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
 
     when should_upgrade $ do
       doUpgrade cid
 
-    (userPK, ts3) <- callII cid webauthID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
+    (userPK, ts3) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
 
-    (userPK, ts4) <- callII cid webauthID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
+    (userPK, ts4) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
+    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
 
   , withoutUpgrade $ iiTest "get multiple delegations and expire" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
     -- request a few delegations
-    (userPK, ts1) <- callII cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
+    (userPK, ts1) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
 
     setCanisterTimeTo cid (30*1000_000_000)
-    (userPK, ts2) <- callII cid webauthID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
+    (userPK, ts2) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
 
     setCanisterTimeTo cid (70*1000_000_000)
-    (userPK, ts3) <- callII cid webauthID #prepare_delegation delegationArgs
-    getButNotThere cid webauthID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
+    (userPK, ts3) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getButNotThere cid webauth1ID delegationArgs ts1
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
 
     setCanisterTimeTo cid (120*1000_000_000)
-    (userPK, ts4) <- callII cid webauthID #prepare_delegation delegationArgs
-    getButNotThere cid webauthID delegationArgs ts1
-    getButNotThere cid webauthID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts3
-    getAndValidate cid sessionPK userPK webauthID delegationArgs ts4
+    (userPK, ts4) <- callII cid webauth1ID #prepare_delegation delegationArgs
+    getButNotThere cid webauth1ID delegationArgs ts1
+    getButNotThere cid webauth1ID delegationArgs ts2
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
+    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
 
   , withUpgrade $ \should_upgrade -> iiTest "user identities differ" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
 
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs1 = (user_number, "front.end.com", sessionPK, Nothing)
-    (user1PK, _exp) <- callII cid webauthID #prepare_delegation delegationArgs1
-    Principal user1Principal <- queryII cid webauthID #get_principal (user_number, "front.end.com")
+    (user1PK, _exp) <- callII cid webauth1ID #prepare_delegation delegationArgs1
+    Principal user1Principal <- queryII cid webauth1ID #get_principal (user_number, "front.end.com")
     lift $ user1Principal @?= mkSelfAuthenticatingId user1PK
 
     when should_upgrade $ do
       doUpgrade cid
 
     let delegationArgs2 = (user_number, "other-front.end.com", sessionPK, Nothing)
-    (user2PK, _exp) <- callII cid webauthID #prepare_delegation delegationArgs2
-    Principal user2Principal <- queryII cid webauthID #get_principal (user_number, "other-front.end.com")
+    (user2PK, _exp) <- callII cid webauth1ID #prepare_delegation delegationArgs2
+    Principal user2Principal <- queryII cid webauth1ID #get_principal (user_number, "other-front.end.com")
     lift $ user2Principal @?= mkSelfAuthenticatingId user2PK
 
     when (user1PK == user2PK) $
       lift $ assertFailure "User identities coincide for different frontends"
 
   , withUpgrade $ \should_upgrade -> iiTest "remove()" $ \cid -> do
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     lookupIs cid user_number [device1]
-    callII cid webauthID #add (user_number, device2)
+    callII cid webauth1ID #add (user_number, device2)
     lookupIs cid user_number [device1, device2]
     -- NB: removing device that is signing this:
-    callII cid webauthID #remove (user_number, webauthPK)
+    callII cid webauth1ID #remove (user_number, webauth1PK)
     lookupIs cid user_number [device2]
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number [device2]
     callII cid webauth2ID #remove (user_number, webauth2PK)
     when should_upgrade $ doUpgrade cid
     lookupIs cid user_number []
-    user_number2 <- callII cid webauthID #register (device1, powAt cid 1) >>= mustGetUserNumber
+    user_number2 <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     when (user_number == user_number2) $
       lift $ assertFailure "Identity Anchor re-used"
@@ -750,10 +659,10 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range @?= (100, 103)
 
     assertStats cid 0
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 100
     assertStats cid 1
-    user_number <- callII cid webauthID #register (device1, powAt cid 1) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 101
     assertStats cid 2
 
@@ -765,20 +674,18 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     let expected_upper_bound = if should_upgrade then 100 + 3_774_873 else 103
     lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
 
-    user_number <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     liftIO $ user_number @?= 102
-    assertStats cid 3
-    callIIReject cid webauthID #register (device1, powAt cid 0)
     assertStats cid 3
 
   , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #assigned_user_number_range @?= (100, 100)
-    response <- callII cid webauthID #register (device1, powAt cid 0)
+    response <- register cid webauth1ID device1
     assertVariant #canister_full response
 
   , withUpgrade $ \should_upgrade -> iiTest "metrics endpoint" $ \cid -> do
-    _ <- callII cid webauth2ID #register (device2, powAt cid 1) >>= mustGetUserNumber
+    _ <- register cid webauth2ID device2 >>= mustGetUserNumber
     metrics <- callII cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
 
     assertMetric metrics "internet_identity_user_count" 1.0
@@ -786,13 +693,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
 
     when should_upgrade $ doUpgrade cid
 
-    userNumber <- callII cid webauthID #register (device1, powAt cid 0) >>= mustGetUserNumber
+    userNumber <- register cid webauth1ID device1 >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
     let sessionPK = toPublicKey sessionSK
     let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
-    _ <- callII cid webauthID #prepare_delegation delegationArgs
+    _ <- callII cid webauth1ID #prepare_delegation delegationArgs
 
-    metrics <- callII cid webauthID #http_request (httpGet "/metrics") >>= mustParseMetrics
+    metrics <- callII cid webauth1ID #http_request (httpGet "/metrics") >>= mustParseMetrics
 
     assertMetric metrics "internet_identity_user_count" 2.0
     assertMetric metrics "internet_identity_signature_count" 1.0
@@ -802,7 +709,8 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
       when should_upgrade $ doUpgrade cid
       r <- queryII cid dummyUserId #http_request (httpGet asset)
       validateHttpResponse cid asset r
-    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /does-not-exist"
+      validateSecurityHeaders r
+    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /ic-badge.svg /does-not-exist"
     ]
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
@@ -834,13 +742,13 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lookupIs cid 10_002 [#alias .== "andrew-mbp" .+ #credential_id .== Just "\SOH\191#%\217u\247\178L-K\182\254\249J.m\187\179_I\ACK\137\244`\163o\SI\150qz\197Hz\214\&8\153\239\213\159\208\RS\243\138\171\138\"\139\173\170\ESC\148\205\129\149ri\\Dn,7\151\146\175\DEL" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X rMm*\229BDe\SOH4\228u\170\206\216\216-ER\v\166r\217\137,\141\227M*@\230\243\"X \225\248\159\191\242\224Z>\241\163\\\GS\155\178\222\139^\136V\253q\v\SUBSJ\bA\131\\\183\147\170" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "andrew phone chrome" .+ #credential_id .== Just ",\235x\NUL\a\140`~\148\248\233C/\177\205\158\ETX0\129\167" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \140\169\203@\ETX\CAN\ETB,\177\153\179\223/|`\US\STX\252r\190s(.\188\136\171\SI\181V*\174@\"X \245<\174AbV\225\234\ENQ\146\247\129\245\ACK\200\205\217\250g\219\179)\197\252\164i\172kXh\180\205" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
     lookupIs cid 10_029 [#alias .== "Pixel" .+ #credential_id .== Just "\SOH\146\238\160b\223\132\205\231b\239\243F\170\163\167\251D\241\170\EM\216\136\174@r\149\183|LuKu[+{\144\217\ETBL\f\244\GS>\179\146\143\RS\179\DLE\227\179\164\188\NULDQy\223\SI\132\183\248\177\219" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \200B>\DEL\GS\248\220\145\245\153\221\&6\131\243uAQCAd>\145k\nw\233\&5\218\SUB~_\244\"X O]7\167=n\ESC\SUB\198\235\208\215s\158\191Gz\143\136\237i\146\203\&6\182\196\129\239\238\SOH\180b" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
     -- This user record has been created manullay with dfx and our test
-    -- webauthPK has been added, so that we can actually log into this now
+    -- webauth1PK has been added, so that we can actually log into this now
     let dfxPK =  "0*0\ENQ\ACK\ETX+ep\ETX!\NUL\241\186;\128\206$\243\130\250\&2\253\a#<\235\142\&0]W\218\254j\211\209\192\SO@\DC3\NAKi&1"
-    lookupIs cid 10_030 [#alias .== "dfx" .+ #credential_id .== Nothing .+ #pubkey .== dfxPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauthPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
-    callII cid webauthID #remove (10_030, dfxPK)
-    lookupIs cid 10_030 [#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauthPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
+    lookupIs cid 10_030 [#alias .== "dfx" .+ #credential_id .== Nothing .+ #pubkey .== dfxPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
+    callII cid webauth1ID #remove (10_030, dfxPK)
+    lookupIs cid 10_030 [#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
     let delegationArgs = (10_030, "example.com", "dummykey", Nothing)
-    (userPK,_) <- callII cid webauthID #prepare_delegation delegationArgs
+    (userPK,_) <- callII cid webauth1ID #prepare_delegation delegationArgs
     -- Check that we get the same user key; this proves that the salt was
     -- recovered from the backup
     lift $ userPK @?= "0<0\x0c\&\x06\&\x0a\&+\x06\&\x01\&\x04\&\x01\&\x83\&\xb8\&C\x01\&\x02\&\x03\&,\x00\&\x0a\&\x00\&\x00\&\x00\&\x00\&\x00\&\x00\&\x00\&\x07\&\x01\&\x01\&:\x89\&&\x91\&M\xd1\&\xc8\&6\xec\&g\xba\&f\xac\&d%\xc2\&\x1d\&\xff\&\xd3\&\xca\&\x5c\&Yh\x85\&_\x87\&x\x0a\&\x1e\&\xc5\&y\x85\&"
@@ -871,7 +779,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #mode .== V.IsJust #install ()
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
-        .+ #arg .== Candid.encode (Nothing :: Maybe InitCandid) -- default value
+        .+ #arg .== Candid.encode (Nothing :: Maybe InternetIdentityInit) -- default value
       act cid
 
     withUpgrade act = ([act False], [act True])
@@ -892,6 +800,15 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #wasm_module .== wasm
         .+ #arg .== Candid.encode ()
 
+    getChallenge cid webauthID = do
+      challenge <- callII cid webauthID #create_challenge ()
+      pure $ #key .== challenge .! #challenge_key .+ #chars .== T.pack "a"
+
+    -- Go through a challenge request/registration flow for this device.
+    -- NOTE: this (dummily) solves the challenge with the string "a", which is
+    -- returned by the backend when compiled with II_DUMMY_CAPTCHA.
+    register cid webauthID device =
+      getChallenge cid webauthID >>= callII cid webauthID #register . (device,)
 
 asHex :: Blob -> String
 asHex = T.unpack . H.encodeHex . BS.toStrict
@@ -907,7 +824,7 @@ enum l = V.IsJust l ()
 newtype WasmOption = WasmOption String
 
 instance IsOption WasmOption where
-  defaultValue = WasmOption "../target/wasm32-unknown-unknown/release/internet_identity.wasm"
+  defaultValue = WasmOption "../internet_identity.wasm"
   parseValue = Just . WasmOption
   optionName = return "wasm"
   optionHelp = return "webassembly module of the identity provider"

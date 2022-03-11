@@ -49,6 +49,11 @@ type KeyType = variant {
     seed_phrase;
 };
 
+type Challenge = record {
+    png_base64: text;
+    challenge_key: ChallengeKey;
+};
+
 type DeviceData = record {
   pubkey : DeviceKey;
   alias : text;
@@ -62,6 +67,8 @@ type RegisterResponse = variant {
   registered: record { user_number: UserNumber; };
   // No more registrations are possible in this instance of the II service canister.
   canister_full;
+  // The challenge was not successful.
+  bad_challenge;
 };
 
 type Delegation = record {
@@ -92,14 +99,17 @@ type InternetIdentityInit = record {
   assigned_user_number_range : record { nat64; nat64; };
 };
 
-type ProofOfWork = record {
-  timestamp : Timestamp;
-  nonce : nat64;
+type ChallengeKey = text;
+
+type ChallengeResult = record {
+    key : ChallengeKey;
+    chars : text;
 };
 
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
-  register : (DeviceData, ProofOfWork) -> (RegisterResponse);
+  create_challenge : () -> (Challenge);
+  register : (DeviceData, ChallengeResult) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;

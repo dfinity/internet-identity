@@ -50,9 +50,18 @@ export class RegisterView extends View {
     await this.browser
       .$("#confirmRegisterButton")
       .waitForDisplayed({ timeout: 25_000 });
+    await this.browser.$("#captchaInput").waitForDisplayed({ timeout: 25_000 });
   }
 
   async confirmRegisterConfirm(): Promise<void> {
+    await this.browser.$("#captchaInput").waitForEnabled({ timeout: 40_000 });
+    // In tests, the captchas are hard-coded to the following string: "a"
+    await this.browser.$("#captchaInput").setValue("a");
+    await this.browser
+      .$("#confirmRegisterButton")
+      // this is a huge timeout because generating the captcha takes a while on
+      // the emulator
+      .waitForEnabled({ timeout: 30_000 });
     await this.browser.$("#confirmRegisterButton").click();
   }
 

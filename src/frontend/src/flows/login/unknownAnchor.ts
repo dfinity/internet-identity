@@ -1,13 +1,16 @@
 import { render, html } from "lit-html";
-import { IIConnection, ApiResult } from "../utils/iiConnection";
-import { parseUserNumber, setUserNumber } from "../utils/userNumber";
-import { withLoader } from "../components/loader";
-import { register } from "./register";
-import { icLogo } from "../components/icons";
-import { addDeviceUserNumber } from "./addDeviceUserNumber";
-import { navbar } from "../components/navbar";
-import { UserIntent, authenticateUnknownIntent } from "../utils/userIntent";
-import { useRecovery } from "./recovery/useRecovery";
+import { IIConnection } from "../../utils/iiConnection";
+import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
+import { withLoader } from "../../components/loader";
+import { register } from "../register";
+import { icLogo } from "../../components/icons";
+import { addDeviceUserNumber } from "../addDeviceUserNumber";
+import { navbar } from "../../components/navbar";
+import { footer } from "../../components/footer";
+import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
+import { useRecovery } from "../recovery/useRecovery";
+import { registerDisabled } from "../registerDisabled";
+import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 
 const pageContent = (userIntent: UserIntent) => html` <style>
     #registerUserNumber:focus {
@@ -68,25 +71,13 @@ const pageContent = (userIntent: UserIntent) => html` <style>
               and want to recover?
             </button>
           </div>`}
+    ${navbar}
   </div>
-  ${navbar}`;
+  ${footer}`;
 
-export type LoginResult =
-  | {
-      tag: "ok";
-      userNumber: bigint;
-      connection: IIConnection;
-    }
-  | {
-      tag: "err";
-      title: string;
-      message: string;
-      detail?: string;
-    };
-
-export const loginUnknown = async (
+export const loginUnknownAnchor = async (
   userIntent: UserIntent
-): Promise<LoginResult> => {
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userIntent), container);
   return new Promise((resolve, reject) => {
@@ -99,15 +90,26 @@ export const loginUnknown = async (
   });
 };
 
+/** Check that the current origin is not the explicit canister id or a raw url.
+ *  Explanation why we need to do this:
+ *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
+ **/
+function isRegistrationAllowed() {
+  return !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
+    window.origin
+  );
+}
+
 const initRegister = (
-  resolve: (res: LoginResult) => void,
+  resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
   const registerButton = document.getElementById(
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
-    register()
+    const result = isRegistrationAllowed() ? register() : registerDisabled();
+    result
       .then((res) => {
         if (res === null) {
           window.location.reload();
@@ -126,7 +128,7 @@ const initRecovery = () => {
   recoverButton.onclick = () => useRecovery();
 };
 
-const initLogin = (resolve: (res: LoginResult) => void) => {
+const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -155,7 +157,7 @@ const initLogin = (resolve: (res: LoginResult) => void) => {
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
-    resolve(apiResultToLoginResult(result));
+    resolve(apiResultToLoginFlowResult(result));
   };
 };
 
@@ -172,58 +174,4 @@ const initLinkDevice = () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     addDeviceUserNumber(userNumber);
   };
-};
-
-export const apiResultToLoginResult = (result: ApiResult): LoginResult => {
-  switch (result.kind) {
-    case "loginSuccess": {
-      return {
-        tag: "ok",
-        userNumber: result.userNumber,
-        connection: result.connection,
-      };
-    }
-    case "authFail": {
-      return {
-        tag: "err",
-        title: "Failed to authenticate",
-        message:
-          "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
-        detail: result.error.message,
-      };
-    }
-    case "unknownUser": {
-      return {
-        tag: "err",
-        title: "Unknown Identity Anchor",
-        message: `Failed to find an identity for the Identity Anchor ${result.userNumber}. Please check your Identity Anchor and try again.`,
-        detail: "",
-      };
-    }
-    case "apiError": {
-      return {
-        tag: "err",
-        title: "We couldn't reach Internet Identity",
-        message:
-          "We failed to call the Internet Identity service, please try again.",
-        detail: result.error.message,
-      };
-    }
-    case "registerNoSpace": {
-      return {
-        tag: "err",
-        title: "Failed to register",
-        message:
-          "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
-      };
-    }
-    case "seedPhraseFail": {
-      return {
-        tag: "err",
-        title: "Invalid Seed Phrase",
-        message:
-          "Failed to recover using this seedphrase. Did you enter it correctly?",
-      };
-    }
-  }
 };

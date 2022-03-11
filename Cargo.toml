@@ -1,11 +1,10 @@
 [workspace]
 members = [
-    "src/certified_map",
     "src/cubehash",
-    "src/hashtree",
     "src/internet_identity",
 ]
 
 [profile.release]
+debug = false # stripped by ic-cdk-optimizer anyway
 lto = true
 opt-level = 'z'

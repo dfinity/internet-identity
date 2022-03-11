@@ -1,6 +1,5 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
-import ChildProc from "child_process";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -48,6 +47,7 @@ export async function runInBrowserCommon(
       "goog:chromeOptions": {
         args: [
           "--headless",
+          "--ignore-certificate-errors", // allow self-signed certificates
           "--disable-gpu",
           `--window-size=${runConfig.screenConfiguration.windowSize}`,
         ],
@@ -235,6 +235,21 @@ export async function switchToPopup(
   await addVirtualAuthenticator(browser);
 }
 
+export async function removeFlavorsWarning(
+  browser: WebdriverIO.Browser
+): Promise<void> {
+  const warningContainer = await browser.$(".flavors-warning-container");
+  await warningContainer.waitForDisplayed();
+  await browser.execute(() => {
+    const warningContainer = document.querySelector(
+      ".flavors-warning-container"
+    );
+    if (warningContainer) {
+      warningContainer.remove();
+    }
+  });
+}
+
 export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
@@ -246,55 +261,4 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(1);
   await browser.switchToWindow(handles[0]);
-}
-
-export function setupSeleniumServer(): void {
-  let seleniumServerProc: ChildProc.ChildProcess;
-
-  beforeAll(async () => {
-    console.log("starting selenium-standalone server...");
-    seleniumServerProc = ChildProc.spawn("npx", [
-      "selenium-standalone",
-      "start",
-      "--config",
-      "./selenium-standalone.config.js",
-    ]);
-
-    const promise = new Promise((resolve, reject) => {
-      seleniumServerProc.stdout?.on("data", (data) => {
-        console.log(`selenium-standalone stdout: ${data}`);
-        if (data.toString().indexOf("Selenium started") !== -1) {
-          console.log("selenium-standalone started");
-          resolve(true);
-        }
-      });
-
-      /*
-       * For reasons unclear, printing stderr breaks the tests. It looks like it tries to print after the tests' end, which jest doesn't like:
-       *
-       * Cannot log after tests are done. Did you forget to wait for something async in your test?
-       * 434
-       *     Attempted to log "selenium-standalone stderr: 10:14:50.626 INFO [ActiveSessions$1.onStop]
-      seleniumServerProc.stderr?.on("data", (data) => {
-      console.log(`selenium-standalone stderr: ${data}`);
-      });
-      */
-
-      seleniumServerProc.on("error", (err) => {
-        console.error("Failed to start selenium-server: ", err);
-        reject(err);
-      });
-
-      setTimeout(() => {
-        reject("selenium-standalone server startup timeout");
-      }, 30_000);
-    });
-
-    await promise;
-  }, 120_000);
-
-  afterAll(() => {
-    console.log("stopping selenium-standalone server...");
-    seleniumServerProc.kill();
-  });
 }

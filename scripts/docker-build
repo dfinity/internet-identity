@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# vim: ft=bash
+# Build internet_identity.wasm inside docker. This outputs a single file, internet_identity.wasm,
+# in the top-level directory.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+cd "$SCRIPTS_DIR/.."
+
+echo "PWD: $PWD"
+
+image_name="internet-identity"
+docker_build_args=( --target scratch )
+
+# forward "flavor" environment variables ("$2") to the docker build
+# NOTE: flavor name ("$1") must be lower case as it's used in the image name
+function check_flavor() {
+    local varname="$2"
+    local flavorname="$1"
+    local value="${!varname:-}"
+
+    if [[ "$value" == "1" ]]
+    then
+        echo "Using flavor $flavorname ($varname)"
+        docker_build_args+=( --build-arg "$varname=$value" )
+        image_name="$image_name-$flavorname"
+    fi
+}
+
+check_flavor "fetchrootkey" "II_FETCH_ROOT_KEY"
+check_flavor "dummycaptcha" "II_DUMMY_CAPTCHA"
+check_flavor "dummyauth" "II_DUMMY_AUTH"
+
+docker_build_args+=(--tag "$image_name" .)
+
+echo "The following image name will be used: $image_name"
+
+tmp_outdir=$(mktemp -d)
+
+set -x
+DOCKER_BUILDKIT=1 docker build "${docker_build_args[@]}" --output "$tmp_outdir"
+set +x
+
+echo "Copying build output from $tmp_outdir to $PWD"
+cp "$tmp_outdir/internet_identity.wasm" .
+
+echo "Removing $tmp_outdir"
+rm -rf "$tmp_outdir"

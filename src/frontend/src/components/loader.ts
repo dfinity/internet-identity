@@ -16,6 +16,8 @@ const loader = () => html`<style>
       width: 125px;
       min-width: 125px;
       max-width: calc(100vw - 1rem);
+      margin: auto;
+      display: block;
     }
   </style>
   <picture id="loader">

@@ -8,6 +8,7 @@ import {
   IC_DERIVATION_PATH,
   IIConnection,
 } from "../../utils/iiConnection";
+import { unknownToString } from "../../utils/utils";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
@@ -30,12 +31,12 @@ export const setupRecovery = async (
           recoverIdentity = await WebAuthnIdentity.create({
             publicKey: creationOptions(devices, "cross-platform"),
           });
-        } catch (err) {
+        } catch (err: unknown) {
           await displayError({
             title: "Authentication failure",
             message:
               "Failed to set up a security key as your recovery mechanism. If you don't have an additional security key you can use a seedphrase instead.",
-            detail: err.toString(),
+            detail: unknownToString(err, "Unknown error"),
             primaryButton: "Try a different method",
           });
           return setupRecovery(userNumber, connection);
@@ -71,11 +72,11 @@ export const setupRecovery = async (
         await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     await displayError({
       title: "Failed to set up recovery",
       message: "We failed to set up recovery for this Identity Anchor.",
-      detail: err.toString(),
+      detail: unknownToString(err, "Unkwnown error"),
       primaryButton: "Continue",
     });
   }

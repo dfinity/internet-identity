@@ -19,13 +19,13 @@ import { FLOWS } from "./flows";
 import {
   Screenshots,
   addVirtualAuthenticator,
+  removeFlavorsWarning,
   removeVirtualAuthenticator,
   runInBrowser,
   runInNestedBrowser,
   switchToPopup,
   waitForFonts,
   waitToClose,
-  setupSeleniumServer,
   RunConfiguration,
 } from "./util";
 
@@ -37,16 +37,19 @@ import canister_ids2 from "../../../../demos/whoami/.dfx/local/canister_ids.json
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
 const WHOAMI_CANISTER = canister_ids2.whoami.local;
 
-const REPLICA_URL = "http://localhost:8000";
-const II_URL = `http://localhost:8000/?canisterId=${IDENTITY_CANISTER}`;
-const FAQ_URL = `http://localhost:8000/faq?canisterId=${IDENTITY_CANISTER}`;
-const ABOUT_URL = `http://localhost:8000/about?canisterId=${IDENTITY_CANISTER}`;
+const REPLICA_URL = process.env.REPLICA_URL
+  ? process.env.REPLICA_URL
+  : "http://localhost:8000";
+const II_ORIGIN = process.env.II_ORIGIN
+  ? process.env.II_ORIGIN
+  : "http://localhost:8000";
+const II_URL = `${II_ORIGIN}/?canisterId=${IDENTITY_CANISTER}`;
+const FAQ_URL = `${II_ORIGIN}/faq?canisterId=${IDENTITY_CANISTER}`;
+const ABOUT_URL = `${II_ORIGIN}/about?canisterId=${IDENTITY_CANISTER}`;
 const DEMO_APP_URL = "http://localhost:8080/";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
-
-setupSeleniumServer();
 
 test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -118,7 +121,7 @@ test("Log into client application, after registration", async () => {
 
     // default value
     const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
+    expect(Number(exp) / (24 * 60 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);
 
@@ -224,6 +227,7 @@ test("Screenshots", async () => {
       await browser.url(II_URL);
 
       await waitForFonts(browser);
+      await removeFlavorsWarning(browser);
       const welcomeView = new WelcomeView(browser);
       await welcomeView.waitForDisplay();
       await screenshots.take("welcome", browser);
@@ -266,6 +270,7 @@ test("Screenshots", async () => {
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       await browser.url(II_URL);
+      await removeFlavorsWarning(browser);
       const welcomeBackView = new WelcomeBackView(browser);
       await welcomeBackView.waitForDisplay();
       const userNumber2 = await welcomeBackView.getIdentityAnchor();
@@ -283,6 +288,7 @@ test("Screenshots", async () => {
       await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
         await addVirtualAuthenticator(browser2);
         await browser2.url(II_URL);
+        await removeFlavorsWarning(browser2);
         const welcomeView2 = new WelcomeView(browser2);
         await welcomeView2.waitForDisplay();
         await welcomeView2.typeUserNumber(userNumber);
@@ -303,6 +309,7 @@ test("Screenshots", async () => {
         // Log in with previous browser again
         await browser.url("about:blank");
         await browser.url(link);
+        await removeFlavorsWarning(browser);
         await waitForFonts(browser);
         const welcomeBackView = new WelcomeBackView(browser);
         await welcomeBackView.waitForDisplay();
@@ -329,6 +336,7 @@ test("Screenshots", async () => {
         const welcomeBackView2 = new WelcomeBackView(browser2);
         await welcomeBackView2.waitForDisplay();
         await welcomeBackView2.fixup();
+        await removeFlavorsWarning(browser2);
         await screenshots.take("new-device-login", browser2);
         await welcomeBackView2.login();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
@@ -363,6 +371,7 @@ test("Screenshots", async () => {
       // About page
       await browser.url("about:blank");
       await browser.url(ABOUT_URL);
+      await removeFlavorsWarning(browser);
       await waitForFonts(browser);
       const aboutView = new AboutView(browser);
       await aboutView.waitForDisplay();
@@ -372,12 +381,14 @@ test("Screenshots", async () => {
       await browser.url("about:blank");
       await browser.url(II_URL + "#about");
       await waitForFonts(browser);
+      await removeFlavorsWarning(browser);
       const aboutViewLegacy = new AboutView(browser);
       await aboutViewLegacy.waitForDisplay();
       await screenshots.take("about-legacy", browser);
 
       // Test device removal
       await browser.url(II_URL);
+      await removeFlavorsWarning(browser);
       await welcomeBackView.waitForDisplay();
       const userNumber3 = await welcomeBackView.getIdentityAnchor();
       expect(userNumber3).toBe(userNumber);
@@ -414,6 +425,7 @@ test("Screenshots", async () => {
       // Compatibility notice page
       await browser.url("about:blank");
       await browser.url(II_URL + "#compatibilityNotice");
+      await removeFlavorsWarning(browser);
       await waitForFonts(browser);
       const compatabilityNoticeView = new CompatabilityNoticeView(browser);
       await compatabilityNoticeView.waitForDisplay();
@@ -422,6 +434,7 @@ test("Screenshots", async () => {
       // FAQ page
       await browser.url("about:blank");
       await browser.url(FAQ_URL);
+      await removeFlavorsWarning(browser);
       await waitForFonts(browser);
       const faqView = new FAQView(browser);
       await faqView.waitForDisplay();
@@ -431,6 +444,13 @@ test("Screenshots", async () => {
       await faqView.openQuestion("lost-device");
       await faqView.waitForDisplay();
       await screenshots.take("faq-open", browser);
+
+      // Flavors warning banner
+      await browser.url("about:blank");
+      await browser.url(II_URL);
+      await waitForFonts(browser);
+      const welcomeView3 = new WelcomeView(browser);
+      await screenshots.take("flavors-warning", browser);
     }
   );
 }, 400_000);

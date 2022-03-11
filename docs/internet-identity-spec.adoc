@@ -71,12 +71,12 @@ A user account is identified by a unique _Identity Anchor_, a smallish natural n
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet
 Computer.
 
-A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://docs.dfinity.systems/public/#id-classes[_self-authenticating id_] of the form
+A user has a separate _user identity_ for each client application frontend (i.e., per hostname). This identity is a https://smartcontracts.org/docs/interface-spec/index.html#id-classes[_self-authenticating id_] of the form
 ....
 user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02` (29 bytes)
 ....
 
-that is derived from a https://docs.dfinity.systems/public/#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
+that is derived from a https://smartcontracts.org/docs/interface-spec/index.html#canister-signatures[canister signature] public “key” based on the `ii_canister_id` and a seed of the form
 ....
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 ....
@@ -89,7 +89,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 - a device _alias_, chosen by the user to recognize the device
 - an optional _credential id_, which is necessary for WebAuthN authentication
 
-When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://docs.dfinity.systems/public/#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
+When a client application frontend wants to log in as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a https://smartcontracts.org/docs/interface-spec/index.html#authentication[_delegation chain_] that allows the session key to sign for the user’s main identity.
 
 The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures[canister signature]. This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
@@ -102,9 +102,7 @@ This section describes the Internet Identity Service from the point of view of a
 
 1. The client application frontend creates a session key pair (e.g., Ed25519).
 2. It installs a `message` event handler on its own `window`.
-3. It loads the url `https://identity.ic0.app/#authorize` in an `<iframe>` or separate tab. Let `identityWindow` be the `Window` object returned from this.
-+
-If using an `<iframe>`, include `allow = "publickey-credentials-get"`, as per https://www.w3.org/TR/webauthn-2/#sctn-iframe-guidance[the Web Authentication recommendation].
+3. It loads the url `https://identity.ic0.app/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
 4. In the `identityWindow`, the user logs in, and the `identityWindow` invokes
 +
 --
@@ -151,7 +149,7 @@ where
    userPublicKey: Uint8Array;
  }
 +
-where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://docs.dfinity.systems/public/#authentication[_authentication on the IC_].
+where the `userPublicKey` is the user’s Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for https://smartcontracts.org/docs/interface-spec/index.html#authentication[_authentication on the IC_].
 9. It could also receive a failure message of the following type
 +
  interface InternetIdentityAuthResponse {
@@ -217,14 +215,9 @@ type GetDelegationResponse = variant {
   no_such_delegation;
 };
 
-type ProofOfWork = record {
-  timestamp : Timestamp
-  nonce : nat64
-};
-
 service : {
   init_salt : () -> ();
-  register : (DeviceData, ProofOfWork) -> (UserNumber);
+  register : (DeviceData) -> (UserNumber);
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
@@ -237,17 +230,13 @@ service : {
 
 The `init_salt` method is mostly internal, see <<salt>>.
 
-=== The `register` method
+=== The `register` and `create_challenge` methods
 
 The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the account record, and adds the given device as the first device.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
-In order to protect the Internet Computer from too many “free” update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a proof of work obligation. The `register` call can only succeed if
-
- * the `timestamp` in the `ProofOfWork` parameter is within 5min of the current time as seen by the Canister
- * the calculation of `H("\10ic-proof-of-work" · timestamp · nonce · |cid| · cid )` (where `H` is the https://cubehash.cr.yp.to/[CubeHash160+16/32+160-256] function, `·` is concatenation, `|…|` is a single byte encoding the length of the raw canister id in bytes, `cid` is the canister id and numbers are encoded as 8-byte little endian values), yields a hash value where leading 2 bytes are `0x00`.
- * the canister did not recently see a registration attempt with that `nonce`.
+In order to protect the Internet Computer from too many “free” update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes _and_ if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 
 === The `add` method
 
@@ -324,7 +313,7 @@ Since this cannot be done during `canister_init` (no calls from canister init), 
 
 === Why we do not use `canister_inspect_message`
 
-The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see https://docs.dfinity.systems/public/#system-api-inspect-message[the interface spec]). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
+The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see https://smartcontracts.org/docs/interface-spec/index.html#system-api-inspect-message[the interface spec]). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
 
 It seems that this implies that we should use `canister_inspect_message` to reject messages that would, for example, not pass authentication.
 
@@ -344,8 +333,6 @@ The primary data structure used by the backend is a map from Identity Anchor to 
 Device lists are stored directly in canister stable memory.
 The total amount of storage for is limited to 2KiB bytes per user.
 With the stable memory size of 4GiB we can store around 2 * 10^6 user records in a single canister.
-
-There is also a set of recently seen proof of work nonces.
 
 ==== Stable memory layout
 
@@ -385,14 +372,6 @@ type UserDeviceList = vec(record {
   credential_id : opt CredentialId;
 });
 ....
-
-==== Proof of work nonces
-
-In order to implement `register` as specified above, the Canister maintains the set of `nonce` values that were used recently (last 10 minutes) in a call to `register`.
-
-The proof of work puzzle is checked both in `canister_inspect_message` as well as in the actual `register` method call. Ideally, the `register` method never traps if `canister_inspect_message` wouldn’t trap as well, so that the canister can remember seeing a certain nonce.
-
-NOTE: Even with that provision the same nonce can be used to ingress multiple messages, as `canister_inspect_message` is always run on a slightly old state. This cannot be avoided, but at least of these calls at most one can actually create a new user account.
 
 === Initialization
 
@@ -630,8 +609,7 @@ For installation or upgrade, you should build it the “official” way.
 In a checkout of this repository, run the following to build the official image:
 [source,bash]
 ----
-docker build -t internet-identity-service .
-docker run --rm --entrypoint cat internet-identity-service /internet_identity.wasm > internet_identity.wasm
+./scripts/docker-build
 ----
 
 The resulting `internet_identity.wasm` is ready for deployment on `mainnet`.
@@ -703,13 +681,12 @@ Once the deployment went through, tag the commit with `mainnet-<date-from-propos
 ==== Building the canister for the identity testnet
 
 Because we need to fetch the root key for all networks that are not mainnet, we
-need to build with `II_ENV=development`:
+need to build with `II_FETCH_ROOT_KEY=1`:
 
 [source,bash]
 ----
 didc encode '(null)' | xxd -r -p > arg.in
-docker build -t internet-identity-development . --build-arg II_ENV=development
-docker run --rm --entrypoint cat internet-identity-development /internet_identity.wasm > internet_identity.wasm
+II_FETCH_ROOT_KEY=1 ./scripts/docker-build
 ----
 
 This will create the Wasm file you want to use for the following deployment steps at `./internet_identity.wasm`.
