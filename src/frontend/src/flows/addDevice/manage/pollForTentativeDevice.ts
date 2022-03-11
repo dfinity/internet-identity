@@ -60,10 +60,10 @@ export const pollForTentativeDevice = async (
       connection.enterDeviceRegistrationMode(userNumber),
       connection.getAnchorInfo(userNumber),
     ]);
-    const tentative_device = getTentativeDevice(userInfo);
-    if (tentative_device) {
+    const tentativeDevice = getTentativeDevice(userInfo);
+    if (tentativeDevice) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(userNumber, tentative_device, timestamp, connection);
+      await verifyDevice(userNumber, tentativeDevice, timestamp, connection);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
       render(pageContent(userNumber), container);
@@ -72,7 +72,7 @@ export const pollForTentativeDevice = async (
   });
 };
 
-const startPolling = async (
+const poll = (
   connection: IIConnection,
   userNumber: bigint,
   shouldStop: () => boolean
@@ -81,11 +81,11 @@ const startPolling = async (
     if (shouldStop()) {
       return null;
     }
-    const tentative_device = getTentativeDevice(response);
-    if (tentative_device) {
-      return tentative_device;
+    const tentativeDevice = getTentativeDevice(response);
+    if (tentativeDevice) {
+      return tentativeDevice;
     }
-    return startPolling(connection, userNumber, shouldStop);
+    return poll(connection, userNumber, shouldStop);
   });
 };
 
@@ -108,9 +108,9 @@ const init = (
     }
   );
 
-  startPolling(connection, userNumber, countdown.isStopped).then(
+  poll(connection, userNumber, countdown.hasStopped).then(
     async (device) => {
-      if (device) {
+      if (!countdown.hasStopped() && device) {
         countdown.stop();
         await verifyDevice(userNumber, device, endTimestamp, connection);
       }
@@ -129,12 +129,12 @@ const init = (
 
 const getTentativeDevice = (
   userInfo: IdentityAnchorInfo
-): DeviceData | undefined => {
+): DeviceData | null => {
   if (
     userInfo.device_registration.length === 1 &&
     userInfo.device_registration[0].tentative_device.length === 1
   ) {
     return userInfo.device_registration[0].tentative_device[0];
   }
-  return undefined;
+  return null;
 };

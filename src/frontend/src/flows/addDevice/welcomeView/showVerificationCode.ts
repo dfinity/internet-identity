@@ -58,7 +58,7 @@ export const showVerificationCode = async (
   );
 };
 
-function startPolling(
+function poll(
   userNumber: bigint,
   credentialToBeVerified: Array<number>,
   shouldStop: () => boolean
@@ -76,7 +76,7 @@ function startPolling(
         }
       }
     }
-    return startPolling(userNumber, credentialToBeVerified, shouldStop);
+    return poll(userNumber, credentialToBeVerified, shouldStop);
   });
 }
 
@@ -99,7 +99,7 @@ const init = async (
       window.location.reload();
     }
   );
-  startPolling(userNumber, credentialToBeVerified, countdown.isStopped).then(
+  poll(userNumber, credentialToBeVerified, countdown.hasStopped).then(
     (verified) => {
       if (verified) {
         countdown.stop();

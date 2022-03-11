@@ -24,7 +24,7 @@ const pageContent = (userNumber: bigint | null) => html`
 `;
 
 /**
- * Entry point for the flow of adding a new authenticator when starting form the welcome view (by clicking 'Already have an anchor but using a new device?').
+ * Entry point for the flow of adding a new authenticator when starting from the welcome view (by clicking 'Already have an anchor but using a new device?').
  * This shows a prompt to enter the identity anchor to add this new device to.
  */
 export const addRemoteDevice = async (

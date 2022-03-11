@@ -80,8 +80,8 @@ const init = (
       await displayError({
         title: "Timeout Reached",
         message:
-          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-        primaryButton: "Ok",
+          "The timeout has been reached. For security reasons the \"add device\" process has been aborted.",
+        primaryButton: "Ok"
       });
       await renderManage(userNumber, connection);
     }
@@ -125,17 +125,24 @@ const init = (
       countdown.stop();
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
       await renderManage(userNumber, connection);
-    } else if (
-      hasOwnProperty(result, "wrong_code") &&
-      result.wrong_code.retries_left > 0
-    ) {
-      toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
+    } else if (hasOwnProperty(result, "wrong_code")) {
+      if (result.wrong_code.retries_left > 0) {
+        toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
+      } else {
+        await displayError({
+          title: "Too Many Wrong Verification Codes Entered",
+          message:
+            "Adding the device has been aborted due to too many invalid code entries.",
+          primaryButton: "Continue"
+        });
+        await renderManage(userNumber, connection);
+      }
     } else if (hasOwnProperty(result, "device_registration_mode_off")) {
       await displayError({
         title: "Device Registration Not Enabled",
         message:
           "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
-        primaryButton: "Continue",
+        primaryButton: "Continue"
       });
       await renderManage(userNumber, connection);
     } else if (hasOwnProperty(result, "no_device_to_verify")) {
@@ -143,17 +150,16 @@ const init = (
         title: "No Device To Verify",
         message:
           "Verification not possible because the device is no longer in a state to be verified.",
-        primaryButton: "Continue",
+        primaryButton: "Continue"
       });
       await renderManage(userNumber, connection);
     } else {
       await displayError({
-        title: "Too Many Wrong Verification Codes Entered",
-        message:
-          "Adding the device has been aborted due to too many invalid code entries.",
-        primaryButton: "Continue",
+        title: "Something Went Wrong",
+        message: "Device could not be verified.",
+        detail: JSON.stringify(result),
+        primaryButton: "Continue"
       });
-      await renderManage(userNumber, connection);
     }
   };
 };

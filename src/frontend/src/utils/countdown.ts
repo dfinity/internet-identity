@@ -20,7 +20,7 @@ export class Countdown {
   constructor(
     private updateFunc: () => void,
     endTimestamp: bigint,
-    private timeoutFunc?: () => Promise<void>
+    private timeoutFunc?: () => void
   ) {
     this.expected = Date.now() + this.interval;
     this.endTimestamp = Number(endTimestamp / BigInt("1000000"));
@@ -28,7 +28,7 @@ export class Countdown {
   }
 
   /**
-   * Stops the countdown. The timout callback is not called.
+   * Stops the countdown. The timeout callback is not called.
    */
   public stop(): void {
     if (this.timeoutHandle !== undefined) {
@@ -40,15 +40,15 @@ export class Countdown {
   /**
    * @return boolean whether the countdown is stopped (either because {@link stop} was called or because the timeout was reached).
    */
-  public isStopped(): boolean {
+  public hasStopped(): boolean {
     return this.timeoutHandle !== undefined;
   }
 
-  private async step() {
+  private step() {
     const now = Date.now();
     if (now >= this.endTimestamp) {
       if (this.timeoutFunc) {
-        await this.timeoutFunc();
+        this.timeoutFunc();
       }
       return;
     }
@@ -73,7 +73,7 @@ export class Countdown {
 export const setupCountdown = (
   endTimestamp: bigint,
   timerElement: HTMLElement,
-  timeoutFunc?: () => Promise<void>
+  timeoutFunc?: () => void
 ): Countdown => {
   return new Countdown(
     () => render(formatRemainingTime(endTimestamp), timerElement),
