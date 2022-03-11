@@ -9,25 +9,26 @@ const pageContent = (userNumber: bigint) => html`
     <h1>Device Registration Not Enabled</h1>
     <p>
       Device registration is not enabled for the Identity Anchor
-      <b>${userNumber}</b>. To enable device registration do the following:
+      <strong>${userNumber}</strong>. To enable device registration do the
+      following:
     </p>
     <ol class="instruction-steps">
       <li>
-        On an <i>existing</i> device:<br />
-        Log into <b>https://identity.ic0.app</b> with Identity Anchor
-        <b>${userNumber}</b>
+        On an <em>existing</em> device:<br />
+        Log into <strong>https://identity.ic0.app</strong> with Identity Anchor
+        <strong>${userNumber}</strong>
       </li>
       <li>
-        On an <i>existing</i> device:<br />
-        Click <b>Add new device</b>
+        On the <em>existing</em> device:<br />
+        Click <strong>Add new device</strong>
       </li>
       <li>
-        On an <i>existing</i> device:<br />
-        Chose <b>Remote Device</b>
+        On the <em>existing</em> device:<br />
+        Chose <strong>Remote Device</strong>
       </li>
       <li>
-        On <i>this</i> device:<br />
-        Press <b>Retry</b>
+        On <em>this</em> device:<br />
+        Press <strong>Retry</strong>
       </li>
     </ol>
     <button id="deviceRegModeDisabledRetry" class="primary">Retry</button>
@@ -35,6 +36,11 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
+/**
+ * Error page which is shown if the identy anchor does not have device registration mode enabled.
+ * It shows instructions to the user on how to continue.
+ * @param tentativeDeviceInfo Information about the device to be added so that the user does not have to enter everything again after enabling device registration mode.
+ */
 export const deviceRegistrationDisabledInfo = async (
   tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {

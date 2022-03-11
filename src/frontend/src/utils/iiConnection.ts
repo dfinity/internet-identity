@@ -77,20 +77,6 @@ if (typeof canisterId !== undefined) {
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 
-async function createBaseActor(): Promise<ActorSubclass<_SERVICE>> {
-  // Only fetch the root key when we're not in prod
-  const httpAgent = new HttpAgent({});
-  if (flavors.FETCH_ROOT_KEY) {
-    await httpAgent.fetchRootKey();
-  }
-  return Actor.createActor<_SERVICE>(internet_identity_idl, {
-    agent: httpAgent,
-    canisterId,
-  });
-}
-
-export const baseActor = createBaseActor();
-
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
@@ -296,7 +282,7 @@ export class IIConnection {
   }
 
   static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await baseActor;
+    const actor = await IIConnection.createActor();
     return await actor.lookup(userNumber);
   }
 
@@ -310,7 +296,7 @@ export class IIConnection {
   static async lookupAuthenticators(
     userNumber: UserNumber
   ): Promise<DeviceData[]> {
-    const actor = await baseActor;
+    const actor = await IIConnection.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "authentication")
@@ -325,7 +311,7 @@ export class IIConnection {
     newPublicKey: DerEncodedPublicKey,
     credentialId?: ArrayBuffer
   ): Promise<AddTentativeDeviceResponse> {
-    const actor = await baseActor;
+    const actor = await IIConnection.createActor();
     return await actor.add_tentative_device(userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -338,7 +324,7 @@ export class IIConnection {
   }
 
   static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await baseActor;
+    const actor = await IIConnection.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "recovery")
@@ -381,7 +367,7 @@ export class IIConnection {
     return this.actor;
   }
 
-  lookupAnchorInfo = async (
+  getAnchorInfo = async (
     userNumber: UserNumber
   ): Promise<IdentityAnchorInfo> => {
     const actor = await this.getActor();

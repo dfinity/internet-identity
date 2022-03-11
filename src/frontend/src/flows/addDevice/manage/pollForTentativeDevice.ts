@@ -3,50 +3,45 @@ import { IIConnection } from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";
-import {
-  Countdown,
-  formatRemainingTime,
-  setupCountdown,
-} from "../../../utils/countdown";
+import { Countdown, setupCountdown } from "../../../utils/countdown";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../../generated/internet_identity_types";
+import { displayError } from "../../../components/displayError";
 
-const pageContent = (userNumber: bigint, endTimestamp: bigint) => html`
+const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Add New Remote Device</h1>
     <p>
       Device registration mode enabled for Identity Anchor
-      <b>${userNumber}</b>. Please follow these steps to add your new device:
+      <strong>${userNumber}</strong>. Please follow these steps to add your new
+      device:
     </p>
     <ol class="instruction-steps">
       <li>
-        On your <i>new</i> device:<br />
-        Open <b>https://identity.ic0.app</b>
+        On your <em>new</em> device:<br />
+        Open <strong>https://identity.ic0.app</strong>
       </li>
       <li>
-        On your <i>new</i> device:<br />
+        On your <em>new</em> device:<br />
         Chose
         <b>Already have an anchor but using a new device?</b>
       </li>
       <li>
-        On your <i>new</i> device:<br />
+        On your <em>new</em> device:<br />
         Enter your Identity Anchor
-        <b>${userNumber}</b>
+        <strong>${userNumber}</strong>
       </li>
       <li>
-        On your <i>new</i> device:<br />
+        On your <em>new</em> device:<br />
         Choose an alias for your new device
       </li>
     </ol>
     <p>
       This page will automatically refresh after completing the above steps.
     </p>
-    <p>
-      Time remaining:
-      <span id="timer">${formatRemainingTime(endTimestamp)}</span>
-    </p>
+    <p>Time remaining: <span id="timer"></span></p>
     <button id="cancelAddRemoteDevice" class="linkStyle">Cancel</button>
   </div>
 `;
@@ -58,15 +53,15 @@ export const pollForTentativeDevice = async (
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
       connection.enterDeviceRegistrationMode(userNumber),
-      connection.lookupAnchorInfo(userNumber),
+      connection.getAnchorInfo(userNumber),
     ]);
     const tentative_device = getTentativeDevice(userInfo);
-    if (tentative_device !== undefined) {
+    if (tentative_device) {
       // directly show the verification screen if the tentative device already exists
       await verifyDevice(userNumber, tentative_device, timestamp, connection);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
-      render(pageContent(userNumber, timestamp), container);
+      render(pageContent(userNumber), container);
       init(userNumber, timestamp, connection);
     }
   });
@@ -79,9 +74,9 @@ const startPolling = (
   endTimestamp: bigint
 ): number => {
   const pollingHandle = window.setInterval(async () => {
-    const userInfo = await connection.lookupAnchorInfo(userNumber);
+    const userInfo = await connection.getAnchorInfo(userNumber);
     const tentative_device = getTentativeDevice(userInfo);
-    if (tentative_device !== undefined) {
+    if (tentative_device) {
       window.clearInterval(pollingHandle);
       timerUpdate.stop();
       await verifyDevice(
@@ -91,7 +86,7 @@ const startPolling = (
         connection
       );
     }
-  }, 2000);
+  }, 3000);
   return pollingHandle;
 };
 
@@ -100,8 +95,9 @@ const init = (
   endTimestamp: bigint,
   connection: IIConnection
 ) => {
-  const countdown = setupCountdown(endTimestamp, () =>
-    renderManage(userNumber, connection)
+  const countdown = setupCountdown(
+    endTimestamp,
+    document.getElementById("timer") as HTMLElement
   );
   const pollingHandle = startPolling(
     connection,
@@ -109,6 +105,16 @@ const init = (
     countdown,
     endTimestamp
   );
+  countdown.start(async () => {
+    window.clearInterval(pollingHandle);
+    await displayError({
+      title: "Timeout Reached",
+      message:
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+      primaryButton: "Ok",
+    });
+    await renderManage(userNumber, connection);
+  });
 
   const cancelButton = document.getElementById(
     "cancelAddRemoteDevice"

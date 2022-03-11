@@ -126,9 +126,7 @@ export const renderManage = async (
 
   let anchorInfo: IdentityAnchorInfo;
   try {
-    anchorInfo = await withLoader(() =>
-      connection.lookupAnchorInfo(userNumber)
-    );
+    anchorInfo = await withLoader(() => connection.getAnchorInfo(userNumber));
   } catch (error: unknown) {
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
@@ -162,6 +160,7 @@ const init = async (
   addAdditionalDeviceButton.onclick = async () => {
     const nextAction = await chooseDeviceAddFlow();
     if (nextAction === null) {
+      // user clicked 'cancel'
       await renderManage(userNumber, connection);
       return;
     }

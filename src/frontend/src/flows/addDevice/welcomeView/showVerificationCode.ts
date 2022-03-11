@@ -5,7 +5,8 @@ import {
   Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { setUserNumber } from "../../../utils/userNumber";
-import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
+import { Countdown, setupCountdown } from "../../../utils/countdown";
+import { displayError } from "../../../components/displayError";
 
 export type TentativeRegistrationInfo = {
   verification_code: string;
@@ -20,9 +21,9 @@ const pageContent = (
     <h1>Device Verification Required</h1>
     <p>
       This device was added tentatively to the Identity Anchor
-      <b>${userNumber}</b>. Log in on an existing device and verify this device
-      using the verification code below. After successful verification this page
-      will automatically refresh.
+      <strong>${userNumber}</strong>. Log in on an existing device and verify
+      this device using the verification code below. After successful
+      verification this page will automatically refresh.
     </p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
@@ -30,17 +31,18 @@ const pageContent = (
     <div id="verificationCode" class="highlightBox">
       ${tentativeRegistrationInfo.verification_code}
     </div>
-    <p>
-      Time remaining:
-      <span id="timer"
-        >${formatRemainingTime(
-          tentativeRegistrationInfo.device_registration_timeout
-        )}</span
-      >
-    </p>
+    <p>Time remaining: <span id="timer"></span></p>
     <button id="showCodeCancel">Cancel</button>
   </div>
 `;
+
+/**
+ * Page to display the verification code which is received after successfully registering a tentative device.
+ * @param userNumber Anchor the device to be verified belongs to
+ * @param alias Alias of the tentative device
+ * @param tentativeRegistrationInfo Verification code and timeout received when registering the tentative device
+ * @param credentialToBeVerified Credential id of the device to be verified. When this id appears in the list of authenticators, verification was successful.
+ */
 export const showVerificationCode = async (
   userNumber: bigint,
   alias: string,
@@ -56,29 +58,56 @@ export const showVerificationCode = async (
   );
 };
 
-const init = async (
+function startPolling(
   userNumber: bigint,
-  endTimestamp: bigint,
-  credentialToBeVerified: CredentialId
-): Promise<void> => {
-  const countdown = setupCountdown(endTimestamp, async () => {
-    window.location.reload();
-  });
-  const pollingHandler = window.setInterval(async () => {
+  credentialToBeVerified: Array<number>,
+  countdown: Countdown
+) {
+  const pollingHandle = window.setInterval(async () => {
     const deviceData = await IIConnection.lookupAuthenticators(userNumber);
     deviceData.forEach((device) => {
       if (device.credential_id.length === 1) {
         const credentialId = device.credential_id[0];
+
         if (credentialIdEqual(credentialId, credentialToBeVerified)) {
           setUserNumber(userNumber);
           countdown.stop();
-          window.clearInterval(pollingHandler);
+          window.clearInterval(pollingHandle);
           // TODO L2-309: do this without reload
           window.location.reload();
         }
       }
     });
-  }, 2000);
+  }, 3000);
+  return pollingHandle;
+}
+
+const init = async (
+  userNumber: bigint,
+  endTimestamp: bigint,
+  credentialToBeVerified: CredentialId
+): Promise<void> => {
+  const countdown = setupCountdown(
+    endTimestamp,
+    document.getElementById("timer") as HTMLElement
+  );
+  const pollingHandle = startPolling(
+    userNumber,
+    credentialToBeVerified,
+    countdown
+  );
+
+  countdown.start(async () => {
+    window.clearInterval(pollingHandle);
+    await displayError({
+      title: "Timeout Reached",
+      message:
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+      primaryButton: "Ok",
+    });
+    // TODO L2-309: do this without reload
+    window.location.reload();
+  });
 
   const cancelButton = document.getElementById(
     "showCodeCancel"
@@ -86,7 +115,7 @@ const init = async (
 
   cancelButton.onclick = () => {
     countdown.stop();
-    window.clearInterval(pollingHandler);
+    window.clearInterval(pollingHandle);
     // TODO L2-309: do this without reload
     window.location.reload();
   };

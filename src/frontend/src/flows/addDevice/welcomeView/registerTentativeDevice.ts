@@ -33,6 +33,10 @@ const pageContent = () => html`
   </div>
 `;
 
+/**
+ * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
+ * @param userNumber anchor to add the tentative device to.
+ */
 export const registerTentativeDevice = async (
   userNumber: bigint
 ): Promise<void> => {

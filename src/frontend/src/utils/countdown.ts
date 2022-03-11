@@ -1,30 +1,51 @@
 import { render } from "lit-html";
-import { displayError } from "../components/displayError";
 
+/**
+ * Countdown implementation which calls the supplied update function approximately every second until the endTimestamp is reached.
+ * When the endTimestamp is reached, the timeout callback supplied to the start method is called once.
+ * Stopping the countdown does not call the timeout callback.
+ */
 export class Countdown {
-  private timeoutHandle;
+  private interval = 1000;
+  private timeoutHandle: number | undefined;
   private expected;
   private readonly endTimestamp;
+  private timeoutFunc: (() => Promise<void>) | undefined;
 
-  constructor(
-    private updateFunc: () => void,
-    private interval: number,
-    private timeoutFunc: () => void,
-    endTimestamp: bigint
-  ) {
+  /**
+   * Constructs a new Countdown. To start the countdown, {@link Countdown.start} has to be called.
+   * @param updateFunc Callback to be called approximately every second until endTimestamp is reached.
+   * @param endTimestamp timestamp (in nanoseconds) when the countdown should end.
+   */
+  constructor(private updateFunc: () => void, endTimestamp: bigint) {
     this.expected = Date.now() + this.interval;
-    this.timeoutHandle = window.setTimeout(() => this.step(), this.interval);
     this.endTimestamp = Number(endTimestamp / BigInt("1000000"));
   }
 
+  /**
+   * Starts the countdown. When the timout is reached, the given callback is called (if any).
+   * @param timeoutFunc Optional callback function to be called when the timeout is reached.
+   */
+  public start(timeoutFunc?: () => Promise<void>): void {
+    this.timeoutFunc = timeoutFunc;
+    this.timeoutHandle = window.setTimeout(() => this.step()); // execute the first step immediately
+  }
+
+  /**
+   * Stops the countdown. When the timout is reached, the given callback is called (if any).
+   */
   public stop(): void {
-    window.clearTimeout(this.timeoutHandle);
+    if (this.timeoutHandle !== undefined) {
+      window.clearTimeout(this.timeoutHandle);
+    }
   }
 
   private async step() {
     const now = Date.now();
     if (now >= this.endTimestamp) {
-      await this.timeoutFunc();
+      if (this.timeoutFunc) {
+        await this.timeoutFunc();
+      }
       return;
     }
     const drift = now - this.expected;
@@ -37,24 +58,20 @@ export class Countdown {
   }
 }
 
+/**
+ * Sets up a countdown ending at endTimestamp updating the timerElement every second.
+ * Note: this function will not yet start the countdown. To {@link Countdown.start} the countdown start() has to be called on the returned object.
+ * @param endTimestamp timestamp (in nanoseconds) when the countdown should end
+ * @param timerElement element to update with the remaining time in mm:ss format.
+ * @return the initialized {@link Countdown}
+ */
 export const setupCountdown = (
-  timestamp: bigint,
-  continueFunc: () => Promise<void>
+  endTimestamp: bigint,
+  timerElement: HTMLElement
 ): Countdown => {
-  const timer = document.getElementById("timer") as HTMLElement;
   return new Countdown(
-    () => render(formatRemainingTime(timestamp), timer),
-    1000,
-    async () => {
-      await displayError({
-        title: "Timeout Reached",
-        message:
-          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-        primaryButton: "Ok",
-      });
-      await continueFunc;
-    },
-    timestamp
+    () => render(formatRemainingTime(endTimestamp), timerElement),
+    endTimestamp
   );
 };
 

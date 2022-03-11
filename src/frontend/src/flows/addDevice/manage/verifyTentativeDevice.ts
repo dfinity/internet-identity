@@ -6,10 +6,10 @@ import { hasOwnProperty } from "../../../utils/utils";
 import { displayError } from "../../../components/displayError";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
-import { formatRemainingTime, setupCountdown } from "../../../utils/countdown";
+import { setupCountdown } from "../../../utils/countdown";
 import { warningIcon } from "../../../components/icons";
 
-const pageContent = (alias: string, endTimestamp: bigint) => html`
+const pageContent = (alias: string) => html`
   <div class="container">
     <h1>Verify New Device</h1>
     <div class="warnBox">
@@ -18,8 +18,9 @@ const pageContent = (alias: string, endTimestamp: bigint) => html`
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
           Verifying will add the shown device to your Identity Anchor. It will
-          have <b>full control over your identity</b>. Only enter a verification
-          code here if you are sure that you <i>personally own</i> this device.
+          have <strong>full control over your identity</strong>. Only enter a
+          verification code here if you are sure that you
+          <em>personally own</em> this device.
         </div>
       </div>
     </div>
@@ -29,8 +30,9 @@ const pageContent = (alias: string, endTimestamp: bigint) => html`
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
           Enter only codes that were displayed on
-          <b>https://identity.ic0.app</b>. Do <b>not</b> enter verification
-          codes that you received any other way.
+          <strong>https://identity.ic0.app</strong>. Do
+          <strong>not</strong> enter verification codes that you received any
+          other way.
         </div>
       </div>
     </div>
@@ -42,10 +44,7 @@ const pageContent = (alias: string, endTimestamp: bigint) => html`
       The entered verification code was invalid. Please try again.
     </div>
     <input id="tentativeDeviceCode" placeholder="Verification Code" />
-    <p>
-      Time remaining:
-      <span id="timer">${formatRemainingTime(endTimestamp)}</span>
-    </p>
+    <p>Time remaining: <span id="timer"></span></p>
     <button id="verifyDevice" class="primary">Verify Device</button>
     <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>
   </div>
@@ -58,7 +57,7 @@ export const verifyDevice = async (
   connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(tentativeDevice.alias, endTimestamp), container);
+  render(pageContent(tentativeDevice.alias), container);
   init(userNumber, connection, endTimestamp);
 };
 
@@ -67,9 +66,20 @@ const init = (
   connection: IIConnection,
   endTimestamp: bigint
 ) => {
-  const countdown = setupCountdown(endTimestamp, () =>
-    renderManage(userNumber, connection)
+  const countdown = setupCountdown(
+    endTimestamp,
+    document.getElementById("timer") as HTMLElement
   );
+  countdown.start(async () => {
+    await displayError({
+      title: "Timeout Reached",
+      message:
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+      primaryButton: "Ok",
+    });
+    await renderManage(userNumber, connection);
+  });
+
   const cancelButton = document.getElementById(
     "cancelVerifyDevice"
   ) as HTMLButtonElement;

@@ -1,6 +1,3 @@
-// Add a new device (i.e. a device connected to the browser the user is
-// currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
-// add e.g. _another_ browser, macbook or iPhone.)
 import { creationOptions, IIConnection } from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -18,6 +15,14 @@ const displayFailedToAddDevice = (error: Error) =>
     primaryButton: "Back to manage",
   });
 
+/**
+ * Add a new device (i.e. a device connected to the browser the user is
+ * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
+ * add e.g. _another_ browser, macbook or iPhone.)
+ * @param userNumber anchor to add the device to
+ * @param connection authenticated II connection
+ * @param devices already existing devices
+ */
 export const addLocalDevice = async (
   userNumber: bigint,
   connection: IIConnection,
@@ -37,7 +42,7 @@ export const addLocalDevice = async (
   const deviceName = await pickDeviceAlias();
   if (deviceName === null) {
     // user clicked "cancel", so we go back to "manage"
-    return renderManage(userNumber, connection);
+    return await renderManage(userNumber, connection);
   }
   try {
     await withLoader(() =>

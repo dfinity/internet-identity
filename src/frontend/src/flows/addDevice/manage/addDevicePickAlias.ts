@@ -12,6 +12,9 @@ const pageContent = () => html`
   </div>
 `;
 
+/**
+ * Shows a page prompting the user to pick a device alias.
+ */
 export const pickDeviceAlias = async (): Promise<string | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);

@@ -50,9 +50,9 @@ const pageContent = () => html`
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
           You are in the process of adding a new device. Any device added here
-          will have <b>full control over your identity</b>. Only continue the
-          process if you want to add a new device that you
-          <i>personally own</i>.
+          will have <strong>full control over your identity</strong>. Only
+          continue the process if you want to add a new device that you
+          <em>personally own</em>.
         </div>
       </div>
     </div>
@@ -62,7 +62,7 @@ const pageContent = () => html`
         <div class="warnTitle">Security Warning</div>
         <div class="warnMessage">
           Do not continue if you were prompted to do this by any website other
-          than <b>https://identity.ic0.app</b>!
+          than <strong>https://identity.ic0.app</strong>!
         </div>
       </div>
     </div>
@@ -75,14 +75,14 @@ const pageContent = () => html`
         <span class="flowIcon">${securityKeyIcon}</span>
         <div class="flowOptionTitle">Local Device</div>
         <div class="flowOptionDescription">
-          Add a new device available on <i>this machine</i>.
+          Add a new device available on <em>this machine</em>.
         </div>
       </button>
       <button class="flowOption" id="remote">
         <span class="flowIcon">${networkIcon}</span>
         <div class="flowOptionTitle">Remote Device</div>
         <div class="flowOptionDescription">
-          Add a new device available on <i>another machine</i>.
+          Add a new device available on <em>another machine</em>.
         </div>
       </button>
     </div>
@@ -92,6 +92,12 @@ const pageContent = () => html`
 
 export type DeviceAddFlow = "local" | "remote";
 
+/**
+ * Entry point for the flow of adding a new authenticator when starting form the management view (by clicking 'add new device' there).
+ * This file is responsible for the next view shown, which is giving the user the choice of
+ * - adding a local authenticator (e.g. a Yubikey attached to the computer) -> if chosen flow is continued with {@link addLocalDevice}
+ * - adding a new remote device (e.g. a different computer with platform biometrics) -> if chosen flow is continued with {@link pollForTentativeDevice}
+ */
 export const chooseDeviceAddFlow = async (): Promise<DeviceAddFlow | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
