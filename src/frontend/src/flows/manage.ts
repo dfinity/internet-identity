@@ -1,49 +1,22 @@
 import { render, html } from "lit-html";
-import {
-  bufferEqual,
-  creationOptions,
-  IIConnection,
-} from "../utils/iiConnection";
+import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
 import { footer } from "../components/footer";
-import { DeviceData, PublicKey } from "../../generated/internet_identity_types";
+import {
+  DeviceData,
+  IdentityAnchorInfo,
+  PublicKey,
+} from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
-import { pickDeviceAlias } from "./addDevicePickAlias";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-
-// The various error messages we may display
-
-const displayFailedToAddNewDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add new device",
-    message: html`
-      We failed to add your new device.<br />
-      If you're trying to add a device that is not attached to this machine try
-      following the instructions at<br />
-      <a
-        target="_blank"
-        href="https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device"
-        >https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device</a
-      >
-    `,
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayFailedToAddTheDevice = (error: Error) =>
-  displayError({
-    title: "Failed to add the new device",
-    message:
-      "We failed to add the new device to this Identity Anchor. Please try again",
-    detail: error.message,
-    primaryButton: "Back to manage",
-  });
+import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
+import { chooseDeviceAddFlow } from "./addDevice/manage";
+import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -62,11 +35,9 @@ const style = () => html`<style>
     display: flex;
     justify-content: space-between;
   }
-
   .labelWithAction label {
     margin: 0;
   }
-
   .labelAction {
     padding: 0;
     border: none;
@@ -132,14 +103,14 @@ const deviceListItem = (alias: string) => html`
 `;
 
 const recoveryNag = () => html`
-  <div class="nagBox">
-    <div class="nagIcon">${warningIcon}</div>
-    <div class="nagContent">
-      <div class="nagTitle">Recovery Mechanism</div>
-      <div class="nagMessage">
+  <div class="warnBox">
+    <div class="warnIcon">${warningIcon}</div>
+    <div class="warnContent">
+      <div class="warnTitle">Recovery Mechanism</div>
+      <div class="warnMessage">
         Add a recovery mechanism to help protect this Identity Anchor.
       </div>
-      <button id="addRecovery" class="primary nagButton">
+      <button id="addRecovery" class="primary warnButton">
         Add Recovery Key
       </button>
     </div>
@@ -153,59 +124,22 @@ export const renderManage = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  let devices: DeviceData[];
+  let anchorInfo: IdentityAnchorInfo;
   try {
-    devices = await withLoader(() => IIConnection.lookupAll(userNumber));
+    anchorInfo = await withLoader(() => connection.getAnchorInfo(userNumber));
   } catch (error: unknown) {
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
     );
     return renderManage(userNumber, connection);
   }
-  render(pageContent(userNumber, devices), container);
-  init(userNumber, connection, devices);
-};
-
-// Add a new device (i.e. a device connected to the device the user is
-// currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
-// add e.g. _another_ macbook or iPhone.)
-const addAdditionalDevice = async (
-  userNumber: bigint,
-  connection: IIConnection,
-  devices: DeviceData[]
-) => {
-  let newDevice: WebAuthnIdentity;
-  try {
-    newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices),
-    });
-  } catch (error: unknown) {
-    await displayFailedToAddNewDevice(
-      error instanceof Error ? error : unknownError()
-    );
-    return renderManage(userNumber, connection);
+  if (anchorInfo.device_registration.length !== 0) {
+    // we are actually in a device registration process
+    await pollForTentativeDevice(userNumber, connection);
+  } else {
+    render(pageContent(userNumber, anchorInfo.devices), container);
+    init(userNumber, connection, anchorInfo.devices);
   }
-  const deviceName = await pickDeviceAlias();
-  if (deviceName === null) {
-    return renderManage(userNumber, connection);
-  }
-  try {
-    await withLoader(() =>
-      connection.add(
-        userNumber,
-        deviceName,
-        { unknown: null },
-        { authentication: null },
-        newDevice.getPublicKey().toDer(),
-        newDevice.rawId
-      )
-    );
-  } catch (error: unknown) {
-    await displayFailedToAddTheDevice(
-      error instanceof Error ? error : unknownError()
-    );
-  }
-  renderManage(userNumber, connection);
 };
 
 // Initializes the management page.
@@ -223,9 +157,24 @@ const init = async (
   const addAdditionalDeviceButton = document.querySelector(
     "#addAdditionalDevice"
   ) as HTMLButtonElement;
-
-  addAdditionalDeviceButton.onclick = () =>
-    addAdditionalDevice(userNumber, connection, devices);
+  addAdditionalDeviceButton.onclick = async () => {
+    const nextAction = await chooseDeviceAddFlow();
+    if (nextAction === null) {
+      // user clicked 'cancel'
+      await renderManage(userNumber, connection);
+      return;
+    }
+    switch (nextAction) {
+      case "local": {
+        await addLocalDevice(userNumber, connection, devices);
+        return;
+      }
+      case "remote": {
+        await pollForTentativeDevice(userNumber, connection);
+        return;
+      }
+    }
+  };
 
   // Add recovery
   const setupRecoveryButton = document.querySelector(

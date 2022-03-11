@@ -8,20 +8,23 @@ import {
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
   _SERVICE,
-  PublicKey,
-  SessionKey,
-  CredentialId,
+  AddTentativeDeviceResponse,
   Challenge,
-  UserNumber,
-  FrontendHostname,
-  Timestamp,
-  DeviceData,
-  RegisterResponse,
-  GetDelegationResponse,
-  Purpose,
-  KeyType,
-  DeviceKey,
   ChallengeResult,
+  CredentialId,
+  DeviceData,
+  DeviceKey,
+  FrontendHostname,
+  GetDelegationResponse,
+  IdentityAnchorInfo,
+  KeyType,
+  PublicKey,
+  Purpose,
+  RegisterResponse,
+  SessionKey,
+  Timestamp,
+  UserNumber,
+  VerifyTentativeDeviceResponse,
 } from "../../generated/internet_identity_types";
 import {
   DelegationChain,
@@ -73,10 +76,6 @@ if (typeof canisterId !== undefined) {
 }
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
-export const baseActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-  agent: new HttpAgent({}),
-  canisterId,
-});
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
@@ -283,7 +282,8 @@ export class IIConnection {
   }
 
   static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
-    return await baseActor.lookup(userNumber);
+    const actor = await IIConnection.createActor();
+    return await actor.lookup(userNumber);
   }
 
   static async createChallenge(): Promise<Challenge> {
@@ -296,14 +296,36 @@ export class IIConnection {
   static async lookupAuthenticators(
     userNumber: UserNumber
   ): Promise<DeviceData[]> {
-    const allDevices = await baseActor.lookup(userNumber);
+    const actor = await IIConnection.createActor();
+    const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "authentication")
     );
   }
 
+  static async addTentativeDevice(
+    userNumber: UserNumber,
+    alias: string,
+    keyType: KeyType,
+    purpose: Purpose,
+    newPublicKey: DerEncodedPublicKey,
+    credentialId?: ArrayBuffer
+  ): Promise<AddTentativeDeviceResponse> {
+    const actor = await IIConnection.createActor();
+    return await actor.add_tentative_device(userNumber, {
+      alias,
+      pubkey: Array.from(new Uint8Array(newPublicKey)),
+      credential_id: credentialId
+        ? [Array.from(new Uint8Array(credentialId))]
+        : [],
+      key_type: keyType,
+      purpose,
+    });
+  }
+
   static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
-    const allDevices = await baseActor.lookup(userNumber);
+    const actor = await IIConnection.createActor();
+    const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "recovery")
     );
@@ -344,6 +366,35 @@ export class IIConnection {
 
     return this.actor;
   }
+
+  getAnchorInfo = async (
+    userNumber: UserNumber
+  ): Promise<IdentityAnchorInfo> => {
+    const actor = await this.getActor();
+    return await actor.get_anchor_info(userNumber);
+  };
+
+  enterDeviceRegistrationMode = async (
+    userNumber: UserNumber
+  ): Promise<Timestamp> => {
+    const actor = await this.getActor();
+    return await actor.enter_device_registration_mode(userNumber);
+  };
+
+  exitDeviceRegistrationMode = async (
+    userNumber: UserNumber
+  ): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.exit_device_registration_mode(userNumber);
+  };
+
+  verifyTentativeDevice = async (
+    userNumber: UserNumber,
+    pin: string
+  ): Promise<VerifyTentativeDeviceResponse> => {
+    const actor = await this.getActor();
+    return await actor.verify_tentative_device(userNumber, pin);
+  };
 
   add = async (
     userNumber: UserNumber,

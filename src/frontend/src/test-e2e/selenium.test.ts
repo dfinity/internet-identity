@@ -1,32 +1,37 @@
 import {
   AboutView,
   AddDeviceAliasView,
-  AddDeviceView,
+  AddDeviceFlowSelectorView,
   AddIdentityAnchorView,
+  AddRemoteDeviceAliasView,
+  AddRemoteDeviceInstructionsView,
+  AddRemoteDeviceVerificationCodeView,
   AuthorizeAppView,
   CompatabilityNoticeView,
   DemoAppView,
   FAQView,
   MainView,
+  NotInRegistrationModeView,
   RecoverView,
   RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
+  VerifyRemoteDeviceView,
   WelcomeBackView,
   WelcomeView,
 } from "./views";
 import { FLOWS } from "./flows";
 import {
-  Screenshots,
   addVirtualAuthenticator,
   removeFlavorsWarning,
   removeVirtualAuthenticator,
+  RunConfiguration,
   runInBrowser,
   runInNestedBrowser,
+  Screenshots,
   switchToPopup,
   waitForFonts,
   waitToClose,
-  RunConfiguration,
 } from "./util";
 
 // Read canister ids from the corresponding dfx files.
@@ -82,6 +87,10 @@ test("Register new identity and add additional device", async () => {
     await addVirtualAuthenticator(browser);
     await mainView.addAdditionalDevice();
 
+    const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
+    await addDeviceFlowView.waitForDisplay();
+    await addDeviceFlowView.selectLocalDevice();
+
     const addDeviceAliasView = new AddDeviceAliasView(browser);
     await addDeviceAliasView.waitForDisplay();
     await addDeviceAliasView.addAdditionalDevice(DEVICE_NAME2);
@@ -94,6 +103,108 @@ test("Register new identity and add additional device", async () => {
 
     await mainView.logout();
     await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+  });
+}, 300_000);
+
+test("Register new identity and add additional remote device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.addAdditionalDevice();
+
+    const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
+    await addDeviceFlowView.waitForDisplay();
+    await addDeviceFlowView.selectRemoteDevice();
+
+    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      await addVirtualAuthenticator(browser2);
+      await browser2.url(II_URL);
+      const welcomeView2 = new WelcomeView(browser2);
+      await welcomeView2.waitForDisplay();
+      await welcomeView2.addDevice();
+      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
+      await addIdentityAnchorView2.waitForDisplay();
+      await addIdentityAnchorView2.continue(userNumber);
+      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
+      await addRemoteDeviceView.waitForDisplay();
+      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
+      await addRemoteDeviceView.continue();
+
+      const verificationCodeView =
+        await new AddRemoteDeviceVerificationCodeView(browser2);
+      await verificationCodeView.waitForDisplay();
+      const code = await verificationCodeView.getVerificationCode();
+
+      // browser 1 again
+      const verificationView = await new VerifyRemoteDeviceView(browser);
+      await verificationView.waitForDisplay();
+      await verificationView.enterVerificationCode(code);
+      await verificationView.continue();
+
+      await browser2.deleteSession();
+    });
+
+    await mainView.waitForDisplay();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+  });
+}, 300_000);
+
+test("Register new identity and add additional remote device starting on new device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      await addVirtualAuthenticator(browser2);
+      await browser2.url(II_URL);
+      const welcomeView2 = new WelcomeView(browser2);
+      await welcomeView2.waitForDisplay();
+      await welcomeView2.addDevice();
+      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
+      await addIdentityAnchorView2.waitForDisplay();
+      await addIdentityAnchorView2.continue(userNumber);
+      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
+      await addRemoteDeviceView.waitForDisplay();
+      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
+      await addRemoteDeviceView.continue();
+
+      const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
+      await notInRegistrationModeView.waitForDisplay();
+
+      // browser 1 again
+      await mainView.addAdditionalDevice();
+      const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
+      await addDeviceFlowView.waitForDisplay();
+      await addDeviceFlowView.selectRemoteDevice();
+
+      const addRemoteDeviceInstructionsView =
+        new AddRemoteDeviceInstructionsView(browser);
+      await addRemoteDeviceInstructionsView.waitForDisplay();
+
+      // browser 2 again
+      await notInRegistrationModeView.retry();
+      const verificationCodeView =
+        await new AddRemoteDeviceVerificationCodeView(browser2);
+      await verificationCodeView.waitForDisplay();
+      const code = await verificationCodeView.getVerificationCode();
+
+      // browser 1 again
+      const verificationView = await new VerifyRemoteDeviceView(browser);
+      await verificationView.waitForDisplay();
+      await verificationView.enterVerificationCode(code);
+      await verificationView.continue();
+
+      await browser2.deleteSession();
+    });
+
+    await mainView.waitForDisplay();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME2);
   });
 }, 300_000);
 
@@ -283,56 +394,70 @@ test("Screenshots", async () => {
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+      await mainView.addAdditionalDevice();
+
+      const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
+      await addDeviceFlowView.waitForDisplay();
+      await screenshots.take("new-device-flow-selection", browser);
+      await addDeviceFlowView.selectRemoteDevice();
+      const addRemoteDeviceInstructionsView =
+        new AddRemoteDeviceInstructionsView(browser);
+      await addRemoteDeviceInstructionsView.waitForDisplay();
+      await addRemoteDeviceInstructionsView.fixup();
+      await screenshots.take("new-device-instructions", browser);
+      await addRemoteDeviceInstructionsView.cancel();
+      await mainView.waitForDisplay();
 
       // Now the link device flow, using a second browser
       await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
         await addVirtualAuthenticator(browser2);
         await browser2.url(II_URL);
-        await removeFlavorsWarning(browser2);
         const welcomeView2 = new WelcomeView(browser2);
         await welcomeView2.waitForDisplay();
-        await welcomeView2.typeUserNumber(userNumber);
+        await removeFlavorsWarning(browser2);
         await welcomeView2.addDevice();
         const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
         await addIdentityAnchorView2.waitForDisplay();
-        await addIdentityAnchorView2.fixup();
         await screenshots.take("new-device-user-number", browser2);
         await addIdentityAnchorView2.continue(userNumber);
-        const addDeviceView2 = new AddDeviceView(browser2);
-        await addDeviceView2.waitForDisplay();
+        const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
+        await addRemoteDeviceView.waitForDisplay();
+        await screenshots.take("new-device-alias", browser2);
+        await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
+        await addRemoteDeviceView.continue();
+        const notInRegistrationModeView = new NotInRegistrationModeView(
+          browser2
+        );
+        await notInRegistrationModeView.waitForDisplay();
+        await screenshots.take(
+          "new-device-registration-mode-disabled-instructions",
+          browser2
+        );
 
-        const link = await addDeviceView2.getLinkText();
-        console.log("The add device link is", link);
-        await addDeviceView2.fixup();
-        await screenshots.take("new-device", browser2);
+        // browser 1 again
+        await mainView.addAdditionalDevice();
+        await addDeviceFlowView.waitForDisplay();
+        await addDeviceFlowView.selectRemoteDevice();
+        await addRemoteDeviceInstructionsView.waitForDisplay();
 
-        // Log in with previous browser again
-        await browser.url("about:blank");
-        await browser.url(link);
-        await removeFlavorsWarning(browser);
-        await waitForFonts(browser);
-        const welcomeBackView = new WelcomeBackView(browser);
-        await welcomeBackView.waitForDisplay();
-        await welcomeBackView.fixup();
-        await screenshots.take("new-device-login", browser);
-        await welcomeBackView.login();
-        await recoveryMethodSelectorView.waitForDisplay();
-        await recoveryMethodSelectorView.skipRecovery();
-        await singleDeviceWarningView.waitForDisplay();
-        await singleDeviceWarningView.remindLater();
-        const addDeviceView = new AddDeviceView(browser);
-        await addDeviceView.waitForConfirmDisplay();
-        await addDeviceView.fixupConfirm();
-        await screenshots.take("new-device-confirm", browser);
-        await addDeviceView.confirm();
-        await addDeviceView.waitForAliasDisplay();
-        await screenshots.take("new-device-alias", browser);
-        await addDeviceView.addDeviceAlias(DEVICE_NAME2);
-        await addDeviceView.addDeviceAliasContinue();
-        await addDeviceView.waitForAddDeviceSuccess();
-        await screenshots.take("new-device-done", browser);
+        // browser 2 again
+        await notInRegistrationModeView.retry();
+        const verificationCodeView =
+          await new AddRemoteDeviceVerificationCodeView(browser2);
+        await verificationCodeView.waitForDisplay();
+        const code = await verificationCodeView.getVerificationCode();
+        await verificationCodeView.fixup();
+        await screenshots.take("new-device-show-verification-code", browser2);
 
-        // Back to other browser, should be a welcome view now
+        // browser 1 again
+        const verificationView = await new VerifyRemoteDeviceView(browser);
+        await verificationView.waitForDisplay();
+        await verificationView.fixup();
+        await screenshots.take("new-device-enter-verification-code", browser);
+        await verificationView.enterVerificationCode(code);
+        await verificationView.continue();
+
+        // browser 2 again
         const welcomeBackView2 = new WelcomeBackView(browser2);
         await welcomeBackView2.waitForDisplay();
         await welcomeBackView2.fixup();

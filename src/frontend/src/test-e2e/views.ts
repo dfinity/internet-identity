@@ -153,7 +153,7 @@ export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("//h1[string()='Anchor Management']")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -203,6 +203,121 @@ export class AddDeviceAliasView extends View {
 
   async continue(): Promise<void> {
     await this.browser.$("#deviceAliasContinue").click();
+  }
+}
+
+export class AddDeviceFlowSelectorView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#cancelAddDevice")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async selectLocalDevice(): Promise<void> {
+    await this.browser.$("#local").click();
+  }
+
+  async selectRemoteDevice(): Promise<void> {
+    await this.browser.$("#remote").click();
+  }
+}
+
+export class AddRemoteDeviceAliasView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#registerTentativeDeviceContinue")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async selectAlias(alias: string): Promise<void> {
+    await this.browser.$("#tentativeDeviceAlias").setValue(alias);
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#registerTentativeDeviceContinue").click();
+  }
+}
+
+export class NotInRegistrationModeView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#deviceRegModeDisabledRetry")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async retry(): Promise<void> {
+    await this.browser.$("#deviceRegModeDisabledRetry").click();
+  }
+}
+
+export class AddRemoteDeviceInstructionsView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#cancelAddRemoteDevice")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async cancel(): Promise<void> {
+    await this.browser.$("#cancelAddRemoteDevice").click();
+  }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
+  }
+}
+
+export class AddRemoteDeviceVerificationCodeView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#verificationCode")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async getVerificationCode(): Promise<string> {
+    return await this.browser.$("#verificationCode").getText();
+  }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
+    const codeElem = await this.browser.$("#verificationCode");
+    await this.browser.execute(
+      "arguments[0].innerText = arguments[1];",
+      codeElem,
+      "123456"
+    );
+  }
+}
+
+export class VerifyRemoteDeviceView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser.$("#verifyDevice").waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterVerificationCode(code: string): Promise<void> {
+    await this.browser.$("#tentativeDeviceCode").setValue(code);
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#verifyDevice").click();
+  }
+
+  async fixup(): Promise<void> {
+    const elem = await this.browser.$("#timer");
+    await this.browser.execute(
+      "arguments[0].outerHTML = arguments[1];",
+      elem,
+      "--:--"
+    );
   }
 }
 
@@ -265,66 +380,6 @@ export class AddIdentityAnchorView extends View {
       elem,
       "12345"
     );
-  }
-}
-
-export class AddDeviceView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser.$("#linkText").waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async getLinkText(): Promise<string> {
-    return await this.browser.$("#linkText").getAttribute("value");
-  }
-
-  async fixup(): Promise<void> {
-    await this.browser.$("#linkText").waitForDisplayed({ timeout: 3_000 });
-    const elem = await this.browser.$("#linkText");
-    await this.browser.execute(
-      "arguments[0].value = arguments[1];",
-      elem,
-      "(link removed from screenshot)"
-    );
-  }
-
-  // View: Add device confirm
-  async waitForConfirmDisplay(): Promise<void> {
-    await this.browser.$("#addDevice").waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async confirm(): Promise<void> {
-    await this.browser.$("#addDevice").click();
-  }
-
-  async fixupConfirm(): Promise<void> {
-    const userNumberElem = await this.browser.$(".highlightBox");
-    await this.browser.execute(
-      "arguments[0].innerText = arguments[1];",
-      userNumberElem,
-      "12345"
-    );
-  }
-
-  // View: Add device alias
-  async waitForAliasDisplay(): Promise<void> {
-    await this.browser
-      .$("#deviceAliasContinue")
-      .waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async addDeviceAlias(alias: string): Promise<void> {
-    await this.browser.$("#deviceAlias").setValue(alias);
-  }
-
-  async addDeviceAliasContinue(): Promise<void> {
-    await this.browser.$("#deviceAliasContinue").click();
-  }
-
-  // View: Add device success
-  async waitForAddDeviceSuccess(): Promise<void> {
-    await this.browser
-      .$("#manageDevicesButton")
-      .waitForDisplayed({ timeout: 10_000 });
   }
 }
 

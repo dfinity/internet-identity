@@ -71,6 +71,26 @@ type RegisterResponse = variant {
   bad_challenge;
 };
 
+type AddTentativeDeviceResponse = variant {
+  // The device was tentatively added.
+  added_tentatively: record { verification_code: text; device_registration_timeout: Timestamp;};
+  // Device registration mode is off, either due to timeout or because it was never enabled.
+  device_registration_mode_off;
+  // There is another device already added tentatively
+  another_device_tentatively_added;
+};
+
+type VerifyTentativeDeviceResponse = variant {
+  // The device was successfully verified.
+  verified;
+  // Wrong verification code entered. Retry with correct code.
+  wrong_code: record { retries_left: nat8};
+  // Device registration mode is off, either due to timeout or because it was never enabled.
+  device_registration_mode_off;
+  // There is no tentative device to be verified.
+  no_device_to_verify;
+};
+
 type Delegation = record {
   pubkey: PublicKey;
   expiration: Timestamp;
@@ -106,6 +126,16 @@ type ChallengeResult = record {
     chars : text;
 };
 
+type DeviceRegistrationInfo = record {
+    tentative_device : opt DeviceData;
+    expiration: Timestamp;
+};
+
+type IdentityAnchorInfo = record {
+    devices : vec DeviceData;
+    device_registration: opt DeviceRegistrationInfo;
+};
+
 service : (opt InternetIdentityInit) -> {
   init_salt: () -> ();
   create_challenge : () -> (Challenge);
@@ -113,8 +143,14 @@ service : (opt InternetIdentityInit) -> {
   add : (UserNumber, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   lookup : (UserNumber) -> (vec DeviceData) query;
+  get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
   get_principal : (UserNumber, FrontendHostname) -> (principal) query;
   stats : () -> (InternetIdentityStats) query;
+
+  enter_device_registration_mode : (UserNumber) -> (Timestamp);
+  exit_device_registration_mode : (UserNumber) -> ();
+  add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse);
+  verify_tentative_device : (UserNumber, verification_code: text) -> (VerifyTentativeDeviceResponse);
 
   prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;

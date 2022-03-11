@@ -4,15 +4,14 @@ import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { register } from "../register";
 import { icLogo } from "../../components/icons";
-import { addDeviceUserNumber } from "../addDeviceUserNumber";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
-import { UserIntent, authenticateUnknownIntent } from "../../utils/userIntent";
 import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
+import { addRemoteDevice } from "../addDevice/welcomeView";
 
-const pageContent = (userIntent: UserIntent) => html` <style>
+const pageContent = () => html` <style>
     #registerUserNumber:focus {
       box-sizing: border-box;
       border-style: double;
@@ -41,52 +40,41 @@ const pageContent = (userIntent: UserIntent) => html` <style>
   <div class="container">
     ${icLogo}
     <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>
-      Provide an Identity Anchor to
-      authenticate${authenticateUnknownIntent(userIntent)}.
-    </p>
+    <p>Provide an Identity Anchor to authenticate.</p>
     <input
       type="text"
       id="registerUserNumber"
       placeholder="Enter Identity Anchor"
     />
     <button type="button" id="loginButton" class="primary">Authenticate</button>
-    ${userIntent.kind === "addDevice"
-      ? html`<div class="spacer"></div>`
-      : html`<div class="textLink" id="registerSection">
-            New?
-            <button id="registerButton" class="linkStyle">
-              Create an Internet Identity Anchor.
-            </button>
-          </div>
-          <div class="textLink">
-            Already have an anchor
-            <button id="addNewDeviceButton" class="linkStyle">
-              but using a new device?
-            </button>
-          </div>
-          <div class="textLink">
-            Lost access
-            <button id="recoverButton" class="linkStyle">
-              and want to recover?
-            </button>
-          </div>`}
+    <div class="textLink" id="registerSection">
+      New?
+      <button id="registerButton" class="linkStyle">
+        Create an Internet Identity Anchor.
+      </button>
+    </div>
+    <div class="textLink">
+      Already have an anchor
+      <button id="addNewDeviceButton" class="linkStyle">
+        but using a new device?
+      </button>
+    </div>
+    <div class="textLink">
+      Lost access
+      <button id="recoverButton" class="linkStyle">and want to recover?</button>
+    </div>
     ${navbar}
   </div>
   ${footer}`;
 
-export const loginUnknownAnchor = async (
-  userIntent: UserIntent
-): Promise<LoginFlowResult> => {
+export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userIntent), container);
+  render(pageContent(), container);
   return new Promise((resolve, reject) => {
     initLogin(resolve);
-    if (userIntent.kind !== "addDevice") {
-      initLinkDevice();
-      initRegister(resolve, reject);
-      initRecovery();
-    }
+    initLinkDevice();
+    initRegister(resolve, reject);
+    initRecovery();
   });
 };
 
@@ -166,12 +154,12 @@ const initLinkDevice = () => {
     "addNewDeviceButton"
   ) as HTMLButtonElement;
 
-  addNewDeviceButton.onclick = () => {
+  addNewDeviceButton.onclick = async () => {
     const userNumberInput = document.getElementById(
       "registerUserNumber"
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    addDeviceUserNumber(userNumber);
+    await addRemoteDevice(userNumber);
   };
 };

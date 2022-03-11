@@ -5,11 +5,11 @@ const pageContent = (userNumber: bigint) => html`
   <div class="container">
     <h1>Congratulations!</h1>
     <p>Your new Identity Anchor has been created.</p>
-    <div class="nagBox">
-      <div class="nagIcon">${warningIcon}</div>
-      <div class="nagContent">
-        <div class="nagTitle">Record Your Identity Anchor</div>
-        <div class="nagMessage">
+    <div class="warnBox">
+      <div class="warnIcon">${warningIcon}</div>
+      <div class="warnContent">
+        <div class="warnTitle">Record Your Identity Anchor</div>
+        <div class="warnMessage">
           Please record your new Identity Anchor. Keep a backup on a storage
           medium and write it down. You will need it later to use Internet
           Identity or to add additional devices. If you lose your Identity

@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { initLogout, logoutSection } from "../components/logout";
+import { initLogout, logoutSection } from "../../../components/logout";
 
 const pageContent = () => html`
   <div class="container">
@@ -12,6 +12,9 @@ const pageContent = () => html`
   </div>
 `;
 
+/**
+ * Shows a page prompting the user to pick a device alias.
+ */
 export const pickDeviceAlias = async (): Promise<string | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
