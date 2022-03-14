@@ -352,9 +352,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
 
-    # Only run on release tags
-    if: startsWith(github.ref, 'refs/tags/release-')
-
     needs: docker-build
 
     steps:
@@ -378,12 +375,26 @@ jobs:
           name: internet_identity_production.wasm
           path: .
 
-      - run: |
-          ./scripts/release --tag ${{ github.ref }} -- \
+      - name: Prepare release
+        uses: ./.github/actions/release
+        id: prepare-release
+        with:
+          assets: |
+            internet_identity_test.wasm
+            internet_identity_dev.wasm
+            internet_identity_production.wasm
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/release-')
+        run: |
+          ./scripts/release \
+            --tag ${{ github.ref }} \
+            --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
+            --generate-notes \
+            -- \
             internet_identity_test.wasm \
             internet_identity_dev.wasm \
             internet_identity_production.wasm
-
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
