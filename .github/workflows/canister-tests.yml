@@ -39,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     strategy:
+      # NOTE: the 'name' in the matrix should match the asset filename, because it is used in 
+      # .github/actions/release to figure out the job ID.
       matrix:
         include:
           # The production build
