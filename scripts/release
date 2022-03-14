@@ -3,6 +3,8 @@ set -euo pipefail
 
 declare -a filenames=( )
 declare tag_name
+declare generate_notes=
+declare notes_file=
 
 #########
 # USAGE #
@@ -16,10 +18,12 @@ function usage() {
     cat << EOF
 
 Usage:
-  release --tag TAG [-- FILE...]
+  release --tag TAG [--generate-notes] [--notes-file FILE] [-- FILE...]
 
 Options:
-  --tag TAG     specify the tag to release
+  --tag TAG             specify the tag to release
+  --generate-notes      add GitHub generated notes
+  --notes-file FILE     use FILE as notes (prepended to generated notes if set)
 
 Environment:
   GITHUB_TOKEN  (required) Personal Access Token for GitHub
@@ -134,8 +138,17 @@ function gh_post_tgz() {
 # The response returned by GitHub includes "upload_url", which is a URL where assets
 # can be POSTed.
 function do_release() {
+
+    jq_args=(
+        --arg tag_name "$tag_name"
+        --rawfile body "$notes_file"
+        --argjson generate_release_notes "$([ "$generate_notes" == 1 ] && echo "true" || echo "false")"
+    )
+
     local release_json
-    release_json=$(jq -n --arg tag_name "$tag_name" '{ tag_name: $tag_name }' \
+    release_json=$(jq -n \
+        "${jq_args[@]}" \
+        '{ tag_name: $tag_name, generate_release_notes: $generate_release_notes, body: $body }' \
         | gh_post_json /repos/dfinity/internet-identity/releases)
 
     local release_id; release_id=$(echo "$release_json" | jq -cMr '.id')
@@ -176,11 +189,18 @@ do
             exit 0
             ;;
         --tag)
-            echo "$@"
             tag_name="${2:?missing value for '--tag'}"
             shift; # shift past --tag and value
             shift;
-            echo "$@"
+            ;;
+        --generate-notes)
+            generate_notes=1
+            shift;
+            ;;
+        --notes-file)
+            notes_file="${2:?missing value for '--notes-file'}"
+            shift; # shift past --notes-file and value
+            shift;
             ;;
         --)
             shift
