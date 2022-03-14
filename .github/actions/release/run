@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# This script creates a nice markdown table with he build artifacts' shas, links to download
+# This script creates a nice markdown table with the build artifacts' shas, links to download
 # the Wasm modules, and links to the `sha256sum` steps in CI for verification.
 
 set -euo pipefail
