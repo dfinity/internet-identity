@@ -20,7 +20,15 @@ If your device supports Windows Hello we can continue. Follow Option A if you've
 
 ## Option A: Adding Windows Hello to an Identity Anchor that uses your phone as authentication method
 
-On your Windows computer go to <https://identity.ic0.app> and click on "Already have an Anchor but using a new device?"
+On your phone go to <https://identity.ic0.app> and log in
+
+image::hello-guide/anchor-management.png[]
+
+Select "Remote Device"
+
+image::hello-guide/add-remote-device.png[]
+
+Now switch to your Windows computer and go to <https://identity.ic0.app> and click on "Already have an Anchor but using a new device?"
 
 image::hello-guide/add-device-start.png[]
 
@@ -28,19 +36,23 @@ Enter your Identity Anchor
 
 image::hello-guide/add-device-anchor.png[]
 
+Enter a name for the Windows device
+
+image::hello-guide/enter-alias.png[]
+
 Complete the Windows Hello dialog by authenticating using Windows Hello
 
 image::hello-guide/add-device-hello.png[]
 
-Once the link is shown click on "Display as QR Code"
+A verification code will be displayed
 
-image::hello-guide/add-device-show-link.png[]
+image::hello-guide/display-verification-code.png[]
 
-Scan the QR code with your phone
+Switch back to your phone and enter the verification code
 
-image::hello-guide/add-device-show-qr.png[]
+image::hello-guide/enter-verifiction-code.png[]
 
-Continue on your phone and follow the steps to add your new Windows Hello device. Once you've completed the steps on your phone you should be able to authenticate on your Windows machine using Windows Hello
+After verifying the Windows computer on your phone you should be able to authenticate on your Windows machine using Windows Hello
 
 image::hello-guide/login-hello.png[]
 
@@ -49,6 +61,10 @@ image::hello-guide/login-hello.png[]
 On your Windows computer go to <https://identity.ic0.app> and authenticate using your security key to reach the Anchor Management page. Once you're there click on "+ ADD NEW DEVICE".
 
 image::hello-guide/anchor-management.png[]
+
+Select "Local Device"
+
+image::hello-guide/add-local-device.png[]
 
 Complete the Windows Hello dialog
 
