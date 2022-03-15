@@ -102,26 +102,17 @@ If you are adding a new device, such as a new security key, or a new browser pro
 
 Other workflows can be more complex. For example, to add your phone's unlock methods as an additional authentication method using your authenticated computer, proceed as follows:
 
-. Open the Internet Identity web page in your phone’s browser. 
+. On your computer: Open the Internet Identity web page and log in.
+. On your computer: Click *add new device*
+. On your computer: choose *remote device*
+** This enables the device registration mode for this identity anchor. The subsequent steps need to be completed within 15 minutes.
+. On your phone: click *Already have an anchor but using a new device?*
+. On your phone: enter your identity anchor
+. On your phone: enter a device alias
+** After completing this step a verification code will be shown
+. On your computer: enter the device verification code
 
-. Click *Already have an anchor but using a new device?*
-
-. Enter the Identity Anchor you'd like to use and and click *Continue*.
-
-. Follow the instructions on screen for setting up your phone's unlock method (FaceID, TouchID, etc) with Internet Identity.
-
-. Authorize your phone.
-+
-After you’ve set up the unlock method with II on your phone, you will be provided with a URL and a QR code. You must use the URL or QR code in a browser in the computer that has already been authorized. For example, you can copy the URL and email it to yourself, then paste it into a browser on the computer. 
-. In the browser on the computer that has already been authorized, open the above link, enter your Identity Anchor, click *Authenticate* and authenticate using an existing authentication method.
-. Link your phone to your identity. 
-+
-If you’re sure that the link you pasted in the browser came from you, click *Yes, add new device*.
-+
-WARNING: Never add authentication methods with links that were given to you or that you are not sure you can trust. If you add an attacker's device, they will be able to take over this Identity Anchor.
-. Give the device profile a name and click *Add Device*.
-+
-Your phone will be redirected to the login page, and you can now use it with your Identity Anchor to authenticate.
+WARNING: Any device added this way will have *full control over your identity*. Only add devices that you _personally own_.
 
 WARNING: You should add as many devices as possible to prevent you from losing access to dapps in case you lose a device. Again, the best way to deal with accidental loss is to set up a recovery method. Also, make sure to keep all added authentication methods safe and do not lose them, as a single authentication method gives access to the Identity Anchor.
 
