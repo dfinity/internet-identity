@@ -179,53 +179,9 @@ This section describes the interface that the backend canister provides.
 
 This interface is currently only used by its own frontend. This tight coupling means that this interface may change, even in incompatible ways. We therefore do not have to apply Candid best practices for backward-compatibility (such as using records for arguments and results).
 
-The summary is given by the following Candid interface (exluding the methods required for the https://www.notion.so/Design-HTTP-Requests-to-Canisters-d6bc980830a947a88bf9148a25169613[HTTP Gateway interface]):
+The summary is given by the following Candid interface:
 ....
-type UserNumber = nat64;
-type PublicKey = blob;
-type CredentialId = blob;
-type DeviceAlias = text;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
-type SessionKey = PublicKey;
-type FrontendHostname = text;
-type Timestamp = nat64;
-
-type DeviceData = record {
-  pubkey : DeviceKey;
-  alias : text;
-  credential_id : opt CredentialId;
-  purpose : variant { recovery; authentication };
-  key_type : variant { unknown; platform; cross_platform; seed_phrase };
-};
-
-type Delegation = record {
-  pubkey: SessionKey;
-  expiration: Timestamp;
-  targets: opt vec principal;
-};
-
-type SignedDelegation = record {
-  delegation: Delegation;
-  signature: blob;
-};
-
-type GetDelegationResponse = variant {
-  signed_delegation: SignedDelegation;
-  no_such_delegation;
-};
-
-service : {
-  init_salt : () -> ();
-  register : (DeviceData) -> (UserNumber);
-  add : (UserNumber, DeviceData) -> ();
-  remove : (UserNumber, DeviceKey) -> ();
-  lookup : (UserNumber) -> (vec DeviceData) query;
-  get_principal : (UserNumber, FrontendHostname) -> (principal) query;
-
-  prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
-  get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
-}
+include::../src/internet_identity/internet_identity.did[]
 ....
 
 The `init_salt` method is mostly internal, see <<salt>>.
@@ -260,11 +216,45 @@ It is the responsibility of the frontend UI to protect the user from doing these
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-=== The `lookup` query method
+=== The `enter_device_registration_mode` method
 
-Fetches all data associated with a user.
+Enables device registration mode for the given identity anchor. When device registration mode is active, new devices can be added using `add_tentative_device` and `verify_tentative_device`. Device registration mode stays active for at most 15 minutes or until the flow is either completed or aborted.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+=== The `exit_device_registration_mode` method
+
+Exits device registration mode immediately. Any non verified tentative devices are discarded.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+=== The `add_tentative_device` method
+
+Tentatively adds a new device to the supplied identity anchor and returns a verification code. This code has to be used with the `verify_tentative_device` method to verify this device. If the flow is aborted or not completed within 15 minutes, the tentative device is discarded.
+
+Tentatively added devices cannot be used to login into the management view or authorize authentications for other dApps.
 
 *Authorization*: Anyone can call this
+
+=== The `verify_tentative_device` method
+
+For an anchor in device registration mode: if called with a valid verification code, adds the tentative device as a regular device to the anchor and exits registration mode. The registration flow is aborted if this method is called five times with invalid verification codes.
+
+Returns an error if called for a device not in registration mode.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+=== The `lookup` query method
+
+Fetches all device data associated with a user.
+
+*Authorization*: Anyone can call this
+
+=== The `get_anchor_info` method
+
+Fetches all data associated with an anchor including registration mode and tentatively registered devices.
+
+*Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 === The `get_principal` query method
 
@@ -473,32 +463,21 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
 
 === Subflow: Login via new device
 
-1. The frontend notices that no `user_number` is present in local storage.
-2. The frontend offers the choices
+. The frontend notices that no `user_number` is present in local storage.
+. The frontend offers the choices
    * Create new account
    * Log into existing account with existing device
    * Log into existing account with new device
-3. The user selects “Log into existing account with new device”
-4. The frontend asks the user for their Identity Anchor, and stores that in `user_number`.
-5. 👆 Frontend asks security device for a new public key and credential id.
-6. The frontend generates a link to be opened on another device where an existing authentication device exists.
-+
---
-The link format is:
+. The user selects “Log into existing account with new device”
+. The frontend asks the user for their Identity Anchor.
+. The frontend asks the user for a device alias.
+. 👆 Frontend asks security device for a new public key and credential id.
+. The frontend calls `add_tentative_device()`
+. The frontend polls `lookup()` until the credential id is present or the timeout is reached.
+. The frontend stores the `user_number` in local storage
+. Login complete
 
-  https://identity.ic0.app/#device=<userNumber>;<publicKey>[;<credentialId>]
-
-where
-
-- `userNumber` is the Identity Anchor, as a decimal number
-- `publicKey` is the hex-encoded DER-encoded WebAuth public key
-- `credentialId`, if present, is the hex-encoded credential id required for this key
-
-(See “Flow: adding devices via link” for what happens on the other device.)
---
-7. The frontend polls the `lookup` query function until it sees that its `publicKey` has been added.
-8. The frontend (maybe) gives an indication that the login was successful.
-9. Login complete
+(See “Flow: adding remote device” for what happens on the other device.)
 
 === Flow: Direct access to the frontend
 
@@ -515,16 +494,17 @@ This flow is the boring default
 
 (One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.)
 
-=== Flow: adding devices via link
+=== Flow: adding remote device
 
-1. The user accesses `/#device=…`
-2. 👆 The appropriate login subflow happens
-3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on a maliciously hidden `device` link will not continue.
-4. Call `add()` to add new device
-5. The hash fragment is removed from the URL
-6. The user is told that they can go back to their other device.
-+
-(This could include a button to go to the management screen, or maybe this _is_ the management screen with a info box.)
+. The user accesses `https://identity.ic0.app/`
+. 👆 The appropriate login subflow happens
+. On the management page the user selects "Add New Device"
+. On the flow selection screen the user selects "Remote Device"
+  * Call `enter_device_registration_mode()` to start device registration flow
+. The UI polls `get_anchor_info()` until a tentative device is present or the timeout is reached
+  * Now the “Flow: Login via new device” happens on the remote device
+. The user enters the verification code
+  * Call `verify_tentative_device()` to complete the flow
 
 === Flow: Setup recovery
 1. The user is offered two options for recovery and the option to skip
