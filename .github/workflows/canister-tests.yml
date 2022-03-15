@@ -323,6 +323,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      # Make sure old screenshots don't pollute the commit
+      - run: rm -v -f screenshots/*.png
+
       # Download the desktop screenshots artifacts
       - uses: actions/download-artifact@v2
         with:
