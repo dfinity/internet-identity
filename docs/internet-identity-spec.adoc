@@ -463,32 +463,21 @@ Let `device_identity` of type `WebAuthenicationIdentity` be the identity created
 
 === Subflow: Login via new device
 
-1. The frontend notices that no `user_number` is present in local storage.
-2. The frontend offers the choices
+. The frontend notices that no `user_number` is present in local storage.
+. The frontend offers the choices
    * Create new account
    * Log into existing account with existing device
    * Log into existing account with new device
-3. The user selects “Log into existing account with new device”
-4. The frontend asks the user for their Identity Anchor, and stores that in `user_number`.
-5. 👆 Frontend asks security device for a new public key and credential id.
-6. The frontend generates a link to be opened on another device where an existing authentication device exists.
-+
---
-The link format is:
+. The user selects “Log into existing account with new device”
+. The frontend asks the user for their Identity Anchor.
+. The frontend asks the user for a device alias.
+. 👆 Frontend asks security device for a new public key and credential id.
+. The frontend calls `add_tentative_device()`
+. The frontend polls `lookup()` until the credential id is present or the timeout is reached.
+. The frontend stores the `user_number` in local storage
+. Login complete
 
-  https://identity.ic0.app/#device=<userNumber>;<publicKey>[;<credentialId>]
-
-where
-
-- `userNumber` is the Identity Anchor, as a decimal number
-- `publicKey` is the hex-encoded DER-encoded WebAuth public key
-- `credentialId`, if present, is the hex-encoded credential id required for this key
-
-(See “Flow: adding devices via link” for what happens on the other device.)
---
-7. The frontend polls the `lookup` query function until it sees that its `publicKey` has been added.
-8. The frontend (maybe) gives an indication that the login was successful.
-9. Login complete
+(See “Flow: adding remote device” for what happens on the other device.)
 
 === Flow: Direct access to the frontend
 
@@ -505,16 +494,17 @@ This flow is the boring default
 
 (One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.)
 
-=== Flow: adding devices via link
+=== Flow: adding remote device
 
-1. The user accesses `/#device=…`
-2. 👆 The appropriate login subflow happens
-3. The user is asked if they really want to add this device, and under what name. This interaction needs to be clear enough so that a user who inadvertently clicked on a maliciously hidden `device` link will not continue.
-4. Call `add()` to add new device
-5. The hash fragment is removed from the URL
-6. The user is told that they can go back to their other device.
-+
-(This could include a button to go to the management screen, or maybe this _is_ the management screen with a info box.)
+. The user accesses `https://identity.ic0.app/`
+. 👆 The appropriate login subflow happens
+. On the management page the user selects "Add New Device"
+. On the flow selection screen the user selects "Remote Device"
+  * Call `enter_device_registration_mode()` to start device registration flow
+. The UI polls `get_anchor_info()` until a tentative device is present or the timeout is reached
+  * Now the “Flow: Login via new device” happens on the remote device
+. The user enters the verification code
+  * Call `verify_tentative_device()` to complete the flow
 
 === Flow: Setup recovery
 1. The user is offered two options for recovery and the option to skip
