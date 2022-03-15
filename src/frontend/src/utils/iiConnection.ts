@@ -37,7 +37,7 @@ import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { displayError } from "../components/displayError";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
-import { flavors } from "../flavors";
+import { features } from "../features";
 
 declare const canisterId: string;
 
@@ -338,7 +338,7 @@ export class IIConnection {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
     // Only fetch the root key when we're not in prod
-    if (flavors.FETCH_ROOT_KEY) {
+    if (features.FETCH_ROOT_KEY) {
       await agent.fetchRootKey();
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {

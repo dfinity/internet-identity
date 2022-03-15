@@ -35,7 +35,7 @@ then
 fi
 
 cat > "$body" <<EOF
-Read more in the [Build flavors](https://github.com/dfinity/internet-identity/tree/$GITHUB_REF_NAME#build-flavors) section of the README.
+Read more in the [Build features](https://github.com/dfinity/internet-identity/tree/$GITHUB_REF_NAME#build-features-and-flavors) section of the README.
 | Filename | sha256 | Verify |
 | --- | --- | --- |
 EOF

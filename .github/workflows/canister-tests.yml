@@ -39,29 +39,31 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     strategy:
-      # NOTE: the 'name' in the matrix should match the asset filename, because it is used in 
+      # NOTE: the 'name' in the matrix should match the asset filename, because it is used in
       # .github/actions/release to figure out the job ID.
+      #
+      # NOTE: if you modify the flavors, update the #flavors table in README.md
       matrix:
         include:
           # The production build
           - name: internet_identity_production.wasm
             II_FETCH_ROOT_KEY: 0
-            II_DUMMY_AUTH: 0
             II_DUMMY_CAPTCHA: 0
+            II_DUMMY_AUTH: 0
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # selenium.
           - name: internet_identity_test.wasm
             II_FETCH_ROOT_KEY: 1
-            II_DUMMY_AUTH: 0
             II_DUMMY_CAPTCHA: 1
+            II_DUMMY_AUTH: 0
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
           - name: internet_identity_dev.wasm
             II_FETCH_ROOT_KEY: 1
-            II_DUMMY_AUTH: 1
             II_DUMMY_CAPTCHA: 1
+            II_DUMMY_AUTH: 1
 
     steps:
       - uses: actions/checkout@v2
