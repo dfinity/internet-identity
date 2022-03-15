@@ -238,7 +238,9 @@ Tentatively added devices cannot be used to login into the management view or au
 
 === The `verify_tentative_device` method
 
-This method, if called with a valid verification code, adds the tentative device to the user permanently and exits registration mode.
+For an anchor in device registration mode: if called with a valid verification code, adds the tentative device as a regular device to the anchor and exits registration mode. The registration flow is aborted if this method is called five times with invalid verification codes.
+
+Returns an error if called for a device not in registration mode.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
@@ -250,7 +252,7 @@ Fetches all device data associated with a user.
 
 === The `get_anchor_info` method
 
-Fetches all data associated with a user including registration mode and tentatively registered devices.
+Fetches all data associated with an anchor including registration mode and tentatively registered devices.
 
 *Authorization*: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
