@@ -765,6 +765,8 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
+/// Returns all devices of the user (authentication and recovery) but no information about device registrations.
+/// Note: Will be changed in the future to be more consistent with get_anchor_info.
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
     STATE.with(|s| {
