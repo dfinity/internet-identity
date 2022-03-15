@@ -13,7 +13,7 @@ const fs = require("fs");
 /*
  * Read the values from dfx.json and canister_ids.json
  */
-const CANISTER_IDS_PATH = `${__dirname}/../.dfx/local/canister_ids.json`;
+const CANISTER_IDS_PATH = `${__dirname}/.dfx/local/canister_ids.json`;
 let canister_id;
 try {
   const canister_ids = JSON.parse(fs.readFileSync(CANISTER_IDS_PATH, "utf8"));
@@ -27,7 +27,7 @@ try {
 
 console.log(`Using canister ID: ${canister_id}`);
 
-const DFX_JSON_PATH = `${__dirname}/../dfx.json`;
+const DFX_JSON_PATH = `${__dirname}/dfx.json`;
 let replica_host;
 try {
   const dfx_json = JSON.parse(fs.readFileSync(DFX_JSON_PATH, "utf8"));
@@ -68,8 +68,8 @@ proxy.stderr.on("data", (data) => {
   console.log(`proxy: ${data}`);
 });
 
-proxy.stdout.on("close", (code) => {
-  console.log(`proxy returned with ${code}`);
+proxy.stdout.on("exit", (code, signal) => {
+  console.log(`proxy returned (return code: ${code}, signal: ${signal})`);
 });
 
 // TODO this should be a flag, and we should have
@@ -91,8 +91,17 @@ if (true) {
     console.log(`wdio: ${data}`);
   });
 
-  wdio.on("close", (code) => {
-    console.log(`wdio returned with ${code}`);
+  wdio.on('exit', (code, signal) => {
+    console.log("Killing proxy");
     proxy.kill();
-  });
+    if (code > 0) {
+      // if code is set and non-zero, bubble up error from wdio tests
+      throw new Error(`End-to-end tests returned with ${code}`);
+    } else if (signal) {
+      // otherwise, if the child was killed externally
+      throw new Error(`End-to-end tests killed with signal ${signal}`);
+    } else {
+      console.log('End-to-end tests finished successfully');
+    }
+  })
 }
