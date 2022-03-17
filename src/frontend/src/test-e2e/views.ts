@@ -227,6 +227,9 @@ export class AddRemoteDeviceAliasView extends View {
     await this.browser
       .$("#registerTentativeDeviceContinue")
       .waitForDisplayed({ timeout: 5_000 });
+
+    // Make sure the loader is gone
+    await this.browser.$("#loader").waitForExist({ reverse: true });
   }
 
   async selectAlias(alias: string): Promise<void> {
@@ -243,9 +246,6 @@ export class NotInRegistrationModeView extends View {
     await this.browser
       .$("#deviceRegModeDisabledRetry")
       .waitForDisplayed({ timeout: 10_000 });
-
-    // Make sure the loader is gone
-    await this.browser.$("#loader").waitForExist({ reverse: true });
   }
 
   async retry(): Promise<void> {
