@@ -245,9 +245,7 @@ export class NotInRegistrationModeView extends View {
       .waitForDisplayed({ timeout: 10_000 });
 
     // Make sure the loader is gone
-    await this.browser
-      .$("#loader")
-      .waitForExist({ reverse: true });
+    await this.browser.$("#loader").waitForExist({ reverse: true });
   }
 
   async retry(): Promise<void> {
