@@ -235,14 +235,14 @@ export async function switchToPopup(
   await addVirtualAuthenticator(browser);
 }
 
-export async function removeFlavorsWarning(
+export async function removeFeaturesWarning(
   browser: WebdriverIO.Browser
 ): Promise<void> {
-  const warningContainer = await browser.$(".flavors-warning-container");
+  const warningContainer = await browser.$(".features-warning-container");
   await warningContainer.waitForDisplayed();
   await browser.execute(() => {
     const warningContainer = document.querySelector(
-      ".flavors-warning-container"
+      ".features-warning-container"
     );
     if (warningContainer) {
       warningContainer.remove();

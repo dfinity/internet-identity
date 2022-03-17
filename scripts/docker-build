@@ -14,24 +14,24 @@ echo "PWD: $PWD"
 image_name="internet-identity"
 docker_build_args=( --target scratch )
 
-# forward "flavor" environment variables ("$2") to the docker build
-# NOTE: flavor name ("$1") must be lower case as it's used in the image name
-function check_flavor() {
+# forward "feature" environment variables ("$2") to the docker build
+# NOTE: feature name ("$1") must be lower case as it's used in the image name
+function check_feature() {
     local varname="$2"
-    local flavorname="$1"
+    local featurename="$1"
     local value="${!varname:-}"
 
     if [[ "$value" == "1" ]]
     then
-        echo "Using flavor $flavorname ($varname)"
+        echo "Using feature $featurename ($varname)"
         docker_build_args+=( --build-arg "$varname=$value" )
-        image_name="$image_name-$flavorname"
+        image_name="$image_name-$featurename"
     fi
 }
 
-check_flavor "fetchrootkey" "II_FETCH_ROOT_KEY"
-check_flavor "dummycaptcha" "II_DUMMY_CAPTCHA"
-check_flavor "dummyauth" "II_DUMMY_AUTH"
+check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
+check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
+check_feature "dummyauth" "II_DUMMY_AUTH"
 
 docker_build_args+=(--tag "$image_name" .)
 

@@ -23,7 +23,7 @@ import {
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
-  removeFlavorsWarning,
+  removeFeaturesWarning,
   removeVirtualAuthenticator,
   RunConfiguration,
   runInBrowser,
@@ -338,7 +338,7 @@ test("Screenshots", async () => {
       await browser.url(II_URL);
 
       await waitForFonts(browser);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       const welcomeView = new WelcomeView(browser);
       await welcomeView.waitForDisplay();
       await screenshots.take("welcome", browser);
@@ -381,7 +381,7 @@ test("Screenshots", async () => {
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
       await browser.url(II_URL);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       const welcomeBackView = new WelcomeBackView(browser);
       await welcomeBackView.waitForDisplay();
       const userNumber2 = await welcomeBackView.getIdentityAnchor();
@@ -414,7 +414,7 @@ test("Screenshots", async () => {
         await browser2.url(II_URL);
         const welcomeView2 = new WelcomeView(browser2);
         await welcomeView2.waitForDisplay();
-        await removeFlavorsWarning(browser2);
+        await removeFeaturesWarning(browser2);
         await welcomeView2.addDevice();
         const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
         await addIdentityAnchorView2.waitForDisplay();
@@ -461,7 +461,7 @@ test("Screenshots", async () => {
         const welcomeBackView2 = new WelcomeBackView(browser2);
         await welcomeBackView2.waitForDisplay();
         await welcomeBackView2.fixup();
-        await removeFlavorsWarning(browser2);
+        await removeFeaturesWarning(browser2);
         await screenshots.take("new-device-login", browser2);
         await welcomeBackView2.login();
         const recoveryMethodSelectorView2 = new RecoveryMethodSelectorView(
@@ -496,7 +496,7 @@ test("Screenshots", async () => {
       // About page
       await browser.url("about:blank");
       await browser.url(ABOUT_URL);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       await waitForFonts(browser);
       const aboutView = new AboutView(browser);
       await aboutView.waitForDisplay();
@@ -506,14 +506,14 @@ test("Screenshots", async () => {
       await browser.url("about:blank");
       await browser.url(II_URL + "#about");
       await waitForFonts(browser);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       const aboutViewLegacy = new AboutView(browser);
       await aboutViewLegacy.waitForDisplay();
       await screenshots.take("about-legacy", browser);
 
       // Test device removal
       await browser.url(II_URL);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       await welcomeBackView.waitForDisplay();
       const userNumber3 = await welcomeBackView.getIdentityAnchor();
       expect(userNumber3).toBe(userNumber);
@@ -550,7 +550,7 @@ test("Screenshots", async () => {
       // Compatibility notice page
       await browser.url("about:blank");
       await browser.url(II_URL + "#compatibilityNotice");
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       await waitForFonts(browser);
       const compatabilityNoticeView = new CompatabilityNoticeView(browser);
       await compatabilityNoticeView.waitForDisplay();
@@ -559,7 +559,7 @@ test("Screenshots", async () => {
       // FAQ page
       await browser.url("about:blank");
       await browser.url(FAQ_URL);
-      await removeFlavorsWarning(browser);
+      await removeFeaturesWarning(browser);
       await waitForFonts(browser);
       const faqView = new FAQView(browser);
       await faqView.waitForDisplay();
@@ -570,12 +570,12 @@ test("Screenshots", async () => {
       await faqView.waitForDisplay();
       await screenshots.take("faq-open", browser);
 
-      // Flavors warning banner
+      // Features warning banner
       await browser.url("about:blank");
       await browser.url(II_URL);
       await waitForFonts(browser);
       const welcomeView3 = new WelcomeView(browser);
-      await screenshots.take("flavors-warning", browser);
+      await screenshots.take("features-warning", browser);
     }
   );
 }, 400_000);

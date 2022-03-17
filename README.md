@@ -9,7 +9,7 @@ documentation.
 
 ## Official build
 
-**NOTE:** You can customize the build by using [build flavors](#build-flavors).
+**NOTE:** You can customize the build by using [build features](#build-features-and-flavors).
 
 The official build should ideally be reproducible, so that independent parties
 can validate that we really deploy what we claim to deploy.
@@ -165,17 +165,19 @@ dfx build internet_identity
 
 This will produce `./internet_identity.wasm`.
 
-## Build flavors
+## Build Features and Flavors
 
-The Internet Identity build can be customized to include "flavors" that are
-useful when developing and testing.
+The Internet Identity build can be customized to include [features](#features) that are
+useful when developing and testing. We provide pre-built [flavors](#flavors)
+of Internet Identity that include different sets of features.
 
-⚠️ These options should only ever be used during development as they effectively poke security holes in Internet Identity ⚠️
+### Features
+
 
 These options can be used both in the "contributing" workflows above (frontend, backend) and
-in the docker build. The flavors are enabled by setting the corresponding
+in the docker build. The features are enabled by setting the corresponding
 environment variable to `1`. Any other string, as well as not setting the
-environment variable, will disable the flavor.
+environment variable, will disable the feature.
 
 For instance:
 
@@ -184,10 +186,12 @@ $ II_FETCH_ROOT_KEY=1 dfx build
 $ II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
 ```
 
-The flavors are described below:
+⚠️ These options should only ever be used during development as they effectively poke security holes in Internet Identity
 
-<!-- NOTE: If you add a flavor here, add it to 'flavors.ts' in the frontend
-codebase too, even if the flavor only impacts the canister code and not the
+The features are described below:
+
+<!-- NOTE: If you add a feature here, add it to 'features.ts' in the frontend
+codebase too, even if the feature only impacts the canister code and not the
 frontend. -->
 
 | Environment variable | Description |
@@ -195,3 +199,14 @@ frontend. -->
 | `II_FETCH_ROOT_KEY` | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |
 | `II_DUMMY_CAPTCHA` | When enabled, the CAPTCHA challenge (sent by the canister code to the frontend code) is always the known string `"a"`. This is useful for automated testing. |
 | `II_DUMMY_AUTH` | When enabled, the frontend code will use a known, stable private key for registering anchors and authenticating. This means that all anchors will have the same public key(s). In particular this bypasses the WebAuthn flows (TouchID, Windows Hello, etc), which simplifies automated testing. |
+
+### Flavors
+
+We offer some pre-built Wasm modules that contain flavors, i.e. sets of features targetting a particular use case. Flavors can be downloaded from the table below for the latest release or from the [release page](https://github.com/dfinity/internet-identity/releases) for a particular release.
+
+| Flavor | | `II_FETCH_ROOT_KEY` | `II_DUMMY_CAPTCHA` | `II_DUMMY_AUTH` | Description |
+| --- | --- | :---: | :---: | :---: | --- |
+| Production | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm) | | |  | This is the production build deployed to https://identity.ic0.app. |
+| Test | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm) | :white_check_mark:  | :white_check_mark: | | This flavor is used by Internet Identity's test suite. It fully supports authentication but uses a known CAPTCHA value for test automation. |
+| Development | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm) | :white_check_mark: | :white_check_mark: | :white_check_mark: | This flavor contains a version of Internet Identity that effectively performs no checks. It can be useful for external developers who want to integrate Internet Identity in their project and care about the general Internet Identity authentication flow, without wanting to deal with authentication and, in particular, WebAuthentication. |
+
