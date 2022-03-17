@@ -247,6 +247,10 @@ jobs:
           name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
           path: wdio.log
 
+      - run: |
+          echo "The following screenshots were created:"
+          shasum -a 256 screenshots/*.png | sork -k2 # sort by 2nd column (filename)
+
       - name: Archive screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
@@ -339,8 +343,8 @@ jobs:
           path: screenshots
 
       - run: |
-          echo the following screenshots were recovered
-          find ./screenshots -name '*.png' -maxdepth 1 -type f -print0 | sort -z | xargs -r0 shasum -a 256
+          echo "The following screenshots were recovered:"
+          shasum -a 256 screenshots/*.png | sork -k2 # sort by 2nd column (filename)
 
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.4.0
