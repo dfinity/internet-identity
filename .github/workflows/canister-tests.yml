@@ -249,7 +249,7 @@ jobs:
 
       - run: |
           echo "The following screenshots were created:"
-          shasum -a 256 screenshots/*.png | sork -k2 # sort by 2nd column (filename)
+          shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
       - name: Archive screenshots
         if: ${{ always() }}
@@ -344,7 +344,7 @@ jobs:
 
       - run: |
           echo "The following screenshots were recovered:"
-          shasum -a 256 screenshots/*.png | sork -k2 # sort by 2nd column (filename)
+          shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v7.4.0
