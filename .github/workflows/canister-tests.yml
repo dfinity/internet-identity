@@ -260,7 +260,7 @@ jobs:
           name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
           path: screenshots/**/*.png
 
-  dummy-auth-tests:
+  using-dev-build:
     runs-on: ubuntu-latest
     needs: docker-build
     env:
@@ -296,20 +296,27 @@ jobs:
           name: internet_identity_dev.wasm
           path: .
 
-      - name: Deploy II
+      - name: Deploy II and run tests
+        working-directory: demos/using-dev-build
         run: |
-          echo installing
-          mv ./internet_identity_dev.wasm ./internet_identity.wasm
-          shasum -a 256 ./internet_identity.wasm
+          set -euo pipefail
 
-          dfx canister --no-wallet create --all
-          dfx canister --no-wallet install --mode install internet_identity --argument '(null)'
+          # Create a fake curl so that we use this build's wasm; also create a "witness"
+          # file to make sure the fake curl was run (rm $witness will fail otherwise)
+          curl_dir=$(mktemp -d); witness=$(mktemp)
+          cat > "$curl_dir/curl" << EOF
+          #!/usr/bin/env bash
+          cp ../../internet_identity_dev.wasm ./internet_identity.wasm && touch $witness
+          EOF
 
-      - name: Run tests
-        working-directory: dummy-auth-tests
-        run: |
+          chmod +x $curl_dir/curl
+          PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)' && rm -rf "$curl_dir" && rm $witness
+
           npm ci
           npm run test
+
+          # Clean up our download
+          rm internet_identity.wasm
 
       - name: Stop replica
         run: |
