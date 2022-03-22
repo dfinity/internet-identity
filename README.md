@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    <a href="https://identity.ic0.app">https://identity.ic0.app</a> | <a href ="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a>
+    <a href="https://identity.ic0.app">https://identity.ic0.app</a> | <a href="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a> | <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a>
 </p>
 
 ---
@@ -32,6 +32,7 @@ For more information, see [What is Internet Identity?](https://smartcontracts.or
 * [Build Features and Flavors](#build-features-and-flavors)
   * [Features](#features)
   * [Flavors](#flavors)
+* [Getting Help](#getting-help)
 * [Links](#links)
 
 ## Getting Started
@@ -120,6 +121,14 @@ We offer some pre-built Wasm modules that contain flavors, i.e. sets of features
 | Production | This is the production build deployed to https://identity.ic0.app. Includes none of the build features. | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm) |
 | Test | This flavor is used by Internet Identity's test suite. It fully supports authentication but uses a known CAPTCHA value for test automation. Includes the following features: <br><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li></ul>| [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm) |
 | Development | This flavor contains a version of Internet Identity that effectively performs no checks. It can be useful for external developers who want to integrate Internet Identity in their project and care about the general Internet Identity authentication flow, without wanting to deal with authentication and, in particular, WebAuthentication. Includes the following features: <br><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li><li><code>II_DUMMY_AUTH</code></li></ul><br>See the [`using-dev-build`](demos/using-dev-build/README.md) project for an example on how to use this flavor.| [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm) |
+
+## Getting Help
+
+We're here to help! Here are some ways you can reach out for help if you get stuck:
+
+* [Internet Identity Bug Tracker](https://github.com/dfinity/internet-identity/issues): Create a new ticket if you encounter a bug using Internet Identity, or if an issue arises when you try to build the code.
+* [DFINITY Forum](https://forum.dfinity.org/c/internet-identity/32): The forum is a great place to look for information and to ask for help.
+* [Support](https://support.dfinity.org/hc/en-us/requests/new): Create a support request if you'd like to keep things private.
 
 ## Links
 
