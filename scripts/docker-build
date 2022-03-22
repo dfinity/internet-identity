@@ -5,14 +5,36 @@
 
 set -euo pipefail
 
+# Make sure we always run from the root
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
 cd "$SCRIPTS_DIR/.."
 
-echo "PWD: $PWD"
+function title() {
+    echo "Build Internet Identity inside Docker"
+}
 
-image_name="internet-identity"
-docker_build_args=( --target scratch )
+function usage() {
+    cat << EOF
+
+Usage:
+  $0
+
+Environment:
+  II_FETCH_ROOT_KEY     When set to "1", enable the "II_FETCH_ROOT_KEY" feature.
+  II_DUMMY_CAPTCHA      When set to "1", enable the "II_DUMMY_CAPTCHA" feature.
+  II_DUMMY_AUTH         When set to "1", enable the "II_DUMMY_AUTH" feature.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+This will create (and override) "./internet_identity.wasm". For more information on build features, see:
+    https://github.com/dfinity/internet-identity#build-features-and-flavors
+EOF
+}
+
+## Building
 
 # forward "feature" environment variables ("$2") to the docker build
 # NOTE: feature name ("$1") must be lower case as it's used in the image name
@@ -29,22 +51,50 @@ function check_feature() {
     fi
 }
 
-check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
-check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
-check_feature "dummyauth" "II_DUMMY_AUTH"
+function build() {
+    image_name="internet-identity"
+    docker_build_args=( --target scratch )
 
-docker_build_args+=(--tag "$image_name" .)
+    check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
+    check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
+    check_feature "dummyauth" "II_DUMMY_AUTH"
 
-echo "The following image name will be used: $image_name"
+    docker_build_args+=(--tag "$image_name" .)
 
-tmp_outdir=$(mktemp -d)
+    echo "The following image name will be used: $image_name"
 
-set -x
-DOCKER_BUILDKIT=1 docker build "${docker_build_args[@]}" --output "$tmp_outdir"
-set +x
+    tmp_outdir=$(mktemp -d)
 
-echo "Copying build output from $tmp_outdir to $PWD"
-cp "$tmp_outdir/internet_identity.wasm" .
+    set -x
+    DOCKER_BUILDKIT=1 docker build "${docker_build_args[@]}" --output "$tmp_outdir"
+    set +x
 
-echo "Removing $tmp_outdir"
-rm -rf "$tmp_outdir"
+    echo "Copying build output from $tmp_outdir to $PWD"
+    cp "$tmp_outdir/internet_identity.wasm" .
+
+    echo "Removing $tmp_outdir"
+    rm -rf "$tmp_outdir"
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'release --help' for more information."
+            exit 1
+            ;;
+    esac
+done
+
+build
