@@ -1,11 +1,17 @@
-![](./ii-logo.png)
+<p align="center"><a href="https://identity.ic0.app" target="_blank" rel="noopener noreferrer"><img width="600" src="./ii-logo.png" alt="Internet Identity"></a></p>
 
-[identity.ic0.app](https://identity.ic0.app) | [Specification][spec]
+<p align="center">
+    <a href="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml/badge.svg" alt="Canister Tests"></a>
+    <a href="https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml/badge.svg" alt="Cargo Tests"></a>
+    <a href="https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml/badge.svg" alt="Frontend checks and lints"></a>
+    <a href="https://github.com/dfinity/internet-identity/releases"><img src="https://img.shields.io/github/downloads/dfinity/internet-identity/total?label=downloads&logo=github" alt="GitHub all releases"></a>
+</p>
 
-[![Canister tests](https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml)
-[![Cargo tests](https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml)
-[![Frontend checks and lints](https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml/badge.svg)](https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml)
-![GitHub all releases](https://img.shields.io/github/downloads/dfinity/internet-identity/total?label=downloads&logo=github)
+<p align="center">
+    <a href="https://identity.ic0.app">https://identity.ic0.app</a> | <a href ="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a>
+</p>
+
+---
 
 Internet Identity is an authentication service for the [Internet Computer][ic]. It is the authentication system that allows hundreds of thousands of users to log in to Dapps like [Distrikt], [DSCVR] and more.
 
