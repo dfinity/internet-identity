@@ -96,3 +96,5 @@ do
             ;;
     esac
 done
+
+build
