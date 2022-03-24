@@ -28,7 +28,7 @@ For more information, see [What is Internet Identity?](https://smartcontracts.or
 * [Getting Started](#getting-started)
   * [Architecture Overview](#architecture-overview)
   * [Building with Docker](#building-with-docker)
-  * [Integrating with Internet Identity](#integrating-with-internet-identity)
+  * [Integration with Internet Identity](#integration-with-internet-identity)
 * [Build Features and Flavors](#build-features-and-flavors)
   * [Features](#features)
   * [Flavors](#flavors)
@@ -45,7 +45,7 @@ Internet Identity is an authentication service for the [Internet Computer][ic]. 
 
 ![Architecture](./ii-architecture.png) <!-- this is an excalidraw.com image, source is ii-architecture.excalidraw -->
 
-Internet Identity runs as a single canister which both serves the frontend application code, and handles the requests sent by the frontend application code. 
+Internet Identity runs as a single canister which both serves the frontend application code, and handles the requests sent by the frontend application code.
 
 > 💡 The canister (backend) interface is specified by the [internet_identity.did](./src/internet_identity/internet_identity.did) [candid] interface. The (backend) canister code is located in [`src/internet_identity`](./src/internet_identity), and the frontend application code (served by the canister through the `http_request` method) is located in [`src/frontend`](./src/frontend).
 
@@ -146,7 +146,6 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 [CONTRIBUTING]: ./CONTRIBUTING.md#running-locally
 [contributing]: ./CONTRIBUTING.md#running-locally
 [ic]: https://internetcomputer.org
-[integrate]: #integrating-with-internet-identity
 [spec]: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification
 [releases]: https://github.com/dfinity/internet-identity/releases
 [Docker]: https://docker.io
