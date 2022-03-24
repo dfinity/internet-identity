@@ -204,13 +204,7 @@ mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct InternetIdentityStats {
-    assigned_user_number_range: (UserNumber, UserNumber),
     users_registered: u64,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct InternetIdentityInit {
-    assigned_user_number_range: (UserNumber, UserNumber),
 }
 
 type AssetHashes = RbTree<&'static str, Hash>;
@@ -247,6 +241,8 @@ impl Default for State {
     fn default() -> Self {
         const FIRST_USER_ID: UserNumber = 10_000;
         Self {
+            // Create a new storage with given capacity. In the past we allowed specifying a range
+            // upon initialization; for more info, see commit history.
             storage: RefCell::new(Storage::new((
                 FIRST_USER_ID,
                 FIRST_USER_ID.saturating_add(storage::DEFAULT_RANGE_SIZE),
@@ -957,21 +953,15 @@ fn stats() -> InternetIdentityStats {
     STATE.with(|state| {
         let storage = state.storage.borrow();
         InternetIdentityStats {
-            assigned_user_number_range: storage.assigned_user_number_range(),
             users_registered: storage.user_count() as u64,
         }
     })
 }
 
 #[init]
-fn init(maybe_arg: Option<InternetIdentityInit>) {
+fn init() {
     init_assets();
     STATE.with(|state| {
-        if let Some(arg) = maybe_arg {
-            state
-                .storage
-                .replace(Storage::new(arg.assigned_user_number_range));
-        }
         state.storage.borrow().flush();
         update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
     });

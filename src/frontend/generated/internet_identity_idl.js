@@ -1,7 +1,4 @@
 export const idlFactory = ({ IDL }) => {
-  const InternetIdentityInit = IDL.Record({
-    'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
-  });
   const UserNumber = IDL.Nat64;
   const PublicKey = IDL.Vec(IDL.Nat8);
   const DeviceKey = PublicKey;
@@ -151,9 +148,4 @@ export const idlFactory = ({ IDL }) => {
       ),
   });
 };
-export const init = ({ IDL }) => {
-  const InternetIdentityInit = IDL.Record({
-    'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
-  });
-  return [IDL.Opt(InternetIdentityInit)];
-};
+export const init = ({ IDL }) => { return []; };

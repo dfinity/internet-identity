@@ -363,20 +363,6 @@ type UserDeviceList = vec(record {
 });
 ....
 
-=== Initialization
-
-The Internet Identity canister is designed for sharded deployments.
-There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users.
-As users are identified by their Identity Anchor, we split the range of Identity Anchors into continuous non-overlapping half-closed intervals and assign each region to one canister instance.
-The assigned range is passed to the canister as an init argument, encoded in Candid:
-
-....
-type InternetIdentityInit = record {
-  // Half-closed interval of Identity Anchors assigned to this canister, [ left_bound, right_bound )
-  assigned_user_number_range: record { nat64; nat64; };
-};
-....
-
 === Approach to upgrades
 
 We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly.
@@ -602,15 +588,9 @@ shasum -a 256 internet_identity.wasm
 
 Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job “docker build” and look at the output of step “Run sha256sum out/internet_identity.wasm”.
 
-=== Initial installation (should happen only once)
+=== Initial installation
 
-Next, you will need `didc` to be able to produce the binary encoded Candid argument needed for installation. Either download it from https://github.com/dfinity/candid/releases/[the latest candid release] or build it from source.
-
-The canister accepts a range of user ids that it's responsible for in `canister_init`. Currently, we only use one canister, so we don't really need to set a range. However, we still need to pass in some value to satisfy the interface. Run the following to get a file with the binary encoded value needed:
-[source,bash]
-----
-didc encode '(null)' | xxd -r -p > arg.in
-----
+This describes the first ever installation of the Internet Identity canister, which should happen only once.
 
 ==== Submitting proposal for installation and voting on mainnet
 
@@ -665,7 +645,6 @@ need to build with `II_FETCH_ROOT_KEY=1`:
 
 [source,bash]
 ----
-didc encode '(null)' | xxd -r -p > arg.in
 II_FETCH_ROOT_KEY=1 ./scripts/docker-build
 ----
 
@@ -676,7 +655,7 @@ This will create the Wasm file you want to use for the following deployment step
 Submit the proposal to install the canister on our `identity` testnet (replace for other testnets as appropriate):
 [source,bash]
 ----
-ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode reinstall --wasm-module-path internet_identity.wasm --arg arg.in
+ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode reinstall --wasm-module-path internet_identity.wasm
 ----
 
 You can check http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/_/dashboard[our testnet's dashboard] to confirm the hash of the wasm installed on the canister matches the one you took note of in the previous steps.

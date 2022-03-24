@@ -53,9 +53,6 @@ export interface IdentityAnchorInfo {
   'devices' : Array<DeviceData>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
-export interface InternetIdentityInit {
-  'assigned_user_number_range' : [bigint, bigint],
-}
 export interface InternetIdentityStats {
   'users_registered' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
