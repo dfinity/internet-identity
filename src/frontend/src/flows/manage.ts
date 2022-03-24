@@ -27,6 +27,15 @@ const displayFailedToListDevices = (error: Error) =>
     primaryButton: "Try again",
   });
 
+// The maximum number of authenticator (non-recovery) devices we allow.
+// The canister limits the _total_ number of devices (recovery included) to 10,
+// and we (the frontend) only allow user one recovery device per type (phrase, fob),
+// which leaves room for 8 authenticator devices.
+const MAX_AUTHENTICATORS = 8;
+const numAuthenticators = (devices: DeviceData[]) =>
+  devices.filter((device) => hasOwnProperty(device.purpose, "authentication"))
+    .length;
+
 // The styling of the page
 
 const style = () => html`<style>
@@ -45,16 +54,44 @@ const style = () => html`<style>
     width: auto;
     margin: 0;
     cursor: pointer;
-    color: #387ff7;
+  }
+
+  .labelActionText {
+    float: right;
     font-size: 12px;
     font-family: "Montserrat", sans-serif;
     text-align: right;
     font-weight: 600;
+    color: #387ff7;
   }
-  .labelAction::before {
+
+  .labelActionText::before {
     content: "+";
     margin-right: 3px;
-    color: #387ff7;
+  }
+
+  .labelAction:disabled .labelActionText {
+    color: var(--grey-100);
+  }
+
+  .tooltip {
+    visibility: hidden;
+    display: inline-block;
+    max-width: 200px;
+    font-size: 12px;
+    position: absolute;
+    z-index: 1;
+    background: var(--grey-100);
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .labelAction:disabled:hover .tooltip {
+    visibility: visible;
+  }
+
+  .labelAddedDevices:hover .tooltip {
+    visibility: visible;
   }
 </style> `;
 
@@ -75,9 +112,23 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     <label>Identity Anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
-      <label id="deviceLabel">Added devices</label>
-      <button class="labelAction" id="addAdditionalDevice">
-        ADD NEW DEVICE
+      <label class="labelAddedDevices" id="deviceLabel"
+        ><span class="tooltip"
+          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
+          (recovery devices excluded)</span
+        >Added devices
+        (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</label
+      >
+      <button
+        ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+        class="labelAction"
+        id="addAdditionalDevice"
+      >
+        <span class="tooltip"
+          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+          Remove a device before you can add a new one.</span
+        >
+        <span class="labelActionText">ADD NEW DEVICE</span>
       </button>
     </div>
     <div id="deviceList"></div>
@@ -87,7 +138,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
           <div class="labelWithAction">
             <label id="deviceLabel">Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
-              ADD RECOVERY MECHANISM
+              <span class="labelActionText">ADD RECOVERY MECHANISM</span>
             </button>
           </div>
           <div id="recoveryList"></div>
