@@ -863,7 +863,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
         .+ #mode .== V.IsJust #install ()
         .+ #canister_id .== Candid.Principal cid
         .+ #wasm_module .== wasm
-        .+ #arg .== Candid.encode (Nothing :: Maybe InternetIdentityInit) -- default value
+        .+ #arg .== Candid.encode ()
       act cid
 
     withUpgrade act = ([act False], [act True])
