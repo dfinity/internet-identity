@@ -204,6 +204,7 @@ mod storage;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct InternetIdentityStats {
+    assigned_user_number_range: (UserNumber, UserNumber),
     users_registered: u64,
 }
 
@@ -953,6 +954,7 @@ fn stats() -> InternetIdentityStats {
     STATE.with(|state| {
         let storage = state.storage.borrow();
         InternetIdentityStats {
+            assigned_user_number_range: storage.assigned_user_number_range(),
             users_registered: storage.user_count() as u64,
         }
     })
