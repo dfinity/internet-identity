@@ -207,7 +207,7 @@ jobs:
         run: |
           mv internet_identity_test.wasm internet_identity.wasm
           dfx canister --no-wallet create --all
-          dfx canister --no-wallet install internet_identity --argument '(null)'
+          dfx canister --no-wallet install internet_identity
 
       - name: Deploy whoami canister
         run: cd demos/whoami && dfx deploy --no-wallet
@@ -315,7 +315,7 @@ jobs:
           EOF
 
           chmod +x $curl_dir/curl
-          PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)' && rm -rf "$curl_dir" && rm $witness
+          PATH=$curl_dir:$PATH dfx deploy --no-wallet && rm -rf "$curl_dir" && rm $witness
 
           npm ci
           npm run test

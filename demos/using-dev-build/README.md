@@ -8,7 +8,7 @@ The following commands will start a replica, install the development Internet Id
 
 ```bash
 $ dfx start # in a different terminal
-$ dfx deploy --no-wallet --argument '(null)'
+$ dfx deploy --no-wallet
 $ npm ci
 $ npm run test
 ```

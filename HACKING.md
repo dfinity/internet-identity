@@ -28,7 +28,7 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
 Then the canister can be used as
@@ -55,7 +55,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
 To serve the frontend locally via webpack (recommended during development), run
