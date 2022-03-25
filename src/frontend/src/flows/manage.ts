@@ -56,6 +56,16 @@ const style = () => html`<style>
     align-items: center;
   }
 
+  .labelWithAction label span {
+    /* global span selector is set to 1.2rem (...), which is too big */
+    font-size: 1rem;
+  }
+
+  .labelWithAction label span.addedDevicesCounter {
+    /* we can't just select the class because the previous selector is more specific */
+    font-size: 0.7rem;
+  }
+
   .labelAction {
     padding: 0;
     border: none;
@@ -74,11 +84,7 @@ const style = () => html`<style>
   }
 
   .addedDevices {
-    margin-right: 10px;
-  }
-
-  .addedDevicesCounter {
-    font-size: 10px;
+    margin-right: 0.2rem;
   }
 
   .labelActionText::before {
