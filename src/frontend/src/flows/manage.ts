@@ -44,9 +44,18 @@ const style = () => html`<style>
     display: flex;
     justify-content: space-between;
   }
+
+  .labelWithAction button {
+    text-align: right;
+  }
+
   .labelWithAction label {
     margin: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
   }
+
   .labelAction {
     padding: 0;
     border: none;
@@ -57,12 +66,19 @@ const style = () => html`<style>
   }
 
   .labelActionText {
-    float: right;
     font-size: 12px;
     font-family: "Montserrat", sans-serif;
     text-align: right;
     font-weight: 600;
     color: #387ff7;
+  }
+
+  .addedDevices {
+    margin-right: 10px;
+  }
+
+  .addedDevicesCounter {
+    font-size: 10px;
   }
 
   .labelActionText::before {
@@ -76,6 +92,7 @@ const style = () => html`<style>
 
   .tooltip {
     visibility: hidden;
+    opacity: 0;
     display: inline-block;
     max-width: 200px;
     font-size: 12px;
@@ -84,14 +101,19 @@ const style = () => html`<style>
     background: var(--grey-100);
     padding: 10px;
     border-radius: 10px;
+    text-align: center;
   }
 
   .labelAction:disabled:hover .tooltip {
     visibility: visible;
+    opacity: 1;
+    transition: opacity 0.2s ease-in;
   }
 
-  .labelAddedDevices:hover .tooltip {
+  .addedDevicesCounter:hover .tooltip {
     visibility: visible;
+    opacity: 1;
+    transition: opacity 0.2s ease-in;
   }
 </style> `;
 
@@ -113,11 +135,13 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
       <label class="labelAddedDevices" id="deviceLabel"
-        ><span class="tooltip"
-          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
-          (recovery devices excluded)</span
-        >Added devices
-        (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</label
+        ><span class="addedDevices">Added devices</span>
+        <span class="addedDevicesCounter"
+          ><span class="tooltip"
+            >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
+            (recovery devices excluded)</span
+          >(${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</span
+        ></label
       >
       <button
         ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
