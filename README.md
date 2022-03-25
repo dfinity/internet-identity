@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    🔗 <a href="https://identity.ic0.app">https://identity.ic0.app</a> | 📜 <a href="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a> | 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> | 📞 <a href="https://discord.com/channels/748416164832608337/956570549960708146">Discord</a>
+    🔗 <a href="https://identity.ic0.app">https://identity.ic0.app</a> | 📜 <a href="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a> | 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> | 📞 <a href="https://discord.gg/E9FxceAg2j">Discord</a>
 </p>
 
 ---
