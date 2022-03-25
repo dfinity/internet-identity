@@ -34,7 +34,7 @@ then
         if [ $attempts -le 10 ]
         then
             echo "selenium-standalone is not ready yet, retrying ($attempts)"
-            sleep 1
+            sleep 2
         else
             echo "selenium-standalone didn't start successfully"
 
