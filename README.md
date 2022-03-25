@@ -70,7 +70,7 @@ $ docker build .
 
 We recommend using the [`docker-build`](./scripts/docker-build) script. It simplifies the usage of [build features](#build-features-and-flavors) and extracts the Wasm module from the final scratch container.
 
-> 💡 You can find instructions for building the code without Docker in the [CONTRIBUTING] document.
+> 💡 You can find instructions for building the code without Docker in the [HACKING] document.
 
 ### Integration with Internet Identity
 
@@ -86,8 +86,8 @@ of Internet Identity that include different sets of features.
 
 ### Features
 
-These options can be used both in the "contributing" workflows above (frontend, backend) and
-in the docker build. The features are enabled by setting the corresponding
+These options can be used both when building [with docker](#building-with-docker) and
+[without docker][HACKING]. The features are enabled by setting the corresponding
 environment variable to `1`. Any other string, as well as not setting the
 environment variable, will disable the feature.
 
@@ -135,7 +135,6 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 * [Internet Identity Specification][spec], the official Internet Identity Specification
 * [Integration with Internet Identity](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/) by Kyle Peacock
 * [What is Internet Identity?](https://smartcontracts.org/docs/ic-identity-guide/what-is-ic-identity.html) on [smartcontracts.org](https://smartcontracts.org)
-* [CONTRIBUTING.md][CONTRIBUTING]
 * [Internet Identity presentation 📼](https://youtu.be/oxEr8UzGeBo) on YouTube, streamed during the Genesis Event
 * [Excalidraw](https://excalidraw.com), used to make diagrams
 
@@ -143,8 +142,7 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 [WebAuthn]: https://webauthn.guide
 [DSCVR]: https://dscvr.one
 
-[CONTRIBUTING]: ./CONTRIBUTING.md#running-locally
-[contributing]: ./CONTRIBUTING.md#running-locally
+[HACKING]: ./HACKING.md#running-locally
 [ic]: https://internetcomputer.org
 [spec]: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification
 [releases]: https://github.com/dfinity/internet-identity/releases
