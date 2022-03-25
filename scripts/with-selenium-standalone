@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-#
+set -euo pipefail
+
 # A script that starts and stops selenium-standalone.
 #
 # Usage:
@@ -19,39 +20,44 @@ sout=$(mktemp)
 serr=$(mktemp)
 
 if selenium-standalone "${selenium_standalone_args[@]}" \
-    2> $serr \
-    > $sout \
+    2> >(tee -a $serr) \
+    > >(tee -a $sout) \
     &
 then
     pid=$!
     echo "selenium-standalone started with pid $pid"
 
     attempts=0
-    while grep -q 'Selenium started' "$sout"
+    while ! grep -q 'Selenium started' "$sout"
     do
         attempts=$((attempts+1))
-        if [ $attempts -le 5 ]
+        if [ $attempts -le 10 ]
         then
             echo "selenium-standalone is not ready yet, retrying ($attempts)"
-            sleep 1
+            sleep 2
         else
             echo "selenium-standalone didn't start successfully"
-            kill "$pid"
-            echo "logs can be found here:"
-            echo "$sout"
-            echo "$serr"
+
+            echo "STDERR:" && touch "$serr" && cat "$serr" && rm "$serr"
+            echo "STDOUT:" && touch "$sout" && cat "$sout" && rm "$sout"
+
+            kill "$pid" || true
             exit 1
         fi
     done
 
     echo "selenium standalone is running"
 
-    "$@"
+    ret=0
+    "$@" || ret="$?"
 
-    kill "$pid"
-    touch "$serr" && rm "$serr"
-    rm "$sout"
+    touch "$serr" && cat "$serr" && rm "$serr"
+    touch "$sout" && cat "$sout" && rm "$sout"
 
+    echo "'$*' returned with $ret"
+
+    kill "$pid" || echo "could not kill selenium-standalone"
+    exit "$ret"
 else
     echo "Could not start selenium-standalone server"
     echo "$sout"
