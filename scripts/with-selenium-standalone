@@ -48,6 +48,7 @@ then
 
     echo "selenium standalone is running"
 
+    ret=0
     "$@" || ret="$?"
 
     touch "$serr" && cat "$serr" && rm "$serr"
