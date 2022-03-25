@@ -71,7 +71,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     <p>
       You can view and manage this Identity Anchor and its added devices here.
     </p>
-    ${hasRecoveryDevice(devices) ? recoveryNag() : undefined}
+    ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
     <label>Identity Anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
@@ -81,7 +81,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       </button>
     </div>
     <div id="deviceList"></div>
-    ${hasRecoveryDevice(devices)
+    ${!hasRecoveryDevice(devices)
       ? undefined
       : html`
           <div class="labelWithAction">
@@ -280,7 +280,7 @@ const bindRemoveListener = (
 
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
-  !devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
+  devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
