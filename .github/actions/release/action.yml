@@ -5,6 +5,10 @@ inputs:
         description: "Assets to upload"
         required: true
         default: ""
+    token:
+        description: "GitHub authentication token"
+        required: true
+        default: ""
 outputs:
   notes-file:
     description: The notes file

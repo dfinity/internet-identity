@@ -90,6 +90,33 @@ do
     shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$body"
 done <<< "$INPUT_ASSETS"
 
+>&2 echo "Creating release notes"
+
+# NOTE: we create the release notes ourselves, instead of letting GitHub do it with
+# 'generate_release_notes: true', here we can actually specify the release range. When doing
+# it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
+# listing contributions since).
+# https://github.com/github/feedback/discussions/5975
+
+previous_tag_name=$(curl \
+    -H "Accept: application/vnd.github.v3+json" \
+    https://api.github.com/repos/dfinity/internet-identity/releases \
+    | jq -cMr 'sort_by(.published_at) | reverse | .[0] | .tag_name')
+>&2 echo "Using following tag as previous: $previous_tag_name"
+
+jq_body=$(jq -cM -n \
+    --arg previous_tag_name "$previous_tag_name" \
+    --arg tag_name "$GITHUB_REF_NAME" \
+    '{ tag_name: $tag_name, previous_tag_name: $previous_tag_name }')
+
+curl \
+    -X POST \
+    -H "authorization: token ${INPUT_TOKEN:?No token given}" \
+    -H "Accept: application/vnd.github.v3+json" \
+    https://api.github.com/repos/dfinity/internet-identity/releases/generate-notes \
+    --data "$jq_body" \
+    | jq -cMr '.body' >> "$body"
+
 >&2 echo "body complete:"
 
 cat "$body"
