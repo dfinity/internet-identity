@@ -33,7 +33,6 @@ export const showWarning = (): void => {
         width: 100%;
         box-sizing: border-box;
         padding: 0.5em 1em;
-        margin: 0 0 1rem;
         text-align: center;
       }
 
