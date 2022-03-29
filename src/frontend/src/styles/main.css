@@ -208,7 +208,8 @@ label {
   margin-bottom: 0.5rem;
 }
 
-main::before, main::after {
+main::before,
+main::after {
   content: "";
   display: block;
   flex-grow: 1;
