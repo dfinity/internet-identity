@@ -216,10 +216,17 @@ main::before, main::after {
 }
 
 main {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+@media (min-width: 512px) {
+  main {
+    height: auto;
+    min-height: 100vh;
+  }
 }
 
 .container {
