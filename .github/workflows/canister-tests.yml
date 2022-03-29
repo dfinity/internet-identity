@@ -365,7 +365,7 @@ jobs:
   # This ... releases
   release:
     runs-on: ubuntu-latest
-
+    if: startsWith(github.ref, 'refs/tags/release-')
     needs: docker-build
 
     steps:
@@ -397,14 +397,13 @@ jobs:
             internet_identity_test.wasm
             internet_identity_dev.wasm
             internet_identity_production.wasm
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/release-')
         run: |
           ./scripts/release \
             --tag ${{ github.ref }} \
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
-            --generate-notes \
             -- \
             internet_identity_test.wasm \
             internet_identity_dev.wasm \
