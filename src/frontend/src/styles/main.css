@@ -34,7 +34,7 @@ body {
 }
 
 footer {
-  padding: 2em;
+  padding: 2em 2em 0;
 }
 
 .powered-by-link {
@@ -208,7 +208,7 @@ label {
   margin-bottom: 0.5rem;
 }
 
-main::before {
+main::before, main::after {
   content: "";
   display: block;
   flex-grow: 1;
@@ -216,17 +216,10 @@ main::before {
 }
 
 main {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-main::after {
-  content: "";
-  display: block;
-  flex-grow: 2;
-  height: 24px;
 }
 
 .container {
