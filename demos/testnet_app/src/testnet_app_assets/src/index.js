@@ -5,7 +5,7 @@ import { idlFactory as testnet_app_idl, canisterId as testnet_app_id } from '../
 
 // Autofills the <input> for the II Url to point to our testnet.
 document.body.onload = () => {
-  const testnetII = "https://rdmx6-jaaaa-aaaaa-aaadq-cai.identity.dfinity.network/"
+  const testnetII = process.env.II_URL;
   document.getElementById("iiUrl").value = testnetII;
 };
 
