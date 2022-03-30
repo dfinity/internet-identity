@@ -100,7 +100,8 @@ module.exports = {
     }),
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'development',
-      TESTNET_APP_CANISTER_ID: canisters["testnet_app"]
+      TESTNET_APP_CANISTER_ID: canisters["testnet_app"],
+      II_URL: process.env.II_URL || "https://rdmx6-jaaaa-aaaaa-aaadq-cai.identity.dfinity.network/",
     }),
     new webpack.ProvidePlugin({
       Buffer: [require.resolve("buffer/"), "Buffer"],
