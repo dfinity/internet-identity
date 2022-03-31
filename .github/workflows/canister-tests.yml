@@ -394,9 +394,9 @@ jobs:
         id: prepare-release
         with:
           assets: |
-            internet_identity_test.wasm
-            internet_identity_dev.wasm
             internet_identity_production.wasm
+            internet_identity_dev.wasm
+            internet_identity_test.wasm
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
@@ -405,9 +405,9 @@ jobs:
             --tag ${{ github.ref }} \
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
             -- \
-            internet_identity_test.wasm \
+            internet_identity_production.wasm \
             internet_identity_dev.wasm \
-            internet_identity_production.wasm
+            internet_identity_test.wasm
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow

@@ -5,6 +5,11 @@
 
 set -euo pipefail
 
+GITHUB_TOKEN=${INPUT_TOKEN:-${GITHUB_TOKEN:?No token given}}
+
+RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
+RELEASE_TAG_PREVIOUS=${RELEASE_TAG_PREVIOUS:-}
+
 # This script sets "RELEASE_ACTION_BODY_FILE" to the path of the generated file. The script is run twice
 # (once when called with 'uses: ', once in post) meaning we can differentiate the first from second run
 # by reading "RELEASE_ACTION_BODY_FILE". On the "post" run, we just cleanup and exit.
@@ -20,24 +25,22 @@ then
     exit 0
 fi
 
-# The file where we'll progressively dump the release body content
-body=$(mktemp)
->&2 echo "Using '$body' for body"
+# Starting the "intro" section where we display a short intro
+section_intro=$(mktemp)
+cat > "$section_intro" << EOF
+This is release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
+EOF
+
+# Starting the "build flavors" section where we add the shas of all input assets
+section_build_flavors=$(mktemp)
 
 # Start the body with a paragraph and table headers
-
-# NOTE: we link to the current release (not to master) because things might change
-if [ -z "${GITHUB_REF_NAME:-}" ]
-then
-    >&2 echo "No github ref name set"
-    rm "$body"
-    exit 1
-fi
-
-cat > "$body" <<EOF
+# NOTE: throughout the doc we link to the current release (not to master) because things might
+# change
+cat > "$section_build_flavors" <<EOF
 ## Build flavors
 
-For more information please see the [Build flavors](https://github.com/dfinity/internet-identity/tree/$GITHUB_REF_NAME#build-features-and-flavors) section of the README.
+For more information please see the [Build flavors](https://github.com/dfinity/internet-identity/tree/$RELEASE_TAG#build-features-and-flavors) section of the README.
 
 | Filename | sha256 | Verify |
 | --- | --- | --- |
@@ -55,29 +58,36 @@ do
     # Instead, we find the job name that includes "$filename" and assume that's the Job ID. This works
     # because our build matrix takes in the filename as argument, which is added to the job name.
     # https://github.community/t/get-action-job-id/17365/7
-    job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
-        | jq -cMr \
+    if [ -z "${GITHUB_RUN_ID:-}" ]
+    then
+        # if not running on GitHub (e.g. locally for debugging), skip
+        html_url="https://example.com"
+        step="step"
+    else
+        job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
+            | jq -cMr \
             --arg filename "$filename" \
             '.jobs[] | select(.name | contains($filename)) | .id')
-    >&2 echo "Found job id: $job_id"
+                    >&2 echo "Found job id: $job_id"
 
-    # Now get the URL that we'll link to for verification of the sha
-    html_url=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
-        | jq -cMr \
+        # Now get the URL that we'll link to for verification of the sha
+        html_url=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
+            | jq -cMr \
             --argjson job_id "$job_id" \
             '.jobs[] | select(.id == $job_id) | .html_url')
-    >&2 echo "Found html_url: $html_url"
+                >&2 echo "Found html_url: $html_url"
 
-    # Additionally grab the step number of the 'sha256sum' step
-    step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
-        | jq -cMr \
+        # Additionally grab the step number of the 'sha256sum' step
+        step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
+            | jq -cMr \
             --argjson job_id "$job_id" \
             '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum")) | .number')
-    >&2 echo "Found step: $step"
+                >&2 echo "Found step: $step"
+    fi
 
     # Prepare the cells:
     # | [filename.wasm](<download link>) | <sha256> | [CI Run](<run link>) |
-    download_link="https://github.com/dfinity/internet-identity/releases/download/$GITHUB_REF_NAME/$filename"
+    download_link="https://github.com/dfinity/internet-identity/releases/download/$RELEASE_TAG/$filename"
     download="[\2]($download_link)"
 
     # shellcheck disable=SC2016
@@ -87,7 +97,14 @@ do
     run="[CI Run]($run_link)"
 
     # Get the shasum and capture the sha (using only POSIX sed)
-    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$body"
+    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$section_build_flavors"
+
+    # If the filename contains "prod" then we assume it's a production asset, and we show the sha256 and download
+    # link in the intro section as well.
+    if [[ "$filename" == *"prod"* ]]
+    then
+        shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%The sha256 of production asset [\2]($download_link) is [\1]($run_link).%" >> "$section_intro"
+    fi
 done <<< "$INPUT_ASSETS"
 
 >&2 echo "Creating release notes"
@@ -97,30 +114,40 @@ done <<< "$INPUT_ASSETS"
 # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
 # listing contributions since).
 # https://github.com/github/feedback/discussions/5975
+section_whats_changed=$(mktemp)
+if [ -z "$RELEASE_TAG_PREVIOUS" ]
+then
+    RELEASE_TAG_PREVIOUS=$(curl --silent \
+        -H "Accept: application/vnd.github.v3+json" \
+        https://api.github.com/repos/dfinity/internet-identity/releases \
+        | jq -cMr 'sort_by(.published_at) | reverse | .[0] | .tag_name')
+fi
 
-previous_tag_name=$(curl \
-    -H "Accept: application/vnd.github.v3+json" \
-    https://api.github.com/repos/dfinity/internet-identity/releases \
-    | jq -cMr 'sort_by(.published_at) | reverse | .[0] | .tag_name')
->&2 echo "Using following tag as previous: $previous_tag_name"
+>&2 echo "Using following tag as previous: $RELEASE_TAG_PREVIOUS"
 
 jq_body=$(jq -cM -n \
-    --arg previous_tag_name "$previous_tag_name" \
-    --arg tag_name "$GITHUB_REF_NAME" \
+    --arg previous_tag_name "$RELEASE_TAG_PREVIOUS" \
+    --arg tag_name "$RELEASE_TAG" \
     '{ tag_name: $tag_name, previous_tag_name: $previous_tag_name }')
 
-curl \
+curl --silent \
     -X POST \
-    -H "authorization: token ${INPUT_TOKEN:?No token given}" \
+    -H "authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github.v3+json" \
     https://api.github.com/repos/dfinity/internet-identity/releases/generate-notes \
     --data "$jq_body" \
-    | jq -cMr '.body' >> "$body"
+    | jq -cMr '.body' >> "$section_whats_changed"
+
+
+body=$(mktemp)
+>&2 echo "Using '$body' for body"
+cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
+cat "$section_whats_changed" >> "$body" && echo >> "$body" && rm "$section_whats_changed"
+cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
 
 >&2 echo "body complete:"
-
 cat "$body"
 
 echo "::set-output name=notes-file::$body"
 
-echo "RELEASE_ACTION_BODY_FILE=$body" >>"$GITHUB_ENV"
+[ -n "${GITHUB_ENV:-}" ] && echo "RELEASE_ACTION_BODY_FILE=$body" >>"$GITHUB_ENV"
