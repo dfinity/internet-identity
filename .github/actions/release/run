@@ -25,14 +25,19 @@ then
     exit 0
 fi
 
-# The file where we'll progressively dump the release body content
-body=$(mktemp)
->&2 echo "Using '$body' for body"
+# Starting the "intro" section where we display a short intro
+section_intro=$(mktemp)
+cat > "$section_intro" << EOF
+This is release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
+EOF
+
+# Starting the "build flavors" section where we add the shas of all input assets
+section_build_flavors=$(mktemp)
 
 # Start the body with a paragraph and table headers
-# NOTE: throughout the doc we link to the current release (not to master) because things might 
+# NOTE: throughout the doc we link to the current release (not to master) because things might
 # change
-cat > "$body" <<EOF
+cat > "$section_build_flavors" <<EOF
 ## Build flavors
 
 For more information please see the [Build flavors](https://github.com/dfinity/internet-identity/tree/$RELEASE_TAG#build-features-and-flavors) section of the README.
@@ -92,7 +97,14 @@ do
     run="[CI Run]($run_link)"
 
     # Get the shasum and capture the sha (using only POSIX sed)
-    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$body"
+    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$section_build_flavors"
+
+    # If the filename contains "prod" then we assume it's a production asset, and we show the sha256 and download
+    # link in the intro section as well.
+    if [[ "$filename" == *"prod"* ]]
+    then
+        shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%The sha256 of production asset [\2]($download_link) is [\1]($run_link).%" >> "$section_intro"
+    fi
 done <<< "$INPUT_ASSETS"
 
 >&2 echo "Creating release notes"
@@ -102,7 +114,7 @@ done <<< "$INPUT_ASSETS"
 # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
 # listing contributions since).
 # https://github.com/github/feedback/discussions/5975
-
+section_whats_changed=$(mktemp)
 if [ -z "$RELEASE_TAG_PREVIOUS" ]
 then
     RELEASE_TAG_PREVIOUS=$(curl --silent \
@@ -124,10 +136,16 @@ curl --silent \
     -H "Accept: application/vnd.github.v3+json" \
     https://api.github.com/repos/dfinity/internet-identity/releases/generate-notes \
     --data "$jq_body" \
-    | jq -cMr '.body' >> "$body"
+    | jq -cMr '.body' >> "$section_whats_changed"
+
+
+body=$(mktemp)
+>&2 echo "Using '$body' for body"
+cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
+cat "$section_whats_changed" >> "$body" && echo >> "$body" && rm "$section_whats_changed"
+cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
 
 >&2 echo "body complete:"
-
 cat "$body"
 
 echo "::set-output name=notes-file::$body"

@@ -17,6 +17,7 @@ $ export INPUT_ASSETS='internet_identity_dev.wasm
 internet_identity_production.wasm
 internet_identity_test.wasm'
 $ export RELEASE_TAG=release-2022-03-30 # Any tag
+$ export GITHUB_SHA=$(git rev-parse $RELEASE_TAG)
 $ export RELEASE_TAG_PREVIOUS=release-2022-03-15 # Any tag older than RELEASE_TAG
 $ ./.github/actions/release/run # finally, run the action
 ```
