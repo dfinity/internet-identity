@@ -60,48 +60,63 @@ const proxy = child_process.spawn("proxy", [
   `${canister_id}:${II_DAPP_PORT}`,
 ]);
 
+let testsStarted = false;
+let proxyOutput = "";
+
 proxy.stdout.on("data", (data) => {
   console.log(`proxy: ${data}`);
+
+  if(!testsStarted) {
+      // Wait for proxy to output "Proxy created" before we start the tests, otherwise the
+      // tests may start before the proxy is running.
+      proxyOutput = `${proxyOutput}${data}`;
+      if(proxyOutput.includes("Proxy created")) {
+
+          console.log("Starting tests");
+          testsStarted = true;
+
+          // TODO this should be a flag, and we should have
+          // npm run test # run the tests
+          // npm run start # start the proxy
+          if (true) {
+              /*
+               * Start the tests
+               */
+              const wdio = child_process.spawn("npm", ["run", "wdio"], {
+                  env: { ...process.env, II_DAPP_URL: II_DAPP_URL },
+              });
+
+              wdio.stdout.on("data", (data) => {
+                  console.log(`wdio: ${data}`);
+              });
+
+              wdio.stderr.on("data", (data) => {
+                  console.log(`wdio: ${data}`);
+              });
+
+              wdio.on('exit', (code, signal) => {
+                  console.log("Killing proxy");
+                  proxy.kill();
+                  if (code > 0) {
+                      // if code is set and non-zero, bubble up error from wdio tests
+                      throw new Error(`End-to-end tests returned with ${code}`);
+                  } else if (signal) {
+                      // otherwise, if the child was killed externally
+                      throw new Error(`End-to-end tests killed with signal ${signal}`);
+                  } else {
+                      console.log('End-to-end tests finished successfully');
+                  }
+              })
+          }
+
+      }
+  }
 });
 
 proxy.stderr.on("data", (data) => {
   console.log(`proxy: ${data}`);
 });
 
-proxy.stdout.on("exit", (code, signal) => {
+proxy.on("exit", (code, signal) => {
   console.log(`proxy returned (return code: ${code}, signal: ${signal})`);
 });
-
-// TODO this should be a flag, and we should have
-// npm run test # run the tests
-// npm run start # start the proxy
-if (true) {
-  /*
-   * Start the tests
-   */
-  const wdio = child_process.spawn("npm", ["run", "wdio"], {
-    env: { ...process.env, II_DAPP_URL: II_DAPP_URL },
-  });
-
-  wdio.stdout.on("data", (data) => {
-    console.log(`wdio: ${data}`);
-  });
-
-  wdio.stderr.on("data", (data) => {
-    console.log(`wdio: ${data}`);
-  });
-
-  wdio.on('exit', (code, signal) => {
-    console.log("Killing proxy");
-    proxy.kill();
-    if (code > 0) {
-      // if code is set and non-zero, bubble up error from wdio tests
-      throw new Error(`End-to-end tests returned with ${code}`);
-    } else if (signal) {
-      // otherwise, if the child was killed externally
-      throw new Error(`End-to-end tests killed with signal ${signal}`);
-    } else {
-      console.log('End-to-end tests finished successfully');
-    }
-  })
-}

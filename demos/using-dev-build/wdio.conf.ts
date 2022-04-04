@@ -3,6 +3,8 @@ import { existsSync, mkdirSync } from "fs";
 export const config: WebdriverIO.Config = {
   baseUrl: process.env.II_DAPP_URL || "http://localhost:8080",
 
+  waitForTimeout: 10_000,
+
   autoCompileOpts: {
     autoCompile: true,
     tsNodeOpts: {
