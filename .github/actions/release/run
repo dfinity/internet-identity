@@ -42,8 +42,8 @@ cat > "$section_build_flavors" <<EOF
 
 For more information please see the [Build flavors](https://github.com/dfinity/internet-identity/tree/$RELEASE_TAG#build-features-and-flavors) section of the README.
 
-| Filename | sha256 | Verify |
-| --- | --- | --- |
+| Filename | sha256 (links to CI Run) |
+| --- | --- |
 EOF
 
 # Read all "INPUT_ASSETS" (where "ASSETS" is the input specified in action.yml)
@@ -86,18 +86,16 @@ do
     fi
 
     # Prepare the cells:
-    # | [filename.wasm](<download link>) | <sha256> | [CI Run](<run link>) |
+    # | [filename.wasm](<download link>) | [<sha256>](<run link>) |
     download_link="https://github.com/dfinity/internet-identity/releases/download/$RELEASE_TAG/$filename"
     download="[\2]($download_link)"
 
     # shellcheck disable=SC2016
-    sha='`\1`'
-
     run_link="$html_url#step:$step:1"
-    run="[CI Run]($run_link)"
+    sha='[`\1`]'"($run_link)"
 
     # Get the shasum and capture the sha (using only POSIX sed)
-    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|$run|%" >> "$section_build_flavors"
+    shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|%" >> "$section_build_flavors"
 
     # If the filename contains "prod" then we assume it's a production asset, and we show the sha256 and download
     # link in the intro section as well.
