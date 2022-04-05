@@ -233,17 +233,19 @@ main {
 .container {
   padding: 3.5rem 0.5rem 2rem;
   max-width: 365px;
-  min-width: 300px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 @media (min-width: 512px) {
   .container {
+    padding: 3.5rem 2.5rem 2rem;
     border: 2px var(--grey-100) solid;
+    min-width: 300px;
     border-radius: 4px;
-    padding: 3.5rem 2.5rem 2rem 2.5rem;
+    box-sizing: inherit;
   }
 }
 
