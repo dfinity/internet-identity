@@ -231,7 +231,7 @@ main {
 }
 
 .container {
-  padding: 3.5rem 2.5rem 2rem 2.5rem;
+  padding: 3.5rem 0.5rem 2rem;
   max-width: 365px;
   min-width: 300px;
   flex: 0 0 auto;
@@ -243,6 +243,7 @@ main {
   .container {
     border: 2px var(--grey-100) solid;
     border-radius: 4px;
+    padding: 3.5rem 2.5rem 2rem 2.5rem;
   }
 }
 
@@ -293,13 +294,18 @@ main {
 .textLink {
   margin-bottom: 0.7rem;
   font-size: 0.95rem;
-  white-space: nowrap;
 }
 .textLink button {
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
   color: black;
+}
+
+@media (min-width: 512px) {
+  .textLink {
+    white-space: nowrap;
+  }
 }
 
 hr {
