@@ -6,7 +6,7 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
-import { hasRequiredFeatures } from "./utils/featureDetection";
+import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningOnFeatures } from "./features";
 
@@ -26,8 +26,9 @@ const init = async () => {
     return aboutView();
   }
 
-  if (!(await hasRequiredFeatures(url))) {
-    return compatibilityNotice();
+  const okOrReason = await checkRequiredFeatures(url);
+  if (okOrReason !== true) {
+    return compatibilityNotice(okOrReason);
   }
 
   // Go through the login flow, potentially creating an anchor.
