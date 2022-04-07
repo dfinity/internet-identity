@@ -1,10 +1,35 @@
 {
+  "__0": "The format of dfx.json is not documented. We use '__X' fields (unknown fields are ignored by dfx) to record our discoveries and other observations.",
   "canisters": {
+    "__0": "The development build of Internet Identity. For more information, see https://github.com/dfinity/internet-identity#build-features-and-flavors",
     "internet_identity": {
       "type": "custom",
       "candid": "internet_identity.did",
       "wasm": "internet_identity.wasm",
+
+      "__0": "There is no standard way to pull remote canisters, so instead we have a dummy build script that",
+      "__1": "simply downloads the Internet Identity canister. See also: https://github.com/dfinity/sdk/issues/2085",
       "build": "curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm -o internet_identity.wasm"
+    },
+
+    "whoami": {
+      "main": "whoami.mo",
+      "type": "motoko"
+    },
+
+    "webapp": {
+      "__0": "Canisters of type 'assets' are like buckets. When deployed, dfx creates a canister that is just one big empty map.",
+      "__1": "After the canister itself is created, dfx uploads all the files specified in the 'source' field.",
+      "__2": "Those files are then stored in the canister's map and served with http_request.",
+      "type": "assets",
+
+      "__3": "NOTE: dfx will run 'npm run build' when the canister is to be built (dfx build or dfx deploy)",
+      "__4": "(which in this case populates 'dist/', see package.json).",
+      "__5": "source must be a directory, otherwise we get a cryptic error.",
+      "source": ["dist/"],
+
+      "__6": "NOTE: the 'frontend' value is needed otherwise HTTP calls are not proxied; value can be anything though.",
+      "frontend": "foo"
     }
   },
   "defaults": {

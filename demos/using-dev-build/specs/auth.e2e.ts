@@ -31,7 +31,7 @@ describe("authentication", () => {
 
     await browser.waitUntil(
       async () => {
-          return (await title.getText()) === "Congratulations!";
+        return (await title.getText()) === "Congratulations!";
       },
       { timeout: 20_000 }
     );

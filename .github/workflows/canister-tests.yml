@@ -210,15 +210,7 @@ jobs:
           dfx canister --no-wallet install internet_identity --argument '(null)'
 
       - name: Deploy whoami canister
-        run: cd demos/whoami && dfx deploy --no-wallet
-
-      # We don't use the canister in the tests, but we want to make sure it
-      # can be built and deployed
-      - name: Deploy testnet_app canister
-        run: |
-          cd demos/testnet_app
-          npm ci
-          dfx deploy --no-wallet
+        run: cd demos/using-dev-build && dfx deploy whoami --no-wallet
 
       - name: Run demo app
         working-directory: demos/sample-javascript
@@ -306,6 +298,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          npm ci
+
           # Create a fake curl so that we use this build's wasm; also create a "witness"
           # file to make sure the fake curl was run (rm $witness will fail otherwise)
           curl_dir=$(mktemp -d); witness=$(mktemp)
@@ -317,7 +311,6 @@ jobs:
           chmod +x $curl_dir/curl
           PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)' && rm -rf "$curl_dir" && rm $witness
 
-          npm ci
           npm run test
 
           # Clean up our download
