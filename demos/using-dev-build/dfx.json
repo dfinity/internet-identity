@@ -1,14 +1,15 @@
 {
   "__0": "The format of dfx.json is not documented. We use '__X' fields (unknown fields are ignored by dfx) to record our discoveries and other observations.",
   "canisters": {
-    "__0": "The development build of Internet Identity. For more information, see https://github.com/dfinity/internet-identity#build-features-and-flavors",
     "internet_identity": {
+      "__0": "The development build of Internet Identity. For more information, see https://github.com/dfinity/internet-identity#build-features-and-flavors",
+
       "type": "custom",
       "candid": "internet_identity.did",
       "wasm": "internet_identity.wasm",
 
-      "__0": "There is no standard way to pull remote canisters, so instead we have a dummy build script that",
-      "__1": "simply downloads the Internet Identity canister. See also: https://github.com/dfinity/sdk/issues/2085",
+      "__1": "There is no standard way to pull remote canisters, so instead we have a dummy build script that",
+      "__2": "simply downloads the Internet Identity canister. See also: https://github.com/dfinity/sdk/issues/2085",
       "build": "curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm -o internet_identity.wasm"
     },
 
