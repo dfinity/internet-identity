@@ -27,7 +27,6 @@ document.body.onload = () => {
 };
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
-
   // When the user clicks, we let agent-js do its thing and redirect open an II
   // tab for authentication
   const iiUrl = document.getElementById("iiUrl").value;
