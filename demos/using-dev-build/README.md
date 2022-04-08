@@ -1,12 +1,15 @@
 # Integrating with Internet Identity
 
-This shows how to integrate and test a project with Internet Identity. This uses the development [build flavor](https://github.com/dfinity/internet-identity/blob/main/README.md#build-features-and-flavors) of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library. This is a standalone project that you can copy to your own project.
+This shows how to integrate and test a project with Internet Identity. This uses the development [build flavor](https://github.com/dfinity/internet-identity/blob/main/README.md#build-features-and-flavors) of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library.
+
+This is a standalone project that you can copy to your own project.
 
 ## Usage
 
 The following commands will start a replica, install the development Internet Identity canister, and run the test suite:
 
 ```bash
+# After checking out dfinity/internet-identity, run this in `./demos/using-dev-build`:
 $ dfx start --background --clean
 $ npm ci
 $ dfx deploy --no-wallet --argument '(null)'
