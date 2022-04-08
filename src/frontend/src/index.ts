@@ -8,14 +8,14 @@ import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
-import { showWarningOnFeatures } from "./features";
+import { showWarningIfNecessary } from "./banner";
 
 const init = async () => {
   const url = new URL(document.URL);
 
-  // If the build contains any "features", show a warning
+  // If the build is not "official", show a warning
   // https://github.com/dfinity/internet-identity#build-features
-  showWarningOnFeatures();
+  showWarningIfNecessary();
 
   // Custom routing to the FAQ page
   if (window.location.pathname === "/faq") {
