@@ -31,6 +31,41 @@ At this point, the replica (for all practical matters, a local version of the In
 
 If the IC actually lets the call (request) through to the `whoami` canister, it means that everything checked out, and the `whoami` canister just responds with the information the IC adds to requests, namely your identity (principal).
 
+### Using the Auth-Client Library To Log In With Internet Identity
+
+DFINITY provides an easy-to-use library to log in with Internet Identity: [agent-js](https://github.com/dfinity/agent-js)
+
+These are the steps required to log in and use the obtained identity for canister calls:
+```
+// First we have to create and AuthClient.
+const authClient = await AuthClient.create();
+
+// Call authClient.login(...) to login with Internet Identity. This will open a new tab
+// with the login prompt. The code has to wait for the login process to complete.
+// We can either use the callback functions directly or wrap the in a promise as
+// we have done here.
+await new Promise((resolve, reject) => {
+  authClient.login({
+    onSuccess: resolve,
+    onError: reject
+  });
+});
+
+// At this point, we're authenticated with II.
+const identity = authClient.getIdentity();
+// Using the identity obtained from the auth client, we can create an agent to interact with the IC
+const agent = new HttpAgent({ identity });
+// Using the interface description of our webapp, we create an Actor that we use to call the service methods
+const webapp = Actor.createActor(webapp_idl, {
+  agent,
+  canisterId: webapp_id
+});
+// Call whoami which returns the principal (user id) of the current user.
+const principal = await webapp.whoami();
+```
+See [`index.js`](./webapp/index.js) for the full working example.
+A detailed description of what happens behind the scenes is available here: [client auth protocol specification](https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#client-auth-protocol)
+
 ### Getting the Canister IDs
 
 Let's now use those canisters. Don't care about details? Skip to the [helpers](#helpers).
