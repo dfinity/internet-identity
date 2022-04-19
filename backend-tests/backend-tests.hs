@@ -467,8 +467,8 @@ decodeTree s =
     begin _ = Left "Expected CBOR request to begin with tag 55799"
 
 -- | The actual tests.
-tests :: FilePath -> TestTree
-tests wasm_file = testGroup "Tests" $ upgradeGroups $
+tests :: FilePath -> TestUpgrades -> TestTree
+tests wasm_file testUpgrades = testGroup "Tests" $ upgradeGroups testUpgrades $
   [ withoutUpgrade $ iiTest "installs" $ \ _cid ->
     return ()
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
@@ -533,7 +533,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     _ <- callII cid webauth1ID #exit_device_registration_mode user_number
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid anonymousID #add_tentative_device (user_number, device2)
     pure ()
- 
+
   , withoutUpgrade $ iiTest "reject device verification if registration mode is expired" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     expiration <- callII cid webauth1ID #enter_device_registration_mode user_number
@@ -542,7 +542,7 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     setCanisterTimeTo cid (fromIntegral expiration) -- registration mode is expired at time expiration
     V.IsJust (V.Label :: Label "device_registration_mode_off") _ <- callII cid webauth1ID #verify_tentative_device (user_number, response .! #verification_code)
     pure ()
-  
+
   , withoutUpgrade $ iiTest "reject device verification if there is no tentative device" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     _ <- callII cid webauth1ID #enter_device_registration_mode user_number
@@ -869,12 +869,17 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     withUpgrade act = ([act False], [act True])
     withoutUpgrade act = ([act], [])
 
-    upgradeGroups :: [([TestTree], [TestTree])] -> [TestTree]
-    upgradeGroups ts =
-      [ testGroup "without upgrade" (concat without)
-      , testGroup "with upgrade" (concat with)
-      ]
-      where (without, with) = unzip ts
+    upgradeGroups :: TestUpgrades -> [([TestTree], [TestTree])] -> [TestTree]
+    upgradeGroups testUpgrades ts =
+      mk isWith (testGroup "with upgrade" (concat with)) <>
+      mk isWithout (testGroup "without upgrade" (concat without))
+      where
+        (without, with) = unzip ts
+        (isWith, isWithout) = case testUpgrades of
+            With -> (True, False)
+            Without -> (False, True)
+            WithAndWithout -> (True, True)
+        mk pred v = if pred then [ v ] else []
 
     doUpgrade cid = do
       wasm <- liftIO $ BS.readFile wasm_file
@@ -907,6 +912,8 @@ enum l = V.IsJust l ()
 -- Configuration: The Wasm file to test
 newtype WasmOption = WasmOption String
 
+data TestUpgrades = WithAndWithout | With | Without
+
 instance IsOption WasmOption where
   defaultValue = WasmOption "../internet_identity.wasm"
   parseValue = Just . WasmOption
@@ -914,17 +921,32 @@ instance IsOption WasmOption where
   optionHelp = return "webassembly module of the identity provider"
   optionCLParser = mkOptionCLParser (metavar "WASM")
 
-
 wasmOption :: OptionDescription
 wasmOption = Option (Proxy :: Proxy WasmOption)
 
+instance IsOption TestUpgrades where
+  defaultValue = WithAndWithout
+  parseValue = \case
+    "with-and-without" -> Just WithAndWithout
+    "with" -> Just With
+    "without" -> Just Without
+    _ -> Nothing
+  optionName = pure "upgrade"
+  optionHelp = pure "Whether to run tests with upgrade ('with'), without upgrade ('without'), or both with and without ('with-and-without')."
+
+testUpgradesOption :: OptionDescription
+testUpgradesOption = Option (Proxy :: Proxy TestUpgrades)
+
 main :: IO ()
-main = defaultMainWithIngredients ingredients $ askOption $ \(WasmOption wasm) -> tests wasm
+main = defaultMainWithIngredients ingredients $
+    askOption $ \testUpgrades ->
+      askOption $ \(WasmOption wasm) ->
+        tests wasm testUpgrades
   where
     ingredients =
       [ rerunningTests
         [ listingTests
-        , includingOptions [wasmOption]
+        , includingOptions [wasmOption, testUpgradesOption]
         , antXMLRunner `composeReporters` htmlRunner `composeReporters` consoleTestReporter
         ]
       ]
