@@ -368,7 +368,7 @@ jobs:
           do
             echo found modified screenshot "$modified"
             old=$(mktemp)
-            git show HEAD:$modified > $out
+            git show HEAD:$modified > $old
             magick_out=$(mktemp)
             if ! magick compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
             then
