@@ -352,7 +352,8 @@ jobs:
           echo "The following screenshots were recovered:"
           shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
-      - run: |
+      - name: "Revert screenshot changes smaller of 8 pixels and less"
+        run: |
           for modified in $(git ls-files --modified ./screenshots)
           do
             echo found modified screenshot "$modified"
@@ -360,28 +361,28 @@ jobs:
             git show HEAD:$modified > $old
             magick_out=$(mktemp)
             metric=0
+            # The 'AE' metric counts the number of pixels that differ between the two images
+            # (we set /dev/null as the "diff" output image)
+            # NOTE: imagemagick prints the value to stderr
             if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
             then
-              echo "Magic found a difference"
+              echo "Magick found a difference"
               metric=$(<"$magick_out")
               echo "$metric"
             fi
 
-            rm "$magick_out"
+            rm "$magick_out"; rm "$old"
 
-            rm "$old"
-
+            # Ensure that we got a meaningful output
             if ! [[ $metric =~ ^[0-9]+$ ]]
             then
               echo "magick didn't return a number"
               exit 1
             fi
 
-            echo "Magick says $metric pixels differ"
-
             if (( metric <= 8 ))
             then
-              echo "That's too small; reverting"
+              echo "Pixel difference ($metric) is too small, reverting"
               git checkout HEAD -- "$modified"
             fi
           done
