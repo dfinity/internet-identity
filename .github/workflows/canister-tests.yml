@@ -369,18 +369,18 @@ jobs:
             old=$(mktemp)
             git show HEAD:$modified > $old
             magick_out=$(mktemp)
+            metric=0
             if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
             then
-              echo "Magick failed"
-              rm "$old"
+              echo "Magic found a difference"
               cat "$magick_out"
-              rm "$magick_out"
-              exit 1
+              metric=$(<"$magick_out")
             fi
+
+            rm "$magick_out"
 
             rm "$old"
 
-            metric=$(<"$magick_out"); rm "$magick_out"
             if ! [[ $metric =~ ^[0-9]+$ ]]
             then
               echo "magick didn't return a number"
