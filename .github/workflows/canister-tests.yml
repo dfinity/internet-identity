@@ -352,6 +352,40 @@ jobs:
           echo "The following screenshots were recovered:"
           shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
+      - run: |
+          for modified in $(git ls-files --modified ./screenshots)
+          do
+            echo found modified screenshot "$modified"
+            old=$(mktemp)
+            git show HEAD:$modified > $old
+            magick_out=$(mktemp)
+            metric=0
+            if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
+            then
+              echo "Magic found a difference"
+              metric=$(<"$magick_out")
+              echo "$metric"
+            fi
+
+            rm "$magick_out"
+
+            rm "$old"
+
+            if ! [[ $metric =~ ^[0-9]+$ ]]
+            then
+              echo "magick didn't return a number"
+              exit 1
+            fi
+
+            echo "Magick says $metric pixels differ"
+
+            if (( metric <= 8 ))
+            then
+              echo "That's too small; reverting"
+              git checkout HEAD -- "$modified"
+            fi
+          done
+
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v9
         with:
