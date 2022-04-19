@@ -337,7 +337,6 @@ jobs:
     if: ${{ github.ref != 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v2
-        if: false
 
       # Make sure old screenshots don't pollute the commit
       - run: rm -v -f screenshots/*.png
