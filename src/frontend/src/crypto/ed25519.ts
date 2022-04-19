@@ -38,7 +38,6 @@ export async function fromSeedWithSlip0010(
  * @param mnemonic A BIP-39 mnemonic.
  * @param derivationPath an array that is always interpreted as a hardened path.
  * e.g. to generate m/44'/223’/0’/0’/0' the derivation path should be [44, 223, 0, 0, 0]
- * @param skipValidation if true, validation checks on the mnemonics are skipped.
  */
 export async function fromMnemonicWithoutValidation(
   mnemonic: string,
