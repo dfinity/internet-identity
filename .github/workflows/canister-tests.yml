@@ -331,7 +331,7 @@ jobs:
 
     # Run after all the tests completed succesfully (and have uploaded their
     # artifacts)
-    needs: selenium
+    # needs: selenium
 
     # We don't want to commit new screenshots to main
     if: ${{ github.ref != 'refs/heads/main' }}
