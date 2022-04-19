@@ -366,9 +366,8 @@ jobs:
             # NOTE: imagemagick prints the value to stderr
             if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
             then
-              echo "Magick found a difference"
               metric=$(<"$magick_out")
-              echo "$metric"
+              echo "Magick AE is: '$metric'"
             fi
 
             rm "$magick_out"; rm "$old"
@@ -376,7 +375,7 @@ jobs:
             # Ensure that we got a meaningful output
             if ! [[ $metric =~ ^[0-9]+$ ]]
             then
-              echo "magick didn't return a number"
+              echo "Magick didn't return a number: $metric"
               exit 1
             fi
 
