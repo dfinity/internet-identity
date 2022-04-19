@@ -352,7 +352,7 @@ jobs:
           echo "The following screenshots were recovered:"
           shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
-      - name: "Revert screenshot changes smaller of 8 pixels and less"
+      - name: "Revert screenshot changes smaller than 8 pixels and less"
         run: |
           for modified in $(git ls-files --modified ./screenshots)
           do
