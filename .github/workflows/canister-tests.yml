@@ -352,6 +352,40 @@ jobs:
           echo "The following screenshots were recovered:"
           shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
+      - name: "Revert screenshot changes smaller than 8 pixels and less"
+        run: |
+          for modified in $(git ls-files --modified ./screenshots)
+          do
+            echo found modified screenshot "$modified"
+            old=$(mktemp)
+            git show HEAD:$modified > $old
+            magick_out=$(mktemp)
+            metric=0
+            # The 'AE' metric counts the number of pixels that differ between the two images
+            # (we set /dev/null as the "diff" output image)
+            # NOTE: imagemagick prints the value to stderr
+            if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
+            then
+              metric=$(<"$magick_out")
+              echo "Magick AE is: '$metric'"
+            fi
+
+            rm "$magick_out"; rm "$old"
+
+            # Ensure that we got a meaningful output
+            if ! [[ $metric =~ ^[0-9]+$ ]]
+            then
+              echo "Magick didn't return a number: $metric"
+              exit 1
+            fi
+
+            if (( metric <= 8 ))
+            then
+              echo "Pixel difference ($metric) is too small, reverting"
+              git checkout HEAD -- "$modified"
+            fi
+          done
+
       - name: Commit screenshots
         uses: EndBug/add-and-commit@v9
         with:
