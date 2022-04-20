@@ -27,13 +27,13 @@ At this point, the replica (for all practical matters, a local version of the In
       };
   };
   ```
-  On the IC, principals are basically the "identity" of someone performing a request or "call" (hence "caller"), and every call must be authenticated — i.e., must have a valid principal. When using Internet Identity you are using [self-authenticating principals](https://smartcontracts.org/docs/interface-spec/index.html#principal), which is a very fancy way of saying that you have a private key on your laptop (hidden behind TouchID, Windows Hello, etc) that your browser uses to sign and prove that you are indeed the person issuing the calls to the IC.
+  On the IC, a principal is the identifier of someone performing a request or "call" (hence "caller"). Every call must have a valid principal. There is also a special principal for anonymous calls. When using Internet Identity you are using [self-authenticating principals](https://smartcontracts.org/docs/interface-spec/index.html#principal), which is a very fancy way of saying that you have a private key on your laptop (hidden behind TouchID, Windows Hello, etc) that your browser uses to sign and prove that you are indeed the person issuing the calls to the IC.
 
 If the IC actually lets the call (request) through to the `whoami` canister, it means that everything checked out, and the `whoami` canister just responds with the information the IC adds to requests, namely your identity (principal).
 
 ### Using the Auth-Client Library To Log In With Internet Identity
 
-DFINITY provides an easy-to-use library to log in with Internet Identity: [agent-js](https://github.com/dfinity/agent-js)
+DFINITY provides an [easy-to-use library (agent-js)](https://github.com/dfinity/agent-js) to log in with Internet Identity. 
 
 These are the steps required to log in and use the obtained identity for canister calls:
 ```
@@ -46,7 +46,7 @@ const authClient = await AuthClient.create();
 await new Promise((resolve, reject) => {
   authClient.login({
     onSuccess: resolve,
-    onError: reject
+    onError: reject,
   });
 });
 ```
@@ -59,13 +59,13 @@ const agent = new HttpAgent({ identity });
 // Using the interface description of our webapp, we create an Actor that we use to call the service methods.
 const webapp = Actor.createActor(webapp_idl, {
   agent,
-  canisterId: webapp_id
+  canisterId: webapp_id,
 });
 // Call whoami which returns the principal (user id) of the current user.
 const principal = await webapp.whoami();
 ```
 See [`index.js`](./webapp/index.js) for the full working example.
-A detailed description of what happens behind the scenes is available here: [client auth protocol specification](https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#client-auth-protocol)
+A detailed description of what happens behind the scenes is available in the [client auth protocol specification](https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#client-auth-protocol).
 
 ### Getting the Canister IDs
 

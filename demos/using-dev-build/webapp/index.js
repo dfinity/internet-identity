@@ -43,7 +43,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     authClient.login({
       identityProvider: iiUrl,
       onSuccess: resolve,
-      onError: reject
+      onError: reject,
     });
   });
 
@@ -54,7 +54,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   // Using the interface description of our webapp, we create an actor that we use to call the service methods.
   const webapp = Actor.createActor(webapp_idl, {
     agent,
-    canisterId: webapp_id
+    canisterId: webapp_id,
   });
   // Call whoami which returns the principal (user id) of the current user.
   const principal = await webapp.whoami();
