@@ -17,22 +17,28 @@ export const init = ({ IDL }) => {
 
 // Autofills the <input> for the II Url to point to the correct canister.
 document.body.onload = () => {
-  const testnetII =
-    process.env.DFX_NETWORK == "local"
-      ? `http://localhost:8000/?canisterId=${process.env.II_CANISTER_ID}`
-      : process.env.DFX_NETWORK == "ic"
-      ? `https://${process.env.II_CANISTER_ID}.ic0.app`
-      : `https://${process.env.II_CANISTER_ID}.dfinity.network`;
-  document.getElementById("iiUrl").value = testnetII;
+  let iiUrl;
+  if (process.env.DFX_NETWORK === "local") {
+    iiUrl = `http://localhost:8000/?canisterId=${process.env.II_CANISTER_ID}`;
+  } else if (process.env.DFX_NETWORK === "ic") {
+    iiUrl = `https://${process.env.II_CANISTER_ID}.ic0.app`;
+  } else {
+    iiUrl = `https://${process.env.II_CANISTER_ID}.dfinity.network`;
+  }
+  document.getElementById("iiUrl").value = iiUrl;
 };
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
-  // When the user clicks, we let agent-js do its thing and redirect open an II
-  // tab for authentication
-  const iiUrl = document.getElementById("iiUrl").value;
+  // When the user clicks, we start the login process.
+  // First we have to create and AuthClient.
   const authClient = await AuthClient.create();
 
-  // This API is just weird
+  // Find out which URL should be used for login.
+  const iiUrl = document.getElementById("iiUrl").value;
+
+  // Call authClient.login(...) to login with Internet Identity. This will open a new tab
+  // with the login prompt. The code has to wait for the login process to complete.
+  // We can either use the callback functions directly or wrap in a promise.
   await new Promise((resolve, reject) => {
     authClient.login({
       identityProvider: iiUrl,
@@ -41,14 +47,17 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     });
   });
 
-  // At this point, we're authenticated with II and we can query the whoami canister
+  // At this point we're authenticated, and we can get the identity from the auth client:
   const identity = authClient.getIdentity();
+  // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
   const agent = new HttpAgent({ identity });
+  // Using the interface description of our webapp, we create an actor that we use to call the service methods.
   const webapp = Actor.createActor(webapp_idl, {
     agent,
     canisterId: webapp_id,
   });
-  const whoAmI = await webapp.whoami();
-
-  document.getElementById("loginStatus").innerText = whoAmI.toText();
+  // Call whoami which returns the principal (user id) of the current user.
+  const principal = await webapp.whoami();
+  // show the principal on the page
+  document.getElementById("loginStatus").innerText = principal.toText();
 });
