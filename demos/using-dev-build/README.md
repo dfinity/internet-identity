@@ -36,7 +36,7 @@ If the IC actually lets the call (request) through to the `whoami` canister, it 
 DFINITY provides an [easy-to-use library (agent-js)](https://github.com/dfinity/agent-js) to log in with Internet Identity. 
 
 These are the steps required to log in and use the obtained identity for canister calls:
-```
+```js
 // First we have to create and AuthClient.
 const authClient = await AuthClient.create();
 
@@ -51,7 +51,7 @@ await new Promise((resolve, reject) => {
 });
 ```
 Once the user has been authenticated with Internet Identity we have access to the identity:
-```
+```js
 // Get the identity from the auth client:
 const identity = authClient.getIdentity();
 // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
