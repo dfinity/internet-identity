@@ -95,6 +95,32 @@ jobs:
           # downloaded file
           path: ${{ matrix.name }}
 
+  wasm-size:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v2
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_production.wasm
+          path: .
+      - id: record-size
+        uses: ./.github/actions/file-size
+        with:
+          file: internet_identity_production.wasm
+          save: ${{ github.ref == 'refs/heads/main' }}
+      - name: "Check canister size"
+        run: |
+          max_size=3670016 # maximum canister size, in bytes
+          actual_size=${{ steps.record-size.outputs.size }}
+          if (( actual_size > max_size ))
+          then
+            echo "Canister size too big"
+            echo "($actual_size > $max_size)"
+            exit 1
+          fi
+
   #####################
   # The backend tests #
   #####################
