@@ -541,6 +541,7 @@ export const creationOptions = (
       name: "Internet Identity",
       displayName: "Internet Identity",
     },
+    attestation: 'none',
   };
 };
 
