@@ -64,7 +64,7 @@ type FailedAttemptsCounter = u8;
 
 struct Base64(String);
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
 enum Purpose {
     #[serde(rename = "recovery")]
     Recovery,
@@ -72,7 +72,7 @@ enum Purpose {
     Authentication,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
 enum KeyType {
     #[serde(rename = "unknown")]
     Unknown,
@@ -606,6 +606,20 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
+            //find required public key
+            let entry_to_remove = entries.get(i as usize).unwrap();
+
+            //verify that required pk is recovery phrase
+            if entry_to_remove.purpose.as_ref().unwrap() == &Purpose::Recovery
+                //and seed phrase
+                && entry_to_remove.key_type.as_ref().unwrap() == &KeyType::SeedPhrase {
+
+                //verify that caller signature from recovery phrase
+                if ic_cdk::api::caller() != Principal::self_authenticating(entry_to_remove.pubkey.clone()) {
+                    trap("Please use public key from recovery phrase to remove recovery");
+                }
+
+            }
             entries.swap_remove(i as usize);
         }
 
@@ -1164,7 +1178,7 @@ fn prune_expired_signatures(asset_hashes: &AssetHashes, sigs: &mut SignatureMap)
 
 // Checks if the caller is authenticated against any of the public keys provided
 // and traps if not.
-fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey>) {
+fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item=&'a PublicKey>) {
     for pk in public_keys {
         if caller() == Principal::self_authenticating(pk) {
             return;
