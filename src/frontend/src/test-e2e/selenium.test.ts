@@ -287,7 +287,7 @@ test("Delegation maxTimeToLive: 2 months", async () => {
     await demoAppView.open(DEMO_APP_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
-    await demoAppView.setMaxTimeToLive(BigInt(2592000_000_000_000));
+    await demoAppView.setMaxTimeToLive(BigInt(5_184_000_000_000_000)); // 60 days
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
