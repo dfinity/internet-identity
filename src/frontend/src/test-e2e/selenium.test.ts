@@ -280,7 +280,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
   });
 }, 300_000);
 
-test("Delegation maxTimeToLive: 1 month", async () => {
+test("Delegation maxTimeToLive: 2 months", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -297,8 +297,8 @@ test("Delegation maxTimeToLive: 1 month", async () => {
     await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
     const exp = await browser.$("#expiration").getText();
-    // NB: Max out at 8 days
-    expect(Number(exp) / 691200_000_000_000).toBeCloseTo(1);
+    // NB: Max out at 30 days
+    expect(Number(exp) / 2_592_000_000_000_000).toBeCloseTo(1);
   });
 }, 300_000);
 
