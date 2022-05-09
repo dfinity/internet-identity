@@ -10,11 +10,35 @@ import { questions } from "../faq/questions";
 
 const pageContent = () => html`
   <style>
+
+    @keyframes flash-warnings {
+      0% {
+        background-color: unset;
+      }
+      50% {
+        background-color: #ED1E79;
+        border-color: #ED1E79;
+      }
+      100% {
+        background-color: unset;
+      }
+    }
+
+    .visible {
+      visibility: unset;
+      animation-name: flash-warnings;
+      animation-duration: 600ms;
+    }
+
+    .hidden {
+      visibility: hidden;
+    }
+
     #inputSeedPhrase {
       width: 100%;
       height: 6rem;
       box-sizing: border-box;
-      margin-bottom: 1rem;
+      margin-bottom: 0;
       font-size: 1rem;
       font-weight: 400;
     }
@@ -23,16 +47,46 @@ const pageContent = () => html`
       width: 100%;
     }
 
-    .warningBox {
+    .warnings-box {
+      border: 1px var(--grey-200) solid;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
       margin-top: 0.5rem;
       margin-bottom: 0.5rem;
     }
+
+    .warnings-box-summary {
+        padding-left: 1em;
+    }
+
+    .warning {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+    }
+
+    .warning-message {
+        display: flex;
+        align-items: center;
+    }
+
+    .warning-message p {
+        margin: 0;
+    }
+
   </style>
   <div class="container full-width">
     <h1>Your seed phrase</h1>
     <p>Please provide your seed phrase</p>
     <textarea id="inputSeedPhrase" placeholder="Your seed phrase"></textarea>
-    <div id="warnings"></div>
+    <details class="warnings-box hidden">
+        <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
+        <div id="warnings"></div>
+    </details>
     <button id="inputSeedPhraseContinue" class="primary">Continue</button>
     <button id="inputSeedPhraseCancel">Cancel</button>
   </div>
@@ -56,6 +110,9 @@ const init = (userNumber: bigint): Promise<string | null> =>
     // generation callback since -- due to debouncing -- it may be called after some period of
     // time and the user may have left the page; we may effectively pick up the wrong element.
     const warningsDiv = document.getElementById("warnings") as HTMLDivElement;
+    const warningsBox = document.querySelector(
+      "details.warnings-box"
+    ) as HTMLDetailsElement;
 
     // Debounce the warning generation as not to spam the user
     let handle: number;
@@ -64,14 +121,24 @@ const init = (userNumber: bigint): Promise<string | null> =>
       handle = window.setTimeout(() => {
         warningsDiv.innerHTML = ""; // Clear previously generated warnings
 
-        // Actually generate the warnings
-        for (const warning of getWarningMessages(
+        const warnings = getWarningMessages(
           userNumber,
           inputSeedPhraseInput.value.trim()
-        )) {
-          const div = document.createElement("div");
-          render(mkWarningDiv(warning), div);
-          warningsDiv.appendChild(div);
+        );
+
+        if (warnings.length >= 1) {
+          warningsBox.classList.add("visible");
+          warningsBox.classList.remove("hidden");
+
+          // Actually generate the warnings
+          for (const warning of warnings) {
+            const div = document.createElement("div");
+            render(mkWarningDiv(warning), div);
+            warningsDiv.appendChild(div);
+          }
+        } else {
+          warningsBox.classList.add("hidden");
+          warningsBox.classList.remove("visible");
         }
       }, 500);
     };
@@ -133,7 +200,9 @@ export const warningMessage = (
     }
 
     case "bad_word_count": {
-      return `Recovery phrase should contain ${RECOVERYPHRASE_WORDCOUNT} words, but input contains ${warning.count} words.`;
+      return `Recovery phrase should contain ${RECOVERYPHRASE_WORDCOUNT} words, but input contains ${
+        warning.count
+      } word${warning.count > 1 ? "s" : ""}.`;
     }
 
     case "bad_words": {
@@ -157,10 +226,11 @@ export const warningMessage = (
   }
 };
 
-const mkWarningDiv = (warningMessage: string | TemplateResult) => html`
-    <div class="warningBox">
-      <span class="warningIcon">${warningIcon}</span>
-      <div class="warningMessage">
-        <p>${warningMessage}</p>
-      </div class="warningMessage">
-    </div>`;
+const mkWarningDiv = (warningMessage: string | TemplateResult) => html` <div
+  class="warning"
+>
+  <span class="warningIcon">${warningIcon}</span>
+  <div class="warning-message">
+    <p>${warningMessage}</p>
+  </div>
+</div>`;
