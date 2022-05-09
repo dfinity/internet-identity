@@ -11,6 +11,7 @@ import { questions } from "../faq/questions";
 const pageContent = () => html`
   <style>
 
+    /* Flash the warnings box if warnings were generated */
     @keyframes flash-warnings {
       0% {
         background-color: unset;
