@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { FrontendHostname } from "../../generated/internet_identity_types";
-import { questions } from "./faq/questions";
+import { questions } from "./faq";
 
 const pageContent = (hostName: string, principal: string) => html`
   <style>
