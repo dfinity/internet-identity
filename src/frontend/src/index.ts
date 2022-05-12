@@ -9,6 +9,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
+import { authDapp } from "./flows/login/auth_login";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -31,23 +32,21 @@ const init = async () => {
     return compatibilityNotice(okOrReason);
   }
 
-  // Go through the login flow, potentially creating an anchor.
-  const { userNumber, connection } = await login();
-
-  // From here on, the user is authenticated to II.
-
-  // Here, if the user doesn't have any recovery device, we prompt them to add
-  // one. The exact flow depends on the device they use.
-  await recoveryWizard(userNumber, connection);
-
   const userIntent = intentFromUrl(url);
+
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      return auth(userNumber, connection);
+      return authDapp();
     }
     // Open the management page
     case "manage": {
+      // Go through the login flow, potentially creating an anchor.
+      const { userNumber, connection } = await login();
+      // Here, if the user doesn't have any recovery device, we prompt them to add
+      // one. The exact flow depends on the device they use.
+      await recoveryWizard(userNumber, connection);
+      // From here on, the user is authenticated to II.
       return renderManage(userNumber, connection);
     }
   }
