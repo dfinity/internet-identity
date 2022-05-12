@@ -24,15 +24,15 @@ export const questions = {
     priority: 10,
     question: "Does Internet Identity support Windows Hello?",
     anchor: "windows-hello",
-    answer: html`<p
-      >Yes! Internet Identity supports authenticating via
+    answer: html`<p>
+      Yes! Internet Identity supports authenticating via
       ${mkExternalLink({
         href: "https://support.microsoft.com/en-us/windows/learn-about-windows-hello-and-set-it-up-dae28983-8242-bb2a-d3d1-87c9d265a5f0",
         text: "Windows Hello",
       })}.
       If Windows Hello is set up on your PC then Internet Identity will offer
-      you to authenticate through Windows Hello.</p
-    >`,
+      you to authenticate through Windows Hello.
+    </p>`,
     links: [
       {
         name: "Windows Hello Guide for Internet Identity",
