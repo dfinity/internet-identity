@@ -9,4 +9,11 @@ export default {
     "dfx-generated/internet_identity": internet_identity,
   },
   setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
+
+  // These two transform options make sure that jest can process files that include ES modules
+  // (in particular, files that have lit-html import)
+  transform: { "\\.[jt]sx?$": "ts-jest", },
+  transformIgnorePatterns: [
+      "node_modules/(?!lit-html/.*)"
+  ]
 };
