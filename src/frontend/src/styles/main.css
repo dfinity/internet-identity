@@ -474,6 +474,10 @@ nav {
   }
 }
 
+.faq__question summary {
+  padding: 0.5rem 1rem;
+}
+
 /* ABOUT stuff */
 
 .about__container {

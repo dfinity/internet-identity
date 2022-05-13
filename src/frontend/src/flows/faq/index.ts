@@ -24,15 +24,15 @@ export const questions = {
     priority: 10,
     question: "Does Internet Identity support Windows Hello?",
     anchor: "windows-hello",
-    answer: html`<span
-      >Yes! Internet Identity supports authenticating via
+    answer: html`<p>
+      Yes! Internet Identity supports authenticating via
       ${mkExternalLink({
         href: "https://support.microsoft.com/en-us/windows/learn-about-windows-hello-and-set-it-up-dae28983-8242-bb2a-d3d1-87c9d265a5f0",
         text: "Windows Hello",
       })}.
       If Windows Hello is set up on your PC then Internet Identity will offer
-      you to authenticate through Windows Hello.</span
-    >`,
+      you to authenticate through Windows Hello.
+    </p>`,
     links: [
       {
         name: "Windows Hello Guide for Internet Identity",
@@ -196,7 +196,11 @@ const pageContent = html`
     }
     :target {
       animation-name: flash-question;
-      animation-duration: 600ms;
+      animation-duration: 3000ms;
+    }
+    .flash-question {
+      animation-name: flash-question;
+      animation-duration: 3000ms;
     }
   </style>
   <div class="faq__container">
@@ -209,15 +213,23 @@ const pageContent = html`
 
 // Open the anchor with id="foo" if the page hash is "#foo"
 const openAnchor = (): void => {
-  const hash = location.hash.substring(1);
+  const hashName = location.hash.substring(1);
 
-  if (hash !== "") {
-    const details = document.getElementById(hash);
+  if (hashName !== "") {
+    const details = document.getElementById(hashName);
     console.log(details);
 
     if (details) {
       details.setAttribute("open", "");
     }
+
+    // Some browsers (chrome for instance) behave differently depending on:
+    // * new page with hash
+    // * existing page within which hash is clicked
+    // by doing this we always are in the 2nd behavior, which is the one that
+    // works for us (actually scrolls to question + flashes question)
+    location.hash = "";
+    location.hash = "#" + hashName;
   }
 };
 
