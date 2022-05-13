@@ -111,6 +111,21 @@ export const questions = {
       },
     ],
   },
+  opensource: {
+    priority: 10,
+    question:
+      'Is Internet Identity opensource? Can I contribute?',
+    anchor: "opensource",
+    answer: html`
+      <p>
+        Both the frontend code and the canister code of Internet Identity are opensource! The code is hosted on GitHub: ${mkExternalLink({href: "https://github.com/dfinity/internet-identity#readme", text: "dfinity/internet-identity"})}. The source code for the Internet Computer, on which Internet Identity runs, is also hosted on GitHub: ${mkExternalLink({href: "https://github.com/dfinity/ic#readme", text: "dfinity/ic"})}.
+      </p>
+
+      <p>
+        Internet Identity does <em>not</em> currently accept external contributions, for legal reasons. We are working on this and soon everyone will be able to contribute.
+      </p>
+    `,
+  },
 };
 
 // The questions, sorted lexicographically (by anchor) and then by Priority.
