@@ -10,6 +10,10 @@ import { useRecovery } from "../recovery/useRecovery";
 import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
+import {
+  initRegistration,
+  registrationSection,
+} from "../../components/registrationLink";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -47,12 +51,7 @@ const pageContent = () => html` <style>
       placeholder="Enter Identity Anchor"
     />
     <button type="button" id="loginButton" class="primary">Authenticate</button>
-    <div class="textLink" id="registerSection">
-      New?
-      <button id="registerButton" class="linkStyle">
-        Create an Internet Identity Anchor.
-      </button>
-    </div>
+    ${registrationSection}
     <div class="textLink">
       Already have an anchor
       <button id="addNewDeviceButton" class="linkStyle">
@@ -78,50 +77,34 @@ export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
   });
 };
 
-/** Check that the current origin is not the explicit canister id or a raw url.
- *  Explanation why we need to do this:
- *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
- **/
-function isRegistrationAllowed() {
-  return !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
-    window.origin
-  );
-}
-
 const initRegister = (
   resolve: (res: LoginFlowResult) => void,
-  reject: (err: Error) => void
+  reject: (err: Error) => void,
 ) => {
-  const registerButton = document.getElementById(
-    "registerButton"
-  ) as HTMLButtonElement;
-  registerButton.onclick = () => {
-    const result = isRegistrationAllowed() ? register() : registerDisabled();
-    result
-      .then((res) => {
-        if (res === null) {
-          window.location.reload();
-        } else {
-          resolve(res);
-        }
-      })
-      .catch(reject);
-  };
+  initRegistration()
+    .then((res) => {
+      if (res === null) {
+        window.location.reload();
+      } else {
+        resolve(res);
+      }
+    })
+    .catch(reject);
 };
 
 const initRecovery = () => {
   const recoverButton = document.getElementById(
-    "recoverButton"
+    "recoverButton",
   ) as HTMLButtonElement;
   recoverButton.onclick = () => useRecovery();
 };
 
 const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   const userNumberInput = document.getElementById(
-    "registerUserNumber"
+    "registerUserNumber",
   ) as HTMLInputElement;
   const loginButton = document.getElementById(
-    "loginButton"
+    "loginButton",
   ) as HTMLButtonElement;
 
   userNumberInput.onkeypress = (e) => {
@@ -151,12 +134,12 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
 
 const initLinkDevice = () => {
   const addNewDeviceButton = document.getElementById(
-    "addNewDeviceButton"
+    "addNewDeviceButton",
   ) as HTMLButtonElement;
 
   addNewDeviceButton.onclick = async () => {
     const userNumberInput = document.getElementById(
-      "registerUserNumber"
+      "registerUserNumber",
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);

@@ -3,13 +3,22 @@ import { undo, userSwitch } from "../../components/icons";
 import { initLogout, logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
-import { getUserNumber, parseUserNumber } from "../../utils/userNumber";
+import {
+  getUserNumber,
+  parseUserNumber,
+  setUserNumber,
+} from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import setup, { AuthContext, retryGetDelegation } from "../../auth";
 import { IIConnection } from "../../utils/iiConnection";
 import { apiResultToLoginFlowResult } from "./flowResult";
 import { displayError } from "../../components/displayError";
 import { recoveryWizard } from "../recovery/recoveryWizard";
+import { useRecovery } from "../recovery/useRecovery";
+import {
+  initRegistration,
+  registrationSection,
+} from "../../components/registrationLink";
 
 const pageContent = (
   hostName: string,
@@ -20,7 +29,7 @@ const pageContent = (
       height: 2rem;
     }
 
-    .userNumberInput {
+    #userNumberInput {
       text-align: center;
       font-size: 1.5rem;
       font-weight: 500;
@@ -66,17 +75,17 @@ const pageContent = (
     <p class="bold">Identity Anchor</p>
     <div>
       <div id="newUserNumber" class="overlap">
-        <input class="userNumberInput" placeholder="Enter Identity Anchor" />
+        <input id="userNumberInput" placeholder="Enter Identity Anchor" />
+        <div id="wrongAnchorMessage" class="error-message-hidden">
+          The entered Identity Anchor is invalid. Please try again.
+        </div>
         <button
           id="existingAnchorButton"
           class="${userNumber === undefined ? "hidden" : ""}"
         >
           ${undo}
         </button>
-        <div class="textLink">
-          or create a
-          <button class="linkStyle">New Identity Anchor.</button>
-        </div>
+        ${registrationSection}
       </div>
       <div id="existingUserNumber" class="overlap">
         <div class="highlightBox">${userNumber}</div>
@@ -114,6 +123,85 @@ export const authDapp = async (): Promise<void> => {
   });
 };
 
+async function authenticate(
+  loginResult: {
+    userNumber: bigint;
+    connection: IIConnection;
+  },
+  authContext: AuthContext,
+) {
+  setUserNumber(loginResult.userNumber); // successful login, store for next time
+  const [userKey, parsed_signed_delegation] = await withLoader(async () => {
+    const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
+    const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
+      loginResult.userNumber,
+      authContext.requestOrigin,
+      sessionKey,
+      authContext.authRequest.maxTimeToLive,
+    );
+
+    // TODO: Signal failure to retrieve the delegation. Error page, or maybe redirect back with error?
+    const signed_delegation = await retryGetDelegation(
+      loginResult.connection,
+      loginResult.userNumber,
+      authContext.requestOrigin,
+      sessionKey,
+      timestamp,
+    );
+
+    // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+    return [
+      userKey,
+      {
+        delegation: {
+          pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
+          expiration: BigInt(signed_delegation.delegation.expiration),
+          targets: undefined,
+        },
+        signature: Uint8Array.from(signed_delegation.signature),
+      },
+    ];
+  });
+  return { userKey, parsed_signed_delegation };
+}
+
+async function shubidu(
+  loginResult:
+    | { tag: "ok"; userNumber: bigint; connection: IIConnection }
+    | { tag: "err"; title: string; message: string; detail?: string }
+    | null,
+  authContext: AuthContext,
+) {
+  if (loginResult === null) {
+    await displayError({
+      title: "todo",
+      message: "todo",
+      primaryButton: "Try again",
+    });
+    window.location.reload();
+    return;
+  }
+  if (loginResult.tag === "ok") {
+    const { userKey, parsed_signed_delegation } = await authenticate(
+      loginResult,
+      authContext,
+    );
+
+    // show the recovery wizard before sending the window post message, otherwise the II window will be closed
+    await recoveryWizard(loginResult.userNumber, loginResult.connection);
+
+    // send the
+    authContext.postMessageCallback({
+      kind: "authorize-client-success",
+      delegations: [parsed_signed_delegation],
+      userPublicKey: Uint8Array.from(userKey),
+    });
+  } else {
+    await displayError({ ...loginResult, primaryButton: "Try again" });
+    init(authContext);
+  }
+}
+
 const init = (authContext: AuthContext) => {
   const userNumber = getUserNumber();
   displayPage(
@@ -122,6 +210,8 @@ const init = (authContext: AuthContext) => {
     userNumber,
   );
   initLogout();
+  initRecovery();
+  initRegistration().then((result) => shubidu(result, authContext));
   const editAnchorButton = document.getElementById(
     "editAnchorButton",
   ) as HTMLButtonElement;
@@ -137,54 +227,15 @@ const init = (authContext: AuthContext) => {
     ev.stopPropagation();
     const result = await withLoader(() => IIConnection.login(readUserNumber()));
     const loginResult = apiResultToLoginFlowResult(result);
-    if (loginResult.tag === "ok") {
-      const [userKey, parsed_signed_delegation] = await withLoader(async () => {
-        const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
-        const [userKey, timestamp] =
-          await loginResult.connection.prepareDelegation(
-            loginResult.userNumber,
-            authContext.requestOrigin,
-            sessionKey,
-            authContext.authRequest.maxTimeToLive,
-          );
-
-        // TODO: Signal failure to retrieve the delegation. Error page, or maybe redirect back with error?
-        const signed_delegation = await retryGetDelegation(
-          loginResult.connection,
-          loginResult.userNumber,
-          authContext.requestOrigin,
-          sessionKey,
-          timestamp,
-        );
-
-        // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
-        return [
-          userKey,
-          {
-            delegation: {
-              pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
-              expiration: BigInt(signed_delegation.delegation.expiration),
-              targets: undefined,
-            },
-            signature: Uint8Array.from(signed_delegation.signature),
-          },
-        ];
-      });
-
-      // show the recovery wizard before sending the window post message, otherwise the II window will be closed
-      await recoveryWizard(loginResult.userNumber, loginResult.connection);
-
-      // send the
-      authContext.postMessageCallback({
-        kind: "authorize-client-success",
-        delegations: [parsed_signed_delegation],
-        userPublicKey: Uint8Array.from(userKey),
-      });
-    } else {
-      await displayError({ ...loginResult, primaryButton: "Try again" });
-      init(authContext);
-    }
+    await shubidu(loginResult, authContext);
   };
+};
+
+const initRecovery = () => {
+  const recoverButton = document.getElementById(
+    "recoverButton",
+  ) as HTMLButtonElement;
+  recoverButton.onclick = () => useRecovery(getUserNumber());
 };
 
 const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
@@ -240,11 +291,11 @@ const formatTimeUnit = (amount: number, unit: string) => {
 };
 
 const readUserNumber = () => {
-  const newUserNumber = document.getElementById(
-    "newUserNumber",
-  ) as HTMLInputElement;
+  const newUserNumber = document.getElementById("newUserNumber") as HTMLElement;
   if (!newUserNumber.classList.contains("hidden")) {
-    return parseUserNumber(newUserNumber.value) as bigint;
+    return parseUserNumber(
+      (document.getElementById("userNumberInput") as HTMLInputElement).value,
+    ) as bigint;
   }
   return getUserNumber() as bigint;
 };
