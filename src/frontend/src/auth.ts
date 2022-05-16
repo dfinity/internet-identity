@@ -10,13 +10,13 @@ import { confirmRedirect } from "./flows/confirmRedirect";
 import { IIConnection } from "./utils/iiConnection";
 import { hasOwnProperty } from "./utils/utils";
 
-interface AuthRequest {
+export interface AuthRequest {
   kind: "authorize-client";
   sessionPublicKey: Uint8Array;
   maxTimeToLive?: bigint;
 }
 
-interface AuthResponseSuccess {
+export interface AuthResponseSuccess {
   kind: "authorize-client-success";
   delegations: {
     delegation: {
@@ -36,6 +36,14 @@ interface AuthResponseFailure {
 
 type AuthResponse = AuthResponseSuccess | AuthResponseFailure;
 
+export class AuthContext {
+  constructor(
+    public authRequest: AuthRequest,
+    public requestOrigin: string,
+    public postMessageCallback: (message: unknown) => void,
+  ) {}
+}
+
 // A message to signal that the II is ready to receive authorization requests.
 const READY_MESSAGE = {
   kind: "authorize-ready",
@@ -46,25 +54,25 @@ const READY_MESSAGE = {
  *
  * This method expects to be called after the login flow.
  */
-export default async function setup(
-  userNumber: UserNumber,
-  connection: IIConnection
-): Promise<void> {
-  // Set up an event listener for receiving messages from the client.
-  window.addEventListener("message", async (event) => {
-    const message = event.data;
-    if (message.kind === "authorize-client") {
-      console.log("Handling authorize-client request.");
-      const response = await handleAuthRequest(
-        connection,
-        userNumber,
-        message,
-        event.origin
-      );
-      (event.source as Window).postMessage(response, event.origin);
-    } else {
-      console.log(`Message of unknown kind received: ${message}`);
-    }
+export default async function setup(): Promise<AuthContext> {
+  const result = new Promise<AuthContext>((resolve, reject) => {
+    // Set up an event listener for receiving messages from the client.
+    window.addEventListener("message", async (event) => {
+      const message = event.data;
+      if (message.kind === "authorize-client") {
+        console.log("Handling authorize-client request.");
+        resolve(
+          new AuthContext(message, event.origin, (responseMessage) =>
+            (event.source as Window).postMessage(responseMessage, event.origin),
+          ),
+        );
+      } else {
+        console.error(
+          `Message of unknown kind received: ${JSON.stringify(message)}`,
+        );
+        reject();
+      }
+    });
   });
 
   // Send a message to indicate we're ready.
@@ -79,16 +87,17 @@ export default async function setup(
     window.location.hash = "";
     window.location.reload();
   }
+  return result;
 }
 
 async function handleAuthRequest(
   connection: IIConnection,
   userNumber: UserNumber,
   request: AuthRequest,
-  hostname: FrontendHostname
+  hostname: FrontendHostname,
 ): Promise<AuthResponse> {
   const userPrincipal = await withLoader(() =>
-    connection.getPrincipal(userNumber, hostname)
+    connection.getPrincipal(userNumber, hostname),
   );
 
   if (!(await confirmRedirect(hostname, userPrincipal.toString()))) {
@@ -104,11 +113,11 @@ async function handleAuthRequest(
       userNumber,
       hostname,
       sessionKey,
-      request.maxTimeToLive
+      request.maxTimeToLive,
     );
     if (prepRes.length !== 2) {
       throw new Error(
-        `Error preparing the delegation. Result received: ${prepRes}`
+        `Error preparing the delegation. Result received: ${prepRes}`,
       );
     }
 
@@ -120,7 +129,7 @@ async function handleAuthRequest(
       userNumber,
       hostname,
       sessionKey,
-      timestamp
+      timestamp,
     );
 
     // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
@@ -141,13 +150,13 @@ async function handleAuthRequest(
   });
 }
 
-const retryGetDelegation = async (
+export const retryGetDelegation = async (
   connection: IIConnection,
   userNumber: bigint,
   hostname: string,
   sessionKey: PublicKey,
   timestamp: bigint,
-  maxRetries = 5
+  maxRetries = 5,
 ): Promise<SignedDelegation> => {
   for (let i = 0; i < maxRetries; i++) {
     // Linear backoff
@@ -158,13 +167,13 @@ const retryGetDelegation = async (
       userNumber,
       hostname,
       sessionKey,
-      timestamp
+      timestamp,
     );
     if (hasOwnProperty(res, "signed_delegation")) {
       return res.signed_delegation;
     }
   }
   throw new Error(
-    `Failed to retrieve a delegation after ${maxRetries} retries.`
+    `Failed to retrieve a delegation after ${maxRetries} retries.`,
   );
 };

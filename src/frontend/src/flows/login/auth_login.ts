@@ -1,18 +1,31 @@
 import { html, render } from "lit-html";
-import { icLogo } from "../../components/icons";
+import { undo, userSwitch } from "../../components/icons";
 import { initLogout, logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
+import { getUserNumber, parseUserNumber } from "../../utils/userNumber";
+import { withLoader } from "../../components/loader";
+import setup, { AuthContext, retryGetDelegation } from "../../auth";
+import { IIConnection } from "../../utils/iiConnection";
+import { apiResultToLoginFlowResult } from "./flowResult";
+import { displayError } from "../../components/displayError";
+import { recoveryWizard } from "../recovery/recoveryWizard";
 
-const pageContent = (hostName: string, authEndTimestamp: number, userNumber?: bigint) => html` <style>
+const pageContent = (
+  hostName: string,
+  maxTimeToLive: bigint | undefined,
+  userNumber?: bigint,
+) => html` <style>
     .spacer {
       height: 2rem;
     }
+
     .userNumberInput {
       text-align: center;
       font-size: 1.5rem;
       font-weight: 500;
     }
+
     .userNumberInput:focus {
       box-sizing: border-box;
       border-style: double;
@@ -29,25 +42,53 @@ const pageContent = (hostName: string, authEndTimestamp: number, userNumber?: bi
         #fbb03b 77.09%
       );
     }
+
+    .overlap {
+    }
+
     .smallText {
       font-size: 0.875rem;
       font-weight: 400;
     }
+
     .bold {
       font-weight: 600;
     }
   </style>
   <div class="container">
-    ${icLogo}
-    <h1>Authorize Authentication</h1>
-    <p>Proceed to authenticate with</p>
-    <div class="smallText highlightBox">${hostName}</div>
-    <p class="bold">Identity Anchor</p>
-    <input class="userNumberInput" value="${userNumber}" placeholder="Enter Identity Anchor">
-    <button type="button" id="login" class="primary">Authenticate</button>
-    <button type="button" id="login">Cancel</button>
-    <span class="smallText">Max session validity: ${new Date(authEndTimestamp).toLocaleString()}</span>
+    <h1>Authorize Authentication for</h1>
+    <div class="highlightBox smallText">${hostName}</div>
+    <div class="smallText">
+      This dapp cannot use Internet Identity to track your activities in other
+      dapps.
+    </div>
     <div class="spacer"></div>
+    <p class="bold">Identity Anchor</p>
+    <div>
+      <div id="newUserNumber" class="overlap">
+        <input class="userNumberInput" placeholder="Enter Identity Anchor" />
+        <button
+          id="existingAnchorButton"
+          class="${userNumber === undefined ? "hidden" : ""}"
+        >
+          ${undo}
+        </button>
+        <div class="textLink">
+          or create a
+          <button class="linkStyle">New Identity Anchor.</button>
+        </div>
+      </div>
+      <div id="existingUserNumber" class="overlap">
+        <div class="highlightBox">${userNumber}</div>
+        <button id="editAnchorButton">${userSwitch}</button>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+    <button type="button" id="login" class="primary">Authenticate</button>
+    <span class="smallText"
+      >Max session validity: ${formatTimeToLive(maxTimeToLive)}</span
+    >
     <div class="textLink">
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
@@ -56,13 +97,154 @@ const pageContent = (hostName: string, authEndTimestamp: number, userNumber?: bi
   </div>
   ${footer}`;
 
-export const authDapp = async (): Promise<void> => {
+function displayPage(
+  origin: string,
+  timeToLive: bigint | undefined,
+  userNumber: bigint | undefined,
+) {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent('https://h5aet-waaaa-aaaab-qaamq-cai.ic0.app/', Date.now(), BigInt(1234156)), container);
-  initLogout();
-  return init();
+  render(pageContent(origin, timeToLive, userNumber), container);
+  setMode(userNumber === undefined ? "newUserNumber" : "existingUserNumber");
+}
+
+export const authDapp = async (): Promise<void> => {
+  await withLoader(async () => {
+    const authContext = await setup();
+    return init(authContext);
+  });
 };
 
-const init = async () => {
-  console.log('init');
+const init = (authContext: AuthContext) => {
+  const userNumber = getUserNumber();
+  displayPage(
+    authContext.requestOrigin,
+    authContext.authRequest.maxTimeToLive,
+    userNumber,
+  );
+  initLogout();
+  const editAnchorButton = document.getElementById(
+    "editAnchorButton",
+  ) as HTMLButtonElement;
+  editAnchorButton.onclick = () => setMode("newUserNumber");
+  const existingAnchorButton = document.getElementById(
+    "existingAnchorButton",
+  ) as HTMLButtonElement;
+  existingAnchorButton.onclick = () => setMode("existingUserNumber");
+
+  const loginButton = document.querySelector("#login") as HTMLButtonElement;
+  loginButton.onclick = async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const result = await withLoader(() => IIConnection.login(readUserNumber()));
+    const loginResult = apiResultToLoginFlowResult(result);
+    if (loginResult.tag === "ok") {
+      const [userKey, parsed_signed_delegation] = await withLoader(async () => {
+        const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
+        const [userKey, timestamp] =
+          await loginResult.connection.prepareDelegation(
+            loginResult.userNumber,
+            authContext.requestOrigin,
+            sessionKey,
+            authContext.authRequest.maxTimeToLive,
+          );
+
+        // TODO: Signal failure to retrieve the delegation. Error page, or maybe redirect back with error?
+        const signed_delegation = await retryGetDelegation(
+          loginResult.connection,
+          loginResult.userNumber,
+          authContext.requestOrigin,
+          sessionKey,
+          timestamp,
+        );
+
+        // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+        return [
+          userKey,
+          {
+            delegation: {
+              pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
+              expiration: BigInt(signed_delegation.delegation.expiration),
+              targets: undefined,
+            },
+            signature: Uint8Array.from(signed_delegation.signature),
+          },
+        ];
+      });
+
+      // show the recovery wizard before sending the window post message, otherwise the II window will be closed
+      await recoveryWizard(loginResult.userNumber, loginResult.connection);
+
+      // send the
+      authContext.postMessageCallback({
+        kind: "authorize-client-success",
+        delegations: [parsed_signed_delegation],
+        userPublicKey: Uint8Array.from(userKey),
+      });
+    } else {
+      await displayError({ ...loginResult, primaryButton: "Try again" });
+      init(authContext);
+    }
+  };
+};
+
+const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
+  const existingUserNumber = document.getElementById(
+    "existingUserNumber",
+  ) as HTMLElement;
+  const newUserNumber = document.getElementById("newUserNumber") as HTMLElement;
+  existingUserNumber.classList.toggle("hidden", mode !== "existingUserNumber");
+  newUserNumber.classList.toggle("hidden", mode !== "newUserNumber");
+};
+
+const formatTimeToLive = (maxTimeToLive: bigint | undefined) => {
+  const seconds =
+    maxTimeToLive !== undefined
+      ? Math.floor(Number(maxTimeToLive / BigInt(1_000_000_000)))
+      : 30 * 60 * 60; // 30 minutes default
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) {
+    return formatWithSecondaryTimeUnit(days, "day", hours % 24, "hour");
+  }
+  if (hours > 0) {
+    return formatWithSecondaryTimeUnit(hours, "hour", minutes % 60, "minute");
+  }
+  if (minutes > 0) {
+    return formatWithSecondaryTimeUnit(
+      minutes,
+      "minute",
+      seconds % 60,
+      "second",
+    );
+  }
+  return formatTimeUnit(seconds, "second");
+};
+
+function formatWithSecondaryTimeUnit(
+  primaryAmount: number,
+  primaryUnit: string,
+  secondaryAmount: number,
+  secondaryUnit: string,
+) {
+  let result = formatTimeUnit(primaryAmount, primaryUnit);
+  if (secondaryAmount > 0) {
+    result = result + `, ${formatTimeUnit(secondaryAmount, secondaryUnit)}`;
+  }
+  return result;
 }
+
+const formatTimeUnit = (amount: number, unit: string) => {
+  const roundedAmount = Math.floor(amount);
+  return `${roundedAmount} ${unit}${roundedAmount > 1 ? "s" : ""}`;
+};
+
+const readUserNumber = () => {
+  const newUserNumber = document.getElementById(
+    "newUserNumber",
+  ) as HTMLInputElement;
+  if (!newUserNumber.classList.contains("hidden")) {
+    return parseUserNumber(newUserNumber.value) as bigint;
+  }
+  return getUserNumber() as bigint;
+};
