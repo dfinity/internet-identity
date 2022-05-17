@@ -15,6 +15,13 @@
             { "allowString" : false,
                 "allowNumber" : false
             }
+        ],
+        "@typescript-eslint/no-unused-vars": [
+            "warn",
+            {  "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_",
+                "caughtErrorsIgnorePattern": "^_"
+            }
         ]
     },
     "ignorePatterns": ["src/**/*.test.ts", "src/frontend/generated/*"]

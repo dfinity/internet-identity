@@ -1,17 +1,19 @@
 import { IIConnection, ApiResult } from "../../utils/iiConnection";
 
-export type LoginFlowResult =
-  | {
-      tag: "ok";
-      userNumber: bigint;
-      connection: IIConnection;
-    }
-  | {
-      tag: "err";
-      title: string;
-      message: string;
-      detail?: string;
-    };
+export type LoginFlowResult = LoginFlowSuccess | LoginFlowError;
+
+export type LoginFlowSuccess = {
+  tag: "ok";
+  userNumber: bigint;
+  connection: IIConnection;
+};
+
+export type LoginFlowError = {
+  tag: "err";
+  title: string;
+  message: string;
+  detail?: string;
+};
 
 export const apiResultToLoginFlowResult = (
   result: ApiResult
