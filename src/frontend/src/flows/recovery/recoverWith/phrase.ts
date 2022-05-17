@@ -2,6 +2,8 @@ import { html, nothing, render, TemplateResult } from "lit-html";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import {
   apiResultToLoginFlowResult,
+  LoginFlowCanceled,
+  canceled,
   LoginFlowSuccess,
 } from "../../login/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
@@ -107,7 +109,7 @@ export const inputSeedPhrase = async (
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string
-): Promise<LoginFlowSuccess | null> => {
+): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   return init(userNumber, device, prefilledPhrase);
@@ -117,7 +119,7 @@ const init = (
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string /* if set, prefilled as input */
-): Promise<LoginFlowSuccess | null> =>
+): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const inputSeedPhraseInput = document.getElementById(
       "inputSeedPhrase"
@@ -173,7 +175,7 @@ const init = (
       "inputSeedPhraseCancel"
     ) as HTMLButtonElement;
     inputSeedPhraseCancel.onclick = () => {
-      resolve(null);
+      resolve(canceled());
     };
     inputSeedPhraseContinue.onclick = async () => {
       const inputValue = inputSeedPhraseInput.value.trim();

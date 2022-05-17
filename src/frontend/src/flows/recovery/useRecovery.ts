@@ -33,7 +33,7 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
     : await deviceRecoveryPage(userNumber, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
-  if (res === null) {
+  if (res.tag === "canceled") {
     return window.location.reload();
   }
 

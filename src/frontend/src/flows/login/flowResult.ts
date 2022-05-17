@@ -15,6 +15,12 @@ export type LoginFlowError = {
   detail?: string;
 };
 
+/** The result of a login flow that was canceled */
+export type LoginFlowCanceled = { tag: "canceled" };
+export function canceled(): LoginFlowCanceled {
+    return { tag: "canceled" };
+}
+
 export const apiResultToLoginFlowResult = (
   result: ApiResult
 ): LoginFlowResult => {

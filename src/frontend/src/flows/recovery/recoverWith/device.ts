@@ -3,7 +3,9 @@ import { displayError } from "../../../components/displayError";
 import { unreachable } from "../../../utils/utils";
 import {
   apiResultToLoginFlowResult,
+  canceled,
   LoginFlowSuccess,
+  LoginFlowCanceled,
 } from "../../login/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { IIConnection } from "../../../utils/iiConnection";
@@ -29,7 +31,7 @@ const pageContent = (userNumber: bigint) => html`
 export const deviceRecoveryPage = async (
   userNumber: bigint,
   device: DeviceData
-): Promise<LoginFlowSuccess | null> => {
+): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
   return init(userNumber, device);
@@ -38,7 +40,7 @@ export const deviceRecoveryPage = async (
 const init = (
   userNumber: bigint,
   device: DeviceData
-): Promise<LoginFlowSuccess | null> =>
+): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const buttonContinue = document.getElementById(
       "recover-with-device__continue"
@@ -69,7 +71,7 @@ const init = (
     ) as HTMLButtonElement | null;
     if (buttonCancel !== null) {
       buttonCancel.onclick = async () => {
-        resolve(null);
+        resolve(canceled());
       };
     }
   });
