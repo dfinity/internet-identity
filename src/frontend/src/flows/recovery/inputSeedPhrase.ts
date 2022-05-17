@@ -6,7 +6,7 @@ import {
   getWarnings,
 } from "../../crypto/mnemonic";
 import { warningIcon } from "../../components/icons";
-import { questions } from "../faq/questions";
+import { questions } from "../faq";
 
 const pageContent = () => html`
   <style>

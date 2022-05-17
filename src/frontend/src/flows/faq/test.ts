@@ -1,4 +1,4 @@
-import { questions } from "./questions";
+import { questions } from "./index";
 
 test("faq anchors are unique", () => {
   const anchors = Object.values(questions).map((q) => q.anchor);

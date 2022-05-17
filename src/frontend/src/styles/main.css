@@ -404,10 +404,15 @@ nav {
   right: 0;
   margin: 0.3rem auto;
 }
+
 .faq__question-summary {
   letter-spacing: -0.01rem;
   font-weight: 300;
   font-size: 1.25rem;
+}
+
+.faq__question-summary-text {
+  margin-left: 1rem;
 }
 
 .faq__title {
@@ -467,6 +472,10 @@ nav {
   .faq__container {
     padding: 0 4rem;
   }
+}
+
+.faq__question summary {
+  padding: 0.5rem 1rem;
 }
 
 /* ABOUT stuff */
