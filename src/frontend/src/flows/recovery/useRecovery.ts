@@ -8,10 +8,20 @@ import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 
 export const useRecovery = async (userNumber?: bigint): Promise<void> => {
-  userNumber =
-    userNumber === undefined
-      ? await promptUserNumber("Recover Identity Anchor", null)
-      : userNumber;
+  if (userNumber !== undefined) {
+    return runRecovery(userNumber);
+  } else {
+    const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
+    console.log(pUserNumber);
+    if (pUserNumber !== null) {
+      return runRecovery(pUserNumber);
+    } else {
+      return window.location.reload();
+    }
+  }
+};
+
+const runRecovery = async (userNumber: bigint): Promise<void> => {
   const recoveryDevices = await IIConnection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
