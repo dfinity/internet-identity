@@ -116,13 +116,13 @@ export class IIConnection {
   protected constructor(
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
-    public actor?: ActorSubclass<_SERVICE>,
+    public actor?: ActorSubclass<_SERVICE>
   ) {}
 
   static async register(
     identity: IdentifiableIdentity,
     alias: string,
-    challengeResult: ChallengeResult,
+    challengeResult: ChallengeResult
   ): Promise<RegisterResult> {
     let delegationIdentity: DelegationIdentity;
     try {
@@ -152,7 +152,7 @@ export class IIConnection {
           key_type: { unknown: null },
           purpose: { authentication: null },
         },
-        challengeResult,
+        challengeResult
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -207,7 +207,7 @@ export class IIConnection {
 
   static async fromWebauthnDevices(
     userNumber: bigint,
-    devices: DeviceData[],
+    devices: DeviceData[]
   ): Promise<LoginResult> {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
@@ -221,8 +221,8 @@ export class IIConnection {
               device.credential_id.map((credentialId: CredentialId) => ({
                 pubkey: derFromPubkey(device.pubkey),
                 credentialId: Buffer.from(credentialId),
-              })),
-            ),
+              }))
+            )
           );
     let delegationIdentity: DelegationIdentity;
     try {
@@ -247,7 +247,7 @@ export class IIConnection {
         // eslint-disable-next-line
         identity,
         delegationIdentity,
-        actor,
+        actor
       ),
     };
   }
@@ -255,16 +255,16 @@ export class IIConnection {
   static async fromSeedPhrase(
     userNumber: bigint,
     seedPhrase: string,
-    expected: DeviceData,
+    expected: DeviceData
   ): Promise<LoginResult> {
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
-      IC_DERIVATION_PATH,
+      IC_DERIVATION_PATH
     );
     if (
       !bufferEqual(
         identity.getPublicKey().toDer(),
-        derFromPubkey(expected.pubkey),
+        derFromPubkey(expected.pubkey)
       )
     ) {
       return {
@@ -294,12 +294,12 @@ export class IIConnection {
   }
 
   static async lookupAuthenticators(
-    userNumber: UserNumber,
+    userNumber: UserNumber
   ): Promise<DeviceData[]> {
     const actor = await IIConnection.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
-      hasOwnProperty(device.purpose, "authentication"),
+      hasOwnProperty(device.purpose, "authentication")
     );
   }
 
@@ -309,7 +309,7 @@ export class IIConnection {
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
-    credentialId?: ArrayBuffer,
+    credentialId?: ArrayBuffer
   ): Promise<AddTentativeDeviceResponse> {
     const actor = await IIConnection.createActor();
     return await actor.add_tentative_device(userNumber, {
@@ -327,13 +327,13 @@ export class IIConnection {
     const actor = await IIConnection.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
-      hasOwnProperty(device.purpose, "recovery"),
+      hasOwnProperty(device.purpose, "recovery")
     );
   }
 
   // Create an actor representing the backend
   static async createActor(
-    delegationIdentity?: DelegationIdentity,
+    delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
@@ -368,21 +368,21 @@ export class IIConnection {
   }
 
   getAnchorInfo = async (
-    userNumber: UserNumber,
+    userNumber: UserNumber
   ): Promise<IdentityAnchorInfo> => {
     const actor = await this.getActor();
     return await actor.get_anchor_info(userNumber);
   };
 
   enterDeviceRegistrationMode = async (
-    userNumber: UserNumber,
+    userNumber: UserNumber
   ): Promise<Timestamp> => {
     const actor = await this.getActor();
     return await actor.enter_device_registration_mode(userNumber);
   };
 
   exitDeviceRegistrationMode = async (
-    userNumber: UserNumber,
+    userNumber: UserNumber
   ): Promise<void> => {
     const actor = await this.getActor();
     return await actor.exit_device_registration_mode(userNumber);
@@ -390,7 +390,7 @@ export class IIConnection {
 
   verifyTentativeDevice = async (
     userNumber: UserNumber,
-    pin: string,
+    pin: string
   ): Promise<VerifyTentativeDeviceResponse> => {
     const actor = await this.getActor();
     return await actor.verify_tentative_device(userNumber, pin);
@@ -402,7 +402,7 @@ export class IIConnection {
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
-    credentialId?: ArrayBuffer,
+    credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
     return await actor.add(userNumber, {
@@ -418,7 +418,7 @@ export class IIConnection {
 
   remove = async (
     userNumber: UserNumber,
-    publicKey: PublicKey,
+    publicKey: PublicKey
   ): Promise<void> => {
     const actor = await this.getActor();
     await actor.remove(userNumber, publicKey);
@@ -426,7 +426,7 @@ export class IIConnection {
 
   getPrincipal = async (
     userNumber: UserNumber,
-    frontend: FrontendHostname,
+    frontend: FrontendHostname
   ): Promise<Principal> => {
     const actor = await this.getActor();
     return await actor.get_principal(userNumber, frontend);
@@ -436,17 +436,17 @@ export class IIConnection {
     userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
-    maxTimeToLive?: bigint,
+    maxTimeToLive?: bigint
   ): Promise<[PublicKey, bigint]> => {
     console.log(
-      `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`,
+      `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
     return await actor.prepare_delegation(
       userNumber,
       hostname,
       sessionKey,
-      maxTimeToLive !== undefined ? [maxTimeToLive] : [],
+      maxTimeToLive !== undefined ? [maxTimeToLive] : []
     );
   };
 
@@ -454,23 +454,23 @@ export class IIConnection {
     userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
-    timestamp: Timestamp,
+    timestamp: Timestamp
   ): Promise<GetDelegationResponse> => {
     console.log(
-      `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`,
+      `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );
     const actor = await this.getActor();
     return await actor.get_delegation(
       userNumber,
       hostname,
       sessionKey,
-      timestamp,
+      timestamp
     );
   };
 }
 
 const requestFEDelegation = async (
-  identity: SignIdentity,
+  identity: SignIdentity
 ): Promise<DelegationIdentity> => {
   const sessionKey = Ed25519KeyIdentity.generate();
   const tenMinutesInMsec = 10 * 1000 * 60;
@@ -481,7 +481,7 @@ const requestFEDelegation = async (
     new Date(Date.now() + tenMinutesInMsec),
     {
       targets: [Principal.from(canisterId)],
-    },
+    }
   );
   return DelegationIdentity.fromDelegation(sessionKey, chain);
 };
@@ -505,7 +505,7 @@ const requestFEDelegation = async (
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: DeviceData[] = [],
-  authenticatorAttachment?: AuthenticatorAttachment,
+  authenticatorAttachment?: AuthenticatorAttachment
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
@@ -518,7 +518,7 @@ export const creationOptions = (
         : {
             id: new Uint8Array(device.credential_id[0]),
             type: "public-key",
-          },
+          }
     ),
     challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
     pubKeyCredParams: [

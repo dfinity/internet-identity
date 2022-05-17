@@ -19,18 +19,18 @@ export const registrationSection = html` <div
  **/
 function isRegistrationAllowed() {
   return !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
-    window.origin,
+    window.origin
   );
 }
 
 export const initRegistration = async (): Promise<LoginFlowResult | null> => {
   const registerButton = document.getElementById(
-    "registerButton",
+    "registerButton"
   ) as HTMLButtonElement;
   return new Promise<LoginFlowResult | null>(
     (resolve) =>
       (registerButton.onclick = () => {
         resolve(isRegistrationAllowed() ? register() : registerDisabled());
-      }),
+      })
   );
 };
