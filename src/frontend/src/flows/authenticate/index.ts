@@ -27,7 +27,7 @@ import {
 } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { toggleErrorMessage } from "../../utils/errorHelper";
-import { questions } from "../faq";\
+import { questions } from "../faq";
 
 const pageContent = (
   hostName: string,
