@@ -37,6 +37,7 @@ const pageContent = (
     .spacer-small {
       height: 1rem;
     }
+
     #gearIcon {
       position: relative;
       top: 4px;
@@ -170,7 +171,6 @@ const pageContent = (
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    <div class="spacer"></div>
     <div id="logoutBox">
       <hr />
       <button type="button" class="linkStyle" id="manageButton">
@@ -245,16 +245,6 @@ const init = (authContext: AuthContext) => {
     "existingAnchorButton"
   ) as HTMLButtonElement;
   existingAnchorButton.onclick = () => setMode("existingUserNumber");
-  const userNumberInput = document.getElementById(
-    "userNumberInput"
-  ) as HTMLInputElement;
-  userNumberInput.onkeypress = (e) => {
-    // submit if user hits enter
-    if (e.key === "Enter") {
-      e.preventDefault();
-      loginButton.click();
-    }
-  };
 
   const loginButton = document.querySelector("#login") as HTMLButtonElement;
   loginButton.onclick = async () => {
@@ -266,6 +256,13 @@ const init = (authContext: AuthContext) => {
     const result = await withLoader(() => IIConnection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     await handleAuthenticationResult(loginResult, authContext);
+  };
+  document.onkeypress = (e) => {
+    if (e.key === "Enter") {
+      // authenticate if user hits enter
+      e.preventDefault();
+      loginButton.click();
+    }
   };
 
   const manageButton = document.getElementById(
