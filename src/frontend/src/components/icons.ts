@@ -49,15 +49,12 @@ export const icLogo = html`
       .st0 {
         fill: none;
       }
-
       .st1 {
         fill: url(#SVGID_1_);
       }
-
       .st2 {
         fill: url(#SVGID_2_);
       }
-
       .st3 {
         fill: #29abe2;
       }
