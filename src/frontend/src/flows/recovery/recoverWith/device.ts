@@ -42,30 +42,34 @@ const init = (
   new Promise((resolve) => {
     const buttonContinue = document.getElementById(
       "recover-with-device__continue"
-    ) as HTMLButtonElement;
-    buttonContinue.onclick = async () => {
-      const result = apiResultToLoginFlowResult(
-        await IIConnection.fromWebauthnDevices(userNumber, [device])
-      );
+    ) as HTMLButtonElement | null;
+    if (buttonContinue !== null) {
+      buttonContinue.onclick = async () => {
+        const result = apiResultToLoginFlowResult(
+          await IIConnection.fromWebauthnDevices(userNumber, [device])
+        );
 
-      switch (result.tag) {
-        case "ok":
-          resolve(result);
-          break;
-        case "err":
-          await displayError({ ...result, primaryButton: "Try again" });
-          deviceRecoveryPage(userNumber, device).then((res) => resolve(res));
-          break;
-        default:
-          unreachable(result);
-          break;
-      }
-    };
+        switch (result.tag) {
+          case "ok":
+            resolve(result);
+            break;
+          case "err":
+            await displayError({ ...result, primaryButton: "Try again" });
+            deviceRecoveryPage(userNumber, device).then((res) => resolve(res));
+            break;
+          default:
+            unreachable(result);
+            break;
+        }
+      };
+    }
 
     const buttonCancel = document.getElementById(
       "recover-with-device__cancel"
-    ) as HTMLButtonElement;
-    buttonCancel.onclick = async () => {
-      resolve(null);
-    };
+    ) as HTMLButtonElement | null;
+    if (buttonCancel !== null) {
+      buttonCancel.onclick = async () => {
+        resolve(null);
+      };
+    }
   });
