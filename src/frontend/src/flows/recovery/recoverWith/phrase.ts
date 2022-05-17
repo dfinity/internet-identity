@@ -1,14 +1,24 @@
 import { html, nothing, render, TemplateResult } from "lit-html";
+import { DeviceData } from "../../../../generated/internet_identity_types";
+import {
+  apiResultToLoginFlowResult,
+  LoginFlowCanceled,
+  canceled,
+  LoginFlowSuccess,
+} from "../../login/flowResult";
+import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
+import { IIConnection } from "../../../utils/iiConnection";
+import { displayError } from "../../../components/displayError";
+import { unreachable } from "../../../utils/utils";
 import {
   Warning,
   RECOVERYPHRASE_WORDCOUNT,
-  dropLeadingUserNumber,
   getWarnings,
-} from "../../crypto/mnemonic";
-import { warningIcon } from "../../components/icons";
-import { questions } from "../faq";
+} from "../../../crypto/mnemonic";
+import { warningIcon } from "../../../components/icons";
+import { questions } from "../../faq";
 
-const pageContent = () => html`
+const pageContent = (userNumber: bigint) => html`
   <style>
 
     /* Flash the warnings box if warnings were generated */
@@ -83,7 +93,9 @@ const pageContent = () => html`
   <div class="container full-width">
     <h1>Your seed phrase</h1>
     <p>Please provide your seed phrase</p>
-    <textarea id="inputSeedPhrase" placeholder="Your seed phrase"></textarea>
+    <textarea id="inputSeedPhrase" placeholder="${
+      userNumber + " above squirrel ..."
+    }"></textarea>
     <details class="warnings-box hidden">
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
@@ -93,15 +105,21 @@ const pageContent = () => html`
   </div>
 `;
 
-export const inputSeedPhrase = async (
-  userNumber: bigint
-): Promise<string | null> => {
+export const phraseRecoveryPage = async (
+  userNumber: bigint,
+  device: DeviceData,
+  prefilledPhrase?: string
+): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
-  return init(userNumber);
+  render(pageContent(userNumber), container);
+  return init(userNumber, device, prefilledPhrase);
 };
 
-const init = (userNumber: bigint): Promise<string | null> =>
+const init = (
+  userNumber: bigint,
+  device: DeviceData,
+  prefilledPhrase?: string /* if set, prefilled as input */
+): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const inputSeedPhraseInput = document.getElementById(
       "inputSeedPhrase"
@@ -144,6 +162,9 @@ const init = (userNumber: bigint): Promise<string | null> =>
       }, 500);
     };
 
+    if (prefilledPhrase !== undefined) {
+      inputSeedPhraseInput.value = prefilledPhrase;
+    }
     inputSeedPhraseInput.oninput = () => {
       debouncedWarnings();
     };
@@ -154,13 +175,29 @@ const init = (userNumber: bigint): Promise<string | null> =>
       "inputSeedPhraseCancel"
     ) as HTMLButtonElement;
     inputSeedPhraseCancel.onclick = () => {
-      resolve(null);
+      resolve(canceled());
     };
     inputSeedPhraseContinue.onclick = async () => {
-      const inputValue = dropLeadingUserNumber(
-        inputSeedPhraseInput.value.trim()
+      const inputValue = inputSeedPhraseInput.value.trim();
+      const mnemonic = dropLeadingUserNumber(inputValue);
+      const result = apiResultToLoginFlowResult(
+        await IIConnection.fromSeedPhrase(userNumber, mnemonic, device)
       );
-      resolve(inputValue);
+
+      switch (result.tag) {
+        case "ok":
+          resolve(result);
+          break;
+        case "err":
+          await displayError({ ...result, primaryButton: "Try again" });
+          phraseRecoveryPage(userNumber, device, inputValue).then((res) =>
+            resolve(res)
+          );
+          break;
+        default:
+          unreachable(result);
+          break;
+      }
     };
   });
 
