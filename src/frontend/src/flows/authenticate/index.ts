@@ -28,6 +28,7 @@ import {
 import { hasOwnProperty } from "../../utils/utils";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { questions } from "../faq";
+import { title } from "process";
 
 const pageContent = (
   hostName: string,
@@ -248,14 +249,24 @@ const init = (authContext: AuthContext) => {
 
   const loginButton = document.querySelector("#login") as HTMLButtonElement;
   loginButton.onclick = async () => {
-    const userNumber = readUserNumber();
-    if (userNumber === undefined) {
-      toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
-      return;
+    try {
+      const userNumber = readUserNumber();
+      if (userNumber === undefined) {
+        toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
+        return;
+      }
+      const result = await withLoader(() => IIConnection.login(userNumber));
+      const loginResult = apiResultToLoginFlowResult(result);
+      await handleAuthenticationResult(loginResult, authContext);
+    } catch (error) {
+      await displayError({
+        title: "Authentication Failed",
+        message: "An error occurred during authentication.",
+        detail: error instanceof Error ? error.message : JSON.stringify(error),
+        primaryButton: "Try again",
+      });
+      init(authContext);
     }
-    const result = await withLoader(() => IIConnection.login(userNumber));
-    const loginResult = apiResultToLoginFlowResult(result);
-    await handleAuthenticationResult(loginResult, authContext);
   };
   document.onkeypress = (e) => {
     if (e.key === "Enter") {
