@@ -105,7 +105,7 @@ const pageContent = (userNumber: bigint) => html`
   </div>
 `;
 
-export const inputSeedPhrase = async (
+export const phraseRecoveryPage = async (
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string
@@ -190,7 +190,7 @@ const init = (
           break;
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
-          inputSeedPhrase(userNumber, device, inputValue).then((res) =>
+          phraseRecoveryPage(userNumber, device, inputValue).then((res) =>
             resolve(res)
           );
           break;
