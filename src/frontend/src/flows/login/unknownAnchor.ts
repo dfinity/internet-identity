@@ -2,12 +2,10 @@ import { render, html } from "lit-html";
 import { IIConnection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { register } from "../register";
 import { icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { useRecovery } from "../recovery/useRecovery";
-import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import {
@@ -79,7 +77,7 @@ export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
 
 const initRegister = (
   resolve: (res: LoginFlowResult) => void,
-  reject: (err: Error) => void,
+  reject: (err: Error) => void
 ) => {
   initRegistration()
     .then((res) => {
@@ -94,17 +92,17 @@ const initRegister = (
 
 const initRecovery = () => {
   const recoverButton = document.getElementById(
-    "recoverButton",
+    "recoverButton"
   ) as HTMLButtonElement;
   recoverButton.onclick = () => useRecovery();
 };
 
 const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   const userNumberInput = document.getElementById(
-    "registerUserNumber",
+    "registerUserNumber"
   ) as HTMLInputElement;
   const loginButton = document.getElementById(
-    "loginButton",
+    "loginButton"
   ) as HTMLButtonElement;
 
   userNumberInput.onkeypress = (e) => {
@@ -134,12 +132,12 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
 
 const initLinkDevice = () => {
   const addNewDeviceButton = document.getElementById(
-    "addNewDeviceButton",
+    "addNewDeviceButton"
   ) as HTMLButtonElement;
 
   addNewDeviceButton.onclick = async () => {
     const userNumberInput = document.getElementById(
-      "registerUserNumber",
+      "registerUserNumber"
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);

@@ -1,6 +1,5 @@
 import "./styles/main.css";
 import { login } from "./flows/login";
-import auth from "./auth";
 import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";

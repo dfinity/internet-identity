@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
-import { undo, userSwitch } from "../../components/icons";
-import { initLogout, logoutSection } from "../../components/logout";
+import { gearIcon, undoIcon, userSwitchIcon } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -28,21 +27,35 @@ import {
 } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { toggleErrorMessage } from "../../utils/errorHelper";
+import { questions } from "../faq";
 
 const pageContent = (
   hostName: string,
   maxTimeToLive: bigint | undefined,
   userNumber?: bigint
 ) => html` <style>
+    .spacer-small {
+      height: 1rem;
+    }
+    #gearIcon {
+      position: relative;
+      top: 4px;
+    }
+
     .spacer {
-      height: 2rem;
+      height: 3rem;
+    }
+
+    .mediumText {
+      font-size: 1.2rem;
     }
 
     #userNumberInput {
-      margin-bottom: 0;
+      margin: 0;
       text-align: center;
-      font-size: 1.5rem;
-      font-weight: 500;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.55rem 3rem;
     }
 
     #userNumberInput:focus {
@@ -62,6 +75,29 @@ const pageContent = (
       );
     }
 
+    .modeContainer {
+      min-height: 7rem;
+    }
+
+    .childContainer {
+      position: relative;
+      margin-bottom: 0.5rem;
+    }
+
+    .switchButton {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      padding: 0.7rem;
+      margin: 0;
+      width: fit-content;
+      background: transparent;
+      border: none;
+    }
+
     .smallText {
       font-size: 0.875rem;
       font-weight: 400;
@@ -70,44 +106,78 @@ const pageContent = (
     .bold {
       font-weight: 600;
     }
+
+    .greyText {
+      color: var(--grey-500);
+    }
+
+    .anchorTitle {
+      margin: 0;
+      color: black;
+    }
   </style>
   <div class="container">
     <h1>Authorize Authentication for</h1>
     <div class="highlightBox smallText">${hostName}</div>
-    <div class="spacer"></div>
-    <p class="bold">Identity Anchor</p>
+    <div class="spacer-small"></div>
+    <p class="anchorTitle">Identity Anchor</p>
     <div>
-      <div id="newUserNumber">
-        <input id="userNumberInput" placeholder="Enter Identity Anchor" />
-        <div id="invalidAnchorMessage" class="error-message-hidden smallText">
-          The entered Identity Anchor is invalid. Please try again.
+      <div id="newUserNumber" class="modeContainer">
+        <div class="childContainer">
+          <input
+            class="mediumText"
+            type="text"
+            id="userNumberInput"
+            placeholder="Enter Identity Anchor"
+          />
+          <button
+            id="existingAnchorButton"
+            class="${userNumber === undefined ? "hidden" : ""} switchButton"
+          >
+            ${undoIcon}
+          </button>
         </div>
-        <button
-          id="existingAnchorButton"
-          class="${userNumber === undefined ? "hidden" : ""}"
-        >
-          ${undo}
-        </button>
+        <div id="invalidAnchorMessage" class="error-message hidden smallText">
+          The Identity Anchor is not valid. Please try again.
+        </div>
         ${registrationSection}
       </div>
-      <div id="existingUserNumber">
-        <div class="highlightBox">${userNumber}</div>
-        <button id="editAnchorButton">${userSwitch}</button>
+      <div id="existingUserNumber" class="modeContainer">
+        <div class="childContainer">
+          <div class="highlightBox mediumText">${userNumber}</div>
+          <button id="editAnchorButton" class="switchButton">
+            ${userSwitchIcon}
+          </button>
+        </div>
       </div>
     </div>
     <button type="button" id="login" class="primary">Authenticate</button>
-    <div class="smallText">
-      Different applications will not be able to track your activities among
-      each other. <a>Learn More.</a>
+    <div class="smallText greyText">
+      Max session validity: ${formatTimeToLive(maxTimeToLive)}
     </div>
-    <span class="smallText"
-      >Max session validity: ${formatTimeToLive(maxTimeToLive)}</span
-    >
+    <div class="smallText greyText">
+      Different applications will not be able to track your activities among
+      each other.
+      <a
+        class="bold greyText"
+        href="/faq#${questions.shareIIAnchor.anchor}"
+        target="_blank"
+        >Learn More.</a
+      >
+    </div>
+    <div class="spacer"></div>
     <div class="textLink">
       Lost access
       <button id="recoverButton" class="linkStyle">and want to recover?</button>
     </div>
-    ${logoutSection("Cancel and clear browser storage")} ${navbar}
+    <div class="spacer"></div>
+    <div id="logoutBox">
+      <hr />
+      <button type="button" class="linkStyle" id="manageButton">
+        ${gearIcon} Manage your Identity Anchor
+      </button>
+    </div>
+    ${navbar}
   </div>
   ${footer}`;
 
@@ -149,10 +219,7 @@ export default async function setup(): Promise<AuthContext> {
   if (window.opener !== null) {
     window.opener.postMessage(READY_MESSAGE, "*");
   } else {
-    // If there's no `window.opener` a user has manually navigated to "/#authorize". Let's
-    // redirect them to the non-hash version.
-    window.location.hash = "";
-    window.location.reload();
+    redirectToWelcomeScreen();
   }
   return result;
 }
@@ -164,7 +231,6 @@ const init = (authContext: AuthContext) => {
     authContext.authRequest.maxTimeToLive,
     userNumber
   );
-  initLogout();
   initRecovery();
   initRegistration().then((result) =>
     result === null
@@ -182,8 +248,6 @@ const init = (authContext: AuthContext) => {
   const userNumberInput = document.getElementById(
     "userNumberInput"
   ) as HTMLInputElement;
-  userNumberInput.onfocus = () =>
-    toggleErrorMessage("userNumberInput", "invalidAnchorMessage", false);
   userNumberInput.onkeypress = (e) => {
     // submit if user hits enter
     if (e.key === "Enter") {
@@ -203,6 +267,11 @@ const init = (authContext: AuthContext) => {
     const loginResult = apiResultToLoginFlowResult(result);
     await handleAuthenticationResult(loginResult, authContext);
   };
+
+  const manageButton = document.getElementById(
+    "manageButton"
+  ) as HTMLButtonElement;
+  manageButton.onclick = () => redirectToWelcomeScreen();
 };
 
 const displayPage = (
@@ -236,7 +305,12 @@ const handleAuthenticationResult = async (
       userPublicKey: Uint8Array.from(userKey),
     });
   } else {
-    await displayError({ ...loginResult, primaryButton: "Try again" });
+    await displayError({
+      title: loginResult.title,
+      message: loginResult.message,
+      detail: loginResult.detail !== "" ? loginResult.detail : undefined,
+      primaryButton: "Try again",
+    });
     init(authContext);
   }
 };
@@ -325,11 +399,19 @@ const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
   newUserNumber.classList.toggle("hidden", mode !== "newUserNumber");
 
   if (mode === "newUserNumber") {
+    toggleErrorMessage("userNumberInput", "invalidAnchorMessage", false);
     const userNumberInput = document.getElementById(
       "userNumberInput"
     ) as HTMLInputElement;
     userNumberInput.focus();
   }
+};
+
+const redirectToWelcomeScreen = () => {
+  // If there's no `window.opener` a user has manually navigated to "/#authorize". Let's
+  // redirect them to the non-hash version.
+  window.location.hash = "";
+  window.location.reload();
 };
 
 const formatTimeToLive = (maxTimeToLive: bigint | undefined) => {
