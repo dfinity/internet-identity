@@ -1,4 +1,5 @@
 import {
+  AuthenticateView,
   MainView,
   RecoveryMethodSelectorView,
   RegisterView,
@@ -7,13 +8,10 @@ import {
 } from "./views";
 
 export const FLOWS = {
-  registerNewIdentity: async (
-    deviceName: string,
-    browser: WebdriverIO.Browser
-  ): Promise<string> => {
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.register();
+  register: async function (
+    browser: WebdriverIO.Browser,
+    deviceName: string
+  ): Promise<string> {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
     await registerView.enterAlias(deviceName);
@@ -30,6 +28,24 @@ export const FLOWS = {
     await singleDeviceWarningView.waitForDisplay();
     await singleDeviceWarningView.remindLater();
     return userNumber;
+  },
+  registerNewIdentityWelcomeView: async (
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<string> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.register();
+    return await FLOWS.register(browser, deviceName);
+  },
+  registerNewIdentityAuthenticateView: async (
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<string> => {
+    const welcomeView = new AuthenticateView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.register();
+    return await FLOWS.register(browser, deviceName);
   },
   login: async (
     userNumber: string,

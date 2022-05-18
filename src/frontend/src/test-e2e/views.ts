@@ -324,15 +324,21 @@ export class VerifyRemoteDeviceView extends View {
   }
 }
 
-export class AuthorizeAppView extends View {
+export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#confirmRedirect")
-      .waitForDisplayed({ timeout: 5_000 });
+    await this.browser.$("#login").waitForDisplayed({ timeout: 5_000 });
   }
 
-  async confirm(): Promise<void> {
-    await this.browser.$("#confirmRedirect").click();
+  async authenticate(): Promise<void> {
+    await this.browser.$("#login").click();
+  }
+
+  async register(): Promise<void> {
+    await this.browser.$("#registerButton").click();
+  }
+
+  async switchToAnchorInput(): Promise<void> {
+    await this.browser.$("#editAnchorButton").click();
   }
 }
 

@@ -6,7 +6,7 @@ import {
   AddRemoteDeviceAliasView,
   AddRemoteDeviceInstructionsView,
   AddRemoteDeviceVerificationCodeView,
-  AuthorizeAppView,
+  AuthenticateView,
   CompatabilityNoticeView,
   DemoAppView,
   FAQView,
@@ -64,7 +64,10 @@ test("Register new identity and login with it", async () => {
     await welcomeView.register();
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.logout();
@@ -76,7 +79,10 @@ test("Register new identity and add additional device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
 
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
@@ -110,7 +116,10 @@ test("Register new identity and add additional remote device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.addAdditionalDevice();
@@ -156,7 +165,10 @@ test("Register new identity and add additional remote device starting on new dev
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
@@ -217,10 +229,7 @@ test("Log into client application, after registration", async () => {
     expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
-    const authorizeAppView = new AuthorizeAppView(browser);
-    await authorizeAppView.waitForDisplay();
-    await authorizeAppView.confirm();
+    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
@@ -246,10 +255,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(60_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
-    const authorizeAppView = new AuthorizeAppView(browser);
-    await authorizeAppView.waitForDisplay();
-    await authorizeAppView.confirm();
+    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
@@ -269,10 +275,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(86400_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
-    const authorizeAppView = new AuthorizeAppView(browser);
-    await authorizeAppView.waitForDisplay();
-    await authorizeAppView.confirm();
+    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
     await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
     const exp = await browser.$("#expiration").getText();
@@ -290,10 +293,7 @@ test("Delegation maxTimeToLive: 2 months", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(5_184_000_000_000_000)); // 60 days
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
-    const authorizeAppView = new AuthorizeAppView(browser);
-    await authorizeAppView.waitForDisplay();
-    await authorizeAppView.confirm();
+    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
     await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
     const exp = await browser.$("#expiration").getText();
@@ -306,7 +306,10 @@ test("Recover access, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
@@ -576,6 +579,16 @@ test("Screenshots", async () => {
       await waitForFonts(browser);
       const welcomeView3 = new WelcomeView(browser);
       await screenshots.take("features-warning", browser);
+
+      // authenticate for dapp view
+      const demoAppView = new DemoAppView(browser);
+      await demoAppView.open(DEMO_APP_URL, II_URL);
+      await demoAppView.waitForDisplay();
+      await switchToPopup(browser);
+      const authenticateView = new AuthenticateView(browser);
+      await screenshots.take("authenticate-known-anchor", browser);
+      await authenticateView.switchToAnchorInput();
+      await screenshots.take("authenticate-unknown-anchor", browser);
     }
   );
 }, 400_000);
