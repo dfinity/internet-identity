@@ -329,6 +329,16 @@ export class AuthenticateView extends View {
     await this.browser.$("#login").waitForDisplayed({ timeout: 5_000 });
   }
 
+  async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
+    expect(this.browser.$("#identityAnchor").getText()).toBe(anchor);
+  }
+
+  async expectAnchorInputField(): Promise<void> {
+    expect(this.browser.$("#userNumberInput").isDisplayedInViewport()).toBe(
+      true
+    );
+  }
+
   async authenticate(): Promise<void> {
     await this.browser.$("#login").click();
   }

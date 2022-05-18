@@ -42,9 +42,10 @@ export const FLOWS = {
     deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<string> => {
-    const welcomeView = new AuthenticateView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.register();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.expectAnchorInputField();
+    await authenticateView.register();
     return await FLOWS.register(browser, deviceName);
   },
   login: async (

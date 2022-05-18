@@ -145,7 +145,9 @@ const pageContent = (
       </div>
       <div id="existingUserNumber" class="modeContainer">
         <div class="childContainer">
-          <div class="highlightBox mediumText">${userNumber}</div>
+          <div id="identityAnchor" class="highlightBox mediumText">
+            ${userNumber}
+          </div>
           <button id="editAnchorButton" class="switchButton">
             ${userSwitchIcon}
           </button>

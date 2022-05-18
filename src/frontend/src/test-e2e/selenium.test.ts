@@ -245,6 +245,39 @@ test("Log into client application, after registration", async () => {
   });
 }, 300_000);
 
+test("Register first then log into client application", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(DEMO_APP_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    await demoAppView.signin();
+    await switchToPopup(browser);
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.expectPrefilledAnchorToBe(userNumber);
+    await authenticateView.authenticate();
+    await waitToClose(browser);
+    await demoAppView.waitForDisplay();
+    const principal = await demoAppView.getPrincipal();
+    expect(principal).not.toBe("2vxsx-fae");
+
+    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
+      principal
+    );
+
+    // default value
+    const exp = await browser.$("#expiration").getText();
+    expect(Number(exp) / (24 * 60 * 60_000_000_000)).toBeCloseTo(1);
+  });
+}, 300_000);
+
 test("Delegation maxTimeToLive: 1 min", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
@@ -584,6 +617,7 @@ test("Screenshots", async () => {
       const demoAppView = new DemoAppView(browser);
       await demoAppView.open(DEMO_APP_URL, II_URL);
       await demoAppView.waitForDisplay();
+      await demoAppView.signin();
       await switchToPopup(browser);
       const authenticateView = new AuthenticateView(browser);
       await screenshots.take("authenticate-known-anchor", browser);
