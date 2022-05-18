@@ -620,6 +620,7 @@ test("Screenshots", async () => {
       await demoAppView.signin();
       await switchToPopup(browser);
       const authenticateView = new AuthenticateView(browser);
+      await authenticateView.waitForDisplay();
       await screenshots.take("authenticate-known-anchor", browser);
       await authenticateView.switchToAnchorInput();
       await screenshots.take("authenticate-unknown-anchor", browser);
