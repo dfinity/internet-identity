@@ -330,7 +330,7 @@ export class AuthenticateView extends View {
   }
 
   async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
-    expect(this.browser.$("#identityAnchor").getText()).toBe(anchor);
+    expect(await this.browser.$("#identityAnchor").getText()).toBe(anchor);
   }
 
   async expectAnchorInputField(): Promise<void> {

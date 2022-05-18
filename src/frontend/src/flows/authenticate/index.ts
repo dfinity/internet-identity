@@ -28,6 +28,9 @@ import {
 import { hasOwnProperty } from "../../utils/utils";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { questions } from "../faq";
+import { formatSessionValidity } from "./sessionValidityFormat";
+
+const DEFAULT_TTL = 30 * 60; // 30 minutes
 
 const pageContent = (
   hostName: string,
@@ -155,7 +158,7 @@ const pageContent = (
     </div>
     <button type="button" id="login" class="primary">Authenticate</button>
     <div class="smallText greyText">
-      Max session validity: ${formatTimeToLive(maxTimeToLive)}
+      Max session validity: ${formatSessionValidity(maxTimeToLive, DEFAULT_TTL)}
     </div>
     <div class="smallText greyText">
       Different applications will not be able to track your activities among
@@ -420,49 +423,6 @@ const redirectToWelcomeScreen = () => {
   // redirect them to the non-hash version.
   window.location.hash = "";
   window.location.reload();
-};
-
-const formatTimeToLive = (maxTimeToLive: bigint | undefined) => {
-  const seconds =
-    maxTimeToLive !== undefined
-      ? Math.floor(Number(maxTimeToLive / BigInt(1_000_000_000)))
-      : 30 * 60; // 30 minutes default
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) {
-    return formatWithSecondaryTimeUnit(days, "day", hours % 24, "hour");
-  }
-  if (hours > 0) {
-    return formatWithSecondaryTimeUnit(hours, "hour", minutes % 60, "minute");
-  }
-  if (minutes > 0) {
-    return formatWithSecondaryTimeUnit(
-      minutes,
-      "minute",
-      seconds % 60,
-      "second"
-    );
-  }
-  return formatTimeUnit(seconds, "second");
-};
-
-const formatWithSecondaryTimeUnit = (
-  primaryAmount: number,
-  primaryUnit: string,
-  secondaryAmount: number,
-  secondaryUnit: string
-) => {
-  let result = formatTimeUnit(primaryAmount, primaryUnit);
-  if (secondaryAmount > 0) {
-    result = result + `, ${formatTimeUnit(secondaryAmount, secondaryUnit)}`;
-  }
-  return result;
-};
-
-const formatTimeUnit = (amount: number, unit: string) => {
-  const roundedAmount = Math.floor(amount);
-  return `${roundedAmount} ${unit}${roundedAmount > 1 ? "s" : ""}`;
 };
 
 const readUserNumber = () => {
