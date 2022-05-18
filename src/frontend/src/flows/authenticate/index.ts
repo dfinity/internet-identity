@@ -427,7 +427,7 @@ const formatTimeToLive = (maxTimeToLive: bigint | undefined) => {
   const seconds =
     maxTimeToLive !== undefined
       ? Math.floor(Number(maxTimeToLive / BigInt(1_000_000_000)))
-      : 30 * 60 * 60; // 30 minutes default
+      : 30 * 60; // 30 minutes default
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
