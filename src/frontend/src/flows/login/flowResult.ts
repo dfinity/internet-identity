@@ -1,17 +1,25 @@
 import { IIConnection, ApiResult } from "../../utils/iiConnection";
 
-export type LoginFlowResult =
-  | {
-      tag: "ok";
-      userNumber: bigint;
-      connection: IIConnection;
-    }
-  | {
-      tag: "err";
-      title: string;
-      message: string;
-      detail?: string;
-    };
+export type LoginFlowResult = LoginFlowSuccess | LoginFlowError;
+
+export type LoginFlowSuccess = {
+  tag: "ok";
+  userNumber: bigint;
+  connection: IIConnection;
+};
+
+export type LoginFlowError = {
+  tag: "err";
+  title: string;
+  message: string;
+  detail?: string;
+};
+
+/** The result of a login flow that was canceled */
+export type LoginFlowCanceled = { tag: "canceled" };
+export function canceled(): LoginFlowCanceled {
+  return { tag: "canceled" };
+}
 
 export const apiResultToLoginFlowResult = (
   result: ApiResult

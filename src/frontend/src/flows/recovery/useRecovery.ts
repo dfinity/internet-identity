@@ -1,22 +1,27 @@
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
-import { IIConnection, LoginResult } from "../../utils/iiConnection";
+import { IIConnection } from "../../utils/iiConnection";
 import { hasOwnProperty } from "../../utils/utils";
-import { apiResultToLoginFlowResult } from "../login/flowResult";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";
-import { inputSeedPhrase } from "./inputSeedPhrase";
+import { phraseRecoveryPage } from "./recoverWith/phrase";
+import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 
-const wantsSeedPhrase = (device: DeviceData): boolean => {
-  return hasOwnProperty(device.key_type, "seed_phrase");
+export const useRecovery = async (userNumber?: bigint): Promise<void> => {
+  if (userNumber !== undefined) {
+    return runRecovery(userNumber);
+  } else {
+    const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
+    console.log(pUserNumber);
+    if (pUserNumber !== null) {
+      return runRecovery(pUserNumber);
+    } else {
+      return window.location.reload();
+    }
+  }
 };
 
-export const useRecovery = async (userNumber?: bigint): Promise<void> => {
-  userNumber =
-    userNumber === undefined
-      ? await promptUserNumber("Recover Identity Anchor", null)
-      : userNumber;
+const runRecovery = async (userNumber: bigint): Promise<void> => {
   const recoveryDevices = await IIConnection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
@@ -28,37 +33,19 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
     return window.location.reload();
   }
 
-  const recoveryDevice =
+  const device =
     recoveryDevices.length === 1
       ? recoveryDevices[0]
       : await pickRecoveryDevice(recoveryDevices);
 
-  const logiFlowResult = apiResultToLoginFlowResult(
-    await loginWithRecovery(userNumber, recoveryDevice)
-  );
-  switch (logiFlowResult.tag) {
-    case "ok": {
-      return renderManage(logiFlowResult.userNumber, logiFlowResult.connection);
-    }
-    case "err": {
-      // TODO Display a recovery specific error
-      await displayError({ ...logiFlowResult, primaryButton: "Try again" });
-      return useRecovery();
-    }
-  }
-};
+  const res = hasOwnProperty(device.key_type, "seed_phrase")
+    ? await phraseRecoveryPage(userNumber, device)
+    : await deviceRecoveryPage(userNumber, device);
 
-const loginWithRecovery = async (
-  userNumber: bigint,
-  device: DeviceData
-): Promise<LoginResult> => {
-  if (wantsSeedPhrase(device)) {
-    const seedPhrase = await inputSeedPhrase(userNumber);
-    if (seedPhrase === null) {
-      return { kind: "seedPhraseFail" };
-    }
-    return await IIConnection.fromSeedPhrase(userNumber, seedPhrase, device);
-  } else {
-    return IIConnection.fromWebauthnDevices(userNumber, [device]);
+  // If res is null, the user canceled the flow, so we go back to the main page.
+  if (res.tag === "canceled") {
+    return window.location.reload();
   }
+
+  renderManage(res.userNumber, res.connection);
 };

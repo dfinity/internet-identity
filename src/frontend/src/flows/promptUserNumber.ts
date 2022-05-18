@@ -12,14 +12,14 @@ const pageContent = (title: string, userNumber: bigint | null) => html`
       value=${userNumber ?? ""}
     />
     <button id="userNumberContinue" class="primary">Continue</button>
+    <button id="userNumberCancel">Cancel</button>
   </div>
 `;
 
-// TODO: Let the user go back?
 export const promptUserNumber = async (
   title: string,
   userNumber: bigint | null
-): Promise<bigint> =>
+): Promise<bigint | null> =>
   new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(pageContent(title, userNumber), container);
@@ -48,4 +48,14 @@ export const promptUserNumber = async (
         userNumberInput.placeholder = "Please enter an Identity Anchor first";
       }
     };
+
+    const userNumberCancel = document.getElementById(
+      "userNumberCancel"
+    ) as HTMLButtonElement;
+
+    if (userNumberCancel !== null) {
+      userNumberCancel.onclick = async () => {
+        resolve(null);
+      };
+    }
   });
