@@ -131,12 +131,11 @@ const pageContent = (
             id="userNumberInput"
             placeholder="Enter Identity Anchor"
           />
-          <button
-            id="existingAnchorButton"
-            class="${userNumber === undefined ? "hidden" : ""} switchButton"
-          >
-            ${undoIcon}
-          </button>
+          ${userNumber !== undefined
+            ? html` <button id="existingAnchorButton" class="switchButton">
+                ${undoIcon}
+              </button>`
+            : ""}
         </div>
         <div id="invalidAnchorMessage" class="error-message hidden smallText">
           The Identity Anchor is not valid. Please try again.
@@ -243,10 +242,10 @@ const init = (authContext: AuthContext) => {
     "editAnchorButton"
   ) as HTMLButtonElement;
   editAnchorButton.onclick = () => setMode("newUserNumber");
-  const existingAnchorButton = document.getElementById(
-    "existingAnchorButton"
-  ) as HTMLButtonElement;
-  existingAnchorButton.onclick = () => setMode("existingUserNumber");
+  const existingAnchorButton = document.getElementById("existingAnchorButton");
+  if (existingAnchorButton !== null) {
+    existingAnchorButton.onclick = () => setMode("existingUserNumber");
+  }
 
   const loginButton = document.querySelector("#login") as HTMLButtonElement;
   loginButton.onclick = async () => {

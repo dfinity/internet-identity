@@ -334,9 +334,9 @@ export class AuthenticateView extends View {
   }
 
   async expectAnchorInputField(): Promise<void> {
-    expect(this.browser.$("#userNumberInput").isDisplayedInViewport()).toBe(
-      true
-    );
+    await this.browser
+      .$("#userNumberInput")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async authenticate(): Promise<void> {
