@@ -236,46 +236,33 @@ const init = (authContext: AuthContext) => {
     userNumber
   );
   initRecovery();
-  initRegistration().then((result) =>
-    result === null
-      ? init(authContext)
-      : handleAuthenticationResult(result, authContext)
-  );
+  initRegistration().then((result) => {
+    if (result === null) {
+      // user canceled registration
+      return init(authContext);
+    }
+    return handleAuthenticationResult(result, authContext);
+  });
+
   const editAnchorButton = document.getElementById(
     "editAnchorButton"
   ) as HTMLButtonElement;
   editAnchorButton.onclick = () => setMode("newUserNumber");
+
   const existingAnchorButton = document.getElementById("existingAnchorButton");
   if (existingAnchorButton !== null) {
     existingAnchorButton.onclick = () => setMode("existingUserNumber");
   }
 
-  const loginButton = document.querySelector("#login") as HTMLButtonElement;
-  loginButton.onclick = async () => {
-    try {
-      const userNumber = readUserNumber();
-      if (userNumber === undefined) {
-        toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
-        return;
-      }
-      const result = await withLoader(() => IIConnection.login(userNumber));
-      const loginResult = apiResultToLoginFlowResult(result);
-      await handleAuthenticationResult(loginResult, authContext);
-    } catch (error) {
-      await displayError({
-        title: "Authentication Failed",
-        message: "An error occurred during authentication.",
-        detail: error instanceof Error ? error.message : JSON.stringify(error),
-        primaryButton: "Try again",
-      });
-      init(authContext);
-    }
-  };
+  const authenticateButton = document.querySelector(
+    "#login"
+  ) as HTMLButtonElement;
+  authenticateButton.onclick = doAuthentication(authContext);
   document.onkeypress = (e) => {
     if (e.key === "Enter") {
       // authenticate if user hits enter
       e.preventDefault();
-      loginButton.click();
+      authenticateButton.click();
     }
   };
 
@@ -283,6 +270,27 @@ const init = (authContext: AuthContext) => {
     "manageButton"
   ) as HTMLButtonElement;
   manageButton.onclick = () => redirectToWelcomeScreen();
+};
+
+const doAuthentication = (authContext: AuthContext) => async () => {
+  try {
+    const userNumber = readUserNumber();
+    if (userNumber === undefined) {
+      toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
+      return;
+    }
+    const result = await withLoader(() => IIConnection.login(userNumber));
+    const loginResult = apiResultToLoginFlowResult(result);
+    await handleAuthenticationResult(loginResult, authContext);
+  } catch (error) {
+    await displayError({
+      title: "Authentication Failed",
+      message: "An error occurred during authentication.",
+      detail: error instanceof Error ? error.message : JSON.stringify(error),
+      primaryButton: "Try again",
+    });
+    init(authContext);
+  }
 };
 
 const displayPage = (
