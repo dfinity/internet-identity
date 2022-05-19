@@ -204,7 +204,7 @@ export async function addCustomCommands(
     "addWebauthnCredential",
     command(
       "POST",
-      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credential",
       {
         command: "addWebauthnCredential",
         description: "Adds a credential to a virtual authenticator",
@@ -219,6 +219,12 @@ export async function addCustomCommands(
         ],
         parameters: [
           {
+            name: "rpId",
+            type: "string",
+            description: "The relying party ID the credential is scoped to.",
+            required: true,
+          },
+          {
             name: "credentialId",
             type: "string",
             description: "The credential ID encoded using Base64url encoding",
@@ -229,12 +235,6 @@ export async function addCustomCommands(
             type: "boolean",
             description:
               "If set to true, a client-side discoverable credential is created. If set to false, a server-side credential is created instead.",
-            required: true,
-          },
-          {
-            name: "rpId",
-            type: "string",
-            description: "The relying party ID the credential is scoped to.",
             required: true,
           },
           {
@@ -277,11 +277,31 @@ export async function addVirtualAuthenticator(
   return await browser.addVirtualWebAuth("ctap2", "usb", true, true);
 }
 
-export async function getCredentials(
+export async function getWebAuthnCredentials(
   browser: WebdriverIO.Browser,
   authId: string
 ): Promise<WebAuthnCredential[]> {
   return await browser.getWebauthnCredentials(authId);
+}
+
+export async function addWebAuthnCredential(
+  browser: WebdriverIO.Browser,
+  authId: string,
+  credential: WebAuthnCredential,
+  rpId: string
+): Promise<void> {
+  return await browser.addWebauthnCredential(
+    authId,
+    rpId,
+    credential.credentialId,
+    credential.isResidentCredential,
+    credential.privateKey,
+    credential.signCount
+  );
+}
+
+export function originToRpId(origin: string): string {
+  return origin.replace(/https?:\/\/([.\w]+).*/, "$1");
 }
 
 export async function removeVirtualAuthenticator(
@@ -327,12 +347,12 @@ export async function waitForFonts(
 
 export async function switchToPopup(
   browser: WebdriverIO.Browser
-): Promise<void> {
+): Promise<string> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(2);
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
-  await addVirtualAuthenticator(browser);
+  return await addVirtualAuthenticator(browser);
 }
 
 export async function removeFeaturesWarning(

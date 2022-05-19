@@ -6,7 +6,6 @@ export type WebAuthnCredential = {
   isResidentCredential: boolean;
   privateKey: string;
   signCount: number;
-  rpId: string | undefined;
 };
 
 declare global {
@@ -25,7 +24,13 @@ declare global {
       ) => Promise<WebAuthnCredential[]>;
       addWebauthnCredential: (
         authenticatorId: string,
-        credential: WebAuthnCredential
+        rpId: string,
+        credentialId: string,
+        isResidentCredential: boolean,
+        privateKey: string,
+        signCount: number,
+        userHandle?: string,
+        largeBlob?: string
       ) => Promise<void>;
     }
   }
