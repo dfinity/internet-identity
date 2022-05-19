@@ -633,6 +633,7 @@ test("Screenshots", async () => {
       await browser.url(II_URL);
       await waitForFonts(browser);
       const welcomeView3 = new WelcomeView(browser);
+      await welcomeView3.waitForDisplay();
       await screenshots.take("features-warning", browser);
 
       // authenticate for dapp view
@@ -641,6 +642,7 @@ test("Screenshots", async () => {
       await demoAppView.waitForDisplay();
       await demoAppView.signin();
       await switchToPopup(browser);
+      await removeFeaturesWarning(browser);
       const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();
       await screenshots.take("authenticate-known-anchor", browser);
