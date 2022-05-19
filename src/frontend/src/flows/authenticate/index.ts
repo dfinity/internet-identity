@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { gearIcon, undoIcon, userSwitchIcon } from "../../components/icons";
+import { editIcon, undoIcon } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -16,10 +16,7 @@ import {
 import { displayError } from "../../components/displayError";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { useRecovery } from "../recovery/useRecovery";
-import {
-  initRegistration,
-  registrationSection,
-} from "../../components/registrationLink";
+import { initRegistration } from "../../components/registrationLink";
 import { AuthContext, READY_MESSAGE } from "./postMessageInterface";
 import {
   PublicKey,
@@ -27,31 +24,22 @@ import {
 } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { toggleErrorMessage } from "../../utils/errorHelper";
-import { questions } from "../faq";
-import { formatSessionValidity } from "./sessionValidityFormat";
-
-const DEFAULT_TTL = 30 * 60; // 30 minutes
 
 const pageContent = (
   hostName: string,
   maxTimeToLive: bigint | undefined,
   userNumber?: bigint
 ) => html` <style>
+    .spacer {
+      height: 2rem;
+    }
+
     .spacer-small {
       height: 1rem;
     }
 
-    #gearIcon {
-      position: relative;
-      top: 4px;
-    }
-
-    .spacer {
-      height: 3rem;
-    }
-
-    .mediumText {
-      font-size: 1.2rem;
+    .anchorText {
+      font-size: 1.5rem;
     }
 
     #userNumberInput {
@@ -59,7 +47,7 @@ const pageContent = (
       text-align: center;
       width: 100%;
       box-sizing: border-box;
-      padding: 0.55rem 3rem;
+      padding: 0.5rem 2rem;
     }
 
     #userNumberInput:focus {
@@ -80,7 +68,7 @@ const pageContent = (
     }
 
     .modeContainer {
-      min-height: 7rem;
+      min-height: 6rem;
     }
 
     .childContainer {
@@ -95,9 +83,9 @@ const pageContent = (
       top: 0;
       bottom: 0;
       right: 0;
-      padding: 0.7rem;
+      padding: 0.3rem;
       margin: 0;
-      width: fit-content;
+      width: 2rem;
       background: transparent;
       border: none;
     }
@@ -107,32 +95,33 @@ const pageContent = (
       font-weight: 400;
     }
 
-    .bold {
-      font-weight: 600;
+    .centeredText {
+      text-align: center;
     }
 
-    .greyText {
-      color: var(--grey-500);
-    }
-
-    .anchorTitle {
-      margin: 0;
+    .sectionTitle {
+      margin: 1rem 0 0.5rem 0;
       color: black;
+    }
+
+    hr {
+      border-color: var(--grey-050);
+      margin: 1rem 0;
     }
   </style>
   <div class="container">
-    <h1>Authorize Authentication for</h1>
+    <h1>Authorize private login</h1>
+    <p class="sectionTitle">Application URL</p>
     <div class="highlightBox smallText">${hostName}</div>
-    <div class="spacer-small"></div>
-    <p class="anchorTitle">Identity Anchor</p>
+    <p class="sectionTitle">Identity Anchor</p>
     <div>
       <div id="newUserNumber" class="modeContainer">
         <div class="childContainer">
           <input
-            class="mediumText"
+            class="anchorText"
             type="text"
             id="userNumberInput"
-            placeholder="Enter Identity Anchor"
+            placeholder="Enter Anchor"
           />
           ${userNumber !== undefined
             ? html` <button id="existingAnchorButton" class="switchButton">
@@ -143,43 +132,39 @@ const pageContent = (
         <div id="invalidAnchorMessage" class="error-message hidden smallText">
           The Identity Anchor is not valid. Please try again.
         </div>
-        ${registrationSection}
       </div>
       <div id="existingUserNumber" class="modeContainer">
         <div class="childContainer">
-          <div id="identityAnchor" class="highlightBox mediumText">
+          <div id="identityAnchor" class="highlightBox anchorText">
             ${userNumber}
           </div>
           <button id="editAnchorButton" class="switchButton">
-            ${userSwitchIcon}
+            ${editIcon}
           </button>
         </div>
       </div>
     </div>
-    <button type="button" id="login" class="primary">Authenticate</button>
-    <div class="smallText greyText">
-      Max session validity: ${formatSessionValidity(maxTimeToLive, DEFAULT_TTL)}
-    </div>
-    <div class="smallText greyText">
-      Different applications will not be able to track your activities among
-      each other.
-      <a
-        class="bold greyText"
-        href="/faq#${questions.shareIIAnchor.anchor}"
-        target="_blank"
-        >Learn More.</a
-      >
-    </div>
+    <button type="button" id="login" class="primary">Authorize</button>
     <div class="spacer"></div>
-    <div class="textLink">
-      Lost access
-      <button id="recoverButton" class="linkStyle">and want to recover?</button>
-    </div>
-    <div id="logoutBox">
-      <hr />
-      <button type="button" class="linkStyle" id="manageButton">
-        ${gearIcon} Manage your Identity Anchor
+    <div id="registerSection">
+      <div class="centeredText">or</div>
+      <div class="spacer"></div>
+      <button type="button" id="registerButton">
+        Create New Identity Anchor
       </button>
+      <div class="spacer-small"></div>
+    </div>
+    <div class="textLink">
+      <hr />
+      <div>
+        <button id="recoverButton" class="linkStyle">Lost access?</button>
+      </div>
+      <div>
+        <button type="button" class="linkStyle" id="manageButton">
+          Manage your Identity Anchor
+        </button>
+      </div>
+      <hr />
     </div>
     ${navbar}
   </div>
@@ -410,12 +395,12 @@ const initRecovery = () => {
 };
 
 const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
-  const existingUserNumber = document.getElementById(
-    "existingUserNumber"
-  ) as HTMLElement;
-  const newUserNumber = document.getElementById("newUserNumber") as HTMLElement;
-  existingUserNumber.classList.toggle("hidden", mode !== "existingUserNumber");
-  newUserNumber.classList.toggle("hidden", mode !== "newUserNumber");
+  const existingUserNumber = document.getElementById("existingUserNumber");
+  const newUserNumber = document.getElementById("newUserNumber");
+  const registerSection = document.getElementById("registerSection");
+  existingUserNumber?.classList.toggle("hidden", mode !== "existingUserNumber");
+  newUserNumber?.classList.toggle("hidden", mode !== "newUserNumber");
+  registerSection?.classList.toggle("hidden", mode !== "newUserNumber");
 
   if (mode === "newUserNumber") {
     toggleErrorMessage("userNumberInput", "invalidAnchorMessage", false);
