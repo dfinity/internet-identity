@@ -340,7 +340,7 @@ export class AuthenticateView extends View {
   }
 
   async authenticate(): Promise<void> {
-    await this.browser.$("#login").click();
+    await this.browser.$("#authorizeButton").click();
   }
 
   async register(): Promise<void> {
