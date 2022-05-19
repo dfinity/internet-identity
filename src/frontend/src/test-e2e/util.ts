@@ -1,5 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
+import { WebAuthnCredential } from "../../test-setup";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -46,7 +47,7 @@ export async function runInBrowserCommon(
       browserName: "chrome",
       "goog:chromeOptions": {
         args: [
-          "--headless",
+          // "--headless",
           "--ignore-certificate-errors", // allow self-signed certificates
           "--disable-gpu",
           `--window-size=${runConfig.screenConfiguration.windowSize}`,
@@ -176,12 +177,111 @@ export async function addCustomCommands(
       }
     )
   );
+
+  await browser.addCommand(
+    "getWebauthnCredentials",
+    command(
+      "GET",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
+      {
+        command: "getWebauthnCredentials",
+        description: "retrieves the credentials of a virtual authenticator",
+        ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-get-credentials",
+        variables: [
+          {
+            name: "authenticatorId",
+            type: "string",
+            description: "The id of the authenticator to remove",
+            required: true,
+          },
+        ],
+        parameters: [],
+      }
+    )
+  );
+
+  await browser.addCommand(
+    "addWebauthnCredential",
+    command(
+      "POST",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
+      {
+        command: "addWebauthnCredential",
+        description: "Adds a credential to a virtual authenticator",
+        ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-add-credential",
+        variables: [
+          {
+            name: "authenticatorId",
+            type: "string",
+            description: "The id of the authenticator to remove",
+            required: true,
+          },
+        ],
+        parameters: [
+          {
+            name: "credentialId",
+            type: "string",
+            description: "The credential ID encoded using Base64url encoding",
+            required: true,
+          },
+          {
+            name: "isResidentCredential",
+            type: "boolean",
+            description:
+              "If set to true, a client-side discoverable credential is created. If set to false, a server-side credential is created instead.",
+            required: true,
+          },
+          {
+            name: "rpId",
+            type: "string",
+            description: "The relying party ID the credential is scoped to.",
+            required: true,
+          },
+          {
+            name: "privateKey",
+            type: "string",
+            description:
+              "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url encoding.",
+            required: true,
+          },
+          {
+            name: "signCount",
+            type: "number",
+            description:
+              "The initial value for a signature counter associated to the public key credential source.",
+            required: true,
+          },
+          {
+            name: "userHandle",
+            type: "string",
+            description:
+              "The userHandle associated to the credential encoded using Base64url encoding.",
+            required: false,
+          },
+          {
+            name: "largeBlob",
+            type: "string",
+            description:
+              "The large, per-credential blob associated to the public key credential source, encoded using Base64url encoding.",
+            required: false,
+          },
+        ],
+      }
+    )
+  );
 }
 
 export async function addVirtualAuthenticator(
   browser: WebdriverIO.Browser
 ): Promise<string> {
   return await browser.addVirtualWebAuth("ctap2", "usb", true, true);
+}
+
+export async function getCredentials(
+  browser: WebdriverIO.Browser,
+  authId: string
+): Promise<WebAuthnCredential[]> {
+  return await browser.getWebauthnCredentials(authId);
 }
 
 export async function removeVirtualAuthenticator(
