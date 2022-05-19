@@ -286,9 +286,8 @@ const handleAuthResult = async (
   if (loginResult.tag === "ok") {
     // successful login, store user number for next time
     setUserNumber(loginResult.userNumber);
-    const [userKey, parsed_signed_delegation] = await fetchDelegation(
-      loginResult,
-      authContext
+    const [userKey, parsed_signed_delegation] = await withLoader(() =>
+      fetchDelegation(loginResult, authContext)
     );
     return new AuthSuccess(loginResult.userNumber, loginResult.connection, () =>
       authContext.postMessageCallback(

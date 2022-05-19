@@ -4,7 +4,6 @@ import {
   PublicKey,
   SignedDelegation,
 } from "../../../generated/internet_identity_types";
-import { withLoader } from "../../components/loader";
 import { hasOwnProperty } from "../../utils/utils";
 
 export const fetchDelegation = async (
@@ -14,36 +13,34 @@ export const fetchDelegation = async (
   },
   authContext: AuthContext
 ): Promise<[PublicKey, Delegation]> => {
-  return await withLoader(async () => {
-    const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
-    const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
-      loginResult.userNumber,
-      authContext.requestOrigin,
-      sessionKey,
-      authContext.authRequest.maxTimeToLive
-    );
+  const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
+  const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
+    loginResult.userNumber,
+    authContext.requestOrigin,
+    sessionKey,
+    authContext.authRequest.maxTimeToLive
+  );
 
-    const signed_delegation = await retryGetDelegation(
-      loginResult.connection,
-      loginResult.userNumber,
-      authContext.requestOrigin,
-      sessionKey,
-      timestamp
-    );
+  const signed_delegation = await retryGetDelegation(
+    loginResult.connection,
+    loginResult.userNumber,
+    authContext.requestOrigin,
+    sessionKey,
+    timestamp
+  );
 
-    // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
-    return [
-      userKey,
-      {
-        delegation: {
-          pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
-          expiration: BigInt(signed_delegation.delegation.expiration),
-          targets: undefined,
-        },
-        signature: Uint8Array.from(signed_delegation.signature),
+  // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+  return [
+    userKey,
+    {
+      delegation: {
+        pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
+        expiration: BigInt(signed_delegation.delegation.expiration),
+        targets: undefined,
       },
-    ];
-  });
+      signature: Uint8Array.from(signed_delegation.signature),
+    },
+  ];
 };
 
 const retryGetDelegation = async (
