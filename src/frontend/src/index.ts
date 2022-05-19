@@ -36,7 +36,12 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      return authenticate();
+      const authSuccess = await authenticate();
+      // show the recovery wizard before sending the window post message, otherwise the II window will be closed
+      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      // send the delegation back to the dapp window (which will then close the II window)
+      authSuccess.sendDelegationMessage();
+      return;
     }
     // Open the management page
     case "manage": {

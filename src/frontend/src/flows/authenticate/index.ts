@@ -14,16 +14,14 @@ import {
   LoginFlowResult,
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
-import { recoveryWizard } from "../recovery/recoveryWizard";
 import { useRecovery } from "../recovery/useRecovery";
 import { initRegistration } from "../../components/registrationLink";
-import { AuthContext, READY_MESSAGE } from "./postMessageInterface";
-import {
-  PublicKey,
-  SignedDelegation,
-} from "../../../generated/internet_identity_types";
-import { hasOwnProperty } from "../../utils/utils";
+import waitForAuthRequest, {
+  AuthContext,
+  delegationMessage,
+} from "./postMessageInterface";
 import { toggleErrorMessage } from "../../utils/errorHelper";
+import { fetchDelegation } from "./fetchDelegation";
 
 const pageContent = (
   hostName: string,
@@ -115,13 +113,13 @@ const pageContent = (
     <div class="highlightBox smallText">${hostName}</div>
     <p class="sectionTitle">Identity Anchor</p>
     <div>
-      <div id="newUserNumber" class="modeContainer">
+      <div id="newUserSection" class="modeContainer">
         <div class="childContainer">
           <input
             class="anchorText"
             type="text"
             id="userNumberInput"
-            placeholder="Enter Anchor"
+            placeholder="Enter anchor"
           />
           ${userNumber !== undefined
             ? html` <button id="existingAnchorButton" class="switchButton">
@@ -133,7 +131,7 @@ const pageContent = (
           The Identity Anchor is not valid. Please try again.
         </div>
       </div>
-      <div id="existingUserNumber" class="modeContainer">
+      <div id="existingUserSection" class="modeContainer">
         <div class="childContainer">
           <div id="identityAnchor" class="highlightBox anchorText">
             ${userNumber}
@@ -144,7 +142,9 @@ const pageContent = (
         </div>
       </div>
     </div>
-    <button type="button" id="login" class="primary">Authorize</button>
+    <button type="button" id="authorizeButton" class="primary">
+      Authorize
+    </button>
     <div class="spacer"></div>
     <div id="registerSection">
       <div class="centeredText">or</div>
@@ -170,64 +170,39 @@ const pageContent = (
   </div>
   ${footer}`;
 
-export const authenticate = async (): Promise<void> => {
-  await withLoader(async () => {
-    const authContext = await setup();
-    return init(authContext);
+export class AuthSuccess {
+  constructor(
+    public userNumber: bigint,
+    public connection: IIConnection,
+    public sendDelegationMessage: () => void
+  ) {}
+}
+
+export const authenticate = async (): Promise<AuthSuccess> => {
+  return new Promise((resolve) => {
+    withLoader(async () => {
+      const authContext = await waitForAuthRequest();
+      if (authContext === null) {
+        redirectToWelcomeScreen();
+        return;
+      }
+      resolve(Promise.resolve(init(authContext)));
+    });
   });
 };
 
-/**
- * Setup an event listener to listen to authorize requests from the client.
- */
-export default async function setup(): Promise<AuthContext> {
-  const result = new Promise<AuthContext>((resolve, reject) => {
-    // Set up an event listener for receiving messages from the client.
-    window.addEventListener("message", async (event) => {
-      const message = event.data;
-      if (message.kind === "authorize-client") {
-        console.log("Handling authorize-client request.");
-        resolve(
-          new AuthContext(message, event.origin, (responseMessage) =>
-            (event.source as Window).postMessage(responseMessage, event.origin)
-          )
-        );
-      } else {
-        console.error(
-          `Message of unknown kind received: ${JSON.stringify(message)}`
-        );
-        reject();
-      }
-    });
-  });
-
-  // Send a message to indicate we're ready.
-  // NOTE: Because `window.opener.origin` cannot be accessed, this message
-  // is sent with "*" as the target origin. This is safe as no sensitive
-  // information is being communicated here.
-  if (window.opener !== null) {
-    window.opener.postMessage(READY_MESSAGE, "*");
-  } else {
-    redirectToWelcomeScreen();
-  }
-  return result;
-}
-
-const init = (authContext: AuthContext) => {
+const init = (authContext: AuthContext): Promise<AuthSuccess> => {
   const userNumber = getUserNumber();
   displayPage(
     authContext.requestOrigin,
     authContext.authRequest.maxTimeToLive,
     userNumber
   );
+  const manageButton = document.getElementById(
+    "manageButton"
+  ) as HTMLButtonElement;
+  manageButton.onclick = () => redirectToWelcomeScreen();
   initRecovery();
-  initRegistration().then((result) => {
-    if (result === null) {
-      // user canceled registration
-      return init(authContext);
-    }
-    return handleAuthenticationResult(result, authContext);
-  });
 
   const editAnchorButton = document.getElementById(
     "editAnchorButton"
@@ -240,9 +215,8 @@ const init = (authContext: AuthContext) => {
   }
 
   const authenticateButton = document.querySelector(
-    "#login"
+    "#authorizeButton"
   ) as HTMLButtonElement;
-  authenticateButton.onclick = doAuthentication(authContext);
   document.onkeypress = (e) => {
     if (e.key === "Enter") {
       // authenticate if user hits enter
@@ -251,22 +225,39 @@ const init = (authContext: AuthContext) => {
     }
   };
 
-  const manageButton = document.getElementById(
-    "manageButton"
-  ) as HTMLButtonElement;
-  manageButton.onclick = () => redirectToWelcomeScreen();
+  return new Promise((resolve) => {
+    initRegistration()
+      .then((result) => {
+        if (result === null) {
+          // user canceled registration
+          return Promise.resolve(init(authContext));
+        }
+        return Promise.resolve(handleAuthResult(result, authContext));
+      })
+      .then((authSuccess) => resolve(authSuccess));
+
+    authenticateButton.onclick = () => {
+      doAuthentication(authContext).then((authSuccess) => {
+        if (authSuccess !== null) {
+          resolve(authSuccess);
+        }
+      });
+    };
+  });
 };
 
-const doAuthentication = (authContext: AuthContext) => async () => {
+const doAuthentication = async (
+  authContext: AuthContext
+): Promise<AuthSuccess | null> => {
   try {
     const userNumber = readUserNumber();
     if (userNumber === undefined) {
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
-      return;
+      return null;
     }
     const result = await withLoader(() => IIConnection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
-    await handleAuthenticationResult(loginResult, authContext);
+    return await handleAuthResult(loginResult, authContext);
   } catch (error) {
     await displayError({
       title: "Authentication Failed",
@@ -274,7 +265,7 @@ const doAuthentication = (authContext: AuthContext) => async () => {
       detail: error instanceof Error ? error.message : JSON.stringify(error),
       primaryButton: "Try again",
     });
-    init(authContext);
+    return init(authContext);
   }
 };
 
@@ -288,26 +279,22 @@ const displayPage = (
   setMode(userNumber === undefined ? "newUserNumber" : "existingUserNumber");
 };
 
-const handleAuthenticationResult = async (
+const handleAuthResult = async (
   loginResult: LoginFlowResult,
   authContext: AuthContext
-) => {
+): Promise<AuthSuccess> => {
   if (loginResult.tag === "ok") {
-    setUserNumber(loginResult.userNumber); // successful login, store user number for next time
-    const { userKey, parsed_signed_delegation } = await fetchDelegation(
+    // successful login, store user number for next time
+    setUserNumber(loginResult.userNumber);
+    const [userKey, parsed_signed_delegation] = await fetchDelegation(
       loginResult,
       authContext
     );
-
-    // show the recovery wizard before sending the window post message, otherwise the II window will be closed
-    await recoveryWizard(loginResult.userNumber, loginResult.connection);
-
-    // send the
-    authContext.postMessageCallback({
-      kind: "authorize-client-success",
-      delegations: [parsed_signed_delegation],
-      userPublicKey: Uint8Array.from(userKey),
-    });
+    return new AuthSuccess(loginResult.userNumber, loginResult.connection, () =>
+      authContext.postMessageCallback(
+        delegationMessage(parsed_signed_delegation, userKey)
+      )
+    );
   } else {
     await displayError({
       title: loginResult.title,
@@ -315,76 +302,8 @@ const handleAuthenticationResult = async (
       detail: loginResult.detail !== "" ? loginResult.detail : undefined,
       primaryButton: "Try again",
     });
-    init(authContext);
+    return init(authContext);
   }
-};
-
-const fetchDelegation = async (
-  loginResult: {
-    userNumber: bigint;
-    connection: IIConnection;
-  },
-  authContext: AuthContext
-) => {
-  const [userKey, parsed_signed_delegation] = await withLoader(async () => {
-    const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
-    const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
-      loginResult.userNumber,
-      authContext.requestOrigin,
-      sessionKey,
-      authContext.authRequest.maxTimeToLive
-    );
-
-    const signed_delegation = await retryGetDelegation(
-      loginResult.connection,
-      loginResult.userNumber,
-      authContext.requestOrigin,
-      sessionKey,
-      timestamp
-    );
-
-    // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
-    return [
-      userKey,
-      {
-        delegation: {
-          pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
-          expiration: BigInt(signed_delegation.delegation.expiration),
-          targets: undefined,
-        },
-        signature: Uint8Array.from(signed_delegation.signature),
-      },
-    ];
-  });
-  return { userKey, parsed_signed_delegation };
-};
-
-const retryGetDelegation = async (
-  connection: IIConnection,
-  userNumber: bigint,
-  hostname: string,
-  sessionKey: PublicKey,
-  timestamp: bigint,
-  maxRetries = 5
-): Promise<SignedDelegation> => {
-  for (let i = 0; i < maxRetries; i++) {
-    // Linear backoff
-    await new Promise((resolve) => {
-      setInterval(resolve, 1000 * i);
-    });
-    const res = await connection.getDelegation(
-      userNumber,
-      hostname,
-      sessionKey,
-      timestamp
-    );
-    if (hasOwnProperty(res, "signed_delegation")) {
-      return res.signed_delegation;
-    }
-  }
-  throw new Error(
-    `Failed to retrieve a delegation after ${maxRetries} retries.`
-  );
 };
 
 const initRecovery = () => {
@@ -395,8 +314,8 @@ const initRecovery = () => {
 };
 
 const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
-  const existingUserNumber = document.getElementById("existingUserNumber");
-  const newUserNumber = document.getElementById("newUserNumber");
+  const existingUserNumber = document.getElementById("existingUserSection");
+  const newUserNumber = document.getElementById("newUserSection");
   const registerSection = document.getElementById("registerSection");
   existingUserNumber?.classList.toggle("hidden", mode !== "existingUserNumber");
   newUserNumber?.classList.toggle("hidden", mode !== "newUserNumber");
@@ -419,10 +338,10 @@ const redirectToWelcomeScreen = () => {
 };
 
 const readUserNumber = () => {
-  const userNumberInputSection = document.getElementById(
-    "newUserNumber"
+  const newUserSection = document.getElementById(
+    "newUserSection"
   ) as HTMLElement;
-  if (!userNumberInputSection.classList.contains("hidden")) {
+  if (!newUserSection.classList.contains("hidden")) {
     const parsedUserNumber = parseUserNumber(
       (document.getElementById("userNumberInput") as HTMLInputElement).value
     );
