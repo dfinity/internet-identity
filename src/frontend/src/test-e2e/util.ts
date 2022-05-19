@@ -47,7 +47,7 @@ export async function runInBrowserCommon(
       browserName: "chrome",
       "goog:chromeOptions": {
         args: [
-          // "--headless",
+          "--headless",
           "--ignore-certificate-errors", // allow self-signed certificates
           "--disable-gpu",
           `--window-size=${runConfig.screenConfiguration.windowSize}`,
