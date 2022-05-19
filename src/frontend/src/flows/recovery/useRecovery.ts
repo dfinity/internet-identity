@@ -12,7 +12,6 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
     return runRecovery(userNumber);
   } else {
     const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
-    console.log(pUserNumber);
     if (pUserNumber !== null) {
       return runRecovery(pUserNumber);
     } else {
