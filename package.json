@@ -14,8 +14,8 @@
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend",
-    "format-check": "prettier --check src/frontend",
+    "format": "prettier --write src/frontend .eslintrc.json",
+    "format-check": "prettier --check src/frontend .eslintrc.json",
     "install-webdrivers": "selenium-standalone install --config ./selenium-standalone.config.js"
   },
   "devDependencies": {
