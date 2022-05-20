@@ -115,6 +115,10 @@ function parseRunConfiguration(): RunConfiguration {
   };
 }
 
+/**
+ * Adds custom commands for webauthn authenticator administration as documented here: https://webdriver.io/docs/customcommands/#add-more-webdriver-commands
+ * @param browser browser to add the commands to
+ */
 export async function addCustomCommands(
   browser: WebdriverIO.Browser
 ): Promise<void> {
