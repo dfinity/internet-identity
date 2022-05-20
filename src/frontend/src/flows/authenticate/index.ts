@@ -167,12 +167,10 @@ const pageContent = (
   </div>
   ${footer}`;
 
-export class AuthSuccess {
-  constructor(
-    public userNumber: bigint,
-    public connection: IIConnection,
-    public sendDelegationMessage: () => void
-  ) {}
+export interface AuthSuccess {
+  userNumber: bigint;
+  connection: IIConnection;
+  sendDelegationMessage: () => void;
 }
 
 /**
@@ -189,7 +187,7 @@ export const authenticate = async (): Promise<AuthSuccess> => {
         redirectToWelcomeScreen();
         return;
       }
-      resolve(Promise.resolve(init(authContext)));
+      init(authContext).then(resolve);
     });
   });
 };
@@ -312,13 +310,16 @@ const handleAuthResult = async (
     const [userKey, parsed_signed_delegation] = await withLoader(() =>
       fetchDelegation(loginResult, authContext)
     );
-    return new AuthSuccess(loginResult.userNumber, loginResult.connection, () =>
-      authContext.postMessageCallback({
-        kind: "authorize-client-success",
-        delegations: [parsed_signed_delegation],
-        userPublicKey: Uint8Array.from(userKey),
-      })
-    );
+    return {
+      userNumber: loginResult.userNumber,
+      connection: loginResult.connection,
+      sendDelegationMessage: () =>
+        authContext.postMessageCallback({
+          kind: "authorize-client-success",
+          delegations: [parsed_signed_delegation],
+          userPublicKey: Uint8Array.from(userKey),
+        }),
+    };
   } else {
     await displayError({
       title: loginResult.title,
