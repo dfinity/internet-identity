@@ -36,6 +36,7 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
+      // show the application authorization screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
       const authSuccess = await authenticate();
       // show the recovery wizard before sending the window post message, otherwise the II window will be closed
       await recoveryWizard(authSuccess.userNumber, authSuccess.connection);

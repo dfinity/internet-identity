@@ -182,6 +182,11 @@ export class AuthSuccess {
   ) {}
 }
 
+/**
+ * Shows the authorize application view and returns information about the authenticated user and a callback, which sends
+ * the delegation to the application window. After having received the delegation the application will close the
+ * Internet Identity window.
+ */
 export const authenticate = async (): Promise<AuthSuccess> => {
   return new Promise((resolve) => {
     withLoader(async () => {
@@ -229,6 +234,7 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
     }
   };
 
+  // Resolve either on successful authentication or after registration
   return new Promise((resolve) => {
     initRegistration()
       .then((result) => {
@@ -241,7 +247,7 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
       .then((authSuccess) => resolve(authSuccess));
 
     authenticateButton.onclick = () => {
-      doAuthentication(authContext).then((authSuccess) => {
+      authenticateUser(authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -250,7 +256,7 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
   });
 };
 
-const doAuthentication = async (
+const authenticateUser = async (
   authContext: AuthContext
 ): Promise<AuthSuccess | null> => {
   try {
@@ -283,6 +289,11 @@ const displayPage = (
   setMode(userNumber === undefined ? "newUserNumber" : "existingUserNumber");
 };
 
+/**
+ * Checks whether login was successful, and if so fetches the delegation from II.
+ * @param loginResult Result of authentication
+ * @param authContext Information about the authentication request being processed.
+ */
 const handleAuthResult = async (
   loginResult: LoginFlowResult,
   authContext: AuthContext
@@ -316,6 +327,10 @@ const initRecovery = () => {
   recoverButton.onclick = () => useRecovery(getUserNumber());
 };
 
+/**
+ * Toggles the view between showing a prefilled anchor number and the input field to provide a new one.
+ * @param mode Mode to set the view to.
+ */
 const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
   const existingUserNumber = document.getElementById("existingUserSection");
   const newUserNumber = document.getElementById("newUserSection");
@@ -343,6 +358,10 @@ const redirectToWelcomeScreen = () => {
   window.location.reload();
 };
 
+/**
+ * Figure out the current user number to use, depending on the mode the view is in and whether there is a valid value
+ * in the input field.
+ */
 const readUserNumber = () => {
   const newUserSection = document.getElementById(
     "newUserSection"

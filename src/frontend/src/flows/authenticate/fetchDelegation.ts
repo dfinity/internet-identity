@@ -6,6 +6,13 @@ import {
 } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 
+/**
+ * Prepares and fetches a delegation valid for the authenticated user and the application information contained in
+ * authContext.
+ * @param loginResult User number and authenticated II connection resulting from successful authentication.
+ * @param authContext Information about the authentication request received from the application via window post message.
+ * @return Tuple of PublicKey and matching delegation.
+ */
 export const fetchDelegation = async (
   loginResult: {
     userNumber: bigint;

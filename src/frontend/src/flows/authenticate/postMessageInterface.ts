@@ -1,3 +1,5 @@
+// Types and functions related to the window post message interface used by
+// applications that want to authenticate the user using Internet Identity
 import { Principal } from "@dfinity/principal";
 
 export interface AuthRequest {
@@ -21,10 +23,24 @@ export interface AuthResponseSuccess {
   userPublicKey: Uint8Array;
 }
 
+/**
+ * All information required to process an authentication request received from
+ * a client application.
+ */
 export class AuthContext {
   constructor(
+    /**
+     * Information sent by the client application.
+     */
     public authRequest: AuthRequest,
+    /**
+     * Origin of the message.
+     */
     public requestOrigin: string,
+    /**
+     * Callback to send a result back to the sender. We currently only send
+     * either a success message or nothing at all.
+     */
     public postMessageCallback: (message: AuthResponseSuccess) => void
   ) {}
 }
@@ -46,7 +62,8 @@ export function delegationMessage(
 }
 
 /**
- * Set up an event listener to and wait for the authorize request from the client.
+ * Set up an event listener for window post messages and wait for the authorize
+ * authentication request from the client application.
  */
 export default async function waitForAuthRequest(): Promise<AuthContext | null> {
   const result = new Promise<AuthContext>((resolve, reject) => {
