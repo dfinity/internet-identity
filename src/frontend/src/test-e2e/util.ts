@@ -227,12 +227,12 @@ export async function waitForFonts(
 
 export async function switchToPopup(
   browser: WebdriverIO.Browser
-): Promise<string> {
+): Promise<void> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(2);
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
-  return await addVirtualAuthenticator(browser);
+  await addVirtualAuthenticator(browser);
 }
 
 export async function removeFeaturesWarning(
