@@ -1,6 +1,5 @@
 import "./styles/main.css";
 import { login } from "./flows/login";
-import auth from "./auth";
 import { renderManage } from "./flows/manage";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
@@ -9,6 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
+import postMessageInterface from "./flows/authenticate/postMessageInterface";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -44,7 +44,7 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      return auth(userNumber, connection);
+      return postMessageInterface(userNumber, connection);
     }
     // Open the management page
     case "manage": {
