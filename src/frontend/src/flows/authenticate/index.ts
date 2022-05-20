@@ -93,10 +93,6 @@ const pageContent = (
       font-weight: 400;
     }
 
-    .centeredText {
-      text-align: center;
-    }
-
     .sectionTitle {
       margin: 1rem 0 0.5rem 0;
       color: black;
@@ -151,7 +147,7 @@ const pageContent = (
     </button>
     <div class="spacer"></div>
     <div id="registerSection">
-      <div class="centeredText">or</div>
+      <div style="text-align: center">or</div>
       <div class="spacer"></div>
       <button type="button" id="registerButton">
         Create New Identity Anchor
@@ -370,6 +366,7 @@ const readUserNumber = () => {
     const parsedUserNumber = parseUserNumber(
       (document.getElementById("userNumberInput") as HTMLInputElement).value
     );
+    // get rid of null, we use undefined for 'not set'
     return parsedUserNumber === null ? undefined : parsedUserNumber;
   }
   return getUserNumber();
