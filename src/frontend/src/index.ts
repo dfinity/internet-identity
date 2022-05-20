@@ -8,7 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import postMessageInterface from "./flows/authenticate/postMessageInterface";
+import auth from "./auth";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -44,7 +44,7 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      return postMessageInterface(userNumber, connection);
+      return auth(userNumber, connection);
     }
     // Open the management page
     case "manage": {
