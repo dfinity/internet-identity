@@ -1,5 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
+import { WebAuthnCredential } from "../../test-setup";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -176,6 +177,98 @@ export async function addCustomCommands(
       }
     )
   );
+
+  await browser.addCommand(
+    "getWebauthnCredentials",
+    command(
+      "GET",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credentials",
+      {
+        command: "getWebauthnCredentials",
+        description: "retrieves the credentials of a virtual authenticator",
+        ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-get-credentials",
+        variables: [
+          {
+            name: "authenticatorId",
+            type: "string",
+            description: "The id of the authenticator to remove",
+            required: true,
+          },
+        ],
+        parameters: [],
+      }
+    )
+  );
+
+  await browser.addCommand(
+    "addWebauthnCredential",
+    command(
+      "POST",
+      "/session/:sessionId/webauthn/authenticator/:authenticatorId/credential",
+      {
+        command: "addWebauthnCredential",
+        description: "Adds a credential to a virtual authenticator",
+        ref: "https://www.w3.org/TR/webauthn-2/#sctn-automation-add-credential",
+        variables: [
+          {
+            name: "authenticatorId",
+            type: "string",
+            description: "The id of the authenticator to remove",
+            required: true,
+          },
+        ],
+        parameters: [
+          {
+            name: "rpId",
+            type: "string",
+            description: "The relying party ID the credential is scoped to.",
+            required: true,
+          },
+          {
+            name: "credentialId",
+            type: "string",
+            description: "The credential ID encoded using Base64url encoding",
+            required: true,
+          },
+          {
+            name: "isResidentCredential",
+            type: "boolean",
+            description:
+              "If set to true, a client-side discoverable credential is created. If set to false, a server-side credential is created instead.",
+            required: true,
+          },
+          {
+            name: "privateKey",
+            type: "string",
+            description:
+              "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url encoding.",
+            required: true,
+          },
+          {
+            name: "signCount",
+            type: "number",
+            description:
+              "The initial value for a signature counter associated to the public key credential source.",
+            required: true,
+          },
+          {
+            name: "userHandle",
+            type: "string",
+            description:
+              "The userHandle associated to the credential encoded using Base64url encoding.",
+            required: false,
+          },
+          {
+            name: "largeBlob",
+            type: "string",
+            description:
+              "The large, per-credential blob associated to the public key credential source, encoded using Base64url encoding.",
+            required: false,
+          },
+        ],
+      }
+    )
+  );
 }
 
 export async function addVirtualAuthenticator(
@@ -189,6 +282,33 @@ export async function removeVirtualAuthenticator(
   authenticatorId: string
 ): Promise<void> {
   return await browser.removeVirtualWebAuth(authenticatorId);
+}
+
+export async function getWebAuthnCredentials(
+  browser: WebdriverIO.Browser,
+  authId: string
+): Promise<WebAuthnCredential[]> {
+  return await browser.getWebauthnCredentials(authId);
+}
+
+export async function addWebAuthnCredential(
+  browser: WebdriverIO.Browser,
+  authId: string,
+  credential: WebAuthnCredential,
+  rpId: string
+): Promise<void> {
+  return await browser.addWebauthnCredential(
+    authId,
+    rpId,
+    credential.credentialId,
+    credential.isResidentCredential,
+    credential.privateKey,
+    credential.signCount
+  );
+}
+
+export function originToRpId(origin: string): string {
+  return origin.replace(/https?:\/\/([.\w]+).*/, "$1");
 }
 
 // 'Screenshots' objects are used to make sure all screenshots end up in the
@@ -227,12 +347,12 @@ export async function waitForFonts(
 
 export async function switchToPopup(
   browser: WebdriverIO.Browser
-): Promise<void> {
+): Promise<string> {
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(2);
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
-  await addVirtualAuthenticator(browser);
+  return await addVirtualAuthenticator(browser);
 }
 
 export async function removeFeaturesWarning(
