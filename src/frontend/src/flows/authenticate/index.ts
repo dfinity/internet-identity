@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { editIcon, undoIcon } from "../../components/icons";
+import { editIcon } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -118,11 +118,6 @@ const pageContent = (
             id="userNumberInput"
             placeholder="Enter anchor"
           />
-          ${userNumber !== undefined
-            ? html` <button id="existingAnchorButton" class="switchButton">
-                ${undoIcon}
-              </button>`
-            : ""}
         </div>
         <div id="invalidAnchorMessage" class="error-message-hidden smallText">
           The Identity Anchor is not valid. Please try again.
@@ -212,14 +207,6 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
     pageMode.mode = "newUserNumber";
     setMode(pageMode);
   };
-
-  const existingAnchorButton = document.getElementById("existingAnchorButton");
-  if (existingAnchorButton !== null) {
-    existingAnchorButton.onclick = () => {
-      pageMode.mode = "existingUserNumber";
-      setMode(pageMode);
-    };
-  }
 
   const authenticateButton = document.getElementById(
     "authorizeButton"
