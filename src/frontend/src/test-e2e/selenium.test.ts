@@ -23,9 +23,6 @@ import {
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
-  getWebAuthnCredentials,
-  originToRpId,
   removeFeaturesWarning,
   removeVirtualAuthenticator,
   RunConfiguration,
@@ -233,58 +230,6 @@ test("Log into client application, after registration", async () => {
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
-    await waitToClose(browser);
-    await demoAppView.waitForDisplay();
-    const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe("2vxsx-fae");
-
-    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
-      principal
-    );
-
-    // default value
-    const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (24 * 60 * 60_000_000_000)).toBeCloseTo(1);
-  });
-}, 300_000);
-
-test("Register first then log into client application", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const authenticatorId1 = await addVirtualAuthenticator(browser);
-
-    await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
-
-    const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
-    expect(credentials).toHaveLength(1);
-
-    const demoAppView = new DemoAppView(browser);
-    await demoAppView.open(DEMO_APP_URL, II_URL);
-    await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
-    await demoAppView.signin();
-
-    const authenticatorId2 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId2,
-      credentials[0],
-      originToRpId(II_ORIGIN)
-    );
-
-    const authenticateView = new AuthenticateView(browser);
-    await authenticateView.waitForDisplay();
-    await authenticateView.expectPrefilledAnchorToBe(userNumber);
-    await authenticateView.authenticate();
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.remindLater();
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
