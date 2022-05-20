@@ -93,6 +93,8 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
   if (window.opener !== null) {
     window.opener.postMessage(READY_MESSAGE, "*");
   } else {
+    // If there's no `window.opener` a user has manually navigated to "/#authorize".
+    // Signal that there will never be an authentication request incoming.
     return Promise.resolve(null);
   }
   return result;

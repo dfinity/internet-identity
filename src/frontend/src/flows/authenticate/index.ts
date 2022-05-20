@@ -188,6 +188,7 @@ export const authenticate = async (): Promise<AuthSuccess> => {
     withLoader(async () => {
       const authContext = await waitForAuthRequest();
       if (authContext === null) {
+        // The user has manually navigated to "/#authorize".
         redirectToWelcomeScreen();
         return;
       }
@@ -354,8 +355,6 @@ const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
 };
 
 const redirectToWelcomeScreen = () => {
-  // If there's no `window.opener` a user has manually navigated to "/#authorize". Let's
-  // redirect them to the non-hash version.
   window.location.hash = "";
   window.location.reload();
 };
