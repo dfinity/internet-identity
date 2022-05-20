@@ -22,7 +22,7 @@ import { fetchDelegation } from "./fetchDelegation";
 
 const pageContent = (
   hostName: string,
-  maxTimeToLive: bigint | undefined,
+  maxTimeToLive?: bigint,
   userNumber?: bigint
 ) => html` <style>
     .spacer {
