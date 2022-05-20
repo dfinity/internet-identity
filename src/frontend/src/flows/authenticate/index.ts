@@ -16,10 +16,7 @@ import {
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
 import { initRegistration } from "../../components/registrationLink";
-import waitForAuthRequest, {
-  AuthContext,
-  delegationMessage,
-} from "./postMessageInterface";
+import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
 
@@ -199,7 +196,7 @@ export const authenticate = async (): Promise<AuthSuccess> => {
 
 const init = (authContext: AuthContext): Promise<AuthSuccess> => {
   const userNumber = getUserNumber();
-  displayPage(
+  const pageMode: PageMode = displayPage(
     authContext.requestOrigin,
     authContext.authRequest.maxTimeToLive,
     userNumber
@@ -208,16 +205,22 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
     "manageButton"
   ) as HTMLButtonElement;
   manageButton.onclick = () => redirectToWelcomeScreen();
-  initRecovery();
+  initRecovery(pageMode);
 
   const editAnchorButton = document.getElementById(
     "editAnchorButton"
   ) as HTMLButtonElement;
-  editAnchorButton.onclick = () => setMode("newUserNumber");
+  editAnchorButton.onclick = () => {
+    pageMode.mode = "newUserNumber";
+    setMode(pageMode);
+  };
 
   const existingAnchorButton = document.getElementById("existingAnchorButton");
   if (existingAnchorButton !== null) {
-    existingAnchorButton.onclick = () => setMode("existingUserNumber");
+    existingAnchorButton.onclick = () => {
+      pageMode.mode = "existingUserNumber";
+      setMode(pageMode);
+    };
   }
 
   const authenticateButton = document.getElementById(
@@ -247,7 +250,7 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
       .then((authSuccess) => resolve(authSuccess));
 
     authenticateButton.onclick = () => {
-      authenticateUser(authContext).then((authSuccess) => {
+      authenticateUser(authContext, pageMode).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -257,10 +260,11 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
 };
 
 const authenticateUser = async (
-  authContext: AuthContext
+  authContext: AuthContext,
+  pageMode: PageMode
 ): Promise<AuthSuccess | null> => {
   try {
-    const userNumber = readUserNumber();
+    const userNumber = readUserNumber(pageMode);
     if (userNumber === undefined) {
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
@@ -286,7 +290,11 @@ const displayPage = (
 ) => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, maxTimeToLive, userNumber), container);
-  setMode(userNumber === undefined ? "newUserNumber" : "existingUserNumber");
+  const pageMode: PageMode = {
+    mode: userNumber === undefined ? "newUserNumber" : "existingUserNumber",
+  };
+  setMode(pageMode);
+  return pageMode;
 };
 
 /**
@@ -305,9 +313,11 @@ const handleAuthResult = async (
       fetchDelegation(loginResult, authContext)
     );
     return new AuthSuccess(loginResult.userNumber, loginResult.connection, () =>
-      authContext.postMessageCallback(
-        delegationMessage(parsed_signed_delegation, userKey)
-      )
+      authContext.postMessageCallback({
+        kind: "authorize-client-success",
+        delegations: [parsed_signed_delegation],
+        userPublicKey: Uint8Array.from(userKey),
+      })
     );
   } else {
     await displayError({
@@ -320,12 +330,12 @@ const handleAuthResult = async (
   }
 };
 
-const initRecovery = () => {
+const initRecovery = (pageMode: PageMode) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLButtonElement;
   recoverButton.onclick = () => {
-    const userNumber = readUserNumber();
+    const userNumber = readUserNumber(pageMode);
     if (userNumber !== undefined) {
       return useRecovery(userNumber);
     }
@@ -333,14 +343,16 @@ const initRecovery = () => {
   };
 };
 
+type PageMode = { mode: "existingUserNumber" | "newUserNumber" };
 /**
  * Toggles the view between showing a prefilled anchor number and the input field to provide a new one.
- * @param mode Mode to set the view to.
+ * @param pageMode Mode to set the view to.
  */
-const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
+const setMode = (pageMode: PageMode) => {
   const existingUserNumber = document.getElementById("existingUserSection");
   const newUserNumber = document.getElementById("newUserSection");
   const registerSection = document.getElementById("registerSection");
+  const mode = pageMode.mode;
   existingUserNumber?.classList.toggle(
     "not-displayed",
     mode !== "existingUserNumber"
@@ -366,11 +378,8 @@ const redirectToWelcomeScreen = () => {
  * Figure out the current user number to use, depending on the mode the view is in and whether there is a valid value
  * in the input field.
  */
-const readUserNumber = () => {
-  const newUserSection = document.getElementById(
-    "newUserSection"
-  ) as HTMLElement;
-  if (!newUserSection.classList.contains("not-displayed")) {
+const readUserNumber = (pageMode: PageMode) => {
+  if (pageMode.mode === "newUserNumber") {
     const parsedUserNumber = parseUserNumber(
       (document.getElementById("userNumberInput") as HTMLInputElement).value
     );

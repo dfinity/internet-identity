@@ -27,39 +27,26 @@ export interface AuthResponseSuccess {
  * All information required to process an authentication request received from
  * a client application.
  */
-export class AuthContext {
-  constructor(
-    /**
-     * Information sent by the client application.
-     */
-    public authRequest: AuthRequest,
-    /**
-     * Origin of the message.
-     */
-    public requestOrigin: string,
-    /**
-     * Callback to send a result back to the sender. We currently only send
-     * either a success message or nothing at all.
-     */
-    public postMessageCallback: (message: AuthResponseSuccess) => void
-  ) {}
+export interface AuthContext {
+  /**
+   * Information sent by the client application.
+   */
+  authRequest: AuthRequest;
+  /**
+   * Origin of the message.
+   */
+  requestOrigin: string;
+  /**
+   * Callback to send a result back to the sender. We currently only send
+   * either a success message or nothing at all.
+   */
+  postMessageCallback: (message: AuthResponseSuccess) => void;
 }
 
 // A message to signal that the II is ready to receive authorization requests.
 export const READY_MESSAGE = {
   kind: "authorize-ready",
 };
-
-export function delegationMessage(
-  parsed_signed_delegation: Delegation,
-  userKey: Array<number>
-): AuthResponseSuccess {
-  return {
-    kind: "authorize-client-success",
-    delegations: [parsed_signed_delegation],
-    userPublicKey: Uint8Array.from(userKey),
-  };
-}
 
 /**
  * Set up an event listener for window post messages and wait for the authorize
@@ -72,11 +59,12 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
       const message = event.data;
       if (message.kind === "authorize-client") {
         console.log("Handling authorize-client request.");
-        resolve(
-          new AuthContext(message, event.origin, (responseMessage) =>
-            (event.source as Window).postMessage(responseMessage, event.origin)
-          )
-        );
+        resolve({
+          authRequest: message,
+          requestOrigin: event.origin,
+          postMessageCallback: (responseMessage) =>
+            (event.source as Window).postMessage(responseMessage, event.origin),
+        });
       } else {
         console.error(
           `Message of unknown kind received: ${JSON.stringify(message)}`
