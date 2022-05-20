@@ -220,10 +220,13 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
     existingAnchorButton.onclick = () => setMode("existingUserNumber");
   }
 
-  const authenticateButton = document.querySelector(
-    "#authorizeButton"
+  const authenticateButton = document.getElementById(
+    "authorizeButton"
   ) as HTMLButtonElement;
-  document.onkeypress = (e) => {
+  const userNumberInput = document.getElementById(
+    "userNumberInput"
+  ) as HTMLInputElement;
+  userNumberInput.onkeypress = (e) => {
     if (e.key === "Enter") {
       // authenticate if user hits enter
       e.preventDefault();
