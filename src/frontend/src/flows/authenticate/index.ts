@@ -106,6 +106,10 @@ const pageContent = (
       border-color: var(--grey-050);
       margin: 1rem 0;
     }
+
+    .not-displayed {
+      display: none;
+    }
   </style>
   <div class="container">
     <h1>Authorize private login</h1>
@@ -127,7 +131,7 @@ const pageContent = (
               </button>`
             : ""}
         </div>
-        <div id="invalidAnchorMessage" class="error-message hidden smallText">
+        <div id="invalidAnchorMessage" class="error-message-hidden smallText">
           The Identity Anchor is not valid. Please try again.
         </div>
       </div>
@@ -316,9 +320,12 @@ const setMode = (mode: "existingUserNumber" | "newUserNumber") => {
   const existingUserNumber = document.getElementById("existingUserSection");
   const newUserNumber = document.getElementById("newUserSection");
   const registerSection = document.getElementById("registerSection");
-  existingUserNumber?.classList.toggle("hidden", mode !== "existingUserNumber");
-  newUserNumber?.classList.toggle("hidden", mode !== "newUserNumber");
-  registerSection?.classList.toggle("hidden", mode !== "newUserNumber");
+  existingUserNumber?.classList.toggle(
+    "not-displayed",
+    mode !== "existingUserNumber"
+  );
+  newUserNumber?.classList.toggle("not-displayed", mode !== "newUserNumber");
+  registerSection?.classList.toggle("not-displayed", mode !== "newUserNumber");
 
   if (mode === "newUserNumber") {
     toggleErrorMessage("userNumberInput", "invalidAnchorMessage", false);
@@ -340,7 +347,7 @@ const readUserNumber = () => {
   const newUserSection = document.getElementById(
     "newUserSection"
   ) as HTMLElement;
-  if (!newUserSection.classList.contains("hidden")) {
+  if (!newUserSection.classList.contains("not-displayed")) {
     const parsedUserNumber = parseUserNumber(
       (document.getElementById("userNumberInput") as HTMLInputElement).value
     );

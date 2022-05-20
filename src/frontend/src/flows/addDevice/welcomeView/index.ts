@@ -9,7 +9,7 @@ const pageContent = (userNumber: bigint | null) => html`
     <p>
       Please provide the Identity Anchor to which you want to add your device.
     </p>
-    <div id="invalidAnchorMessage" class="hidden error-message">
+    <div id="invalidAnchorMessage" class="error-message-hidden">
       Please enter a valid Identity Anchor.
     </div>
     <input

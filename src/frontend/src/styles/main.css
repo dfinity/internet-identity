@@ -85,6 +85,12 @@ input.errored::placeholder {
   color: var(--flamingo-500);
 }
 
+.error-message-hidden {
+  visibility: hidden;
+  height: 0;
+  margin: 0;
+}
+
 .error-message {
   color: var(--flamingo-500);
   margin: 0 0 0.5rem;
@@ -244,7 +250,7 @@ main {
 }
 
 .hidden {
-  display: none;
+  visibility: hidden;
 }
 
 #timer {

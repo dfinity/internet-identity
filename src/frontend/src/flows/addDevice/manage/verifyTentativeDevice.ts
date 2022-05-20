@@ -40,7 +40,7 @@ const pageContent = (alias: string) => html`
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
     <label>Device Verification Code</label>
-    <div id="wrongCodeMessage" class="hidden error-message">
+    <div id="wrongCodeMessage" class="error-message-hidden">
       The entered verification code was invalid. Please try again.
     </div>
     <input id="tentativeDeviceCode" placeholder="Verification Code" />
