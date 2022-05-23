@@ -1,1 +1,1 @@
-<!--- We currently do not accept contributions. See .github/CONTRIBUTING.md. -->
+<!-- Make sure you talk to us before submitting changes. See CONTRIBUTING.md. -->
