@@ -12,6 +12,7 @@ import { IIConnection } from "../../utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
+  LoginFlowSuccess,
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
@@ -22,7 +23,7 @@ import { fetchDelegation } from "./fetchDelegation";
 
 const pageContent = (
   hostName: string,
-  maxTimeToLive?: bigint,
+  editAnchor: boolean,
   userNumber?: bigint
 ) => html` <style>
     .spacer {
@@ -71,7 +72,7 @@ const pageContent = (
       margin-bottom: 0.5rem;
     }
 
-    .switchButton {
+    #editAnchorButton {
       display: flex;
       flex-direction: column;
       position: absolute;
@@ -105,42 +106,20 @@ const pageContent = (
     }
   </style>
   <div class="container">
-    <h1>Authorize private login</h1>
+    <h1>Authorize Authentication</h1>
     <p class="sectionTitle">Application URL</p>
     <div class="highlightBox smallText">${hostName}</div>
     <p class="sectionTitle">Identity Anchor</p>
     <div>
-      <div id="newUserSection" class="modeContainer">
-        <div class="childContainer">
-          <input
-            class="anchorText"
-            type="text"
-            id="userNumberInput"
-            placeholder="Enter anchor"
-          />
-        </div>
-        <div id="invalidAnchorMessage" class="error-message-hidden smallText">
-          The Identity Anchor is not valid. Please try again.
-        </div>
-      </div>
-      <div id="existingUserSection" class="modeContainer">
-        <div class="childContainer">
-          <div id="identityAnchor" class="highlightBox anchorText">
-            ${userNumber}
-          </div>
-          <button id="editAnchorButton" class="switchButton">
-            ${editIcon}
-          </button>
-        </div>
-      </div>
+      ${!editAnchor && userNumber !== undefined
+        ? existingAnchorSection(userNumber)
+        : editAnchorSection(userNumber)}
     </div>
     <button type="button" id="authorizeButton" class="primary">
       Authorize
     </button>
     <div class="spacer"></div>
-    <div id="registerSection">
-      <div style="text-align: center">or</div>
-      <div class="spacer"></div>
+    <div id="registerSection" class="${editAnchor ? "" : "hidden"}">
       <button type="button" id="registerButton">
         Create New Identity Anchor
       </button>
@@ -162,6 +141,32 @@ const pageContent = (
   </div>
   ${footer}`;
 
+const existingAnchorSection = (userNumber: bigint) => html` <div
+  class="modeContainer"
+>
+  <div class="childContainer">
+    <div id="identityAnchor" class="highlightBox anchorText">${userNumber}</div>
+    <button id="editAnchorButton">${editIcon}</button>
+  </div>
+</div>`;
+
+const editAnchorSection = (userNumber?: bigint) => html` <div
+  class="modeContainer"
+>
+  <div class="childContainer">
+    <input
+      class="anchorText"
+      type="text"
+      id="userNumberInput"
+      placeholder="Enter anchor"
+      value="${userNumber?.toString()}"
+    />
+  </div>
+  <div id="invalidAnchorMessage" class="error-message-hidden smallText">
+    The Identity Anchor is not valid. Please try again.
+  </div>
+</div>`;
+
 export interface AuthSuccess {
   userNumber: bigint;
   connection: IIConnection;
@@ -182,60 +187,71 @@ export const authenticate = async (): Promise<AuthSuccess> => {
         redirectToWelcomeScreen();
         return;
       }
-      init(authContext).then(resolve);
+      const userNumber = getUserNumber();
+      init(authContext, userNumber === undefined, userNumber).then(resolve);
     });
   });
 };
 
-const init = (authContext: AuthContext): Promise<AuthSuccess> => {
-  const userNumber = getUserNumber();
-  const pageMode: PageMode = displayPage(
-    authContext.requestOrigin,
-    authContext.authRequest.maxTimeToLive,
-    userNumber
-  );
+const init = (
+  authContext: AuthContext,
+  editMode: boolean,
+  userNumber?: bigint
+): Promise<AuthSuccess> => {
+  displayPage(authContext.requestOrigin, editMode, userNumber);
   const manageButton = document.getElementById(
     "manageButton"
   ) as HTMLButtonElement;
   manageButton.onclick = () => redirectToWelcomeScreen();
-  initRecovery(pageMode);
+  initRecovery(editMode);
 
-  const editAnchorButton = document.getElementById(
-    "editAnchorButton"
-  ) as HTMLButtonElement;
-  editAnchorButton.onclick = () => {
-    pageMode.mode = "newUserNumber";
-    setMode(pageMode);
-  };
-
-  const authenticateButton = document.getElementById(
-    "authorizeButton"
-  ) as HTMLButtonElement;
-  const userNumberInput = document.getElementById(
-    "userNumberInput"
-  ) as HTMLInputElement;
-  userNumberInput.onkeypress = (e) => {
-    if (e.key === "Enter") {
-      // authenticate if user hits enter
-      e.preventDefault();
-      authenticateButton.click();
-    }
-  };
-
-  // Resolve either on successful authentication or after registration
   return new Promise((resolve) => {
+    const authenticateButton = document.getElementById(
+      "authorizeButton"
+    ) as HTMLButtonElement;
+    if (editMode) {
+      const userNumberInput = document.getElementById(
+        "userNumberInput"
+      ) as HTMLInputElement;
+      userNumberInput.onkeypress = (e) => {
+        if (e.key === "Enter") {
+          // authenticate if user hits enter
+          e.preventDefault();
+          authenticateButton.click();
+        }
+      };
+    } else {
+      const editAnchorButton = document.getElementById(
+        "editAnchorButton"
+      ) as HTMLButtonElement;
+      editAnchorButton.onclick = () =>
+        init(authContext, true, userNumber).then(resolve);
+    }
+
+    // Resolve either on successful authentication or after registration
     initRegistration()
       .then((result) => {
         if (result === null) {
           // user canceled registration
-          return Promise.resolve(init(authContext));
+          return Promise.resolve(init(authContext, editMode, userNumber));
         }
-        return Promise.resolve(handleAuthResult(result, authContext));
+        if (result.tag === "ok") {
+          return Promise.resolve(handleAuthSuccess(result, authContext));
+        }
+        // something went wrong, display error and try again
+        return Promise.resolve(
+          displayError({
+            title: result.title,
+            message: result.message,
+            detail: result.detail !== "" ? result.detail : undefined,
+            primaryButton: "Try again",
+          }).then(() => init(authContext, editMode, userNumber))
+        );
       })
-      .then((authSuccess) => resolve(authSuccess));
+      .then(resolve);
 
     authenticateButton.onclick = () => {
-      authenticateUser(authContext, pageMode).then((authSuccess) => {
+      authenticateUser(authContext, editMode).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -246,17 +262,25 @@ const init = (authContext: AuthContext): Promise<AuthSuccess> => {
 
 const authenticateUser = async (
   authContext: AuthContext,
-  pageMode: PageMode
+  editMode: boolean
 ): Promise<AuthSuccess | null> => {
+  const userNumber = readUserNumber(editMode);
   try {
-    const userNumber = readUserNumber(pageMode);
     if (userNumber === undefined) {
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
     }
     const result = await withLoader(() => IIConnection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
-    return await handleAuthResult(loginResult, authContext);
+    if (loginResult.tag === "ok") {
+      return await handleAuthSuccess(loginResult, authContext);
+    }
+    await displayError({
+      title: loginResult.title,
+      message: loginResult.message,
+      detail: loginResult.detail !== "" ? loginResult.detail : undefined,
+      primaryButton: "Try again",
+    });
   } catch (error) {
     await displayError({
       title: "Authentication Failed",
@@ -264,97 +288,51 @@ const authenticateUser = async (
       detail: error instanceof Error ? error.message : JSON.stringify(error),
       primaryButton: "Try again",
     });
-    return init(authContext);
   }
+  return init(authContext, editMode, userNumber);
 };
 
 const displayPage = (
   origin: string,
-  maxTimeToLive: bigint | undefined,
-  userNumber: bigint | undefined
+  editMode: boolean,
+  userNumber?: bigint
 ) => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(origin, maxTimeToLive, userNumber), container);
-  const pageMode: PageMode = {
-    mode: userNumber === undefined ? "newUserNumber" : "existingUserNumber",
-  };
-  setMode(pageMode);
-  return pageMode;
+  render(pageContent(origin, editMode, userNumber), container);
 };
 
-/**
- * Checks whether login was successful, and if so fetches the delegation from II.
- * @param loginResult Result of authentication
- * @param authContext Information about the authentication request being processed.
- */
-const handleAuthResult = async (
-  loginResult: LoginFlowResult,
+async function handleAuthSuccess(
+  loginResult: LoginFlowSuccess,
   authContext: AuthContext
-): Promise<AuthSuccess> => {
-  if (loginResult.tag === "ok") {
-    // successful login, store user number for next time
-    setUserNumber(loginResult.userNumber);
-    const [userKey, parsed_signed_delegation] = await withLoader(() =>
-      fetchDelegation(loginResult, authContext)
-    );
-    return {
-      userNumber: loginResult.userNumber,
-      connection: loginResult.connection,
-      sendDelegationMessage: () =>
-        authContext.postMessageCallback({
-          kind: "authorize-client-success",
-          delegations: [parsed_signed_delegation],
-          userPublicKey: Uint8Array.from(userKey),
-        }),
-    };
-  } else {
-    await displayError({
-      title: loginResult.title,
-      message: loginResult.message,
-      detail: loginResult.detail !== "" ? loginResult.detail : undefined,
-      primaryButton: "Try again",
-    });
-    return init(authContext);
-  }
-};
+) {
+  // successful login, store user number for next time
+  setUserNumber(loginResult.userNumber);
+  const [userKey, parsed_signed_delegation] = await withLoader(() =>
+    fetchDelegation(loginResult, authContext)
+  );
+  return {
+    userNumber: loginResult.userNumber,
+    connection: loginResult.connection,
+    sendDelegationMessage: () =>
+      authContext.postMessageCallback({
+        kind: "authorize-client-success",
+        delegations: [parsed_signed_delegation],
+        userPublicKey: Uint8Array.from(userKey),
+      }),
+  };
+}
 
-const initRecovery = (pageMode: PageMode) => {
+const initRecovery = (editMode: boolean) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLButtonElement;
   recoverButton.onclick = () => {
-    const userNumber = readUserNumber(pageMode);
+    const userNumber = readUserNumber(editMode);
     if (userNumber !== undefined) {
       return useRecovery(userNumber);
     }
     toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
   };
-};
-
-type PageMode = { mode: "existingUserNumber" | "newUserNumber" };
-/**
- * Toggles the view between showing a prefilled anchor number and the input field to provide a new one.
- * @param pageMode Mode to set the view to.
- */
-const setMode = (pageMode: PageMode) => {
-  const existingUserNumber = document.getElementById("existingUserSection");
-  const newUserNumber = document.getElementById("newUserSection");
-  const registerSection = document.getElementById("registerSection");
-  const mode = pageMode.mode;
-  existingUserNumber?.classList.toggle(
-    "not-displayed",
-    mode !== "existingUserNumber"
-  );
-  newUserNumber?.classList.toggle("not-displayed", mode !== "newUserNumber");
-  registerSection?.classList.toggle("not-displayed", mode !== "newUserNumber");
-
-  if (mode === "newUserNumber") {
-    toggleErrorMessage("userNumberInput", "invalidAnchorMessage", false);
-    const userNumberInput = document.getElementById(
-      "userNumberInput"
-    ) as HTMLInputElement;
-    userNumberInput.focus();
-  }
 };
 
 const redirectToWelcomeScreen = () => {
@@ -363,11 +341,10 @@ const redirectToWelcomeScreen = () => {
 };
 
 /**
- * Figure out the current user number to use, depending on the mode the view is in and whether there is a valid value
- * in the input field.
+ * Figure out the current user number to use, depending on the mode the view is in.
  */
-const readUserNumber = (pageMode: PageMode) => {
-  if (pageMode.mode === "newUserNumber") {
+const readUserNumber = (editMode: boolean) => {
+  if (editMode) {
     const parsedUserNumber = parseUserNumber(
       (document.getElementById("userNumberInput") as HTMLInputElement).value
     );
