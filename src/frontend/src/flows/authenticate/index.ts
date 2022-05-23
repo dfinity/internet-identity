@@ -11,7 +11,6 @@ import { withLoader } from "../../components/loader";
 import { IIConnection } from "../../utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
-  LoginFlowResult,
   LoginFlowSuccess,
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
@@ -26,14 +25,6 @@ const pageContent = (
   editAnchor: boolean,
   userNumber?: bigint
 ) => html` <style>
-    .spacer {
-      height: 2rem;
-    }
-
-    .spacer-small {
-      height: 1rem;
-    }
-
     .anchorText {
       font-size: 1.5rem;
     }
@@ -86,6 +77,10 @@ const pageContent = (
       border: none;
     }
 
+    #registerButton {
+      margin: 2rem 0;
+    }
+
     .smallText {
       font-size: 0.875rem;
       font-weight: 400;
@@ -99,10 +94,6 @@ const pageContent = (
     hr {
       border-color: var(--grey-050);
       margin: 1rem 0;
-    }
-
-    .not-displayed {
-      display: none;
     }
   </style>
   <div class="container">
@@ -118,12 +109,10 @@ const pageContent = (
     <button type="button" id="authorizeButton" class="primary">
       Authorize
     </button>
-    <div class="spacer"></div>
     <div id="registerSection" class="${editAnchor ? "" : "hidden"}">
       <button type="button" id="registerButton">
         Create New Identity Anchor
       </button>
-      <div class="spacer-small"></div>
     </div>
     <div class="textLink">
       <hr />
@@ -159,7 +148,7 @@ const editAnchorSection = (userNumber?: bigint) => html` <div
       type="text"
       id="userNumberInput"
       placeholder="Enter anchor"
-      value="${userNumber?.toString()}"
+      value="${userNumber !== undefined ? userNumber?.toString() : ""}"
     />
   </div>
   <div id="invalidAnchorMessage" class="error-message-hidden smallText">
@@ -213,6 +202,7 @@ const init = (
       const userNumberInput = document.getElementById(
         "userNumberInput"
       ) as HTMLInputElement;
+      // todo proper userNumberInput.focus(); (everything selectd? or cursor at end of input?)
       userNumberInput.onkeypress = (e) => {
         if (e.key === "Enter") {
           // authenticate if user hits enter
