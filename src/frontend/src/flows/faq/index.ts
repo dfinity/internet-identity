@@ -132,9 +132,17 @@ export const questions = {
       </p>
 
       <p>
-        Internet Identity does <em>not</em> currently accept external
-        contributions, for legal reasons. We are working on this and soon
-        everyone will be able to contribute.
+        If you'd like to contribute to Internet Identity, please head over to
+        the
+        ${mkExternalLink({
+          href: "https://github.com/dfinity/internet-identity",
+          text: "GitHub repository",
+        })}
+        and check out the
+        ${mkExternalLink({
+          href: "https://github.com/dfinity/internet-identity/blob/main/CONTRIBUTING.md",
+          text: "contributing guidelines",
+        })}!
       </p>
     `,
   },

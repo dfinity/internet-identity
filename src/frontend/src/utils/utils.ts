@@ -81,3 +81,8 @@ export function iOSOrSafari(): boolean {
   // For details, see https://stackoverflow.com/a/23522755/2716377
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
+
+/* A function that can never be called. Can be used to prove that all type alternatives have been exhausted. */
+export function unreachable(_: never): never {
+  throw new Error("The impossible happened");
+}
