@@ -1,7 +1,7 @@
 use crate::{assets, AssetHashes, ContentType, ASSETS, LABEL_ASSETS, LABEL_SIG, STATE};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
-use ic_cdk::export::candid::{CandidType, Deserialize, Func};
+use candid::{CandidType, Deserialize, Func};
 use ic_cdk::trap;
 use ic_certified_map::HashTree;
 use internet_identity::metrics_encoder::MetricsEncoder;
