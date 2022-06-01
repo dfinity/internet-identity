@@ -216,6 +216,14 @@ const init = (
       ) as HTMLButtonElement;
       editAnchorButton.onclick = () =>
         init(authContext, true, userNumber).then(resolve);
+      authenticateButton.focus();
+      authenticateButton.onkeypress = (e) => {
+        if (e.key === "Enter") {
+          // authenticate if user hits enter
+          e.preventDefault();
+          authenticateButton.click();
+        }
+      };
     }
 
     // Resolve either on successful authentication or after registration
