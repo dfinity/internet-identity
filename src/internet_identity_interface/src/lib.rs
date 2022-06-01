@@ -16,13 +16,14 @@ pub type FailedAttemptsCounter = u8;
 
 pub struct Base64(pub String);
 
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceData {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
     pub purpose: Purpose,
     pub key_type: KeyType,
+    pub protection_type: ProtectionType,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -53,6 +54,14 @@ pub enum KeyType {
     CrossPlatform,
     #[serde(rename = "seed_phrase")]
     SeedPhrase,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
+pub enum ProtectionType {
+    #[serde(rename = "protected")]
+    Protected,
+    #[serde(rename = "unprotected")]
+    Unprotected,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
