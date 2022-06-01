@@ -8,7 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import { authenticate } from "./flows/authenticate";
+import authenticate from "./flows/authenticate";
 
 const init = async () => {
   const url = new URL(document.URL);

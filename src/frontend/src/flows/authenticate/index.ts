@@ -171,7 +171,7 @@ export interface AuthSuccess {
  * the delegation to the application window. After having received the delegation the application will close the
  * Internet Identity window.
  */
-export const authenticate = async (): Promise<AuthSuccess> => {
+export default async (): Promise<AuthSuccess> => {
   return new Promise((resolve) => {
     withLoader(async () => {
       const authContext = await waitForAuthRequest();
