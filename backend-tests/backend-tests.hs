@@ -254,6 +254,7 @@ device1 = empty
     .+ #pubkey .== webauth1PK
     .+ #credential_id .== Nothing
     .+ #purpose .== enum #authentication
+    .+ #protection_type .== enum #unprotected
     .+ #key_type .== enum #cross_platform
 
 webauth2SK :: SecretKey
@@ -269,7 +270,33 @@ device2 = empty
     .+ #pubkey .== webauth2PK
     .+ #credential_id .== Just "foobar"
     .+ #purpose .== enum #authentication
+    .+ #protection_type .== enum #unprotected
     .+ #key_type .== enum #platform
+
+webauth3SK :: SecretKey
+webauth3SK = createSecretKeyWebAuthnRSA "foobar3"
+webauth3PK = toPublicKey webauth3SK
+webauth3PK :: PublicKey
+webauth3ID :: EntityId
+webauth3ID = EntityId $ mkSelfAuthenticatingId webauth3PK
+
+device3 :: DeviceData
+device3 = empty
+    .+ #alias .== "device3"
+    .+ #pubkey .== webauth3PK
+    .+ #credential_id .== Just "foobar"
+    .+ #purpose .== enum #authentication
+    .+ #key_type .== enum #seed_phrase
+    .+ #protection_type .== enum #protected
+
+device4 :: DeviceData
+device4 = empty
+    .+ #alias .== "device4"
+    .+ #pubkey .== webauth1PK
+    .+ #credential_id .== Just "foobar"
+    .+ #purpose .== enum #authentication
+    .+ #key_type .== enum #seed_phrase
+    .+ #protection_type .== enum #protected
 
 anonymousID :: EntityId
 anonymousID = EntityId "\x04"
@@ -735,6 +762,18 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     when (user_number == user_number2) $
       lift $ assertFailure "Identity Anchor re-used"
 
+  , withUpgrade $ \should_upgrade -> iiTest "remove protected seed phrase" $ \cid -> do
+    user_number <- register cid webauth3ID device3 >>= mustGetUserNumber
+    callII cid webauth3ID #add (user_number, device2)
+    lookupIs cid user_number [device3, device2]
+    callIIRejectWith cid webauth2ID #remove (user_number, webauth3PK) "failed to remove protected recovery phrase"
+    callIIRejectWith cid webauth3ID #add (user_number, device4) "recovery mechanism already protected"
+    when should_upgrade $ doUpgrade cid
+    callII cid webauth3ID #remove (user_number, webauth3PK)
+    lookupIs cid user_number [device2]
+    callII cid webauth2ID #add (user_number, device4)
+    lookupIs cid user_number [device2, device4]
+
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #assigned_user_number_range @?= (100, 103)
@@ -822,15 +861,16 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     -- and should be auto-corrected on upgrade
     lift $ s .! #assigned_user_number_range @?= (10_000, 10_000 + 3_774_873)
     lookupIs cid 9_999 []
-    lookupIs cid 10_000 [#alias .== "Desktop" .+ #credential_id .== Just "c\184\175\179\134\221u}\250[\169U\v\202f\147g\ETBvo9[\175\173\144R\163\132\237\196F\177\DC2(\188\185\203hI\128\187Z\129'\v1\212\185V\ETB\135)m@ M1\233l\ESC8kI\132" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \238o!-\ESC\148\252\192\DC4\240P\176\135\240j\211AW\255S\193\153\129\227\151hB\177dK\n\FS\"X \rk\197\238\a{\210\&0\v<\134\223\135\170_\223\144\210V\208\DC3\RS\251\228D$3\r\232\176\EOTq" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown ]
-    lookupIs cid 10_002 [#alias .== "andrew-mbp" .+ #credential_id .== Just "\SOH\191#%\217u\247\178L-K\182\254\249J.m\187\179_I\ACK\137\244`\163o\SI\150qz\197Hz\214\&8\153\239\213\159\208\RS\243\138\171\138\"\139\173\170\ESC\148\205\129\149ri\\Dn,7\151\146\175\DEL" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X rMm*\229BDe\SOH4\228u\170\206\216\216-ER\v\166r\217\137,\141\227M*@\230\243\"X \225\248\159\191\242\224Z>\241\163\\\GS\155\178\222\139^\136V\253q\v\SUBSJ\bA\131\\\183\147\170" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "andrew phone chrome" .+ #credential_id .== Just ",\235x\NUL\a\140`~\148\248\233C/\177\205\158\ETX0\129\167" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \140\169\203@\ETX\CAN\ETB,\177\153\179\223/|`\US\STX\252r\190s(.\188\136\171\SI\181V*\174@\"X \245<\174AbV\225\234\ENQ\146\247\129\245\ACK\200\205\217\250g\219\179)\197\252\164i\172kXh\180\205" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
-    lookupIs cid 10_029 [#alias .== "Pixel" .+ #credential_id .== Just "\SOH\146\238\160b\223\132\205\231b\239\243F\170\163\167\251D\241\170\EM\216\136\174@r\149\183|LuKu[+{\144\217\ETBL\f\244\GS>\179\146\143\RS\179\DLE\227\179\164\188\NULDQy\223\SI\132\183\248\177\219" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \200B>\DEL\GS\248\220\145\245\153\221\&6\131\243uAQCAd>\145k\nw\233\&5\218\SUB~_\244\"X O]7\167=n\ESC\SUB\198\235\208\215s\158\191Gz\143\136\237i\146\203\&6\182\196\129\239\238\SOH\180b" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
+    lookupIs cid 10_000 [#alias .== "Desktop" .+ #credential_id .== Just "c\184\175\179\134\221u}\250[\169U\v\202f\147g\ETBvo9[\175\173\144R\163\132\237\196F\177\DC2(\188\185\203hI\128\187Z\129'\v1\212\185V\ETB\135)m@ M1\233l\ESC8kI\132" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \238o!-\ESC\148\252\192\DC4\240P\176\135\240j\211AW\255S\193\153\129\227\151hB\177dK\n\FS\"X \rk\197\238\a{\210\&0\v<\134\223\135\170_\223\144\210V\208\DC3\RS\251\228D$3\r\232\176\EOTq" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
+    lookupIs cid 10_000 [#alias .== "Desktop" .+ #credential_id .== Just "c\184\175\179\134\221u}\250[\169U\v\202f\147g\ETBvo9[\175\173\144R\163\132\237\196F\177\DC2(\188\185\203hI\128\187Z\129'\v1\212\185V\ETB\135)m@ M1\233l\ESC8kI\132" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \238o!-\ESC\148\252\192\DC4\240P\176\135\240j\211AW\255S\193\153\129\227\151hB\177dK\n\FS\"X \rk\197\238\a{\210\&0\v<\134\223\135\170_\223\144\210V\208\DC3\RS\251\228D$3\r\232\176\EOTq" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
+    lookupIs cid 10_002 [#protection_type .== enum #unprotected .+ #alias .== "andrew-mbp" .+ #credential_id .== Just "\SOH\191#%\217u\247\178L-K\182\254\249J.m\187\179_I\ACK\137\244`\163o\SI\150qz\197Hz\214\&8\153\239\213\159\208\RS\243\138\171\138\"\139\173\170\ESC\148\205\129\149ri\\Dn,7\151\146\175\DEL" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X rMm*\229BDe\SOH4\228u\170\206\216\216-ER\v\166r\217\137,\141\227M*@\230\243\"X \225\248\159\191\242\224Z>\241\163\\\GS\155\178\222\139^\136V\253q\v\SUBSJ\bA\131\\\183\147\170" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "andrew phone chrome" .+ #credential_id .== Just ",\235x\NUL\a\140`~\148\248\233C/\177\205\158\ETX0\129\167" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \140\169\203@\ETX\CAN\ETB,\177\153\179\223/|`\US\STX\252r\190s(.\188\136\171\SI\181V*\174@\"X \245<\174AbV\225\234\ENQ\146\247\129\245\ACK\200\205\217\250g\219\179)\197\252\164i\172kXh\180\205" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
+    lookupIs cid 10_029 [#alias .== "Pixel" .+ #credential_id .== Just "\SOH\146\238\160b\223\132\205\231b\239\243F\170\163\167\251D\241\170\EM\216\136\174@r\149\183|LuKu[+{\144\217\ETBL\f\244\GS>\179\146\143\RS\179\DLE\227\179\164\188\NULDQy\223\SI\132\183\248\177\219" .+ #pubkey .== "0^0\f\ACK\n+\ACK\SOH\EOT\SOH\131\184C\SOH\SOH\ETXN\NUL\165\SOH\STX\ETX& \SOH!X \200B>\DEL\GS\248\220\145\245\153\221\&6\131\243uAQCAd>\145k\nw\233\&5\218\SUB~_\244\"X O]7\167=n\ESC\SUB\198\235\208\215s\158\191Gz\143\136\237i\146\203\&6\182\196\129\239\238\SOH\180b" .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
     -- This user record has been created manullay with dfx and our test
     -- webauth1PK has been added, so that we can actually log into this now
     let dfxPK =  "0*0\ENQ\ACK\ETX+ep\ETX!\NUL\241\186;\128\206$\243\130\250\&2\253\a#<\235\142\&0]W\218\254j\211\209\192\SO@\DC3\NAKi&1"
-    lookupIs cid 10_030 [#alias .== "dfx" .+ #credential_id .== Nothing .+ #pubkey .== dfxPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
+    lookupIs cid 10_030 [#protection_type .== enum #unprotected .+ #alias .== "dfx" .+ #credential_id .== Nothing .+ #pubkey .== dfxPK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown,#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
     callII cid webauth1ID #remove (10_030, dfxPK)
-    lookupIs cid 10_030 [#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown]
+    lookupIs cid 10_030 [#alias .== "testkey" .+ #credential_id .== Nothing .+ #pubkey .== webauth1PK .+ #purpose .== enum #authentication .+ #key_type .== enum #unknown .+ #protection_type .== enum #unprotected]
     let delegationArgs = (10_030, "example.com", "dummykey", Nothing)
     (userPK,_) <- callII cid webauth1ID #prepare_delegation delegationArgs
     -- Check that we get the same user key; this proves that the salt was
