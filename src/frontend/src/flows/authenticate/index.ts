@@ -202,7 +202,7 @@ const init = (
       const userNumberInput = document.getElementById(
         "userNumberInput"
       ) as HTMLInputElement;
-      // todo proper userNumberInput.focus(); (everything selectd? or cursor at end of input?)
+      userNumberInput.select();
       userNumberInput.onkeypress = (e) => {
         if (e.key === "Enter") {
           // authenticate if user hits enter
