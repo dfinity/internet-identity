@@ -53,6 +53,12 @@ export const READY_MESSAGE = {
  * authentication request from the client application.
  */
 export default async function waitForAuthRequest(): Promise<AuthContext | null> {
+  if (window.opener === null) {
+    // If there's no `window.opener` a user has manually navigated to "/#authorize".
+    // Signal that there will never be an authentication request incoming.
+    return Promise.resolve(null);
+  }
+
   const result = new Promise<AuthContext>((resolve, reject) => {
     // Set up an event listener for receiving messages from the client.
     window.addEventListener("message", async (event) => {
@@ -78,12 +84,6 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
-  if (window.opener !== null) {
-    window.opener.postMessage(READY_MESSAGE, "*");
-  } else {
-    // If there's no `window.opener` a user has manually navigated to "/#authorize".
-    // Signal that there will never be an authentication request incoming.
-    return Promise.resolve(null);
-  }
+  window.opener.postMessage(READY_MESSAGE, "*");
   return result;
 }
