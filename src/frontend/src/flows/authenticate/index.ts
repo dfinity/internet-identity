@@ -223,20 +223,18 @@ const init = (
       .then((result) => {
         if (result === null) {
           // user canceled registration
-          return Promise.resolve(init(authContext, editMode, userNumber));
+          return init(authContext, editMode, userNumber);
         }
         if (result.tag === "ok") {
-          return Promise.resolve(handleAuthSuccess(result, authContext));
+          return handleAuthSuccess(result, authContext);
         }
         // something went wrong, display error and try again
-        return Promise.resolve(
-          displayError({
-            title: result.title,
-            message: result.message,
-            detail: result.detail !== "" ? result.detail : undefined,
-            primaryButton: "Try again",
-          }).then(() => init(authContext, editMode, userNumber))
-        );
+        return displayError({
+          title: result.title,
+          message: result.message,
+          detail: result.detail !== "" ? result.detail : undefined,
+          primaryButton: "Try again",
+        }).then(() => init(authContext, editMode, userNumber));
       })
       .then(resolve);
 
