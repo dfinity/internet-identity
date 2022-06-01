@@ -81,14 +81,18 @@ const pageContent = (
       margin: 2rem 0;
     }
 
-    .smallText {
-      font-size: 0.875rem;
+    .hostName {
+      font-size: 1rem;
       font-weight: 400;
     }
 
     .sectionTitle {
       margin: 1rem 0 0.5rem 0;
       color: black;
+    }
+
+    .buttonContainer {
+      margin: 0.5rem 0;
     }
 
     hr {
@@ -99,7 +103,7 @@ const pageContent = (
   <div class="container">
     <h1>Authorize Authentication</h1>
     <p class="sectionTitle">Application URL</p>
-    <div class="highlightBox smallText">${hostName}</div>
+    <div class="highlightBox hostName">${hostName}</div>
     <p class="sectionTitle">Identity Anchor</p>
     <div>
       ${!editAnchor && userNumber !== undefined
@@ -116,10 +120,10 @@ const pageContent = (
     </div>
     <div class="textLink">
       <hr />
-      <div>
+      <div class="buttonContainer">
         <button id="recoverButton" class="linkStyle">Lost access?</button>
       </div>
-      <div>
+      <div class="buttonContainer">
         <button type="button" class="linkStyle" id="manageButton">
           Manage your Identity Anchor
         </button>
