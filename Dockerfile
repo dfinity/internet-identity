@@ -51,7 +51,6 @@ RUN cargo install ic-cdk-optimizer --version 0.3.1
 # that cargo knows to rebuild it with the new content.
 COPY Cargo.lock .
 COPY Cargo.toml .
-COPY src/cubehash src/cubehash
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
