@@ -8,7 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import authenticate from "./flows/authenticate";
+import authorizeAuthentication from "./flows/authenticate";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -36,8 +36,8 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      // show the application authorization screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
-      const authSuccess = await authenticate();
+      // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
+      const authSuccess = await authorizeAuthentication();
       // show the recovery wizard before sending the window post message, otherwise the II window will be closed
       await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
       // send the delegation back to the dapp window (which will then close the II window)
