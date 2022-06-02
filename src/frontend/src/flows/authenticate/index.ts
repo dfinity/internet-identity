@@ -20,11 +20,7 @@ import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
-const pageContent = (
-  hostName: string,
-  editAnchor: boolean,
-  userNumber?: bigint
-) => html` <style>
+const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     .anchorText {
       font-size: 1.5rem;
     }
@@ -110,14 +106,24 @@ const pageContent = (
     <div class="highlightBox hostName">${hostName}</div>
     <h2 class="sectionTitle">Identity Anchor</h2>
     <div class="modeContainer">
-      ${!editAnchor && userNumber !== undefined
-        ? existingAnchorSection(userNumber)
-        : editAnchorSection(userNumber)}
+      <div class="childContainer">
+        <input
+          class="anchorText"
+          type="text"
+          id="userNumberInput"
+          placeholder="Enter anchor"
+          value="${userNumber !== undefined ? userNumber?.toString() : ""}"
+        />
+        <button id="editAnchorButton">${editIcon}</button>
+      </div>
+      <div id="invalidAnchorMessage" class="error-message-hidden">
+        The Identity Anchor is not valid. Please try again.
+      </div>
     </div>
     <button type="button" id="authorizeButton" class="primary">
       Authorize
     </button>
-    <div id="registerSection" class="${editAnchor ? "" : "hidden"}">
+    <div id="registerSection">
       <button type="button" id="registerButton">
         Create New Identity Anchor
       </button>
@@ -137,28 +143,6 @@ const pageContent = (
     ${navbar}
   </div>
   ${footer}`;
-
-const existingAnchorSection = (userNumber: bigint) => html` <div
-  class="childContainer"
->
-  <div id="identityAnchor" class="highlightBox anchorText">${userNumber}</div>
-  <button id="editAnchorButton">${editIcon}</button>
-</div>`;
-
-const editAnchorSection = (userNumber?: bigint) => html`
-  <div class="childContainer">
-    <input
-      class="anchorText"
-      type="text"
-      id="userNumberInput"
-      placeholder="Enter anchor"
-      value="${userNumber !== undefined ? userNumber?.toString() : ""}"
-    />
-  </div>
-  <div id="invalidAnchorMessage" class="error-message-hidden">
-    The Identity Anchor is not valid. Please try again.
-  </div>
-`;
 
 export interface AuthSuccess {
   userNumber: bigint;
@@ -181,53 +165,62 @@ export default async (): Promise<AuthSuccess> => {
         return;
       }
       const userNumber = getUserNumber();
-      init(authContext, userNumber === undefined, userNumber).then(resolve);
+      init(authContext, userNumber).then(resolve);
     });
   });
 };
 
 const init = (
   authContext: AuthContext,
-  editMode: boolean,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
-  displayPage(authContext.requestOrigin, editMode, userNumber);
-  const manageButton = document.getElementById(
-    "manageButton"
+  displayPage(authContext.requestOrigin, userNumber);
+  initManagementBtn();
+  initRecovery();
+
+  const authorizeButton = document.getElementById(
+    "authorizeButton"
   ) as HTMLButtonElement;
-  manageButton.onclick = () => redirectToWelcomeScreen();
-  initRecovery(editMode);
+  const userNumberInput = document.getElementById(
+    "userNumberInput"
+  ) as HTMLInputElement;
+  const editAnchorButton = document.getElementById(
+    "editAnchorButton"
+  ) as HTMLButtonElement;
+  const registerSection = document.getElementById(
+    "registerSection"
+  ) as HTMLInputElement;
+
+  userNumberInput.onkeypress = (e) => {
+    if (e.key === "Enter") {
+      // authenticate if user hits enter
+      e.preventDefault();
+      authorizeButton.click();
+    }
+  };
+
+  if (userNumber === undefined) {
+    editAnchorButton.classList.toggle("hidden", true);
+    userNumberInput.select();
+  } else {
+    userNumberInput.classList.toggle("highlightBox", true);
+    registerSection.classList.toggle("hidden", true);
+    userNumberInput.disabled = true;
+    authorizeButton.focus();
+  }
+  editAnchorButton.onclick = () => {
+    registerSection.classList.toggle("hidden", false);
+    editAnchorButton.classList.toggle("hidden", true);
+    userNumberInput.classList.toggle("highlightBox", false);
+    userNumberInput.disabled = false;
+    userNumberInput.select();
+  };
 
   return new Promise((resolve) => {
-    const authorizeButton = document.getElementById(
-      "authorizeButton"
-    ) as HTMLButtonElement;
-    if (editMode) {
-      const userNumberInput = document.getElementById(
-        "userNumberInput"
-      ) as HTMLInputElement;
-      userNumberInput.select();
-      userNumberInput.onkeypress = (e) => {
-        if (e.key === "Enter") {
-          // authenticate if user hits enter
-          e.preventDefault();
-          authorizeButton.click();
-        }
-      };
-    } else {
-      const editAnchorButton = document.getElementById(
-        "editAnchorButton"
-      ) as HTMLButtonElement;
-      editAnchorButton.onclick = () =>
-        init(authContext, true, userNumber).then(resolve);
-      authorizeButton.focus();
-    }
-
     // Resolve either on successful authentication or after registration
-    initRegistration(authContext, editMode, userNumber).then(resolve);
-
+    initRegistration(authContext, userNumber).then(resolve);
     authorizeButton.onclick = () => {
-      authenticateUser(authContext, editMode).then((authSuccess) => {
+      authenticateUser(authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -236,9 +229,15 @@ const init = (
   });
 };
 
+function initManagementBtn() {
+  const manageButton = document.getElementById(
+    "manageButton"
+  ) as HTMLButtonElement;
+  manageButton.onclick = () => redirectToWelcomeScreen();
+}
+
 const initRegistration = async (
   authContext: AuthContext,
-  editMode: boolean,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
   const registerButton = document.getElementById(
@@ -250,7 +249,7 @@ const initRegistration = async (
         .then((result) => {
           if (result === null) {
             // user canceled registration
-            return init(authContext, editMode, userNumber);
+            return init(authContext, userNumber);
           }
           if (result.tag === "ok") {
             return handleAuthSuccess(result, authContext);
@@ -261,7 +260,7 @@ const initRegistration = async (
             message: result.message,
             detail: result.detail !== "" ? result.detail : undefined,
             primaryButton: "Try again",
-          }).then(() => init(authContext, editMode, userNumber));
+          }).then(() => init(authContext, userNumber));
         })
         .then(resolve);
     };
@@ -269,10 +268,9 @@ const initRegistration = async (
 };
 
 const authenticateUser = async (
-  authContext: AuthContext,
-  editMode: boolean
+  authContext: AuthContext
 ): Promise<AuthSuccess | null> => {
-  const userNumber = readUserNumber(editMode);
+  const userNumber = readUserNumber();
   try {
     if (userNumber === undefined) {
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
@@ -297,16 +295,12 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return init(authContext, editMode, userNumber);
+  return init(authContext, userNumber);
 };
 
-const displayPage = (
-  origin: string,
-  editMode: boolean,
-  userNumber?: bigint
-) => {
+const displayPage = (origin: string, userNumber?: bigint) => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(origin, editMode, userNumber), container);
+  render(pageContent(origin, userNumber), container);
 };
 
 async function handleAuthSuccess(
@@ -330,12 +324,12 @@ async function handleAuthSuccess(
   };
 }
 
-const initRecovery = (editMode: boolean) => {
+const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLButtonElement;
   recoverButton.onclick = () => {
-    const userNumber = readUserNumber(editMode);
+    const userNumber = readUserNumber();
     if (userNumber !== undefined) {
       return useRecovery(userNumber);
     }
@@ -349,15 +343,12 @@ const redirectToWelcomeScreen = () => {
 };
 
 /**
- * Figure out the current user number to use, depending on the mode the view is in.
+ * Read and parse the user number from the input field.
  */
-const readUserNumber = (editMode: boolean) => {
-  if (editMode) {
-    const parsedUserNumber = parseUserNumber(
-      (document.getElementById("userNumberInput") as HTMLInputElement).value
-    );
-    // get rid of null, we use undefined for 'not set'
-    return parsedUserNumber === null ? undefined : parsedUserNumber;
-  }
-  return getUserNumber();
+const readUserNumber = () => {
+  const parsedUserNumber = parseUserNumber(
+    (document.getElementById("userNumberInput") as HTMLInputElement).value
+  );
+  // get rid of null, we use undefined for 'not set'
+  return parsedUserNumber === null ? undefined : parsedUserNumber;
 };
