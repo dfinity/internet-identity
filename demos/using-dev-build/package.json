@@ -16,7 +16,7 @@
     "@wdio/local-runner": "7.16.13",
     "@wdio/mocha-framework": "7.16.13",
     "@wdio/spec-reporter": "7.16.13",
-    "chromedriver": "100.0.0",
+    "chromedriver": "101.0.0",
     "copy-webpack-plugin": "^9.0.1",
     "html-webpack-plugin": "5.3.2",
     "prettier": "^2.5.0",
