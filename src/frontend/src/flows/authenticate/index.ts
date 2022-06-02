@@ -15,10 +15,10 @@ import {
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
-import { initRegistration } from "../../components/registrationLink";
 import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
+import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
 const pageContent = (
   hostName: string,
@@ -88,6 +88,8 @@ const pageContent = (
 
     .sectionTitle {
       margin: 1rem 0 0.5rem 0;
+      font-size: 1rem;
+      font-weight: normal;
       color: black;
     }
 
@@ -102,9 +104,9 @@ const pageContent = (
   </style>
   <div class="container">
     <h1>Authorize Authentication</h1>
-    <p class="sectionTitle">Application URL</p>
+    <h2 class="sectionTitle">Application URL</h2>
     <div class="highlightBox hostName">${hostName}</div>
-    <p class="sectionTitle">Identity Anchor</p>
+    <h2 class="sectionTitle">Identity Anchor</h2>
     <div>
       ${!editAnchor && userNumber !== undefined
         ? existingAnchorSection(userNumber)
@@ -199,7 +201,7 @@ const init = (
   initRecovery(editMode);
 
   return new Promise((resolve) => {
-    const authenticateButton = document.getElementById(
+    const authorizeButton = document.getElementById(
       "authorizeButton"
     ) as HTMLButtonElement;
     if (editMode) {
@@ -211,7 +213,7 @@ const init = (
         if (e.key === "Enter") {
           // authenticate if user hits enter
           e.preventDefault();
-          authenticateButton.click();
+          authorizeButton.click();
         }
       };
     } else {
@@ -220,42 +222,50 @@ const init = (
       ) as HTMLButtonElement;
       editAnchorButton.onclick = () =>
         init(authContext, true, userNumber).then(resolve);
-      authenticateButton.focus();
-      authenticateButton.onkeypress = (e) => {
-        if (e.key === "Enter") {
-          // authenticate if user hits enter
-          e.preventDefault();
-          authenticateButton.click();
-        }
-      };
+      authorizeButton.focus();
     }
 
     // Resolve either on successful authentication or after registration
-    initRegistration()
-      .then((result) => {
-        if (result === null) {
-          // user canceled registration
-          return init(authContext, editMode, userNumber);
-        }
-        if (result.tag === "ok") {
-          return handleAuthSuccess(result, authContext);
-        }
-        // something went wrong, display error and try again
-        return displayError({
-          title: result.title,
-          message: result.message,
-          detail: result.detail !== "" ? result.detail : undefined,
-          primaryButton: "Try again",
-        }).then(() => init(authContext, editMode, userNumber));
-      })
-      .then(resolve);
+    initRegistration(authContext, editMode, userNumber).then(resolve);
 
-    authenticateButton.onclick = () => {
+    authorizeButton.onclick = () => {
       authenticateUser(authContext, editMode).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
       });
+    };
+  });
+};
+
+const initRegistration = async (
+  authContext: AuthContext,
+  editMode: boolean,
+  userNumber?: bigint
+): Promise<AuthSuccess> => {
+  const registerButton = document.getElementById(
+    "registerButton"
+  ) as HTMLButtonElement;
+  return new Promise((resolve) => {
+    registerButton.onclick = () => {
+      registerIfAllowed()
+        .then((result) => {
+          if (result === null) {
+            // user canceled registration
+            return init(authContext, editMode, userNumber);
+          }
+          if (result.tag === "ok") {
+            return handleAuthSuccess(result, authContext);
+          }
+          // something went wrong, display error and try again
+          return displayError({
+            title: result.title,
+            message: result.message,
+            detail: result.detail !== "" ? result.detail : undefined,
+            primaryButton: "Try again",
+          }).then(() => init(authContext, editMode, userNumber));
+        })
+        .then(resolve);
     };
   });
 };

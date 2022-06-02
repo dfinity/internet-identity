@@ -1,4 +1,4 @@
-import { render, html } from "lit-html";
+import { html, render } from "lit-html";
 import { IIConnection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
@@ -8,10 +8,7 @@ import { footer } from "../../components/footer";
 import { useRecovery } from "../recovery/useRecovery";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
-import {
-  initRegistration,
-  registrationSection,
-} from "../../components/registrationLink";
+import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -49,7 +46,12 @@ const pageContent = () => html` <style>
       placeholder="Enter Identity Anchor"
     />
     <button type="button" id="loginButton" class="primary">Authenticate</button>
-    ${registrationSection}
+    <div class="textLink" id="registerSection">
+      New?
+      <button id="registerButton" class="linkStyle">
+        Create an Internet Identity Anchor.
+      </button>
+    </div>
     <div class="textLink">
       Already have an anchor
       <button id="addNewDeviceButton" class="linkStyle">
@@ -79,15 +81,20 @@ const initRegister = (
   resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
-  initRegistration()
-    .then((res) => {
-      if (res === null) {
-        window.location.reload();
-      } else {
-        resolve(res);
-      }
-    })
-    .catch(reject);
+  const registerButton = document.getElementById(
+    "registerButton"
+  ) as HTMLButtonElement;
+  registerButton.onclick = () => {
+    registerIfAllowed()
+      .then((res) => {
+        if (res === null) {
+          window.location.reload();
+        } else {
+          resolve(res);
+        }
+      })
+      .catch(reject);
+  };
 };
 
 const initRecovery = () => {
