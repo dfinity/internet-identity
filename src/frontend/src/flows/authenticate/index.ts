@@ -99,6 +99,7 @@ const pageContent = (
 
     hr {
       border-color: var(--grey-050);
+      border-left: none;
       margin: 1rem 0;
     }
   </style>
