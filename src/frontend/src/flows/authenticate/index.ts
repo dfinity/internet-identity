@@ -161,7 +161,8 @@ export default async (): Promise<AuthSuccess> => {
       const authContext = await waitForAuthRequest();
       if (authContext === null) {
         // The user has manually navigated to "/#authorize".
-        redirectToWelcomeScreen();
+        window.location.hash = "";
+        window.location.reload();
         return;
       }
       const userNumber = getUserNumber();
@@ -233,7 +234,10 @@ function initManagementBtn() {
   const manageButton = document.getElementById(
     "manageButton"
   ) as HTMLButtonElement;
-  manageButton.onclick = () => redirectToWelcomeScreen();
+  manageButton.onclick = () => {
+    window.location.hash = "";
+    window.location.reload();
+  };
 }
 
 const initRegistration = async (
@@ -279,7 +283,9 @@ const authenticateUser = async (
     const result = await withLoader(() => IIConnection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
-      return await handleAuthSuccess(loginResult, authContext);
+      return await withLoader(() =>
+        handleAuthSuccess(loginResult, authContext)
+      );
     }
     await displayError({
       title: loginResult.title,
@@ -309,8 +315,9 @@ async function handleAuthSuccess(
 ) {
   // successful login, store user number for next time
   setUserNumber(loginResult.userNumber);
-  const [userKey, parsed_signed_delegation] = await withLoader(() =>
-    fetchDelegation(loginResult, authContext)
+  const [userKey, parsed_signed_delegation] = await fetchDelegation(
+    loginResult,
+    authContext
   );
   return {
     userNumber: loginResult.userNumber,
@@ -335,11 +342,6 @@ const initRecovery = () => {
     }
     toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
   };
-};
-
-const redirectToWelcomeScreen = () => {
-  window.location.hash = "";
-  window.location.reload();
 };
 
 /**
