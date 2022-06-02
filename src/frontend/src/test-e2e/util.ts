@@ -182,6 +182,7 @@ export async function addCustomCommands(
     )
   );
 
+  // This retrieves previously created credentials, see https://www.w3.org/TR/webauthn-2/#sctn-automation-get-credentials
   await browser.addCommand(
     "getWebauthnCredentials",
     command(
@@ -204,6 +205,7 @@ export async function addCustomCommands(
     )
   );
 
+  // This adds a previously created credential, see https://www.w3.org/TR/webauthn-2/#sctn-automation-add-credential
   await browser.addCommand(
     "addWebauthnCredential",
     command(
@@ -311,7 +313,7 @@ export async function addWebAuthnCredential(
   );
 }
 
-export function originToRpId(origin: string): string {
+export function originToRelyingPartyId(origin: string): string {
   return origin.replace(/https?:\/\/([.\w]+).*/, "$1");
 }
 

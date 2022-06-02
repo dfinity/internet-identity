@@ -25,7 +25,7 @@ import {
   addVirtualAuthenticator,
   addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRpId,
+  originToRelyingPartyId,
   removeFeaturesWarning,
   removeVirtualAuthenticator,
   RunConfiguration,
@@ -623,7 +623,7 @@ test("Register first then log into client application", async () => {
       browser,
       authenticatorId2,
       credentials[0],
-      originToRpId(II_ORIGIN)
+      originToRelyingPartyId(II_ORIGIN)
     );
 
     const authenticateView = new AuthenticateView(browser);
