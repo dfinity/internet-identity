@@ -98,8 +98,9 @@ const pageContent = (
     }
 
     hr {
-      border-color: var(--grey-050);
-      border-left: none;
+      border: none;
+      border-top-color: var(--grey-050);
+      border-top-style: solid;
       margin: 1rem 0;
     }
   </style>
