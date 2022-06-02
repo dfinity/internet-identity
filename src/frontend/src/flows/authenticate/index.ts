@@ -55,7 +55,7 @@ const pageContent = (
     }
 
     .modeContainer {
-      min-height: 6rem;
+      min-height: 7rem;
     }
 
     .childContainer {
@@ -78,7 +78,7 @@ const pageContent = (
     }
 
     #registerButton {
-      margin: 2rem 0;
+      margin: 3rem 0;
     }
 
     .hostName {
@@ -107,7 +107,7 @@ const pageContent = (
     <h2 class="sectionTitle">Application URL</h2>
     <div class="highlightBox hostName">${hostName}</div>
     <h2 class="sectionTitle">Identity Anchor</h2>
-    <div>
+    <div class="modeContainer">
       ${!editAnchor && userNumber !== undefined
         ? existingAnchorSection(userNumber)
         : editAnchorSection(userNumber)}
@@ -137,17 +137,13 @@ const pageContent = (
   ${footer}`;
 
 const existingAnchorSection = (userNumber: bigint) => html` <div
-  class="modeContainer"
+  class="childContainer"
 >
-  <div class="childContainer">
-    <div id="identityAnchor" class="highlightBox anchorText">${userNumber}</div>
-    <button id="editAnchorButton">${editIcon}</button>
-  </div>
+  <div id="identityAnchor" class="highlightBox anchorText">${userNumber}</div>
+  <button id="editAnchorButton">${editIcon}</button>
 </div>`;
 
-const editAnchorSection = (userNumber?: bigint) => html` <div
-  class="modeContainer"
->
+const editAnchorSection = (userNumber?: bigint) => html`
   <div class="childContainer">
     <input
       class="anchorText"
@@ -157,10 +153,10 @@ const editAnchorSection = (userNumber?: bigint) => html` <div
       value="${userNumber !== undefined ? userNumber?.toString() : ""}"
     />
   </div>
-  <div id="invalidAnchorMessage" class="error-message-hidden smallText">
+  <div id="invalidAnchorMessage" class="error-message-hidden">
     The Identity Anchor is not valid. Please try again.
   </div>
-</div>`;
+`;
 
 export interface AuthSuccess {
   userNumber: bigint;
