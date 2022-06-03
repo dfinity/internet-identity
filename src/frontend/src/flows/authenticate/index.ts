@@ -112,7 +112,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
           type="text"
           id="userNumberInput"
           placeholder="Enter anchor"
-          value="${userNumber !== undefined ? userNumber?.toString() : ""}"
+          value="${userNumber !== undefined ? userNumber : ""}"
         />
         <button id="editAnchorButton">${editIcon}</button>
       </div>
@@ -201,18 +201,18 @@ const init = (
   };
 
   if (userNumber === undefined) {
-    editAnchorButton.classList.toggle("hidden", true);
+    editAnchorButton.classList.add("hidden");
     userNumberInput.select();
   } else {
-    userNumberInput.classList.toggle("highlightBox", true);
-    registerSection.classList.toggle("hidden", true);
+    userNumberInput.classList.add("highlightBox");
+    registerSection.classList.add("hidden");
     userNumberInput.disabled = true;
     authorizeButton.focus();
   }
   editAnchorButton.onclick = () => {
-    registerSection.classList.toggle("hidden", false);
-    editAnchorButton.classList.toggle("hidden", true);
-    userNumberInput.classList.toggle("highlightBox", false);
+    editAnchorButton.classList.add("hidden");
+    registerSection.classList.remove("hidden");
+    userNumberInput.classList.remove("highlightBox");
     userNumberInput.disabled = false;
     userNumberInput.select();
   };
