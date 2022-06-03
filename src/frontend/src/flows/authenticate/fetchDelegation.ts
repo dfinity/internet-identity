@@ -1,74 +1,54 @@
 import { IIConnection } from "../../utils/iiConnection";
+import { AuthContext, Delegation } from "./postMessageInterface";
 import {
-  FrontendHostname,
   PublicKey,
   SignedDelegation,
-  UserNumber,
 } from "../../../generated/internet_identity_types";
-import { withLoader } from "../../components/loader";
-import { confirmRedirect } from "../confirmRedirect";
 import { hasOwnProperty } from "../../utils/utils";
-import { AuthRequest, AuthResponse } from "./postMessageInterface";
 
-export async function handleAuthRequest(
-  connection: IIConnection,
-  userNumber: UserNumber,
-  request: AuthRequest,
-  hostname: FrontendHostname
-): Promise<AuthResponse> {
-  const userPrincipal = await withLoader(() =>
-    connection.getPrincipal(userNumber, hostname)
+/**
+ * Prepares and fetches a delegation valid for the authenticated user and the application information contained in
+ * authContext.
+ * @param loginResult User number and authenticated II connection resulting from successful authentication.
+ * @param authContext Information about the authentication request received from the application via window post message.
+ * @return Tuple of PublicKey and matching delegation.
+ */
+export const fetchDelegation = async (
+  loginResult: {
+    userNumber: bigint;
+    connection: IIConnection;
+  },
+  authContext: AuthContext
+): Promise<[PublicKey, Delegation]> => {
+  const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
+  const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
+    loginResult.userNumber,
+    authContext.requestOrigin,
+    sessionKey,
+    authContext.authRequest.maxTimeToLive
   );
 
-  if (!(await confirmRedirect(hostname, userPrincipal.toString()))) {
-    return {
-      kind: "authorize-client-failure",
-      text: `User did not grant access to ${hostname}.`,
-    };
-  }
+  const signed_delegation = await retryGetDelegation(
+    loginResult.connection,
+    loginResult.userNumber,
+    authContext.requestOrigin,
+    sessionKey,
+    timestamp
+  );
 
-  return await withLoader(async () => {
-    const sessionKey = Array.from(request.sessionPublicKey);
-    const prepRes = await connection.prepareDelegation(
-      userNumber,
-      hostname,
-      sessionKey,
-      request.maxTimeToLive
-    );
-    if (prepRes.length !== 2) {
-      throw new Error(
-        `Error preparing the delegation. Result received: ${prepRes}`
-      );
-    }
-
-    const [userKey, timestamp] = prepRes;
-
-    // TODO: Signal failure to retrieve the delegation. Error page, or maybe redirect back with error?
-    const signed_delegation = await retryGetDelegation(
-      connection,
-      userNumber,
-      hostname,
-      sessionKey,
-      timestamp
-    );
-
-    // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
-    const parsed_signed_delegation = {
+  // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
+  return [
+    userKey,
+    {
       delegation: {
         pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
         expiration: BigInt(signed_delegation.delegation.expiration),
         targets: undefined,
       },
       signature: Uint8Array.from(signed_delegation.signature),
-    };
-
-    return {
-      kind: "authorize-client-success",
-      delegations: [parsed_signed_delegation],
-      userPublicKey: Uint8Array.from(userKey),
-    };
-  });
-}
+    },
+  ];
+};
 
 const retryGetDelegation = async (
   connection: IIConnection,

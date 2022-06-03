@@ -8,7 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import auth from "./auth";
+import authorizeAuthentication from "./flows/authenticate";
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -31,23 +31,27 @@ const init = async () => {
     return compatibilityNotice(okOrReason);
   }
 
-  // Go through the login flow, potentially creating an anchor.
-  const { userNumber, connection } = await login();
-
-  // From here on, the user is authenticated to II.
-
-  // Here, if the user doesn't have any recovery device, we prompt them to add
-  // one. The exact flow depends on the device they use.
-  await recoveryWizard(userNumber, connection);
-
   const userIntent = intentFromUrl(url);
+
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      return auth(userNumber, connection);
+      // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
+      const authSuccess = await authorizeAuthentication();
+      // show the recovery wizard before sending the window post message, otherwise the II window will be closed
+      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      // send the delegation back to the dapp window (which will then close the II window)
+      authSuccess.sendDelegationMessage();
+      return;
     }
     // Open the management page
     case "manage": {
+      // Go through the login flow, potentially creating an anchor.
+      const { userNumber, connection } = await login();
+      // Here, if the user doesn't have any recovery device, we prompt them to add
+      // one. The exact flow depends on the device they use.
+      await recoveryWizard(userNumber, connection);
+      // From here on, the user is authenticated to II.
       return renderManage(userNumber, connection);
     }
   }
