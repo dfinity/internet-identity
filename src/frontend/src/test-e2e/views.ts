@@ -324,15 +324,37 @@ export class VerifyRemoteDeviceView extends View {
   }
 }
 
-export class AuthorizeAppView extends View {
+export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#confirmRedirect")
+      .$("#authorizeButton")
       .waitForDisplayed({ timeout: 5_000 });
   }
 
-  async confirm(): Promise<void> {
-    await this.browser.$("#confirmRedirect").click();
+  async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
+    expect(await this.browser.$("#userNumberInput").getValue()).toBe(anchor);
+  }
+
+  async expectAnchorInputField(): Promise<void> {
+    await this.browser
+      .$("#userNumberInput")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async authenticate(): Promise<void> {
+    await this.browser.$("#authorizeButton").click();
+  }
+
+  async register(): Promise<void> {
+    await this.browser.$("#registerButton").click();
+  }
+
+  async switchToAnchorInput(): Promise<void> {
+    await this.browser.$("#editAnchorButton").click();
+    // deselect input box, so we do not get flaky screenshots due to the blinking cursor
+    await this.browser.execute(
+      "document.getElementById('authorizeButton').focus();"
+    );
   }
 }
 

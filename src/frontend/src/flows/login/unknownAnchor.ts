@@ -2,14 +2,13 @@ import { render, html } from "lit-html";
 import { IIConnection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { register } from "../register";
 import { icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { useRecovery } from "../recovery/useRecovery";
-import { registerDisabled } from "../registerDisabled";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
+import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
@@ -78,16 +77,6 @@ export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
   });
 };
 
-/** Check that the current origin is not the explicit canister id or a raw url.
- *  Explanation why we need to do this:
- *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
- **/
-function isRegistrationAllowed() {
-  return !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
-    window.origin
-  );
-}
-
 const initRegister = (
   resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
@@ -96,8 +85,7 @@ const initRegister = (
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
-    const result = isRegistrationAllowed() ? register() : registerDisabled();
-    result
+    registerIfAllowed()
       .then((res) => {
         if (res === null) {
           window.location.reload();
