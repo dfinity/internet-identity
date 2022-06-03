@@ -74,8 +74,9 @@ jobs:
         run: |
           cargo fmt
       - name: Commit Formatting changes
-        uses: EndBug/add-and-commit@v7.2.0
-        if: ${{ github.event_name == 'pull_request' }}
+        uses: EndBug/add-and-commit@v9
+        # We don't want to commit formatting changes to main
+        if: ${{ github.ref != 'refs/heads/main' }}
         with:
           add: src/internet_identity
           author_name: Formatting Committer
