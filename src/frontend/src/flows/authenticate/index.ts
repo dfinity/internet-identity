@@ -200,14 +200,15 @@ const init = (
     }
   };
 
-  if (userNumber === undefined) {
-    editAnchorButton.classList.add("hidden");
-    userNumberInput.select();
-  } else {
+  // only use non-edit mode if the anchor is set and was previously used successfully (i.e. is in local storage)
+  if (userNumber !== undefined && userNumber === getUserNumber()) {
     userNumberInput.classList.add("highlightBox");
     registerSection.classList.add("hidden");
     userNumberInput.disabled = true;
     authorizeButton.focus();
+  } else {
+    editAnchorButton.classList.add("hidden");
+    userNumberInput.select();
   }
   editAnchorButton.onclick = () => {
     editAnchorButton.classList.add("hidden");
