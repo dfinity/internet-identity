@@ -42,7 +42,8 @@ jobs:
       - name: Run Tests
         shell: bash
         run: |
-          cargo test --all-targets --all-features
+          # the "rand" features are needed for the captcha crate to compile
+          cargo test --all-targets --features 'rand/std,rand/std_rng'
         env:
           RUST_BACKTRACE: 1
 
