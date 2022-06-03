@@ -4,28 +4,32 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-base64 = "0.13.0"
 hex = "0.4"
-ic-cdk = "0.3.2"
-ic-cdk-macros = "0.3"
-ic-certified-map = "0.3.0"
-ic-types = "0.1.1"
-lazy_static = "1.4.0"
-lodepng = "3.6.1"
+lazy_static = "1.4"
 serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"
-serde_with = "1.6.2"
-sha2 = "0.9.1"
-rand_core = "0.5.1"
-rand_chacha = "0.2.2"
-#  We need a custom captcha that allows using custom RNGs
-#  https://github.com/dfinity/internet-identity/issues/472
-captcha = { git = 'https://github.com/nmattia/captcha', rev = '4751b6fa4e56229c2af5b9a28195ff039551d8e7' }
+serde_with = "1.14"
+sha2 = "^0.9" # set bound to match ic-certified-map bound
+
+# Captcha deps
+lodepng = "*"
+base64 = "*"
+
+rand = { version ="*", default-features = false }
+rand_core = { version = "*", default-features = false }
+rand_chacha = { version = "*", default-features = false }
+captcha = { git = "https://github.com/nmattia/captcha", rev = "2245e263b1b88d870e045178a147ea2ce4c452c5", default-features = false }
+
+# All IC deps
+candid = "0.7"
+ic-cdk = "0.5"
+ic-cdk-macros = "0.5"
+ic-certified-map = "0.3"
+ic-types = "0.3"
 
 [dev-dependencies]
 hex-literal = "0.2.1"
-rand = "0.8.3"
 
 [features]
 # the dummy_captcha feature which ensures the captcha string is always "a"
