@@ -4,9 +4,9 @@ use crate::AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentative
 use crate::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
+use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
-use candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use internet_identity::signature_map::SignatureMap;
@@ -401,17 +401,17 @@ async fn add_tentative_device(
             }) => AnotherDeviceTentativelyAdded,
             Some(mut registration) => {
                 registration.state = DeviceTentativelyAdded {
-tentative_device: device_data,
-failed_attempts: 0,
-verification_code: verification_code.clone(),
-};
-AddedTentatively {
-device_registration_timeout: registration.expiration,
-verification_code,
-}
-}
-}
-})
+                    tentative_device: device_data,
+                    failed_attempts: 0,
+                    verification_code: verification_code.clone(),
+                };
+                AddedTentatively {
+                    device_registration_timeout: registration.expiration,
+                    verification_code,
+                }
+            }
+        }
+    })
 }
 
 #[update]
