@@ -401,17 +401,17 @@ async fn add_tentative_device(
             }) => AnotherDeviceTentativelyAdded,
             Some(mut registration) => {
                 registration.state = DeviceTentativelyAdded {
-                    tentative_device: device_data,
-                    failed_attempts: 0,
-                    verification_code: verification_code.clone(),
-                };
-                AddedTentatively {
-                    device_registration_timeout: registration.expiration,
-                    verification_code,
-                }
-            }
-        }
-    })
+tentative_device: device_data,
+failed_attempts: 0,
+verification_code: verification_code.clone(),
+};
+AddedTentatively {
+device_registration_timeout: registration.expiration,
+verification_code,
+}
+}
+}
+})
 }
 
 #[update]
