@@ -136,12 +136,27 @@ curl --silent \
     --data "$jq_body" \
     | jq -cMr '.body' >> "$section_whats_changed"
 
+# Start the WASM verification section, where we explain how to verify the hash
+section_wasm_verification=$(mktemp)
+cat > "$section_build_flavors" <<EOF
+## WASM Verification
+
+To build the WASM module yourself and verify its hash, run the following commands from the root of the Internet Identity repo:
+
+\`\`\`
+git pull # to ensure you have the latest changes.
+git checkout $GITHUB_SHA
+./scripts/docker-build
+sha256sum internet_identity.wasm
+\`\`\`
+EOF
 
 body=$(mktemp)
 >&2 echo "Using '$body' for body"
 cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
 cat "$section_whats_changed" >> "$body" && echo >> "$body" && rm "$section_whats_changed"
 cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
+cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_wasm_verification"
 
 >&2 echo "body complete:"
 cat "$body"
