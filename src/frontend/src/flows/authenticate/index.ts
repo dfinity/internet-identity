@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { editIcon } from "../../components/icons";
+import { editIcon, icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -74,7 +74,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     }
 
     #registerButton {
-      margin: 3rem 0;
+      margin: 0.5rem 0 1rem 0;
     }
 
     .hostName {
@@ -83,7 +83,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     }
 
     .sectionTitle {
-      margin: 1rem 0 0.5rem 0;
+      margin: 0.5rem 0 0.5rem 0;
       font-size: 1rem;
       font-weight: normal;
       color: black;
@@ -97,10 +97,11 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       border: none;
       border-top-color: var(--grey-050);
       border-top-style: solid;
-      margin: 1rem 0;
+      margin: 0.5rem 0;
     }
   </style>
   <div class="container">
+    ${icLogo}
     <h1>Authorize Authentication</h1>
     <h2 class="sectionTitle">Application URL</h2>
     <div class="highlightBox hostName">${hostName}</div>
