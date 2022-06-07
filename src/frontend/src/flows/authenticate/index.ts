@@ -336,13 +336,7 @@ const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLButtonElement;
-  recoverButton.onclick = () => {
-    const userNumber = readUserNumber();
-    if (userNumber !== undefined) {
-      return useRecovery(userNumber);
-    }
-    toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
-  };
+  recoverButton.onclick = () => useRecovery(readUserNumber());
 };
 
 /**
