@@ -327,18 +327,15 @@ const bindRemoveListener = (
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");
     } else {
-      let shouldProceed;
-      if (sameDevice) {
-        shouldProceed = confirm(
-          "This will remove your current device and you will be logged out."
-        );
-      } else {
-        shouldProceed = confirm(
-          `Do you really want to remove the ${
-            hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-          }"${device.alias}"?`
-        );
-      }
+      const shouldProceed = sameDevice
+        ? confirm(
+            "This will remove your current device and you will be logged out."
+          )
+        : confirm(
+            `Do you really want to remove the ${
+              hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+            }"${device.alias}"?`
+          );
       if (!shouldProceed) {
         return;
       }
