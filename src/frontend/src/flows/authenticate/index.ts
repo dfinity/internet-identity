@@ -102,10 +102,10 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
   </style>
   <div class="container">
     ${icLogo}
-    <h1>Authorize Authentication</h1>
-    <h2 class="sectionTitle">Application URL</h2>
+    <h1>Internet Identity</h1>
+    <h2 class="sectionTitle">Authenticate to service:</h2>
     <div class="highlightBox hostName">${hostName}</div>
-    <h2 class="sectionTitle">Identity Anchor</h2>
+    <h2 class="sectionTitle">Use Identity Anchor:</h2>
     <div class="modeContainer">
       <div class="childContainer">
         <input
@@ -122,7 +122,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       </div>
     </div>
     <button type="button" id="authorizeButton" class="primary">
-      Authorize
+      Start Session
     </button>
     <div id="registerSection">
       <button type="button" id="registerButton">
