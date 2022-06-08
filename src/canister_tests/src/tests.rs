@@ -26,7 +26,7 @@ fn ii_upgrade_retains_anchors() {
     let challenge = api::create_challenge(&env, canister_id);
     let user_number = match api::register(&env, canister_id, framework::some_device_data(), types::ChallengeAttempt { chars: "a".to_string(), key: challenge.challenge_key }) {
         types::RegisterResponse::Registered { user_number } => user_number,
-        response => panic!("woops: {:?}", response),
+        response => panic!("could not register: {:?}", response),
     };
     framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 

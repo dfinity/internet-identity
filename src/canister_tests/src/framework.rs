@@ -52,7 +52,7 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
             if ! default_path.exists() {
                 return None
             }
-            Some(std::fs::read(default_path).expect("could not read foo"))
+            Some(std::fs::read(default_path).expect(&format!("could not read Wasm module: {:?}", default_path)))
         },
         Some(path) => {
             let pathname: String = path.into_string().expect(&format!("Invalid string path for {}", env_var.clone()));
@@ -60,7 +60,7 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
             if ! path.exists() {
                 panic!("Could not find {}", pathname);
             }
-            Some(std::fs::read(path).expect("bwoah"))
+            Some(std::fs::read(path.clone()).expect(&format!("could not read Wasm module: {:?}", path)))
         },
     }
 }
