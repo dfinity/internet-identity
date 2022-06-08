@@ -1,0 +1,17 @@
+[package]
+name = "canister_tests"
+version = "0.1.0"
+edition = "2018"
+
+[dev-dependencies]
+lazy_static = "1.4"
+serde = "1"
+serde_bytes = "0.11"
+
+internet_identity_interface = { path = "../internet_identity_interface" }
+
+# All IC deps
+candid = "0.7"
+ic-cdk = "0.5"
+ic-types = "0.3"
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "46b3de985fef2cc9e326ed191c266b610512443b" }
