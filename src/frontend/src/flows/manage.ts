@@ -336,7 +336,7 @@ const bindRemoveListener = (
         shouldProceed = confirm(
           `Do you really want to remove the ${
             hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-          }'${device.alias}'?`
+          }"${device.alias}"?`
         );
       }
       if (!shouldProceed) {

@@ -538,7 +538,7 @@ test("Screenshots", async () => {
         }
       );
       expect(await browser.getAlertText()).toBe(
-        `Do you really want to remove the device ${DEVICE_NAME2}?`
+        `Do you really want to remove the device "${DEVICE_NAME2}"?`
       );
       await browser.acceptAlert();
       await browser.waitUntil(
