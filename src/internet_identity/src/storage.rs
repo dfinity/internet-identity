@@ -1,9 +1,9 @@
-use super::UserNumber;
 use candid;
 use ic_cdk::api::{
     stable::{stable64_grow, stable64_read, stable64_size, stable64_write},
     trap,
 };
+use internet_identity_interface::UserNumber;
 use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
