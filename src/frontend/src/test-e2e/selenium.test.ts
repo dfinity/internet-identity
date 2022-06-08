@@ -530,7 +530,17 @@ test("Screenshots", async () => {
       await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView.removeDevice(DEVICE_NAME2);
-      // No dialog here!
+      await browser.waitUntil(
+        async () => (await browser.getAlertText()) !== undefined,
+        {
+          timeout: 1_000,
+          timeoutMsg: "expected alert to be displayed after 1s",
+        }
+      );
+      expect(await browser.getAlertText()).toBe(
+        `Do you really want to remove the device ${DEVICE_NAME2}?`
+      );
+      await browser.acceptAlert();
       await browser.waitUntil(
         async () => {
           const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);
