@@ -59,7 +59,7 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
     return Promise.resolve(null);
   }
 
-  const result = new Promise<AuthContext>((resolve, reject) => {
+  const result = new Promise<AuthContext>((resolve) => {
     // Set up an event listener for receiving messages from the client.
     window.addEventListener("message", async (event) => {
       const message = event.data;
@@ -72,10 +72,9 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
             (event.source as Window).postMessage(responseMessage, event.origin),
         });
       } else {
-        console.error(
+        console.warn(
           `Message of unknown kind received: ${JSON.stringify(message)}`
         );
-        reject();
       }
     });
   });
