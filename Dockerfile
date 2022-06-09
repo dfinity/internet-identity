@@ -60,7 +60,7 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity_interface/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
-    && cargo build --target wasm32-unknown-unknown --release -j1 \
+    && cargo build --manifest-path ./src/internet_identity/Cargo.toml --target wasm32-unknown-unknown --release -j1 \
     && rm -rf src
 
 FROM deps as build
@@ -72,6 +72,8 @@ ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 
 RUN touch src/internet_identity/src/lib.rs
+RUN touch src/internet_identity_interface/src/lib.rs
+RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
 RUN ./src/internet_identity/build.sh
