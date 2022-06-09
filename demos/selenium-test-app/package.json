@@ -1,13 +1,13 @@
 {
-  "name": "ic-agent-sample-javascript-app",
+  "name": "selenium-test-app",
   "private": true,
   "dependencies": {
-    "@dfinity/agent": "^0.10.2",
-    "@dfinity/auth-client": "^0.10.2",
-    "@dfinity/authentication": "^0.10.2",
-    "@dfinity/candid": "^0.10.2",
-    "@dfinity/identity": "^0.10.2",
-    "@dfinity/principal": "^0.10.2",
+    "@dfinity/agent": "^0.11.3",
+    "@dfinity/auth-client": "^0.11.3",
+    "@dfinity/authentication": "^0.11.3",
+    "@dfinity/candid": "^0.11.3",
+    "@dfinity/identity": "^0.11.3",
+    "@dfinity/principal": "^0.11.3",
     "assert": "^2.0.0",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
@@ -17,7 +17,7 @@
     "util": "^0.12.4",
     "webpack": "^5.65.0",
     "webpack-cli": "^4.9.1",
-    "webpack-dev-server": "^4.6.0"
+    "webpack-dev-server": "^4.9.2"
   },
   "scripts": {
     "build": "webpack",
@@ -27,6 +27,5 @@
     "publish:release": "",
     "test:coverage": "",
     "test": ""
-  },
-  "version": "0.8.3"
+  }
 }
