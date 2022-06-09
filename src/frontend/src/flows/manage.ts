@@ -7,7 +7,6 @@ import { footer } from "../components/footer";
 import {
   DeviceData,
   IdentityAnchorInfo,
-  PublicKey,
 } from "../../generated/internet_identity_types";
 import { closeIcon, warningIcon } from "../components/icons";
 import { displayError } from "../components/displayError";
@@ -285,7 +284,7 @@ const renderDevices = async (
       userNumber,
       connection,
       identityElement,
-      device.pubkey,
+      device,
       isOnlyDevice
     );
     hasOwnProperty(device.purpose, "recovery")
@@ -313,12 +312,12 @@ const bindRemoveListener = (
   userNumber: bigint,
   connection: IIConnection,
   listItem: HTMLElement,
-  publicKey: PublicKey,
+  device: DeviceData,
   isOnlyDevice: boolean
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const pubKey: DerEncodedPublicKey = new Uint8Array(publicKey)
+    const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
       .buffer as DerEncodedPublicKey;
     const sameDevice = bufferEqual(
       connection.identity.getPublicKey().toDer(),
@@ -328,19 +327,23 @@ const bindRemoveListener = (
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");
     } else {
-      if (sameDevice) {
-        const shouldProceed = confirm(
-          "This will remove your current device and you will be logged out."
-        );
-        if (!shouldProceed) {
-          return;
-        }
+      const shouldProceed = sameDevice
+        ? confirm(
+            "This will remove your current device and you will be logged out."
+          )
+        : confirm(
+            `Do you really want to remove the ${
+              hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+            }"${device.alias}"?`
+          );
+      if (!shouldProceed) {
+        return;
       }
     }
 
     // Otherwise, remove identity
     try {
-      await withLoader(() => connection.remove(userNumber, publicKey));
+      await withLoader(() => connection.remove(userNumber, device.pubkey));
       if (sameDevice) {
         localStorage.clear();
         location.reload();
