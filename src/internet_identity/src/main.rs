@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use storage::{Salt, Storage};
 
+use internet_identity_interface::*;
+
 mod assets;
 mod http;
 
@@ -49,49 +51,6 @@ const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
-
-type UserNumber = u64;
-type CredentialId = ByteBuf;
-type PublicKey = ByteBuf;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
-type SessionKey = PublicKey;
-type FrontendHostname = String;
-type Timestamp = u64; // in nanos since epoch
-type Signature = ByteBuf;
-type DeviceVerificationCode = String;
-type FailedAttemptsCounter = u8;
-
-struct Base64(String);
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum Purpose {
-    #[serde(rename = "recovery")]
-    Recovery,
-    #[serde(rename = "authentication")]
-    Authentication,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum KeyType {
-    #[serde(rename = "unknown")]
-    Unknown,
-    #[serde(rename = "platform")]
-    Platform,
-    #[serde(rename = "cross_platform")]
-    CrossPlatform,
-    #[serde(rename = "seed_phrase")]
-    SeedPhrase,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct DeviceData {
-    pubkey: DeviceKey,
-    alias: String,
-    credential_id: Option<CredentialId>,
-    purpose: Purpose,
-    key_type: KeyType,
-}
 
 /// This is an internal version of `DeviceData` primarily useful to provide a
 /// backwards compatible level between older device data stored in stable memory
@@ -129,74 +88,6 @@ impl From<DeviceDataInternal> for DeviceData {
             key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
         }
     }
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct Delegation {
-    pubkey: PublicKey,
-    expiration: Timestamp,
-    targets: Option<Vec<Principal>>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct SignedDelegation {
-    delegation: Delegation,
-    signature: Signature,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum GetDelegationResponse {
-    #[serde(rename = "signed_delegation")]
-    SignedDelegation(SignedDelegation),
-    #[serde(rename = "no_such_delegation")]
-    NoSuchDelegation,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum RegisterResponse {
-    #[serde(rename = "registered")]
-    Registered { user_number: UserNumber },
-    #[serde(rename = "canister_full")]
-    CanisterFull,
-    #[serde(rename = "bad_challenge")]
-    BadChallenge,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum AddTentativeDeviceResponse {
-    #[serde(rename = "added_tentatively")]
-    AddedTentatively {
-        verification_code: DeviceVerificationCode,
-        device_registration_timeout: Timestamp,
-    },
-    #[serde(rename = "device_registration_mode_off")]
-    DeviceRegistrationModeOff,
-    #[serde(rename = "another_device_tentatively_added")]
-    AnotherDeviceTentativelyAdded,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum VerifyTentativeDeviceResponse {
-    #[serde(rename = "verified")]
-    Verified,
-    #[serde(rename = "wrong_code")]
-    WrongCode { retries_left: u8 },
-    #[serde(rename = "device_registration_mode_off")]
-    DeviceRegistrationModeOff,
-    #[serde(rename = "no_device_to_verify")]
-    NoDeviceToVerify,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct DeviceRegistrationInfo {
-    expiration: Timestamp,
-    tentative_device: Option<DeviceData>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct IdentityAnchorInfo {
-    devices: Vec<DeviceData>,
-    device_registration: Option<DeviceRegistrationInfo>,
 }
 
 mod hash;

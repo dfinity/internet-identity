@@ -600,6 +600,7 @@ test("Screenshots", async () => {
       await demoAppView.signin();
       await switchToPopup(browser);
       await removeFeaturesWarning(browser);
+      await waitForFonts(browser);
       const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();
       await screenshots.take("authenticate-known-anchor", browser);
