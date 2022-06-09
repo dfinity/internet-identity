@@ -244,7 +244,7 @@ test("Log into client application, after registration", async () => {
 
     // default value
     const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (24 * 60 * 60_000_000_000)).toBeCloseTo(1);
+    expect(Number(exp) / (8 * 60 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);
 
@@ -658,6 +658,6 @@ test("Register first then log into client application", async () => {
 
     // default value
     const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (24 * 60 * 60_000_000_000)).toBeCloseTo(1);
+    expect(Number(exp) / (8 * 60 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);
