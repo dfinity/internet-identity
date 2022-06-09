@@ -47,6 +47,9 @@ footer {
   display: inline-block;
   transition: background 0.2s;
 }
+.powered-by-link img {
+  max-width: 100%;
+}
 
 .powered-by-link:hover,
 .powered-by-link:focus {
