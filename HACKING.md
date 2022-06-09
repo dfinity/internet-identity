@@ -71,10 +71,10 @@ Then open `http://localhost:8080` in your browser. Webpack will reload the page 
 npm run format && npm run lint
 ```
 
-Finally, to test workflows like authentication from a client application, you start the sample app:
+Finally, to test workflows like authentication from a client application, you start the Selenium test app:
 
 ```bash
-cd demos/sample-javascript
+cd demos/selenium-test-app
 npm ci
 npm run develop
 ```
