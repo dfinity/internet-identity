@@ -34,7 +34,7 @@ body {
 }
 
 footer {
-  padding: 1em 2em .5rem;
+  padding: 1em 2em 0.5rem;
 }
 @media (min-width: 512px) {
   footer {

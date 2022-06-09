@@ -75,7 +75,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
 
     .hostName {
       padding: 1rem 0;
-      font-size: .8rem;
+      font-size: 0.8rem;
       font-weight: 400;
     }
 
@@ -119,7 +119,10 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       />
       <button id="editAnchorButton">${editIcon}</button>
     </div>
-    <div id="invalidAnchorMessage" class="anchor-error-message error-message-hidden">
+    <div
+      id="invalidAnchorMessage"
+      class="anchor-error-message error-message-hidden"
+    >
       The Identity Anchor is not valid. Please try again.
     </div>
 
