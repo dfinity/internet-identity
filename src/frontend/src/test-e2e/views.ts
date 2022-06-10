@@ -7,6 +7,7 @@ export class WelcomeView extends View {
     await this.browser
       .$("#registerUserNumber")
       .waitForDisplayed({ timeout: 10_000 });
+    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
@@ -154,6 +155,7 @@ export class MainView extends View {
     await this.browser
       .$("//h1[string()='Anchor Management']")
       .waitForDisplayed({ timeout: 10_000 });
+    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -329,6 +331,7 @@ export class AuthenticateView extends View {
     await this.browser
       .$("#authorizeButton")
       .waitForDisplayed({ timeout: 5_000 });
+    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
   }
 
   async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
@@ -363,6 +366,7 @@ export class WelcomeBackView extends View {
     await this.browser
       .$("#loginDifferent")
       .waitForDisplayed({ timeout: 15_000 });
+    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
   }
 
   async getIdentityAnchor(): Promise<string> {
