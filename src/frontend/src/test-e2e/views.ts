@@ -462,6 +462,34 @@ export class DemoAppView extends View {
     );
     return await whoamiResponseElem.getText();
   }
+
+  async getMessageText(messageNo: number): Promise<string> {
+    return await this.browser
+      .$(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
+      .getText();
+  }
+
+  async waitForNthMessage(messageNo: number): Promise<void> {
+    await this.browser
+      .$(`div.postMessage:nth-child(${messageNo})`)
+      .waitForDisplayed();
+  }
+
+  async openIiTab(): Promise<void> {
+    await this.browser.$("#openIiWindowBtn").click();
+  }
+
+  async sendInvalidData(): Promise<void> {
+    await this.browser.$("#invalidDataBtn").click();
+  }
+
+  async sendIncompleteMessage(): Promise<void> {
+    await this.browser.$("#incompleteMessageBtn").click();
+  }
+
+  async sendValidMessage(): Promise<void> {
+    await this.browser.$("#validMessageBtn").click();
+  }
 }
 
 export class RecoverView extends View {

@@ -661,3 +661,43 @@ test("Register first then log into client application", async () => {
     expect(Number(exp) / (8 * 60 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);
+
+test("Authorize ready message should be sent immediately", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(DEMO_APP_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    await demoAppView.openIiTab();
+    await demoAppView.waitForNthMessage(1);
+    expect(await demoAppView.getMessageText(1)).toContain("authorize-ready");
+  });
+}, 300_000);
+
+test("Should ignore invalid data and allow second valid message", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(DEMO_APP_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    await demoAppView.openIiTab();
+    await demoAppView.waitForNthMessage(1); // message 1: authorize-ready
+    await demoAppView.sendInvalidData(); // message 2
+    await demoAppView.sendValidMessage(); // message 3
+
+    await switchToPopup(browser);
+    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+
+    // switch back to demo app
+    await browser.switchToWindow((await browser.getWindowHandles())[0]);
+
+    await demoAppView.waitForNthMessage(4); // message 4: authorize-success
+    const successMessage = await demoAppView.getMessageText(4);
+    expect(successMessage).toContain("authorize-client-success");
+
+    // Internet Identity default value (as opposed to agent-js)
+    const exp = JSON.parse(successMessage).delegations[0].delegation.expiration;
+    const expectedTimestamp = 30 * 60_000_000_000 + Date.now() * 1_000_000; // 30 min in the future in nanos
+    expect(Number(exp) / expectedTimestamp).toBeCloseTo(1);
+  });
+}, 300_000);
