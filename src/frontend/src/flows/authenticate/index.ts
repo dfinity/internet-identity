@@ -101,12 +101,23 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     .hidden {
       display: none;
     }
+
+    .host-name {
+      padding: 1rem 0.5rem;
+    }
+
+    /* overwrite main.css */
+
+    .container {
+      padding: 3.5rem 1rem 2rem;
+    }
+
   </style>
   <div class="container">
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>
-    <div class="highlightBox hostName">${hostName}</div>
+    <div class="host-name highlightBox hostName">${hostName}</div>
     <p>Use Identity Anchor:</p>
 
     <div class="childContainer">
