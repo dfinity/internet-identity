@@ -111,7 +111,6 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     .container {
       padding: 3.5rem 1rem 2rem;
     }
-
   </style>
   <div class="container">
     ${icLogo}
