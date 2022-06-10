@@ -106,10 +106,13 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       padding: 1rem 0.5rem;
     }
 
-    /* overwrite main.css */
-
     .container {
       padding: 3.5rem 1rem 2rem;
+    }
+    @media (min-width: 512px) {
+      .container {
+        padding: 3.5rem 2.5rem 2rem;
+      }
     }
   </style>
   <div class="container">
