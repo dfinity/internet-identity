@@ -696,8 +696,7 @@ test("Should ignore invalid data and allow second valid message", async () => {
     expect(successMessage).toContain("authorize-client-success");
 
     // Internet Identity default value (as opposed to agent-js)
-    const exp = JSON.parse(successMessage).delegations[0].delegation.expiration;
-    const expectedTimestamp = 30 * 60_000_000_000 + Date.now() * 1_000_000; // 30 min in the future in nanos
-    expect(Number(exp) / expectedTimestamp).toBeCloseTo(1);
+    const exp = await browser.$("#expiration").getText();
+    expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
   });
 }, 300_000);

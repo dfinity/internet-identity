@@ -1,5 +1,10 @@
 import { Actor, HttpAgent } from "@dfinity/agent";
-import { DelegationIdentity, Ed25519KeyIdentity } from "@dfinity/identity";
+import {
+  Delegation,
+  DelegationChain,
+  DelegationIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
 
@@ -23,6 +28,7 @@ const maxTimeToLiveEl = document.getElementById("maxTimeToLive");
 
 let authClient;
 let iiProtocolTestWindow;
+let localIdentity;
 
 const updateView = (identity) => {
   principalEl.innerText = identity.getPrincipal();
@@ -70,6 +76,25 @@ function addMessageElement(message, received) {
 window.addEventListener("message", (event) => {
   if (event.source === iiProtocolTestWindow) {
     addMessageElement(event.data, true);
+    if (event?.data?.kind === "authorize-client-success") {
+      const delegations = event.data.delegations.map((signedDelegation) => {
+        return {
+          delegation: new Delegation(
+            signedDelegation.delegation.pubkey,
+            signedDelegation.delegation.expiration,
+            signedDelegation.delegation.targets
+          ),
+          signature: signedDelegation.signature.buffer,
+        };
+      });
+      const delegationChain = DelegationChain.fromDelegations(
+        delegations,
+        event.data.userPublicKey.buffer
+      );
+      updateView(
+        DelegationIdentity.fromDelegation(localIdentity, delegationChain)
+      );
+    }
   }
 });
 
@@ -137,11 +162,10 @@ const init = async () => {
       alert("Open II tab first");
       return;
     }
+    localIdentity = Ed25519KeyIdentity.generate();
     const validMessage = {
       kind: "authorize-client",
-      sessionPublicKey: new Uint8Array(
-        Ed25519KeyIdentity.generate().getPublicKey().toDer()
-      ),
+      sessionPublicKey: new Uint8Array(localIdentity.getPublicKey().toDer()),
     };
     addMessageElement(validMessage, false);
     iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
