@@ -51,3 +51,86 @@ pub fn lookup(
         Err(e) => panic!("Failed to lookup: {:?}", e),
     }
 }
+
+pub fn get_anchor_info(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<types::IdentityAnchorInfo, CallError> {
+    match framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)) {
+        Ok((r,)) => Ok(r),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn enter_device_registration_mode(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<types::Timestamp, CallError> {
+    match framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "enter_device_registration_mode",
+        (user_number,),
+    ) {
+        Ok((r,)) => Ok(r),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn exit_device_registration_mode(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<(), CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "exit_device_registration_mode",
+        (user_number,),
+    )
+}
+
+pub fn add_tentative_device(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_data: types::DeviceData,
+) -> Result<types::AddTentativeDeviceResponse, CallError> {
+    match framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "add_tentative_device",
+        (user_number, device_data),
+    ) {
+        Ok((r,)) => Ok(r),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn verify_tentative_device(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    verification_code: types::DeviceVerificationCode,
+) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
+    match framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "verify_tentative_device",
+        (user_number, verification_code),
+    ) {
+        Ok((r,)) => Ok(r),
+        Err(e) => Err(e),
+    }
+}
