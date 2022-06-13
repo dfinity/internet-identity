@@ -35,7 +35,7 @@ jobs:
         # We don't want to commit formatting changes to main
         if: ${{ github.ref != 'refs/heads/main' }}
         with:
-          add: src/internet_identity
+          add: src
           author_name: Formatting Committer
           author_email: "<nobody@example.com>"
           message: "Updating rust formatting"
