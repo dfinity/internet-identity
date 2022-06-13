@@ -1,3 +1,5 @@
+import { waitForImages } from "./util";
+
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
 }
@@ -7,7 +9,7 @@ export class WelcomeView extends View {
     await this.browser
       .$("#registerUserNumber")
       .waitForDisplayed({ timeout: 10_000 });
-    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
+    await waitForImages(this.browser);
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
@@ -155,7 +157,7 @@ export class MainView extends View {
     await this.browser
       .$("//h1[string()='Anchor Management']")
       .waitForDisplayed({ timeout: 10_000 });
-    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
+    await waitForImages(this.browser);
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -331,7 +333,7 @@ export class AuthenticateView extends View {
     await this.browser
       .$("#authorizeButton")
       .waitForDisplayed({ timeout: 5_000 });
-    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
+    await waitForImages(this.browser);
   }
 
   async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
@@ -366,7 +368,7 @@ export class WelcomeBackView extends View {
     await this.browser
       .$("#loginDifferent")
       .waitForDisplayed({ timeout: 15_000 });
-    await this.browser.$("#ic-badge").waitForDisplayed({ timeout: 3_000 });
+    await waitForImages(this.browser);
   }
 
   async getIdentityAnchor(): Promise<string> {

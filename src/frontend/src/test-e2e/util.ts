@@ -351,6 +351,29 @@ export async function waitForFonts(
   );
 }
 
+// Inspired by https://github.com/dfinity/nns-dapp/blob/0449da36fd20eb9bb5d712d78aea8879cb51ec8e/e2e-tests/common/waitForImages.ts
+export const waitForImages = async (
+  browser: WebdriverIO.Browser
+): Promise<true | void> =>
+  // Wait for all images to be "complete", i.e. loaded
+  browser.waitUntil(
+    () =>
+      browser.execute(function () {
+        const imgs: HTMLCollectionOf<HTMLImageElement> =
+          document.getElementsByTagName("img");
+        if (imgs.length <= 0) {
+          return true;
+        }
+
+        const imagesReady: boolean = Array.prototype.every.call(imgs, (img) => {
+          return img.complete;
+        });
+        const documentReady: boolean = document.readyState === "complete";
+        return imagesReady && documentReady;
+      }),
+    { timeoutMsg: "image wasn't loaded" }
+  );
+
 export async function switchToPopup(
   browser: WebdriverIO.Browser
 ): Promise<string> {
