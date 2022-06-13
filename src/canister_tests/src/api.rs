@@ -43,7 +43,7 @@ pub fn lookup(
     match framework::call_candid_as(
         env,
         canister_id,
-        framework::some_principal(),
+        framework::principal_1(),
         "lookup",
         (user_number,),
     ) {
