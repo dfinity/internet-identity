@@ -1,10 +1,10 @@
-use candid::{parser::value::IDLValue, IDLArgs};
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
-use ic_types::{Principal};
-use ic_state_machine_tests::{PrincipalId, CanisterId, StateMachine, UserError, WasmResult};
-use serde_bytes::ByteBuf;
-use lazy_static::lazy_static;
+use candid::{parser::value::IDLValue, IDLArgs};
+use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
+use ic_types::Principal;
 use internet_identity_interface as types;
+use lazy_static::lazy_static;
+use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
 
@@ -41,7 +41,6 @@ lazy_static! {
     };
 }
 
-
 /** Helper that returns the content of `default_path` if found, or None if the file does not exist.
  * The `env_var` environment variable is also read for custom location; if the variable is set
  * _but_ the Wasm module is not present, we simply panic (i.e. we don't return None)
@@ -49,19 +48,27 @@ lazy_static! {
 fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
     match env::var_os(env_var.clone()) {
         None => {
-            if ! default_path.exists() {
-                return None
+            if !default_path.exists() {
+                return None;
             }
-            Some(std::fs::read(default_path).expect(&format!("could not read Wasm module: {:?}", default_path)))
-        },
+            Some(
+                std::fs::read(default_path)
+                    .expect(&format!("could not read Wasm module: {:?}", default_path)),
+            )
+        }
         Some(path) => {
-            let pathname: String = path.into_string().expect(&format!("Invalid string path for {}", env_var.clone()));
+            let pathname: String = path
+                .into_string()
+                .expect(&format!("Invalid string path for {}", env_var.clone()));
             let path = path::PathBuf::from(pathname.clone());
-            if ! path.exists() {
+            if !path.exists() {
                 panic!("Could not find {}", pathname);
             }
-            Some(std::fs::read(path.clone()).expect(&format!("could not read Wasm module: {:?}", path)))
-        },
+            Some(
+                std::fs::read(path.clone())
+                    .expect(&format!("could not read Wasm module: {:?}", path)),
+            )
+        }
     }
 }
 
@@ -97,7 +104,7 @@ pub fn some_device_data() -> types::DeviceData {
     }
 }
 
-/* Here are a few functions that are not directly related to II and could be upstreamed 
+/* Here are a few functions that are not directly related to II and could be upstreamed
  * (were actually stolen from somewhere else)
  */
 
@@ -108,10 +115,10 @@ pub fn call_candid_as<Input, Output>(
     sender: PrincipalId,
     method: &str,
     input: Input,
-    ) -> Result<Output, CallError>
+) -> Result<Output, CallError>
 where
-Input: ArgumentEncoder,
-Output: for<'a> ArgumentDecoder<'a>,
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
 {
     with_candid(input, |bytes| {
         env.execute_ingress_as(sender, canister_id, method, bytes)
@@ -124,10 +131,10 @@ pub fn call_candid<Input, Output>(
     canister_id: CanisterId,
     method: &str,
     input: Input,
-    ) -> Result<Output, CallError>
+) -> Result<Output, CallError>
 where
-Input: ArgumentEncoder,
-Output: for<'a> ArgumentDecoder<'a>,
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
 {
     with_candid(input, |bytes| {
         env.execute_ingress(canister_id, method, bytes)
@@ -145,10 +152,10 @@ pub enum CallError {
 pub fn with_candid<Input, Output>(
     input: Input,
     f: impl FnOnce(Vec<u8>) -> Result<WasmResult, UserError>,
-    ) -> Result<Output, CallError>
+) -> Result<Output, CallError>
 where
-Input: ArgumentEncoder,
-Output: for<'a> ArgumentDecoder<'a>,
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
 {
     let in_bytes = encode_args(input).expect("failed to encode args");
     match f(in_bytes) {
@@ -157,10 +164,9 @@ Output: for<'a> ArgumentDecoder<'a>,
                 "Failed to decode bytes {:?} as candid type: {}",
                 std::any::type_name::<Output>(),
                 e
-                )
+            )
         })),
         Ok(WasmResult::Reject(message)) => Err(CallError::Reject(message)),
         Err(user_error) => Err(CallError::UserError(user_error)),
     }
 }
-
