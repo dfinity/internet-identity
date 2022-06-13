@@ -326,6 +326,8 @@ export class Screenshots {
   constructor(private directory: string, private suffix: string) {}
 
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
+    await waitForImages(browser);
+    await waitForFonts(browser);
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
