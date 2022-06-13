@@ -34,13 +34,21 @@ body {
 }
 
 footer {
-  padding: 2em 2em 0;
+  padding: 1em 2em 0.5rem;
+}
+@media (min-width: 512px) {
+  footer {
+    padding: 2em 2em 1rem;
+  }
 }
 
 .powered-by-link {
   padding: 0.5em;
   display: inline-block;
   transition: background 0.2s;
+}
+.powered-by-link img {
+  max-width: 100%;
 }
 
 .powered-by-link:hover,
@@ -323,7 +331,12 @@ hr {
 }
 
 nav {
-  margin-top: 2em;
+  margin-top: 1.5em;
+}
+@media (min-width: 512px) {
+  nav {
+    margin-top: 2em;
+  }
 }
 
 .nav-links {

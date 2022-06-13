@@ -50,10 +50,6 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       );
     }
 
-    .modeContainer {
-      min-height: 7rem;
-    }
-
     .childContainer {
       position: relative;
       margin-bottom: 0.5rem;
@@ -78,19 +74,17 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     }
 
     .hostName {
-      font-size: 1rem;
+      padding: 1rem 0;
+      font-size: 0.8rem;
       font-weight: 400;
-    }
-
-    .sectionTitle {
-      margin: 0.5rem 0 0.5rem 0;
-      font-size: 1rem;
-      font-weight: normal;
-      color: black;
     }
 
     .buttonContainer {
       margin: 0.5rem 0;
+    }
+
+    button.primary {
+      margin-top: 1rem;
     }
 
     hr {
@@ -99,28 +93,52 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
       border-top-style: solid;
       margin: 0.5rem 0;
     }
+
+    .anchor-error-message .error-message {
+      margin-bottom: 1rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .host-name {
+      padding: 1rem 0.5rem;
+    }
+
+    .container {
+      padding: 3.5rem 1rem 2rem;
+    }
+    @media (min-width: 512px) {
+      .container {
+        padding: 3.5rem 2.5rem 2rem;
+      }
+    }
   </style>
   <div class="container">
     ${icLogo}
     <h1>Internet Identity</h1>
-    <h2 class="sectionTitle">Authenticate to service:</h2>
-    <div class="highlightBox hostName">${hostName}</div>
-    <h2 class="sectionTitle">Use Identity Anchor:</h2>
-    <div class="modeContainer">
-      <div class="childContainer">
-        <input
-          class="anchorText"
-          type="text"
-          id="userNumberInput"
-          placeholder="Enter anchor"
-          value="${userNumber !== undefined ? userNumber : ""}"
-        />
-        <button id="editAnchorButton">${editIcon}</button>
-      </div>
-      <div id="invalidAnchorMessage" class="error-message-hidden">
-        The Identity Anchor is not valid. Please try again.
-      </div>
+    <p>Authenticate to service:</p>
+    <div class="host-name highlightBox hostName">${hostName}</div>
+    <p>Use Identity Anchor:</p>
+
+    <div class="childContainer">
+      <input
+        class="anchorText"
+        type="text"
+        id="userNumberInput"
+        placeholder="Enter anchor"
+        value="${userNumber !== undefined ? userNumber : ""}"
+      />
+      <button id="editAnchorButton">${editIcon}</button>
     </div>
+    <div
+      id="invalidAnchorMessage"
+      class="anchor-error-message error-message-hidden"
+    >
+      The Identity Anchor is not valid. Please try again.
+    </div>
+
     <button type="button" id="authorizeButton" class="primary">
       Start Session
     </button>
