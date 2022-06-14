@@ -191,9 +191,9 @@ where
 pub fn expect_user_error_with_message<T>(
     result: Result<T, CallError>,
     error_code: ErrorCode,
-    message: &str,
+    message_pattern: Regex,
 ) {
     assert!(matches!(result,
             Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
-            Regex::new(message).unwrap().is_match(user_error.description())));
+            message_pattern.is_match(user_error.description())));
 }

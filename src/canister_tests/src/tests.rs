@@ -3,6 +3,7 @@ use crate::{api, flows, framework};
 use ic_error_types::ErrorCode;
 use ic_state_machine_tests::StateMachine;
 use internet_identity_interface as types;
+use regex::Regex;
 
 #[test]
 fn ii_canister_can_be_installed() {
@@ -61,7 +62,7 @@ fn registration_with_mismatched_sender_fails() {
     expect_user_error_with_message(
         result,
         ErrorCode::CanisterCalledTrap,
-        "[a-z0-9-]+ could not be authenticated against",
+        Regex::new("[a-z0-9-]+ could not be authenticated against").unwrap(),
     );
 }
 
@@ -82,6 +83,7 @@ mod remote_device_registration_tests {
     use ic_error_types::ErrorCode;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;
+    use regex::Regex;
     use std::time::{Duration, SystemTime};
 
     /// Test entering registration mode including returned expiration time.
@@ -111,7 +113,7 @@ mod remote_device_registration_tests {
         expect_user_error_with_message(
             result,
             ErrorCode::CanisterCalledTrap,
-            "[a-z0-9-]+ could not be authenticated.",
+            Regex::new("[a-z0-9-]+ could not be authenticated.").unwrap(),
         );
     }
 
@@ -303,9 +305,10 @@ mod remote_device_registration_tests {
         Ok(())
     }
 
-    /// Tests that the flow is aborted after 3 failed verification attempts.
+    /// Tests that the flow is aborted after the expected number of failed verification attempts.
     #[test]
     fn reject_verification_with_wrong_code() -> Result<(), CallError> {
+        const MAX_RETRIES: u8 = 3;
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
@@ -318,36 +321,21 @@ mod remote_device_registration_tests {
             user_number,
             device_data_2(),
         )?;
-        assert!(matches!(
-            api::verify_tentative_device(
-                &env,
-                canister_id,
-                principal_1(),
-                user_number,
-                "invalid code".to_string()
-            )?,
-            types::VerifyTentativeDeviceResponse::WrongCode { retries_left: 2 }
-        ));
-        assert!(matches!(
-            api::verify_tentative_device(
-                &env,
-                canister_id,
-                principal_1(),
-                user_number,
-                "invalid code".to_string()
-            )?,
-            types::VerifyTentativeDeviceResponse::WrongCode { retries_left: 1 }
-        ));
-        assert!(matches!(
-            api::verify_tentative_device(
-                &env,
-                canister_id,
-                principal_1(),
-                user_number,
-                "invalid code".to_string()
-            )?,
-            types::VerifyTentativeDeviceResponse::WrongCode { retries_left: 0 }
-        ));
+        for expected_retries in (0..MAX_RETRIES).rev() {
+            assert!(matches!(
+                api::verify_tentative_device(
+                    &env,
+                    canister_id,
+                    principal_1(),
+                    user_number,
+                    "invalid code".to_string()
+                )?,
+                types::VerifyTentativeDeviceResponse::WrongCode {
+                    retries_left
+                } if retries_left == expected_retries
+            ));
+        }
+
         assert!(matches!(
             api::verify_tentative_device(
                 &env,

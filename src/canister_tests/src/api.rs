@@ -23,16 +23,14 @@ pub fn register(
     device_data: types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
 ) -> Result<types::RegisterResponse, CallError> {
-    match framework::call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
         "register",
         (device_data, challenge_attempt),
-    ) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    )
+    .map(|(x,)| x)
 }
 
 pub fn lookup(
@@ -58,10 +56,8 @@ pub fn get_anchor_info(
     sender: PrincipalId,
     user_number: types::UserNumber,
 ) -> Result<types::IdentityAnchorInfo, CallError> {
-    match framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
+        .map(|(x,)| x)
 }
 
 pub fn enter_device_registration_mode(
@@ -70,16 +66,14 @@ pub fn enter_device_registration_mode(
     sender: PrincipalId,
     user_number: types::UserNumber,
 ) -> Result<types::Timestamp, CallError> {
-    match framework::call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
         "enter_device_registration_mode",
         (user_number,),
-    ) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    )
+    .map(|(x,)| x)
 }
 
 pub fn exit_device_registration_mode(
@@ -104,16 +98,14 @@ pub fn add_tentative_device(
     user_number: types::UserNumber,
     device_data: types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
-    match framework::call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
         "add_tentative_device",
         (user_number, device_data),
-    ) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    )
+    .map(|(x,)| x)
 }
 
 pub fn verify_tentative_device(
@@ -123,14 +115,12 @@ pub fn verify_tentative_device(
     user_number: types::UserNumber,
     verification_code: types::DeviceVerificationCode,
 ) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
-    match framework::call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
         "verify_tentative_device",
         (user_number, verification_code),
-    ) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    )
+    .map(|(x,)| x)
 }
