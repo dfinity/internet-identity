@@ -1,9 +1,11 @@
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs};
+use ic_error_types::ErrorCode;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
 use ic_types::Principal;
 use internet_identity_interface as types;
 use lazy_static::lazy_static;
+use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
@@ -88,16 +90,31 @@ pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Ve
     env.upgrade_canister(canister_id, wasm, byts).unwrap()
 }
 
-pub const PUBKEY: &str = "test";
+pub const PUBKEY_1: &str = "test";
+pub const PUBKEY_2: &str = "some other key";
 
-pub fn some_principal() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(PUBKEY))
+pub fn principal_1() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(PUBKEY_1))
 }
 
-pub fn some_device_data() -> types::DeviceData {
+pub fn principal_2() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(PUBKEY_2))
+}
+
+pub fn device_data_1() -> types::DeviceData {
     types::DeviceData {
-        pubkey: ByteBuf::from(PUBKEY),
+        pubkey: ByteBuf::from(PUBKEY_1),
         alias: "My Device".to_string(),
+        credential_id: None,
+        purpose: types::Purpose::Authentication,
+        key_type: types::KeyType::Unknown,
+    }
+}
+
+pub fn device_data_2() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from(PUBKEY_2),
+        alias: "My second device".to_string(),
         credential_id: None,
         purpose: types::Purpose::Authentication,
         key_type: types::KeyType::Unknown,
@@ -169,4 +186,14 @@ where
         Ok(WasmResult::Reject(message)) => Err(CallError::Reject(message)),
         Err(user_error) => Err(CallError::UserError(user_error)),
     }
+}
+
+pub fn expect_user_error_with_message<T>(
+    result: Result<T, CallError>,
+    error_code: ErrorCode,
+    message_pattern: Regex,
+) {
+    assert!(matches!(result,
+            Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
+            message_pattern.is_match(user_error.description())));
 }

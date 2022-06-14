@@ -1,5 +1,22 @@
 <html>
   <body>
+  <style>
+      .postMessage {
+          border: black solid thin;
+          padding: 1rem;
+          margin: 1rem 0;
+          overflow-wrap: break-word;
+      }
+      .postMessage-title {
+          font-weight: bold;
+      }
+      .received {
+          background-color: lightblue;
+      }
+      .sent {
+          background-color: lightgreen;
+      }
+  </style>
     <div>
       <h1>Identity</h1>
       <h2>Sign In</h2>
@@ -28,7 +45,7 @@
       <div id="principal"></div>
       <h3>Delegation:</h3>
       <pre id="delegation"></pre>
-      <h3>Expiry (ns from now)</h3>
+      <h3>Expiry (ns from now):</h3>
       <div id="expiration"></div>
     </div>
 
@@ -48,5 +65,13 @@
       <button id="whoamiBtn">Who Am I?</button>
       <div id="whoamiResponse"></div>
     </div>
+    <h1>Protocol Tests</h1>
+    <button id="openIiWindowBtn">Open II tab</button>
+    <button id="invalidDataBtn">Send Invalid Data</button>
+    <button id="incompleteMessageBtn">Send incomplete message</button>
+    <button id="validMessageBtn">Send valid message</button>
+    <button id="closeIIWindowBtn">Close II tab</button>
+    <h3>WindowPostMessages:</h3>
+    <div id="messages"></div>
   </body>
 </html>
