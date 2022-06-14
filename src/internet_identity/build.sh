@@ -20,6 +20,10 @@ npm run build
 II_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
 
+# standardize source references
+CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
+RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
+
 cargo_build_args=(
     --manifest-path "$II_DIR/Cargo.toml"
     --target "$TARGET"
@@ -38,8 +42,9 @@ then
 fi
 
 echo Running cargo build "${cargo_build_args[@]}"
+echo RUSTFLAGS: "$RUSTFLAGS"
 
-cargo build "${cargo_build_args[@]}"
+RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
 
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 
