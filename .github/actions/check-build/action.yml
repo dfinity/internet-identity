@@ -1,0 +1,61 @@
+name: 'Check build'
+description: This action performs a clean, non-Docker build of II, and optionally checks the Wasm module sha256 against the 'sha256' argument. Nothing is cached except for ic-cdk-optimizer.
+inputs:
+  sha256:
+    description: The expected sha256 of the final Wasm module
+    required: false
+  rust-version:
+    description: The rust version
+    required: true
+  ic-cdk-optimizer-version:
+    description: The ic-cdk-optimizer version
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust
+      shell: bash
+      run: |
+        rustup update "${{ inputs.rust-version }}" --no-self-update
+        rustup default "${{ inputs.rust-version }}"
+        rustup target add wasm32-unknown-unknown
+
+    # cache and store ic-cdk-optimizer and skip install on cache hit
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cargo/bin/ic-cdk-optimizer # that's where cargo installs it
+        key: ic-cdk-optimizer-${{ inputs.ic-cdk-optimizer-version }}-${{ runner.os }}-check-build
+
+    - run: |
+        if [ ! -e "$HOME/.cargo/bin/ic-cdk-optimizer" ]
+        then
+          echo "installing cdk optimizer"
+          cargo install ic-cdk-optimizer --version "${{ inputs.ic-cdk-optimizer-version }}"
+        else
+          echo "NOT installing cdk optimizer"
+        fi
+      shell: bash
+
+    # run the build
+    - run: npm ci
+      shell: bash
+    - run: ./src/internet_identity/build.sh
+      shell: bash
+
+    # check the hash
+    - name: Check output hash
+      shell: bash
+      run: |
+        sha256=$(shasum -a 256 ./internet_identity.wasm | cut -d ' ' -f1)
+        echo got sha "$sha256"
+        if [ -n "${{ inputs.sha256 }}" ]
+        then
+          echo "checking build hash against ${{ inputs.sha256 }}"
+          if [ "$sha256" == "${{ inputs.sha256 }}" ]
+          then
+            echo output sha256 matches expected
+          else
+            echo "sha mismatch: '$sha256' /= '${{ inputs.sha256 }}'"
+            exit 1
+          fi
+        fi
