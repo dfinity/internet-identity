@@ -88,15 +88,20 @@ pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Ve
     env.upgrade_canister(canister_id, wasm, byts).unwrap()
 }
 
-pub const PUBKEY: &str = "test";
+pub const PUBKEY_1: &str = "test";
+pub const PUBKEY_2: &str = "some other key";
 
-pub fn some_principal() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(PUBKEY))
+pub fn principal_1() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(PUBKEY_1))
 }
 
-pub fn some_device_data() -> types::DeviceData {
+pub fn principal_2() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(PUBKEY_2))
+}
+
+pub fn device_data_1() -> types::DeviceData {
     types::DeviceData {
-        pubkey: ByteBuf::from(PUBKEY),
+        pubkey: ByteBuf::from(PUBKEY_1),
         alias: "My Device".to_string(),
         credential_id: None,
         purpose: types::Purpose::Authentication,

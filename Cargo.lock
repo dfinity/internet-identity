@@ -392,10 +392,12 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "ic-cdk",
+ "ic-error-types",
  "ic-state-machine-tests",
  "ic-types 0.3.0",
  "internet_identity_interface",
  "lazy_static",
+ "regex",
  "serde",
  "serde_bytes",
 ]
