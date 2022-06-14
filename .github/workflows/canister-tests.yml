@@ -537,6 +537,7 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     needs: docker-build
     strategy:
       matrix:
