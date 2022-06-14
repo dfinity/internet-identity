@@ -1,4 +1,3 @@
-use crate::api::register;
 use crate::framework::{principal_1, principal_2, CallError};
 use crate::{api, framework};
 use framework::device_data_1;
@@ -28,7 +27,7 @@ fn ii_upgrade_retains_anchors() {
     let env = StateMachine::new();
     let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
     let challenge = api::create_challenge(&env, canister_id);
-    let user_number = match register(
+    let user_number = match api::register(
         &env,
         canister_id,
         principal_1(),
@@ -65,7 +64,7 @@ fn registration_with_mismatched_sender_fails() {
     let env = StateMachine::new();
     let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
     let challenge = api::create_challenge(&env, canister_id);
-    let result = register(
+    let result = api::register(
         &env,
         canister_id,
         principal_2(),
