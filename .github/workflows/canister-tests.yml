@@ -534,3 +534,18 @@ jobs:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  clean-build:
+    runs-on: ${{ matrix.os }}
+    if: ${{ github.ref == 'refs/heads/main' }}
+    strategy:
+      matrix:
+        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, macos-12 ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: ./.github/actions/check-build
+        with:
+          sha256: '' # tell the build check to _not_ check the hash until we have reproducibility
+          rust-version: 1.58.1
+          ic-cdk-optimizer-version: 0.3.1
