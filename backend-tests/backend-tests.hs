@@ -473,9 +473,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     return ()
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
-  , withoutUpgrade $ iiTest "register with wrong user fails" $ \cid -> do
-    challenge <- getChallenge cid dummyUserId
-    callIIRejectWith cid dummyUserId #register (device1, challenge) "[a-z0-9-]+ could not be authenticated against"
   , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     let sessionSK = createSecretKeyEd25519 "hohoho"
