@@ -1,6 +1,7 @@
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 use crate::framework;
-use ic_state_machine_tests::{CanisterId, StateMachine};
+use crate::framework::CallError;
+use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 
 /// A fake "health check" method that just checks the canister is alive a well.
@@ -18,18 +19,19 @@ pub fn create_challenge(env: &StateMachine, canister_id: CanisterId) -> types::C
 pub fn register(
     env: &StateMachine,
     canister_id: CanisterId,
+    sender: PrincipalId,
     device_data: types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
-) -> types::RegisterResponse {
+) -> Result<types::RegisterResponse, CallError> {
     match framework::call_candid_as(
         env,
         canister_id,
-        framework::some_principal(),
+        sender,
         "register",
         (device_data, challenge_attempt),
     ) {
-        Ok((r,)) => r,
-        Err(e) => panic!("Failed to register: {:?}", e),
+        Ok((r,)) => Ok(r),
+        Err(e) => Err(e),
     }
 }
 
@@ -41,7 +43,7 @@ pub fn lookup(
     match framework::call_candid_as(
         env,
         canister_id,
-        framework::some_principal(),
+        framework::principal_1(),
         "lookup",
         (user_number,),
     ) {
