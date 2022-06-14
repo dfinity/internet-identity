@@ -23,16 +23,14 @@ pub fn register(
     device_data: types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
 ) -> Result<types::RegisterResponse, CallError> {
-    match framework::call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
         "register",
         (device_data, challenge_attempt),
-    ) {
-        Ok((r,)) => Ok(r),
-        Err(e) => Err(e),
-    }
+    )
+    .map(|(x,)| x)
 }
 
 pub fn lookup(
@@ -50,4 +48,79 @@ pub fn lookup(
         Ok((r,)) => r,
         Err(e) => panic!("Failed to lookup: {:?}", e),
     }
+}
+
+pub fn get_anchor_info(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<types::IdentityAnchorInfo, CallError> {
+    framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
+        .map(|(x,)| x)
+}
+
+pub fn enter_device_registration_mode(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<types::Timestamp, CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "enter_device_registration_mode",
+        (user_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn exit_device_registration_mode(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+) -> Result<(), CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "exit_device_registration_mode",
+        (user_number,),
+    )
+}
+
+pub fn add_tentative_device(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_data: types::DeviceData,
+) -> Result<types::AddTentativeDeviceResponse, CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "add_tentative_device",
+        (user_number, device_data),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn verify_tentative_device(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    verification_code: types::DeviceVerificationCode,
+) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "verify_tentative_device",
+        (user_number, verification_code),
+    )
+    .map(|(x,)| x)
 }

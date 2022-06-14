@@ -1,9 +1,11 @@
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs};
+use ic_error_types::ErrorCode;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
 use ic_types::Principal;
 use internet_identity_interface as types;
 use lazy_static::lazy_static;
+use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
@@ -109,6 +111,16 @@ pub fn device_data_1() -> types::DeviceData {
     }
 }
 
+pub fn device_data_2() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from(PUBKEY_2),
+        alias: "My second device".to_string(),
+        credential_id: None,
+        purpose: types::Purpose::Authentication,
+        key_type: types::KeyType::Unknown,
+    }
+}
+
 /* Here are a few functions that are not directly related to II and could be upstreamed
  * (were actually stolen from somewhere else)
  */
@@ -174,4 +186,14 @@ where
         Ok(WasmResult::Reject(message)) => Err(CallError::Reject(message)),
         Err(user_error) => Err(CallError::UserError(user_error)),
     }
+}
+
+pub fn expect_user_error_with_message<T>(
+    result: Result<T, CallError>,
+    error_code: ErrorCode,
+    message_pattern: Regex,
+) {
+    assert!(matches!(result,
+            Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
+            message_pattern.is_match(user_error.description())));
 }
