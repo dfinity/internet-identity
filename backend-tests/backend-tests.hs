@@ -707,15 +707,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     assertMetric metrics "internet_identity_signature_count" 1.0
     assertMetric metrics "internet_identity_users_in_registration_mode" 1.0
 
-  , withUpgrade $ \should_upgrade -> testGroup "HTTP Assets"
-    [ iiTest asset $ \cid -> do
-      when should_upgrade $ doUpgrade cid
-      r <- queryII cid dummyUserId #http_request (httpGet asset)
-      validateHttpResponse cid asset r
-      validateSecurityHeaders r
-    | asset <- words "/ /index.html /index.js /loader.webp /favicon.ico /ic-badge.svg /does-not-exist"
-    ]
-
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence
     t <- getTimestamp

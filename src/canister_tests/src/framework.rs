@@ -125,6 +125,20 @@ pub fn device_data_2() -> types::DeviceData {
  * (were actually stolen from somewhere else)
  */
 
+/// Call a canister candid query method, anonymous.
+pub fn query_candid<Input, Output>(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    method: &str,
+    input: Input,
+) -> Result<Output, CallError>
+where
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
+{
+    with_candid(input, |bytes| env.query(canister_id, method, bytes))
+}
+
 /// Call a canister candid method, authenticated.
 pub fn call_candid_as<Input, Output>(
     env: &StateMachine,

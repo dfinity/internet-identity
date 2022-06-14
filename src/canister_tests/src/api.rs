@@ -11,6 +11,14 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
         framework::call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
+pub fn http_request(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    http_request: types::HttpRequest,
+) -> Result<types::HttpResponse, CallError> {
+    framework::query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
+}
+
 pub fn create_challenge(env: &StateMachine, canister_id: CanisterId) -> types::Challenge {
     let (c,) = framework::call_candid(env, canister_id, "create_challenge", ()).unwrap();
     c

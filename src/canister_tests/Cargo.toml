@@ -4,16 +4,23 @@ version = "0.1.0"
 edition = "2018"
 
 [dev-dependencies]
+base64 = "0.13.0"
+flate2 = "1.0"
+itertools = "0.10.3"
 lazy_static = "1.4"
 regex = "1.5.6"
 serde = "1"
+serde_cbor = "0.11"
 serde_bytes = "0.11"
+sha2 = "0.10"
 
 internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.7"
+ic-agent = "0.17.0"
 ic-cdk = "0.5"
 ic-types = "0.3"
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "46b3de985fef2cc9e326ed191c266b610512443b" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "46b3de985fef2cc9e326ed191c266b610512443b" }
+ic-crypto-utils-threshold-sig-der = { git = "https://github.com/dfinity/ic", rev = "dc8786da10c13dd2bd8e9d019553bd12cbc5a2af" }
+ic-error-types = { git = "https://github.com/dfinity/ic", rev = "dc8786da10c13dd2bd8e9d019553bd12cbc5a2af" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "dc8786da10c13dd2bd8e9d019553bd12cbc5a2af" }

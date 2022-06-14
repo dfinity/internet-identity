@@ -66,6 +66,165 @@ fn registration_with_mismatched_sender_fails() {
     );
 }
 
+/// Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
+#[cfg(test)]
+mod http_tests {
+    use crate::certificate_validation::validate_certification;
+    use crate::framework::CallError;
+    use crate::{api, framework};
+    use ic_state_machine_tests::StateMachine;
+    use internet_identity_interface::{HeaderField, HttpRequest};
+    use itertools::Itertools;
+    use regex::Regex;
+    use serde_bytes::ByteBuf;
+
+    #[test]
+    fn ii_canister_serves_http_assets() -> Result<(), CallError> {
+        let assets: Vec<(&str, Option<&str>)> = vec![
+            ("/", None),
+            ("/index.html", None),
+            ("/index.js", Some("gzip")),
+            ("/loader.webp", None),
+            ("/favicon.ico", None),
+            ("/ic-badge.svg", None),
+        ];
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+
+        for (asset, encoding) in assets {
+            let http_response = api::http_request(
+                &env,
+                canister_id,
+                HttpRequest {
+                    method: "GET".to_string(),
+                    url: asset.to_string(),
+                    headers: vec![],
+                    body: ByteBuf::new(),
+                },
+            )?;
+
+            assert_eq!(http_response.status_code, 200);
+
+            // check the appropriate Content-Encoding header is set
+            if let Some(enc) = encoding {
+                let (_, content_encoding) = http_response
+                    .headers
+                    .iter()
+                    .filter(|(name, _)| name == "Content-Encoding")
+                    .exactly_one()
+                    .expect("error retrieving \"Content-Encoding\" header");
+                assert_eq!(
+                    content_encoding, enc,
+                    "unexpected \"Content-Encoding\" header value"
+                );
+            }
+
+            let (_, ic_certificate) = http_response
+                .headers
+                .iter()
+                .filter(|(name, _)| name == "IC-Certificate")
+                .exactly_one()
+                .unwrap();
+
+            validate_certification(
+                ic_certificate,
+                canister_id,
+                asset,
+                &http_response.body,
+                None, // should really be `encoding`, but we need to solve L2-722 first
+                env.root_key(),
+            )
+            .expect(&format!("validation for asset \"{}\" failed", asset));
+
+            verify_security_headers(&http_response.headers)
+        }
+        Ok(())
+    }
+
+    fn verify_security_headers(headers: &Vec<HeaderField>) {
+        let expected_headers = vec![
+            ("X-Frame-Options", "DENY"),
+            ("X-Content-Type-Options", "nosniff"),
+            ("Referrer-Policy", "same-origin"),
+            (
+                "Permissions-Policy",
+                "accelerometer=(),\
+    ambient-light-sensor=(),\
+    autoplay=(),\
+    battery=(),\
+    camera=(),\
+    clipboard-read=(),\
+    clipboard-write=(self),\
+    conversion-measurement=(),\
+    cross-origin-isolated=(),\
+    display-capture=(),\
+    document-domain=(),\
+    encrypted-media=(),\
+    execution-while-not-rendered=(),\
+    execution-while-out-of-viewport=(),\
+    focus-without-user-activation=(),\
+    fullscreen=(),\
+    gamepad=(),\
+    geolocation=(),\
+    gyroscope=(),\
+    hid=(),\
+    idle-detection=(),\
+    interest-cohort=(),\
+    keyboard-map=(),\
+    magnetometer=(),\
+    microphone=(),\
+    midi=(),\
+    navigation-override=(),\
+    payment=(),\
+    picture-in-picture=(),\
+    publickey-credentials-get=(self),\
+    screen-wake-lock=(),\
+    serial=(),\
+    speaker-selection=(),\
+    sync-script=(),\
+    sync-xhr=(self),\
+    trust-token-redemption=(),\
+    usb=(),\
+    vertical-scroll=(),\
+    web-share=(),\
+    window-placement=(),\
+    xr-spatial-tracking=()",
+            ),
+        ];
+
+        for (header_name, expected_value) in expected_headers {
+            let (_, value) = headers
+                .iter()
+                .filter(|(name, _)| name == header_name)
+                .exactly_one()
+                .expect(&format!("error retrieving \"{}\" header", header_name));
+            assert_eq!(value, expected_value);
+        }
+
+        let (_, csp) = headers
+            .iter()
+            .filter(|(name, _)| name == "Content-Security-Policy")
+            .exactly_one()
+            .expect("error retrieving \"Content-Security-Policy\" header");
+
+        assert!(Regex::new(
+            "^default-src 'none';\
+   connect-src 'self' https://ic0.app;\
+   img-src 'self' data:;\
+   script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+   base-uri 'none';\
+   frame-ancestors 'none';\
+    form-action 'none';\
+    style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+    style-src-elem 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+    font-src https://fonts\\.gstatic\\.com;\
+    upgrade-insecure-requests;$"
+        )
+        .unwrap()
+        .is_match(csp));
+    }
+}
+
 /// Tests concerning the device registration flow for remote devices (i.e. authenticators on another computer).
 /// The flow has the following steps:
 /// 1. on device 1: enter registration mode
@@ -75,6 +234,7 @@ fn registration_with_mismatched_sender_fails() {
 /// Additionally, there are the following bounds on the registration flow:
 /// 1. registration mode expires after 15 minutes
 /// 2. there is a limit of 3 attempts for step 3 in the above process
+#[cfg(test)]
 mod remote_device_registration_tests {
     use crate::framework::{
         device_data_2, expect_user_error_with_message, principal_1, principal_2, CallError,
