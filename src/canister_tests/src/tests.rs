@@ -65,7 +65,7 @@ fn registration_with_mismatched_sender_fails() {
     );
 }
 
-/// Tests concerning the two step device registration flow for remote devices (i.e. authenticators on another computer).
+/// Tests concerning the device registration flow for remote devices (i.e. authenticators on another computer).
 /// The flow has the following steps:
 /// 1. on device 1: enter registration mode
 /// 2. on device 2: register the new device tentatively -> this returns a verification code
