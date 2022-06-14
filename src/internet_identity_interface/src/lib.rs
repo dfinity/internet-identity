@@ -1,5 +1,5 @@
-use serde_bytes::ByteBuf;
 use candid::{CandidType, Deserialize, Principal};
+use serde_bytes::ByteBuf;
 
 pub type UserNumber = u64;
 pub type CredentialId = ByteBuf;
@@ -61,8 +61,6 @@ pub struct Challenge {
 }
 
 pub type ChallengeKey = String;
-
-
 
 // The user's attempt
 #[derive(Clone, Debug, CandidType, Deserialize)]
