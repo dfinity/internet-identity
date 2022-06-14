@@ -33,7 +33,6 @@ import {
   runInNestedBrowser,
   Screenshots,
   switchToPopup,
-  waitForFonts,
   waitToClose,
 } from "./util";
 
@@ -343,7 +342,6 @@ test("Screenshots", async () => {
       await addVirtualAuthenticator(browser);
       await browser.url(II_URL);
 
-      await waitForFonts(browser);
       await removeFeaturesWarning(browser);
       const welcomeView = new WelcomeView(browser);
       await welcomeView.waitForDisplay();
@@ -503,7 +501,6 @@ test("Screenshots", async () => {
       await browser.url("about:blank");
       await browser.url(ABOUT_URL);
       await removeFeaturesWarning(browser);
-      await waitForFonts(browser);
       const aboutView = new AboutView(browser);
       await aboutView.waitForDisplay();
       await screenshots.take("about", browser);
@@ -511,7 +508,6 @@ test("Screenshots", async () => {
       // About page, legacy link
       await browser.url("about:blank");
       await browser.url(II_URL + "#about");
-      await waitForFonts(browser);
       await removeFeaturesWarning(browser);
       const aboutViewLegacy = new AboutView(browser);
       await aboutViewLegacy.waitForDisplay();
@@ -567,7 +563,6 @@ test("Screenshots", async () => {
       await browser.url("about:blank");
       await browser.url(II_URL + "#compatibilityNotice");
       await removeFeaturesWarning(browser);
-      await waitForFonts(browser);
       const compatabilityNoticeView = new CompatabilityNoticeView(browser);
       await compatabilityNoticeView.waitForDisplay();
       await screenshots.take("compatibility-notice", browser);
@@ -576,7 +571,6 @@ test("Screenshots", async () => {
       await browser.url("about:blank");
       await browser.url(FAQ_URL);
       await removeFeaturesWarning(browser);
-      await waitForFonts(browser);
       const faqView = new FAQView(browser);
       await faqView.waitForDisplay();
       await screenshots.take("faq", browser);
@@ -589,7 +583,6 @@ test("Screenshots", async () => {
       // Features warning banner
       await browser.url("about:blank");
       await browser.url(II_URL);
-      await waitForFonts(browser);
       const welcomeView3 = new WelcomeView(browser);
       await screenshots.take("features-warning", browser);
 
@@ -600,7 +593,6 @@ test("Screenshots", async () => {
       await demoAppView.signin();
       await switchToPopup(browser);
       await removeFeaturesWarning(browser);
-      await waitForFonts(browser);
       const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();
       await screenshots.take("authenticate-known-anchor", browser);
