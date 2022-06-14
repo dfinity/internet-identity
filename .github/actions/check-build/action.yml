@@ -20,12 +20,6 @@ runs:
         rustup default "${{ inputs.rust-version }}"
         rustup target add wasm32-unknown-unknown
 
-    # cache and store ic-cdk-optimizer and skip install on cache hit
-    - uses: actions/cache@v2
-      with:
-        path: ~/.cargo/bin/ic-cdk-optimizer # that's where cargo installs it
-        key: ic-cdk-optimizer-${{ inputs.ic-cdk-optimizer-version }}-${{ runner.os }}-check-build
-
     - run: |
         if [ ! -e "$HOME/.cargo/bin/ic-cdk-optimizer" ]
         then
