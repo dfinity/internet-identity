@@ -28,16 +28,15 @@ fn ii_upgrade_retains_anchors() {
     let env = StateMachine::new();
     let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
     let challenge = api::create_challenge(&env, canister_id);
-    let challenge_attempt = types::ChallengeAttempt {
-        chars: "a".to_string(),
-        key: challenge.challenge_key,
-    };
     let user_number = match register(
-        env_argument,
+        &env,
         canister_id,
         principal_1(),
         device_data_1(),
-        challenge_attempt,
+        types::ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
     )
     .unwrap()
     {
