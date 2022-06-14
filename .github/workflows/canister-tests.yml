@@ -537,15 +537,25 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: docker-build
     strategy:
       matrix:
         os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, macos-12 ]
     steps:
       - uses: actions/checkout@v2
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_production.wasm
+          path: .
+      - run: |
+          sha256=$(shasum -a 256 ./internet_identity_production.wasm | cut -d ' ' -f1)
+          echo "::set-output name=sha256::$sha256"
+        id: sha256
 
       - uses: ./.github/actions/check-build
         with:
-          sha256: '' # tell the build check to _not_ check the hash until we have reproducibility
+          # we check that ubuntu builds match the docker build
+          sha256: ${{ startsWith(matrix.os, 'ubuntu') && steps.sha256.outputs.sha256 || '' }}
           rust-version: 1.58.1
           ic-cdk-optimizer-version: 0.3.1
