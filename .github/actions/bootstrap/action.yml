@@ -3,8 +3,15 @@ description: Bootstrap the Internet Identity build environment
 runs:
   using: "composite"
   steps:
-    - uses: ./.github/actions/uname
-      id: uname
+    - id: uname
+      shell: bash
+      run: |
+        # print include system info relevant for cache compatibility
+        uname="$(uname -mpsr)"
+        echo "uname value: $uname"
+        uname_hash="$(echo "$uname" | shasum -a 256 | head -c 10)"
+        echo "uname hash value: $uname_hash"
+        echo "::set-output name=uname-hash::$uname_hash"
 
     # cache ic-cdk-optimizer
     # NOTE: here we make sure to only cache ic-cdk-optimizer and _not_ e.g. the cargo target, since in some cases
