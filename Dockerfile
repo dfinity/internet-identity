@@ -29,23 +29,13 @@ RUN npm --version
 
 # Install Rust and Cargo in /opt
 ENV RUSTUP_HOME=/opt/rustup \
-    CARGO_HOME=/opt/cargo \
-    PATH=/opt/cargo/bin:$PATH
-
-RUN curl --fail https://sh.rustup.rs -sSf \
-        | sh -s -- -y --default-toolchain ${rust_version}-x86_64-unknown-linux-gnu --no-modify-path && \
-    rustup default ${rust_version}-x86_64-unknown-linux-gnu && \
-    rustup target add wasm32-unknown-unknown
-
-ENV CARGO_HOME=/cargo \
-    CARGO_TARGET_DIR=/cargo_target \
+    CARGO_HOME=/cargo \
     PATH=/cargo/bin:$PATH
 
-# Install IC CDK optimizer
-# (keep version in sync with scripts/build)
-RUN cargo install ic-cdk-optimizer --version 0.3.1
-
 COPY ./scripts ./scripts
+COPY ./rust-toolchain.toml ./rust-toolchain.toml
+
+RUN ./scripts/bootstrap
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
 # to build only the dependecies, we pretend that our project is a simple, empty
@@ -56,6 +46,7 @@ COPY Cargo.toml .
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
+ENV CARGO_TARGET_DIR=/cargo_target
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \

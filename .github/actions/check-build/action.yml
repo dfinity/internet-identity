@@ -1,34 +1,13 @@
 name: 'Check build'
-description: This action performs a clean, non-Docker build of II, and optionally checks the Wasm module sha256 against the 'sha256' argument. Nothing is cached except for ic-cdk-optimizer.
+description: This action performs a clean, non-Docker build of II, and optionally checks the Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
 inputs:
   sha256:
     description: The expected sha256 of the final Wasm module
     required: false
-  rust-version:
-    description: The rust version
-    required: true
-  ic-cdk-optimizer-version:
-    description: The ic-cdk-optimizer version
-    required: true
 runs:
   using: "composite"
   steps:
-    - name: Install Rust
-      shell: bash
-      run: |
-        rustup update "${{ inputs.rust-version }}" --no-self-update
-        rustup default "${{ inputs.rust-version }}"
-        rustup target add wasm32-unknown-unknown
-
-    - run: |
-        if [ ! -e "$HOME/.cargo/bin/ic-cdk-optimizer" ]
-        then
-          echo "installing cdk optimizer"
-          cargo install ic-cdk-optimizer --version "${{ inputs.ic-cdk-optimizer-version }}"
-        else
-          echo "NOT installing cdk optimizer"
-        fi
-      shell: bash
+    - uses: ./.github/actions/bootstrap
 
     # run the build
     - run: npm ci
