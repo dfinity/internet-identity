@@ -33,7 +33,7 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
-    - run: ./src/internet_identity/build.sh
+    - run: ./scripts/build
       shell: bash
 
     # check the hash

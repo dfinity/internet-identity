@@ -42,8 +42,10 @@ ENV CARGO_HOME=/cargo \
     PATH=/cargo/bin:$PATH
 
 # Install IC CDK optimizer
-# (keep version in sync with src/internet_identity/build.sh)
+# (keep version in sync with scripts/build)
 RUN cargo install ic-cdk-optimizer --version 0.3.1
+
+COPY ./scripts ./scripts
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
 # to build only the dependecies, we pretend that our project is a simple, empty
@@ -60,7 +62,7 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity_interface/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
-    && cargo build --manifest-path ./src/internet_identity/Cargo.toml --target wasm32-unknown-unknown --release -j1 \
+    && ./scripts/build --only-dependencies \
     && rm -rf src
 
 FROM deps as build
@@ -76,7 +78,7 @@ RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
-RUN ./src/internet_identity/build.sh
+RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm
 
 FROM scratch AS scratch

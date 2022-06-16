@@ -4,7 +4,7 @@
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm",
-      "build": "src/internet_identity/build.sh"
+      "build": "scripts/build"
     }
   },
   "defaults": {
