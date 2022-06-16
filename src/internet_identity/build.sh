@@ -1,6 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Build Internet Identity"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 [--only-dependencies]
+
+Options:
+  --only-dependencies   only build rust dependencies (no js build, no wasm optimization)
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Builds the Internet Identity canister.
+
+NOTE: This requires a working rust toolchain as well as ic-cdk-optimizer.
+EOF
+
+}
+
+ONLY_DEPS=
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --only-dependencies)
+            ONLY_DEPS=1
+            shift
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'build --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
 # Checking for dependencies
 # XXX: we currently cannot check for the exact version of ic-cdk-optimizer
 # because of https://github.com/dfinity/cdk-rs/issues/181
@@ -13,9 +67,12 @@ then
     exit 1
 fi
 
-# Compile frontend assets to dist
-echo Compiling frontend assets
-npm run build
+if [ "$ONLY_DEPS" != "1" ]
+then
+    # Compile frontend assets to dist
+    echo Compiling frontend assets
+    npm run build
+fi
 
 II_DIR="$(dirname "$0")"
 TARGET="wasm32-unknown-unknown"
@@ -46,8 +103,11 @@ echo RUSTFLAGS: "$RUSTFLAGS"
 
 RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
 
-CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
+if [ "$ONLY_DEPS" != "1" ]
+then
+    CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 
-ic-cdk-optimizer \
-    "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-    -o "$II_DIR/../../internet_identity.wasm"
+    ic-cdk-optimizer \
+        "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
+        -o "$II_DIR/../../internet_identity.wasm"
+fi
