@@ -22,7 +22,7 @@ lazy_static! {
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM (note that I run from {:?}).
 
         In order to build the Wasm module, please run the following command:
-            II_DUMMY_CAPTHA=1 ./src/internet_identity/build.sh
+            II_DUMMY_CAPTHA=1 ./scripts/build
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };

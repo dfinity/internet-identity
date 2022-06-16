@@ -42,7 +42,7 @@ ENV CARGO_HOME=/cargo \
     PATH=/cargo/bin:$PATH
 
 # Install IC CDK optimizer
-# (keep version in sync with src/internet_identity/build.sh)
+# (keep version in sync with scripts/build)
 RUN cargo install ic-cdk-optimizer --version 0.3.1
 
 COPY ./scripts ./scripts
@@ -55,7 +55,6 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
-COPY src/internet_identity/build.sh src/internet_identity/build.sh
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
@@ -79,7 +78,7 @@ RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
-RUN ./src/internet_identity/build.sh
+RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm
 
 FROM scratch AS scratch
