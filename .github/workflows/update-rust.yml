@@ -1,0 +1,50 @@
+# A GitHub Actions workflow that regularly checks for new Rust toolchain release
+# and creates a PR on new versions.
+name: Rust Update
+
+on:
+  schedule:
+    # check for new rust versions daily at 7:30
+    - cron:  '30 7 * * *'
+
+jobs:
+  rust-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+        # First, check rust GitHub releases for a new version. We assume that the
+        # latest version's tag name is the version.
+      - name: Check new rust version
+        id: update
+        run: |
+          current_rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
+          echo "current rust version '$current_rust_version'"
+          latest_rust_version=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest | jq -cMr .tag_name)
+          echo "latest rust version '$latest_rust_version'"
+
+          if [ "$current_rust_version" != "$latest_rust_version" ]
+          then
+            echo rust toolchain needs an update
+            sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
+            echo "::set-output name=updated::1"
+          else
+            echo "::set-output name=updated::0"
+          fi
+
+          cat ./rust-toolchain.toml
+
+        # If the rust-toolchain was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./rust-toolchain.toml
+          commit-message: Update rust version
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: bot-rust-update
+          delete-branch: true
+          title: 'Update rust version'

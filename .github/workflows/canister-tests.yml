@@ -417,6 +417,10 @@ jobs:
     if: ${{ github.ref != 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          # set a PAT so that add-and-commit can trigger
+          # CI runs
+          token: ${{ secrets.GIX_BOT_PAT }}
 
       # Make sure old screenshots don't pollute the commit
       - run: rm -v -f screenshots/*.png
