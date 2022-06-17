@@ -49,6 +49,7 @@ export const setupRecovery = async (
             { cross_platform: null },
             { recovery: null },
             recoverIdentity.getPublicKey().toDer(),
+            { unprotected: null },
             recoverIdentity.rawId
           )
         );
@@ -66,10 +67,32 @@ export const setupRecovery = async (
             name,
             { seed_phrase: null },
             { recovery: null },
-            recoverIdentity.getPublicKey().toDer()
+            recoverIdentity.getPublicKey().toDer(),
+            { unprotected: null }
           )
         );
         await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
+        break;
+      }
+      case "seedPhraseProtected": {
+        const name = "Recovery phrase";
+        const seedPhrase = generate().trim();
+        const recoverIdentity = await fromMnemonicWithoutValidation(
+          seedPhrase,
+          IC_DERIVATION_PATH
+        );
+        await withLoader(() =>
+          connection.add(
+            userNumber,
+            name,
+            { seed_phrase: null },
+            { recovery: null },
+            recoverIdentity.getPublicKey().toDer(),
+            { protected: null }
+          )
+        );
+        await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
+        break;
       }
     }
   } catch (err: unknown) {

@@ -23,6 +23,7 @@ export interface Delegation {
 }
 export interface DeviceData {
   'alias' : string,
+  'protection_type' : ProtectionType,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
   'purpose' : Purpose,
@@ -64,6 +65,8 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
+export type ProtectionType = { 'unprotected' : null } |
+  { 'protected' : null };
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };

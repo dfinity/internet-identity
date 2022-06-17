@@ -151,6 +151,7 @@ export class IIConnection {
           credential_id: [credential_id],
           key_type: { unknown: null },
           purpose: { authentication: null },
+          protection_type: { unprotected: null },
         },
         challengeResult
       );
@@ -320,6 +321,7 @@ export class IIConnection {
         : [],
       key_type: keyType,
       purpose,
+      protection_type: { unprotected: null },
     });
   }
 
@@ -402,6 +404,7 @@ export class IIConnection {
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
+    protection_type: DeviceData["protection_type"],
     credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
@@ -413,6 +416,7 @@ export class IIConnection {
         : [],
       key_type: keyType,
       purpose,
+      protection_type,
     });
   };
 
