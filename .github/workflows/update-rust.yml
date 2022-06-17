@@ -1,0 +1,27 @@
+name: Rust Update
+
+on:
+  push:
+
+jobs:
+  rust-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          current_rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
+          echo "current rust version '$current_rust_version'"
+          latest_rust_version=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest | jq -cMr .tag_name)
+          echo "latest rust version '$latest_rust_version'"
+
+
+          if [ "$current_rust_version" != "$latest_rust_version" ]
+          then
+            echo rust toolchain needs an update
+            sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
+          fi
+
+          cat
+          ./rust-toolchain.toml
+
+
