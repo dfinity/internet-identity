@@ -20,9 +20,5 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' }}
         with:
           add: src
-          author_name: Formatting Committer
-          author_email: "<nobody@example.com>"
-          message: "Updating rust formatting"
-          # do not pull: if this branch is behind, then we might as well let
-          # the pushing fail
-          pull_strategy: "NO-PULL"
+          default_author: github_actions
+          message: "🤖 cargo-fmt auto-update"
