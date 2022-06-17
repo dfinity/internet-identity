@@ -23,4 +23,14 @@ jobs:
 
           cat ./rust-toolchain.toml
 
-
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.RUST_UPDATE_PAT }}
+          add-paths: ./rust-toolchain.toml
+          commit-message: Update rust version
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: bot-rust-update
+          delete-branch: true
+          title: 'Update rust version'
