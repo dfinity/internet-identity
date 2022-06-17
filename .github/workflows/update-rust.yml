@@ -8,22 +8,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: |
+      - name: Check new rust version
+        id: update
+        run: |
           current_rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
           echo "current rust version '$current_rust_version'"
           latest_rust_version=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest | jq -cMr .tag_name)
           echo "latest rust version '$latest_rust_version'"
 
-
           if [ "$current_rust_version" != "$latest_rust_version" ]
           then
             echo rust toolchain needs an update
             sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
+            echo "::set-output name=updated::1"
+          else
+            echo "::set-output name=updated::0"
           fi
 
           cat ./rust-toolchain.toml
 
       - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == "1" }}
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.RUST_UPDATE_PAT }}
