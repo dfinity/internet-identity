@@ -28,7 +28,7 @@ jobs:
           cat ./rust-toolchain.toml
 
       - name: Create Pull Request
-        if: ${{ steps.update.outputs.updated == "1" }}
+        if: ${{ steps.update.outputs.updated == '1' }}
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.RUST_UPDATE_PAT }}
