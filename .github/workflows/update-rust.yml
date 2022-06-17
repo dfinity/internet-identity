@@ -21,7 +21,6 @@ jobs:
             sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
           fi
 
-          cat
-          ./rust-toolchain.toml
+          cat ./rust-toolchain.toml
 
 
