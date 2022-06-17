@@ -326,6 +326,107 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
+test("Remove unprotected recovery phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+    await mainView.removeDevice("Recovery phrase");
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.waitForDeviceNotDisplay("Recovery phrase", 10_000);
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhraseProtected(
+      browser
+    );
+    await mainView.waitForDisplay();
+    await mainView.removeDevice("Recovery phrase");
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.waitForDeviceNotDisplay("Recovery phrase");
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase, confirm with empty seed phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await FLOWS.addRecoveryMechanismSeedPhraseProtected(browser);
+    await mainView.waitForDisplay();
+    await mainView.removeDevice("Recovery phrase");
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase("");
+    await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.waitForInvalidSeedPhraseDisplay();
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase, confirm with invalid seed phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhraseProtected(
+      browser
+    );
+    await mainView.waitForDisplay();
+    await mainView.removeDevice("Recovery phrase");
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(
+      seedPhrase.split(" ").reverse().join(" ")
+    );
+    await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.waitForInvalidSeedPhraseDisplay();
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase, confirm with valid yet incorrect seed phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentity(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await FLOWS.addRecoveryMechanismSeedPhraseProtected(browser);
+    await mainView.waitForDisplay();
+    await mainView.removeDevice("Recovery phrase");
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(
+      "10000 enhance scorpion tool pill anchor interest vanish describe nuclear latin mimic tired claw clarify three economy mistake duck robot miss response public food absurd"
+    );
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.waitForDeviceDisplay("Recovery phrase");
+  });
+}, 300_000);
+
 test("Screenshots", async () => {
   await runInBrowser(
     async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {

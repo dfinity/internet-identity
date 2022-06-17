@@ -69,4 +69,21 @@ export const FLOWS = {
 
     return seedPhrase;
   },
+  addRecoveryMechanismSeedPhraseProtected: async (
+    browser: WebdriverIO.Browser
+  ): Promise<string> => {
+    const mainView = new MainView(browser);
+    await mainView.waitForDisplay();
+    await mainView.addRecovery();
+
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.useSeedPhraseProtected();
+    await recoveryMethodSelectorView.waitForSeedPhrase();
+    const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
+    await recoveryMethodSelectorView.copySeedPhrase();
+    await recoveryMethodSelectorView.seedPhraseContinue();
+
+    return seedPhrase;
+  },
 };

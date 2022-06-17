@@ -11,6 +11,7 @@ const pageContent = (devices: DeviceData[]) => html`
     }
     .recoveryContainer {
       display: flex;
+      flex-direction: column;
       gap: 1rem;
       margin-top: 1rem;
     }
@@ -68,6 +69,17 @@ const pageContent = (devices: DeviceData[]) => html`
         <div class="recoveryDescription">Use your own storage</div>
       </button>
       <button
+        ?disabled=${hasRecoveryPhrase(devices)}
+        class="recoveryOption"
+        id="seedPhraseProtected"
+      >
+        <span class="recoveryIcon">${seedPhraseIcon}</span>
+        <div class="recoveryTitle">Protected Seed Phrase</div>
+        <div class="recoveryDescription">
+          Use your own storage, removal requires seed phrase confirmation
+        </div>
+      </button>
+      <button
         ?disabled=${hasRecoveryKey(devices)}
         class="recoveryOption"
         id="securityKey"
@@ -81,7 +93,10 @@ const pageContent = (devices: DeviceData[]) => html`
   </div>
 `;
 
-export type RecoveryMechanism = "securityKey" | "seedPhrase";
+export type RecoveryMechanism =
+  | "securityKey"
+  | "seedPhrase"
+  | "seedPhraseProtected";
 
 export const chooseRecoveryMechanism = async (
   devices: DeviceData[]
@@ -99,11 +114,15 @@ const init = (): Promise<RecoveryMechanism | null> =>
     const seedPhrase = document.getElementById(
       "seedPhrase"
     ) as HTMLButtonElement;
+    const seedPhraseProtected = document.getElementById(
+      "seedPhraseProtected"
+    ) as HTMLButtonElement;
     const skipRecovery = document.getElementById(
       "skipRecovery"
     ) as HTMLButtonElement;
     securityKey.onclick = () => resolve("securityKey");
     seedPhrase.onclick = () => resolve("seedPhrase");
+    seedPhraseProtected.onclick = () => resolve("seedPhraseProtected");
     skipRecovery.onclick = () => resolve(null);
   });
 

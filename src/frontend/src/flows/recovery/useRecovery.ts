@@ -48,7 +48,7 @@ export const useRecovery = async (userNumber?: bigint): Promise<void> => {
   }
 };
 
-const loginWithRecovery = async (
+export const loginWithRecovery = async (
   userNumber: bigint,
   device: DeviceData
 ): Promise<LoginResult> => {

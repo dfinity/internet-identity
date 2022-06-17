@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../utils/iiConnection";
+import { bufferEqual, IIConnection, LoginResult } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
@@ -17,6 +17,7 @@ import { DerEncodedPublicKey } from "@dfinity/agent";
 import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "./addDevice/manage";
 import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
+import { loginWithRecovery } from "./recovery/useRecovery";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -285,7 +286,7 @@ const renderDevices = async (
       userNumber,
       connection,
       identityElement,
-      device.pubkey,
+      device,
       isOnlyDevice
     );
     hasOwnProperty(device.purpose, "recovery")
@@ -306,6 +307,42 @@ const renderDevices = async (
   }
 };
 
+type RemovalConnectionResult = Success | Failure;
+
+type Success = { kind: "success"; connection: IIConnection };
+type Failure = { kind: "failure"; loginResult: LoginResult };
+
+const getRemovalConnection = async (
+  originalConnection: IIConnection,
+  userNumber: bigint,
+  deviceData: DeviceData
+): Promise<RemovalConnectionResult> => {
+  const isProtectedRecoveryPhrase =
+    "protected" in deviceData.protection_type &&
+    deviceData.alias === "Recovery phrase";
+
+  if (isProtectedRecoveryPhrase) {
+    const loginResult = await loginWithRecovery(userNumber, deviceData);
+
+    if (loginResult.kind === "loginSuccess") {
+      return {
+        kind: "success",
+        connection: loginResult.connection,
+      };
+    } else {
+      return {
+        kind: "failure",
+        loginResult,
+      };
+    }
+  } else {
+    return {
+      kind: "success",
+      connection: originalConnection,
+    };
+  }
+};
+
 // Add listener to the "X" button, right of the device name. Performs some
 // checks before removing the device (is the user is authenticated with the
 // device to remove, or if the device is the last one).
@@ -313,17 +350,28 @@ const bindRemoveListener = (
   userNumber: bigint,
   connection: IIConnection,
   listItem: HTMLElement,
-  publicKey: PublicKey,
+  deviceData: DeviceData,
   isOnlyDevice: boolean
 ) => {
   const button = listItem.querySelector("button") as HTMLButtonElement;
   button.onclick = async () => {
-    const pubKey: DerEncodedPublicKey = new Uint8Array(publicKey)
+    const pubKey: DerEncodedPublicKey = new Uint8Array(deviceData.pubkey)
       .buffer as DerEncodedPublicKey;
     const sameDevice = bufferEqual(
       connection.identity.getPublicKey().toDer(),
       pubKey
     );
+
+    const removalConnectionResult = await getRemovalConnection(
+      connection,
+      userNumber,
+      deviceData
+    );
+
+    if (removalConnectionResult.kind === "failure") {
+      renderManage(userNumber, connection);
+      return;
+    }
 
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");
@@ -340,7 +388,9 @@ const bindRemoveListener = (
 
     // Otherwise, remove identity
     try {
-      await withLoader(() => connection.remove(userNumber, publicKey));
+      await withLoader(() =>
+        removalConnectionResult.connection.remove(userNumber, deviceData.pubkey)
+      );
       if (sameDevice) {
         localStorage.clear();
         location.reload();

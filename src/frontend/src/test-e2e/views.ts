@@ -126,6 +126,10 @@ export class RecoveryMethodSelectorView extends View {
     await this.browser.$("#seedPhrase").click();
   }
 
+  async useSeedPhraseProtected(): Promise<void> {
+    await this.browser.$("#seedPhraseProtected").click();
+  }
+
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
       .$("//h1[string()='Seedphrase']")
@@ -160,6 +164,18 @@ export class MainView extends View {
     await this.browser
       .$(`//div[string()='${deviceName}']`)
       .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForDeviceNotDisplay(
+    deviceName: string,
+    wait: number = 0
+  ): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    const selector = `//div[string()='${deviceName}']`;
+    const result = await this.browser.$(selector);
+    if (result.error === undefined) {
+      throw new Error(`selector ${selector} resulted in finding an element`);
+    }
   }
 
   async addAdditionalDevice(): Promise<void> {
@@ -470,6 +486,12 @@ export class RecoverView extends View {
 
   async enterSeedPhraseContinue(): Promise<void> {
     await this.browser.$("#inputSeedPhraseContinue").click();
+  }
+
+  async waitForInvalidSeedPhraseDisplay(): Promise<void> {
+    await this.browser
+      .$("//h1[string()='Invalid Seedphrase']")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 }
 
