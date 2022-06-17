@@ -6,41 +6,10 @@ use ic_cdk::trap;
 use ic_certified_map::HashTree;
 use internet_identity::metrics_encoder::MetricsEncoder;
 use internet_identity::signature_map::SignatureMap;
+use internet_identity_interface::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
-
-pub type HeaderField = (String, String);
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct Token {}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-enum StreamingStrategy {
-    Callback { callback: Func, token: Token },
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct StreamingCallbackHttpResponse {
-    body: ByteBuf,
-    token: Option<Token>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpRequest {
-    method: String,
-    url: String,
-    headers: Vec<(String, String)>,
-    body: ByteBuf,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpResponse {
-    status_code: u16,
-    headers: Vec<HeaderField>,
-    body: Cow<'static, Bytes>,
-    streaming_strategy: Option<StreamingStrategy>,
-}
 
 impl ContentType {
     pub fn to_mime_type_string(&self) -> String {

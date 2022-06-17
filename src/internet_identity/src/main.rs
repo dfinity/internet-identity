@@ -1,5 +1,4 @@
 use crate::assets::init_assets;
-use crate::http::{HeaderField, HttpRequest, HttpResponse};
 use crate::AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
 use crate::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
