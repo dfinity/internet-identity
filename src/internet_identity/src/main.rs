@@ -57,8 +57,7 @@ type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = String;
-type Timestamp = u64;
-// in nanos since epoch
+type Timestamp = u64; // in nanos since epoch
 type Signature = ByteBuf;
 type DeviceVerificationCode = String;
 type FailedAttemptsCounter = u8;
@@ -73,7 +72,7 @@ enum Purpose {
     Authentication,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
+#[derive(Clone, Debug, CandidType, Deserialize)]
 enum KeyType {
     #[serde(rename = "unknown")]
     Unknown,
@@ -309,7 +308,7 @@ async fn init_salt() {
     });
 
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res, )) => res,
+        Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
     };
     let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
@@ -409,9 +408,9 @@ async fn add_tentative_device(
                 AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
             Some(TentativeDeviceRegistration {
-                     state: DeviceTentativelyAdded { .. },
-                     ..
-                 }) => AnotherDeviceTentativelyAdded,
+                state: DeviceTentativelyAdded { .. },
+                ..
+            }) => AnotherDeviceTentativelyAdded,
             Some(mut registration) => {
                 registration.state = DeviceTentativelyAdded {
                     tentative_device: device_data,
@@ -496,7 +495,7 @@ fn get_verified_device(
 /// Return a decimal representation of a random `u32` to be used as verification code
 async fn new_verification_code() -> DeviceVerificationCode {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res, )) => res,
+        Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
     };
     let rand = u32::from_be_bytes(res[..4].try_into().unwrap_or_else(|_| {
@@ -741,14 +740,14 @@ fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
 // Get a random number generator based on 'raw_rand'
 async fn make_rng() -> rand_chacha::ChaCha20Rng {
     let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res, )) => res,
+        Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
     };
     let seed: Salt = raw_rand[..].try_into().unwrap_or_else(|_| {
         trap(&format!(
-            "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
-            raw_rand.len()
-        ));
+                "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
+                raw_rand.len()
+                ));
     });
 
     rand_chacha::ChaCha20Rng::from_seed(seed)
@@ -838,12 +837,12 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
             .get(&user_number)
         {
             Some(TentativeDeviceRegistration {
-                     expiration,
-                     state:
-                     DeviceTentativelyAdded {
-                         tentative_device, ..
-                     },
-                 }) if *expiration > now => IdentityAnchorInfo {
+                expiration,
+                state:
+                    DeviceTentativelyAdded {
+                        tentative_device, ..
+                    },
+            }) if *expiration > now => IdentityAnchorInfo {
                 devices,
                 device_registration: Some(DeviceRegistrationInfo {
                     expiration: *expiration,
@@ -1199,7 +1198,7 @@ fn prune_expired_signatures(asset_hashes: &AssetHashes, sigs: &mut SignatureMap)
 
 // Checks if the caller is authenticated against any of the public keys provided
 // and traps if not.
-fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item=&'a PublicKey>) {
+fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey>) {
     for pk in public_keys {
         if caller() == Principal::self_authenticating(pk) {
             return;
