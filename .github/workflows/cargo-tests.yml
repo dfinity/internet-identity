@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          # set a PAT so that add-and-commit can trigger
+          # CI runs
+          token: ${{ secrets.GIX_BOT_PAT }}
       - uses: ./.github/actions/bootstrap
 
       - name: Cargo fmt
