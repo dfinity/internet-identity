@@ -1,5 +1,5 @@
 // adapted from https://github.com/dfinity/icx-proxy/blob/0cd1a22f717b56ac550a3554a25a845878bfb4e8/src/main.rs#L611
-// TODO: certificate validation should be it's own library
+// TODO: certificate validation should be its own library
 
 use crate::certificate_validation::ValidationError::{
     AssetHashMismatch, AssetPathLookupFailed, MalformedCertificate, TreeHashCertifiedDataMismatch,
@@ -33,6 +33,8 @@ pub enum ValidationError {
     AssetHashMismatch,
 }
 
+/// Validates asset certification accoriding to the HTTP gateway specification:
+/// https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-certification
 pub fn validate_certification(
     ic_certificate: &str,
     canister_id: CanisterId,

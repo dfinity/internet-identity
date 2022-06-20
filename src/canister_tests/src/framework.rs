@@ -4,6 +4,8 @@ use ic_error_types::ErrorCode;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
 use ic_types::Principal;
 use internet_identity_interface as types;
+use internet_identity_interface::HeaderField;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -210,4 +212,87 @@ pub fn expect_user_error_with_message<T>(
     assert!(matches!(result,
             Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
             message_pattern.is_match(user_error.description())));
+}
+
+pub fn verify_security_headers(headers: &Vec<HeaderField>) {
+    let expected_headers = vec![
+        ("X-Frame-Options", "DENY"),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "same-origin"),
+        (
+            "Permissions-Policy",
+            "accelerometer=(),\
+ambient-light-sensor=(),\
+autoplay=(),\
+battery=(),\
+camera=(),\
+clipboard-read=(),\
+clipboard-write=(self),\
+conversion-measurement=(),\
+cross-origin-isolated=(),\
+display-capture=(),\
+document-domain=(),\
+encrypted-media=(),\
+execution-while-not-rendered=(),\
+execution-while-out-of-viewport=(),\
+focus-without-user-activation=(),\
+fullscreen=(),\
+gamepad=(),\
+geolocation=(),\
+gyroscope=(),\
+hid=(),\
+idle-detection=(),\
+interest-cohort=(),\
+keyboard-map=(),\
+magnetometer=(),\
+microphone=(),\
+midi=(),\
+navigation-override=(),\
+payment=(),\
+picture-in-picture=(),\
+publickey-credentials-get=(self),\
+screen-wake-lock=(),\
+serial=(),\
+speaker-selection=(),\
+sync-script=(),\
+sync-xhr=(self),\
+trust-token-redemption=(),\
+usb=(),\
+vertical-scroll=(),\
+web-share=(),\
+window-placement=(),\
+xr-spatial-tracking=()",
+        ),
+    ];
+
+    for (header_name, expected_value) in expected_headers {
+        let (_, value) = headers
+            .iter()
+            .filter(|(name, _)| name == header_name)
+            .exactly_one()
+            .expect(&format!("error retrieving \"{}\" header", header_name));
+        assert_eq!(value, expected_value);
+    }
+
+    let (_, csp) = headers
+        .iter()
+        .filter(|(name, _)| name == "Content-Security-Policy")
+        .exactly_one()
+        .expect("error retrieving \"Content-Security-Policy\" header");
+
+    assert!(Regex::new(
+        "^default-src 'none';\
+connect-src 'self' https://ic0.app;\
+img-src 'self' data:;\
+script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+base-uri 'none';\
+frame-ancestors 'none';\
+form-action 'none';\
+style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+style-src-elem 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+font-src https://fonts\\.gstatic\\.com;\
+upgrade-insecure-requests;$"
+    )
+    .unwrap()
+    .is_match(csp));
 }

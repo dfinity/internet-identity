@@ -73,11 +73,11 @@ mod http_tests {
     use crate::framework::CallError;
     use crate::{api, framework};
     use ic_state_machine_tests::StateMachine;
-    use internet_identity_interface::{HeaderField, HttpRequest};
+    use internet_identity_interface::HttpRequest;
     use itertools::Itertools;
-    use regex::Regex;
     use serde_bytes::ByteBuf;
 
+    /// Verifies that expected assets are delivered, certified and have security headers.
     #[test]
     fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         let assets: Vec<(&str, Option<&str>)> = vec![
@@ -89,8 +89,9 @@ mod http_tests {
             ("/ic-badge.svg", None),
         ];
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
+        // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
         for (asset, encoding) in assets {
             let http_response = api::http_request(
                 &env,
@@ -135,93 +136,9 @@ mod http_tests {
                 env.root_key(),
             )
             .expect(&format!("validation for asset \"{}\" failed", asset));
-
-            verify_security_headers(&http_response.headers)
+            framework::verify_security_headers(&http_response.headers);
         }
         Ok(())
-    }
-
-    fn verify_security_headers(headers: &Vec<HeaderField>) {
-        let expected_headers = vec![
-            ("X-Frame-Options", "DENY"),
-            ("X-Content-Type-Options", "nosniff"),
-            ("Referrer-Policy", "same-origin"),
-            (
-                "Permissions-Policy",
-                "accelerometer=(),\
-    ambient-light-sensor=(),\
-    autoplay=(),\
-    battery=(),\
-    camera=(),\
-    clipboard-read=(),\
-    clipboard-write=(self),\
-    conversion-measurement=(),\
-    cross-origin-isolated=(),\
-    display-capture=(),\
-    document-domain=(),\
-    encrypted-media=(),\
-    execution-while-not-rendered=(),\
-    execution-while-out-of-viewport=(),\
-    focus-without-user-activation=(),\
-    fullscreen=(),\
-    gamepad=(),\
-    geolocation=(),\
-    gyroscope=(),\
-    hid=(),\
-    idle-detection=(),\
-    interest-cohort=(),\
-    keyboard-map=(),\
-    magnetometer=(),\
-    microphone=(),\
-    midi=(),\
-    navigation-override=(),\
-    payment=(),\
-    picture-in-picture=(),\
-    publickey-credentials-get=(self),\
-    screen-wake-lock=(),\
-    serial=(),\
-    speaker-selection=(),\
-    sync-script=(),\
-    sync-xhr=(self),\
-    trust-token-redemption=(),\
-    usb=(),\
-    vertical-scroll=(),\
-    web-share=(),\
-    window-placement=(),\
-    xr-spatial-tracking=()",
-            ),
-        ];
-
-        for (header_name, expected_value) in expected_headers {
-            let (_, value) = headers
-                .iter()
-                .filter(|(name, _)| name == header_name)
-                .exactly_one()
-                .expect(&format!("error retrieving \"{}\" header", header_name));
-            assert_eq!(value, expected_value);
-        }
-
-        let (_, csp) = headers
-            .iter()
-            .filter(|(name, _)| name == "Content-Security-Policy")
-            .exactly_one()
-            .expect("error retrieving \"Content-Security-Policy\" header");
-
-        assert!(Regex::new(
-            "^default-src 'none';\
-   connect-src 'self' https://ic0.app;\
-   img-src 'self' data:;\
-   script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
-   base-uri 'none';\
-   frame-ancestors 'none';\
-    form-action 'none';\
-    style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
-    style-src-elem 'unsafe-inline' https://fonts\\.googleapis\\.com;\
-    font-src https://fonts\\.gstatic\\.com;\
-    upgrade-insecure-requests;$"
-        )
-        .unwrap()
-        .is_match(csp));
     }
 }
 
