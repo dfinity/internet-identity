@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection, LoginResult } from "../utils/iiConnection";
+import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
