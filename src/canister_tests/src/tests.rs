@@ -66,6 +66,81 @@ fn registration_with_mismatched_sender_fails() {
     );
 }
 
+/// Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
+#[cfg(test)]
+mod http_tests {
+    use crate::certificate_validation::validate_certification;
+    use crate::framework::CallError;
+    use crate::{api, framework};
+    use ic_state_machine_tests::StateMachine;
+    use internet_identity_interface::HttpRequest;
+    use serde_bytes::ByteBuf;
+
+    /// Verifies that expected assets are delivered, certified and have security headers.
+    #[test]
+    fn ii_canister_serves_http_assets() -> Result<(), CallError> {
+        let assets: Vec<(&str, Option<&str>)> = vec![
+            ("/", None),
+            ("/index.html", None),
+            ("/index.js", Some("gzip")),
+            ("/loader.webp", None),
+            ("/favicon.ico", None),
+            ("/ic-badge.svg", None),
+        ];
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
+        for (asset, encoding) in assets {
+            let http_response = api::http_request(
+                &env,
+                canister_id,
+                HttpRequest {
+                    method: "GET".to_string(),
+                    url: asset.to_string(),
+                    headers: vec![],
+                    body: ByteBuf::new(),
+                },
+            )?;
+
+            assert_eq!(http_response.status_code, 200);
+
+            // check the appropriate Content-Encoding header is set
+            if let Some(enc) = encoding {
+                let (_, content_encoding) = http_response
+                    .headers
+                    .iter()
+                    .find(|(name, _)| name.to_lowercase() == "content-encoding")
+                    .expect("Content-Encoding header not found");
+                assert_eq!(
+                    content_encoding, enc,
+                    "unexpected Content-Encoding header value"
+                );
+            }
+
+            // 1. It searches for a response header called Ic-Certificate (case-insensitive).
+            let (_, ic_certificate) = http_response
+                .headers
+                .iter()
+                .find(|(name, _)| name.to_lowercase() == "ic-certificate")
+                .expect("IC-Certificate header not found");
+
+            validate_certification(
+                ic_certificate,
+                canister_id,
+                asset,
+                &http_response.body,
+                None, // should really be `encoding`, but cannot use it because II certifies encoded response bodies, see L2-722 for details
+                env.root_key(),
+                env.time(),
+            )
+            .expect(&format!("validation for asset \"{}\" failed", asset));
+            framework::verify_security_headers(&http_response.headers);
+        }
+        Ok(())
+    }
+}
+
 /// Tests concerning the device registration flow for remote devices (i.e. authenticators on another computer).
 /// The flow has the following steps:
 /// 1. on device 1: enter registration mode
@@ -75,6 +150,7 @@ fn registration_with_mismatched_sender_fails() {
 /// Additionally, there are the following bounds on the registration flow:
 /// 1. registration mode expires after 15 minutes
 /// 2. there is a limit of 3 attempts for step 3 in the above process
+#[cfg(test)]
 mod remote_device_registration_tests {
     use crate::framework::{
         device_data_2, expect_user_error_with_message, principal_1, principal_2, CallError,

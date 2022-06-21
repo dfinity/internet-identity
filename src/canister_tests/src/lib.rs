@@ -4,6 +4,7 @@
  *  * `api`: Rust-bindings for the II canister
  *  * `framework`: Helpers of various kinds for writing tests.
  *  * `flows`: Reusable flows consisting of multiple II interactions
+ *  * `certificate_validation`: Validation logic for asset certification
  *
  * Most changes should happen in the `tests` module. The split was done this way so that `tests` is a simple
  * as possible to make tests easy to read and write.
@@ -23,3 +24,6 @@ mod framework;
 
 #[cfg(test)]
 mod flows;
+
+#[cfg(test)]
+mod certificate_validation;

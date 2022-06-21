@@ -4,6 +4,7 @@ use ic_error_types::ErrorCode;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
 use ic_types::Principal;
 use internet_identity_interface as types;
+use internet_identity_interface::HeaderField;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -125,6 +126,20 @@ pub fn device_data_2() -> types::DeviceData {
  * (were actually stolen from somewhere else)
  */
 
+/// Call a canister candid query method, anonymous.
+pub fn query_candid<Input, Output>(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    method: &str,
+    input: Input,
+) -> Result<Output, CallError>
+where
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
+{
+    with_candid(input, |bytes| env.query(canister_id, method, bytes))
+}
+
 /// Call a canister candid method, authenticated.
 pub fn call_candid_as<Input, Output>(
     env: &StateMachine,
@@ -196,4 +211,85 @@ pub fn expect_user_error_with_message<T>(
     assert!(matches!(result,
             Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
             message_pattern.is_match(user_error.description())));
+}
+
+pub fn verify_security_headers(headers: &Vec<HeaderField>) {
+    let expected_headers = vec![
+        ("X-Frame-Options", "DENY"),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "same-origin"),
+        (
+            "Permissions-Policy",
+            "accelerometer=(),\
+ambient-light-sensor=(),\
+autoplay=(),\
+battery=(),\
+camera=(),\
+clipboard-read=(),\
+clipboard-write=(self),\
+conversion-measurement=(),\
+cross-origin-isolated=(),\
+display-capture=(),\
+document-domain=(),\
+encrypted-media=(),\
+execution-while-not-rendered=(),\
+execution-while-out-of-viewport=(),\
+focus-without-user-activation=(),\
+fullscreen=(),\
+gamepad=(),\
+geolocation=(),\
+gyroscope=(),\
+hid=(),\
+idle-detection=(),\
+interest-cohort=(),\
+keyboard-map=(),\
+magnetometer=(),\
+microphone=(),\
+midi=(),\
+navigation-override=(),\
+payment=(),\
+picture-in-picture=(),\
+publickey-credentials-get=(self),\
+screen-wake-lock=(),\
+serial=(),\
+speaker-selection=(),\
+sync-script=(),\
+sync-xhr=(self),\
+trust-token-redemption=(),\
+usb=(),\
+vertical-scroll=(),\
+web-share=(),\
+window-placement=(),\
+xr-spatial-tracking=()",
+        ),
+    ];
+
+    for (header_name, expected_value) in expected_headers {
+        let (_, value) = headers
+            .iter()
+            .find(|(name, _)| name.to_lowercase() == header_name.to_lowercase())
+            .expect(&format!("header \"{}\" not found", header_name));
+        assert_eq!(value, expected_value);
+    }
+
+    let (_, csp) = headers
+        .iter()
+        .find(|(name, _)| name.to_lowercase() == "content-security-policy")
+        .expect("header \"Content-Security-Policy\" not found");
+
+    assert!(Regex::new(
+        "^default-src 'none';\
+connect-src 'self' https://ic0.app;\
+img-src 'self' data:;\
+script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+base-uri 'none';\
+frame-ancestors 'none';\
+form-action 'none';\
+style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+style-src-elem 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+font-src https://fonts\\.gstatic\\.com;\
+upgrade-insecure-requests;$"
+    )
+    .unwrap()
+    .is_match(csp));
 }
