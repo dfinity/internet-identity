@@ -130,7 +130,7 @@ mod http_tests {
                 canister_id,
                 asset,
                 &http_response.body,
-                None, // should really be `encoding`, but we need to solve L2-722 first
+                None, // should really be `encoding`, but cannot use it because II certifies encoded response bodies, see L2-722 for details
                 env.root_key(),
             )
             .expect(&format!("validation for asset \"{}\" failed", asset));

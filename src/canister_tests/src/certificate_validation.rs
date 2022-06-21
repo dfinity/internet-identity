@@ -16,7 +16,6 @@ use regex::Regex;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
-use HeaderPart::{Certificate, Tree};
 
 // The limit of a buffer we should decompress ~10mb.
 const MAX_CHUNK_SIZE_TO_DECOMPRESS: usize = 1024;
@@ -43,12 +42,12 @@ pub fn validate_certification(
     root_key: ThresholdSigPublicKey,
 ) -> Result<(), ValidationError> {
     // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
-    let cert = parse_header_value(ic_certificate, Certificate)?;
-    let tree: HashTree = parse_header_value(ic_certificate, Tree)?;
+    let (encoded_cert, encoded_tree) = parse_header(ic_certificate)?;
 
     // 3. The certificate must be a valid certificate as per Certification, signed by the root key.
     // If the certificate contains a subnet delegation, the delegation must be valid for the given canister.
     // The timestamp in /time must be recent.
+    let cert = decode_value(encoded_cert)?;
     let disable_range_check = false; // Agent-rs allows to disable the range check for the canister ids. false -> check enabled
     if let Err(err) = agent(&root_key).verify(&cert, canister_id.get().0, disable_range_check) {
         return Err(ValidationError::CertificateValidationFailed { inner: err });
@@ -68,6 +67,7 @@ pub fn validate_certification(
     };
 
     // 4. The tree must be a hash tree as per Encoding of certificates.
+    let tree: HashTree = decode_value(encoded_tree)?;
     // 5. The root hash of that tree must match the canister's certified data.
     if *witness != tree.digest() {
         return Err(TreeHashCertifiedDataMismatch);
@@ -87,11 +87,34 @@ pub fn validate_certification(
     };
 
     // 7. That leaf must contain the SHA-256 hash of the decoded body.
+    // This is where Internet Identity breaks spec because it certifies encoded response bodies, see L2-722 for details.
     let body_sha = decode_body_to_sha256(body, encoding).unwrap();
     if body_sha != tree_sha {
         return Err(AssetHashMismatch);
     }
     Ok(())
+}
+
+fn parse_header(ic_certificate: &str) -> Result<(&str, &str), ValidationError> {
+    let captures = Regex::new("^certificate=:([^:]*):,\\s*tree=:([^:]*):$")
+        .unwrap()
+        .captures(ic_certificate)
+        .ok_or(MalformedCertificate {
+            message: "unexpected format".to_string(),
+        })?;
+    let encoded_cert = captures
+        .get(1)
+        .ok_or(MalformedCertificate {
+            message: "no match for encoded cert".to_string(),
+        })?
+        .as_str();
+    let encoded_tree = captures
+        .get(2)
+        .ok_or(MalformedCertificate {
+            message: "no match for encoded tree".to_string(),
+        })?
+        .as_str();
+    Ok((encoded_cert, encoded_tree))
 }
 
 fn agent(root_key: &ThresholdSigPublicKey) -> Agent {
@@ -107,35 +130,11 @@ fn agent(root_key: &ThresholdSigPublicKey) -> Agent {
     agent
 }
 
-#[derive(Debug)]
-enum HeaderPart {
-    Certificate,
-    Tree,
-}
-
-fn parse_header_value<T>(ic_certificate: &str, part: HeaderPart) -> Result<T, ValidationError>
+fn decode_value<T>(encoded_value: &str) -> Result<T, ValidationError>
 where
     T: for<'a> Deserialize<'a>,
 {
-    let capture_group = match part {
-        Certificate => 1,
-        Tree => 2,
-    };
-    let captures = Regex::new("^certificate=:([^:]*):, tree=:([^:]*):$")
-        .unwrap()
-        .captures(ic_certificate)
-        .ok_or(MalformedCertificate {
-            message: "unexpected format".to_string(),
-        })?;
-    let cert_blob = base64::decode(
-        captures
-            .get(capture_group)
-            .ok_or(MalformedCertificate {
-                message: format!("no regex match for header part {:?}", part),
-            })?
-            .as_str(),
-    )
-    .map_err(|err| MalformedCertificate {
+    let cert_blob = base64::decode(encoded_value).map_err(|err| MalformedCertificate {
         message: format!("failed to decode base64 value: {:?}", err),
     })?;
     serde_cbor::from_slice(&cert_blob).map_err(|err| MalformedCertificate {
@@ -157,6 +156,7 @@ fn decode_body_to_sha256(body: &[u8], encoding: Option<&str>) -> Option<[u8; 32]
                 sha256.update(&decoded[0..bytes]);
             }
             if decoder.bytes().next().is_some() {
+                // return None if payload exceed limits for decompression
                 return None;
             }
         }
