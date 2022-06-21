@@ -5,7 +5,6 @@ use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, W
 use ic_types::Principal;
 use internet_identity_interface as types;
 use internet_identity_interface::HeaderField;
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -268,17 +267,15 @@ xr-spatial-tracking=()",
     for (header_name, expected_value) in expected_headers {
         let (_, value) = headers
             .iter()
-            .filter(|(name, _)| name == header_name)
-            .exactly_one()
-            .expect(&format!("error retrieving \"{}\" header", header_name));
+            .find(|(name, _)| name.to_lowercase() == header_name.to_lowercase())
+            .expect(&format!("header \"{}\" not found", header_name));
         assert_eq!(value, expected_value);
     }
 
     let (_, csp) = headers
         .iter()
-        .filter(|(name, _)| name == "Content-Security-Policy")
-        .exactly_one()
-        .expect("error retrieving \"Content-Security-Policy\" header");
+        .find(|(name, _)| name.to_lowercase() == "content-security-policy")
+        .expect("header \"Content-Security-Policy\" not found");
 
     assert!(Regex::new(
         "^default-src 'none';\

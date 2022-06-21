@@ -16,12 +16,11 @@ use regex::Regex;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
+use HeaderPart::{Certificate, Tree};
 
 // The limit of a buffer we should decompress ~10mb.
 const MAX_CHUNK_SIZE_TO_DECOMPRESS: usize = 1024;
 const MAX_CHUNKS_TO_DECOMPRESS: u64 = 10_240;
-
-const CERTIFICATE_REGEX: &'static str = "^certificate=:([^:]*):, tree=:([^:]*):$";
 
 #[derive(Debug)]
 pub enum ValidationError {
@@ -43,14 +42,19 @@ pub fn validate_certification(
     encoding: Option<&str>,
     root_key: ThresholdSigPublicKey,
 ) -> Result<(), ValidationError> {
-    let cert = parse_header_value(ic_certificate, 1)?;
-    let tree: HashTree = parse_header_value(ic_certificate, 2)?;
-    let agent = initialize_agent(&root_key);
+    // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
+    let cert = parse_header_value(ic_certificate, Certificate)?;
+    let tree: HashTree = parse_header_value(ic_certificate, Tree)?;
 
-    if let Err(err) = agent.verify(&cert, canister_id.get().0, false) {
+    // 3. The certificate must be a valid certificate as per Certification, signed by the root key.
+    // If the certificate contains a subnet delegation, the delegation must be valid for the given canister.
+    // The timestamp in /time must be recent.
+    let disable_range_check = false; // Agent-rs allows to disable the range check for the canister ids. false -> check enabled
+    if let Err(err) = agent(&root_key).verify(&cert, canister_id.get().0, disable_range_check) {
         return Err(ValidationError::CertificateValidationFailed { inner: err });
     }
 
+    // 3. (cont.) The subnet state tree in the certificate must reveal the canister's certified data.
     let certified_data_path = vec![
         "canister".into(),
         canister_id.into(),
@@ -63,10 +67,14 @@ pub fn validate_certification(
         }
     };
 
+    // 4. The tree must be a hash tree as per Encoding of certificates.
+    // 5. The root hash of that tree must match the canister's certified data.
     if *witness != tree.digest() {
         return Err(TreeHashCertifiedDataMismatch);
     }
 
+    // 6. The path ["http_assets",<url>], where url is the utf8-encoded url from the HttpRequest must exist and be a leaf.
+    // Else, if it does not exist, ["http_assets","/index.html"] must exist and be a leaf.
     let asset_path = ["http_assets".into(), uri_path.into()];
     let tree_sha = match tree.lookup_path(&asset_path) {
         LookupResult::Found(v) => v,
@@ -78,6 +86,7 @@ pub fn validate_certification(
         },
     };
 
+    // 7. That leaf must contain the SHA-256 hash of the decoded body.
     let body_sha = decode_body_to_sha256(body, encoding).unwrap();
     if body_sha != tree_sha {
         return Err(AssetHashMismatch);
@@ -85,7 +94,7 @@ pub fn validate_certification(
     Ok(())
 }
 
-fn initialize_agent(root_key: &ThresholdSigPublicKey) -> Agent {
+fn agent(root_key: &ThresholdSigPublicKey) -> Agent {
     let agent = Agent::builder()
         .with_transport(
             ReqwestHttpReplicaV2Transport::create("https://irrelevant-but-mandatory.com").unwrap(),
@@ -98,11 +107,21 @@ fn initialize_agent(root_key: &ThresholdSigPublicKey) -> Agent {
     agent
 }
 
-fn parse_header_value<T>(ic_certificate: &str, capture_group: usize) -> Result<T, ValidationError>
+#[derive(Debug)]
+enum HeaderPart {
+    Certificate,
+    Tree,
+}
+
+fn parse_header_value<T>(ic_certificate: &str, part: HeaderPart) -> Result<T, ValidationError>
 where
     T: for<'a> Deserialize<'a>,
 {
-    let captures = Regex::new(CERTIFICATE_REGEX)
+    let capture_group = match part {
+        Certificate => 1,
+        Tree => 2,
+    };
+    let captures = Regex::new("^certificate=:([^:]*):, tree=:([^:]*):$")
         .unwrap()
         .captures(ic_certificate)
         .ok_or(MalformedCertificate {
@@ -112,7 +131,7 @@ where
         captures
             .get(capture_group)
             .ok_or(MalformedCertificate {
-                message: format!("no regex match for capture group {}", capture_group),
+                message: format!("no regex match for header part {:?}", part),
             })?
             .as_str(),
     )

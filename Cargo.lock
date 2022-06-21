@@ -418,7 +418,6 @@ dependencies = [
  "ic-state-machine-tests",
  "ic-types 0.3.0",
  "internet_identity_interface",
- "itertools",
  "lazy_static",
  "regex",
  "serde",

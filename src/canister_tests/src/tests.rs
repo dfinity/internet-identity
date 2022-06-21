@@ -74,7 +74,6 @@ mod http_tests {
     use crate::{api, framework};
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::HttpRequest;
-    use itertools::Itertools;
     use serde_bytes::ByteBuf;
 
     /// Verifies that expected assets are delivered, certified and have security headers.
@@ -111,21 +110,20 @@ mod http_tests {
                 let (_, content_encoding) = http_response
                     .headers
                     .iter()
-                    .filter(|(name, _)| name == "Content-Encoding")
-                    .exactly_one()
-                    .expect("error retrieving \"Content-Encoding\" header");
+                    .find(|(name, _)| name.to_lowercase() == "content-encoding")
+                    .expect("Content-Encoding header not found");
                 assert_eq!(
                     content_encoding, enc,
-                    "unexpected \"Content-Encoding\" header value"
+                    "unexpected Content-Encoding header value"
                 );
             }
 
+            // 1. It searches for a response header called Ic-Certificate (case-insensitive).
             let (_, ic_certificate) = http_response
                 .headers
                 .iter()
-                .filter(|(name, _)| name == "IC-Certificate")
-                .exactly_one()
-                .unwrap();
+                .find(|(name, _)| name.to_lowercase() == "ic-certificate")
+                .expect("IC-Certificate header not found");
 
             validate_certification(
                 ic_certificate,
