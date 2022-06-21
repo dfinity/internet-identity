@@ -44,7 +44,7 @@ jobs:
           add-paths: ./rust-toolchain.toml
           commit-message: Update rust version
           committer: GitHub <noreply@github.com>
-          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
           branch: bot-rust-update
           delete-branch: true
           title: 'Update rust version'
