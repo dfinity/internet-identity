@@ -2,20 +2,18 @@
 // TODO: certificate validation should be its own library
 
 use crate::certificate_validation::ValidationError::{
-    AssetHashMismatch, AssetPathLookupFailed, MalformedCertificate, TreeHashCertifiedDataMismatch,
-    WitnessLookupFailed,
+    AssetHashMismatch, AssetPathLookupFailed, CertificateExpired, MalformedCertificate,
 };
 use candid::types::ic_types::hash_tree::LookupResult;
 use flate2::read::GzDecoder;
-use ic_agent::agent::http_transport::ReqwestHttpReplicaV2Transport;
-use ic_agent::hash_tree::HashTree;
-use ic_agent::{lookup_value, Agent, AgentError};
-use ic_crypto_utils_threshold_sig_der::public_key_to_der;
-use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey};
+use ic_certified_vars::{verify_certificate, CertificateValidationError};
+use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey, Time};
+use ic_types::HashTree;
 use regex::Regex;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
+use std::time::{Duration, SystemTime};
 
 // The limit of a buffer we should decompress ~10mb.
 const MAX_CHUNK_SIZE_TO_DECOMPRESS: usize = 1024;
@@ -24,9 +22,8 @@ const MAX_CHUNKS_TO_DECOMPRESS: u64 = 10_240;
 #[derive(Debug)]
 pub enum ValidationError {
     MalformedCertificate { message: String },
-    CertificateValidationFailed { inner: AgentError },
-    WitnessLookupFailed { inner: AgentError },
-    TreeHashCertifiedDataMismatch,
+    CertificateValidationFailed { inner: CertificateValidationError },
+    CertificateExpired,
     AssetPathLookupFailed,
     AssetHashMismatch,
 }
@@ -40,37 +37,36 @@ pub fn validate_certification(
     body: &[u8],
     encoding: Option<&str>,
     root_key: ThresholdSigPublicKey,
+    current_time: SystemTime,
 ) -> Result<(), ValidationError> {
     // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
     let (encoded_cert, encoded_tree) = parse_header(ic_certificate)?;
+    let cert_blob = base64::decode(encoded_cert).map_err(|err| MalformedCertificate {
+        message: format!("failed to decode base64 certificate: {:?}", err),
+    })?;
+
+    // 4. The tree must be a hash tree as per Encoding of certificates.
+    // (Out of order because verify_certificate also checks certified_data.)
+    let tree: HashTree = decode_base64_encoded_cbor(encoded_tree)?;
 
     // 3. The certificate must be a valid certificate as per Certification, signed by the root key.
     // If the certificate contains a subnet delegation, the delegation must be valid for the given canister.
-    // The timestamp in /time must be recent.
-    let cert = decode_base64_encoded_cbor(encoded_cert)?;
-    let disable_range_check = false; // Agent-rs allows to disable the range check for the canister ids. false -> check enabled
-    if let Err(err) = agent(&root_key).verify(&cert, canister_id.get().0, disable_range_check) {
-        return Err(ValidationError::CertificateValidationFailed { inner: err });
-    }
-
-    // 3. (cont.) The subnet state tree in the certificate must reveal the canister's certified data.
-    let certified_data_path = vec![
-        "canister".into(),
-        canister_id.into(),
-        "certified_data".into(),
-    ];
-    let witness = match lookup_value(&cert, certified_data_path) {
-        Ok(witness) => witness,
-        Err(err) => {
-            return Err(WitnessLookupFailed { inner: err });
-        }
-    };
-
-    // 4. The tree must be a hash tree as per Encoding of certificates.
-    let tree: HashTree = decode_base64_encoded_cbor(encoded_tree)?;
+    // The subnet state tree in the certificate must reveal the canister's certified data.
     // 5. The root hash of that tree must match the canister's certified data.
-    if witness != tree.digest() {
-        return Err(TreeHashCertifiedDataMismatch);
+    // (Out of order because verify_certificate also checks certified_data.)
+    let certificate_time = verify_certificate(&cert_blob, &canister_id, &root_key, &tree.digest())
+        .map_err(|err| ValidationError::CertificateValidationFailed { inner: err })?;
+
+    // 3. (cont.) The timestamp in /time must be recent.
+    let certificate_validity = Duration::from_secs(300); // 5 min, also used by the service worker and deemed a reasonable interpretation of 'recent'
+    let current_time = Time::from_nanos_since_unix_epoch(
+        current_time
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64,
+    );
+    if (current_time - certificate_time) > certificate_validity {
+        return Err(CertificateExpired);
     }
 
     // 6. The path ["http_assets",<url>], where url is the utf8-encoded url from the HttpRequest must exist and be a leaf.
@@ -115,19 +111,6 @@ fn parse_header(ic_certificate: &str) -> Result<(&str, &str), ValidationError> {
         })?
         .as_str();
     Ok((encoded_cert, encoded_tree))
-}
-
-fn agent(root_key: &ThresholdSigPublicKey) -> Agent {
-    let agent = Agent::builder()
-        .with_transport(
-            ReqwestHttpReplicaV2Transport::create("https://irrelevant-but-mandatory.com").unwrap(),
-        )
-        .build()
-        .unwrap();
-    agent
-        .set_root_key(public_key_to_der(&root_key.into_bytes()).unwrap())
-        .expect("setting root key failed");
-    agent
 }
 
 fn decode_base64_encoded_cbor<T>(encoded_value: &str) -> Result<T, ValidationError>

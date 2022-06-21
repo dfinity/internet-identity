@@ -132,6 +132,7 @@ mod http_tests {
                 &http_response.body,
                 None, // should really be `encoding`, but cannot use it because II certifies encoded response bodies, see L2-722 for details
                 env.root_key(),
+                env.time(),
             )
             .expect(&format!("validation for asset \"{}\" failed", asset));
             framework::verify_security_headers(&http_response.headers);
