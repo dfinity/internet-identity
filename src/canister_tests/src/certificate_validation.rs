@@ -33,7 +33,7 @@ pub enum ValidationError {
     AssetHashMismatch,
 }
 
-/// Validates asset certification accoriding to the HTTP gateway specification:
+/// Validates asset certification according to the HTTP gateway specification:
 /// https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-certification
 pub fn validate_certification(
     ic_certificate: &str,
