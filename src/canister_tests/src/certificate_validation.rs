@@ -47,7 +47,7 @@ pub fn validate_certification(
     // 3. The certificate must be a valid certificate as per Certification, signed by the root key.
     // If the certificate contains a subnet delegation, the delegation must be valid for the given canister.
     // The timestamp in /time must be recent.
-    let cert = decode_value(encoded_cert)?;
+    let cert = decode_base64_encoded_cbor(encoded_cert)?;
     let disable_range_check = false; // Agent-rs allows to disable the range check for the canister ids. false -> check enabled
     if let Err(err) = agent(&root_key).verify(&cert, canister_id.get().0, disable_range_check) {
         return Err(ValidationError::CertificateValidationFailed { inner: err });
@@ -67,9 +67,9 @@ pub fn validate_certification(
     };
 
     // 4. The tree must be a hash tree as per Encoding of certificates.
-    let tree: HashTree = decode_value(encoded_tree)?;
+    let tree: HashTree = decode_base64_encoded_cbor(encoded_tree)?;
     // 5. The root hash of that tree must match the canister's certified data.
-    if *witness != tree.digest() {
+    if witness != tree.digest() {
         return Err(TreeHashCertifiedDataMismatch);
     }
 
@@ -130,7 +130,7 @@ fn agent(root_key: &ThresholdSigPublicKey) -> Agent {
     agent
 }
 
-fn decode_value<T>(encoded_value: &str) -> Result<T, ValidationError>
+fn decode_base64_encoded_cbor<T>(encoded_value: &str) -> Result<T, ValidationError>
 where
     T: for<'a> Deserialize<'a>,
 {
