@@ -46,7 +46,7 @@ fn ii_canister_can_be_upgraded_and_rolled_back() {
 #[test]
 fn registration_with_mismatched_sender_fails() {
     let env = StateMachine::new();
-    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+    let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
     let challenge = api::create_challenge(&env, canister_id);
     let result = api::register(
         &env,
@@ -165,7 +165,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_enter_device_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result =
@@ -179,7 +179,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_not_enter_device_registration_mode_for_other_user() {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result =
@@ -196,7 +196,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_register_remote_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -232,7 +232,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -281,7 +281,7 @@ mod remote_device_registration_tests {
     #[test]
     fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -309,7 +309,7 @@ mod remote_device_registration_tests {
     #[test]
     fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -334,7 +334,7 @@ mod remote_device_registration_tests {
     fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallError> {
         const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -361,7 +361,7 @@ mod remote_device_registration_tests {
     #[test]
     fn reject_verification_without_tentative_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -385,7 +385,7 @@ mod remote_device_registration_tests {
     fn reject_verification_with_wrong_code() -> Result<(), CallError> {
         const MAX_RETRIES: u8 = 3;
         let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
