@@ -1,0 +1,49 @@
+# This workflow regularly performs a build using the latest release's code
+# and matches the resulting checksum against the checksum of the release's asset.
+#
+# We use this regular check to be notified early if our builds are not reproducible
+# over time (due to e.g. changing or missing dependencies).
+name: Release Build Check
+
+on:
+  schedule:
+    # check build daily at 7:30
+    - cron:  '30 7 * * *'
+
+jobs:
+  # First, gather some info about the latest release, namely:
+  # * The tag name for the checkout
+  # * The checksum of the production asset
+  latest-release:
+    outputs:
+      ref: ${{ steps.release.outputs.ref }}
+      sha256: ${{ steps.release.outputs.sha256 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest release information
+        run: |
+          latest_release_ref=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/internet-identity/releases/latest | jq -cMr .tag_name)
+          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm" -o internet_identity_previous.wasm
+          latest_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm | cut -d ' ' -f1)
+          echo latest release is "$latest_release_ref"
+          echo latest release sha256 is "$latest_release_sha256"
+          echo "::set-output name=ref::$latest_release_ref"
+          echo "::set-output name=sha256::$latest_release_sha256"
+        id: release
+
+  # Then perform the build, using the release as checkout
+  clean-build:
+    runs-on: ${{ matrix.os }}
+    needs: latest-release
+    strategy:
+      matrix:
+        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, macos-12 ]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
+
+      - uses: ./.github/actions/check-build
+        with:
+          # we check that ubuntu builds match the latest release build
+          sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.sha256 || '' }}
