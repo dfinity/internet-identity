@@ -13,10 +13,11 @@ import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
+import { LoginFlowCanceled } from "../flows/login/flowResult";
 import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "./addDevice/manage";
 import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
-import { loginWithRecovery } from "./recovery/useRecovery";
+import { phraseRecoveryPage } from "./recovery/recoverWith/phrase";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -309,7 +310,7 @@ const renderDevices = async (
 type RemovalConnectionResult = Success | Failure;
 
 type Success = { kind: "success"; connection: IIConnection };
-type Failure = { kind: "failure"; loginResult: LoginResult };
+type Failure = { kind: "failure"; loginResult: LoginFlowCanceled };
 
 const getRemovalConnection = async (
   originalConnection: IIConnection,
@@ -321,9 +322,11 @@ const getRemovalConnection = async (
     deviceData.alias === "Recovery phrase";
 
   if (isProtectedRecoveryPhrase) {
-    const loginResult = await loginWithRecovery(userNumber, deviceData);
+    //const loginResult = await loginWithRecovery(userNumber, deviceData);
+    // TODO: what happens on error?
+    const loginResult = await phraseRecoveryPage(userNumber, deviceData);
 
-    if (loginResult.kind === "loginSuccess") {
+    if (loginResult.tag === "ok") {
       return {
         kind: "success",
         connection: loginResult.connection,
