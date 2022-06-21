@@ -66,6 +66,462 @@ fn registration_with_mismatched_sender_fails() {
     );
 }
 
+/// Tests related to prepare_delegation and get_delegation II canister calls.
+#[cfg(test)]
+mod delegation_tests {
+    use crate::framework::{expect_user_error_with_message, principal_1, principal_2, CallError};
+    use crate::{api, flows, framework};
+    use ic_error_types::ErrorCode::CanisterCalledTrap;
+    use ic_state_machine_tests::StateMachine;
+    use internet_identity_interface::GetDelegationResponse;
+    use regex::Regex;
+    use serde_bytes::ByteBuf;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    /// Verifies that valid delegations are issued.
+    #[test]
+    fn should_get_valid_delegation() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that non-default expirations are respected.
+    #[test]
+    fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            Some(3_600_000_000_000), // 1 hour
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(60 * 60)) // 1 hour
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that the delegations are valid at most for 30 days.
+    #[test]
+    fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64), // 31 days
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 24 * 60 * 60)) // 30 days
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that delegations can be requested in parallel.
+    #[test]
+    fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp1.com";
+        let frontend_hostname_2 = "https://dapp2.com";
+        let pub_session_key_1 = ByteBuf::from("session public key 1");
+        let pub_session_key_2 = ByteBuf::from("session public key 2");
+        let delegation_params = vec![
+            (
+                &pub_session_key_1,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_1,
+                frontend_hostname_2,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_2,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_1,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH.add(Duration::from_secs(30)),
+            ),
+        ];
+
+        let mut prepare_delegation_results = vec![];
+        for (session_key, frontend_hostname, time) in delegation_params.clone() {
+            env.set_time(time);
+            let (canister_sig_key, expiration) = api::prepare_delegation(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                frontend_hostname.to_string(),
+                session_key.clone(),
+                None,
+            )?;
+
+            assert_eq!(
+                expiration,
+                env.time()
+                    .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos() as u64
+            );
+            prepare_delegation_results.push((canister_sig_key, expiration))
+        }
+
+        for (idx, (session_key, frontend_hostname, _)) in delegation_params.iter().enumerate() {
+            let (canister_sig_key, expiration) = prepare_delegation_results.get(idx).unwrap();
+            let signed_delegation = match api::get_delegation(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                frontend_hostname.to_string(),
+                (*session_key).clone(),
+                *expiration,
+            )? {
+                GetDelegationResponse::SignedDelegation(delegation) => delegation,
+                GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+            };
+
+            framework::verify_delegation(&env, canister_sig_key.clone(), &signed_delegation);
+            assert_eq!(signed_delegation.delegation.pubkey, (*session_key).clone());
+            assert_eq!(signed_delegation.delegation.expiration, *expiration);
+        }
+        Ok(())
+    }
+
+    /// Verifies that an anchor that was registered using II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
+    #[test]
+    fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that different front-ends yield different principals.
+    #[test]
+    fn should_issue_different_principals() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp1.com";
+        let frontend_hostname_2 = "https://dapp2.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key_1, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_1.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        let (canister_sig_key_2, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_2.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        assert_ne!(canister_sig_key_1, canister_sig_key_2);
+        Ok(())
+    }
+
+    /// Verifies that there is a graceful failure if II gets upgraded between prepare_delegation and get_delegation.
+    #[test]
+    fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        // upgrade, even with the same WASM clears non-stable memory
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
+            GetDelegationResponse::NoSuchDelegation => {}
+        };
+        Ok(())
+    }
+
+    /// Verifies that there is a graceful failure if get_delegation is called after the expiration of the delegation.
+    #[test]
+    fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        env.advance_time(Duration::from_secs(30 * 60 + 1)); // one second more than delegation validity of 30 min
+
+        // we have to call prepare again, because expired signatures can only be pruned in update calls
+        api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
+            GetDelegationResponse::NoSuchDelegation => {}
+        };
+        Ok(())
+    }
+
+    /// Verifies that delegations can only be prepared by the matching user.
+    #[test]
+    fn can_not_prepare_delegation_for_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let result = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number, // belongs to principal_1
+            "https://some-dapp.com".to_string(),
+            ByteBuf::from("session key"),
+            None,
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+
+    /// Verifies that get_delegation can only be called by the matching user.
+    #[test]
+    fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        let result = api::get_delegation(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+        Ok(())
+    }
+}
+
 /// Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 #[cfg(test)]
 mod http_tests {

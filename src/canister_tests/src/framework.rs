@@ -1,12 +1,17 @@
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs};
+use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
+use ic_crypto_internal_basic_sig_iccsa::{public_key_bytes_from_der, verify};
 use ic_error_types::ErrorCode;
+use ic_interfaces::crypto::Signable;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
-use ic_types::Principal;
+use ic_types::messages::Delegation;
+use ic_types::Time;
 use internet_identity_interface as types;
-use internet_identity_interface::HeaderField;
+use internet_identity_interface::{HeaderField, SignedDelegation, UserKey};
 use lazy_static::lazy_static;
 use regex::Regex;
+use sdk_ic_types::Principal;
 use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
@@ -138,6 +143,23 @@ where
     Output: for<'a> ArgumentDecoder<'a>,
 {
     with_candid(input, |bytes| env.query(canister_id, method, bytes))
+}
+
+/// Call a canister candid query method, authenticated.
+pub fn query_candid_as<Input, Output>(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    method: &str,
+    input: Input,
+) -> Result<Output, CallError>
+where
+    Input: ArgumentEncoder,
+    Output: for<'a> ArgumentDecoder<'a>,
+{
+    with_candid(input, |bytes| {
+        env.query_as(sender, canister_id, method, bytes)
+    })
 }
 
 /// Call a canister candid method, authenticated.
@@ -292,4 +314,27 @@ upgrade-insecure-requests;$"
     )
     .unwrap()
     .is_match(csp));
+}
+
+pub fn verify_delegation(
+    env: &StateMachine,
+    user_key: UserKey,
+    signed_delegation: &SignedDelegation,
+) {
+    // transform delegation into ic typed delegation so that we have access to the signature domain separator
+    // (via as_signed_bytes)
+    let delegation = Delegation::new(
+        signed_delegation.delegation.pubkey.clone().into_vec(),
+        Time::from_nanos_since_unix_epoch(signed_delegation.delegation.expiration),
+    );
+
+    // this requires imports of internal crypto infrastructure
+    // -> extend state-machine-tests to offer the functionality instead (see L2-739)
+    verify(
+        &delegation.as_signed_bytes(),
+        SignatureBytes(signed_delegation.signature.clone().into_vec()),
+        public_key_bytes_from_der(user_key.as_ref()).unwrap(),
+        &env.root_key(),
+    )
+    .expect("signature invalid");
 }
