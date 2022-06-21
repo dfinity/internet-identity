@@ -134,10 +134,10 @@ fn decode_value<T>(encoded_value: &str) -> Result<T, ValidationError>
 where
     T: for<'a> Deserialize<'a>,
 {
-    let cert_blob = base64::decode(encoded_value).map_err(|err| MalformedCertificate {
+    let blob = base64::decode(encoded_value).map_err(|err| MalformedCertificate {
         message: format!("failed to decode base64 value: {:?}", err),
     })?;
-    serde_cbor::from_slice(&cert_blob).map_err(|err| MalformedCertificate {
+    serde_cbor::from_slice(&blob).map_err(|err| MalformedCertificate {
         message: format!("failed to decode cbor value: {:?}", err),
     })
 }
