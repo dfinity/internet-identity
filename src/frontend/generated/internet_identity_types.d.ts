@@ -127,6 +127,11 @@ export interface _SERVICE {
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
+  'update' : (
+      arg_0: UserNumber,
+      arg_1: DeviceKey,
+      arg_2: DeviceData,
+    ) => Promise<undefined>,
   'verify_tentative_device' : (arg_0: UserNumber, arg_1: string) => Promise<
       VerifyTentativeDeviceResponse
     >,

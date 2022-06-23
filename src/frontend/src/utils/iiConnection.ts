@@ -404,6 +404,7 @@ export class IIConnection {
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
+    // TODO: more consistent casing
     protection_type: DeviceData["protection_type"],
     credentialId?: ArrayBuffer
   ): Promise<void> => {
@@ -414,6 +415,27 @@ export class IIConnection {
       credential_id: credentialId
         ? [Array.from(new Uint8Array(credentialId))]
         : [],
+      key_type: keyType,
+      purpose,
+      protection_type,
+    });
+  };
+
+  update = async (
+    userNumber: UserNumber,
+    publicKey: PublicKey,
+    alias: string,
+    keyType: KeyType,
+    purpose: Purpose,
+    protection_type: DeviceData["protection_type"],
+    credentialId: [] | [CredentialId]
+  ): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.update(userNumber, publicKey, {
+      alias,
+      pubkey: publicKey,
+      // TODO; something stupid is going one with the cred id
+      credential_id: credentialId,
       key_type: keyType,
       purpose,
       protection_type,

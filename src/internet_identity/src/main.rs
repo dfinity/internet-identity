@@ -483,6 +483,51 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 }
 
 #[update]
+/// TODO: how do we deal with concurrent modifications due to stale reads?
+async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+    check_entry_limits(&device_data);
+
+    STATE.with(|s| {
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        // trap if not authenticated with device (for protected)
+
+        let is_protected_recovery_device =
+            device_data.protection_type.eq(&ProtectionType::Protected)
+                && device_data.key_type.eq(&KeyType::SeedPhrase); // TODO: why check if type is SeedPhrase?
+
+        // TODO: make sure each pubkey is unique
+        // TODO: should the canister care that there is exactly one protected device?
+
+        for e in &mut entries {
+            if e.pubkey == device_key {
+                *e = device_data.into();
+                break;
+            }
+        }
+
+        s.storage
+            .borrow()
+            .write(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to write device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+    })
+
+}
+
+#[update]
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     ensure_salt_set().await;
     STATE.with(|s| {

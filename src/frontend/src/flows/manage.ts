@@ -9,7 +9,13 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../generated/internet_identity_types";
-import { closeIcon, warningIcon } from "../components/icons";
+import {
+  closeIcon,
+  settingsIcon,
+  warningIcon,
+  shieldIcon,
+  shieldNotIcon,
+} from "../components/icons";
 import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
@@ -181,9 +187,29 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
 `;
 
 // TODO: make sure users don't use protected by default
-const deviceListItem = (alias: string) => html`
+const deviceListItem = (
+  alias: string,
+  settings: boolean,
+  shield: true | false | null
+) => html`
   <div class="deviceItemAlias">${alias}</div>
-  <button type="button" class="deviceItemRemove">${closeIcon}</button>
+  <div class="deviceItemAction">
+    ${shield === null ? "" : shield ? shieldIcon : shieldNotIcon}
+  </div>
+  ${settings
+    ? html`<button
+        type="button"
+        data-action="settings"
+        class="deviceItemAction"
+      >
+        ${settingsIcon}
+      </button>`
+    : ""}
+  ${!settings
+    ? html`<button type="button" data-action="remove" class="deviceItemAction">
+        ${closeIcon}
+      </button>`
+    : ""}
 `;
 
 const recoveryNag = () => html`
@@ -280,11 +306,42 @@ const renderDevices = async (
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
-    render(deviceListItem(device.alias), identityElement);
+    console.log(device)
+    const shield = hasOwnProperty(device.purpose, "recovery")
+      ? "protected" in device.protection_type : null;
+    console.log("shield:", shield)
+
+    const settings = hasOwnProperty(device.purpose, "recovery");
+
+    render(deviceListItem(device.alias, settings, shield), identityElement);
     const isOnlyDevice = devices.length < 2;
-    const button = identityElement.querySelector("button") as HTMLButtonElement;
-    button.onclick = () =>
-      removeDevice(userNumber, connection, device, isOnlyDevice);
+    const button = identityElement.querySelector(
+      "button[data-action=remove]"
+    ) as HTMLButtonElement;
+    if (button !== null) {
+      button.onclick = () =>
+        removeDevice(userNumber, connection, device, isOnlyDevice);
+    }
+    const buttonSettings = identityElement.querySelector(
+      "button[data-action=settings]"
+    ) as HTMLButtonElement;
+    if (buttonSettings !== null) {
+      buttonSettings.onclick = async () => {
+        // TODO: connection.update is slow, we need to show a loader or something
+        await connection.update(
+          userNumber,
+          device.pubkey,
+          device.alias,
+          device.key_type,
+          device.purpose,
+          "protected" in device.protection_type ? { "unprotected": null} : {"protected": null},
+          device.credential_id
+        );
+
+        await renderManage(userNumber, connection);
+
+      };
+    }
     hasOwnProperty(device.purpose, "recovery")
       ? recoveryList.appendChild(identityElement)
       : list.appendChild(identityElement);
