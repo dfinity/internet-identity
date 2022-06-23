@@ -180,6 +180,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${footer}
 `;
 
+// TODO: make sure users don't use protected by default
 const deviceListItem = (alias: string) => html`
   <div class="deviceItemAlias">${alias}</div>
   <button type="button" class="deviceItemRemove">${closeIcon}</button>
@@ -281,13 +282,9 @@ const renderDevices = async (
     identityElement.className = "deviceItem";
     render(deviceListItem(device.alias), identityElement);
     const isOnlyDevice = devices.length < 2;
-    bindRemoveListener(
-      userNumber,
-      connection,
-      identityElement,
-      device,
-      isOnlyDevice
-    );
+    const button = identityElement.querySelector("button") as HTMLButtonElement;
+    button.onclick = () =>
+      removeDevice(userNumber, connection, device, isOnlyDevice);
     hasOwnProperty(device.purpose, "recovery")
       ? recoveryList.appendChild(identityElement)
       : list.appendChild(identityElement);
@@ -327,7 +324,7 @@ const getRemovalConnection = async (
 
     switch (loginResult.tag) {
       case "ok":
-          return loginResult.connection;
+        return loginResult.connection;
       case "canceled":
         return null;
       default:
@@ -342,74 +339,68 @@ const getRemovalConnection = async (
 // Add listener to the "X" button, right of the device name. Performs some
 // checks before removing the device (is the user is authenticated with the
 // device to remove, or if the device is the last one).
-const bindRemoveListener = (
+const removeDevice = async (
   userNumber: bigint,
   connection: IIConnection,
-  listItem: HTMLElement,
   device: DeviceData,
   isOnlyDevice: boolean
 ) => {
-  const button = listItem.querySelector("button") as HTMLButtonElement;
-  button.onclick = async () => {
-    const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
-      .buffer as DerEncodedPublicKey;
-    const sameDevice = bufferEqual(
-      connection.identity.getPublicKey().toDer(),
-      pubKey
-    );
+  const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+    .buffer as DerEncodedPublicKey;
+  const sameDevice = bufferEqual(
+    connection.identity.getPublicKey().toDer(),
+    pubKey
+  );
 
-// TODO: show dialog _before_ entering protected phrase only, or also after?
-// update dialog to say "you will need to enter phrase"
-    if (isOnlyDevice) {
-      return alert("You can not remove your last device.");
-    } else {
-      const shouldProceed = sameDevice
-        ? confirm(
-            "This will remove your current device and you will be logged out."
-          )
-        : confirm(
-            `Do you really want to remove the ${
-              hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-            }"${device.alias}"?`
-          );
-      if (!shouldProceed) {
-        return;
-      }
+  // TODO: show dialog _before_ entering protected phrase only, or also after?
+  // update dialog to say "you will need to enter phrase"
+  if (isOnlyDevice) {
+    return alert("You can not remove your last device.");
+  } else {
+    const shouldProceed = sameDevice
+      ? confirm(
+          "This will remove your current device and you will be logged out."
+        )
+      : confirm(
+          `Do you really want to remove the ${
+            hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+          }"${device.alias}"?`
+        );
+    if (!shouldProceed) {
+      return;
     }
+  }
 
-    const removalConnection = await getRemovalConnection(
-      connection,
-      userNumber,
-      device
-    );
+  const removalConnection = await getRemovalConnection(
+    connection,
+    userNumber,
+    device
+  );
 
-    // if null then user canceled so we just redraw the manage page
-    if (removalConnection === null) {
-      renderManage(userNumber, connection);
-        return;
+  // if null then user canceled so we just redraw the manage page
+  if (removalConnection === null) {
+    renderManage(userNumber, connection);
+    return;
+  }
+
+  // Otherwise, remove identity
+  try {
+    await withLoader(() => removalConnection.remove(userNumber, device.pubkey));
+    if (sameDevice) {
+      localStorage.clear();
+      location.reload();
     }
-
-    // Otherwise, remove identity
-    try {
-      await withLoader(() =>
-        removalConnection.remove(userNumber, device.pubkey)
-      );
-      if (sameDevice) {
-        localStorage.clear();
-        location.reload();
-      }
-      renderManage(userNumber, connection);
-    } catch (err: unknown) {
-      await displayError({
-        title: "Failed to remove the device",
-        message:
-          "An unexpected error occured when trying to remove the device. Please try again",
-        detail: unknownToString(err, "Unknown error"),
-        primaryButton: "Back to Manage",
-      });
-      renderManage(userNumber, connection);
-    }
-  };
+    renderManage(userNumber, connection);
+  } catch (err: unknown) {
+    await displayError({
+      title: "Failed to remove the device",
+      message:
+        "An unexpected error occured when trying to remove the device. Please try again",
+      detail: unknownToString(err, "Unknown error"),
+      primaryButton: "Back to Manage",
+    });
+    renderManage(userNumber, connection);
+  }
 };
 
 // Whether or the user has registered a device as recovery
