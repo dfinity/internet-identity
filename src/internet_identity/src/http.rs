@@ -1,5 +1,4 @@
 use crate::{assets, AssetHashes, ContentType, ASSETS, LABEL_ASSETS, LABEL_SIG, STATE};
-use candid::{CandidType, Deserialize, Func};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
