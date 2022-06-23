@@ -352,54 +352,11 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     assertStats cid 0
     lookupIs cid 123 []
 
-  , withUpgrade $ \should_upgrade -> iiTest "register and lookup" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    assertStats cid 1
-    when should_upgrade $ doUpgrade cid
-    assertStats cid 1
-    lookupIs cid user_number [device1]
-
-  , withUpgrade $ \should_upgrade -> iiTest "register and lookup (with credential id)" $ \cid -> do
-    user_number <- register cid webauth2ID device2 >>= mustGetUserNumber
-    when should_upgrade $ doUpgrade cid
-    lookupIs cid user_number [device2]
-
-  , withUpgrade $ \should_upgrade -> iiTest "register add lookup" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    when should_upgrade $ doUpgrade cid
-    callII cid webauth1ID #add (user_number, device2)
-    when should_upgrade $ doUpgrade cid
-    lookupIs cid user_number [device1, device2]
-
-  , withUpgrade $ \should_upgrade -> iiTest "register and add with wrong user" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    when should_upgrade $ doUpgrade cid
-    callIIReject cid webauth2ID #add (user_number, device2)
-    lookupIs cid user_number [device1]
-
   , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
     queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
-
-  , withUpgrade $ \should_upgrade -> iiTest "remove()" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    lookupIs cid user_number [device1]
-    callII cid webauth1ID #add (user_number, device2)
-    lookupIs cid user_number [device1, device2]
-    -- NB: removing device that is signing this:
-    callII cid webauth1ID #remove (user_number, webauth1PK)
-    lookupIs cid user_number [device2]
-    when should_upgrade $ doUpgrade cid
-    lookupIs cid user_number [device2]
-    callII cid webauth2ID #remove (user_number, webauth2PK)
-    when should_upgrade $ doUpgrade cid
-    lookupIs cid user_number []
-    user_number2 <- register cid webauth1ID device1 >>= mustGetUserNumber
-    when should_upgrade $ doUpgrade cid
-    when (user_number == user_number2) $
-      lift $ assertFailure "Identity Anchor re-used"
 
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
