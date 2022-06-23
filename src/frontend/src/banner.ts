@@ -6,8 +6,7 @@ import { anyFeatures } from "./features";
 export const showWarningIfNecessary = (): void => {
   const officialUrl = "https://identity.ic0.app";
   if (anyFeatures()) {
-    showWarning(html`This is an insecure development version of Internet
-      Identity.
+    showWarning(html`Test only. Do not use your regular anchor!
       <a
         class="features-warning-btn"
         target="_blank"
