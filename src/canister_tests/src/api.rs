@@ -3,6 +3,7 @@ use crate::framework;
 use crate::framework::CallError;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
+use sdk_ic_types::Principal;
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
@@ -79,6 +80,23 @@ pub fn get_delegation(
         sender,
         "get_delegation",
         (user_number, frontend_hostname, session_key, timestamp),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_principal(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+) -> Result<Principal, CallError> {
+    framework::query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_principal",
+        (user_number, frontend_hostname),
     )
     .map(|(x,)| x)
 }
