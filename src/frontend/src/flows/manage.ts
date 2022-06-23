@@ -3,6 +3,7 @@ import { bufferEqual, IIConnection } from "../utils/iiConnection";
 import { withLoader } from "../components/loader";
 import { initLogout, logoutSection } from "../components/logout";
 import { navbar } from "../components/navbar";
+import { unreachable } from "../utils/utils";
 import { footer } from "../components/footer";
 import {
   DeviceData,
@@ -192,9 +193,7 @@ const recoveryNag = () => html`
       <div class="warnMessage">
         Add a recovery mechanism to help protect this Identity Anchor.
       </div>
-      <button id="addRecovery" class="primary warnButton">
-        Add Recovery Key
-      </button>
+      <button id="addRecovery" class="primary warnButton">Add Recovery</button>
     </div>
   </div>
 `;
@@ -316,32 +315,27 @@ const getRemovalConnection = async (
   originalConnection: IIConnection,
   userNumber: bigint,
   deviceData: DeviceData
-): Promise<RemovalConnectionResult> => {
+): Promise<IIConnection | null> => {
   const isProtectedRecoveryPhrase =
     "protected" in deviceData.protection_type &&
     deviceData.alias === "Recovery phrase";
 
   if (isProtectedRecoveryPhrase) {
-    //const loginResult = await loginWithRecovery(userNumber, deviceData);
     // TODO: what happens on error?
     const loginResult = await phraseRecoveryPage(userNumber, deviceData);
+    console.log("yay login result", loginResult);
 
-    if (loginResult.tag === "ok") {
-      return {
-        kind: "success",
-        connection: loginResult.connection,
-      };
-    } else {
-      return {
-        kind: "failure",
-        loginResult,
-      };
+    switch (loginResult.tag) {
+      case "ok":
+          return loginResult.connection;
+      case "canceled":
+        return null;
+      default:
+        unreachable(loginResult);
+        break;
     }
   } else {
-    return {
-      kind: "success",
-      connection: originalConnection,
-    };
+    return originalConnection;
   }
 };
 
@@ -364,17 +358,8 @@ const bindRemoveListener = (
       pubKey
     );
 
-    const removalConnectionResult = await getRemovalConnection(
-      connection,
-      userNumber,
-      device
-    );
-
-    if (removalConnectionResult.kind === "failure") {
-      renderManage(userNumber, connection);
-      return;
-    }
-
+// TODO: show dialog _before_ entering protected phrase only, or also after?
+// update dialog to say "you will need to enter phrase"
     if (isOnlyDevice) {
       return alert("You can not remove your last device.");
     } else {
@@ -392,10 +377,22 @@ const bindRemoveListener = (
       }
     }
 
+    const removalConnection = await getRemovalConnection(
+      connection,
+      userNumber,
+      device
+    );
+
+    // if null then user canceled so we just redraw the manage page
+    if (removalConnection === null) {
+      renderManage(userNumber, connection);
+        return;
+    }
+
     // Otherwise, remove identity
     try {
       await withLoader(() =>
-        removalConnectionResult.connection.remove(userNumber, device.pubkey)
+        removalConnection.remove(userNumber, device.pubkey)
       );
       if (sameDevice) {
         localStorage.clear();
