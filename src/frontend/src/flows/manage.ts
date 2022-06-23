@@ -20,7 +20,6 @@ import { displayError } from "../components/displayError";
 import { setupRecovery } from "./recovery/setupRecovery";
 import { hasOwnProperty, unknownToString } from "../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { LoginFlowCanceled } from "../flows/login/flowResult";
 import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "./addDevice/manage";
 import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
@@ -306,10 +305,11 @@ const renderDevices = async (
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
-    console.log(device)
+    console.log(device);
     const shield = hasOwnProperty(device.purpose, "recovery")
-      ? "protected" in device.protection_type : null;
-    console.log("shield:", shield)
+      ? "protected" in device.protection_type
+      : null;
+    console.log("shield:", shield);
 
     const settings = hasOwnProperty(device.purpose, "recovery");
 
@@ -334,12 +334,13 @@ const renderDevices = async (
           device.alias,
           device.key_type,
           device.purpose,
-          "protected" in device.protection_type ? { "unprotected": null} : {"protected": null},
+          "protected" in device.protection_type
+            ? { unprotected: null }
+            : { protected: null },
           device.credential_id
         );
 
         await renderManage(userNumber, connection);
-
       };
     }
     hasOwnProperty(device.purpose, "recovery")
@@ -359,11 +360,6 @@ const renderDevices = async (
     recoveryDevices.appendChild(recoveryList);
   }
 };
-
-type RemovalConnectionResult = Success | Failure;
-
-type Success = { kind: "success"; connection: IIConnection };
-type Failure = { kind: "failure"; loginResult: LoginFlowCanceled };
 
 const getRemovalConnection = async (
   originalConnection: IIConnection,
