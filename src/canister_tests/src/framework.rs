@@ -163,6 +163,7 @@ where
 }
 
 /// Call a canister candid method, authenticated.
+/// The state machine executes update calls synchronously, so there is no need to poll for the result.
 pub fn call_candid_as<Input, Output>(
     env: &StateMachine,
     canister_id: CanisterId,
@@ -179,7 +180,8 @@ where
     })
 }
 
-/// Call a canister candid method.
+/// Call a canister candid method, anonymous.
+/// The state machine executes update calls synchronously, so there is no need to poll for the result.
 pub fn call_candid<Input, Output>(
     env: &StateMachine,
     canister_id: CanisterId,

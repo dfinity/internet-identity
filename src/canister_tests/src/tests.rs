@@ -250,48 +250,53 @@ mod delegation_tests {
             ),
         ];
 
-        let mut prepare_delegation_results = vec![];
-        for (session_key, frontend_hostname, time) in delegation_params.clone() {
-            env.set_time(time);
-            let (canister_sig_key, expiration) = api::prepare_delegation(
-                &env,
-                canister_id,
-                principal_1(),
-                user_number,
-                frontend_hostname.to_string(),
-                session_key.clone(),
-                None,
-            )?;
+        // prepare multiple delegations in parallel before calling get_delegation
+        let prepare_delegation_results =
+            delegation_params
+                .into_iter()
+                .map(|(session_key, frontend_hostname, time)| {
+                    env.set_time(time);
+                    let (canister_sig_key, expiration) = api::prepare_delegation(
+                        &env,
+                        canister_id,
+                        principal_1(),
+                        user_number,
+                        frontend_hostname.to_string(),
+                        session_key.clone(),
+                        None,
+                    )
+                    .expect("prepare_delegation failed");
 
-            assert_eq!(
-                expiration,
-                env.time()
-                    .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64
-            );
-            prepare_delegation_results.push((canister_sig_key, expiration))
-        }
+                    assert_eq!(
+                        expiration,
+                        env.time()
+                            .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_nanos() as u64
+                    );
+                    (session_key, frontend_hostname, canister_sig_key, expiration)
+                });
 
-        for (idx, (session_key, frontend_hostname, _)) in delegation_params.iter().enumerate() {
-            let (canister_sig_key, expiration) = prepare_delegation_results.get(idx).unwrap();
+        for (session_key, frontend_hostname, canister_sig_key, expiration) in
+            prepare_delegation_results
+        {
             let signed_delegation = match api::get_delegation(
                 &env,
                 canister_id,
                 principal_1(),
                 user_number,
                 frontend_hostname.to_string(),
-                (*session_key).clone(),
-                *expiration,
+                session_key.clone(),
+                expiration,
             )? {
                 GetDelegationResponse::SignedDelegation(delegation) => delegation,
                 GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
             };
 
-            framework::verify_delegation(&env, canister_sig_key.clone(), &signed_delegation);
-            assert_eq!(signed_delegation.delegation.pubkey, (*session_key).clone());
-            assert_eq!(signed_delegation.delegation.expiration, *expiration);
+            framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+            assert_eq!(signed_delegation.delegation.pubkey, session_key.clone());
+            assert_eq!(signed_delegation.delegation.expiration, expiration);
         }
         Ok(())
     }
