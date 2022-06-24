@@ -1,29 +1,31 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../utils/iiConnection";
-import { withLoader } from "../components/loader";
-import { initLogout, logoutSection } from "../components/logout";
-import { navbar } from "../components/navbar";
-import { unreachable } from "../utils/utils";
-import { footer } from "../components/footer";
+import { bufferEqual, IIConnection } from "../../utils/iiConnection";
+import { withLoader } from "../../components/loader";
+import { initLogout, logoutSection } from "../../components/logout";
+import { navbar } from "../../components/navbar";
+import { unreachable } from "../../utils/utils";
+import { footer } from "../../components/footer";
+import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../generated/internet_identity_types";
+} from "../../../generated/internet_identity_types";
 import {
   closeIcon,
   settingsIcon,
   warningIcon,
   shieldIcon,
   shieldNotIcon,
-} from "../components/icons";
-import { displayError } from "../components/displayError";
-import { setupRecovery } from "./recovery/setupRecovery";
-import { hasOwnProperty, unknownToString } from "../utils/utils";
+  warningIcon2,
+} from "../../components/icons";
+import { displayError } from "../../components/displayError";
+import { setupRecovery } from "../recovery/setupRecovery";
+import { hasOwnProperty, unknownToString } from "../../utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
-import { chooseDeviceAddFlow } from "./addDevice/manage";
-import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
-import { phraseRecoveryPage } from "./recovery/recoverWith/phrase";
+import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
+import { chooseDeviceAddFlow } from "../addDevice/manage";
+import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
+import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -128,6 +130,13 @@ const style = () => html`<style>
     opacity: 1;
     transition: opacity 0.2s ease-in;
   }
+
+  .warning-unprotected:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.2s ease-in;
+
+  }
 </style> `;
 
 // Actual page content. We display the Identity Anchor and the list of
@@ -186,29 +195,19 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
 `;
 
 // TODO: make sure users don't use protected by default
+// TODO: don't offer to unprotect
+// TODO: Fix CSS of icon
 const deviceListItem = (
-  alias: string,
-  settings: boolean,
-  shield: true | false | null
+  device: DeviceData,
 ) => html`
-  <div class="deviceItemAlias">${alias}</div>
-  <div class="deviceItemAction">
-    ${shield === null ? "" : shield ? shieldIcon : shieldNotIcon}
-  </div>
-  ${settings
-    ? html`<button
-        type="button"
-        data-action="settings"
-        class="deviceItemAction"
-      >
-        ${settingsIcon}
-      </button>`
-    : ""}
-  ${!settings
-    ? html`<button type="button" data-action="remove" class="deviceItemAction">
-        ${closeIcon}
-      </button>`
-    : ""}
+  <div class="deviceItemAlias">${device.alias} ${isUnprotectedPhrase(device) ? html`<span class="warning-unprotected">${warningIcon2}<span class="tooltip">Oh dear!</span></span>` : ''}</div>
+  <button
+    type="button"
+    data-action="settings"
+    class="deviceItemAction"
+  >
+  ${settingsIcon}
+  </button>
 `;
 
 const recoveryNag = () => html`
@@ -306,14 +305,8 @@ const renderDevices = async (
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
     console.log(device);
-    const shield = hasOwnProperty(device.purpose, "recovery")
-      ? "protected" in device.protection_type
-      : null;
-    console.log("shield:", shield);
 
-    const settings = hasOwnProperty(device.purpose, "recovery");
-
-    render(deviceListItem(device.alias, settings, shield), identityElement);
+    render(deviceListItem(device), identityElement);
     const isOnlyDevice = devices.length < 2;
     const button = identityElement.querySelector(
       "button[data-action=remove]"
@@ -327,19 +320,7 @@ const renderDevices = async (
     ) as HTMLButtonElement;
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
-        // TODO: connection.update is slow, we need to show a loader or something
-        await connection.update(
-          userNumber,
-          device.pubkey,
-          device.alias,
-          device.key_type,
-          device.purpose,
-          "protected" in device.protection_type
-            ? { unprotected: null }
-            : { protected: null },
-          device.credential_id
-        );
-
+        await deviceSettings(userNumber, connection, device).catch((e) => console.log(e))
         await renderManage(userNumber, connection);
       };
     }
@@ -360,6 +341,10 @@ const renderDevices = async (
     recoveryDevices.appendChild(recoveryList);
   }
 };
+
+
+const isUnprotectedPhrase = (device: DeviceData): boolean =>
+    device.alias === "Recovery phrase" && ! ("protected" in device.protection_type);
 
 const getRemovalConnection = async (
   originalConnection: IIConnection,

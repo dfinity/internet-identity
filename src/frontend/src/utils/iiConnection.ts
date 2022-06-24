@@ -151,6 +151,7 @@ export class IIConnection {
           credential_id: [credential_id],
           key_type: { unknown: null },
           purpose: { authentication: null },
+          // TODO: this should really be 'protected' | 'unprotected'
           protection_type: { unprotected: null },
         },
         challengeResult

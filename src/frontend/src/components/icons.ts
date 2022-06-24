@@ -249,3 +249,8 @@ export const shieldNotIcon = html`
     />
   </svg>
 `;
+//
+// source: https://fonts.google.com/icons?selected=Material%20Symbols%20Outlined%3Awarning%3AFILL%401%3Bwght%40400%3BGRAD%400%3Bopsz%4024
+export const warningIcon2 = html`
+<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24"><path d="M1 21 12 2 23 21ZM11 15H13V10H11ZM12 18Q12.425 18 12.713 17.712Q13 17.425 13 17Q13 16.575 12.713 16.288Q12.425 16 12 16Q11.575 16 11.288 16.288Q11 16.575 11 17Q11 17.425 11.288 17.712Q11.575 18 12 18Z"/></svg>
+`;
