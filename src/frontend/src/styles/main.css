@@ -146,11 +146,6 @@ summary::marker {
   content: none;
 }
 
-summary .faq__question-summary-text {
-  display: list-item;
-  list-style-position: outside;
-}
-
 button {
   border: 1px solid var(--grey-200);
   background: var(--background-color);
@@ -434,7 +429,9 @@ nav {
 }
 
 .faq__question-summary-text {
-  margin-left: 1rem;
+  display: list-item;
+  list-style-position: outside;
+  padding-left: 1rem;
 }
 
 .faq__title {
