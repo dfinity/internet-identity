@@ -93,21 +93,86 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let mut devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices.len(), 2);
         assert!(devices.iter().any(|device| device == &device_data_1()));
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
-        let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
-        assert_eq!(anchor_info.devices.len(), 2);
-        assert!(anchor_info
-            .devices
-            .iter()
-            .any(|device| device == &device_data_1()));
-        assert!(anchor_info
-            .devices
-            .iter()
-            .any(|device| device == &device_data_2()));
+        let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
+
+        // sort devices to not fail on different orderings
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        assert_eq!(devices, anchor_info.devices);
+        Ok(())
+    }
+
+    /// Verifies that the same device cannot be added twice.
+    #[test]
+    fn should_not_add_existing_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_1(), // this device was already added during registration
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Device already added\\.").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Verifies that the devices cannot be added for other users.
+    #[test]
+    fn should_not_add_device_for_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            device_data_1(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+
+    /// Verifies that a new device can be added to anchors that were registered using the previous II release.
+    #[test]
+    fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 2);
+        assert!(devices.iter().any(|device| device == &device_data_2()));
         Ok(())
     }
 
@@ -187,53 +252,6 @@ mod device_management_tests {
         );
     }
 
-    /// Verifies that the same device cannot be added twice.
-    #[test]
-    fn should_not_add_existing_device() -> Result<(), CallError> {
-        let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-        let user_number = flows::register_anchor(&env, canister_id);
-
-        let result = api::add(
-            &env,
-            canister_id,
-            principal_1(),
-            user_number,
-            device_data_1(), // this device was already added during registration
-        );
-
-        expect_user_error_with_message(
-            result,
-            CanisterCalledTrap,
-            Regex::new("Device already added\\.").unwrap(),
-        );
-        Ok(())
-    }
-
-    /// Verifies that the devices cannot be added for other users.
-    #[test]
-    fn should_not_add_device_for_different_user() {
-        let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
-        let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
-
-        let result = api::add(
-            &env,
-            canister_id,
-            principal_1(),
-            user_number_2,
-            device_data_1(),
-        );
-
-        expect_user_error_with_message(
-            result,
-            CanisterCalledTrap,
-            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-        );
-    }
-
     /// Verifies that a device can be removed if it has been added using the previous II release.
     #[test]
     fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
@@ -264,28 +282,6 @@ mod device_management_tests {
         let devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
-        Ok(())
-    }
-
-    /// Verifies that a new device can be added to anchors that were registered using the previous II release.
-    #[test]
-    fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
-        let env = StateMachine::new();
-        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
-        let user_number = flows::register_anchor(&env, canister_id);
-
-        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
-        api::add(
-            &env,
-            canister_id,
-            principal_1(),
-            user_number,
-            device_data_2(),
-        )?;
-
-        let devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices.len(), 2);
-        assert!(devices.iter().any(|device| device == &device_data_2()));
         Ok(())
     }
 
