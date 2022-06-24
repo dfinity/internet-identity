@@ -87,17 +87,34 @@ pub fn lookup(
     env: &StateMachine,
     canister_id: CanisterId,
     user_number: types::UserNumber,
-) -> Vec<types::DeviceData> {
-    match framework::call_candid_as(
+) -> Result<Vec<types::DeviceData>, CallError> {
+    framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+}
+
+pub fn add(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_data: types::DeviceData,
+) -> Result<(), CallError> {
+    framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+}
+
+pub fn remove(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_key: types::PublicKey,
+) -> Result<(), CallError> {
+    framework::call_candid_as(
         env,
         canister_id,
-        framework::principal_1(),
-        "lookup",
-        (user_number,),
-    ) {
-        Ok((r,)) => r,
-        Err(e) => panic!("Failed to lookup: {:?}", e),
-    }
+        sender,
+        "remove",
+        (user_number, device_key),
+    )
 }
 
 pub fn get_anchor_info(
