@@ -302,15 +302,19 @@ mod device_management_tests {
     }
 }
 
-/// Tests related to prepare_delegation and get_delegation II canister calls.
+/// Tests related to prepare_delegation, get_delegation and get_principal II canister calls.
 #[cfg(test)]
 mod delegation_tests {
-    use crate::framework::{expect_user_error_with_message, principal_1, principal_2, CallError};
+    use crate::framework::{
+        device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+        CallError,
+    };
     use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::GetDelegationResponse;
     use regex::Regex;
+    use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
     use std::ops::Add;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -760,6 +764,121 @@ mod delegation_tests {
             Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
         );
         Ok(())
+    }
+
+    /// Verifies that get_principal and prepare_delegation return the same principal.
+    #[test]
+    fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        let principal = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+        )?;
+        assert_eq!(Principal::self_authenticating(canister_sig_key), principal);
+        Ok(())
+    }
+
+    /// Verifies that get_principal returns different principals for different front end host names.
+    #[test]
+    fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp-1.com";
+        let frontend_hostname_2 = "https://dapp-2.com";
+
+        let dapp_principal_1 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_1.to_string(),
+        )?;
+
+        let dapp_principal_2 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_2.to_string(),
+        )?;
+
+        assert_ne!(dapp_principal_1, dapp_principal_2);
+        Ok(())
+    }
+
+    /// Verifies that get_principal returns different principals for different anchors.
+    #[test]
+    fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number_1 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let frontend_hostname = "https://dapp-1.com";
+
+        let dapp_principal_1 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_1,
+            frontend_hostname.to_string(),
+        )?;
+
+        let dapp_principal_2 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            frontend_hostname.to_string(),
+        )?;
+
+        assert_ne!(dapp_principal_1, dapp_principal_2);
+        Ok(())
+    }
+
+    /// Verifies that get_principal requires authentication.
+    #[test]
+    fn should_not_allow_get_principal_for_other_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+        let frontend_hostname_1 = "https://dapp-1.com";
+
+        let result = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            frontend_hostname_1.to_string(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated\\.").unwrap(),
+        );
     }
 }
 

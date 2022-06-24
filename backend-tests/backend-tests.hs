@@ -352,12 +352,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     assertStats cid 0
     lookupIs cid 123 []
 
-  , withUpgrade $ \should_upgrade -> iiTest "register and get principal with wrong user" $ \cid -> do
-    queryIIReject cid webauth2ID #get_principal (10000, "front.end.com")
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    when should_upgrade $ doUpgrade cid
-    queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
-
   , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
     s <- queryII cid dummyUserId #stats ()
     lift $ s .! #assigned_user_number_range @?= (100, 103)
