@@ -524,7 +524,6 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
-
 }
 
 #[update]
