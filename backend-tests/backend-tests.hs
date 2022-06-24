@@ -286,30 +286,6 @@ lookupIs cid user_number ds = do
 addTS :: (a, b, c, d) -> e -> (a, b, c, e)
 addTS (a,b,c, _) ts = (a,b,c,ts)
 
-getAndValidate :: HasCallStack => Blob -> Blob -> Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
-getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts = do
-  sd <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts) >>= \case
-    V.IsJust (V.Label :: Label "signed_delegation") sd -> return sd
-    V.IsJust (V.Label :: Label "no_such_delegation") () ->
-        liftIO $ assertFailure "Got unexpected no_such_delegation"
-    _ -> error "unreachable"
-  let delegation = sd .! #delegation
-  let sig = sd .! #signature
-  lift $ delegation .! #pubkey @?= sessionPK
-
-  root_key <- gets $ toPublicKey . secretRootKey
-  case verify root_key "ic-request-auth-delegation" userPK (delegationHash delegation) sig of
-    Left err -> liftIO $ assertFailure $ T.unpack err
-    Right () -> return ()
-
-getButNotThere :: HasCallStack => Blob -> EntityId -> (Word64, T.Text, Blob, Maybe Word64) -> Word64 -> M ()
-getButNotThere cid webauth1ID delegationArgs ts = do
-  queryII cid webauth1ID #get_delegation (addTS delegationArgs ts) >>= \case
-    V.IsJust (V.Label :: Label "signed_delegation") _ ->
-        liftIO $ assertFailure "Unexpected delegation"
-    V.IsJust (V.Label :: Label "no_such_delegation") () -> return ()
-    _ -> error "unreachable"
-
 assertStats :: HasCallStack => Blob -> Word64 -> M()
 assertStats cid expUsers = do
   s <- queryII cid dummyUserId #stats ()
@@ -369,13 +345,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     return ()
   , withoutUpgrade $ iiTest "installs and upgrade" $ \ cid ->
     doUpgrade cid
-  , withoutUpgrade $ iiTest "get delegation without authorization" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    (_, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    queryIIRejectWith cid dummyUserId #get_delegation (addTS delegationArgs ts) "[a-z0-9-]+ could not be authenticated"
 
   , withUpgrade $ \should_upgrade -> iiTest "lookup on fresh" $ \cid -> do
     assertStats cid 0
@@ -413,124 +382,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
     when should_upgrade $ doUpgrade cid
     queryIIReject cid webauth2ID #get_principal (user_number, "front.end.com")
-
-  , withUpgrade $ \should_upgrade -> iiTest "get delegation and validate" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    -- prepare delegation
-    (userPK, ts) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    ts <- if should_upgrade
-      then do
-        doUpgrade cid
-        -- after upgrade, no signature is available
-        V.IsJust (V.Label :: Label "no_such_delegation") ()
-          <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts)
-        -- so request it again
-        (userPK', ts') <- callII cid webauth1ID #prepare_delegation delegationArgs
-        lift $ userPK' @?= userPK
-        return ts'
-      else return ts
-
-    V.IsJust (V.Label :: Label "signed_delegation") sd
-      <- queryII cid webauth1ID #get_delegation (addTS delegationArgs ts)
-    let delegation = sd .! #delegation
-    let sig = sd .! #signature
-    lift $ delegation .! #pubkey @?= sessionPK
-
-    root_key <- gets $ toPublicKey . secretRootKey
-    case verify root_key "ic-request-auth-delegation" userPK (delegationHash delegation) sig of
-      Left err -> liftIO $ assertFailure $ T.unpack err
-      Right () -> return ()
-
-  , withUpgrade $ \should_upgrade -> iiTest "get delegation with wrong user" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    when should_upgrade $ do
-      doUpgrade cid
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    callIIRejectWith cid webauth2ID #prepare_delegation delegationArgs "[a-z0-9-]+ could not be authenticated."
-
-  , withUpgrade $ \should_upgrade -> iiTest "get multiple delegations and validate" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    -- request a few delegations
-    (userPK, ts1) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-
-    (userPK, ts2) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
-
-    when should_upgrade $ do
-      doUpgrade cid
-
-    (userPK, ts3) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
-
-    (userPK, ts4) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-    unless should_upgrade $ getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
-
-  , withoutUpgrade $ iiTest "get multiple delegations and expire" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (user_number, "front.end.com", sessionPK, Nothing)
-    -- request a few delegations
-    (userPK, ts1) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-
-    setCanisterTimeTo cid (30*1000_000_000)
-    (userPK, ts2) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
-
-    setCanisterTimeTo cid (70*1000_000_000)
-    (userPK, ts3) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getButNotThere cid webauth1ID delegationArgs ts1
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
-
-    setCanisterTimeTo cid (120*1000_000_000)
-    (userPK, ts4) <- callII cid webauth1ID #prepare_delegation delegationArgs
-    getButNotThere cid webauth1ID delegationArgs ts1
-    getButNotThere cid webauth1ID delegationArgs ts2
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts3
-    getAndValidate cid sessionPK userPK webauth1ID delegationArgs ts4
-
-  , withUpgrade $ \should_upgrade -> iiTest "user identities differ" $ \cid -> do
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs1 = (user_number, "front.end.com", sessionPK, Nothing)
-    (user1PK, _exp) <- callII cid webauth1ID #prepare_delegation delegationArgs1
-    Principal user1Principal <- queryII cid webauth1ID #get_principal (user_number, "front.end.com")
-    lift $ user1Principal @?= mkSelfAuthenticatingId user1PK
-
-    when should_upgrade $ do
-      doUpgrade cid
-
-    let delegationArgs2 = (user_number, "other-front.end.com", sessionPK, Nothing)
-    (user2PK, _exp) <- callII cid webauth1ID #prepare_delegation delegationArgs2
-    Principal user2Principal <- queryII cid webauth1ID #get_principal (user_number, "other-front.end.com")
-    lift $ user2Principal @?= mkSelfAuthenticatingId user2PK
-
-    when (user1PK == user2PK) $
-      lift $ assertFailure "User identities coincide for different frontends"
 
   , withUpgrade $ \should_upgrade -> iiTest "remove()" $ \cid -> do
     user_number <- register cid webauth1ID device1 >>= mustGetUserNumber

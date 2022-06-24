@@ -41,6 +41,48 @@ pub fn register(
     .map(|(x,)| x)
 }
 
+pub fn prepare_delegation(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+    session_key: types::SessionKey,
+    max_time_to_live: Option<u64>,
+) -> Result<(types::UserKey, types::Timestamp), CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "prepare_delegation",
+        (
+            user_number,
+            frontend_hostname,
+            session_key,
+            max_time_to_live,
+        ),
+    )
+}
+
+pub fn get_delegation(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+    session_key: types::SessionKey,
+    timestamp: u64,
+) -> Result<types::GetDelegationResponse, CallError> {
+    framework::query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_delegation",
+        (user_number, frontend_hostname, session_key, timestamp),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn lookup(
     env: &StateMachine,
     canister_id: CanisterId,
