@@ -3,6 +3,7 @@ use crate::framework;
 use crate::framework::CallError;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
+use sdk_ic_types::Principal;
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
@@ -41,21 +42,97 @@ pub fn register(
     .map(|(x,)| x)
 }
 
+pub fn prepare_delegation(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+    session_key: types::SessionKey,
+    max_time_to_live: Option<u64>,
+) -> Result<(types::UserKey, types::Timestamp), CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "prepare_delegation",
+        (
+            user_number,
+            frontend_hostname,
+            session_key,
+            max_time_to_live,
+        ),
+    )
+}
+
+pub fn get_delegation(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+    session_key: types::SessionKey,
+    timestamp: u64,
+) -> Result<types::GetDelegationResponse, CallError> {
+    framework::query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_delegation",
+        (user_number, frontend_hostname, session_key, timestamp),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_principal(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    frontend_hostname: types::FrontendHostname,
+) -> Result<Principal, CallError> {
+    framework::query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_principal",
+        (user_number, frontend_hostname),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn lookup(
     env: &StateMachine,
     canister_id: CanisterId,
     user_number: types::UserNumber,
-) -> Vec<types::DeviceData> {
-    match framework::call_candid_as(
+) -> Result<Vec<types::DeviceData>, CallError> {
+    framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+}
+
+pub fn add(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_data: types::DeviceData,
+) -> Result<(), CallError> {
+    framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+}
+
+pub fn remove(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_key: types::PublicKey,
+) -> Result<(), CallError> {
+    framework::call_candid_as(
         env,
         canister_id,
-        framework::principal_1(),
-        "lookup",
-        (user_number,),
-    ) {
-        Ok((r,)) => r,
-        Err(e) => panic!("Failed to lookup: {:?}", e),
-    }
+        sender,
+        "remove",
+        (user_number, device_key),
+    )
 }
 
 pub fn get_anchor_info(

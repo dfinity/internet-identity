@@ -28,7 +28,7 @@ fn ii_upgrade_retains_anchors() {
     let user_number = flows::register_anchor(&env, canister_id);
     framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
-    let retrieved_device_data = api::lookup(&env, canister_id, user_number);
+    let retrieved_device_data = api::lookup(&env, canister_id, user_number).expect("lookup failed");
 
     assert_eq!(retrieved_device_data, vec![device_data_1()]);
 }
@@ -64,6 +64,822 @@ fn registration_with_mismatched_sender_fails() {
         ErrorCode::CanisterCalledTrap,
         Regex::new("[a-z0-9-]+ could not be authenticated against").unwrap(),
     );
+}
+
+/// Tests related to local device management (add, remove, lookup, get_anchor_info).
+/// Tests for the 'add remote device flow' are in the module [remote_device_registration_tests].
+#[cfg(test)]
+mod device_management_tests {
+    use crate::framework::{
+        device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+        CallError,
+    };
+    use crate::{api, flows, framework};
+    use ic_error_types::ErrorCode::CanisterCalledTrap;
+    use ic_state_machine_tests::StateMachine;
+    use regex::Regex;
+
+    /// Verifies that a new device can be added.
+    #[test]
+    fn should_add_additional_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        let mut devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 2);
+        assert!(devices.iter().any(|device| device == &device_data_1()));
+        assert!(devices.iter().any(|device| device == &device_data_2()));
+
+        let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
+
+        // sort devices to not fail on different orderings
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        assert_eq!(devices, anchor_info.devices);
+        Ok(())
+    }
+
+    /// Verifies that the same device cannot be added twice.
+    #[test]
+    fn should_not_add_existing_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_1(), // this device was already added during registration
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Device already added\\.").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Verifies that the devices cannot be added for other users.
+    #[test]
+    fn should_not_add_device_for_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            device_data_1(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+
+    /// Verifies that a new device can be added to anchors that were registered using the previous II release.
+    #[test]
+    fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 2);
+        assert!(devices.iter().any(|device| device == &device_data_2()));
+        Ok(())
+    }
+
+    /// Verifies that a device can be removed.
+    #[test]
+    fn should_remove_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert!(devices.iter().any(|device| device == &device_data_2()));
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2().pubkey,
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 1);
+        assert!(!devices.iter().any(|device| device == &device_data_2()));
+        Ok(())
+    }
+
+    /// Verifies that the even last device can be removed.
+    /// This behaviour should be changed because it makes anchors unusable, see L2-745.
+    #[test]
+    fn should_remove_last_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_1().pubkey,
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert!(devices.is_empty());
+        Ok(())
+    }
+
+    /// Verifies that users can only remove their own devices.
+    #[test]
+    fn should_not_remove_device_of_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+
+        let result = api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            device_data_2().pubkey,
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+
+    /// Verifies that a device can be removed if it has been added using the previous II release.
+    #[test]
+    fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert!(devices.iter().any(|device| device == &device_data_2()));
+
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2().pubkey,
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 1);
+        assert!(!devices.iter().any(|device| device == &device_data_2()));
+        Ok(())
+    }
+
+    /// Verifies that get_anchor_info requires authentication.
+    #[test]
+    fn should_not_allow_get_anchor_info_for_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let result = api::get_anchor_info(&env, canister_id, principal_2(), user_number);
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+}
+
+/// Tests related to prepare_delegation, get_delegation and get_principal II canister calls.
+#[cfg(test)]
+mod delegation_tests {
+    use crate::framework::{
+        device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+        CallError,
+    };
+    use crate::{api, flows, framework};
+    use ic_error_types::ErrorCode::CanisterCalledTrap;
+    use ic_state_machine_tests::StateMachine;
+    use internet_identity_interface::GetDelegationResponse;
+    use regex::Regex;
+    use sdk_ic_types::Principal;
+    use serde_bytes::ByteBuf;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    /// Verifies that valid delegations are issued.
+    #[test]
+    fn should_get_valid_delegation() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that non-default expirations are respected.
+    #[test]
+    fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            Some(3_600_000_000_000), // 1 hour
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(60 * 60)) // 1 hour
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that the delegations are valid at most for 30 days.
+    #[test]
+    fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64), // 31 days
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 24 * 60 * 60)) // 30 days
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that delegations can be requested in parallel.
+    #[test]
+    fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp1.com";
+        let frontend_hostname_2 = "https://dapp2.com";
+        let pub_session_key_1 = ByteBuf::from("session public key 1");
+        let pub_session_key_2 = ByteBuf::from("session public key 2");
+        let delegation_params = vec![
+            (
+                &pub_session_key_1,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_1,
+                frontend_hostname_2,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_2,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH,
+            ),
+            (
+                &pub_session_key_1,
+                frontend_hostname_1,
+                SystemTime::UNIX_EPOCH.add(Duration::from_secs(30)),
+            ),
+        ];
+
+        // prepare multiple delegations in parallel before calling get_delegation
+        let prepare_delegation_results =
+            delegation_params
+                .into_iter()
+                .map(|(session_key, frontend_hostname, time)| {
+                    env.set_time(time);
+                    let (canister_sig_key, expiration) = api::prepare_delegation(
+                        &env,
+                        canister_id,
+                        principal_1(),
+                        user_number,
+                        frontend_hostname.to_string(),
+                        session_key.clone(),
+                        None,
+                    )
+                    .expect("prepare_delegation failed");
+
+                    assert_eq!(
+                        expiration,
+                        env.time()
+                            .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_nanos() as u64
+                    );
+                    (session_key, frontend_hostname, canister_sig_key, expiration)
+                });
+
+        for (session_key, frontend_hostname, canister_sig_key, expiration) in
+            prepare_delegation_results
+        {
+            let signed_delegation = match api::get_delegation(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                frontend_hostname.to_string(),
+                session_key.clone(),
+                expiration,
+            )? {
+                GetDelegationResponse::SignedDelegation(delegation) => delegation,
+                GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+            };
+
+            framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+            assert_eq!(signed_delegation.delegation.pubkey, session_key.clone());
+            assert_eq!(signed_delegation.delegation.expiration, expiration);
+        }
+        Ok(())
+    }
+
+    /// Verifies that an anchor that was registered using II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
+    #[test]
+    fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        let (canister_sig_key, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        assert_eq!(
+            expiration,
+            env.time()
+                .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
+
+        let signed_delegation = match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(delegation) => delegation,
+            GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+        };
+
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
+        assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+        assert_eq!(signed_delegation.delegation.expiration, expiration);
+        Ok(())
+    }
+
+    /// Verifies that different front-ends yield different principals.
+    #[test]
+    fn should_issue_different_principals() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp1.com";
+        let frontend_hostname_2 = "https://dapp2.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key_1, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_1.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        let (canister_sig_key_2, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_2.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        assert_ne!(canister_sig_key_1, canister_sig_key_2);
+        Ok(())
+    }
+
+    /// Verifies that there is a graceful failure if II gets upgraded between prepare_delegation and get_delegation.
+    #[test]
+    fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        // upgrade, even with the same WASM clears non-stable memory
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
+            GetDelegationResponse::NoSuchDelegation => {}
+        };
+        Ok(())
+    }
+
+    /// Verifies that there is a graceful failure if get_delegation is called after the expiration of the delegation.
+    #[test]
+    fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        env.advance_time(Duration::from_secs(30 * 60 + 1)); // one second more than delegation validity of 30 min
+
+        // we have to call prepare again, because expired signatures can only be pruned in update calls
+        api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        match api::get_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        )? {
+            GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
+            GetDelegationResponse::NoSuchDelegation => {}
+        };
+        Ok(())
+    }
+
+    /// Verifies that delegations can only be prepared by the matching user.
+    #[test]
+    fn can_not_prepare_delegation_for_different_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let result = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number, // belongs to principal_1
+            "https://some-dapp.com".to_string(),
+            ByteBuf::from("session key"),
+            None,
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+    }
+
+    /// Verifies that get_delegation can only be called by the matching user.
+    #[test]
+    fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (_, expiration) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+        let result = api::get_delegation(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            expiration,
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Verifies that get_principal and prepare_delegation return the same principal.
+    #[test]
+    fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname = "https://some-dapp.com";
+        let pub_session_key = ByteBuf::from("session public key");
+
+        let (canister_sig_key, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            pub_session_key.clone(),
+            None,
+        )?;
+
+        let principal = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+        )?;
+        assert_eq!(Principal::self_authenticating(canister_sig_key), principal);
+        Ok(())
+    }
+
+    /// Verifies that get_principal returns different principals for different front end host names.
+    #[test]
+    fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let frontend_hostname_1 = "https://dapp-1.com";
+        let frontend_hostname_2 = "https://dapp-2.com";
+
+        let dapp_principal_1 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_1.to_string(),
+        )?;
+
+        let dapp_principal_2 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname_2.to_string(),
+        )?;
+
+        assert_ne!(dapp_principal_1, dapp_principal_2);
+        Ok(())
+    }
+
+    /// Verifies that get_principal returns different principals for different anchors.
+    #[test]
+    fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number_1 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let frontend_hostname = "https://dapp-1.com";
+
+        let dapp_principal_1 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_1,
+            frontend_hostname.to_string(),
+        )?;
+
+        let dapp_principal_2 = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            frontend_hostname.to_string(),
+        )?;
+
+        assert_ne!(dapp_principal_1, dapp_principal_2);
+        Ok(())
+    }
+
+    /// Verifies that get_principal requires authentication.
+    #[test]
+    fn should_not_allow_get_principal_for_other_user() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+        let frontend_hostname_1 = "https://dapp-1.com";
+
+        let result = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number_2,
+            frontend_hostname_1.to_string(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated\\.").unwrap(),
+        );
+    }
 }
 
 /// Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
