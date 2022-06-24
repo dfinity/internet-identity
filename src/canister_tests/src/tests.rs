@@ -833,23 +833,23 @@ mod delegation_tests {
         let user_number_1 =
             flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
         let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
-        let frontend_hostname_1 = "https://dapp-1.com";
+            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        let frontend_hostname = "https://dapp-1.com";
 
         let dapp_principal_1 = api::get_principal(
             &env,
             canister_id,
             principal_1(),
             user_number_1,
-            frontend_hostname_1.to_string(),
+            frontend_hostname.to_string(),
         )?;
 
         let dapp_principal_2 = api::get_principal(
             &env,
             canister_id,
-            principal_2(),
+            principal_1(),
             user_number_2,
-            frontend_hostname_1.to_string(),
+            frontend_hostname.to_string(),
         )?;
 
         assert_ne!(dapp_principal_1, dapp_principal_2);
@@ -858,7 +858,7 @@ mod delegation_tests {
 
     /// Verifies that get_principal requires authentication.
     #[test]
-    fn should_not_allow_get_anchor_for_other_user() {
+    fn should_not_allow_get_principal_for_other_user() {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
