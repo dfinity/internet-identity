@@ -1,3 +1,4 @@
+use crate::flows;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs};
 use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
@@ -329,6 +330,12 @@ pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
     let metric_timestamp = SystemTime::UNIX_EPOCH
         + Duration::from_millis(metric_capture.get(2).unwrap().as_str().parse().unwrap());
     (metric, metric_timestamp)
+}
+
+pub fn assert_metric(env: &StateMachine, canister_id: CanisterId, metric: &str, expected: u64) {
+    let metrics = flows::get_metrics(env, canister_id);
+    let (value, _) = parse_metric(&metrics, metric);
+    assert_eq!(value, expected);
 }
 
 pub fn verify_delegation(

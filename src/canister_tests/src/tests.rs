@@ -886,7 +886,9 @@ mod delegation_tests {
 #[cfg(test)]
 mod http_tests {
     use crate::certificate_validation::validate_certification;
-    use crate::framework::{device_data_1, device_data_2, principal_1, principal_2, CallError};
+    use crate::framework::{
+        assert_metric, device_data_1, device_data_2, principal_1, principal_2, CallError,
+    };
     use crate::{api, flows, framework};
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{ChallengeAttempt, HttpRequest};
@@ -1009,31 +1011,24 @@ mod http_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
+        assert_metric(&env, canister_id, "internet_identity_user_count", 0);
         for count in 0..2 {
-            let metrics = flows::get_metrics(&env, canister_id);
-
-            let (user_count, _) = framework::parse_metric(&metrics, "internet_identity_user_count");
-            assert_eq!(user_count, count);
-
             flows::register_anchor(&env, canister_id);
+            assert_metric(&env, canister_id, "internet_identity_user_count", count + 1);
         }
         Ok(())
     }
 
     /// Verifies that the signature count metric is updated correctly.
     #[test]
-    fn metrics_signature_count_should_increase_after_prepare_delegation() -> Result<(), CallError> {
+    fn metrics_signature_count() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let frontend_hostname = "https://some-dapp.com";
         let user_number = flows::register_anchor(&env, canister_id);
 
+        assert_metric(&env, canister_id, "internet_identity_signature_count", 0);
         for count in 0..3 {
-            let metrics = flows::get_metrics(&env, canister_id);
-            let (signature_count, _) =
-                framework::parse_metric(&metrics, "internet_identity_signature_count");
-            assert_eq!(signature_count, count);
-
             api::prepare_delegation(
                 &env,
                 canister_id,
@@ -1043,11 +1038,18 @@ mod http_tests {
                 ByteBuf::from(format!("session key {}", count)),
                 None,
             )?;
+
+            assert_metric(
+                &env,
+                canister_id,
+                "internet_identity_signature_count",
+                count + 1,
+            );
         }
 
         // long after expiry (we don't want this test to break, if we change the default delegation expiration)
         env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
-        // preparing a new delegation prunes old ones
+        // we need to make an update call to prune expired delegations
         api::prepare_delegation(
             &env,
             canister_id,
@@ -1097,27 +1099,34 @@ mod http_tests {
         // immediately upgrade because installing the canister does not set the metric
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
-        for _ in 0..2 {
-            let metrics = flows::get_metrics(&env, canister_id);
-            let (upgrade_timestamp, _) =
-                framework::parse_metric(&metrics, "internet_identity_last_upgrade_timestamp");
-            assert_eq!(
-                upgrade_timestamp,
-                env.time()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64
-            );
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_last_upgrade_timestamp",
+            env.time()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64,
+        );
 
-            env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
-            framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
-        }
+        env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_last_upgrade_timestamp",
+            env.time()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64,
+        );
         Ok(())
     }
 
     /// Verifies that the inflight challenges metric is updated correctly.
     #[test]
-    fn metrics_inflight_challenges_should_update_after_create_challenge() -> Result<(), CallError> {
+    fn metrics_inflight_challenges() -> Result<(), CallError> {
         let env = StateMachine::new();
         // advance time so that time calculation for captcha validity (now - CAPTCHA_CHALLENGE_LIFETIME) does not overflow
         env.advance_time(Duration::from_secs(3600));
@@ -1168,7 +1177,7 @@ mod http_tests {
 
     /// Verifies that the users in registration mode metric is updated correctly.
     #[test]
-    fn metrics_device_registration_mode_should_update_correctly() -> Result<(), CallError> {
+    fn metrics_device_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number_1 = flows::register_anchor(&env, canister_id);
