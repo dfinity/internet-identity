@@ -5,7 +5,7 @@ use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::call;
-use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap, print};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use internet_identity::signature_map::SignatureMap;
@@ -414,6 +414,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         ));
     }
 
+    // TODO: check that only recovery phrases can be protected
     ensure_salt_set().await;
 
     STATE.with(|s| {
@@ -451,6 +452,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        let device_protected = device_data.protection_type.eq(&ProtectionType::Protected);
 
         if entries
             .iter()
@@ -483,9 +485,13 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 }
 
 #[update]
-/// TODO: how do we deal with concurrent modifications due to stale reads?
 async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+    // TODO: check that protected iff seedphrase
     check_entry_limits(&device_data);
+    if(device_key != device_data.pubkey) {
+        trap("device key may not be updated");
+    }
+        // TODO: make sure device_key matches new device pubkey
 
     STATE.with(|s| {
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
@@ -496,21 +502,23 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
         });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-        // trap if not authenticated with device (for protected)
 
-        let is_protected_recovery_device =
-            device_data.protection_type.eq(&ProtectionType::Protected)
-                && device_data.key_type.eq(&KeyType::SeedPhrase); // TODO: why check if type is SeedPhrase?
 
-        // TODO: make sure each pubkey is unique
-        // TODO: should the canister care that there is exactly one protected device?
+        let index = entries.iter().position(|e| e.pubkey == device_key).unwrap(); // TODO: trap
+        let e = entries.get_mut(index).unwrap();
 
-        for e in &mut entries {
-            if e.pubkey == device_key {
-                *e = device_data.into();
-                break;
-            }
-        }
+
+        // Run appropriate checks for protected devices
+        match e.protection_type {
+            None => (),
+            Some(ProtectionType::Unprotected) => (),
+            Some(ProtectionType::Protected) => {
+                // TODO: error message should mention "protected"
+                trap_if_not_authenticated(std::iter::once(&e.pubkey))
+            },
+        };
+
+        *e = device_data.into();
 
         s.storage
             .borrow()
@@ -542,19 +550,19 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
-            let entry_to_remove = entries.get(i as usize).unwrap();
+            let e = entries.get(i).unwrap();
 
-            if entry_to_remove.key_type.is_some()
-                && entry_to_remove.key_type.as_ref().unwrap() == &KeyType::SeedPhrase
-                && entry_to_remove.protection_type.is_some()
-                && entry_to_remove.protection_type.as_ref().unwrap() == &ProtectionType::Protected
-            {
-                if caller() != Principal::self_authenticating(entry_to_remove.pubkey.clone()) {
-                    trap("failed to remove protected recovery phrase");
-                }
+            // Run appropriate checks for protected devices
+            match e.protection_type {
+                None => (),
+                Some(ProtectionType::Unprotected) => (),
+                Some(ProtectionType::Protected) => {
+                    // TODO: error message could mention "protected"
+                    trap_if_not_authenticated(std::iter::once(&e.pubkey))
+                },
             }
 
-            entries.swap_remove(i as usize);
+            entries.remove(i);
         }
 
         s.storage

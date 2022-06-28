@@ -176,6 +176,169 @@ mod device_management_tests {
         Ok(())
     }
 
+    #[cfg(test)]
+    mod update {
+
+        use ic_error_types::ErrorCode::CanisterCalledTrap;
+        use regex::Regex;
+        use internet_identity_interface as types;
+        use crate::framework::{expect_user_error_with_message};
+        use crate::framework::{
+            device_data_1, principal_1,
+            device_data_2, principal_2,
+            PUBKEY_2,
+            CallError,
+        };
+        use crate::{api, flows, framework};
+        use ic_state_machine_tests::StateMachine;
+        use serde_bytes::ByteBuf;
+
+        #[test]
+        fn should_update_device() -> Result<(), CallError> {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let principal = principal_1();
+            let mut device = device_data_1();
+
+            let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
+
+            let devices = api::lookup(&env, canister_id, user_number)?;
+            assert_eq!(devices, vec![device.clone()]);
+
+            device.alias.push_str("oh foo");
+
+            api::update(&env, canister_id, principal, user_number, device.clone().pubkey, device.clone())?;
+
+            let devices = api::lookup(&env, canister_id, user_number)?;
+            assert_eq!(devices, vec![device]);
+
+            Ok(())
+        }
+
+        /// Verifies that the device key (i.e. the device ID) cannot be updated
+        #[test]
+        fn should_not_modify_pubkey() {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let principal = principal_1();
+            let mut device = device_data_1();
+
+            let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
+
+            let original_pubkey = device.pubkey;
+            let pubkey_2 = ByteBuf::from(PUBKEY_2);
+            assert!(original_pubkey != pubkey_2);
+            device.pubkey = pubkey_2;
+
+            let result = api::update(&env, canister_id, principal, user_number, original_pubkey, device.clone());
+
+            expect_user_error_with_message(
+                result,
+                CanisterCalledTrap,
+                Regex::new("device key may not be updated").unwrap(),
+                );
+        }
+
+        /// Verifies that users can only update their own devices.
+        #[test]
+        fn should_not_update_device_of_different_user() {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+            let user_number_2 =
+                flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+
+            let result = api::update(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number_2,
+                device_data_2().pubkey,
+                device_data_2(),
+                );
+
+            expect_user_error_with_message(
+                result,
+                CanisterCalledTrap,
+                Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+                );
+        }
+
+        /// Verifies that unprotected devices can only be updated from themselves
+        #[test]
+        fn should_not_update_protected_with_different_device() {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let mut device1 = device_data_1();
+            device1.protection_type = types::ProtectionType::Protected;
+            // TODO: key type should be seedphrase
+
+            let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+
+            api::add(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                device_data_2(),
+                ).unwrap();
+
+            let result = api::update(
+                &env,
+                canister_id,
+                principal_2(),
+                user_number,
+                device1.pubkey.clone(),
+                device1.clone(), // data here doesnt' actually matter
+                );
+
+            expect_user_error_with_message(
+                result,
+                CanisterCalledTrap,
+                Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+                );
+        }
+
+        /// Verifies that unprotected devices can only be updated from themselves,
+        /// even if the authenticated device itself is protected
+        #[test]
+        fn should_not_update_protected_with_different_protected_device() {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let mut device1 = device_data_1();
+            device1.protection_type = types::ProtectionType::Protected;
+            // TODO key type seedphrase
+            let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+
+            let mut device2 = device_data_2();
+            device2.protection_type = types::ProtectionType::Protected;
+            device2.key_type = types::KeyType::SeedPhrase;
+
+            api::add(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                device2
+                ).unwrap();
+
+            let result = api::update(
+                &env,
+                canister_id,
+                principal_2(),
+                user_number,
+                device1.pubkey.clone(),
+                device1.clone(), // data here doesnt' actually matter
+                );
+
+            expect_user_error_with_message(
+                result,
+                CanisterCalledTrap,
+                Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+                );
+        }
+    }
+
     /// Verifies that a device can be removed.
     #[test]
     fn should_remove_device() -> Result<(), CallError> {

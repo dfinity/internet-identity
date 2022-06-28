@@ -61,7 +61,7 @@ export const deviceSettings = async (
   connection: IIConnection,
   device: DeviceData
 ): Promise<void> => {
-    // TODO: re-fetch device here
+    // TODO: re-fetch device here?
   const container = document.getElementById("pageContent") as HTMLElement;
 
   const isProtected = hasOwnProperty(device.purpose, "recovery") && "protected" in device.protection_type;

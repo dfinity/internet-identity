@@ -119,6 +119,17 @@ pub fn add(
     framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
 }
 
+pub fn update(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_key: types::PublicKey,
+    device_data: types::DeviceData,
+) -> Result<(), CallError> {
+    framework::call_candid_as(env, canister_id, sender, "update", (user_number, device_key, device_data))
+}
+
 pub fn remove(
     env: &StateMachine,
     canister_id: CanisterId,
