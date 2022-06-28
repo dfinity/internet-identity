@@ -414,7 +414,6 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         ));
     }
 
-    // TODO: check that only recovery phrases can be protected
     ensure_salt_set().await;
 
     STATE.with(|s| {
@@ -509,8 +508,10 @@ fn mutate_device_or_trap(
         None => (),
         Some(ProtectionType::Unprotected) => (),
         Some(ProtectionType::Protected) => {
-            // TODO: error message should mention "protected"
-            trap_if_not_authenticated(std::iter::once(&e.pubkey))
+            // If the call is not authenticated with the device to mutate, abort
+            if caller() != Principal ::self_authenticating(&e.pubkey)  {
+                trap("Must be authenticated with protected device to mutate");
+            }
         }
     };
 

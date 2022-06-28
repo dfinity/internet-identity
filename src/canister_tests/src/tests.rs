@@ -202,7 +202,7 @@ mod device_management_tests {
             let devices = api::lookup(&env, canister_id, user_number)?;
             assert_eq!(devices, vec![device.clone()]);
 
-            device.alias.push_str("oh foo");
+            device.alias.push_str("some suffix");
 
             api::update(
                 &env,
@@ -282,7 +282,7 @@ mod device_management_tests {
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let mut device1 = device_data_1();
             device1.protection_type = types::ProtectionType::Protected;
-            // TODO: key type should be seedphrase
+            device1.key_type = types::KeyType::SeedPhrase;
 
             let user_number =
                 flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
@@ -308,7 +308,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+                Regex::new("Must be authenticated with protected device to mutate").unwrap(),
             );
         }
 
@@ -320,7 +320,7 @@ mod device_management_tests {
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let mut device1 = device_data_1();
             device1.protection_type = types::ProtectionType::Protected;
-            // TODO key type seedphrase
+            device1.key_type = types::KeyType::SeedPhrase;
             let user_number =
                 flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
@@ -342,7 +342,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+                Regex::new("Must be authenticated with protected device to mutate").unwrap(),
             );
         }
     }
