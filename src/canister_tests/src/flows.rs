@@ -1,8 +1,11 @@
-use crate::api::{create_challenge, register};
+use crate::api::{create_challenge, http_request, register};
 use crate::framework::{device_data_1, principal_1};
 use ic_state_machine_tests::{CanisterId, StateMachine};
 use ic_types::PrincipalId;
-use internet_identity_interface::{ChallengeAttempt, DeviceData, RegisterResponse, UserNumber};
+use internet_identity_interface::{
+    ChallengeAttempt, DeviceData, HttpRequest, RegisterResponse, UserNumber,
+};
+use serde_bytes::ByteBuf;
 
 pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> UserNumber {
     register_anchor_with(env, canister_id, principal_1(), device_data_1())
@@ -29,4 +32,19 @@ pub fn register_anchor_with(
         response => panic!("could not register: {:?}", response),
     };
     user_number
+}
+
+pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
+    let response = http_request(
+        &env,
+        canister_id,
+        HttpRequest {
+            method: "GET".to_string(),
+            url: "/metrics".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+        },
+    )
+    .expect("HTTP request to /metrics failed");
+    String::from_utf8_lossy(&*response.body).to_string()
 }

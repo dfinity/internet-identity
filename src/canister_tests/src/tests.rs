@@ -886,11 +886,14 @@ mod delegation_tests {
 #[cfg(test)]
 mod http_tests {
     use crate::certificate_validation::validate_certification;
-    use crate::framework::CallError;
-    use crate::{api, framework};
+    use crate::framework::{
+        assert_metric, device_data_1, device_data_2, principal_1, principal_2, CallError,
+    };
+    use crate::{api, flows, framework};
     use ic_state_machine_tests::StateMachine;
-    use internet_identity_interface::HttpRequest;
+    use internet_identity_interface::{ChallengeAttempt, HttpRequest};
     use serde_bytes::ByteBuf;
+    use std::time::{Duration, SystemTime};
 
     /// Verifies that expected assets are delivered, certified and have security headers.
     #[test]
@@ -953,6 +956,269 @@ mod http_tests {
             .expect(&format!("validation for asset \"{}\" failed", asset));
             framework::verify_security_headers(&http_response.headers);
         }
+        Ok(())
+    }
+
+    /// Verifies that all expected metrics are available via the HTTP endpoint.
+    #[test]
+    fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
+        let metrics = vec![
+            "internet_identity_user_count",
+            "internet_identity_min_user_number",
+            "internet_identity_max_user_number",
+            "internet_identity_signature_count",
+            "internet_identity_stable_memory_pages",
+            "internet_identity_last_upgrade_timestamp",
+            "internet_identity_inflight_challenges",
+            "internet_identity_users_in_registration_mode",
+        ];
+        let env = StateMachine::new();
+        env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let metrics_body = flows::get_metrics(&env, canister_id);
+        for metric in metrics {
+            let (_, metric_timestamp) = framework::parse_metric(&metrics_body, metric);
+            assert_eq!(
+                metric_timestamp,
+                env.time(),
+                "metric timestamp did not match state machine time"
+            )
+        }
+        Ok(())
+    }
+
+    /// Verifies that the metrics list the expected user range.
+    #[test]
+    fn metrics_should_list_expected_user_range() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let metrics = flows::get_metrics(&env, canister_id);
+
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
+        assert_eq!(min_user_number, 10_000);
+        assert_eq!(max_user_number, 3_784_872);
+        Ok(())
+    }
+
+    /// Verifies that the user count metric is updated correctly.
+    #[test]
+    fn metrics_user_count_should_increase_after_register() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        assert_metric(&env, canister_id, "internet_identity_user_count", 0);
+        for count in 0..2 {
+            flows::register_anchor(&env, canister_id);
+            assert_metric(&env, canister_id, "internet_identity_user_count", count + 1);
+        }
+        Ok(())
+    }
+
+    /// Verifies that the signature count metric is updated correctly.
+    #[test]
+    fn metrics_signature_count() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let frontend_hostname = "https://some-dapp.com";
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        assert_metric(&env, canister_id, "internet_identity_signature_count", 0);
+        for count in 0..3 {
+            api::prepare_delegation(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                frontend_hostname.to_string(),
+                ByteBuf::from(format!("session key {}", count)),
+                None,
+            )?;
+
+            assert_metric(
+                &env,
+                canister_id,
+                "internet_identity_signature_count",
+                count + 1,
+            );
+        }
+
+        // long after expiry (we don't want this test to break, if we change the default delegation expiration)
+        env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
+        // we need to make an update call to prune expired delegations
+        api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            ByteBuf::from("last session key"),
+            None,
+        )?;
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (signature_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_signature_count");
+        assert_eq!(signature_count, 1); // old ones pruned and a new one created
+        Ok(())
+    }
+
+    /// Verifies that the stable memory pages count metric is updated correctly.
+    #[test]
+    fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (signature_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        // empty II has some metadata in stable memory which requires at least one page
+        assert_eq!(signature_count, 1);
+
+        // a wasm page is 64kb and a single user takes up 2kb -> 32 users require a complete wasm page
+        for _ in 0..32 {
+            flows::register_anchor(&env, canister_id);
+        }
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (signature_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        assert_eq!(signature_count, 2);
+        Ok(())
+    }
+
+    /// Verifies that the last II wasm upgrade timestamp is updated correctly.
+    #[test]
+    fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        // immediately upgrade because installing the canister does not set the metric
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_last_upgrade_timestamp",
+            env.time()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64,
+        );
+
+        env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_last_upgrade_timestamp",
+            env.time()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64,
+        );
+        Ok(())
+    }
+
+    /// Verifies that the inflight challenges metric is updated correctly.
+    #[test]
+    fn metrics_inflight_challenges() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        // advance time so that time calculation for captcha validity (now - CAPTCHA_CHALLENGE_LIFETIME) does not overflow
+        env.advance_time(Duration::from_secs(3600));
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
+        assert_eq!(challenge_count, 0);
+
+        let challenge_1 = api::create_challenge(&env, canister_id);
+        api::create_challenge(&env, canister_id);
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
+        assert_eq!(challenge_count, 2);
+
+        // solving a challenge removes it from the inflight pool
+        api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge_1.challenge_key,
+            },
+        )?;
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
+        assert_eq!(challenge_count, 1);
+
+        // long after expiry (we don't want this test to break, if we change the captcha expiration)
+        env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
+        // the only call that prunes expired captchas
+        api::create_challenge(&env, canister_id);
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
+        assert_eq!(challenge_count, 1); // 1 pruned due to expiry, but also one created
+
+        Ok(())
+    }
+
+    /// Verifies that the users in registration mode metric is updated correctly.
+    #[test]
+    fn metrics_device_registration_mode() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number_1 = flows::register_anchor(&env, canister_id);
+        let user_number_2 = flows::register_anchor(&env, canister_id);
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+        assert_eq!(challenge_count, 0);
+
+        api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
+        api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_2)?;
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+        assert_eq!(challenge_count, 2);
+
+        api::exit_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+        assert_eq!(challenge_count, 1);
+
+        // long after expiry (we don't want this test to break, if we change the registration mode expiration)
+        env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
+        // make an update call related to tentative devices so that registration mode expiry gets checked
+        api::add_tentative_device(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number_2,
+            device_data_2(),
+        )?;
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+        assert_eq!(challenge_count, 0);
+
         Ok(())
     }
 }

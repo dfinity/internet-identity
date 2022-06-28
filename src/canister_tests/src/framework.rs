@@ -1,3 +1,4 @@
+use crate::flows;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs};
 use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
@@ -15,6 +16,7 @@ use sdk_ic_types::Principal;
 use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
+use std::time::{Duration, SystemTime};
 
 /* The first few lines deal with actually getting the Wasm module(s) to test */
 
@@ -316,6 +318,24 @@ upgrade-insecure-requests;$"
     )
     .unwrap()
     .is_match(csp));
+}
+
+pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
+    let metric_capture = Regex::new(&format!("(?m)^{} (\\d+) (\\d+)$", metric))
+        .unwrap()
+        .captures(body)
+        .expect(&format!("metric {} not found", metric));
+
+    let metric: u64 = metric_capture.get(1).unwrap().as_str().parse().unwrap();
+    let metric_timestamp = SystemTime::UNIX_EPOCH
+        + Duration::from_millis(metric_capture.get(2).unwrap().as_str().parse().unwrap());
+    (metric, metric_timestamp)
+}
+
+pub fn assert_metric(env: &StateMachine, canister_id: CanisterId, metric: &str, expected: u64) {
+    let metrics = flows::get_metrics(env, canister_id);
+    let (value, _) = parse_metric(&metrics, metric);
+    assert_eq!(value, expected);
 }
 
 pub fn verify_delegation(

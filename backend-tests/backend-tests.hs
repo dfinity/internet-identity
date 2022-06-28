@@ -301,24 +301,6 @@ mustGetUserNumber response = case V.view #registered response of
   Just r -> return (r .! #user_number)
   Nothing -> liftIO $ assertFailure $ "expected to get 'registered' response, got " ++ show response
 
-mustParseMetrics :: HasCallStack => HttpResponse -> M MetricsRepository
-mustParseMetrics resp =
-  case parseMetricsFromText bodyText of
-    Left err -> liftIO $ assertFailure $ printf "failed to parse metrics from text, error: %s, input: %s" err bodyText
-    Right metrics -> return metrics
-  where
-    bodyText = T.decodeUtf8 $ BS.toStrict $ resp .! #body
-
-assertMetric :: HasCallStack => MetricsRepository -> MetricName -> MetricValue -> M ()
-assertMetric repo name expectedValue =
-  case lookupMetric repo name of
-    Left err ->
-      liftIO $ assertFailure $ printf "failed to lookup metric %s: %s, repository: %s" name err (show repo)
-    Right (actualValue, _) ->
-      if expectedValue /= actualValue
-      then liftIO $ assertFailure $ printf "the value of metric %s expected to be %f but actually was %f" name expectedValue actualValue
-      else return ()
-
 assertRightS :: MonadIO m  => Either String a -> m a
 assertRightS (Left e) = liftIO $ assertFailure e
 assertRightS (Right x) = pure x
@@ -381,29 +363,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     lift $ s .! #assigned_user_number_range @?= (100, 100)
     response <- register cid webauth1ID device1
     assertVariant #canister_full response
-
-  , withUpgrade $ \should_upgrade -> iiTest "metrics endpoint" $ \cid -> do
-    _ <- register cid webauth2ID device2 >>= mustGetUserNumber
-    metrics <- callII cid webauth2ID #http_request (httpGet "/metrics") >>= mustParseMetrics
-
-    assertMetric metrics "internet_identity_user_count" 1.0
-    assertMetric metrics "internet_identity_signature_count" 0.0
-    assertMetric metrics "internet_identity_users_in_registration_mode" 0.0
-
-    when should_upgrade $ doUpgrade cid
-
-    userNumber <- register cid webauth1ID device1 >>= mustGetUserNumber
-    let sessionSK = createSecretKeyEd25519 "hohoho"
-    let sessionPK = toPublicKey sessionSK
-    let delegationArgs = (userNumber, "front.end.com", sessionPK, Nothing)
-    _ <- callII cid webauth1ID #prepare_delegation delegationArgs
-    _ <- callII cid webauth1ID #enter_device_registration_mode userNumber
-
-    metrics <- callII cid webauth1ID #http_request (httpGet "/metrics") >>= mustParseMetrics
-
-    assertMetric metrics "internet_identity_user_count" 2.0
-    assertMetric metrics "internet_identity_signature_count" 1.0
-    assertMetric metrics "internet_identity_users_in_registration_mode" 1.0
 
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence
