@@ -447,10 +447,12 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        for e in entries.iter_mut() {
-            if e.pubkey == device_data.pubkey {
-                trap("Device already added.");
-            }
+        if entries
+            .iter()
+            .find(|e| e.pubkey == device_data.pubkey)
+            .is_some()
+        {
+            trap("Device already added.");
         }
 
         if entries.len() >= MAX_ENTRIES_PER_USER {
