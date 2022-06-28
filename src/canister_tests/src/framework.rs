@@ -229,14 +229,31 @@ where
     }
 }
 
-pub fn expect_user_error_with_message<T>(
+pub fn expect_user_error_with_message<T: std::fmt::Debug>(
     result: Result<T, CallError>,
     error_code: ErrorCode,
     message_pattern: Regex,
 ) {
-    assert!(matches!(result,
-            Err(CallError::UserError(user_error)) if user_error.code() == error_code &&
-            message_pattern.is_match(user_error.description())));
+    match result {
+        Ok(_) => panic!("expected error, got {:?}", result),
+        Err(CallError::Reject(_)) => panic!("expected user error, got {:?}", result),
+        Err(CallError::UserError(ref user_error)) => {
+            if !(user_error.code() == error_code) {
+                panic!(
+                    "expected error code {:?}, got {:?}",
+                    error_code,
+                    user_error.code()
+                );
+            }
+            if !message_pattern.is_match(user_error.description()) {
+                panic!(
+                    "expected #{:?}, got {:?}",
+                    message_pattern,
+                    user_error.description()
+                );
+            }
+        }
+    }
 }
 
 pub fn verify_security_headers(headers: &Vec<HeaderField>) {
