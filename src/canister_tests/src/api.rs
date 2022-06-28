@@ -127,7 +127,13 @@ pub fn update(
     device_key: types::PublicKey,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(env, canister_id, sender, "update", (user_number, device_key, device_data))
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "update",
+        (user_number, device_key, device_data),
+    )
 }
 
 pub fn remove(

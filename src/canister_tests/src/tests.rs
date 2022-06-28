@@ -179,18 +179,15 @@ mod device_management_tests {
     #[cfg(test)]
     mod update {
 
-        use ic_error_types::ErrorCode::CanisterCalledTrap;
-        use regex::Regex;
-        use internet_identity_interface as types;
-        use crate::framework::{expect_user_error_with_message};
+        use crate::framework::expect_user_error_with_message;
         use crate::framework::{
-            device_data_1, principal_1,
-            device_data_2, principal_2,
-            PUBKEY_2,
-            CallError,
+            device_data_1, device_data_2, principal_1, principal_2, CallError, PUBKEY_2,
         };
         use crate::{api, flows, framework};
+        use ic_error_types::ErrorCode::CanisterCalledTrap;
         use ic_state_machine_tests::StateMachine;
+        use internet_identity_interface as types;
+        use regex::Regex;
         use serde_bytes::ByteBuf;
 
         #[test]
@@ -207,7 +204,14 @@ mod device_management_tests {
 
             device.alias.push_str("oh foo");
 
-            api::update(&env, canister_id, principal, user_number, device.clone().pubkey, device.clone())?;
+            api::update(
+                &env,
+                canister_id,
+                principal,
+                user_number,
+                device.clone().pubkey,
+                device.clone(),
+            )?;
 
             let devices = api::lookup(&env, canister_id, user_number)?;
             assert_eq!(devices, vec![device]);
@@ -230,13 +234,20 @@ mod device_management_tests {
             assert!(original_pubkey != pubkey_2);
             device.pubkey = pubkey_2;
 
-            let result = api::update(&env, canister_id, principal, user_number, original_pubkey, device.clone());
+            let result = api::update(
+                &env,
+                canister_id,
+                principal,
+                user_number,
+                original_pubkey,
+                device.clone(),
+            );
 
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
                 Regex::new("device key may not be updated").unwrap(),
-                );
+            );
         }
 
         /// Verifies that users can only update their own devices.
@@ -255,13 +266,13 @@ mod device_management_tests {
                 user_number_2,
                 device_data_2().pubkey,
                 device_data_2(),
-                );
+            );
 
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
                 Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-                );
+            );
         }
 
         /// Verifies that unprotected devices can only be updated from themselves
@@ -273,7 +284,8 @@ mod device_management_tests {
             device1.protection_type = types::ProtectionType::Protected;
             // TODO: key type should be seedphrase
 
-            let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+            let user_number =
+                flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
             api::add(
                 &env,
@@ -281,7 +293,8 @@ mod device_management_tests {
                 principal_1(),
                 user_number,
                 device_data_2(),
-                ).unwrap();
+            )
+            .unwrap();
 
             let result = api::update(
                 &env,
@@ -290,13 +303,13 @@ mod device_management_tests {
                 user_number,
                 device1.pubkey.clone(),
                 device1.clone(), // data here doesnt' actually matter
-                );
+            );
 
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
                 Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-                );
+            );
         }
 
         /// Verifies that unprotected devices can only be updated from themselves,
@@ -308,19 +321,14 @@ mod device_management_tests {
             let mut device1 = device_data_1();
             device1.protection_type = types::ProtectionType::Protected;
             // TODO key type seedphrase
-            let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+            let user_number =
+                flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
             let mut device2 = device_data_2();
             device2.protection_type = types::ProtectionType::Protected;
             device2.key_type = types::KeyType::SeedPhrase;
 
-            api::add(
-                &env,
-                canister_id,
-                principal_1(),
-                user_number,
-                device2
-                ).unwrap();
+            api::add(&env, canister_id, principal_1(), user_number, device2).unwrap();
 
             let result = api::update(
                 &env,
@@ -329,13 +337,13 @@ mod device_management_tests {
                 user_number,
                 device1.pubkey.clone(),
                 device1.clone(), // data here doesnt' actually matter
-                );
+            );
 
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
                 Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-                );
+            );
         }
     }
 
