@@ -9,7 +9,7 @@ use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, W
 use ic_types::messages::Delegation;
 use ic_types::Time;
 use internet_identity_interface as types;
-use internet_identity_interface::{HeaderField, SignedDelegation, UserKey};
+use internet_identity_interface::{HeaderField, InternetIdentityInit, SignedDelegation, UserKey};
 use lazy_static::lazy_static;
 use regex::Regex;
 use sdk_ic_types::Principal;
@@ -85,9 +85,15 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
 /* Here are a few useful helpers for writing tests */
 
 pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    let nulls = vec![IDLValue::Null; 1];
-    let args = IDLArgs::new(&nulls);
-    let byts = args.to_bytes().unwrap();
+    install_ii_canister_with_arg(&env, wasm, None)
+}
+
+pub fn install_ii_canister_with_arg(
+    env: &StateMachine,
+    wasm: Vec<u8>,
+    arg: Option<InternetIdentityInit>,
+) -> CanisterId {
+    let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
     env.install_canister(wasm, byts, None).unwrap()
 }
 

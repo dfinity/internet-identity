@@ -23,9 +23,11 @@ pub fn http_request(
     framework::query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
 }
 
-pub fn create_challenge(env: &StateMachine, canister_id: CanisterId) -> types::Challenge {
-    let (c,) = framework::call_candid(env, canister_id, "create_challenge", ()).unwrap();
-    c
+pub fn create_challenge(
+    env: &StateMachine,
+    canister_id: CanisterId,
+) -> Result<types::Challenge, CallError> {
+    framework::call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
 }
 
 pub fn register(

@@ -17,7 +17,7 @@ pub fn register_anchor_with(
     sender: PrincipalId,
     device_data: &DeviceData,
 ) -> UserNumber {
-    let challenge = create_challenge(&env, canister_id);
+    let challenge = create_challenge(&env, canister_id).expect("challenge creation failed");
     let user_number = match register(
         &env,
         canister_id,
