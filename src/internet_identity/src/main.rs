@@ -98,11 +98,6 @@ struct InternetIdentityStats {
     users_registered: u64,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct InternetIdentityInit {
-    assigned_user_number_range: (UserNumber, UserNumber),
-}
-
 type AssetHashes = RbTree<&'static str, Hash>;
 
 struct TentativeDeviceRegistration {
