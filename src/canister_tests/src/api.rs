@@ -29,7 +29,7 @@ pub fn register(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
-    device_data: types::DeviceData,
+    device_data: &types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
 ) -> Result<types::RegisterResponse, CallError> {
     framework::call_candid_as(

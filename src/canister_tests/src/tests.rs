@@ -52,7 +52,7 @@ fn registration_with_mismatched_sender_fails() {
         &env,
         canister_id,
         principal_2(),
-        device_data_1(),
+        &device_data_1(),
         types::ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
@@ -135,9 +135,9 @@ mod device_management_tests {
     fn should_not_add_device_for_different_user() {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+            flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
 
         let result = api::add(
             &env,
@@ -233,9 +233,9 @@ mod device_management_tests {
     fn should_not_remove_device_of_different_user() {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+            flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
 
         let result = api::remove(
             &env,
@@ -831,9 +831,9 @@ mod delegation_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number_1 =
-            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let frontend_hostname = "https://dapp-1.com";
 
         let dapp_principal_1 = api::get_principal(
@@ -861,9 +861,9 @@ mod delegation_tests {
     fn should_not_allow_get_principal_for_other_user() {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-        flows::register_anchor_with(&env, canister_id, principal_1(), device_data_1());
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
-            flows::register_anchor_with(&env, canister_id, principal_2(), device_data_2());
+            flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
         let frontend_hostname_1 = "https://dapp-1.com";
 
         let result = api::get_principal(
@@ -1150,7 +1150,7 @@ mod http_tests {
             &env,
             canister_id,
             principal_1(),
-            device_data_1(),
+            &device_data_1(),
             ChallengeAttempt {
                 chars: "a".to_string(),
                 key: challenge_1.challenge_key,

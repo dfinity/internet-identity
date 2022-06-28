@@ -8,14 +8,14 @@ use internet_identity_interface::{
 use serde_bytes::ByteBuf;
 
 pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> UserNumber {
-    register_anchor_with(env, canister_id, principal_1(), device_data_1())
+    register_anchor_with(env, canister_id, principal_1(), &device_data_1())
 }
 
 pub fn register_anchor_with(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
-    device_data: DeviceData,
+    device_data: &DeviceData,
 ) -> UserNumber {
     let challenge = create_challenge(&env, canister_id);
     let user_number = match register(
