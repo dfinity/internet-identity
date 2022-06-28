@@ -159,3 +159,8 @@ pub struct HttpResponse {
     pub body: Cow<'static, Bytes>,
     pub streaming_strategy: Option<StreamingStrategy>,
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct InternetIdentityInit {
+    pub assigned_user_number_range: (UserNumber, UserNumber),
+}
