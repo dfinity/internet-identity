@@ -460,12 +460,6 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
             trap("Device already added.");
         }
 
-        // Right now we only allow protecting recovery phrases; in the future we may
-        // extend this to all devices.
-        if device_protected && !device_data.key_type.eq(&KeyType::SeedPhrase) {
-            trap("Only recovery phrases can be protected");
-        }
-
         if entries.len() >= MAX_ENTRIES_PER_USER {
             trap(&format!(
                 "at most {} authentication information entries are allowed per user",
@@ -509,7 +503,7 @@ fn mutate_device_or_trap(
         Some(ProtectionType::Unprotected) => (),
         Some(ProtectionType::Protected) => {
             // If the call is not authenticated with the device to mutate, abort
-            if caller() != Principal ::self_authenticating(&e.pubkey)  {
+            if caller() != Principal::self_authenticating(&e.pubkey) {
                 trap("Must be authenticated with protected device to mutate");
             }
         }
