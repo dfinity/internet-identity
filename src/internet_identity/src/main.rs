@@ -492,9 +492,11 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 /// Replace or remove an existing device.
 ///
 /// NOTE: all mutable operations should call this function because it deals with protected stuff
-fn mutate_device_or_trap(entries: &mut Vec<DeviceDataInternal>, device_key: DeviceKey, new_value: Option<DeviceData>)
-{
-
+fn mutate_device_or_trap(
+    entries: &mut Vec<DeviceDataInternal>,
+    device_key: DeviceKey,
+    new_value: Option<DeviceData>,
+) {
     let index = match entries.iter().position(|e| e.pubkey == device_key) {
         None => trap("aie aie aie"),
         Some(index) => index,
@@ -512,16 +514,15 @@ fn mutate_device_or_trap(entries: &mut Vec<DeviceDataInternal>, device_key: Devi
         }
     };
 
-
     match new_value {
         Some(device_data) => {
             *e = device_data.into();
-        },
+        }
         None => {
-        // NOTE: we void the more efficient remove_swap to ensure device ordering
-        // is not changed
+            // NOTE: we void the more efficient remove_swap to ensure device ordering
+            // is not changed
             entries.remove(index);
-        },
+        }
     }
 }
 
@@ -1148,13 +1149,16 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device(device_data: &DeviceData) {
-
     check_entry_limits(device_data);
 
-    if device_data.protection_type == ProtectionType::Protected && device_data.key_type != KeyType::SeedPhrase {
-        trap(&format!("Only recovery phrases can be protected but key type is {:?}", device_data.key_type));
+    if device_data.protection_type == ProtectionType::Protected
+        && device_data.key_type != KeyType::SeedPhrase
+    {
+        trap(&format!(
+            "Only recovery phrases can be protected but key type is {:?}",
+            device_data.key_type
+        ));
     }
-
 }
 
 fn check_entry_limits(device_data: &DeviceData) {
