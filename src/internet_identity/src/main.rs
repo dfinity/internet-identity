@@ -5,7 +5,7 @@ use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::call;
-use ic_cdk::api::{caller, data_certificate, id, print, set_certified_data, time, trap};
+use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use internet_identity::signature_map::SignatureMap;
@@ -404,7 +404,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         return RegisterResponse::BadChallenge;
     }
 
-    check_entry_limits(&device_data);
+    check_device(&device_data);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
         ic_cdk::trap(&format!(
@@ -439,7 +439,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
 async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
-    check_entry_limits(&device_data);
+    check_device(&device_data);
 
     ensure_salt_set().await;
 
@@ -452,7 +452,6 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-        let device_protected = device_data.protection_type.eq(&ProtectionType::Protected);
 
         if entries
             .iter()
@@ -467,7 +466,6 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         if device_protected && !device_data.key_type.eq(&KeyType::SeedPhrase) {
             trap("Only recovery phrases can be protected");
         }
-
 
         if entries.len() >= MAX_ENTRIES_PER_USER {
             trap(&format!(
@@ -491,14 +489,48 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
     })
 }
 
+/// Replace or remove an existing device.
+///
+/// NOTE: all mutable operations should call this function because it deals with protected stuff
+fn mutate_device_or_trap(entries: &mut Vec<DeviceDataInternal>, device_key: DeviceKey, new_value: Option<DeviceData>)
+{
+
+    let index = match entries.iter().position(|e| e.pubkey == device_key) {
+        None => trap("aie aie aie"),
+        Some(index) => index,
+    };
+
+    let e = entries.get_mut(index).unwrap();
+
+    // Run appropriate checks for protected devices
+    match e.protection_type {
+        None => (),
+        Some(ProtectionType::Unprotected) => (),
+        Some(ProtectionType::Protected) => {
+            // TODO: error message should mention "protected"
+            trap_if_not_authenticated(std::iter::once(&e.pubkey))
+        }
+    };
+
+
+    match new_value {
+        Some(device_data) => {
+            *e = device_data.into();
+        },
+        None => {
+        // NOTE: we void the more efficient remove_swap to ensure device ordering
+        // is not changed
+            entries.remove(index);
+        },
+    }
+}
+
 #[update]
 async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
-    // TODO: check that protected iff seedphrase
-    check_entry_limits(&device_data);
-    if (device_key != device_data.pubkey) {
+    check_device(&device_data);
+    if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
-    // TODO: make sure device_key matches new device pubkey
 
     STATE.with(|s| {
         let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
@@ -510,20 +542,7 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        let index = entries.iter().position(|e| e.pubkey == device_key).unwrap(); // TODO: trap
-        let e = entries.get_mut(index).unwrap();
-
-        // Run appropriate checks for protected devices
-        match e.protection_type {
-            None => (),
-            Some(ProtectionType::Unprotected) => (),
-            Some(ProtectionType::Protected) => {
-                // TODO: error message should mention "protected"
-                trap_if_not_authenticated(std::iter::once(&e.pubkey))
-            }
-        };
-
-        *e = device_data.into();
+        mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
         s.storage
             .borrow()
@@ -554,21 +573,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
-            let e = entries.get(i).unwrap();
-
-            // Run appropriate checks for protected devices
-            match e.protection_type {
-                None => (),
-                Some(ProtectionType::Unprotected) => (),
-                Some(ProtectionType::Protected) => {
-                    // TODO: error message could mention "protected"
-                    trap_if_not_authenticated(std::iter::once(&e.pubkey))
-                }
-            }
-
-            entries.remove(i);
-        }
+        mutate_device_or_trap(&mut entries, device_key, None);
 
         s.storage
             .borrow()
@@ -1132,6 +1137,24 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
         }
     }
     ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+}
+
+/// This checks some device invariants, in particular:
+///   * Sizes of various fields do not exceed limits
+///   * Only recovery phrases can be protected
+///
+///  Otherwise, trap.
+///
+///  NOTE: while in the future we may lift this restriction, for now we do ensure that
+///  protected devices are limited to recovery phrases, which the webapp expects.
+fn check_device(device_data: &DeviceData) {
+
+    check_entry_limits(device_data);
+
+    if device_data.protection_type == ProtectionType::Protected && device_data.key_type != KeyType::SeedPhrase {
+        trap(&format!("Only recovery phrases can be protected but key type is {:?}", device_data.key_type));
+    }
+
 }
 
 fn check_entry_limits(device_data: &DeviceData) {
