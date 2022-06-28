@@ -317,7 +317,7 @@ mod delegation_tests {
     use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
     use std::ops::Add;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, UNIX_EPOCH};
 
     /// Verifies that valid delegations are issued.
     #[test]
@@ -471,22 +471,22 @@ mod delegation_tests {
             (
                 &pub_session_key_1,
                 frontend_hostname_1,
-                SystemTime::UNIX_EPOCH,
+                Duration::from_secs(0),
             ),
             (
                 &pub_session_key_1,
                 frontend_hostname_2,
-                SystemTime::UNIX_EPOCH,
+                Duration::from_secs(0),
             ),
             (
                 &pub_session_key_2,
                 frontend_hostname_1,
-                SystemTime::UNIX_EPOCH,
+                Duration::from_secs(0),
             ),
             (
                 &pub_session_key_1,
                 frontend_hostname_1,
-                SystemTime::UNIX_EPOCH.add(Duration::from_secs(30)),
+                Duration::from_secs(30),
             ),
         ];
 
@@ -494,8 +494,8 @@ mod delegation_tests {
         let prepare_delegation_results =
             delegation_params
                 .into_iter()
-                .map(|(session_key, frontend_hostname, time)| {
-                    env.set_time(time);
+                .map(|(session_key, frontend_hostname, time_shift)| {
+                    env.advance_time(time_shift);
                     let (canister_sig_key, expiration) = api::prepare_delegation(
                         &env,
                         canister_id,
@@ -1128,8 +1128,6 @@ mod http_tests {
     #[test]
     fn metrics_inflight_challenges() -> Result<(), CallError> {
         let env = StateMachine::new();
-        // advance time so that time calculation for captcha validity (now - CAPTCHA_CHALLENGE_LIFETIME) does not overflow
-        env.advance_time(Duration::from_secs(3600));
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
@@ -1242,7 +1240,8 @@ mod remote_device_registration_tests {
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;
     use regex::Regex;
-    use std::time::{Duration, SystemTime};
+    use std::ops::Add;
+    use std::time::{Duration, UNIX_EPOCH};
 
     /// Test entering registration mode including returned expiration time.
     #[test]
@@ -1254,7 +1253,14 @@ mod remote_device_registration_tests {
         let result =
             api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
 
-        assert!(matches!(result, 900_000_000_000)); // 900 seconds -> 15 min
+        assert_eq!(
+            result,
+            env.time()
+                .add(Duration::from_secs(900)) // 900 seconds -> 15 min
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64
+        );
         Ok(())
     }
 
@@ -1421,9 +1427,7 @@ mod remote_device_registration_tests {
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-        env.set_time(
-            SystemTime::UNIX_EPOCH + REGISTRATION_MODE_EXPIRATION + Duration::from_secs(1),
-        );
+        env.advance_time(REGISTRATION_MODE_EXPIRATION + Duration::from_secs(1));
         let result = api::add_tentative_device(
             &env,
             canister_id,
