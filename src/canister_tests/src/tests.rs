@@ -437,7 +437,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::compat::lookup(&env, canister_id, user_number)?;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());

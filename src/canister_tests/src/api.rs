@@ -4,11 +4,14 @@ use crate::framework::CallError;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 use sdk_ic_types::Principal;
+use candid;
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     let user_number: types::UserNumber = 0;
-    let _: (Vec<types::DeviceData>,) =
+    // XXX: we use "IDLValue" because we're just checking that the canister is sending
+    // valid data, but we don't care about the actual data.
+    let _: (candid::parser::value::IDLValue,) =
         framework::call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
@@ -107,6 +110,53 @@ pub fn lookup(
     user_number: types::UserNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
     framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+}
+
+
+pub mod compat {
+
+use crate::framework;
+use crate::framework::CallError;
+use ic_state_machine_tests::{CanisterId, StateMachine};
+use internet_identity_interface as types;
+use candid;
+
+use candid::{CandidType, Deserialize};
+
+pub fn lookup(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    user_number: types::UserNumber,
+) -> Result<Vec<types::DeviceData>, CallError> {
+    let device_data: Vec<super::compat::DeviceDataOld> = framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)?;
+    Ok(device_data.iter().map(|old| old.clone().into()).collect())
+}
+
+
+/// NOTE: this should work both with old and new
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct DeviceDataOld {
+    pub pubkey: types::DeviceKey,
+    pub alias: String,
+    pub credential_id: Option<types::CredentialId>,
+    pub purpose: types::Purpose,
+    pub key_type: types::KeyType,
+    pub protection_type: Option<types::ProtectionType>,
+}
+
+impl From<DeviceDataOld> for types::DeviceData {
+    fn from(device_data_old: DeviceDataOld) -> Self {
+        Self {
+            pubkey: device_data_old.pubkey,
+            alias: device_data_old.alias,
+            credential_id: device_data_old.credential_id,
+            purpose: device_data_old.purpose,
+            key_type: device_data_old.key_type,
+            protection_type: device_data_old.protection_type.unwrap_or(types::ProtectionType::Unprotected),
+        }
+    }
+}
+
 }
 
 pub fn add(
