@@ -35,34 +35,38 @@ const style = () => html`<style></style> `;
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-// TODO: make isProtected more robust
 // TODO: Delete device should be red and have dialog for confirmation
 // TODO: make sure user cannot remove last device
 // TODO: warning if user will get logged out
-const pageContent = (
-  userNumber: bigint,
-  device: DeviceData,
-  isProtected: boolean
-) => html`
+const pageContent = (userNumber: bigint, device: DeviceData) => html`
   ${style()}
   <div class="container">
     <h1>Device Management</h1>
     <p><strong>${device.alias}<strong></p>
 
-    <button class="${
-      isRecoveryDevice(device) ? "" : "hidden"
-    }" data-action="toggle">${
-  isProtected ? "Unprotect" : "Make protected"
-}</button>
+    ${
+      shouldOfferToProtect(device)
+        ? html`<button data-action="protect">Protect</button>`
+        : ""
+    }
+
     <button data-action="remove">Delete Device</button>
     <button data-action="back">Back</button>
   </div>
   ${footer}
 `;
 
+// We offer to protect unprotected recovery phrases only, although in the
+// future we may offer to protect all devices
+const shouldOfferToProtect = (device: DeviceData): boolean =>
+  hasOwnProperty(device.purpose, "recovery") && !isProtected(device);
+
 // Whether or the user has registered a device as recovery
 const isRecoveryDevice = (device: DeviceData): boolean =>
   hasOwnProperty(device.purpose, "recovery");
+
+const isProtected = (device: DeviceData): boolean =>
+  "protected" in device.protection_type;
 
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
@@ -73,25 +77,19 @@ export const deviceSettings = async (
   // TODO: re-fetch device here?
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  const isProtected =
-    hasOwnProperty(device.purpose, "recovery") &&
-    "protected" in device.protection_type;
-
-  render(pageContent(userNumber, device, isProtected), container);
-  return init(userNumber, connection, device, isProtected);
+  render(pageContent(userNumber, device), container);
+  return init(userNumber, connection, device);
 };
 
 const getRemovalConnection = async (
   originalConnection: IIConnection,
   userNumber: bigint,
-  deviceData: DeviceData
+  device: DeviceData
 ): Promise<IIConnection | null> => {
-  const isProtected =
-    "protected" in deviceData.protection_type;
-
-  if (isProtected) {
+  // TODO: don't go through this if user is authenticated with device already
+  if (isProtected(device)) {
     // TODO: what happens on error?
-    const loginResult = await phraseRecoveryPage(userNumber, deviceData);
+    const loginResult = await phraseRecoveryPage(userNumber, device);
 
     switch (loginResult.tag) {
       case "ok":
@@ -111,8 +109,7 @@ const getRemovalConnection = async (
 const init = async (
   userNumber: bigint,
   connection: IIConnection,
-  device: DeviceData,
-  isProtected: boolean
+  device: DeviceData
 ): Promise<void> =>
   new Promise((resolve) => {
     const backButton = document.querySelector(
@@ -122,13 +119,12 @@ const init = async (
       backButton.onclick = () => resolve();
     }
 
-    const toggleButton = document.querySelector(
-      "button[data-action=toggle]"
+    const protectButton = document.querySelector(
+      "button[data-action=protect]"
     ) as HTMLButtonElement;
-    if (toggleButton !== null) {
-        // TODO: make sure that user inputs recovery on toggle
-        // TODO: change to "protect" and drop unprotect button
-      toggleButton.onclick = async () => {
+    if (protectButton !== null) {
+      // TODO: make sure that user inputs recovery before protecting
+      protectButton.onclick = async () => {
         device.protection_type =
           "protected" in device.protection_type
             ? { unprotected: null }

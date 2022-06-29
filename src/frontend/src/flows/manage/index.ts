@@ -308,6 +308,7 @@ const renderDevices = async (
     ) as HTMLButtonElement;
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
+        // TODO: displayError
         await deviceSettings(userNumber, connection, device).catch((e) =>
           console.log(e)
         );

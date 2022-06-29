@@ -359,7 +359,7 @@ test("Make recovery protected", async () => {
     await mainView.waitForDisplay();
 
     const recoveryAlias = "Recovery phrase";
-    await mainView.toggleDeviceProtection(recoveryAlias);
+    await mainView.protectDevice(recoveryAlias);
     // TODO: check that device is protected
   });
 }, 300_000);
@@ -375,7 +375,7 @@ test("Remove protected recovery phrase", async () => {
     await mainView.waitForDisplay();
 
     const recoveryAlias = "Recovery phrase";
-    await mainView.toggleDeviceProtection(recoveryAlias);
+    await mainView.protectDevice(recoveryAlias);
 
     await mainView.removeDevice(recoveryAlias);
 
@@ -388,7 +388,6 @@ test("Remove protected recovery phrase", async () => {
   });
 }, 300_000);
 
-
 test("Remove protected recovery phrase, confirm with empty seed phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
@@ -400,7 +399,7 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     await mainView.waitForDisplay();
 
     const recoveryAlias = "Recovery phrase";
-    await mainView.toggleDeviceProtection(recoveryAlias);
+    await mainView.protectDevice(recoveryAlias);
 
     await mainView.removeDevice(recoveryAlias);
 

@@ -190,13 +190,13 @@ export class MainView extends View {
   }
 
   // TODO: create settings view?
-  async toggleDeviceProtection(deviceName: string): Promise<void> {
+  async protectDevice(deviceName: string): Promise<void> {
     await this.browser
       .$(`//div[string()='${deviceName}']/following-sibling::button`)
       .click();
 
     await this.browser.$("h1=Device Management").waitForDisplayed();
-    await this.browser.$("button[data-action='toggle']").click();
+    await this.browser.$("button[data-action='protect']").click();
     await this.browser.$("button[data-action='back']").click();
   }
 
