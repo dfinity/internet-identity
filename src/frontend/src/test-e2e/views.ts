@@ -126,10 +126,6 @@ export class RecoveryMethodSelectorView extends View {
     await this.browser.$("#seedPhrase").click();
   }
 
-  async useSeedPhraseProtected(): Promise<void> {
-    await this.browser.$("#seedPhraseProtected").click();
-  }
-
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
       .$("//h1[string()='Seedphrase']")
@@ -166,13 +162,10 @@ export class MainView extends View {
       .waitForDisplayed({ timeout: 10_000 });
   }
 
-  async waitForDeviceNotDisplay(deviceName: string, wait: 0): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, wait));
-    const selector = `//div[string()='${deviceName}']`;
-    const result = await this.browser.$(selector);
-    if (result.error === undefined) {
-      throw new Error(`selector ${selector} resulted in finding an element`);
-    }
+  async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//div[string()='${deviceName}']`)
+      .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
   async addAdditionalDevice(): Promise<void> {
@@ -196,10 +189,25 @@ export class MainView extends View {
     );
   }
 
+  // TODO: create settings view?
+  async toggleDeviceProtection(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//div[string()='${deviceName}']/following-sibling::button`)
+      .click();
+
+    await this.browser.$("h1=Device Management").waitForDisplayed();
+    await this.browser.$("button[data-action='toggle']").click();
+    await this.browser.$("button[data-action='back']").click();
+  }
+
   async removeDevice(deviceName: string): Promise<void> {
     await this.browser
       .$(`//div[string()='${deviceName}']/following-sibling::button`)
       .click();
+
+    await this.browser.$("h1=Device Management").waitForDisplayed();
+    await this.browser.$("button[data-action='remove']").click();
+    // TODO: should also have dialog & accept it
   }
 }
 
@@ -536,9 +544,7 @@ export class RecoverView extends View {
   }
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
-    await this.browser
-      .$("//h1[string()='Invalid Seedphrase']")
-      .waitForDisplayed({ timeout: 5_000 });
+    await this.browser.$("h1=Invalid Seed Phrase").waitForDisplayed();
   }
 }
 

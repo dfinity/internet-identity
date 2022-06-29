@@ -135,7 +135,6 @@ const style = () => html`<style>
     visibility: visible;
     opacity: 1;
     transition: opacity 0.2s ease-in;
-
   }
 </style> `;
 
@@ -194,21 +193,17 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${footer}
 `;
 
-// TODO: make sure users don't use protected by default
 // TODO: don't offer to unprotect
 // TODO: Fix CSS of icon
-const deviceListItem = (
-  device: DeviceData,
-) => html`
-  <div class="deviceItemAlias">${device.alias} ${isUnprotectedPhrase(device) ? html`<span class="warning-unprotected">${warningIcon2}<span class="tooltip">Oh dear!</span></span>` : ''}</div>
-  <button
-    type="button"
-    data-action="settings"
-    class="deviceItemAction"
-  >
-  ${settingsIcon}
+// TODO: add warning + tooltip
+const deviceListItem = (device: DeviceData) => html`
+  <div class="deviceItemAlias">${device.alias}</div>
+  <button type="button" data-action="settings" class="deviceItemAction">
+    ${settingsIcon}
   </button>
 `;
+
+// <div class="deviceItemAlias">${device.alias}${isUnprotectedPhrase(device) ? html`<span class="warning-unprotected">${warningIcon2}<span class="tooltip">Oh dear!</span></span>` : ''}</div>
 
 const recoveryNag = () => html`
   <div class="warnBox">
@@ -308,19 +303,14 @@ const renderDevices = async (
 
     render(deviceListItem(device), identityElement);
     const isOnlyDevice = devices.length < 2;
-    const button = identityElement.querySelector(
-      "button[data-action=remove]"
-    ) as HTMLButtonElement;
-    if (button !== null) {
-      button.onclick = () =>
-        removeDevice(userNumber, connection, device, isOnlyDevice);
-    }
     const buttonSettings = identityElement.querySelector(
       "button[data-action=settings]"
     ) as HTMLButtonElement;
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
-        await deviceSettings(userNumber, connection, device).catch((e) => console.log(e))
+        await deviceSettings(userNumber, connection, device).catch((e) =>
+          console.log(e)
+        );
         await renderManage(userNumber, connection);
       };
     }
@@ -342,104 +332,9 @@ const renderDevices = async (
   }
 };
 
-
 const isUnprotectedPhrase = (device: DeviceData): boolean =>
-    device.alias === "Recovery phrase" && ! ("protected" in device.protection_type);
-
-const getRemovalConnection = async (
-  originalConnection: IIConnection,
-  userNumber: bigint,
-  deviceData: DeviceData
-): Promise<IIConnection | null> => {
-  const isProtectedRecoveryPhrase =
-    "protected" in deviceData.protection_type &&
-    deviceData.alias === "Recovery phrase";
-
-  if (isProtectedRecoveryPhrase) {
-    // TODO: what happens on error?
-    const loginResult = await phraseRecoveryPage(userNumber, deviceData);
-    console.log("yay login result", loginResult);
-
-    switch (loginResult.tag) {
-      case "ok":
-        return loginResult.connection;
-      case "canceled":
-        return null;
-      default:
-        unreachable(loginResult);
-        break;
-    }
-  } else {
-    return originalConnection;
-  }
-};
-
-// Add listener to the "X" button, right of the device name. Performs some
-// checks before removing the device (is the user is authenticated with the
-// device to remove, or if the device is the last one).
-const removeDevice = async (
-  userNumber: bigint,
-  connection: IIConnection,
-  device: DeviceData,
-  isOnlyDevice: boolean
-) => {
-  const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
-    .buffer as DerEncodedPublicKey;
-  const sameDevice = bufferEqual(
-    connection.identity.getPublicKey().toDer(),
-    pubKey
-  );
-
-  // TODO: show dialog _before_ entering protected phrase only, or also after?
-  // update dialog to say "you will need to enter phrase"
-  if (isOnlyDevice) {
-    return alert("You can not remove your last device.");
-  } else {
-    const shouldProceed = sameDevice
-      ? confirm(
-          "This will remove your current device and you will be logged out."
-        )
-      : confirm(
-          `Do you really want to remove the ${
-            hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-          }"${device.alias}"?`
-        );
-    if (!shouldProceed) {
-      return;
-    }
-  }
-
-  const removalConnection = await getRemovalConnection(
-    connection,
-    userNumber,
-    device
-  );
-
-  // if null then user canceled so we just redraw the manage page
-  if (removalConnection === null) {
-    renderManage(userNumber, connection);
-    return;
-  }
-
-  // Otherwise, remove identity
-  try {
-    await withLoader(() => removalConnection.remove(userNumber, device.pubkey));
-    if (sameDevice) {
-      localStorage.clear();
-      location.reload();
-    }
-    renderManage(userNumber, connection);
-  } catch (err: unknown) {
-    await displayError({
-      title: "Failed to remove the device",
-      message:
-        "An unexpected error occured when trying to remove the device. Please try again",
-      detail: unknownToString(err, "Unknown error"),
-      primaryButton: "Back to Manage",
-    });
-    renderManage(userNumber, connection);
-  }
-};
+  device.alias === "Recovery phrase" &&
+  !("protected" in device.protection_type);
 
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
