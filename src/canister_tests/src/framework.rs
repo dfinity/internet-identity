@@ -219,9 +219,11 @@ where
     match f(in_bytes) {
         Ok(WasmResult::Reply(out_bytes)) => Ok(decode_args(&out_bytes).unwrap_or_else(|e| {
             panic!(
-                "Failed to decode bytes {:?} as candid type: {}",
+                "Failed to decode response as candid type {}:\nerror: {}\nbytes: {:?}\nutf8: {}",
                 std::any::type_name::<Output>(),
-                e
+                e,
+                out_bytes,
+                String::from_utf8_lossy(&out_bytes),
             )
         })),
         Ok(WasmResult::Reject(message)) => Err(CallError::Reject(message)),
