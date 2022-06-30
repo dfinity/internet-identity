@@ -363,7 +363,8 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate").unwrap(),
+                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                    .unwrap(),
             );
         }
 
@@ -397,7 +398,8 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate").unwrap(),
+                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                    .unwrap(),
             );
         }
     }
