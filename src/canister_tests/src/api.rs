@@ -119,7 +119,7 @@ pub mod compat {
     use crate::framework;
     use crate::framework::CallError;
     use candid;
-    use ic_state_machine_tests::{CanisterId, StateMachine};
+    use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
     use internet_identity_interface as types;
 
     use candid::{CandidType, Deserialize};
@@ -129,14 +129,14 @@ pub mod compat {
         canister_id: CanisterId,
         user_number: types::UserNumber,
     ) -> Result<Vec<types::DeviceData>, CallError> {
-        let device_data: Vec<super::compat::DeviceDataOld> =
+        let device_data: Vec<super::compat::DeviceData> =
             framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)?;
         Ok(device_data.iter().map(|old| old.clone().into()).collect())
     }
 
     /// A version of `DeviceData` that is compatible with code with or without `protection_type`.
     #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-    pub struct DeviceDataOld {
+    pub struct DeviceData {
         pub pubkey: types::DeviceKey,
         pub alias: String,
         pub credential_id: Option<types::CredentialId>,
@@ -145,8 +145,8 @@ pub mod compat {
         pub protection_type: Option<types::ProtectionType>,
     }
 
-    impl From<DeviceDataOld> for types::DeviceData {
-        fn from(device_data_old: DeviceDataOld) -> Self {
+    impl From<DeviceData> for types::DeviceData {
+        fn from(device_data_old: DeviceData) -> Self {
             Self {
                 pubkey: device_data_old.pubkey,
                 alias: device_data_old.alias,
@@ -156,6 +156,35 @@ pub mod compat {
                 protection_type: device_data_old
                     .protection_type
                     .unwrap_or(types::ProtectionType::Unprotected),
+            }
+        }
+    }
+
+
+    // Same as above, for get_anchor_info
+    pub fn get_anchor_info(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: PrincipalId,
+        user_number: types::UserNumber,
+    ) -> Result<types::IdentityAnchorInfo, CallError> {
+        let info: super::compat::IdentityAnchorInfo =
+            framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)).map(|(x,)| x)?;
+        Ok(info.into())
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize)]
+    pub struct IdentityAnchorInfo {
+        pub devices: Vec<DeviceData>,
+        pub device_registration: Option<types::DeviceRegistrationInfo>,
+    }
+
+
+    impl From<IdentityAnchorInfo> for types::IdentityAnchorInfo {
+        fn from(old: IdentityAnchorInfo) -> Self {
+            Self {
+                devices: old.devices.into_iter().map(|e| e.into()).collect(),
+                device_registration: old.device_registration,
             }
         }
     }

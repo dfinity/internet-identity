@@ -1,4 +1,4 @@
-use crate::framework::{device_data_1, expect_user_error_with_message, principal_2};
+use crate::framework::{device_data_1, expect_user_error_with_message, principal_1, principal_2};
 use crate::{api, flows, framework};
 use ic_error_types::ErrorCode;
 use ic_state_machine_tests::StateMachine;
@@ -41,6 +41,24 @@ fn ii_canister_can_be_upgraded_and_rolled_back() {
     api::health_check(&env, canister_id);
     framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
     api::health_check(&env, canister_id);
+}
+
+#[test]
+fn upgrade_and_rollback_keeps_anchors_intact() {
+    let env = StateMachine::new();
+    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+    let mut devices_before = api::compat::lookup(&env, canister_id, user_number).unwrap();
+    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+    api::health_check(&env, canister_id);
+    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
+    api::health_check(&env, canister_id);
+    let mut devices_after= api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number).unwrap().devices;
+
+    devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+    devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+    assert_eq!(devices_before, devices_after);
 }
 
 #[test]
