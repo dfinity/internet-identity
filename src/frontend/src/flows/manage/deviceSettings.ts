@@ -19,9 +19,8 @@ const style = () => html`<style></style> `;
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
 // TODO: Delete device should be red and have dialog for confirmation
-// TODO: make sure user cannot remove last device
 // TODO: warning if user will get logged out
-const pageContent = (userNumber: bigint, device: DeviceData) => html`
+const pageContent = (userNumber: bigint, device: DeviceData, isOnlyDevice: boolean) => html`
   ${style()}
   <div class="container">
     <h1>Device Management</h1>
@@ -33,7 +32,8 @@ const pageContent = (userNumber: bigint, device: DeviceData) => html`
         : ""
     }
 
-    <button data-action="remove">Delete Device</button>
+    <button data-action="remove" ?disabled=${isOnlyDevice}>Delete Device</button>
+    ${isOnlyDevice? "You cannot remove your last device" : ''}
     <button data-action="back">Back</button>
   </div>
   ${footer}
@@ -51,12 +51,13 @@ const isProtected = (device: DeviceData): boolean =>
 export const deviceSettings = async (
   userNumber: bigint,
   connection: IIConnection,
-  device: DeviceData
+  device: DeviceData,
+  isOnlyDevice: boolean,
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  render(pageContent(userNumber, device), container);
-  return init(userNumber, connection, device);
+  render(pageContent(userNumber, device, isOnlyDevice), container);
+  return init(userNumber, connection, device, isOnlyDevice);
 };
 
 const deviceConnection = async (
@@ -90,7 +91,8 @@ const deviceConnection = async (
 const init = async (
   userNumber: bigint,
   connection: IIConnection,
-  device: DeviceData
+  device: DeviceData,
+  isOnlyDevice: boolean,
 ): Promise<void> =>
   new Promise((resolve) => {
     const backButton = document.querySelector(
@@ -134,7 +136,7 @@ const init = async (
             device.credential_id
           );
         });
-        await deviceSettings(userNumber, connection, device);
+        await deviceSettings(userNumber, connection, device, isOnlyDevice);
         resolve();
       };
     }

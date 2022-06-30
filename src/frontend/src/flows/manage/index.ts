@@ -274,6 +274,7 @@ const renderDevices = async (
 ) => {
   const list = document.createElement("ul");
   const recoveryList = document.createElement("ul");
+  const isOnlyDevice = devices.length < 2;
 
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
@@ -286,7 +287,7 @@ const renderDevices = async (
     ) as HTMLButtonElement;
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
-        await deviceSettings(userNumber, connection, device).catch((e) =>
+        await deviceSettings(userNumber, connection, device, isOnlyDevice).catch((e) =>
           displayError({
             title: "Could not edit device",
             message: "An error happened on the settings page.",

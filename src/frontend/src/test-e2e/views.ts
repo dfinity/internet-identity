@@ -212,6 +212,16 @@ export class MainView extends View {
     await this.browser.$("button[data-action='remove']").click();
     // TODO: should also have dialog & accept it
   }
+
+  async removeDeviceDisabled(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//div[string()='${deviceName}']/following-sibling::button`)
+      .click();
+
+    await this.browser.$("h1=Device Management").waitForDisplayed();
+    await this.browser.$("button[data-action='remove']").waitForEnabled({reverse: true});
+    await this.browser.$("button[data-action='back']").click();
+  }
 }
 
 export class AddDeviceAliasView extends View {
