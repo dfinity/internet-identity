@@ -254,7 +254,7 @@ mod device_management_tests {
 
             let original_pubkey = device.pubkey;
             let pubkey_2 = ByteBuf::from(PUBKEY_2);
-            assert!(original_pubkey != pubkey_2);
+            assert_ne!(original_pubkey, pubkey_2);
             device.pubkey = pubkey_2;
 
             let result = api::update(
