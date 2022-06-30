@@ -279,7 +279,6 @@ const renderDevices = async (
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
-    console.log(device);
 
     render(deviceListItem(device), identityElement);
     const buttonSettings = identityElement.querySelector(

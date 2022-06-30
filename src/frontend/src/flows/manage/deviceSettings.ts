@@ -10,7 +10,6 @@ import { hasOwnProperty } from "../../utils/utils";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 // The styling of the page
-
 const style = () => html`<style></style> `;
 
 // Actual page content. We display the Identity Anchor and the list of
