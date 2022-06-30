@@ -86,7 +86,7 @@ const deviceConnection = async (
   }
 };
 
-// Initializes the management page.
+// Initializes the device settings page
 const init = async (
   userNumber: bigint,
   connection: IIConnection,
