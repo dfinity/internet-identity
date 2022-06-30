@@ -77,8 +77,8 @@ mod device_management_tests {
     use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
-    use regex::Regex;
     use internet_identity_interface as types;
+    use regex::Regex;
 
     /// Verifies that a new device can be added.
     #[test]
@@ -425,7 +425,6 @@ mod device_management_tests {
         );
     }
 
-
     /// Verifies that unprotected devices can not be removed with another device
     #[test]
     fn should_not_remove_protected_with_different_device() {
@@ -435,8 +434,7 @@ mod device_management_tests {
         device1.protection_type = types::ProtectionType::Protected;
         device1.key_type = types::KeyType::SeedPhrase;
 
-        let user_number =
-            flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+        let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
         api::add(
             &env,
@@ -444,8 +442,8 @@ mod device_management_tests {
             principal_1(),
             user_number,
             device_data_2(),
-            )
-            .unwrap();
+        )
+        .unwrap();
 
         let result = api::remove(
             &env,
@@ -453,13 +451,13 @@ mod device_management_tests {
             principal_2(),
             user_number,
             device1.pubkey.clone(),
-            );
+        );
 
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
             Regex::new("Must be authenticated with protected device to mutate").unwrap(),
-            );
+        );
     }
 
     /// Verifies that a device can be removed if it has been added using the previous II release.
