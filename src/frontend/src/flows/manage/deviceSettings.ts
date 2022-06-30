@@ -1,5 +1,6 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { DerEncodedPublicKey } from "@dfinity/agent";
+import { bufferEqual, IIConnection } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
@@ -18,9 +19,11 @@ const style = () => html`<style></style> `;
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-// TODO: Delete device should be red and have dialog for confirmation
-// TODO: warning if user will get logged out
-const pageContent = (userNumber: bigint, device: DeviceData, isOnlyDevice: boolean) => html`
+const pageContent = (
+  userNumber: bigint,
+  device: DeviceData,
+  isOnlyDevice: boolean
+) => html`
   ${style()}
   <div class="container">
     <h1>Device Management</h1>
@@ -33,7 +36,7 @@ const pageContent = (userNumber: bigint, device: DeviceData, isOnlyDevice: boole
     }
 
     <button data-action="remove" ?disabled=${isOnlyDevice}>Delete Device</button>
-    ${isOnlyDevice? "You cannot remove your last device" : ''}
+    ${isOnlyDevice ? "You cannot remove your last device" : ""}
     <button data-action="back">Back</button>
   </div>
   ${footer}
@@ -52,7 +55,7 @@ export const deviceSettings = async (
   userNumber: bigint,
   connection: IIConnection,
   device: DeviceData,
-  isOnlyDevice: boolean,
+  isOnlyDevice: boolean
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -92,7 +95,7 @@ const init = async (
   userNumber: bigint,
   connection: IIConnection,
   device: DeviceData,
-  isOnlyDevice: boolean,
+  isOnlyDevice: boolean
 ): Promise<void> =>
   new Promise((resolve) => {
     const backButton = document.querySelector(
@@ -146,6 +149,26 @@ const init = async (
     ) as HTMLButtonElement;
     if (deleteButton !== null) {
       deleteButton.onclick = async () => {
+        const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+          .buffer as DerEncodedPublicKey;
+        const sameDevice = bufferEqual(
+          connection.identity.getPublicKey().toDer(),
+          pubKey
+        );
+
+        const shouldProceed = sameDevice
+          ? confirm(
+              "This will remove your current device and you will be logged out."
+            )
+          : confirm(
+              `Do you really want to remove the ${
+                hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+              }"${device.alias}"?`
+            );
+        if (!shouldProceed) {
+          return;
+        }
+
         // If the device is protected then we need to be authenticated with the device to remove it
         // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
         const removalConnection = isProtected(device)

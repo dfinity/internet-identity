@@ -344,6 +344,7 @@ test("Remove unprotected recovery phrase", async () => {
     const recoveryAlias = "Recovery phrase";
     await mainView.waitForDeviceDisplay(recoveryAlias);
     await mainView.removeDevice(recoveryAlias);
+    await browser.acceptAlert();
     await mainView.waitForDeviceNotDisplay(recoveryAlias);
   });
 }, 300_000);
@@ -377,6 +378,7 @@ test("Remove protected recovery phrase", async () => {
     await mainView.protectDevice(recoveryAlias, seedPhrase);
 
     await mainView.removeDevice(recoveryAlias);
+    await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -401,6 +403,7 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     await mainView.protectDevice(recoveryAlias, seedPhrase);
 
     await mainView.removeDevice(recoveryAlias);
+    await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -562,7 +565,6 @@ test("Screenshots", async () => {
         await screenshots.take("new-device-listed", browser2);
 
         // Try to remove current device
-        /* FIXME
         await mainView2.removeDevice(DEVICE_NAME2);
         await browser2.waitUntil(
           async () => !!(await browser2.getAlertText()),
@@ -575,7 +577,6 @@ test("Screenshots", async () => {
           "This will remove your current device and you will be logged out."
         );
         await browser2.dismissAlert();
-        */
         await browser2.deleteSession();
       });
 
@@ -608,7 +609,6 @@ test("Screenshots", async () => {
       await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
       await mainView.removeDevice(DEVICE_NAME2);
-      /* FIXME
       await browser.waitUntil(
         async () => (await browser.getAlertText()) !== undefined,
         {
@@ -620,7 +620,6 @@ test("Screenshots", async () => {
         `Do you really want to remove the device "${DEVICE_NAME2}"?`
       );
       await browser.acceptAlert();
-      */
       await browser.waitUntil(
         async () => {
           const device2 = await browser.$(`//div[string()='${DEVICE_NAME2}']`);

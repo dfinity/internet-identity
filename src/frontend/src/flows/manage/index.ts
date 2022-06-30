@@ -287,7 +287,12 @@ const renderDevices = async (
     ) as HTMLButtonElement;
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
-        await deviceSettings(userNumber, connection, device, isOnlyDevice).catch((e) =>
+        await deviceSettings(
+          userNumber,
+          connection,
+          device,
+          isOnlyDevice
+        ).catch((e) =>
           displayError({
             title: "Could not edit device",
             message: "An error happened on the settings page.",
