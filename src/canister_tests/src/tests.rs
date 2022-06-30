@@ -78,6 +78,7 @@ mod device_management_tests {
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use regex::Regex;
+    use internet_identity_interface as types;
 
     /// Verifies that a new device can be added.
     #[test]
@@ -190,6 +191,7 @@ mod device_management_tests {
         use regex::Regex;
         use serde_bytes::ByteBuf;
 
+        /// Verifies that a device can be updated
         #[test]
         fn should_update_device() -> Result<(), CallError> {
             let env = StateMachine::new();
@@ -421,6 +423,43 @@ mod device_management_tests {
             CanisterCalledTrap,
             Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
         );
+    }
+
+
+    /// Verifies that unprotected devices can not be removed with another device
+    #[test]
+    fn should_not_remove_protected_with_different_device() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let mut device1 = device_data_1();
+        device1.protection_type = types::ProtectionType::Protected;
+        device1.key_type = types::KeyType::SeedPhrase;
+
+        let user_number =
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+            )
+            .unwrap();
+
+        let result = api::remove(
+            &env,
+            canister_id,
+            principal_2(),
+            user_number,
+            device1.pubkey.clone(),
+            );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Must be authenticated with protected device to mutate").unwrap(),
+            );
     }
 
     /// Verifies that a device can be removed if it has been added using the previous II release.

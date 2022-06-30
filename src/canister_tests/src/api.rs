@@ -112,6 +112,8 @@ pub fn lookup(
     framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
 }
 
+/// A "compatibility" module for older versions of II that don't necessarily have a
+/// `protection_type`. Can be removed once the latest release includes `protection_type`.
 pub mod compat {
 
     use crate::framework;
@@ -132,7 +134,7 @@ pub mod compat {
         Ok(device_data.iter().map(|old| old.clone().into()).collect())
     }
 
-    /// NOTE: this should work both with old and new
+    /// A version of `DeviceData` that is compatible with code with or without `protection_type`.
     #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
     pub struct DeviceDataOld {
         pub pubkey: types::DeviceKey,
