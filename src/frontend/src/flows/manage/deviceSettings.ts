@@ -116,11 +116,6 @@ const init = async (
         // with the device.
         const newConnection = await deviceConnection(userNumber, device);
 
-        // User canceled so we just return to manage
-        if (newConnection == null) {
-          resolve();
-        }
-
         await withLoader(async () => {
           // if null then user canceled so we just redraw the manage page
           if (newConnection == null) {
