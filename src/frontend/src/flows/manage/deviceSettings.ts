@@ -9,6 +9,9 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
+// The "device settings" page where users can view information about a device,
+// remove a device, make a recovery phrase protected, etc.
+
 // The styling of the page
 const style = () => html`<style></style> `;
 
@@ -30,11 +33,20 @@ const pageContent = (
 
     ${
       shouldOfferToProtect(device)
-        ? html`<button data-action="protect">Protect</button>`
+        ? html`<button data-action="protect">Protect</button>
+            <p>You will be asked for your phrase</p>`
         : ""
     }
 
     <button data-action="remove" ?disabled=${isOnlyDevice}>Delete Device</button>
+    ${
+      !isOnlyDevice && isProtected(device)
+        ? html`<p>
+            Your device is protected and you will be prompted to authenticate
+            with it before removal
+          </p>`
+        : ""
+    }
     ${isOnlyDevice ? "You cannot remove your last device" : ""}
     <button data-action="back">Back</button>
   </div>
@@ -62,6 +74,8 @@ export const deviceSettings = async (
   return init(userNumber, connection, device, isOnlyDevice);
 };
 
+// Get a connection that's authenticated with the given device
+// NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   userNumber: bigint,
   device: DeviceData

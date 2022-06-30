@@ -18,7 +18,6 @@ import {
 import { warningIcon } from "../../../components/icons";
 import { questions } from "../../faq";
 
-// TODO: customize message
 const pageContent = (userNumber: bigint) => html`
   <style>
 
