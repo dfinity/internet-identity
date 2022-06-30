@@ -491,7 +491,7 @@ fn mutate_device_or_trap(
     new_value: Option<DeviceData>,
 ) {
     let index = match entries.iter().position(|e| e.pubkey == device_key) {
-        None => trap("aie aie aie"),
+        None => trap("Could not find device to mutate, check device key"),
         Some(index) => index,
     };
 
