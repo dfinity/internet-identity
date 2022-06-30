@@ -231,30 +231,3 @@ export const settingsIcon = html`
     />
   </svg>
 `;
-
-// source: https://fonts.google.com/icons?selected=Material%20Symbols%20Outlined%3Ashield%3AFILL%401%3Bwght%40100%3BGRAD%400%3Bopsz%4024
-export const shieldIcon = html`
-  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24">
-    <path
-      d="M12 20.65Q9.125 19.75 7.213 17.1Q5.3 14.45 5.3 11.1V5.9L12 3.4L18.7 5.9V11.1Q18.7 14.45 16.788 17.1Q14.875 19.75 12 20.65Z"
-    />
-  </svg>
-`;
-
-// source: https://fonts.google.com/icons?selected=Material%20Symbols%20Outlined%3Aremove_moderator%3AFILL%401%3Bwght%40100%3BGRAD%400%3Bopsz%4024
-export const shieldNotIcon = html`
-  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24">
-    <path
-      d="M17.8 15.3 7.55 5.05 12 3.4 18.7 5.9V11.1Q18.7 12.05 18.5 13.075Q18.3 14.1 17.8 15.3ZM19.8 20.8 16.5 17.5Q15.625 18.6 14.45 19.438Q13.275 20.275 12 20.65Q8.95 19.7 7.125 17Q5.3 14.3 5.3 11.1V6.3L3.3 4.3L3.8 3.8L20.3 20.3Z"
-    />
-  </svg>
-`;
-//
-// source: https://fonts.google.com/icons?selected=Material%20Symbols%20Outlined%3Awarning%3AFILL%401%3Bwght%40400%3BGRAD%400%3Bopsz%4024
-export const warningIcon2 = html`
-  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24">
-    <path
-      d="M1 21 12 2 23 21ZM11 15H13V10H11ZM12 18Q12.425 18 12.713 17.712Q13 17.425 13 17Q13 16.575 12.713 16.288Q12.425 16 12 16Q11.575 16 11.288 16.288Q11 16.575 11 17Q11 17.425 11.288 17.712Q11.575 18 12 18Z"
-    />
-  </svg>
-`;

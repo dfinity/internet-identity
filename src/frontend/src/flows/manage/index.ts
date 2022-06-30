@@ -1,31 +1,21 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../../utils/iiConnection";
+import { IIConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { initLogout, logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
-import { unreachable } from "../../utils/utils";
 import { footer } from "../../components/footer";
 import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import {
-  closeIcon,
-  settingsIcon,
-  warningIcon,
-  shieldIcon,
-  shieldNotIcon,
-  warningIcon2,
-} from "../../components/icons";
+import { settingsIcon, warningIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import { setupRecovery } from "../recovery/setupRecovery";
-import { hasOwnProperty, unknownToString } from "../../utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
+import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
-import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -130,12 +120,6 @@ const style = () => html`<style>
     opacity: 1;
     transition: opacity 0.2s ease-in;
   }
-
-  .warning-unprotected:hover .tooltip {
-    visibility: visible;
-    opacity: 1;
-    transition: opacity 0.2s ease-in;
-  }
 </style> `;
 
 // Actual page content. We display the Identity Anchor and the list of
@@ -193,17 +177,12 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${footer}
 `;
 
-// TODO: don't offer to unprotect
-// TODO: Fix CSS of icon
-// TODO: add warning + tooltip
 const deviceListItem = (device: DeviceData) => html`
   <div class="deviceItemAlias">${device.alias}</div>
   <button type="button" data-action="settings" class="deviceItemAction">
     ${settingsIcon}
   </button>
 `;
-
-// <div class="deviceItemAlias">${device.alias}${isUnprotectedPhrase(device) ? html`<span class="warning-unprotected">${warningIcon2}<span class="tooltip">Oh dear!</span></span>` : ''}</div>
 
 const recoveryNag = () => html`
   <div class="warnBox">
@@ -302,7 +281,6 @@ const renderDevices = async (
     console.log(device);
 
     render(deviceListItem(device), identityElement);
-    const isOnlyDevice = devices.length < 2;
     const buttonSettings = identityElement.querySelector(
       "button[data-action=settings]"
     ) as HTMLButtonElement;
@@ -332,10 +310,6 @@ const renderDevices = async (
     recoveryDevices.appendChild(recoveryList);
   }
 };
-
-const isUnprotectedPhrase = (device: DeviceData): boolean =>
-  device.alias === "Recovery phrase" &&
-  !("protected" in device.protection_type);
 
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>

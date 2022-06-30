@@ -1,28 +1,10 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../../utils/iiConnection";
+import { IIConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { initLogout, logoutSection } from "../../components/logout";
-import { navbar } from "../../components/navbar";
 import { unreachable } from "../../utils/utils";
 import { footer } from "../../components/footer";
-import {
-  DeviceData,
-  IdentityAnchorInfo,
-} from "../../../generated/internet_identity_types";
-import {
-  closeIcon,
-  settingsIcon,
-  warningIcon,
-  shieldIcon,
-  shieldNotIcon,
-} from "../../components/icons";
-import { displayError } from "../../components/displayError";
-import { setupRecovery } from "../recovery/setupRecovery";
-import { hasOwnProperty, unknownToString } from "../../utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
-import { chooseDeviceAddFlow } from "../addDevice/manage";
-import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
+import { DeviceData } from "../../../generated/internet_identity_types";
+import { hasOwnProperty } from "../../utils/utils";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 // The styling of the page
@@ -60,10 +42,6 @@ const pageContent = (userNumber: bigint, device: DeviceData) => html`
 // future we may offer to protect all devices
 const shouldOfferToProtect = (device: DeviceData): boolean =>
   hasOwnProperty(device.purpose, "recovery") && !isProtected(device);
-
-// Whether or the user has registered a device as recovery
-const isRecoveryDevice = (device: DeviceData): boolean =>
-  hasOwnProperty(device.purpose, "recovery");
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection_type;
@@ -152,7 +130,7 @@ const init = async (
     ) as HTMLButtonElement;
     if (deleteButton !== null) {
       deleteButton.onclick = async () => {
-        let removalConnection = await getRemovalConnection(
+        const removalConnection = await getRemovalConnection(
           connection,
           userNumber,
           device
