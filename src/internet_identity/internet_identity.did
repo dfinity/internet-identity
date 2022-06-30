@@ -49,7 +49,7 @@ type KeyType = variant {
     seed_phrase;
 };
 
-type ProtectionType = variant {
+type DeviceProtection = variant {
     protected;
     unprotected;
 };
@@ -65,7 +65,7 @@ type DeviceData = record {
   credential_id : opt CredentialId;
   purpose: Purpose;
   key_type: KeyType;
-  protection_type: ProtectionType;
+  protection: DeviceProtection;
 };
 
 type RegisterResponse = variant {

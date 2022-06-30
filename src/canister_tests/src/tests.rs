@@ -304,7 +304,7 @@ mod device_management_tests {
             let env = StateMachine::new();
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let mut device1 = device_data_1();
-            device1.protection_type = types::ProtectionType::Protected;
+            device1.protection = types::DeviceProtection::Protected;
             device1.key_type = types::KeyType::SeedPhrase;
 
             let user_number =
@@ -342,13 +342,13 @@ mod device_management_tests {
             let env = StateMachine::new();
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let mut device1 = device_data_1();
-            device1.protection_type = types::ProtectionType::Protected;
+            device1.protection = types::DeviceProtection::Protected;
             device1.key_type = types::KeyType::SeedPhrase;
             let user_number =
                 flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
             let mut device2 = device_data_2();
-            device2.protection_type = types::ProtectionType::Protected;
+            device2.protection = types::DeviceProtection::Protected;
             device2.key_type = types::KeyType::SeedPhrase;
 
             api::add(&env, canister_id, principal_1(), user_number, device2).unwrap();
@@ -452,7 +452,7 @@ mod device_management_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let mut device1 = device_data_1();
-        device1.protection_type = types::ProtectionType::Protected;
+        device1.protection = types::DeviceProtection::Protected;
         device1.key_type = types::KeyType::SeedPhrase;
 
         let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);

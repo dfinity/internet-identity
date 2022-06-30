@@ -61,7 +61,7 @@ struct DeviceDataInternal {
     credential_id: Option<CredentialId>,
     purpose: Option<Purpose>,
     key_type: Option<KeyType>,
-    protection_type: Option<ProtectionType>,
+    protection: Option<DeviceProtection>,
 }
 
 impl From<DeviceData> for DeviceDataInternal {
@@ -72,7 +72,7 @@ impl From<DeviceData> for DeviceDataInternal {
             credential_id: device_data.credential_id,
             purpose: Some(device_data.purpose),
             key_type: Some(device_data.key_type),
-            protection_type: Some(device_data.protection_type),
+            protection: Some(device_data.protection),
         }
     }
 }
@@ -87,9 +87,9 @@ impl From<DeviceDataInternal> for DeviceData {
                 .purpose
                 .unwrap_or(Purpose::Authentication),
             key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
-            protection_type: device_data_internal
-                .protection_type
-                .unwrap_or(ProtectionType::Unprotected),
+            protection: device_data_internal
+                .protection
+                .unwrap_or(DeviceProtection::Unprotected),
         }
     }
 }
@@ -498,10 +498,10 @@ fn mutate_device_or_trap(
     let e = entries.get_mut(index).unwrap();
 
     // Run appropriate checks for protected devices
-    match e.protection_type {
+    match e.protection {
         None => (),
-        Some(ProtectionType::Unprotected) => (),
-        Some(ProtectionType::Protected) => {
+        Some(DeviceProtection::Unprotected) => (),
+        Some(DeviceProtection::Protected) => {
             // If the call is not authenticated with the device to mutate, abort
             if caller() != Principal::self_authenticating(&e.pubkey) {
                 trap("Device is protected. Must be authenticated with this device to mutate");
@@ -1146,7 +1146,7 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
 fn check_device(device_data: &DeviceData) {
     check_entry_limits(device_data);
 
-    if device_data.protection_type == ProtectionType::Protected
+    if device_data.protection == DeviceProtection::Protected
         && device_data.key_type != KeyType::SeedPhrase
     {
         trap(&format!(

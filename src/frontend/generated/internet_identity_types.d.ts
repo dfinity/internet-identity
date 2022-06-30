@@ -23,13 +23,15 @@ export interface Delegation {
 }
 export interface DeviceData {
   'alias' : string,
-  'protection_type' : ProtectionType,
+  'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
 export type DeviceKey = PublicKey;
+export type DeviceProtection = { 'unprotected' : null } |
+  { 'protected' : null };
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
@@ -65,8 +67,6 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export type ProtectionType = { 'unprotected' : null } |
-  { 'protected' : null };
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };

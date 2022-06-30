@@ -113,7 +113,7 @@ pub fn lookup(
 }
 
 /// A "compatibility" module for older versions of II that don't necessarily have a
-/// `protection_type`. Can be removed once the latest release includes `protection_type`.
+/// `protection`. Can be removed once the latest release includes `protection`.
 pub mod compat {
 
     use crate::framework;
@@ -134,7 +134,7 @@ pub mod compat {
         Ok(device_data.iter().map(|old| old.clone().into()).collect())
     }
 
-    /// A version of `DeviceData` that is compatible with code with or without `protection_type`.
+    /// A version of `DeviceData` that is compatible with code with or without `protection`.
     #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
     pub struct DeviceData {
         pub pubkey: types::DeviceKey,
@@ -142,7 +142,7 @@ pub mod compat {
         pub credential_id: Option<types::CredentialId>,
         pub purpose: types::Purpose,
         pub key_type: types::KeyType,
-        pub protection_type: Option<types::ProtectionType>,
+        pub protection: Option<types::DeviceProtection>,
     }
 
     impl From<DeviceData> for types::DeviceData {
@@ -153,9 +153,9 @@ pub mod compat {
                 credential_id: device_data_old.credential_id,
                 purpose: device_data_old.purpose,
                 key_type: device_data_old.key_type,
-                protection_type: device_data_old
-                    .protection_type
-                    .unwrap_or(types::ProtectionType::Unprotected),
+                protection: device_data_old
+                    .protection
+                    .unwrap_or(types::DeviceProtection::Unprotected),
             }
         }
     }

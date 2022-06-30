@@ -3,7 +3,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
   });
   const UserNumber = IDL.Nat64;
-  const ProtectionType = IDL.Variant({
+  const DeviceProtection = IDL.Variant({
     'unprotected' : IDL.Null,
     'protected' : IDL.Null,
   });
@@ -22,7 +22,7 @@ export const idlFactory = ({ IDL }) => {
   const CredentialId = IDL.Vec(IDL.Nat8);
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
-    'protection_type' : ProtectionType,
+    'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
     'purpose' : Purpose,

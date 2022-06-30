@@ -59,7 +59,7 @@ const shouldOfferToProtect = (device: DeviceData): boolean =>
   hasOwnProperty(device.purpose, "recovery") && !isProtected(device);
 
 const isProtected = (device: DeviceData): boolean =>
-  "protected" in device.protection_type;
+  "protected" in device.protection;
 
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
@@ -123,7 +123,7 @@ const init = async (
     ) as HTMLButtonElement;
     if (protectButton !== null) {
       protectButton.onclick = async () => {
-        device.protection_type = { protected: null };
+        device.protection = { protected: null };
 
         // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
         // but we do it to make sure one last time that the user can actually succesfully authenticate
@@ -143,7 +143,7 @@ const init = async (
             device.alias,
             device.key_type,
             device.purpose,
-            device.protection_type,
+            device.protection,
             device.credential_id
           );
         });

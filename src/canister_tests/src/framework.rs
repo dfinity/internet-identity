@@ -116,7 +116,7 @@ pub fn device_data_1() -> types::DeviceData {
         credential_id: None,
         purpose: types::Purpose::Authentication,
         key_type: types::KeyType::Unknown,
-        protection_type: types::ProtectionType::Unprotected,
+        protection: types::DeviceProtection::Unprotected,
     }
 }
 
@@ -127,7 +127,7 @@ pub fn device_data_2() -> types::DeviceData {
         credential_id: None,
         purpose: types::Purpose::Authentication,
         key_type: types::KeyType::Unknown,
-        protection_type: types::ProtectionType::Unprotected,
+        protection: types::DeviceProtection::Unprotected,
     }
 }
 
