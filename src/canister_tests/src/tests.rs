@@ -242,6 +242,38 @@ mod device_management_tests {
             Ok(())
         }
 
+        /// Verifies that a protected device can be updated
+        #[test]
+        fn should_update_protected_device() -> Result<(), CallError> {
+            let env = StateMachine::new();
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let principal = principal_1();
+            let mut device = device_data_1();
+            device.protection = types::DeviceProtection::Protected;
+            device.key_type = types::KeyType::SeedPhrase;
+
+            let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
+
+            let devices = api::lookup(&env, canister_id, user_number)?;
+            assert_eq!(devices, vec![device.clone()]);
+
+            device.alias.push_str("some suffix");
+
+            api::update(
+                &env,
+                canister_id,
+                principal,
+                user_number,
+                device.clone().pubkey,
+                device.clone(),
+            )?;
+
+            let devices = api::lookup(&env, canister_id, user_number)?;
+            assert_eq!(devices, vec![device]);
+
+            Ok(())
+        }
+
         /// Verifies that the device key (i.e. the device ID) cannot be updated
         #[test]
         fn should_not_modify_pubkey() {
@@ -391,6 +423,41 @@ mod device_management_tests {
             &env,
             canister_id,
             principal_1(),
+            user_number,
+            device_data_2().pubkey,
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices.len(), 1);
+        assert!(!devices.iter().any(|device| device == &device_data_2()));
+        Ok(())
+    }
+
+    /// Verifies that a protected device can be removed.
+    #[test]
+    fn should_remove_protected_device() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let mut device2 = device_data_2();
+        device2.protection = types::DeviceProtection::Protected;
+        device2.key_type = types::KeyType::SeedPhrase;
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert!(devices.iter().any(|device| device == &device_data_2()));
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_2(),
             user_number,
             device_data_2().pubkey,
         )?;
