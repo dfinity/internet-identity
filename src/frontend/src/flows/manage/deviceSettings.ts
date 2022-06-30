@@ -15,12 +15,8 @@ import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 // The styling of the page
 const style = () => html`<style></style> `;
 
-// Actual page content. We display the Identity Anchor and the list of
-// (non-recovery) devices. Additionally, if the user does _not_ have any
-// recovery devices, we display a warning "nag box" and suggest to the user
-// that they add a recovery device. If the user _does_ have at least one
-// recovery device, then we do not display a "nag box", but we list the
-// recovery devices.
+// Actual page content. We display options for protecting recovery phrases or 
+// deleting general devices.
 const pageContent = (
   userNumber: bigint,
   device: DeviceData,

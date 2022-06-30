@@ -69,7 +69,7 @@ export async function runInBrowserCommon(
     // run test
     await test(browser, runConfig);
   } catch (e) {
-    // console.log(await browser.getPageSource());
+    console.log(await browser.getPageSource());
     console.error(e);
     await browser.saveScreenshot(
       `screenshots/error/${new Date().getTime()}.png`

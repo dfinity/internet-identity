@@ -404,7 +404,6 @@ export class IIConnection {
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
-    // TODO: more consistent casing
     protection: DeviceData["protection"],
     credentialId?: ArrayBuffer
   ): Promise<void> => {
