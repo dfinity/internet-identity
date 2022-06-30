@@ -197,34 +197,32 @@ export class MainView extends View {
 }
 
 export class DeviceSettingsView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser.$("h1=Device Management").waitForDisplayed();
+  }
 
-    async waitForDisplay(): Promise<void> {
-        await this.browser.$("h1=Device Management").waitForDisplayed();
-    }
+  async remove(): Promise<void> {
+    await this.browser.$("button[data-action='remove']").click();
+  }
 
-    async remove(): Promise<void> {
-        await this.browser.$("button[data-action='remove']").click();
-    }
+  async back(): Promise<void> {
+    await this.browser.$("button[data-action='back']").click();
+  }
 
-    async back(): Promise<void> {
-        await this.browser.$("button[data-action='back']").click();
-    }
+  async protect(seedPhrase: string): Promise<void> {
+    await this.browser.$("button[data-action='protect']").click();
 
-    async protect(seedPhrase: string): Promise<void> {
-        await this.browser.$("button[data-action='protect']").click();
+    const recoveryView = new RecoverView(this.browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+  }
 
-        const recoveryView = new RecoverView(this.browser);
-        await recoveryView.waitForSeedInputDisplay();
-        await recoveryView.enterSeedPhrase(seedPhrase);
-        await recoveryView.enterSeedPhraseContinue();
-    }
-
-    async removeDisabled(): Promise<void> {
-        await this.browser
-        .$("button[data-action='remove']")
-        .waitForEnabled({ reverse: true });
-    }
-
+  async removeDisabled(): Promise<void> {
+    await this.browser
+      .$("button[data-action='remove']")
+      .waitForEnabled({ reverse: true });
+  }
 }
 
 export class AddDeviceAliasView extends View {
