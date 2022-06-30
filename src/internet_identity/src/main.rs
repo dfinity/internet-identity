@@ -504,7 +504,7 @@ fn mutate_device_or_trap(
         Some(ProtectionType::Protected) => {
             // If the call is not authenticated with the device to mutate, abort
             if caller() != Principal::self_authenticating(&e.pubkey) {
-                trap("Must be authenticated with protected device to mutate");
+                trap("Device is protected. Must be authenticated with this device to mutate");
             }
         }
     };
