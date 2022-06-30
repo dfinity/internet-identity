@@ -49,6 +49,9 @@ type KeyType = variant {
     seed_phrase;
 };
 
+// This describes whether a device is "protected" or not.
+// When protected, a device can only be updated or removed if the
+// user is authenticated with that very device.
 type DeviceProtection = variant {
     protected;
     unprotected;
