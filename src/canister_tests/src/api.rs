@@ -160,7 +160,6 @@ pub mod compat {
         }
     }
 
-
     // Same as above, for get_anchor_info
     pub fn get_anchor_info(
         env: &StateMachine,
@@ -169,7 +168,8 @@ pub mod compat {
         user_number: types::UserNumber,
     ) -> Result<types::IdentityAnchorInfo, CallError> {
         let info: super::compat::IdentityAnchorInfo =
-            framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)).map(|(x,)| x)?;
+            framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
+                .map(|(x,)| x)?;
         Ok(info.into())
     }
 
@@ -178,7 +178,6 @@ pub mod compat {
         pub devices: Vec<DeviceData>,
         pub device_registration: Option<types::DeviceRegistrationInfo>,
     }
-
 
     impl From<IdentityAnchorInfo> for types::IdentityAnchorInfo {
         fn from(old: IdentityAnchorInfo) -> Self {

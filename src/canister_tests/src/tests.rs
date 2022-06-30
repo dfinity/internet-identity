@@ -53,7 +53,10 @@ fn upgrade_and_rollback_keeps_anchors_intact() {
     api::health_check(&env, canister_id);
     framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
     api::health_check(&env, canister_id);
-    let mut devices_after= api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number).unwrap().devices;
+    let mut devices_after =
+        api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
+            .unwrap()
+            .devices;
 
     devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
