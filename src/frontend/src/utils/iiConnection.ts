@@ -151,7 +151,6 @@ export class IIConnection {
           credential_id: [credential_id],
           key_type: { unknown: null },
           purpose: { authentication: null },
-          // TODO: this should really be 'protected' | 'unprotected'
           protection_type: { unprotected: null },
         },
         challengeResult
@@ -435,7 +434,6 @@ export class IIConnection {
     return await actor.update(userNumber, publicKey, {
       alias,
       pubkey: publicKey,
-      // TODO; something stupid is going one with the cred id
       credential_id: credentialId,
       key_type: keyType,
       purpose,
