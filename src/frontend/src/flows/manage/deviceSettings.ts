@@ -43,7 +43,7 @@ const pageContent = (
       !isOnlyDevice && isProtected(device)
         ? html`<p>
             Your device is protected and you will be prompted to authenticate
-            with it before removal
+            with it before removal.
           </p>`
         : ""
     }
