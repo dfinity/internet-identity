@@ -484,7 +484,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
 
 /// Replace or remove an existing device.
 ///
-/// NOTE: all mutable operations should call this function because it deals with protected stuff
+/// NOTE: all mutable operations should call this function because it handles device protection
 fn mutate_device_or_trap(
     entries: &mut Vec<DeviceDataInternal>,
     device_key: DeviceKey,
