@@ -92,7 +92,9 @@ const pageContent = (userNumber: bigint, message?: string) => html`
   </style>
   <div class="container full-width">
     <h1>Your seed phrase</h1>
-    <p>${ message !== undefined ? message : "Please provide your seed phrase"}</p>
+    <p>${
+      message !== undefined ? message : "Please provide your seed phrase"
+    }</p>
     <textarea id="inputSeedPhrase" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
