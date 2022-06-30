@@ -34,7 +34,7 @@ const pageContent = (
     ${
       shouldOfferToProtect(device)
         ? html`<button data-action="protect">Protect</button>
-            <p>You will be asked for your phrase</p>`
+            <p>You will be asked for your recovery phrase.</p>`
         : ""
     }
 
