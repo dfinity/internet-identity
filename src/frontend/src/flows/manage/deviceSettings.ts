@@ -15,7 +15,7 @@ import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 // The styling of the page
 const style = () => html`<style></style> `;
 
-// Actual page content. We display options for protecting recovery phrases or 
+// Actual page content. We display options for protecting recovery phrases or
 // deleting general devices.
 const pageContent = (
   userNumber: bigint,
