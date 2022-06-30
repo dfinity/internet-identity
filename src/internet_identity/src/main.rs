@@ -495,15 +495,15 @@ fn mutate_device_or_trap(
         Some(index) => index,
     };
 
-    let e = entries.get_mut(index).unwrap();
+    let device = entries.get_mut(index).unwrap();
 
     // Run appropriate checks for protected devices
-    match e.protection {
+    match device.protection {
         None => (),
         Some(DeviceProtection::Unprotected) => (),
         Some(DeviceProtection::Protected) => {
             // If the call is not authenticated with the device to mutate, abort
-            if caller() != Principal::self_authenticating(&e.pubkey) {
+            if caller() != Principal::self_authenticating(&device.pubkey) {
                 trap("Device is protected. Must be authenticated with this device to mutate");
             }
         }
@@ -511,7 +511,7 @@ fn mutate_device_or_trap(
 
     match new_value {
         Some(device_data) => {
-            *e = device_data.into();
+            *device = device_data.into();
         }
         None => {
             // NOTE: we void the more efficient remove_swap to ensure device ordering
