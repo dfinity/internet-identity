@@ -189,14 +189,17 @@ export class MainView extends View {
     );
   }
 
-  // TODO: create settings view?
-  async protectDevice(deviceName: string): Promise<void> {
+  async protectDevice(deviceName: string, seedPhrase: string): Promise<void> {
     await this.browser
       .$(`//div[string()='${deviceName}']/following-sibling::button`)
       .click();
 
     await this.browser.$("h1=Device Management").waitForDisplayed();
     await this.browser.$("button[data-action='protect']").click();
+    const recoveryView = new RecoverView(this.browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
     await this.browser.$("button[data-action='back']").click();
   }
 
