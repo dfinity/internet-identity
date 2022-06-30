@@ -74,10 +74,16 @@ export const deviceSettings = async (
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   userNumber: bigint,
-  device: DeviceData
+  device: DeviceData,
+  recoveryPhraseMessage: string
 ): Promise<IIConnection | null> => {
   try {
-    const loginResult = await phraseRecoveryPage(userNumber, device);
+    const loginResult = await phraseRecoveryPage(
+      userNumber,
+      device,
+      undefined,
+      recoveryPhraseMessage
+    );
     switch (loginResult.tag) {
       case "ok":
         return loginResult.connection;
@@ -124,7 +130,11 @@ const init = async (
         // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
         // but we do it to make sure one last time that the user can actually successfully authenticate
         // with the device.
-        const newConnection = await deviceConnection(userNumber, device);
+        const newConnection = await deviceConnection(
+          userNumber,
+          device,
+          "Please input your recovery phrase for protecting it."
+        );
 
         await withLoader(async () => {
           // if null then user canceled so we just redraw the manage page
@@ -176,7 +186,11 @@ const init = async (
         // If the device is protected then we need to be authenticated with the device to remove it
         // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
         const removalConnection = isProtected(device)
-          ? await deviceConnection(userNumber, device)
+          ? await deviceConnection(
+              userNumber,
+              device,
+              "Please input your recovery phrase for removing it."
+            )
           : connection;
 
         await withLoader(async () => {

@@ -18,7 +18,7 @@ import {
 import { warningIcon } from "../../../components/icons";
 import { questions } from "../../faq";
 
-const pageContent = (userNumber: bigint) => html`
+const pageContent = (userNumber: bigint, message?: string) => html`
   <style>
 
     /* Flash the warnings box if warnings were generated */
@@ -92,7 +92,7 @@ const pageContent = (userNumber: bigint) => html`
   </style>
   <div class="container full-width">
     <h1>Your seed phrase</h1>
-    <p>Please provide your seed phrase</p>
+    <p>${ message !== undefined ? message : "Please provide your seed phrase"}</p>
     <textarea id="inputSeedPhrase" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
@@ -108,17 +108,19 @@ const pageContent = (userNumber: bigint) => html`
 export const phraseRecoveryPage = async (
   userNumber: bigint,
   device: DeviceData,
-  prefilledPhrase?: string
+  prefilledPhrase?: string,
+  message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber), container);
+  render(pageContent(userNumber, message), container);
   return init(userNumber, device, prefilledPhrase);
 };
 
 const init = (
   userNumber: bigint,
   device: DeviceData,
-  prefilledPhrase?: string /* if set, prefilled as input */
+  prefilledPhrase?: string /* if set, prefilled as input */,
+  message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const inputSeedPhraseInput = document.getElementById(
@@ -190,8 +192,8 @@ const init = (
           break;
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
-          phraseRecoveryPage(userNumber, device, inputValue).then((res) =>
-            resolve(res)
+          phraseRecoveryPage(userNumber, device, inputValue, message).then(
+            (res) => resolve(res)
           );
           break;
         default:
