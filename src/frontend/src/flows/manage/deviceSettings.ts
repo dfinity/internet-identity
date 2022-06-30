@@ -24,26 +24,33 @@ const pageContent = (
 ) => html`
   ${style()}
   <div class="container">
-    <h1>Device Management</h1>
-    <p><strong>${device.alias}<strong></p>
+    <h1 style="margin: 0 0 1.5rem">
+      ${isRecovery(device) ? "" : "Device"} ${device.alias}
+    </h1>
 
-    ${
-      shouldOfferToProtect(device)
-        ? html`<button data-action="protect">Protect</button>
-            <p>You will be asked for your recovery phrase.</p>`
-        : ""
-    }
-
-    <button data-action="remove" ?disabled=${isOnlyDevice}>Delete Device</button>
-    ${
-      !isOnlyDevice && isProtected(device)
-        ? html`<p>
-            Your device is protected and you will be prompted to authenticate
-            with it before removal.
-          </p>`
-        : ""
-    }
-    ${isOnlyDevice ? "You cannot remove your last device" : ""}
+    ${shouldOfferToProtect(device)
+      ? html` <p>
+            By making your recovery phrase protected, you will need to input
+            your recovery phrase to delete it.
+          </p>
+          <button data-action="protect">Protect</button>
+          <hr />`
+      : ""}
+    ${!isOnlyDevice
+      ? html`<button data-action="remove">
+          Delete ${isRecovery(device) ? "Recovery" : "Device"}
+        </button>`
+      : ""}
+    ${!isOnlyDevice && isProtected(device)
+      ? html`<p>
+          Your device is protected and you will be prompted to authenticate with
+          it before removal.
+        </p>`
+      : ""}
+    ${isOnlyDevice
+      ? html`<p>This is your last device. You cannot remove it.</p>
+          <p>Without devices your anchor would be useless.</p>`
+      : ""}
     <button data-action="back">Back</button>
   </div>
   ${footer}
@@ -56,6 +63,9 @@ const shouldOfferToProtect = (device: DeviceData): boolean =>
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
+
+const isRecovery = (device: DeviceData): boolean =>
+  hasOwnProperty(device.purpose, "recovery");
 
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (

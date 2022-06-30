@@ -323,9 +323,9 @@ main {
 }
 
 hr {
-  margin-bottom: 1rem;
-  width: 100%;
-  border-top: 1px solid var(--grey-400);
+  margin: 1rem auto;
+  width: 60%;
+  border-top: 1px solid var(--grey-100);
 }
 
 #icLogo {
@@ -646,4 +646,8 @@ nav {
   width: fit-content;
   align-self: flex-end;
   margin: 0;
+}
+
+button[data-action="protect"] {
+  margin-bottom: 0;
 }
