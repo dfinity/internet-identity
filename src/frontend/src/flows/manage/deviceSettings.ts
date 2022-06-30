@@ -126,7 +126,7 @@ const init = async (
         device.protection = { protected: null };
 
         // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
-        // but we do it to make sure one last time that the user can actually succesfully authenticate
+        // but we do it to make sure one last time that the user can actually successfully authenticate
         // with the device.
         const newConnection = await deviceConnection(userNumber, device);
 
