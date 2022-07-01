@@ -23,6 +23,7 @@ pub struct DeviceData {
     pub credential_id: Option<CredentialId>,
     pub purpose: Purpose,
     pub key_type: KeyType,
+    pub protection: DeviceProtection,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -53,6 +54,14 @@ pub enum KeyType {
     CrossPlatform,
     #[serde(rename = "seed_phrase")]
     SeedPhrase,
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub enum DeviceProtection {
+    #[serde(rename = "protected")]
+    Protected,
+    #[serde(rename = "unprotected")]
+    Unprotected,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

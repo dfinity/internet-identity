@@ -49,6 +49,14 @@ type KeyType = variant {
     seed_phrase;
 };
 
+// This describes whether a device is "protected" or not.
+// When protected, a device can only be updated or removed if the
+// user is authenticated with that very device.
+type DeviceProtection = variant {
+    protected;
+    unprotected;
+};
+
 type Challenge = record {
     png_base64: text;
     challenge_key: ChallengeKey;
@@ -60,6 +68,7 @@ type DeviceData = record {
   credential_id : opt CredentialId;
   purpose: Purpose;
   key_type: KeyType;
+  protection: DeviceProtection;
 };
 
 type RegisterResponse = variant {
@@ -141,6 +150,7 @@ service : (opt InternetIdentityInit) -> {
   create_challenge : () -> (Challenge);
   register : (DeviceData, ChallengeResult) -> (RegisterResponse);
   add : (UserNumber, DeviceData) -> ();
+  update : (UserNumber, DeviceKey, DeviceData) -> ();
   remove : (UserNumber, DeviceKey) -> ();
   // Returns all devices of the user (authentication and recovery) but no information about device registrations.
   // Note: Will be changed in the future to be more consistent with get_anchor_info.

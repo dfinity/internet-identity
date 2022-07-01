@@ -79,7 +79,7 @@ export const apiResultToLoginFlowResult = (
         tag: "err",
         title: "Invalid Seed Phrase",
         message:
-          "Failed to recover using this seedphrase. Did you enter it correctly?",
+          "Failed to authenticate using this seed phrase. Did you enter it correctly?",
       };
     }
   }

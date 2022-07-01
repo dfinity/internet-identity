@@ -1,21 +1,21 @@
 import { render, html } from "lit-html";
-import { bufferEqual, IIConnection } from "../utils/iiConnection";
-import { withLoader } from "../components/loader";
-import { initLogout, logoutSection } from "../components/logout";
-import { navbar } from "../components/navbar";
-import { footer } from "../components/footer";
+import { IIConnection } from "../../utils/iiConnection";
+import { withLoader } from "../../components/loader";
+import { initLogout, logoutSection } from "../../components/logout";
+import { navbar } from "../../components/navbar";
+import { footer } from "../../components/footer";
+import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../generated/internet_identity_types";
-import { closeIcon, warningIcon } from "../components/icons";
-import { displayError } from "../components/displayError";
-import { setupRecovery } from "./recovery/setupRecovery";
-import { hasOwnProperty, unknownToString } from "../utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { pollForTentativeDevice } from "./addDevice/manage/pollForTentativeDevice";
-import { chooseDeviceAddFlow } from "./addDevice/manage";
-import { addLocalDevice } from "./addDevice/manage/addLocalDevice";
+} from "../../../generated/internet_identity_types";
+import { settingsIcon, warningIcon } from "../../components/icons";
+import { displayError } from "../../components/displayError";
+import { setupRecovery } from "../recovery/setupRecovery";
+import { hasOwnProperty } from "../../utils/utils";
+import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
+import { chooseDeviceAddFlow } from "../addDevice/manage";
+import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -177,9 +177,11 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${footer}
 `;
 
-const deviceListItem = (alias: string) => html`
-  <div class="deviceItemAlias">${alias}</div>
-  <button type="button" class="deviceItemRemove">${closeIcon}</button>
+const deviceListItem = (device: DeviceData) => html`
+  <div class="deviceItemAlias">${device.alias}</div>
+  <button type="button" data-action="settings" class="deviceItemAction">
+    ${settingsIcon}
+  </button>
 `;
 
 const recoveryNag = () => html`
@@ -190,9 +192,7 @@ const recoveryNag = () => html`
       <div class="warnMessage">
         Add a recovery mechanism to help protect this Identity Anchor.
       </div>
-      <button id="addRecovery" class="primary warnButton">
-        Add Recovery Key
-      </button>
+      <button id="addRecovery" class="primary warnButton">Add Recovery</button>
     </div>
   </div>
 `;
@@ -274,19 +274,34 @@ const renderDevices = async (
 ) => {
   const list = document.createElement("ul");
   const recoveryList = document.createElement("ul");
+  const isOnlyDevice = devices.length < 2;
 
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
     identityElement.className = "deviceItem";
-    render(deviceListItem(device.alias), identityElement);
-    const isOnlyDevice = devices.length < 2;
-    bindRemoveListener(
-      userNumber,
-      connection,
-      identityElement,
-      device,
-      isOnlyDevice
-    );
+
+    render(deviceListItem(device), identityElement);
+    const buttonSettings = identityElement.querySelector(
+      "button[data-action=settings]"
+    ) as HTMLButtonElement;
+    if (buttonSettings !== null) {
+      buttonSettings.onclick = async () => {
+        await deviceSettings(
+          userNumber,
+          connection,
+          device,
+          isOnlyDevice
+        ).catch((e) =>
+          displayError({
+            title: "Could not edit device",
+            message: "An error happened on the settings page.",
+            detail: e.toString(),
+            primaryButton: "Ok",
+          })
+        );
+        await renderManage(userNumber, connection);
+      };
+    }
     hasOwnProperty(device.purpose, "recovery")
       ? recoveryList.appendChild(identityElement)
       : list.appendChild(identityElement);
@@ -303,63 +318,6 @@ const renderDevices = async (
     recoveryDevices.innerHTML = ``;
     recoveryDevices.appendChild(recoveryList);
   }
-};
-
-// Add listener to the "X" button, right of the device name. Performs some
-// checks before removing the device (is the user is authenticated with the
-// device to remove, or if the device is the last one).
-const bindRemoveListener = (
-  userNumber: bigint,
-  connection: IIConnection,
-  listItem: HTMLElement,
-  device: DeviceData,
-  isOnlyDevice: boolean
-) => {
-  const button = listItem.querySelector("button") as HTMLButtonElement;
-  button.onclick = async () => {
-    const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
-      .buffer as DerEncodedPublicKey;
-    const sameDevice = bufferEqual(
-      connection.identity.getPublicKey().toDer(),
-      pubKey
-    );
-
-    if (isOnlyDevice) {
-      return alert("You can not remove your last device.");
-    } else {
-      const shouldProceed = sameDevice
-        ? confirm(
-            "This will remove your current device and you will be logged out."
-          )
-        : confirm(
-            `Do you really want to remove the ${
-              hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-            }"${device.alias}"?`
-          );
-      if (!shouldProceed) {
-        return;
-      }
-    }
-
-    // Otherwise, remove identity
-    try {
-      await withLoader(() => connection.remove(userNumber, device.pubkey));
-      if (sameDevice) {
-        localStorage.clear();
-        location.reload();
-      }
-      renderManage(userNumber, connection);
-    } catch (err: unknown) {
-      await displayError({
-        title: "Failed to remove the device",
-        message:
-          "An unexpected error occured when trying to remove the device. Please try again",
-        detail: unknownToString(err, "Unknown error"),
-        primaryButton: "Back to Manage",
-      });
-      renderManage(userNumber, connection);
-    }
-  };
 };
 
 // Whether or the user has registered a device as recovery

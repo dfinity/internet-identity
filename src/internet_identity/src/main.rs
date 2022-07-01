@@ -61,6 +61,7 @@ struct DeviceDataInternal {
     credential_id: Option<CredentialId>,
     purpose: Option<Purpose>,
     key_type: Option<KeyType>,
+    protection: Option<DeviceProtection>,
 }
 
 impl From<DeviceData> for DeviceDataInternal {
@@ -71,6 +72,7 @@ impl From<DeviceData> for DeviceDataInternal {
             credential_id: device_data.credential_id,
             purpose: Some(device_data.purpose),
             key_type: Some(device_data.key_type),
+            protection: Some(device_data.protection),
         }
     }
 }
@@ -85,6 +87,9 @@ impl From<DeviceDataInternal> for DeviceData {
                 .purpose
                 .unwrap_or(Purpose::Authentication),
             key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
+            protection: device_data_internal
+                .protection
+                .unwrap_or(DeviceProtection::Unprotected),
         }
     }
 }
@@ -399,7 +404,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         return RegisterResponse::BadChallenge;
     }
 
-    check_entry_limits(&device_data);
+    check_device(&device_data);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
         ic_cdk::trap(&format!(
@@ -433,7 +438,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
 async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
-    check_entry_limits(&device_data);
+    check_device(&device_data);
 
     ensure_salt_set().await;
 
@@ -477,6 +482,78 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
     })
 }
 
+/// Replace or remove an existing device.
+///
+/// NOTE: all mutable operations should call this function because it handles device protection
+fn mutate_device_or_trap(
+    entries: &mut Vec<DeviceDataInternal>,
+    device_key: DeviceKey,
+    new_value: Option<DeviceData>,
+) {
+    let index = match entries.iter().position(|e| e.pubkey == device_key) {
+        None => trap("Could not find device to mutate, check device key"),
+        Some(index) => index,
+    };
+
+    let device = entries.get_mut(index).unwrap();
+
+    // Run appropriate checks for protected devices
+    match device.protection {
+        None => (),
+        Some(DeviceProtection::Unprotected) => (),
+        Some(DeviceProtection::Protected) => {
+            // If the call is not authenticated with the device to mutate, abort
+            if caller() != Principal::self_authenticating(&device.pubkey) {
+                trap("Device is protected. Must be authenticated with this device to mutate");
+            }
+        }
+    };
+
+    match new_value {
+        Some(device_data) => {
+            *device = device_data.into();
+        }
+        None => {
+            // NOTE: we void the more efficient remove_swap to ensure device ordering
+            // is not changed
+            entries.remove(index);
+        }
+    }
+}
+
+#[update]
+async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+    check_device(&device_data);
+    if device_key != device_data.pubkey {
+        trap("device key may not be updated");
+    }
+
+    STATE.with(|s| {
+        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to read device data of user {}: {}",
+                user_number, err
+            ))
+        });
+
+        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+
+        mutate_device_or_trap(&mut entries, device_key, Some(device_data));
+
+        s.storage
+            .borrow()
+            .write(user_number, entries)
+            .unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to write device data of user {}: {}",
+                    user_number, err
+                ))
+            });
+
+        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+    })
+}
+
 #[update]
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     ensure_salt_set().await;
@@ -492,9 +569,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        if let Some(i) = entries.iter().position(|e| e.pubkey == device_key) {
-            entries.swap_remove(i as usize);
-        }
+        mutate_device_or_trap(&mut entries, device_key, None);
 
         s.storage
             .borrow()
@@ -1058,6 +1133,27 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
         }
     }
     ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+}
+
+/// This checks some device invariants, in particular:
+///   * Sizes of various fields do not exceed limits
+///   * Only recovery phrases can be protected
+///
+///  Otherwise, trap.
+///
+///  NOTE: while in the future we may lift this restriction, for now we do ensure that
+///  protected devices are limited to recovery phrases, which the webapp expects.
+fn check_device(device_data: &DeviceData) {
+    check_entry_limits(device_data);
+
+    if device_data.protection == DeviceProtection::Protected
+        && device_data.key_type != KeyType::SeedPhrase
+    {
+        trap(&format!(
+            "Only recovery phrases can be protected but key type is {:?}",
+            device_data.key_type
+        ));
+    }
 }
 
 fn check_entry_limits(device_data: &DeviceData) {

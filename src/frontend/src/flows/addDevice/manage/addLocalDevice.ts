@@ -52,6 +52,7 @@ export const addLocalDevice = async (
         { unknown: null },
         { authentication: null },
         newDevice.getPublicKey().toDer(),
+        { unprotected: null },
         newDevice.rawId
       )
     );

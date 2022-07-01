@@ -1,6 +1,7 @@
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 use crate::framework;
 use crate::framework::CallError;
+use candid;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 use sdk_ic_types::Principal;
@@ -8,7 +9,9 @@ use sdk_ic_types::Principal;
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     let user_number: types::UserNumber = 0;
-    let _: (Vec<types::DeviceData>,) =
+    // XXX: we use "IDLValue" because we're just checking that the canister is sending
+    // valid data, but we don't care about the actual data.
+    let _: (candid::parser::value::IDLValue,) =
         framework::call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
@@ -109,6 +112,83 @@ pub fn lookup(
     framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
 }
 
+/// A "compatibility" module for older versions of II that don't necessarily have a
+/// `protection`. Can be removed once the latest release includes `protection`.
+pub mod compat {
+
+    use crate::framework;
+    use crate::framework::CallError;
+    use candid;
+    use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
+    use internet_identity_interface as types;
+
+    use candid::{CandidType, Deserialize};
+
+    pub fn lookup(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        user_number: types::UserNumber,
+    ) -> Result<Vec<types::DeviceData>, CallError> {
+        let device_data: Vec<super::compat::DeviceData> =
+            framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)?;
+        Ok(device_data.iter().map(|old| old.clone().into()).collect())
+    }
+
+    /// A version of `DeviceData` that is compatible with code with or without `protection`.
+    #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+    pub struct DeviceData {
+        pub pubkey: types::DeviceKey,
+        pub alias: String,
+        pub credential_id: Option<types::CredentialId>,
+        pub purpose: types::Purpose,
+        pub key_type: types::KeyType,
+        pub protection: Option<types::DeviceProtection>,
+    }
+
+    impl From<DeviceData> for types::DeviceData {
+        fn from(device_data_old: DeviceData) -> Self {
+            Self {
+                pubkey: device_data_old.pubkey,
+                alias: device_data_old.alias,
+                credential_id: device_data_old.credential_id,
+                purpose: device_data_old.purpose,
+                key_type: device_data_old.key_type,
+                protection: device_data_old
+                    .protection
+                    .unwrap_or(types::DeviceProtection::Unprotected),
+            }
+        }
+    }
+
+    // Same as above, for get_anchor_info
+    pub fn get_anchor_info(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: PrincipalId,
+        user_number: types::UserNumber,
+    ) -> Result<types::IdentityAnchorInfo, CallError> {
+        let info: super::compat::IdentityAnchorInfo =
+            framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
+                .map(|(x,)| x)?;
+        Ok(info.into())
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize)]
+    pub struct IdentityAnchorInfo {
+        pub devices: Vec<DeviceData>,
+        pub device_registration: Option<types::DeviceRegistrationInfo>,
+    }
+
+    impl From<IdentityAnchorInfo> for types::IdentityAnchorInfo {
+        fn from(old: IdentityAnchorInfo) -> Self {
+            Self {
+                devices: old.devices.into_iter().map(|e| e.into()).collect(),
+                device_registration: old.device_registration,
+            }
+        }
+    }
+}
+
 pub fn add(
     env: &StateMachine,
     canister_id: CanisterId,
@@ -117,6 +197,23 @@ pub fn add(
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
     framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+}
+
+pub fn update(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: PrincipalId,
+    user_number: types::UserNumber,
+    device_key: types::PublicKey,
+    device_data: types::DeviceData,
+) -> Result<(), CallError> {
+    framework::call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "update",
+        (user_number, device_key, device_data),
+    )
 }
 
 pub fn remove(

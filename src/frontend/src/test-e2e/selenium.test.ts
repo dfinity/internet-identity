@@ -10,6 +10,7 @@ import {
   CompatabilityNoticeView,
   DemoAppView,
   FAQView,
+  DeviceSettingsView,
   MainView,
   NotInRegistrationModeView,
   RecoverView,
@@ -331,6 +332,105 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
+test("Remove unprotected recovery phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+
+    const recoveryAlias = "Recovery phrase";
+    await mainView.waitForDeviceDisplay(recoveryAlias);
+    await mainView.deviceSettings(recoveryAlias);
+
+    const settingsView = new DeviceSettingsView(browser);
+    await settingsView.waitForDisplay();
+    await settingsView.remove();
+    await browser.acceptAlert();
+
+    await mainView.waitForDeviceNotDisplay(recoveryAlias);
+  });
+}, 300_000);
+
+test("Make recovery protected", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+
+    const recoveryAlias = "Recovery phrase";
+    await mainView.deviceSettings(recoveryAlias);
+
+    const settingsView = new DeviceSettingsView(browser);
+    await settingsView.waitForDisplay();
+    await settingsView.protect(seedPhrase);
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+
+    const recoveryAlias = "Recovery phrase";
+    await mainView.deviceSettings(recoveryAlias);
+
+    const settingsView = new DeviceSettingsView(browser);
+    await settingsView.waitForDisplay();
+    await settingsView.protect(seedPhrase);
+
+    await settingsView.remove();
+    await browser.acceptAlert();
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDisplay();
+    await mainView.waitForDeviceNotDisplay(recoveryAlias);
+  });
+}, 300_000);
+
+test("Remove protected recovery phrase, confirm with empty seed phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+
+    const recoveryAlias = "Recovery phrase";
+    await mainView.deviceSettings(recoveryAlias);
+
+    const settingsView = new DeviceSettingsView(browser);
+    await settingsView.waitForDisplay();
+    await settingsView.protect(seedPhrase);
+
+    await settingsView.remove();
+    await browser.acceptAlert();
+
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase("");
+    await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.waitForInvalidSeedPhraseDisplay();
+  });
+}, 300_000);
+
 test("Screenshots", async () => {
   await runInBrowser(
     async (browser: WebdriverIO.Browser, runConfig: RunConfiguration) => {
@@ -481,8 +581,14 @@ test("Screenshots", async () => {
         await mainView2.fixup();
         await screenshots.take("new-device-listed", browser2);
 
+        // Go to the device settings
+        await mainView2.deviceSettings(DEVICE_NAME2);
+        const settingsView = new DeviceSettingsView(browser2);
+        await settingsView.waitForDisplay();
+        await screenshots.take("device-settings", browser2);
+
         // Try to remove current device
-        await mainView2.removeDevice(DEVICE_NAME2);
+        await settingsView.remove();
         await browser2.waitUntil(
           async () => !!(await browser2.getAlertText()),
           {
@@ -525,7 +631,12 @@ test("Screenshots", async () => {
       await singleDeviceWarningView.waitForDisplay();
       await singleDeviceWarningView.remindLater();
       await mainView.waitForDeviceDisplay(DEVICE_NAME2);
-      await mainView.removeDevice(DEVICE_NAME2);
+      await mainView.deviceSettings(DEVICE_NAME2);
+
+      const settingsView = new DeviceSettingsView(browser);
+      await settingsView.waitForDisplay();
+      await settingsView.remove();
+
       await browser.waitUntil(
         async () => (await browser.getAlertText()) !== undefined,
         {
@@ -551,10 +662,11 @@ test("Screenshots", async () => {
       await mainView.fixup();
       await screenshots.take("after-removal", browser);
 
-      await mainView.removeDevice(DEVICE_NAME1);
-      const alertText = await browser.getAlertText();
-      expect(alertText).toBe("You can not remove your last device.");
-      await browser.acceptAlert();
+      // Make sure last device cannot be removed
+      await mainView.deviceSettings(DEVICE_NAME1);
+      await settingsView.waitForDisplay();
+      await settingsView.removeDisabled();
+      await settingsView.back();
 
       // device still present. You can't remove your last device.
       await mainView.waitForDeviceDisplay(DEVICE_NAME1);
