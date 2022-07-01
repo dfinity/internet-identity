@@ -139,7 +139,7 @@ const init = async (
         const newConnection = await deviceConnection(
           userNumber,
           device,
-          "Please input your recovery phrase for protecting it."
+          "Please input your recovery phrase to protect it."
         );
 
         await withLoader(async () => {
@@ -195,7 +195,7 @@ const init = async (
           ? await deviceConnection(
               userNumber,
               device,
-              "Please input your recovery phrase for removing it."
+              "Please input your recovery phrase to remove it."
             )
           : connection;
 
