@@ -198,7 +198,7 @@ export class MainView extends View {
 
 export class DeviceSettingsView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("h1=Device Management").waitForDisplayed();
+    await this.browser.$("#deviceSettings").waitForDisplayed();
   }
 
   async remove(): Promise<void> {
@@ -221,7 +221,7 @@ export class DeviceSettingsView extends View {
   async removeDisabled(): Promise<void> {
     await this.browser
       .$("button[data-action='remove']")
-      .waitForEnabled({ reverse: true });
+      .waitForDisplayed({ reverse: true });
   }
 }
 

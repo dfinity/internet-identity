@@ -12,9 +12,6 @@ import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
 
-// The styling of the page
-const style = () => html`<style></style> `;
-
 // Actual page content. We display options for protecting recovery phrases or
 // deleting general devices.
 const pageContent = (
@@ -22,8 +19,7 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean
 ) => html`
-  ${style()}
-  <div class="container">
+  <div id="deviceSettings" class="container">
     <h1 style="margin: 0 0 1.5rem">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
