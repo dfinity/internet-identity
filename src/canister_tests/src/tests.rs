@@ -1,4 +1,4 @@
-use crate::framework::{device_data_1, expect_user_error_with_message, principal_1, principal_2};
+use crate::framework::{device_data_1, expect_user_error_with_message, principal_2};
 use crate::{api, flows, framework};
 use ic_error_types::ErrorCode;
 use ic_state_machine_tests::StateMachine;
@@ -33,35 +33,94 @@ fn ii_upgrade_retains_anchors() {
     assert_eq!(retrieved_device_data, vec![device_data_1()]);
 }
 
-#[test]
-fn ii_canister_can_be_upgraded_and_rolled_back() {
-    let env = StateMachine::new();
-    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
-    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
-    api::health_check(&env, canister_id);
-    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
-    api::health_check(&env, canister_id);
-}
+/// Tests for making sure that any release can be rolled back. This tests stable memory compatibility and pre / post install hooks.
+#[cfg(test)]
+mod rollback_tests {
+    use crate::framework::{device_data_1, device_data_2, principal_1, CallError};
+    use crate::{api, flows, framework};
+    use ic_state_machine_tests::StateMachine;
+    use sdk_ic_types::Principal;
+    use serde_bytes::ByteBuf;
 
-#[test]
-fn upgrade_and_rollback_keeps_anchors_intact() {
-    let env = StateMachine::new();
-    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
-    let user_number = flows::register_anchor(&env, canister_id);
-    let mut devices_before = api::compat::lookup(&env, canister_id, user_number).unwrap();
-    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
-    api::health_check(&env, canister_id);
-    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
-    api::health_check(&env, canister_id);
-    let mut devices_after =
-        api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
-            .unwrap()
-            .devices;
+    /// Tests simple upgrade and downgrade.
+    #[test]
+    fn ii_canister_can_be_upgraded_and_rolled_back() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+        api::health_check(&env, canister_id);
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
+        api::health_check(&env, canister_id);
+    }
 
-    devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+    /// Tests that the devices can still be read after upgrade and rollback.
+    #[test]
+    fn upgrade_and_rollback_keeps_anchor_intact() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let mut devices_before = api::compat::lookup(&env, canister_id, user_number).unwrap();
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+        api::health_check(&env, canister_id);
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
+        api::health_check(&env, canister_id);
+        let mut devices_after =
+            api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
+                .unwrap()
+                .devices;
 
-    assert_eq!(devices_before, devices_after);
+        devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+        assert_eq!(devices_before, devices_after);
+    }
+
+    /// Verifies that an anchor that was created with the new version of II can still be used when
+    /// II is rolled back to the previous version.
+    #[test]
+    fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
+        let frontend_hostname = "frontend.com";
+        let env = StateMachine::new();
+
+        // use the new version to register an anchor
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        let principal = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+        )?;
+
+        // roll back
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
+
+        // use anchor
+        let devices = api::compat::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices, [device_data_1()]);
+
+        let (user_key, _) = api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            frontend_hostname.to_string(),
+            ByteBuf::from("session key"),
+            None,
+        )?;
+        assert_eq!(Principal::self_authenticating(user_key), principal);
+
+        // make sure devices can also be modified
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        Ok(())
+    }
 }
 
 #[test]
