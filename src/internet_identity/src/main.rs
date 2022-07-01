@@ -596,11 +596,9 @@ async fn create_challenge() -> Challenge {
 
         // Prune old challenges. This drops all challenges that are older than
         // CAPTCHA_CHALLENGE_LIFETIME
-        // TODO: test this
         inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
 
         // Error out if there are too many inflight challenges
-        // TODO: test this
         if inflight_challenges.len() >= MAX_INFLIGHT_CHALLENGES {
             trap("too many inflight captchas");
         }

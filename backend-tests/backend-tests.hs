@@ -361,36 +361,6 @@ tests wasm_file = testGroup "Tests" $ upgradeGroups $
     assertStats cid 0
     lookupIs cid 123 []
 
-  , withUpgrade $ \should_upgrade -> iiTestWithInit "init range" (100, 103) $ \cid -> do
-    s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range @?= (100, 103)
-
-    assertStats cid 0
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    liftIO $ user_number @?= 100
-    assertStats cid 1
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    liftIO $ user_number @?= 101
-    assertStats cid 2
-
-    when should_upgrade $ doUpgrade cid
-    s <- queryII cid dummyUserId #stats ()
-    -- The storage updates the upper bound on upgrade if it doesn't use the
-    -- full capacity. This is a hack that has to go away when we start using
-    -- multiple backend canisters.
-    let expected_upper_bound = if should_upgrade then 100 + 3_774_873 else 103
-    lift $ s .! #assigned_user_number_range @?= (100, expected_upper_bound)
-
-    user_number <- register cid webauth1ID device1 >>= mustGetUserNumber
-    liftIO $ user_number @?= 102
-    assertStats cid 3
-
-  , withoutUpgrade $ iiTestWithInit "empty init range" (100, 100) $ \cid -> do
-    s <- queryII cid dummyUserId #stats ()
-    lift $ s .! #assigned_user_number_range @?= (100, 100)
-    response <- register cid webauth1ID device1
-    assertVariant #canister_full response
-
   , withUpgrade $ \should_upgrade -> testCase "upgrade from stable memory backup" $ withIC $ do
     -- See test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md for providence
     t <- getTimestamp

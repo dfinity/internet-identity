@@ -1,9 +1,6 @@
-use crate::framework::{device_data_1, expect_user_error_with_message, principal_2};
+use crate::framework::device_data_1;
 use crate::{api, flows, framework};
-use ic_error_types::ErrorCode;
 use ic_state_machine_tests::StateMachine;
-use internet_identity_interface as types;
-use regex::Regex;
 
 #[test]
 fn ii_canister_can_be_installed() {
@@ -123,27 +120,184 @@ mod rollback_tests {
     }
 }
 
-#[test]
-fn registration_with_mismatched_sender_fails() {
-    let env = StateMachine::new();
-    let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
-    let challenge = api::create_challenge(&env, canister_id);
-    let result = api::register(
-        &env,
-        canister_id,
-        principal_2(),
-        &device_data_1(),
-        types::ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-    );
+/// Tests for the user registration flow. The registration process consists of two canister calls:
+/// 1. create_challenge: retrieve a captcha
+/// 2. register: submit the captcha solution and device information to create a new anchor
+#[cfg(test)]
+mod registration_tests {
+    use crate::framework::{
+        device_data_1, expect_user_error_with_message, principal_1, principal_2, CallError,
+    };
+    use crate::{api, flows, framework};
+    use ic_error_types::ErrorCode::CanisterCalledTrap;
+    use ic_state_machine_tests::StateMachine;
+    use internet_identity_interface::{ChallengeAttempt, InternetIdentityInit, RegisterResponse};
+    use regex::Regex;
+    use sdk_ic_types::Principal;
+    use std::time::Duration;
 
-    expect_user_error_with_message(
-        result,
-        ErrorCode::CanisterCalledTrap,
-        Regex::new("[a-z0-9-]+ could not be authenticated against").unwrap(),
-    );
+    /// Tests user registration with cross checks for lookup, get_anchor_info and get_principal.
+    #[test]
+    fn should_register_new_anchor() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices, vec![device_data_1()]);
+        let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
+        assert_eq!(anchor_info.devices, vec![device_data_1()]);
+        let principal = api::get_principal(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            "https://some-frontend.com".to_string(),
+        )?;
+        assert_ne!(principal, Principal::anonymous());
+        Ok(())
+    }
+
+    /// Tests that multiple anchors can be registered (even with the same device / keys). This is useful
+    /// for users to separate different contexts using multiple anchors.
+    #[test]
+    fn should_allow_multiple_registrations() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number_1 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+        let user_number_2 =
+            flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+
+        assert_ne!(user_number_1, user_number_2);
+    }
+
+    /// Tests that the user numbers start at the beginning of the init range and are capped at the end (exclusive).
+    #[test]
+    fn should_assign_correct_user_numbers() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister_with_arg(
+            &env,
+            framework::II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: (127, 129),
+            }),
+        );
+
+        let user_number = flows::register_anchor(&env, canister_id);
+        assert_eq!(user_number, 127);
+
+        let user_number = flows::register_anchor(&env, canister_id);
+        assert_eq!(user_number, 128);
+
+        let challenge = api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        )?;
+        assert!(matches!(result, RegisterResponse::CanisterFull));
+        Ok(())
+    }
+
+    /// Tests that the call to register needs to be signed by the device that is being registered.
+    /// This is to make sure that the initial public key belongs to a private key that can be used to sign requests.
+    #[test]
+    fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let challenge = api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_2(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("[a-z\\d-]+ could not be authenticated against").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Tests that the solution to the captcha needs to be correct.
+    #[test]
+    fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let challenge = api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "wrong solution".to_string(),
+                key: challenge.challenge_key,
+            },
+        )?;
+
+        assert!(matches!(result, RegisterResponse::BadChallenge));
+        Ok(())
+    }
+
+    /// Tests that there is a time limit for captchas.
+    /// Currently only checked by create_challenge, see L2-766.
+    #[test]
+    fn should_not_allow_expired_captcha() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let challenge = api::create_challenge(&env, canister_id)?;
+        env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
+
+        // required because register does not check captcha expiry
+        api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        )?;
+
+        assert!(matches!(result, RegisterResponse::BadChallenge));
+        Ok(())
+    }
+
+    /// Tests that there is a maximum number of captchas that can be created in a given timeframe.
+    #[test]
+    fn should_limit_captcha_creation() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        for _ in 0..500 {
+            api::create_challenge(&env, canister_id)?;
+        }
+        let result = api::create_challenge(&env, canister_id);
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("too many inflight captchas").unwrap(),
+        );
+        Ok(())
+    }
 }
 
 /// Tests related to local device management (add, remove, lookup, get_anchor_info).
@@ -1249,7 +1403,7 @@ mod http_tests {
     };
     use crate::{api, flows, framework};
     use ic_state_machine_tests::StateMachine;
-    use internet_identity_interface::{ChallengeAttempt, HttpRequest};
+    use internet_identity_interface::{ChallengeAttempt, HttpRequest, InternetIdentityInit};
     use serde_bytes::ByteBuf;
     use std::time::{Duration, SystemTime};
 
@@ -1361,6 +1515,39 @@ mod http_tests {
         assert_eq!(min_user_number, 10_000);
         assert_eq!(max_user_number, 3_784_872);
         Ok(())
+    }
+
+    #[test]
+    fn should_widen_user_range_on_upgrade() {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister_with_arg(
+            &env,
+            framework::II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: (127, 129),
+            }),
+        );
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
+        assert_eq!(min_user_number, 127);
+        assert_eq!(max_user_number, 128);
+
+        // The storage updates the upper bound on upgrade if it doesn't use the
+        // full capacity. This is a hack that has to go away when we start using
+        // multiple backend canisters.
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        let metrics = flows::get_metrics(&env, canister_id);
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
+        assert_eq!(min_user_number, 127);
+        assert_eq!(max_user_number, 3_774_999);
     }
 
     /// Verifies that the user count metric is updated correctly.
@@ -1493,8 +1680,8 @@ mod http_tests {
             framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
         assert_eq!(challenge_count, 0);
 
-        let challenge_1 = api::create_challenge(&env, canister_id);
-        api::create_challenge(&env, canister_id);
+        let challenge_1 = api::create_challenge(&env, canister_id)?;
+        api::create_challenge(&env, canister_id)?;
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
@@ -1521,7 +1708,7 @@ mod http_tests {
         // long after expiry (we don't want this test to break, if we change the captcha expiration)
         env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
         // the only call that prunes expired captchas
-        api::create_challenge(&env, canister_id);
+        api::create_challenge(&env, canister_id)?;
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
