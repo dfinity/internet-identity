@@ -35,6 +35,7 @@ Some functional requirements are
  * users have separate identities (or "pseudonyms") per client application (more precisely, per client application frontend "hostname")
  * these identities are stable, i.e., do not depend on a user's security devices
  * the client frontends interact with any canister on the Internet Computer under the user’s identity with that frontend
+ ** client frontends may choose to interact with a canister using the canister's frontend url given the canister authorizes the frontend to do so
  * users do not need ever to remember secret information (but possibly per-user non-secret information)
  * a security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
 
@@ -125,12 +126,14 @@ where `msg` is a value with of type
    kind: "authorize-client";
    sessionPublicKey: Uint8Array;
    maxTimeToLive?: bigint;
+   derivationOrigin?: string;
  }
 
 where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the https://internetcomputer.org/docs/current/references/ic-interface-spec/#state-tree-canister-information[_public_ custom WASM section] `ii_alternative_domains` of the corresponding canister (see <<alternative-frontend-origins>>).
 --
 6. Now the client application window expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -170,8 +173,19 @@ The client application frontend should support delegation chains of length more 
 The Internet Identity frontend will use `event.origin` as the “Frontend URL” to base the user identity on. This includes protocol, full hostname and port. This means
 
 * Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
+** However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see <<alternative-frontend-origins>>.
 * The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
 --
+
+[#alternative-frontend-origins]
+=== Alternative Frontend Origins
+To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see <<client-auth-protocol>>). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
+
+*Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default. However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
+
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the https://internetcomputer.org/docs/current/references/ic-interface-spec/#state-tree-canister-information[_public_ canister metadata] with name `ii_alternative_origins`. The value of this metadata must be candid encoded `(Vec<Text>)`, where each element is an allowed alternative frontend URL.
+
+The tool https://github.com/dfinity/ic-wasm[ic-wasm] can be used to add custom sections to wasm modules.
 
 == The Internet Identity Service Backend interface
 
@@ -528,13 +542,18 @@ This flow is the boring default
 2. 👆 The appropriate login subflow happens
 3. The frontend listens to a `message` event (as per https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage[`postMessage` API])
 4. The `event.data` should be a message as per our <<client-auth-protocol>>.
-5. The `event.origin` is used as the Application Frontend’s hostname
-6. The front end calls `get_principal()` to obtain the user- and front-end-specific principal.
-7. The user is asked if they want to log into the client application, showing the client application frontend’s hostname and the used principal.
+5. If the `message` contains a value for `derivationOrigin`:
+  . If the `derivationOrigin` value does not match the format specified in the section  <<client-auth-protocol>>, the process flow is aborted with a failure message.
+  . The frontend calls `/api/v2/canister/<effective_canister_id>/read_state` to retrieve the `ii_alternative_origins` metadata of the canister corresponding to the `derivationOrigin`
+  . If there is no such metadata in the state tree, the flow is aborted with a failure message.
+  . The frontend decodes the retrieved metadata as per encoding specified in section <<alternative-frontend-origins>>.
+  . If the `event.origin` is listed in the decoded metadata the `derivationOrigin` will be used as the Application Frontend’s hostname.
+6. If the `message` does _not_ contain a value for `derivationOrigin` the `event.origin` is used as the Application Frontend’s hostname
+7. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
 8. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
 9. The frontend queries `get_delegation()` to get the delegation data
 10. It posts that data to the client application, using `event.source.postMessage` and the types specified in <<client-auth-protocol>>.
-11. It shows a message indicating that the login is complete.
+11. After receiving the data the client application is expected to close the Internet Identity window / tab.
 
 === Flow: Deleting devices
 
