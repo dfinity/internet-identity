@@ -555,7 +555,7 @@ mod stable_memory_tests {
         Ok(())
     }
 
-    /// Verifies that an existing account with two recovery can only make changes after deleting one.
+    /// Verifies that an existing account with two recovery phrases can only make changes after deleting one.
     /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
     #[test]
     fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), CallError> {
