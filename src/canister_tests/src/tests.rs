@@ -131,7 +131,9 @@ mod registration_tests {
     use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
-    use internet_identity_interface::{ChallengeAttempt, InternetIdentityInit, RegisterResponse};
+    use internet_identity_interface::{
+        ChallengeAttempt, DeviceProtection, InternetIdentityInit, RegisterResponse,
+    };
     use regex::Regex;
     use sdk_ic_types::Principal;
     use std::time::Duration;
@@ -227,6 +229,34 @@ mod registration_tests {
             result,
             CanisterCalledTrap,
             Regex::new("[a-z\\d-]+ could not be authenticated against").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Verifies that non-recovery devices cannot be registered as protected.
+    #[test]
+    fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let mut device1 = device_data_1();
+        device1.protection = DeviceProtection::Protected;
+
+        let challenge = api::create_challenge(&&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device1,
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Only recovery phrases can be protected but key type is Unknown").unwrap(),
         );
         Ok(())
     }
@@ -886,28 +916,19 @@ mod device_management_tests {
             );
         }
 
-        /// Verifies that unprotected devices can only be updated from themselves,
-        /// even if the authenticated device itself is protected
+        /// Verifies that non-recovery devices cannot be updated to be protected.
         #[test]
-        fn should_not_update_protected_with_different_protected_device() {
+        fn should_not_update_non_recovery_device_to_be_protected() {
             let env = StateMachine::new();
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let user_number = flows::register_anchor(&env, canister_id);
+
             let mut device1 = device_data_1();
             device1.protection = types::DeviceProtection::Protected;
-            device1.key_type = types::KeyType::SeedPhrase;
-            let user_number =
-                flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
-
-            let mut device2 = device_data_2();
-            device2.protection = types::DeviceProtection::Protected;
-            device2.key_type = types::KeyType::SeedPhrase;
-
-            api::add(&env, canister_id, principal_1(), user_number, device2).unwrap();
-
             let result = api::update(
                 &env,
                 canister_id,
-                principal_2(),
+                principal_1(),
                 user_number,
                 device1.pubkey.clone(),
                 device1.clone(), // data here doesnt' actually matter
@@ -916,7 +937,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                Regex::new("Only recovery phrases can be protected but key type is Unknown")
                     .unwrap(),
             );
         }
