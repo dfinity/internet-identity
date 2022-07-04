@@ -106,6 +106,8 @@ pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Ve
 
 pub const PUBKEY_1: &str = "test";
 pub const PUBKEY_2: &str = "some other key";
+pub const RECOVERY_PUBKEY_1: &str = "recovery 1";
+pub const RECOVERY_PUBKEY_2: &str = "recovery 2";
 
 pub fn principal_1() -> PrincipalId {
     PrincipalId(Principal::self_authenticating(PUBKEY_1))
@@ -113,6 +115,13 @@ pub fn principal_1() -> PrincipalId {
 
 pub fn principal_2() -> PrincipalId {
     PrincipalId(Principal::self_authenticating(PUBKEY_2))
+}
+pub fn principal_recovery_1() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(RECOVERY_PUBKEY_1))
+}
+
+pub fn principal_recovery_2() -> PrincipalId {
+    PrincipalId(Principal::self_authenticating(RECOVERY_PUBKEY_2))
 }
 
 pub fn device_data_1() -> types::DeviceData {
@@ -133,6 +142,28 @@ pub fn device_data_2() -> types::DeviceData {
         credential_id: None,
         purpose: types::Purpose::Authentication,
         key_type: types::KeyType::Unknown,
+        protection: types::DeviceProtection::Unprotected,
+    }
+}
+
+pub fn recovery_device_data_1() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from(RECOVERY_PUBKEY_1),
+        alias: "Recovery Phrase 1".to_string(),
+        credential_id: None,
+        purpose: types::Purpose::Recovery,
+        key_type: types::KeyType::SeedPhrase,
+        protection: types::DeviceProtection::Unprotected,
+    }
+}
+
+pub fn recovery_device_data_2() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from(RECOVERY_PUBKEY_2),
+        alias: "Recovery Phrase 2".to_string(),
+        credential_id: None,
+        purpose: types::Purpose::Recovery,
+        key_type: types::KeyType::SeedPhrase,
         protection: types::DeviceProtection::Unprotected,
     }
 }
