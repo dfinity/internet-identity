@@ -133,7 +133,7 @@ where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
-* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the https://internetcomputer.org/docs/current/references/ic-interface-spec/#state-tree-canister-information[_public_ custom WASM section] `ii_alternative_domains` of the corresponding canister (see <<alternative-frontend-origins>>).
+* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii_alternative_origins` of the corresponding canister (see <<alternative-frontend-origins>>).
 --
 6. Now the client application window expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -183,9 +183,46 @@ To allow flexibility regarding the canister frontend URL, the client may choose 
 
 *Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default. However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the https://internetcomputer.org/docs/current/references/ic-interface-spec/#state-tree-canister-information[_public_ canister metadata] with name `ii_alternative_origins`. The value of this metadata must be candid encoded `(Vec<Text>)`, where each element is an allowed alternative frontend URL.
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii_alternative_origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
 
-The tool https://github.com/dfinity/ic-wasm[ic-wasm] can be used to add custom sections to wasm modules.
+==== JSON Schema
+[source]
+----
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "II Alternative Origins Principal Derivation Origins",
+  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use a canonical canister URL (https://<canister_id>.ic0.app or https://<canister_id>.raw.ic0.app) for principal derivation.",
+  "type": "object",
+  "properties": {
+    "alternativeOrigins": {
+      "description": "List of allowed alternative frontend origins",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [ "alternativeOrigins" ]
+}
+----
+
+===== Example
+
+[source]
+----
+{
+  "alternativeOrigins": [
+    "https://alternative-1.com",
+    "https://www.nice-frontend-name.org"
+  ]
+}
+----
+
+*Note:* The path `/.well-known/ii_alternative_origins` will always be requested using the non-raw `https://<canister_id>.ic0.app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii_alternative_origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii_alternative_origins`.
+
+*Note:* In order to allow Internet Identity to read the path `/.well-known/ii_alternative_origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
 
 == The Internet Identity Service Backend interface
 
