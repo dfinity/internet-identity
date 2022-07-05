@@ -133,7 +133,7 @@ where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
-* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii_alternative_origins` of the corresponding canister (see <<alternative-frontend-origins>>).
+* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see <<alternative-frontend-origins>>).
 --
 6. Now the client application window expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -183,8 +183,9 @@ To allow flexibility regarding the canister frontend URL, the client may choose 
 
 *Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default. However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii_alternative_origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
 
+[#alternative-frontend-origins-schema]
 ==== JSON Schema
 [source]
 ----
@@ -220,9 +221,9 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 }
 ----
 
-*Note:* The path `/.well-known/ii_alternative_origins` will always be requested using the non-raw `https://<canister_id>.ic0.app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii_alternative_origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii_alternative_origins`.
+*Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0.app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii-alternative-origins`.
 
-*Note:* In order to allow Internet Identity to read the path `/.well-known/ii_alternative_origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
+*Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
 
 == The Internet Identity Service Backend interface
 
@@ -581,10 +582,10 @@ This flow is the boring default
 4. The `event.data` should be a message as per our <<client-auth-protocol>>.
 5. If the `message` contains a value for `derivationOrigin`:
   . If the `derivationOrigin` value does not match the format specified in the section  <<client-auth-protocol>>, the process flow is aborted with a failure message.
-  . The frontend calls `/api/v2/canister/<effective_canister_id>/read_state` to retrieve the `ii_alternative_origins` metadata of the canister corresponding to the `derivationOrigin`
-  . If there is no such metadata in the state tree, the flow is aborted with a failure message.
-  . The frontend decodes the retrieved metadata as per encoding specified in section <<alternative-frontend-origins>>.
-  . If the `event.origin` is listed in the decoded metadata the `derivationOrigin` will be used as the Application Frontend’s hostname.
+  . The frontend calls `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` to retrieve the allowed alternative origins.
+  . If there is no such _certified_ asset the flow is aborted with a failure message.
+  . The frontend validates the retrieved data as per schema specified in section <<alternative-frontend-origins-schema>>.
+  . If the `event.origin` is contained in the array value of the property `alternativeOrigins` the `derivationOrigin` will be used as the Application Frontend’s hostname.
 6. If the `message` does _not_ contain a value for `derivationOrigin` the `event.origin` is used as the Application Frontend’s hostname
 7. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
 8. The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
