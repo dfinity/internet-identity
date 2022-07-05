@@ -404,7 +404,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         return RegisterResponse::BadChallenge;
     }
 
-    check_device(&device_data);
+    check_device(&device_data, &vec![]);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
         ic_cdk::trap(&format!(
@@ -438,8 +438,6 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
 async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
-    check_device(&device_data);
-
     ensure_salt_set().await;
 
     STATE.with(|s| {
@@ -451,6 +449,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        check_device(&device_data, &entries);
 
         if entries
             .iter()
@@ -523,7 +522,6 @@ fn mutate_device_or_trap(
 
 #[update]
 async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
-    check_device(&device_data);
     if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
@@ -537,6 +535,7 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
         });
 
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+        check_device(&device_data, &entries);
 
         mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
@@ -1136,12 +1135,13 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
 /// This checks some device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
 ///   * Only recovery phrases can be protected
+///   * There can only be one recovery phrase
 ///
 ///  Otherwise, trap.
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
-fn check_device(device_data: &DeviceData) {
+fn check_device(device_data: &DeviceData, existing_devices: &[DeviceDataInternal]) {
     check_entry_limits(device_data);
 
     if device_data.protection == DeviceProtection::Protected
@@ -1151,6 +1151,16 @@ fn check_device(device_data: &DeviceData) {
             "Only recovery phrases can be protected but key type is {:?}",
             device_data.key_type
         ));
+    }
+
+    // if the device is a recovery phrase, check if a different recovery phrase already exists
+    if device_data.key_type == KeyType::SeedPhrase
+        && existing_devices.iter().any(|existing_device| {
+            existing_device.pubkey != device_data.pubkey
+                && existing_device.key_type == Some(KeyType::SeedPhrase)
+        })
+    {
+        trap("There is already a recovery phrase and only one is allowed.");
     }
 }
 

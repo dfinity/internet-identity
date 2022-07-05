@@ -131,7 +131,9 @@ mod registration_tests {
     use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
-    use internet_identity_interface::{ChallengeAttempt, InternetIdentityInit, RegisterResponse};
+    use internet_identity_interface::{
+        ChallengeAttempt, DeviceProtection, InternetIdentityInit, RegisterResponse,
+    };
     use regex::Regex;
     use sdk_ic_types::Principal;
     use std::time::Duration;
@@ -231,6 +233,34 @@ mod registration_tests {
         Ok(())
     }
 
+    /// Verifies that non-recovery devices cannot be registered as protected.
+    #[test]
+    fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let mut device1 = device_data_1();
+        device1.protection = DeviceProtection::Protected;
+
+        let challenge = api::create_challenge(&&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device1,
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Only recovery phrases can be protected but key type is Unknown").unwrap(),
+        );
+        Ok(())
+    }
+
     /// Tests that the solution to the captcha needs to be correct.
     #[test]
     fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
@@ -302,13 +332,18 @@ mod registration_tests {
 
 /// Tests related to stable memory. In particular, the tests in this module make sure that II can be recovered from a stable memory backup.
 mod stable_memory_tests {
-    use crate::framework::CallError;
+    use crate::framework::{
+        expect_user_error_with_message, principal_1, principal_recovery_1, principal_recovery_2,
+        recovery_device_data_1, recovery_device_data_2, CallError,
+    };
     use crate::{api, framework};
+    use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::{PrincipalId, StateMachine};
     use internet_identity_interface::DeviceData;
     use internet_identity_interface::DeviceProtection::Unprotected;
     use internet_identity_interface::KeyType::Unknown;
     use internet_identity_interface::Purpose::Authentication;
+    use regex::Regex;
     use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
     use std::path::PathBuf;
@@ -483,6 +518,91 @@ mod stable_memory_tests {
         assert_eq!(devices.len(), 1);
         Ok(())
     }
+
+    /// Verifies that an anchor with two recovery phrases can still use both.
+    /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
+    #[test]
+    fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let frontend_hostname = "frontend_hostname".to_string();
+        let session_key = ByteBuf::from("session_key");
+
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
+        env.set_stable_memory(canister_id, &stable_memory_backup);
+        // upgrade again to reset cached header info in II storage module
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_recovery_1(),
+            10_000,
+            frontend_hostname.clone(),
+            session_key.clone(),
+            None,
+        )?;
+        api::prepare_delegation(
+            &env,
+            canister_id,
+            principal_recovery_2(),
+            10_000,
+            frontend_hostname,
+            session_key,
+            None,
+        )?;
+        Ok(())
+    }
+
+    /// Verifies that an existing account with two recovery phrases can only make changes after deleting one.
+    /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
+    #[test]
+    fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
+        env.set_stable_memory(canister_id, &stable_memory_backup);
+        // upgrade again to reset cached header info in II storage module
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
+
+        let mut recovery_1 = recovery_device_data_1();
+        recovery_1.alias = "new alias".to_string();
+        let result = api::update(
+            &env,
+            canister_id,
+            principal_1(),
+            10_000,
+            recovery_1.pubkey.clone(),
+            recovery_1.clone(),
+        );
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("There is already a recovery phrase and only one is allowed\\.").unwrap(),
+        );
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            10_000,
+            recovery_device_data_2().pubkey,
+        )?;
+
+        // successful after removing the other one
+        api::update(
+            &env,
+            canister_id,
+            principal_1(),
+            10_000,
+            recovery_1.pubkey.clone(),
+            recovery_1,
+        )?;
+        Ok(())
+    }
 }
 
 /// Tests related to local device management (add, remove, lookup, get_anchor_info).
@@ -491,7 +611,7 @@ mod stable_memory_tests {
 mod device_management_tests {
     use crate::framework::{
         device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
-        CallError,
+        recovery_device_data_1, recovery_device_data_2, CallError,
     };
     use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
@@ -546,6 +666,36 @@ mod device_management_tests {
             result,
             CanisterCalledTrap,
             Regex::new("Device already added\\.").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Verifies that a second recovery phrase cannot be added.
+    #[test]
+    fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            recovery_device_data_1(),
+        )?;
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            recovery_device_data_2(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("There is already a recovery phrase and only one is allowed\\.").unwrap(),
         );
         Ok(())
     }
@@ -766,28 +916,19 @@ mod device_management_tests {
             );
         }
 
-        /// Verifies that unprotected devices can only be updated from themselves,
-        /// even if the authenticated device itself is protected
+        /// Verifies that non-recovery devices cannot be updated to be protected.
         #[test]
-        fn should_not_update_protected_with_different_protected_device() {
+        fn should_not_update_non_recovery_device_to_be_protected() {
             let env = StateMachine::new();
             let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+            let user_number = flows::register_anchor(&env, canister_id);
+
             let mut device1 = device_data_1();
             device1.protection = types::DeviceProtection::Protected;
-            device1.key_type = types::KeyType::SeedPhrase;
-            let user_number =
-                flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
-
-            let mut device2 = device_data_2();
-            device2.protection = types::DeviceProtection::Protected;
-            device2.key_type = types::KeyType::SeedPhrase;
-
-            api::add(&env, canister_id, principal_1(), user_number, device2).unwrap();
-
             let result = api::update(
                 &env,
                 canister_id,
-                principal_2(),
+                principal_1(),
                 user_number,
                 device1.pubkey.clone(),
                 device1.clone(), // data here doesnt' actually matter
@@ -796,7 +937,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                Regex::new("Only recovery phrases can be protected but key type is Unknown")
                     .unwrap(),
             );
         }
