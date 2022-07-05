@@ -39,13 +39,13 @@ const pageContent = (
       : ""}
     ${!isOnlyDevice && isProtected(device)
       ? html`<p>
-          Your device is protected and you will be prompted to authenticate with
-          it before removal.
+          This ${isRecovery(device) ? device.alias : "device"} is protected and
+          you will be prompted to authenticate with it before removal.
         </p>`
       : ""}
     ${isOnlyDevice
       ? html`<p>This is your last device. You cannot remove it.</p>
-          <p>Without devices your anchor would be useless.</p>`
+          <p>Without devices your anchor would be inaccessible.</p>`
       : ""}
     <button data-action="back">Back</button>
   </div>
@@ -207,6 +207,14 @@ const init = async (
           }
           await removalConnection.remove(userNumber, device.pubkey);
         });
+
+        if (sameDevice) {
+          // clear anchor and reload the page.
+          // do not resolve, otherwise the management page will try to reload the list of devices which will cause an error
+          localStorage.clear();
+          location.reload();
+          return;
+        }
         resolve();
       };
     }
