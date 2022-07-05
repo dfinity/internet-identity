@@ -207,6 +207,14 @@ const init = async (
           }
           await removalConnection.remove(userNumber, device.pubkey);
         });
+
+        if (sameDevice) {
+          // clear anchor and reload the page.
+          // do not resolve, otherwise the management page will try to reload the list of devices which will cause an error
+          localStorage.clear();
+          location.reload();
+          return;
+        }
         resolve();
       };
     }
