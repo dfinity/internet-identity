@@ -79,7 +79,7 @@ const style = () => html`<style>
     font-family: "Montserrat", sans-serif;
     text-align: right;
     font-weight: 600;
-    color: #387ff7;
+    color: #1f6ef4;
   }
 
   .addedDevices {
@@ -139,7 +139,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     <label>Identity Anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
-      <label class="labelAddedDevices" id="deviceLabel"
+      <label class="labelAddedDevices" class="deviceLabel"
         ><span class="addedDevices">Added devices</span>
         <span class="addedDevicesCounter"
           ><span class="tooltip"
@@ -165,7 +165,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       ? undefined
       : html`
           <div class="labelWithAction">
-            <label id="deviceLabel">Recovery mechanisms</label>
+            <label class="deviceLabel">Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
               <span class="labelActionText">ADD RECOVERY MECHANISM</span>
             </button>
@@ -179,7 +179,12 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
 
 const deviceListItem = (device: DeviceData) => html`
   <div class="deviceItemAlias">${device.alias}</div>
-  <button type="button" data-action="settings" class="deviceItemAction">
+  <button
+    type="button"
+    aria-label="settings"
+    data-action="settings"
+    class="deviceItemAction"
+  >
     ${settingsIcon}
   </button>
 `;
