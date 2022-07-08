@@ -256,32 +256,13 @@ jobs:
         with:
           node-version: 16.x
 
-      # This step hangs on Github actions on Darwin for some reason, that
-      # is why we run this only on Linux for now
-      - name: Install DFX
-        run: |
-          echo Install DFX Version: "$DFX_VERSION"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
-
       # Helps with debugging
       - name: Show versions
         run: |
-          echo dfx --version
-          dfx --version
           echo node --version
           node --version
           echo docker --version
           docker --version
-
-      # needed so that we can run the test on identity.ic0.app
-      - name: Add hosts to /etc/hosts
-        run: |
-          sudo echo "127.0.0.1 identity.ic0.app" | sudo tee -a /etc/hosts
-          sudo echo "127.0.0.1 ic0.app" | sudo tee -a /etc/hosts
-
-      - run: docker build reverse_proxy -t ii_proxy
-      - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
-      - run: dfx start ${{ matrix.start-flag }} --background
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
@@ -289,39 +270,43 @@ jobs:
           name: internet_identity_test.wasm
           path: .
 
-      - name: Deploy Internet Identity
-        run: |
-          mv internet_identity_test.wasm internet_identity.wasm
-          dfx canister --no-wallet create --all
-          dfx canister --no-wallet install internet_identity --argument '(null)'
-
-      - name: Deploy selenium test app canister
+      - name: Build selenium test app canister
         working-directory: demos/selenium-test-app
-        run: |
-          dfx deploy --no-wallet
-          npm run develop --no-live-reload --no-devtool &
-          sleep 10 # crude
+        run: ./build.sh
 
-      - name: install selenium webdrivers
+      - name: Prepare Canister WASM Files
         run: |
-          npm ci
-          npm run install-webdrivers
+          mv internet_identity_test.wasm docker-test-env/dfx-docker/canisters/internet_identity.wasm
+          cp src/internet_identity/internet_identity.did docker-test-env/dfx-docker/canisters/internet_identity.did
+          mv demos/selenium-test-app/selenium_test_app.wasm docker-test-env/dfx-docker/canisters/selenium_test_app.wasm
+          cp demos/selenium-test-app/selenium_test_app.did docker-test-env/dfx-docker/canisters/selenium_test_app.did
 
+      - name: Build and start docker compose
+        working-directory: docker-test-env
+        run: |
+          docker compose build --build-arg dfx_emulator_flag=${{ matrix.start-flag }}
+          docker compose up -d --wait
       - run: rm -v -f screenshots/*.png
+      - run: npm ci
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
-      - run: dfx stop
-
-      - name: Print docker logs
+      - name: Collect docker logs
+        working-directory: docker-test-env
         if: ${{ always() }}
-        run: docker logs $(docker ps -qf "ancestor=ii_proxy")
+        run: docker compose logs > ../docker-compose.log
+
+      - name: Shut down docker services
+        working-directory: docker-test-env
+        run: docker compose down
+
+
 
       - name: Archive test logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
-          path: wdio.log
+          path: ./*.log
 
       - run: |
           echo "The following screenshots were created:"

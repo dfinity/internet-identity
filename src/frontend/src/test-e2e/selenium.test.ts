@@ -9,8 +9,8 @@ import {
   AuthenticateView,
   CompatabilityNoticeView,
   DemoAppView,
-  FAQView,
   DeviceSettingsView,
+  FAQView,
   MainView,
   NotInRegistrationModeView,
   RecoverView,
@@ -31,30 +31,17 @@ import {
   removeVirtualAuthenticator,
   RunConfiguration,
   runInBrowser,
-  runInNestedBrowser,
   Screenshots,
   switchToPopup,
   waitToClose,
 } from "./util";
 
-// Read canister ids from the corresponding dfx files.
-// This assumes that they have been successfully dfx-deployed
-import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
-import canister_ids2 from "../../../../demos/selenium-test-app/.dfx/local/canister_ids.json";
-
-const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
-const SELENIUM_TEST_APP_CANISTER = canister_ids2.selenium_test_app.local;
-
-const REPLICA_URL = process.env.REPLICA_URL
-  ? process.env.REPLICA_URL
-  : "http://localhost:8000";
-const II_ORIGIN = process.env.II_ORIGIN
-  ? process.env.II_ORIGIN
-  : "http://localhost:8000";
-const II_URL = `${II_ORIGIN}/?canisterId=${IDENTITY_CANISTER}`;
-const FAQ_URL = `${II_ORIGIN}/faq?canisterId=${IDENTITY_CANISTER}`;
-const ABOUT_URL = `${II_ORIGIN}/about?canisterId=${IDENTITY_CANISTER}`;
-const DEMO_APP_URL = "http://localhost:8080/";
+const TEST_APP_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+const REPLICA_URL = "https://ic0.app";
+const II_URL = "https://identity.ic0.app";
+const FAQ_URL = `${II_URL}/faq`;
+const ABOUT_URL = `${II_URL}/about`;
+const DEMO_APP_URL = "https://nice-name.com";
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
@@ -131,7 +118,7 @@ test("Register new identity and add additional remote device", async () => {
     await addDeviceFlowView.waitForDisplay();
     await addDeviceFlowView.selectRemoteDevice();
 
-    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+    await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
       await browser2.url(II_URL);
       const welcomeView2 = new WelcomeView(browser2);
@@ -155,8 +142,6 @@ test("Register new identity and add additional remote device", async () => {
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
-
-      await browser2.deleteSession();
     });
 
     await mainView.waitForDisplay();
@@ -175,7 +160,7 @@ test("Register new identity and add additional remote device starting on new dev
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
-    await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+    await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
       await browser2.url(II_URL);
       const welcomeView2 = new WelcomeView(browser2);
@@ -214,8 +199,6 @@ test("Register new identity and add additional remote device starting on new dev
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
-
-      await browser2.deleteSession();
     });
 
     await mainView.waitForDisplay();
@@ -238,9 +221,9 @@ test("Log into client application, after registration", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    expect(
-      await demoAppView.whoami(REPLICA_URL, SELENIUM_TEST_APP_CANISTER)
-    ).toBe(principal);
+    expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
+      principal
+    );
 
     // default value
     const exp = await browser.$("#expiration").getText();
@@ -514,7 +497,7 @@ test("Screenshots", async () => {
       await mainView.waitForDisplay();
 
       // Now the link device flow, using a second browser
-      await runInNestedBrowser(async (browser2: WebdriverIO.Browser) => {
+      await runInBrowser(async (browser2: WebdriverIO.Browser) => {
         await addVirtualAuthenticator(browser2);
         await browser2.url(II_URL);
         const welcomeView2 = new WelcomeView(browser2);
@@ -601,7 +584,6 @@ test("Screenshots", async () => {
           "This will remove your current device and you will be logged out."
         );
         await browser2.dismissAlert();
-        await browser2.deleteSession();
       });
 
       // About page
@@ -739,7 +721,7 @@ test("Register first then log into client application", async () => {
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_ORIGIN)
+      originToRelyingPartyId(II_URL)
     );
 
     const authenticateView = new AuthenticateView(browser);
@@ -757,9 +739,9 @@ test("Register first then log into client application", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    expect(
-      await demoAppView.whoami(REPLICA_URL, SELENIUM_TEST_APP_CANISTER)
-    ).toBe(principal);
+    expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
+      principal
+    );
 
     // default value
     const exp = await browser.$("#expiration").getText();

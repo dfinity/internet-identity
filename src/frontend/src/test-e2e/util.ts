@@ -20,25 +20,6 @@ export async function runInBrowser(
     runConfig: RunConfiguration
   ) => Promise<void>
 ): Promise<void> {
-  await runInBrowserCommon(true, test);
-}
-
-export async function runInNestedBrowser(
-  test: (
-    browser: WebdriverIO.Browser,
-    runConfig: RunConfiguration
-  ) => Promise<void>
-): Promise<void> {
-  await runInBrowserCommon(false, test);
-}
-
-export async function runInBrowserCommon(
-  outer: boolean,
-  test: (
-    browser: WebdriverIO.Browser,
-    runConfig: RunConfiguration
-  ) => Promise<void>
-): Promise<void> {
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
@@ -79,9 +60,10 @@ export async function runInBrowserCommon(
     );
     throw e;
   } finally {
-    if (outer) {
-      // only close outer session
+    try {
       await browser.deleteSession();
+    } catch (e) {
+      console.error("error occurred during session cleanup: " + e.message);
     }
   }
 }

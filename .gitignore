@@ -19,3 +19,6 @@ wdio.log
 
 # Cargo build output
 target/
+
+# selenium docker setup filse
+dfx-docker/canisters
