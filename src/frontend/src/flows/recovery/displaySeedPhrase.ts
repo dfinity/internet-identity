@@ -47,5 +47,6 @@ const init = (): Promise<void> =>
       const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
       displaySeedPhraseContinue.classList.toggle("hidden", false);
       render(checkmarkIcon, seedCopy);
+      seedCopy.title = "copied";
     });
   });
