@@ -39,8 +39,19 @@
           placeholder="(use default)"
         />
       </div>
+      <div>
+        <label for="derivationOrigin" style="display: inline-block; width: 200px"
+        >Derivation Origin:</label>
+        <input
+          type="text"
+          id="derivationOrigin"
+          placeholder="(use default)"
+        />
+      </div>
       <button id="signinBtn">Sign In</button>
       <button id="signoutBtn">Sign Out</button>
+      <h3>/.well-known/ii-alternative-origins</h3>
+      <div id="alternativeOrigins"></div>
       <h3>Principal:</h3>
       <div id="principal"></div>
       <h3>Delegation:</h3>
@@ -54,16 +65,37 @@
       <label for="hostUrl" style="display: inline-block; width: 120px"
         >Replica URL:
       </label>
-      <input type="text" id="hostUrl" value="https://boundary.ic0.app/" />
+      <input type="text" id="hostUrl" value="https://ic0.app/" />
       <br />
       <label for="canisterId" style="display: inline-block; width: 120px"
         >Canister ID:
       </label>
-      <input type="text" id="canisterId" value="4k2wq-cqaaa-aaaab-qac7q-cai" />
+      <input type="text" id="canisterId" value="ryjl3-tyaaa-aaaaa-aaaba-cai" />
     </div>
     <div>
       <button id="whoamiBtn">Who Am I?</button>
       <div id="whoamiResponse"></div>
+    </div>
+    <div>
+      <label for="newAlternativeOrigins" style="display: inline-block">
+        Set new value for /.well-known/ii-alternative-origins:
+      </label>
+      <div>
+        <input type="radio" id="certified" name="alternativeOriginsMode" value="certified"
+               checked>
+        <label for="certified">Certified</label>
+      </div>
+      <div>
+        <input type="radio" id="uncertified" name="alternativeOriginsMode" value="uncertified">
+        <label for="uncertified">Uncertified</label>
+      </div>
+      <div>
+        <input type="radio" id="redirect" name="alternativeOriginsMode" value="redirect">
+        <label for="redirect">Redirect</label>
+        <input type="text" id="redirectLocation" value="/.well-known/evil-alternative-origins" />
+      </div>
+      <input type="text" id="newAlternativeOrigins" />
+      <button id="updateNewAlternativeOrigins">Update Value</button>
     </div>
     <h1>Protocol Tests</h1>
     <button id="openIiWindowBtn">Open II tab</button>
@@ -71,6 +103,13 @@
     <button id="incompleteMessageBtn">Send incomplete message</button>
     <button id="validMessageBtn">Send valid message</button>
     <button id="closeIIWindowBtn">Close II tab</button>
+    <div>
+      <label for="customMessage" style="display: inline-block;">
+        Send custom message:
+      </label>
+      <input type="text" id="customMessage" />
+      <button id="customMessageBtn">Send Message</button>
+    </div>
     <h3>WindowPostMessages:</h3>
     <div id="messages"></div>
   </body>

@@ -249,6 +249,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: ./.github/actions/bootstrap
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
@@ -294,14 +295,10 @@ jobs:
           dfx canister --no-wallet create --all
           dfx canister --no-wallet install internet_identity --argument '(null)'
 
-      - name: Deploy whoami canister
-        run: cd demos/using-dev-build && dfx deploy whoami --no-wallet
-
-      - name: Run demo app
+      - name: Deploy selenium test app canister
         working-directory: demos/selenium-test-app
         run: |
-          npm ci
-          npm run build
+          dfx deploy --no-wallet
           npm run develop --no-live-reload --no-devtool &
           sleep 10 # crude
 

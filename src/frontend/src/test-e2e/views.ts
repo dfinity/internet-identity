@@ -467,6 +467,12 @@ export class DemoAppView extends View {
 
   async waitForDisplay(): Promise<void> {
     await this.browser.$("#principal").waitForDisplayed({ timeout: 10_000 });
+    // wait for the slowest element to appear
+    await this.browser.waitUntil(
+      async () =>
+        (await this.browser.$("#alternativeOrigins").getText()) !== "",
+      { timeoutMsg: "alternativeOrigins were not displayed" }
+    );
   }
 
   async getPrincipal(): Promise<string> {

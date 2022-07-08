@@ -40,10 +40,10 @@ import {
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import canister_ids1 from "../../../../.dfx/local/canister_ids.json";
-import canister_ids2 from "../../../../demos/using-dev-build/.dfx/local/canister_ids.json";
+import canister_ids2 from "../../../../demos/selenium-test-app/.dfx/local/canister_ids.json";
 
 const IDENTITY_CANISTER = canister_ids1.internet_identity.local;
-const WHOAMI_CANISTER = canister_ids2.whoami.local;
+const SELENIUM_TEST_APP_CANISTER = canister_ids2.selenium_test_app.local;
 
 const REPLICA_URL = process.env.REPLICA_URL
   ? process.env.REPLICA_URL
@@ -238,9 +238,9 @@ test("Log into client application, after registration", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
-      principal
-    );
+    expect(
+      await demoAppView.whoami(REPLICA_URL, SELENIUM_TEST_APP_CANISTER)
+    ).toBe(principal);
 
     // default value
     const exp = await browser.$("#expiration").getText();
@@ -390,6 +390,7 @@ test("Remove protected recovery phrase", async () => {
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
     await settingsView.protect(seedPhrase);
+    await settingsView.waitForDisplay();
 
     await settingsView.remove();
     await browser.acceptAlert();
@@ -756,9 +757,9 @@ test("Register first then log into client application", async () => {
     const principal = await demoAppView.getPrincipal();
     expect(principal).not.toBe("2vxsx-fae");
 
-    expect(await demoAppView.whoami(REPLICA_URL, WHOAMI_CANISTER)).toBe(
-      principal
-    );
+    expect(
+      await demoAppView.whoami(REPLICA_URL, SELENIUM_TEST_APP_CANISTER)
+    ).toBe(principal);
 
     // default value
     const exp = await browser.$("#expiration").getText();
