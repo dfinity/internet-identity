@@ -158,6 +158,9 @@ fn security_headers() -> Vec<HeaderField> {
         // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
         // by modern browsers.
         //
+        // connect-src https://*.ic0.app is required in order for II to be able to fetch the
+        // /.well-known/ii-alternative-origins path of authenticating canisters setting a derivationOrigin.
+        //
         // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
         // application. Adding hashes would require a big restructuring of the application and build
         // infrastructure.
@@ -170,7 +173,7 @@ fn security_headers() -> Vec<HeaderField> {
             "Content-Security-Policy".to_string(),
             format!(
                 "default-src 'none';\
-             connect-src 'self' https://ic0.app;\
+             connect-src 'self' https://ic0.app https://*.ic0.app;\
              img-src 'self' data:;\
              script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
