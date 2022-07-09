@@ -7,30 +7,70 @@ import {
 } from "@dfinity/identity";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
+import { IDL } from "@dfinity/candid";
 
 const signInBtn = document.getElementById("signinBtn");
 const signOutBtn = document.getElementById("signoutBtn");
 const whoamiBtn = document.getElementById("whoamiBtn");
+const updateAlternativeOriginsBtn = document.getElementById(
+  "updateNewAlternativeOrigins"
+);
 const openIiWindowBtn = document.getElementById("openIiWindowBtn");
 const closeIiWindowBtn = document.getElementById("closeIIWindowBtn");
 const invalidDataBtn = document.getElementById("invalidDataBtn");
 const incompleteMessageBtn = document.getElementById("incompleteMessageBtn");
 const validMessageBtn = document.getElementById("validMessageBtn");
+const customMessageEl = document.getElementById("customMessage");
+const customMessageBtn = document.getElementById("customMessageBtn");
 const messagesEl = document.getElementById("messages");
 const hostUrlEl = document.getElementById("hostUrl");
 const whoAmIResponseEl = document.getElementById("whoamiResponse");
+const alternativeOriginsEl = document.getElementById("alternativeOrigins");
+const newAlternativeOriginsEl = document.getElementById(
+  "newAlternativeOrigins"
+);
 const canisterIdEl = document.getElementById("canisterId");
 const principalEl = document.getElementById("principal");
 const delegationEl = document.getElementById("delegation");
 const expirationEl = document.getElementById("expiration");
 const iiUrlEl = document.getElementById("iiUrl");
 const maxTimeToLiveEl = document.getElementById("maxTimeToLive");
+const derivationOriginEl = document.getElementById("derivationOrigin");
 
 let authClient;
 let iiProtocolTestWindow;
 let localIdentity;
 
-const updateView = (identity) => {
+const idlFactory = ({ IDL }) => {
+  const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    url: IDL.Text,
+    method: IDL.Text,
+    body: IDL.Vec(IDL.Nat8),
+    headers: IDL.Vec(HeaderField),
+  });
+  const HttpResponse = IDL.Record({
+    body: IDL.Vec(IDL.Nat8),
+    headers: IDL.Vec(HeaderField),
+    status_code: IDL.Nat16,
+  });
+  const AlternativeOriginsMode = IDL.Variant({
+    UncertifiedContent: IDL.Null,
+    Redirect: IDL.Record({ location: IDL.Text }),
+    CertifiedContent: IDL.Null,
+  });
+  return IDL.Service({
+    http_request: IDL.Func([HttpRequest], [HttpResponse], ["query"]),
+    update_alternative_origins: IDL.Func(
+      [IDL.Text, AlternativeOriginsMode],
+      [],
+      []
+    ),
+    whoami: IDL.Func([], [IDL.Principal], ["query"]),
+  });
+};
+
+const updateDelegationView = (identity) => {
   principalEl.innerText = identity.getPrincipal();
   if (identity instanceof DelegationIdentity) {
     delegationEl.innerText = JSON.stringify(
@@ -50,6 +90,11 @@ const updateView = (identity) => {
     delegationEl.innerText = "Current identity is not a DelegationIdentity";
     expirationEl.innerText = "N/A";
   }
+};
+
+const updateAlternativeOriginsView = async () => {
+  const response = await fetch("/.well-known/ii-alternative-origins");
+  alternativeOriginsEl.innerText = await response.text();
 };
 
 function addMessageElement(message, received) {
@@ -91,7 +136,7 @@ window.addEventListener("message", (event) => {
         delegations,
         event.data.userPublicKey.buffer
       );
-      updateView(
+      updateDelegationView(
         DelegationIdentity.fromDelegation(localIdentity, delegationChain)
       );
     }
@@ -100,26 +145,31 @@ window.addEventListener("message", (event) => {
 
 const init = async () => {
   authClient = await AuthClient.create();
-  updateView(authClient.getIdentity());
-
+  updateDelegationView(authClient.getIdentity());
+  await updateAlternativeOriginsView();
+  canisterIdEl.value = canisterId;
   signInBtn.onclick = async () => {
+    let derivationOrigin =
+      derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
     if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
       authClient.login({
         identityProvider: iiUrlEl.value,
         maxTimeToLive: BigInt(maxTimeToLive.value),
-        onSuccess: () => updateView(authClient.getIdentity()),
+        derivationOrigin,
+        onSuccess: () => updateDelegationView(authClient.getIdentity()),
       });
     } else {
       authClient.login({
         identityProvider: iiUrlEl.value,
-        onSuccess: () => updateView(authClient.getIdentity()),
+        derivationOrigin,
+        onSuccess: () => updateDelegationView(authClient.getIdentity()),
       });
     }
   };
 
   signOutBtn.onclick = async () => {
     await authClient.logout();
-    updateView(authClient.getIdentity());
+    updateDelegationView(authClient.getIdentity());
   };
 
   openIiWindowBtn.onclick = () => {
@@ -163,12 +213,52 @@ const init = async () => {
       return;
     }
     localIdentity = Ed25519KeyIdentity.generate();
+    let derivationOrigin =
+      derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
+    let maxTimeToLive =
+      BigInt(maxTimeToLiveEl.value) > BigInt(0)
+        ? BigInt(maxTimeToLiveEl.value)
+        : undefined;
     const validMessage = {
       kind: "authorize-client",
       sessionPublicKey: new Uint8Array(localIdentity.getPublicKey().toDer()),
+      derivationOrigin,
+      maxTimeToLive,
     };
     addMessageElement(validMessage, false);
     iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
+  };
+
+  customMessageBtn.onclick = () => {
+    if (!iiProtocolTestWindow) {
+      alert("Open II tab first");
+      return;
+    }
+    let message = JSON.parse(customMessageEl.value);
+    addMessageElement(message, false);
+    iiProtocolTestWindow.postMessage(message, iiUrlEl.value);
+  };
+
+  updateAlternativeOriginsBtn.onclick = async () => {
+    const canisterId = Principal.fromText(canisterIdEl.value);
+    const httpAgent = new HttpAgent({ host: hostUrlEl.value });
+    await httpAgent.fetchRootKey();
+    const actor = Actor.createActor(idlFactory, {
+      agent: httpAgent,
+      canisterId,
+    });
+    const modeSelection = document.querySelector(
+      'input[name="alternativeOriginsMode"]:checked'
+    ).value;
+    let mode = { CertifiedContent: null };
+    if (modeSelection === "uncertified") {
+      mode = { UncertifiedContent: null };
+    } else if (modeSelection === "redirect") {
+      let location = document.getElementById("redirectLocation").value;
+      mode = { Redirect: { location: location } };
+    }
+    await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
+    await updateAlternativeOriginsView();
   };
 };
 
@@ -176,16 +266,7 @@ init();
 
 whoamiBtn.addEventListener("click", async () => {
   const identity = await authClient.getIdentity();
-
-  // We either have an Agent with an anonymous identity (not authenticated),
-  // or already authenticated agent, or parsing the redirect from window.location.
-  const idlFactory = ({ IDL }) =>
-    IDL.Service({
-      whoami: IDL.Func([], [IDL.Principal], ["query"]),
-    });
-
   const canisterId = Principal.fromText(canisterIdEl.value);
-
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
       host: hostUrlEl.value,
