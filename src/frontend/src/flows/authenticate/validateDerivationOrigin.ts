@@ -38,7 +38,7 @@ export const validateDerivationOrigin = async (
       { redirect: "error" }
     );
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       return {
         result: "invalid",
         message: `resource ${alternativeOriginsUrl} returned invalid status: ${response.status}`,
