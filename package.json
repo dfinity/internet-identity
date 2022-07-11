@@ -10,13 +10,12 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "./scripts/with-selenium-standalone jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\" --detectOpenHandles",
+    "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
     "format": "prettier --write src/frontend .eslintrc.json",
-    "format-check": "prettier --check src/frontend .eslintrc.json",
-    "install-webdrivers": "selenium-standalone install --config ./selenium-standalone.config.js"
+    "format-check": "prettier --check src/frontend .eslintrc.json"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",
@@ -40,7 +39,6 @@
     "jest-cli": "^27.0.6",
     "prettier": "2.3.2",
     "process": "0.11.10",
-    "selenium-standalone": "^7.1.0",
     "stream-browserify": "3.0.0",
     "style-loader": "^3.2.1",
     "terser-webpack-plugin": "5.1.4",
