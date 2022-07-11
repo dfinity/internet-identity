@@ -363,7 +363,7 @@ xr-spatial-tracking=()",
 
     assert!(Regex::new(
         "^default-src 'none';\
-connect-src 'self' https://ic0.app;\
+connect-src 'self' https://ic0.app https://\\*\\.ic0.app;\
 img-src 'self' data:;\
 script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
 base-uri 'none';\

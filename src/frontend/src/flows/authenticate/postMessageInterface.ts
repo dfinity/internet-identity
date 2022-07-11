@@ -6,6 +6,7 @@ export interface AuthRequest {
   kind: "authorize-client";
   sessionPublicKey: Uint8Array;
   maxTimeToLive?: bigint;
+  derivationOrigin?: string;
 }
 
 export interface Delegation {
@@ -23,6 +24,11 @@ export interface AuthResponseSuccess {
   userPublicKey: Uint8Array;
 }
 
+interface AuthResponseFailure {
+  kind: "authorize-client-failure";
+  text: string;
+}
+
 /**
  * All information required to process an authentication request received from
  * a client application.
@@ -37,10 +43,11 @@ export interface AuthContext {
    */
   requestOrigin: string;
   /**
-   * Callback to send a result back to the sender. We currently only send
-   * either a success message or nothing at all.
+   * Callback to send a result back to the sender.
    */
-  postMessageCallback: (message: AuthResponseSuccess) => void;
+  postMessageCallback: (
+    message: AuthResponseSuccess | AuthResponseFailure
+  ) => void;
 }
 
 // A message to signal that the II is ready to receive authorization requests.
@@ -64,7 +71,11 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
     window.addEventListener("message", async (event) => {
       const message = event.data;
       if (message.kind === "authorize-client") {
-        console.log("Handling authorize-client request.");
+        console.log(
+          `Handling authorize-client request ${JSON.stringify(message, (_, v) =>
+            typeof v === "bigint" ? v.toString() : v
+          )}`
+        );
         resolve({
           authRequest: message,
           requestOrigin: event.origin,
