@@ -21,9 +21,16 @@ export const fetchDelegation = async (
   authContext: AuthContext
 ): Promise<[PublicKey, Delegation]> => {
   const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
+
+  // at this point, derivationOrigin is either validated or undefined
+  const derivationOrigin =
+    authContext.authRequest.derivationOrigin !== undefined
+      ? authContext.authRequest.derivationOrigin
+      : authContext.requestOrigin;
+
   const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
     loginResult.userNumber,
-    authContext.requestOrigin,
+    derivationOrigin,
     sessionKey,
     authContext.authRequest.maxTimeToLive
   );
@@ -31,7 +38,7 @@ export const fetchDelegation = async (
   const signed_delegation = await retryGetDelegation(
     loginResult.connection,
     loginResult.userNumber,
-    authContext.requestOrigin,
+    derivationOrigin,
     sessionKey,
     timestamp
   );

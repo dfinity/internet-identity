@@ -19,8 +19,13 @@ import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
+import { validateDerivationOrigin } from "./validateDerivationOrigin";
 
-const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
+const pageContent = (
+  hostName: string,
+  userNumber?: bigint,
+  derivationOrigin?: string
+) => html` <style>
     .anchorText {
       font-size: 1.5rem;
     }
@@ -109,6 +114,7 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     .container {
       padding: 3.5rem 1rem 2rem;
     }
+
     @media (min-width: 512px) {
       .container {
         padding: 3.5rem 2.5rem 2rem;
@@ -120,6 +126,9 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>
     <div class="host-name highlightBox hostName">${hostName}</div>
+    ${derivationOrigin !== undefined && derivationOrigin !== hostName
+      ? derivationOriginSection(derivationOrigin)
+      : ""}
     <p>Use Identity Anchor:</p>
 
     <div class="childContainer">
@@ -163,6 +172,11 @@ const pageContent = (hostName: string, userNumber?: bigint) => html` <style>
   </div>
   ${footer}`;
 
+const derivationOriginSection = (derivationOrigin: string) => html` <p>
+    This service is an alias of:
+  </p>
+  <div class="host-name highlightBox hostName">${derivationOrigin}</div>`;
+
 export interface AuthSuccess {
   userNumber: bigint;
   connection: IIConnection;
@@ -175,18 +189,49 @@ export interface AuthSuccess {
  * Internet Identity window.
  */
 export default async (): Promise<AuthSuccess> => {
-  return new Promise((resolve) => {
-    withLoader(async () => {
-      const authContext = await waitForAuthRequest();
-      if (authContext === null) {
-        // The user has manually navigated to "/#authorize".
-        window.location.hash = "";
-        window.location.reload();
-        return;
-      }
-      const userNumber = getUserNumber();
-      init(authContext, userNumber).then(resolve);
+  const authContext = await withLoader(() => waitForAuthRequest());
+  if (authContext === null) {
+    // The user has manually navigated to "/#authorize".
+    window.location.hash = "";
+    window.location.reload();
+    return new Promise((_resolve) => {
+      // never resolve, window is being reloaded
     });
+  }
+
+  const validationResult = await withLoader(
+    async () =>
+      await validateDerivationOrigin(
+        authContext.requestOrigin,
+        authContext.authRequest.derivationOrigin
+      )
+  );
+  if (validationResult.result === "invalid") {
+    await displayError({
+      title: "Invalid Derivation Origin",
+      message: `"${authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${authContext.requestOrigin}"`,
+      detail: validationResult.message,
+      primaryButton: "Close",
+    });
+
+    // notify the client application
+    // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
+    authContext.postMessageCallback({
+      kind: "authorize-client-failure",
+      text: `Invalid derivation origin: ${validationResult.message}`,
+    });
+
+    // we cannot recover from this, retrying or reloading won't help
+    // close the window as it returns the user to the offending application that opened II for authentication
+    window.close();
+    return new Promise((_resolve) => {
+      // never resolve, do not call init
+    });
+  }
+
+  const userNumber = getUserNumber();
+  return new Promise((resolve) => {
+    init(authContext, userNumber).then(resolve);
   });
 };
 
@@ -194,7 +239,11 @@ const init = (
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
-  displayPage(authContext.requestOrigin, userNumber);
+  displayPage(
+    authContext.requestOrigin,
+    userNumber,
+    authContext.authRequest.derivationOrigin
+  );
   initManagementBtn();
   initRecovery();
 
@@ -324,9 +373,13 @@ const authenticateUser = async (
   return init(authContext, userNumber);
 };
 
-const displayPage = (origin: string, userNumber?: bigint) => {
+const displayPage = (
+  origin: string,
+  userNumber?: bigint,
+  derivationOrigin?: string
+) => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(origin, userNumber), container);
+  render(pageContent(origin, userNumber, derivationOrigin), container);
 };
 
 async function handleAuthSuccess(
