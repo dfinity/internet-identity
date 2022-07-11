@@ -55,7 +55,9 @@ const pageContent = (
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices
 const shouldOfferToProtect = (device: DeviceData): boolean =>
-  hasOwnProperty(device.purpose, "recovery") && !isProtected(device);
+  hasOwnProperty(device.purpose, "recovery") &&
+  hasOwnProperty(device.key_type, "seed_phrase") &&
+  !isProtected(device);
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
