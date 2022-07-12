@@ -1,5 +1,5 @@
 {
-  "name": "selenium_test_app",
+  "name": "test_app",
   "private": true,
   "dependencies": {
     "@dfinity/agent": "^0.12.1-beta.0",

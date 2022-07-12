@@ -1,9 +1,9 @@
 {
   "canisters": {
-    "selenium_test_app": {
+    "test_app": {
       "type": "custom",
-      "candid": "selenium_test_app.did",
-      "wasm": "selenium_test_app.wasm",
+      "candid": "test_app.did",
+      "wasm": "test_app.wasm",
       "build": "./build.sh"
     }
   },
