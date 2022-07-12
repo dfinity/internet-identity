@@ -415,10 +415,8 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
-        let stable_memory_backup = std::fs::read(PathBuf::from(
-            "../../backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.bin",
-        ))
-        .unwrap();
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
@@ -452,10 +450,8 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
-        let stable_memory_backup = std::fs::read(PathBuf::from(
-            "../../backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.bin",
-        ))
-        .unwrap();
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
@@ -495,10 +491,8 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
-        let stable_memory_backup = std::fs::read(PathBuf::from(
-            "../../backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.bin",
-        ))
-        .unwrap();
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
