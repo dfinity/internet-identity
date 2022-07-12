@@ -139,7 +139,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     <label>Identity Anchor</label>
     <div class="highlightBox">${userNumber}</div>
     <div class="labelWithAction">
-      <label class="labelAddedDevices" class="deviceLabel"
+      <label class="labelAddedDevices"
         ><span class="addedDevices">Added devices</span>
         <span class="addedDevicesCounter"
           ><span class="tooltip"
@@ -165,7 +165,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       ? undefined
       : html`
           <div class="labelWithAction">
-            <label class="deviceLabel">Recovery mechanisms</label>
+            <label>Recovery mechanisms</label>
             <button class="labelAction" id="addRecovery">
               <span class="labelActionText">ADD RECOVERY MECHANISM</span>
             </button>
