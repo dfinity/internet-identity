@@ -180,55 +180,6 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-  #####################
-  # The backend tests #
-  #####################
-
-  backend:
-    runs-on: ${{ matrix.os }}
-    needs: docker-build
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    env:
-      GHC_VERSION: 8.8.4
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Cache ~/.cabal/store
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cabal/store
-          key: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
-          restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
-
-      - uses: actions/setup-haskell@v1.1.3
-        with:
-          ghc-version: ${{ env.GHC_VERSION }}
-          cabal-version: "3.2"
-
-      - name: Build test runner
-        working-directory: backend-tests
-        run: |
-          cabal update
-          # we cannot use `cabal install` because the build is performed in
-          # another directory which breaks the relative path used in
-          # backend-tests.hs to internet_identity.did
-          cabal build --with-ghc ghc-${{ env.GHC_VERSION }}
-
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v2
-        with:
-          name: internet_identity_test.wasm
-          path: .
-
-      - name: Run Tests
-        shell: bash
-        working-directory: backend-tests
-        run: mv ../internet_identity_test.wasm ../internet_identity.wasm && cabal run
-
   ######################
   # The selenium tests #
   ######################

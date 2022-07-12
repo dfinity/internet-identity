@@ -26,11 +26,6 @@ To create the user with the key that our tests can log into, I had to
    dfx canister --no-wallet --network messaging call internet_identity register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 0; timestamp = 0})'
    ```
    the error message tells me the current time stamp
- * Used
-   ```
-   npx ts-node pow.ts rdmx6-jaaaa-aaaaa-aaadq-cai 1619677860554976404
-   ```
-   to geneate a PoW nonce
  * Registered
    ```
    dfx canister --no-wallet --network messaging call internet_identity register '(record {pubkey = blob "(publickeyfromwireshark)"; alias = "dfx"}, record {nonce = 6872029500088652; timestamp = 1619677860554976404})'
