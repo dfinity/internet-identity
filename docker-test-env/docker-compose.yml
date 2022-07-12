@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  ic:
+    build: dfx-docker
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./dfx-docker/canisters:/canisters:ro"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    extra_hosts:
+      - "rrkah-fqaaa-aaaaa-aaaaq-cai.localhost:127.0.0.1"
+      - "ryjl3-tyaaa-aaaaa-aaaba-cai.localhost:127.0.0.1"
+    networks:
+      ic:
+        aliases:
+          - rrkah-fqaaa-aaaaa-aaaaq-cai.localhost
+          - ryjl3-tyaaa-aaaaa-aaaba-cai.localhost
+  nginx:
+    build: reverse_proxy
+    ports:
+      - "8443:443"
+    networks:
+      ic:
+        aliases:
+          - ic0.app
+          # internet identity
+          - rrkah-fqaaa-aaaaa-aaaaq-cai.ic0.app
+          - identity.ic0.app
+          # selenium test app
+          - ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app
+          - nice-name.com
+  selenium:
+    image: selenium/standalone-chrome:102.0
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: '2gb'
+    environment:
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_MAX_SESSIONS=5
+    networks:
+      - ic
+networks:
+  ic:

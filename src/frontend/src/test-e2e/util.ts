@@ -20,25 +20,6 @@ export async function runInBrowser(
     runConfig: RunConfiguration
   ) => Promise<void>
 ): Promise<void> {
-  await runInBrowserCommon(true, test);
-}
-
-export async function runInNestedBrowser(
-  test: (
-    browser: WebdriverIO.Browser,
-    runConfig: RunConfiguration
-  ) => Promise<void>
-): Promise<void> {
-  await runInBrowserCommon(false, test);
-}
-
-export async function runInBrowserCommon(
-  outer: boolean,
-  test: (
-    browser: WebdriverIO.Browser,
-    runConfig: RunConfiguration
-  ) => Promise<void>
-): Promise<void> {
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
@@ -79,9 +60,10 @@ export async function runInBrowserCommon(
     );
     throw e;
   } finally {
-    if (outer) {
-      // only close outer session
+    try {
       await browser.deleteSession();
+    } catch (e) {
+      console.error("error occurred during session cleanup: " + e.message);
     }
   }
 }
@@ -379,8 +361,11 @@ export const waitForImages = async (
 export async function switchToPopup(
   browser: WebdriverIO.Browser
 ): Promise<string> {
+  await browser.waitUntil(
+    async () => (await browser.getWindowHandles()).length === 2,
+    { timeoutMsg: "window did not open" }
+  );
   const handles = await browser.getWindowHandles();
-  expect(handles.length).toBe(2);
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
   return await addVirtualAuthenticator(browser);

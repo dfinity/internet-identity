@@ -1,0 +1,22 @@
+{
+  "canisters": {
+    "test_app": {
+      "type": "custom",
+      "candid": "test_app.did",
+      "wasm": "test_app.wasm",
+      "build": "./build.sh"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "0.0.0.0:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}

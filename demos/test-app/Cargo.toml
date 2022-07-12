@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "test_app"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+base64 = "0.13.0"
+lazy_static = "1.4"
+candid = "0.7"
+ic-cdk = "0.5"
+ic-cdk-macros = "0.5"
+ic-certified-map = "0.3"
+sha2 = "^0.9" # set bound to match ic-certified-map bound
+serde = "1"
+serde_bytes = "0.11"
+serde_cbor = "0.11"
+serde_with = "1.14"

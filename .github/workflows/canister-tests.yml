@@ -121,6 +121,34 @@ jobs:
             exit 1
           fi
 
+  test-app-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            demos/test-app/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/test-app/Cargo.lock', 'rust-toolchain.toml') }}
+      - uses: ./.github/actions/bootstrap
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+      - name: "Build test app canister"
+        working-directory: demos/test-app
+        run: ./build.sh
+      - name: 'Upload test app'
+        uses: actions/upload-artifact@v2
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: test_app.wasm
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ./demos/test-app/test_app.wasm
+
   ###########################
   # The Rust canister tests #
   ###########################
@@ -147,7 +175,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - uses: ./.github/actions/bootstrap
 
@@ -180,62 +208,13 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-  #####################
-  # The backend tests #
-  #####################
-
-  backend:
-    runs-on: ${{ matrix.os }}
-    needs: docker-build
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    env:
-      GHC_VERSION: 8.8.4
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Cache ~/.cabal/store
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cabal/store
-          key: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-${{ hashFiles('backend-tests/cabal.project', 'backend-tests//cabal.project.freeze') }}
-          restore-keys: cabal-${{ runner.os }}-${{ env.GHC_VERSION }}-
-
-      - uses: actions/setup-haskell@v1.1.3
-        with:
-          ghc-version: ${{ env.GHC_VERSION }}
-          cabal-version: "3.2"
-
-      - name: Build test runner
-        working-directory: backend-tests
-        run: |
-          cabal update
-          # we cannot use `cabal install` because the build is performed in
-          # another directory which breaks the relative path used in
-          # backend-tests.hs to internet_identity.did
-          cabal build --with-ghc ghc-${{ env.GHC_VERSION }}
-
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v2
-        with:
-          name: internet_identity_test.wasm
-          path: .
-
-      - name: Run Tests
-        shell: bash
-        working-directory: backend-tests
-        run: mv ../internet_identity_test.wasm ../internet_identity.wasm && cabal run
-
   ######################
   # The selenium tests #
   ######################
 
   selenium:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: [docker-build, test-app-build]
     strategy:
       matrix:
         start-flag: [ '', '--emulator' ]
@@ -249,82 +228,62 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
           node-version: 16.x
 
-      # This step hangs on Github actions on Darwin for some reason, that
-      # is why we run this only on Linux for now
-      - name: Install DFX
-        run: |
-          echo Install DFX Version: "$DFX_VERSION"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
-
       # Helps with debugging
       - name: Show versions
         run: |
-          echo dfx --version
-          dfx --version
           echo node --version
           node --version
           echo docker --version
           docker --version
 
-      # needed so that we can run the test on identity.ic0.app
-      - name: Add hosts to /etc/hosts
-        run: |
-          sudo echo "127.0.0.1 identity.ic0.app" | sudo tee -a /etc/hosts
-          sudo echo "127.0.0.1 ic0.app" | sudo tee -a /etc/hosts
-
-      - run: docker build reverse_proxy -t ii_proxy
-      - run: docker run --add-host host.docker.internal:host-gateway -d -p 443:443 ii_proxy
-      - run: dfx start ${{ matrix.start-flag }} --background
-
-      - name: 'Download wasm'
+      - name: 'Download II wasm'
         uses: actions/download-artifact@v2
         with:
           name: internet_identity_test.wasm
           path: .
 
-      - name: Deploy Internet Identity
+      - name: 'Download test app wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: test_app.wasm
+          path: .
+
+      - name: Prepare Canister WASM Files
         run: |
-          mv internet_identity_test.wasm internet_identity.wasm
-          dfx canister --no-wallet create --all
-          dfx canister --no-wallet install internet_identity --argument '(null)'
+          mv internet_identity_test.wasm docker-test-env/dfx-docker/canisters/internet_identity.wasm
+          cp src/internet_identity/internet_identity.did docker-test-env/dfx-docker/canisters/internet_identity.did
+          mv test_app.wasm docker-test-env/dfx-docker/canisters/test_app.wasm
+          cp demos/test-app/test_app.did docker-test-env/dfx-docker/canisters/test_app.did
 
-      - name: Deploy whoami canister
-        run: cd demos/using-dev-build && dfx deploy whoami --no-wallet
-
-      - name: Run demo app
-        working-directory: demos/selenium-test-app
+      - name: Build and start docker compose
+        working-directory: docker-test-env
         run: |
-          npm ci
-          npm run build
-          npm run develop --no-live-reload --no-devtool &
-          sleep 10 # crude
-
-      - name: install selenium webdrivers
-        run: |
-          npm ci
-          npm run install-webdrivers
-
+          docker compose build --build-arg dfx_emulator_flag=${{ matrix.start-flag }}
+          docker compose up -d --wait
       - run: rm -v -f screenshots/*.png
+      - run: npm ci
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
-      - run: dfx stop
-
-      - name: Print docker logs
+      - name: Collect docker logs
+        working-directory: docker-test-env
         if: ${{ always() }}
-        run: docker logs $(docker ps -qf "ancestor=ii_proxy")
+        run: docker compose logs > ../docker-compose.log
+
+      - name: Shut down docker services
+        working-directory: docker-test-env
+        run: docker compose down
 
       - name: Archive test logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
-          path: wdio.log
+          path: ./*.log
 
       - run: |
           echo "The following screenshots were created:"
@@ -409,7 +368,7 @@ jobs:
   upload-screenshots:
     runs-on: ubuntu-latest
 
-    # Run after all the tests completed succesfully (and have uploaded their
+    # Run after all the tests completed successfully (and have uploaded their
     # artifacts)
     needs: selenium
 
