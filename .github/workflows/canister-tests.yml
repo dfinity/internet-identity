@@ -217,7 +217,6 @@ jobs:
     needs: [docker-build, test-app-build]
     strategy:
       matrix:
-        start-flag: [ '', '--emulator' ]
         device: [ 'desktop', 'mobile' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
@@ -263,7 +262,7 @@ jobs:
       - name: Build and start docker compose
         working-directory: docker-test-env
         run: |
-          docker compose build --build-arg dfx_emulator_flag=${{ matrix.start-flag }}
+          docker compose build
           docker compose up -d --wait
       - run: rm -v -f screenshots/*.png
       - run: npm ci
@@ -282,7 +281,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-test-log-${{ matrix.device }} ${{ matrix.start-flag }}
+          name: e2e-test-log-${{ matrix.device }}
           path: ./*.log
 
       - run: |
@@ -292,14 +291,14 @@ jobs:
       - name: Upload screenshots
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
+          name: e2e-screenshots-${{ matrix.device }}
           path: screenshots/*.png
 
       - name: Archive test failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: e2e-test-failures-${{ matrix.device }} ${{ matrix.start-flag }}
+          name: e2e-test-failures-${{ matrix.device }}
           path: test-failures/*
           if-no-files-found: ignore
 
