@@ -45,7 +45,7 @@ export const questions = {
     question: "If I lose my device, can I still use Internet Identity?",
     anchor: "lost-device",
     answer:
-      "If you have an Identity Anchor tied to only one device and you lose that one device, you will be locked out. As a best practice, we recommend adding multiple devices multiple devices and recovery mechanisms to every Identity Anchor.",
+      "If you have an Identity Anchor tied to only one device and you lose that one device, you will be locked out. As a best practice, we recommend adding multiple devices and recovery mechanisms to every Identity Anchor.",
     links: [
       {
         name: "Device Management How-To",
