@@ -175,7 +175,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - uses: ./.github/actions/bootstrap
 
