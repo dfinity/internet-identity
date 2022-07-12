@@ -1,6 +1,6 @@
-# Selenium Test App
+# Test App
 
-This app is used by the Internet Identity Selenium tests. It contains additional functionality for testing and debugging that is not required to integrate with Internet Identity. See `demos/using-dev-build` for a minimal example.
+This app is used by the Internet Identity Selenium tests. It contains additional functionality for manual testing and debugging that is not required to integrate with Internet Identity. See `demos/using-dev-build` for a minimal example on how to authenticate with II.
 
 ## Getting Started
 

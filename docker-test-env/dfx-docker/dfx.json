@@ -5,10 +5,10 @@
       "candid": "./canisters/internet_identity.did",
       "wasm": "./canisters/internet_identity.wasm"
     },
-    "selenium_test_app": {
+    "test_app": {
       "type": "custom",
-      "candid": "./canisters/selenium_test_app.did",
-      "wasm":   "./canisters/selenium_test_app.wasm"
+      "candid": "./canisters/test_app.did",
+      "wasm":   "./canisters/test_app.wasm"
     }
   },
   "networks": {

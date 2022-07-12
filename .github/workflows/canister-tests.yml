@@ -221,16 +221,16 @@ jobs:
           name: internet_identity_test.wasm
           path: .
 
-      - name: Build selenium test app canister
-        working-directory: demos/selenium-test-app
+      - name: Build test app canister
+        working-directory: demos/test-app
         run: ./build.sh
 
       - name: Prepare Canister WASM Files
         run: |
           mv internet_identity_test.wasm docker-test-env/dfx-docker/canisters/internet_identity.wasm
           cp src/internet_identity/internet_identity.did docker-test-env/dfx-docker/canisters/internet_identity.did
-          mv demos/selenium-test-app/selenium_test_app.wasm docker-test-env/dfx-docker/canisters/selenium_test_app.wasm
-          cp demos/selenium-test-app/selenium_test_app.did docker-test-env/dfx-docker/canisters/selenium_test_app.did
+          mv demos/test-app/test_app.wasm docker-test-env/dfx-docker/canisters/test_app.wasm
+          cp demos/test-app/test_app.did docker-test-env/dfx-docker/canisters/test_app.did
 
       - name: Build and start docker compose
         working-directory: docker-test-env
@@ -342,7 +342,7 @@ jobs:
   upload-screenshots:
     runs-on: ubuntu-latest
 
-    # Run after all the tests completed succesfully (and have uploaded their
+    # Run after all the tests completed successfully (and have uploaded their
     # artifacts)
     needs: selenium
 
