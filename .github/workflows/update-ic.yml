@@ -1,0 +1,48 @@
+# A GitHub Actions workflow that regularly creates a pull request to update the IC dependencies
+name: IC Dependencies Update
+
+on:
+  schedule:
+    # create a new pull request every monday
+    - cron:  '0 0 * * MON'
+
+jobs:
+  ic-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+        # First, check ic GitHub for new commits.
+      - name: Check new rust version
+        id: update
+        run: |
+          current_ic_commit=$(cat ./src/canister_tests/Cargo.toml | sed -n 's/.*{\s*git\s*=\s*"https:\/\/github\.com\/dfinity\/ic",\s*rev\s*=\s*"\([a-z0-9]*\)" }.*/\1/p' | head -n 1)
+          echo "current ic commit '$current_ic_commit'"
+          latest_ic_commit=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/ic/commits/master | jq -cMr .sha)
+          echo "latest ic commit '$latest_ic_commit'"
+
+          if [ "$current_ic_commit" != "$latest_ic_commit" ]
+          then
+            echo IC dependencies need an update
+            sed -i -e "s/$current_ic_commit/$latest_ic_commit/g" ./src/canister_tests/Cargo.toml
+            echo "::set-output name=updated::1"
+          else
+            echo "::set-output name=updated::0"
+          fi
+
+          cat ./src/canister_tests/Cargo.toml
+
+        # If the ic commit was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./src/canister_tests/Cargo.toml
+          commit-message: Update commit of IC dependencies
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-ic-update
+          delete-branch: true
+          title: 'Update commit of IC dependencies '
