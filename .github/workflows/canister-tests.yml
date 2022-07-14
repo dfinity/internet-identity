@@ -289,12 +289,19 @@ jobs:
           echo "The following screenshots were created:"
           shasum -a 256 screenshots/*.png | sort -k2 # sort by 2nd column (filename)
 
-      - name: Archive screenshots
-        if: ${{ always() }}
+      - name: Upload screenshots
         uses: actions/upload-artifact@v2
         with:
           name: e2e-screenshots-${{ matrix.device }} ${{ matrix.start-flag }}
-          path: screenshots/**/*.png
+          path: screenshots/*.png
+
+      - name: Archive test failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-failures-${{ matrix.device }} ${{ matrix.start-flag }}
+          path: test-failures/*
+          if-no-files-found: ignore
 
   using-dev-build:
     runs-on: ubuntu-latest

@@ -30,6 +30,4 @@ To run selenium tests, do the following:
 
 The following interesting interfaces are exposed by the docker compose setup:
 * The replica is accessible on port `8000` (i.e. for canister calls with `dfx`).
-* It is possible to connect to the selenium container to watch the tests being executed:
-  1. Remove the `--headless` option in `src/frontend/src/test-e2e/util.ts:31`. Additionally, the window size can also be adjusted for a better viewing experience.
-  2. Open `http://localhost:7900/` in the browser. The password is `secret`.
+* It is possible to connect to the selenium container to watch the tests being executed by opening `http://localhost:7900/` in the browser. The password is `secret`.

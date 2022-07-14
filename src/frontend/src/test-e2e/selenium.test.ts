@@ -26,6 +26,7 @@ import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
   addWebAuthnCredential,
+  focusBrowser,
   getWebAuthnCredentials,
   originToRelyingPartyId,
   removeFeaturesWarning,
@@ -140,6 +141,7 @@ test("Register new identity and add additional remote device", async () => {
       const code = await verificationCodeView.getVerificationCode();
 
       // browser 1 again
+      await focusBrowser(browser);
       const verificationView = await new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
@@ -180,6 +182,7 @@ test("Register new identity and add additional remote device starting on new dev
       await notInRegistrationModeView.waitForDisplay();
 
       // browser 1 again
+      await focusBrowser(browser);
       await mainView.addAdditionalDevice();
       const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
       await addDeviceFlowView.waitForDisplay();
@@ -190,6 +193,7 @@ test("Register new identity and add additional remote device starting on new dev
       await addRemoteDeviceInstructionsView.waitForDisplay();
 
       // browser 2 again
+      await focusBrowser(browser2);
       await notInRegistrationModeView.retry();
       const verificationCodeView =
         await new AddRemoteDeviceVerificationCodeView(browser2);
@@ -197,6 +201,7 @@ test("Register new identity and add additional remote device starting on new dev
       const code = await verificationCodeView.getVerificationCode();
 
       // browser 1 again
+      await focusBrowser(browser);
       const verificationView = await new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
@@ -525,12 +530,14 @@ test("Screenshots", async () => {
         );
 
         // browser 1 again
+        await focusBrowser(browser);
         await mainView.addAdditionalDevice();
         await addDeviceFlowView.waitForDisplay();
         await addDeviceFlowView.selectRemoteDevice();
         await addRemoteDeviceInstructionsView.waitForDisplay();
 
         // browser 2 again
+        await focusBrowser(browser2);
         await notInRegistrationModeView.retry();
         const verificationCodeView =
           await new AddRemoteDeviceVerificationCodeView(browser2);
@@ -540,6 +547,7 @@ test("Screenshots", async () => {
         await screenshots.take("new-device-show-verification-code", browser2);
 
         // browser 1 again
+        await focusBrowser(browser);
         const verificationView = await new VerifyRemoteDeviceView(browser);
         await verificationView.waitForDisplay();
         await verificationView.fixup();
@@ -548,6 +556,7 @@ test("Screenshots", async () => {
         await verificationView.continue();
 
         // browser 2 again
+        await focusBrowser(browser2);
         const welcomeBackView2 = new WelcomeBackView(browser2);
         await welcomeBackView2.waitForDisplay();
         await welcomeBackView2.fixup();
@@ -675,12 +684,15 @@ test("Screenshots", async () => {
       // FAQ open page
       await faqView.openQuestion("lost-device");
       await faqView.waitForDisplay();
+      // wait for the question flashing animation to finish
+      await new Promise((resolve) => setTimeout(() => resolve(null), 3000));
       await screenshots.take("faq-open", browser);
 
       // Features warning banner
       await browser.url("about:blank");
       await browser.url(II_URL);
-      const welcomeView3 = new WelcomeView(browser);
+      const welcomeView3 = new WelcomeBackView(browser);
+      await welcomeView3.waitForDisplay();
       await screenshots.take("features-warning", browser);
 
       // authenticate for dapp view
@@ -791,6 +803,8 @@ test("Should ignore invalid data and allow second valid message", async () => {
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
     await demoAppView.openIiTab();
+    // switch back to demo app
+    await browser.switchToWindow((await browser.getWindowHandles())[0]);
     await demoAppView.waitForNthMessage(1); // message 1: authorize-ready
     await demoAppView.sendInvalidData(); // message 2
     await demoAppView.sendValidMessage(); // message 3
