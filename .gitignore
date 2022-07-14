@@ -21,4 +21,7 @@ wdio.log
 target/
 
 # selenium docker environment files
-dfx-docker/canisters
+docker-test-env/dfx-docker/canisters/
+
+# built canisters
+*.wasm
