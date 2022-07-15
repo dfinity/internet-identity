@@ -1,17 +1,23 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
 import { WebAuthnCredential } from "../../test-setup";
+import { ChromeOptions } from "@wdio/types/build/Capabilities";
+import * as fsasync from "fs/promises";
+import * as fs from "fs";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
   screenType: "mobile",
-  windowSize: "360,640",
+  deviceMetrics: {
+    width: 360,
+    height: 640,
+  },
 };
 
 // desktop resolution is used when env variable SCREEN=desktop is set
 const DESKTOP_SCREEN: ScreenConfiguration = {
   screenType: "desktop",
-  windowSize: "1920,1080",
+  windowSize: "1928,1209", // increased from 1920,1080 when the headless flag was removed to account for the GUI border of 8,129.
 };
 
 export async function runInBrowser(
@@ -23,17 +29,27 @@ export async function runInBrowser(
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
+  const chromeOptions: ChromeOptions = {
+    args: [
+      "--ignore-certificate-errors", // allow self-signed certificates
+      "--disable-gpu",
+    ],
+  };
+
+  if (runConfig.screenConfiguration.screenType === "mobile") {
+    chromeOptions.mobileEmulation = {
+      deviceMetrics: runConfig.screenConfiguration.deviceMetrics,
+    };
+  } else {
+    chromeOptions.args?.push(
+      `--window-size=${runConfig.screenConfiguration.windowSize}`
+    );
+  }
+
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
-      "goog:chromeOptions": {
-        args: [
-          "--headless",
-          "--ignore-certificate-errors", // allow self-signed certificates
-          "--disable-gpu",
-          `--window-size=${runConfig.screenConfiguration.windowSize}`,
-        ],
-      },
+      "goog:chromeOptions": chromeOptions,
     },
     automationProtocol: "webdriver",
     path: "/wd/hub",
@@ -50,13 +66,24 @@ export async function runInBrowser(
     // run test
     await test(browser, runConfig);
   } catch (e) {
-    console.log(await browser.getPageSource());
-    console.error(e);
-    await browser.saveScreenshot(
-      `screenshots/error/${new Date().getTime()}.png`
+    const testName = expect.getState().currentTestName.replace(/\W/g, "_");
+    if (!fs.existsSync("test-failures")) {
+      fs.mkdirSync("test-failures");
+    }
+    await fsasync.writeFile(
+      `test-failures/${testName}.html`,
+      await browser.getPageSource()
     );
+    const browserLogs = await browser.getLogs("browser");
+    const printableLogs = browserLogs.reduce(
+      (accumulator, entry) => accumulator + "\n" + JSON.stringify(entry),
+      ""
+    );
+    await fsasync.writeFile(`test-failures/${testName}.log`, printableLogs);
+    await browser.saveScreenshot(`test-failures/${testName}.png`);
+    console.error(e);
     console.log(
-      "An error occurred during e2e test execution. Logs can be found in the wdio.log file and an additional error screenshot was saved under screenshots/error. On Github Actions you can find the log and screenshots under 'Artifacts'."
+      "An error occurred during e2e test execution. WebDriver logs can be found in the wdio.log file and an error information (screenshot, console logs, page source) was saved in the test-failures folder. On Github Actions you can find the log and screenshots under 'Artifacts'."
     );
     throw e;
   } finally {
@@ -68,10 +95,20 @@ export async function runInBrowser(
   }
 }
 
-export interface ScreenConfiguration {
-  screenType: "desktop" | "mobile";
-  windowSize: string;
-}
+export type ScreenConfiguration =
+  | {
+      screenType: "desktop";
+      windowSize: string;
+    }
+  | {
+      screenType: "mobile";
+      deviceMetrics: {
+        width?: number;
+        height?: number;
+        pixelRatio?: number;
+        touch?: boolean;
+      };
+    };
 
 export interface RunConfiguration {
   screenConfiguration: ScreenConfiguration;
@@ -310,6 +347,10 @@ export class Screenshots {
   async take(name: string, browser: WebdriverIO.Browser): Promise<void> {
     await waitForImages(browser);
     await waitForFonts(browser);
+
+    // wait another second for the scrollbar to fade on mobile
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
@@ -369,6 +410,16 @@ export async function switchToPopup(
   await browser.switchToWindow(handles[1]);
   // enable virtual authenticator in the new window
   return await addVirtualAuthenticator(browser);
+}
+
+/**
+ * Switches to the first window of the given browser. Explicit window focusing is required when using the mobile emulation mode of chrome.
+ * @param browser to switch to.
+ */
+export async function focusBrowser(
+  browser: WebdriverIO.Browser
+): Promise<void> {
+  await browser.switchToWindow((await browser.getWindowHandles())[0]);
 }
 
 export async function removeFeaturesWarning(
