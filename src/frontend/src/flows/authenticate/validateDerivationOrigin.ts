@@ -17,18 +17,24 @@ export const validateDerivationOrigin = async (
   }
 
   // check format of derivationOrigin
-  const matches = /^https:\/\/([\w-]*)(\.raw)?\.ic0\.app$/.exec(
+  const matches = /^https:\/\/([\w-]+)(\.raw)?\.ic0\.app$/.exec(
     derivationOrigin
   );
   if (matches === null) {
     return {
       result: "invalid",
       message:
-        'derivationOrigin does not match regex "^https:\\/\\/([\\w-]*)(\\.raw)?\\.ic0\\.app$"',
+        'derivationOrigin does not match regex "^https:\\/\\/([\\w-]+)(\\.raw)?\\.ic0\\.app$"',
     };
   }
 
   try {
+    if (matches.length < 2) {
+      return {
+        result: "invalid",
+        message: "invalid regex match result. No value for capture group 1.",
+      };
+    }
     const canisterId = Principal.fromText(matches[1]); // verifies that a valid canister id was matched
     const alternativeOriginsUrl = `https://${canisterId.toText()}.ic0.app/.well-known/ii-alternative-origins`;
     const response = await fetch(
