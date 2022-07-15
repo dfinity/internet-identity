@@ -64,7 +64,7 @@ export class DummyIdentity
 }
 
 // Check if the canister ID was defined before we even try to read it
-if (typeof canisterId !== undefined) {
+if (typeof canisterId === "undefined") {
   displayError({
     title: "Canister ID not set",
     message:
@@ -73,6 +73,7 @@ if (typeof canisterId !== undefined) {
   }).then(() => {
     window.location.reload();
   });
+  throw "canisterId is undefined"; // abort further execution of this script
 }
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
