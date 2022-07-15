@@ -22,6 +22,7 @@ target/
 
 # selenium docker environment files
 docker-test-env/dfx-docker/canisters/
+test-failures/
 
 # built canisters
 *.wasm
