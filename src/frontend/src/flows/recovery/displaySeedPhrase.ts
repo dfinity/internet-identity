@@ -1,4 +1,3 @@
-import ClipboardJS from "clipboard";
 import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon } from "../../components/icons";
 
@@ -43,10 +42,31 @@ const init = (): Promise<void> =>
     displaySeedPhraseContinue.onclick = () => resolve();
 
     const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
-    new ClipboardJS(seedCopy).on("success", () => {
-      const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
-      displaySeedPhraseContinue.classList.toggle("hidden", false);
-      render(checkmarkIcon, seedCopy);
-      seedCopy.title = "copied";
+    const seedPhrase = document.getElementById("seedPhrase")
+      ?.innerText as string;
+
+    const selectText = (element: HTMLElement) => {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    seedCopy.addEventListener("click", () => {
+      navigator.clipboard
+        .writeText(seedPhrase)
+        .then(() => {
+          const seedPhraseDiv = document.getElementById("seedPhrase");
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          selectText(seedPhraseDiv!);
+          displaySeedPhraseContinue.classList.toggle("hidden", false);
+          render(checkmarkIcon, seedCopy);
+          seedCopy.title = "copied";
+        })
+        .catch((e) => {
+          console.error("Unable to copy seed phrase", e);
+        });
     });
   });
