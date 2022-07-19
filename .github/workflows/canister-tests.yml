@@ -344,27 +344,48 @@ jobs:
           path: .
 
       - name: Deploy II and run tests
-        working-directory: demos/using-dev-build
         run: |
           set -euo pipefail
 
+          # Copy example to make sure it does not rely on living inside the II repo
+          builddir=$(mktemp -d)
+          cp -r ./demos/using-dev-build/. "$builddir"
+          pushd "$builddir"
+
+          # Install npm deps
           npm ci
 
-          # Create a fake curl so that we use this build's wasm; also create a "witness"
-          # file to make sure the fake curl was run (rm $witness will fail otherwise)
-          curl_dir=$(mktemp -d); witness=$(mktemp)
+          # Create a fake curl so that we use this build's wasm and did files; also create "witness"
+          # files to make sure the fake curl was run (rm $witness_foo will fail otherwise)
+          curl_dir=$(mktemp -d); witness_wasm=$(mktemp)
+          curl_dir=$(mktemp -d); witness_did=$(mktemp)
           cat > "$curl_dir/curl" << EOF
           #!/usr/bin/env bash
-          cp ../../internet_identity_dev.wasm ./internet_identity.wasm && touch $witness
+          case "\$*" in
+            *"internet_identity.wasm"*)
+              cp "$GITHUB_WORKSPACE"/internet_identity_dev.wasm ./internet_identity.wasm && touch $witness_wasm
+              ;;
+            *"internet_identity.did"*)
+              cp "$GITHUB_WORKSPACE"/src/internet_identity/internet_identity.did ./internet_identity.did && touch $witness_did
+              ;;
+            *)
+              echo "unexpected arguments: \$*"
+              exit 1
+              ;;
+          esac
           EOF
 
           chmod +x $curl_dir/curl
-          PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)' && rm -rf "$curl_dir" && rm $witness
+          PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)'
+          rm -rf "$curl_dir"; rm $witness_wasm; rm $witness_did
 
           npm run test
 
-          # Clean up our download
-          rm internet_identity.wasm
+          # Clean up temp files
+          rm internet_identity.wasm; rm internet_identity.did
+          popd
+          rm -rf "$builddir"
+
       - name: Stop replica
         run: |
           dfx stop
@@ -482,6 +503,7 @@ jobs:
             internet_identity_production.wasm
             internet_identity_dev.wasm
             internet_identity_test.wasm
+            internet_identity.did
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
@@ -492,7 +514,8 @@ jobs:
             -- \
             internet_identity_production.wasm \
             internet_identity_dev.wasm \
-            internet_identity_test.wasm
+            internet_identity_test.wasm \
+            internet_identity.did
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
