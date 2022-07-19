@@ -73,7 +73,7 @@ if (typeof canisterId === "undefined") {
   }).then(() => {
     window.location.reload();
   });
-  throw "canisterId is undefined"; // abort further execution of this script
+  throw new Error("canisterId is undefined"); // abort further execution of this script
 }
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
