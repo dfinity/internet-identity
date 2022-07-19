@@ -659,7 +659,7 @@ test("Screenshots", async () => {
       // Make sure last device cannot be removed
       await mainView.deviceSettings(DEVICE_NAME1);
       await settingsView.waitForDisplay();
-      await settingsView.removeDisabled();
+      await settingsView.removeNotDisplayed();
       await settingsView.back();
 
       // device still present. You can't remove your last device.

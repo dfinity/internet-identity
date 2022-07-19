@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v2
 
         # First, check ic GitHub for new commits.
-      - name: Check new rust version
+      - name: Check new ic version
         id: update
         run: |
           current_ic_commit=$(cat ./src/canister_tests/Cargo.toml | sed -n 's/.*{\s*git\s*=\s*"https:\/\/github\.com\/dfinity\/ic",\s*rev\s*=\s*"\([a-z0-9]*\)" }.*/\1/p' | head -n 1)

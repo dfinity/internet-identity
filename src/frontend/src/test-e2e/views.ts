@@ -222,7 +222,7 @@ export class DeviceSettingsView extends View {
     await recoveryView.enterSeedPhraseContinue();
   }
 
-  async removeDisabled(): Promise<void> {
+  async removeNotDisplayed(): Promise<void> {
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });

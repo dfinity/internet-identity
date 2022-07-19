@@ -1,24 +1,28 @@
 version: "3.9"
 services:
+  # service hosting dfx running II and the test app
+  # canister ids are assigned deterministically on startup, so we can hardcode them
   ic:
     build: dfx-docker
     ports:
       - "8000:8000"
     volumes:
       - "./dfx-docker/canisters:/canisters:ro"
+    # we consider the canister ready, once the II page is reachable
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai" ]
       interval: 30s
       timeout: 10s
       retries: 5
-    extra_hosts:
-      - "rrkah-fqaaa-aaaaa-aaaaq-cai.localhost:127.0.0.1"
-      - "ryjl3-tyaaa-aaaaa-aaaba-cai.localhost:127.0.0.1"
     networks:
       ic:
         aliases:
+          # dfx starts icx-proxy with a configuration that allows canister based domains only on localhost,
+          # so we make this canister available using <canister_id>.localhost domains
           - rrkah-fqaaa-aaaaa-aaaaq-cai.localhost
           - ryjl3-tyaaa-aaaaa-aaaba-cai.localhost
+
+  # Nginx proxy to terminate tls and transform domains to *.localhost
   nginx:
     build: reverse_proxy
     ports:
@@ -30,16 +34,18 @@ services:
           # internet identity
           - rrkah-fqaaa-aaaaa-aaaaq-cai.ic0.app
           - identity.ic0.app
-          # selenium test app
+          # test app
           - ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app
           - nice-name.com
+
+  # Selenium container with chromdriver and chrome
   selenium:
     image: selenium/standalone-chrome:102.0
     ports:
-      - "4444:4444"
-      - "7900:7900"
-    shm_size: '2gb'
-    environment:
+      - "4444:4444" # port for the test runner to connect to chromedriver
+      - "7900:7900" # port to access the page to watch what chrome is doing (http://localhost:7900, pw is secret)
+    shm_size: '2gb' # allow more memory for chrome to actually render the pages
+    environment: # default number of sessions is 1. We need more because of flows involving multiple devices (which we simulate using parallel sessions).
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true
       - SE_NODE_MAX_SESSIONS=5
     networks:
