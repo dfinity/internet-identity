@@ -5,11 +5,11 @@ use crate::certificate_validation::ValidationError::{
     AssetHashMismatch, AssetPathLookupFailed, CertificateExpired, MalformedCertificate,
 };
 use candid::types::ic_types::hash_tree::LookupResult;
+use candid::types::ic_types::HashTree;
 use flate2::read::GzDecoder;
 use ic_certified_vars::{verify_certificate, CertificateValidationError};
 use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey, Time};
 use regex::Regex;
-use sdk_ic_types::HashTree;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;

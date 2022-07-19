@@ -1,6 +1,6 @@
 use crate::flows;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
-use candid::{parser::value::IDLValue, IDLArgs};
+use candid::{parser::value::IDLValue, IDLArgs, Principal};
 use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
 use ic_crypto_internal_basic_sig_iccsa::{public_key_bytes_from_der, verify};
 use ic_error_types::ErrorCode;
@@ -12,7 +12,6 @@ use internet_identity_interface as types;
 use internet_identity_interface::{HeaderField, InternetIdentityInit, SignedDelegation, UserKey};
 use lazy_static::lazy_static;
 use regex::Regex;
-use sdk_ic_types::Principal;
 use serde_bytes::ByteBuf;
 use std::env;
 use std::path;
