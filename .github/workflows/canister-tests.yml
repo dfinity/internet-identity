@@ -357,8 +357,9 @@ jobs:
 
           # Create a fake curl so that we use this build's wasm and did files; also create "witness"
           # files to make sure the fake curl was run (rm $witness_foo will fail otherwise)
-          curl_dir=$(mktemp -d); witness_wasm=$(mktemp)
-          curl_dir=$(mktemp -d); witness_did=$(mktemp)
+          witnesses=$(mktemp -d); witness_wasm="$witnesses/wasm"; witness_did="$witnesses/did"
+          curl_dir=$(mktemp -d)
+
           cat > "$curl_dir/curl" << EOF
           #!/usr/bin/env bash
           case "\$*" in
@@ -377,7 +378,7 @@ jobs:
 
           chmod +x $curl_dir/curl
           PATH=$curl_dir:$PATH dfx deploy --no-wallet --argument '(null)'
-          rm -rf "$curl_dir"; rm $witness_wasm; rm $witness_did
+          rm -rf "$curl_dir"; rm "$witness_wasm"; rm "$witness_did"; rmdir "$witnesses"
 
           npm run test
 
