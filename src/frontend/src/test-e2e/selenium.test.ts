@@ -966,7 +966,7 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
       '"https://some-random-disallowed-url.com" is not a valid derivation origin for "https://nice-name.com"'
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      'derivationOrigin does not match regex "^https:\\/\\/([\\w-]+)(\\.raw)?\\.ic0\\.app$"'
+      "derivationOrigin does not match regex /^https:\\/\\/([\\w-]+)(?:\\.raw)?\\.ic0\\.app$/"
     );
   });
 }, 300_000);
@@ -1006,7 +1006,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
       '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      'An error occurred while validation the derivationOrigin "https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app": Failed to fetch'
+      'An error occurred while validating the derivationOrigin "https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app": Failed to fetch'
     );
   });
 }, 300_000);
