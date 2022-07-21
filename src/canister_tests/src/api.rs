@@ -2,9 +2,9 @@
 use crate::framework;
 use crate::framework::CallError;
 use candid;
+use candid::Principal;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
-use sdk_ic_types::Principal;
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
