@@ -133,7 +133,7 @@ where
 
 * the `sessionPublicKey` contains the public key of the session key pair.
 * the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
-* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]*(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see <<alternative-frontend-origins>>).
+* the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see <<alternative-frontend-origins>>).
 --
 6. Now the client application window expects a message back, with data `event`.
 7. If `event.origin !== "https://identity.ic0.app"`, ignore this message.
@@ -180,6 +180,11 @@ The Internet Identity frontend will use `event.origin` as the “Frontend URL”
 [#alternative-frontend-origins]
 === Alternative Frontend Origins
 To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see <<client-auth-protocol>>). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
+
+[IMPORTANT]
+--
+This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
+--
 
 *Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default. However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 
