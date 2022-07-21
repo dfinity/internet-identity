@@ -659,7 +659,7 @@ test("Screenshots", async () => {
       // Make sure last device cannot be removed
       await mainView.deviceSettings(DEVICE_NAME1);
       await settingsView.waitForDisplay();
-      await settingsView.removeDisabled();
+      await settingsView.removeNotDisplayed();
       await settingsView.back();
 
       // device still present. You can't remove your last device.
@@ -966,7 +966,7 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
       '"https://some-random-disallowed-url.com" is not a valid derivation origin for "https://nice-name.com"'
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      'derivationOrigin does not match regex "^https:\\/\\/([\\w-]*)(\\.raw)?\\.ic0\\.app$"'
+      'derivationOrigin does not match regex "^https:\\/\\/([\\w-]+)(\\.raw)?\\.ic0\\.app$"'
     );
   });
 }, 300_000);

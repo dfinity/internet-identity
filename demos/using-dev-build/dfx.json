@@ -9,8 +9,9 @@
       "wasm": "internet_identity.wasm",
 
       "__1": "There is no standard way to pull remote canisters, so instead we have a dummy build script that",
-      "__2": "simply downloads the Internet Identity canister. See also: https://github.com/dfinity/sdk/issues/2085",
-      "build": "curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm -o internet_identity.wasm"
+      "__2": "simply downloads the Internet Identity canister and Candid description.",
+      "__3": "See also: https://github.com/dfinity/sdk/issues/2085",
+      "build": "./scripts/download-did-and-wasm"
     },
 
     "whoami": {
