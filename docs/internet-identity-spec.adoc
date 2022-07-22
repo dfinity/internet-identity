@@ -207,6 +207,7 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
         "type": "string"
       },
       "minItems": 0,
+      "maxItems": 10,
       "uniqueItems": true
     }
   },
@@ -227,6 +228,8 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 ----
 
 *Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0.app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii-alternative-origins`.
+
+*Note:* To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
 
 *Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
 
