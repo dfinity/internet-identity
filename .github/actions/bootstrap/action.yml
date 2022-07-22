@@ -3,15 +3,30 @@ description: Bootstrap the Internet Identity build environment
 runs:
   using: "composite"
   steps:
-    - id: uname
+    - id: platform
       shell: bash
       run: |
+        set -euo pipefail
+
         # print include system info relevant for cache compatibility
-        uname="$(uname -mpsr)"
-        echo "uname value: $uname"
-        uname_hash="$(echo "$uname" | shasum -a 256 | head -c 10)"
-        echo "uname hash value: $uname_hash"
-        echo "::set-output name=uname-hash::$uname_hash"
+        uname_sys=$(uname -s)
+        case "$uname_sys" in
+            Darwin)
+                echo "system is darwin ($uname_sys)"
+                ver=$(uname -r | sed 's/\./_/g')
+                echo "darwin version is '$ver'"
+                echo "::set-output name=platform-id::darwin-$ver"
+                ;;
+            Linux)
+                echo "system is linux ($uname_sys)"
+                glibc_version=$(ldd --version | head -n 1 | grep -oP 'ldd (.*) \K[[:digit:]]+\.[[:digit:]]+' | sed 's/\./_/g')
+                echo "glibc version is '$glibc_version'"
+                echo "::set-output name=platform-id::ubuntu-glibc-$glibc_version"
+                ;;
+            *)
+                echo uknown system "$uname_sys"
+                ;;
+        esac
 
     # cache ic-cdk-optimizer
     # NOTE: here we make sure to only cache ic-cdk-optimizer and _not_ e.g. the cargo target, since in some cases
@@ -20,7 +35,7 @@ runs:
     - uses: actions/cache@v2
       with:
         path: ~/.cargo/bin
-        key: cargo-bin-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-${{ steps.uname.outputs.uname-hash }}
+        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
     - name: Bootstrap
       shell: bash
