@@ -1,6 +1,7 @@
 import { Principal } from "@dfinity/principal";
 
 const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
+const MAX_ALTERNATIVE_ORIGINS = 10;
 export type ValidationResult =
   | { result: "valid" }
   | { result: "invalid"; message: string };
@@ -57,6 +58,8 @@ export const validateDerivationOrigin = async (
         headers: {
           Accept: "application/json",
         },
+        // do not send cookies or other credentials
+        credentials: "omit",
       }
     );
 
@@ -76,6 +79,16 @@ export const validateDerivationOrigin = async (
       return {
         result: "invalid",
         message: `resource ${alternativeOriginsUrl} has invalid format: received ${alternativeOriginsObj}`,
+      };
+    }
+
+    // check number of entries
+    if (
+      alternativeOriginsObj.alternativeOrigins.length > MAX_ALTERNATIVE_ORIGINS
+    ) {
+      return {
+        result: "invalid",
+        message: `Resource ${alternativeOriginsUrl} has too many entries: To prevent misuse at most ${MAX_ALTERNATIVE_ORIGINS} alternative origins are allowed.`,
       };
     }
 

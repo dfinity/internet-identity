@@ -971,6 +971,46 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
   });
 }, 300_000);
 
+test("Should not issue delegation when /.well-known/ii-alternative-origins has too many entries", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const authenticatorId1 = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
+    expect(credentials).toHaveLength(1);
+
+    const niceDemoAppView = new DemoAppView(browser);
+    await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
+    await niceDemoAppView.waitForDisplay();
+    await niceDemoAppView.updateAlternativeOrigins(
+      REPLICA_URL,
+      TEST_APP_CANISTER_ID,
+      '{"alternativeOrigins":["https://a0.com", "https://a1.com", "https://a2.com", "https://a3.com", "https://a4.com", "https://a5.com", "https://a6.com", "https://a7.com", "https://a8.com", "https://a9.com", "https://a10.com"]}',
+      "certified"
+    );
+    await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
+    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    await niceDemoAppView.signin();
+
+    const authenticatorId3 = await switchToPopup(browser);
+    await addWebAuthnCredential(
+      browser,
+      authenticatorId3,
+      credentials[0],
+      originToRelyingPartyId(II_URL)
+    );
+    const errorView = new ErrorView(browser);
+    await errorView.waitForDisplay();
+    expect(await errorView.getErrorMessage()).toEqual(
+      '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
+    );
+    expect(await errorView.getErrorDetail()).toEqual(
+      "Resource https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed."
+    );
+  });
+}, 300_000);
+
 test("Should not follow redirect returned by /.well-known/ii-alternative-origins", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
