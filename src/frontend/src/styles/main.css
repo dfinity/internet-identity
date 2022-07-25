@@ -344,7 +344,15 @@ nav {
 }
 
 .nav-links {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+}
+
+.nav-links li + li::before {
+  content: "·";
+  margin: 0 0.5rem;
 }
 
 .nav-link {
