@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document describes and specifies the Internet Identity from various angles and at various levels of abstraction, namely:
+This document describes and specifies Internet Identity from various angles and at various levels of abstraction, namely:
 
 -   High level goals, requirements and use cases
 
@@ -16,7 +16,7 @@ This document describes and specifies the Internet Identity from various angles 
 
 -   Internal implementation notes about the Internet Identity Service frontend
 
--   Notes about deployment
+-   Notes about deployment.
 
 The Internet Identity Service consists of
 
@@ -38,12 +38,11 @@ The Internet Identity service allows users to
 
 Some functional requirements are
 
--   users have separate identities (or \"pseudonyms\") per client application (more precisely, per client application frontend \"hostname\")
+-   users have separate identities (or \"pseudonyms\") per client application (more precisely, per client application frontend \"hostname\", though see [Alternative Frontend Origins](#alternative-frontend-origins) for caveat about `.raw` domains)
 
 -   these identities are stable, i.e., do not depend on a user's security devices
 
 -   the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
-    -   the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
 
 -   users do not need ever to remember secret information (but possibly per-user non-secret information)
 
@@ -61,11 +60,13 @@ Some noteworthy security assumptions are:
 
 -   The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
 
-    - _note: Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation._
+:::note
+Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation._
+:::
 
 -   The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
--   The user's browser is trustworthy, postMessage communication between different origins is authentic.
+-   The user's browser is trustworthy, `postMessage` communication between different origins is authentic.
 
 -   For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties).
 
@@ -77,17 +78,19 @@ The Internet Computer serves this frontend under hostname `https://identity.ic0.
 The canister maintains a salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer's source of secure randomness.
 
 
-_note: Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities._
+:::note
+Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities._
+:::
 
 A user account is identified by a unique *Identity Anchor*, a smallish natural number chosen by the canister.
 
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet Computer.
 
-A user has a separate *user identity* for each client application frontend (i.e., per hostname). This identity is a [*self-authenticating id*](https://smartcontracts.org/docs/interface-spec/index.html#id-classes) of the form
+A user has a separate *user identity* for each client application frontend (i.e., per hostname). This identity is a [*self-authenticating id*](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the form
 
     user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02` (29 bytes)
 
-that is derived from a [canister signature](https://smartcontracts.org/docs/interface-spec/index.html#canister-signatures) public "key" based on the `ii_canister_id` and a seed of the form
+that is derived from a [canister signature](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) public "key" based on the `ii_canister_id` and a seed of the form
 
     seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 
@@ -101,13 +104,13 @@ The Internet Identity Service Backend stores the following data in user accounts
 
     -   a device *alias*, chosen by the user to recognize the device
 
-    -   an optional *credential id*, which is necessary for WebAuthN authentication
+    -   an optional *credential id*, which is necessary for WebAuthn authentication
 
-When a client application frontend wants to log in as a user, it uses a *session key* (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [*delegation chain*](https://smartcontracts.org/docs/interface-spec/index.html#authentication) that allows the session key to sign for the user's main identity.
+When a client application frontend wants to log in as a user, it uses a *session key* (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [*delegation chain*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) that allows the session key to sign for the user's main identity.
 
 The delegation chain consists of one delegation, called the *client delegation*. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a [canister signature](https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures). This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
-The Internet Identity Service Frontend also manages a *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
+The Internet Identity Service Frontend also manages an *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
 ## Client authentication protocol
 
@@ -146,9 +149,9 @@ This section describes the Internet Identity Service from the point of view of a
 
     -   the `sessionPublicKey` contains the public key of the session key pair.
 
-    -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+    -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a one larger.
 
-    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.ic0\.app$`. Internet Identity will onl y accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` o f the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 
 
 6.  Now the client application window expects a message back, with data `event`.
@@ -181,29 +184,34 @@ This section describes the Internet Identity Service from the point of view of a
 
     The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
-The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/authentication) and The [`@dfinity/authentication`](https://www.npmjs.com/package/@dfinity/authentication) NPM packages provide helpful functionality here.
+The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/auth-client) and The [`@dfinity/authentication`](https://www.npmjs.com/package/@dfinity/authentication) NPM packages provide helpful functionality here.
 
 The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
-_note:
+:::note
 The Internet Identity frontend will use `event.origin` as the "Frontend URL" to base the user identity on. This includes protocol, full hostname and port. This means
+
 
 -   Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
     - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
-_
+:::
 
 ## Alternative Frontend Origins
 
 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
 
-> **IMPORTANT**: This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this featu re to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+:::caution
+This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this featu re to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+:::
 
-*Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` princip als or vice versa.
+:::note
+`https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` princip als or vice versa.
+:::
 
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
 
 
 ### JSON Schema {#alternative-frontend-origins-schema}
@@ -243,12 +251,17 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 }
 ```
 
-*Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0. app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii-alternative-origins`.
+:::note
+The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0.app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii-alternative-origins`.
+:::
 
+:::note
+To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
+:::
 
-*Note:* To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
-
-*Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin `https://identity.ic0.app`.
+:::note
+In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin `https://identity.ic0.app`.
+:::
 
 ## The Internet Identity Service Backend interface
 
@@ -445,8 +458,6 @@ The Internet Identity canister is designed for sharded deployments. There can be
 
 We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly. The signature map is simply dropped on upgrade, so users will have to re-request their delegations.
 
-### Logic for signature/certified variable caching
-
 ## The Internet Identity Service frontend
 
 The Internet Identity Service frontend is the user-visible part of the Internet Identity Service, and where it all comes together. It communicates with
@@ -481,7 +492,9 @@ The possible login subflows are shared among entry points `/` and `/authorized`,
 
 All update calls to the Internet Identity Service Backend are made under the `device_identity` and are signed with the session key.
 
+:::info
 The steps marked with 👆 are the steps where the user presses the security device.
+:::
 
 ### Subflow: Login as returning user
 
@@ -607,7 +620,9 @@ This flow is the boring default
 
     -   A "logout" button
 
-(One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.)
+:::note
+One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.
+:::
 
 ### Flow: adding remote device
 
