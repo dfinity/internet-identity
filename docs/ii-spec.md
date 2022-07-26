@@ -1,6 +1,6 @@
-# [The Internet Identity Specification](#_the_internet_identity_specification)
+# The Internet Identity Specification
 
-## [Introduction](#_introduction)
+## Introduction
 
 This document describes and specifies the Internet Identity from various angles and at various levels of abstraction, namely:
 
@@ -8,7 +8,7 @@ This document describes and specifies the Internet Identity from various angles 
 
 -   Overview of the security and identity machinery, including the interplay of identities, keys, and delegations
 
--   Interface as used by client applications frontends, i.e., our [client authentication protocol](#client-auth-protocol)
+-   Interface as used by client applications frontends, i.e., our [client authentication protocol](#client-authentication-protocol)
 
 -   The interface of the Internet Identity Service *backend*, i.e., describing its contract at the Candid layer, as used by its frontend
 
@@ -24,9 +24,9 @@ The Internet Identity Service consists of
 
 -   its frontend, a web application served by the backend canister.
 
-Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Internet Identity Service directly (via the [client authentication protocol](#client-auth-protocol) described below).
+Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Internet Identity Service directly (via the [client authentication protocol](#client-authentication-protocol) described below).
 
-## [Goals, requirements and use cases](#_goals_requirements_and_use_cases)
+## Goals, requirements and use cases
 
 The Internet Identity service allows users to
 
@@ -69,7 +69,7 @@ Some noteworthy security assumptions are:
 
 -   For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties).
 
-## [Identity design and data model](#_identity_design_and_data_model)
+## Identity design and data model
 
 
 The Internet Computer serves this frontend under hostname `https://identity.ic0.app`.
@@ -109,7 +109,7 @@ The delegation chain consists of one delegation, called the *client delegation*.
 
 The Internet Identity Service Frontend also manages a *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
-## [Client authentication protocol](#client-auth-protocol)
+## Client authentication protocol
 
 This section describes the Internet Identity Service from the point of view of a client application frontend.
 
@@ -194,10 +194,10 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
 _
 
-## [Alternative Frontend Origins](#alternative-frontend-origins)
+## Alternative Frontend Origins
 
 
-To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-auth-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
+To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
 
 > **IMPORTANT**: This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this featu re to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
 
@@ -206,7 +206,7 @@ To allow flexibility regarding the canister frontend URL, the client may choose 
 In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
 
 
-## [JSON Schema](#alternative-frontend-origins-schema)
+### JSON Schema {#alternative-frontend-origins-schema}
 
 
 ``` json
@@ -243,14 +243,14 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 }
 ```
 
-*Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0. app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-k nown/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or r eplicas from tampering with `ii-alternative-origins`.
+*Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0. app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-known/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or replicas from tampering with `ii-alternative-origins`.
 
 
 *Note:* To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
 
-*Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
+*Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin `https://identity.ic0.app`.
 
-## [The Internet Identity Service Backend interface](#_the_internet_identity_service_backend_interface)
+## The Internet Identity Service Backend interface
 
 This section describes the interface that the backend canister provides.
 
@@ -259,9 +259,9 @@ This interface is currently only used by its own frontend. This tight coupling m
 The summary is given by the [Candid interface](./_attachments/internet_identity.did).
 
 
-The `init_salt` method is mostly internal, see [The salt](#salt).
+The `init_salt` method is mostly internal, see [Salt](#salt).
 
-### [The `register` and `create_challenge` methods](#_the_register_and_create_challenge_methods)
+### The `register` and `create_challenge` methods
 
 The `register` method is used to create a new user. The Internet Identity Service backend creates a *fresh* Identity Anchor, creates the account record, and adds the given device as the first device.
 
@@ -269,7 +269,7 @@ The `register` method is used to create a new user. The Internet Identity Servic
 
 In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes *and* if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 
-### [The `add` method](#_the_add_method)
+### The `add` method
 
 The `add` method appends a new device to the given user's record.
 
@@ -279,7 +279,7 @@ This may also fail (with a *reject*) if the user is registering too many devices
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `remove` method](#_the_remove_method)
+### The `remove` method
 
 The `remove` method removes a device, identified by its public key, from the list of devices a user has.
 
@@ -291,19 +291,19 @@ It is the responsibility of the frontend UI to protect the user from doing these
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `enter_device_registration_mode` method](#_the_enter_device_registration_mode_method)
+### The `enter_device_registration_mode` method
 
 Enables device registration mode for the given identity anchor. When device registration mode is active, new devices can be added using `add_tentative_device` and `verify_tentative_device`. Device registration mode stays active for at most 15 minutes or until the flow is either completed or aborted.
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `exit_device_registration_mode` method](#_the_exit_device_registration_mode_method)
+### The `exit_device_registration_mode` method
 
 Exits device registration mode immediately. Any non verified tentative devices are discarded.
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `add_tentative_device` method](#_the_add_tentative_device_method)
+### The `add_tentative_device` method
 
 Tentatively adds a new device to the supplied identity anchor and returns a verification code. This code has to be used with the `verify_tentative_device` method to verify this device. If the flow is aborted or not completed within 15 minutes, the tentative device is discarded.
 
@@ -311,7 +311,7 @@ Tentatively added devices cannot be used to login into the management view or au
 
 **Authorization**: Anyone can call this
 
-### [The `verify_tentative_device` method](#_the_verify_tentative_device_method)
+### The `verify_tentative_device` method
 
 For an anchor in device registration mode: if called with a valid verification code, adds the tentative device as a regular device to the anchor and exits registration mode. The registration flow is aborted if this method is called five times with invalid verification codes.
 
@@ -319,25 +319,25 @@ Returns an error if called for a device not in registration mode.
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `lookup` query method](#_the_lookup_query_method)
+### The `lookup` query method
 
 Fetches all device data associated with a user.
 
 **Authorization**: Anyone can call this
 
-### [The `get_anchor_info` method](#_the_get_anchor_info_method)
+### The `get_anchor_info` method
 
 Fetches all data associated with an anchor including registration mode and tentatively registered devices.
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `get_principal` query method](#_the_get_principal_query_method)
+### The `get_principal` query method
 
 Fetches the principal for a given user and front end.
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `prepare_delegation` method](#_the_prepare_delegation_method)
+### The `prepare_delegation` method
 
 The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor and Client Application Frontend Hostname to the given session key.
 
@@ -351,19 +351,19 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-### [The `get_delegation` query method](#_the_get_delegation_query_method)
+### The `get_delegation` query method
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
-Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-auth-protocol).
+Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-authentication-protocol).
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
-## [The Internet Identity Service backend internals](#_the_internet_identity_service_backend_internals)
+## The Internet Identity Service backend internals
 
 This section, which is to be expanded, describes interesting design choices about the internals of the Internet Identity Service Canister. In particular
 
-### [The salt](#salt)
+### Salt
 
 The `salt` used to blind the hashes that form the `seed` of the Canister Signature "public keys" is obtained via a call to `aaaaa-aa.raw_rand()`. The resulting 32 byte sequence is used as-is.
 
@@ -377,7 +377,7 @@ Since this cannot be done during `canister_init` (no calls from canister init), 
 
 -   *all* other update methods, at the beginning, if `salt == EMPTY_SALT`, they await `self.init_salt()`, ignoring the result (even if it is an error). Then they check if we still have `salt == EMPTY_SALT` and trap if that is the case.
 
-### [Why we do not use `canister_inspect_message`](#_why_we_do_not_use_canister_inspect_message)
+### Why we do not use `canister_inspect_message`
 
 The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see [the interface spec](https://smartcontracts.org/docs/interface-spec/index.html#system-api-inspect-message)). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
 
@@ -393,11 +393,11 @@ On the flip side, implementing `canister_inspect_message` adds code, and thus a 
 
 Therefore the Internet Identity Canister intentionally does not implement `canister_inspect_message`.
 
-### [Internal data model and data structures used](#_internal_data_model_and_data_structures_used)
+### Internal data model and data structures used
 
 The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage for is limited to 2KiB bytes per user. With the stable memory size of 4GiB we can store around 2 \* 10\^6 user records in a single canister.
 
-#### [Stable memory layout](#_stable_memory_layout)
+#### Stable memory layout
 
 All the integers (u64, u32, u16) are encoded in Little-Endian.
 
@@ -432,7 +432,7 @@ User record for Identity Anchor N is stored at offset `sizeof(Header) + (N - use
       credential_id : opt CredentialId;
     });
 
-### [Initialization](#_initialization)
+### Initialization
 
 The Internet Identity canister is designed for sharded deployments. There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users. As users are identified by their Identity Anchor, we split the range of Identity Anchors into continuous non-overlapping half-closed intervals and assign each region to one canister instance. The assigned range is passed to the canister as an init argument, encoded in Candid:
 
@@ -441,13 +441,13 @@ The Internet Identity canister is designed for sharded deployments. There can be
       assigned_user_number_range: record { nat64; nat64; };
     };
 
-### [Approach to upgrades](#_approach_to_upgrades)
+### Approach to upgrades
 
 We don't need any logic recovery logic in pre/post-upgrade hooks because we place all user data to stable memory in a way that can be accessed directly. The signature map is simply dropped on upgrade, so users will have to re-request their delegations.
 
-### [Logic for signature/certified variable caching](#_logic_for_signaturecertified_variable_caching)
+### Logic for signature/certified variable caching
 
-## [The Internet Identity Service frontend](#_the_internet_identity_service_frontend)
+## The Internet Identity Service frontend
 
 The Internet Identity Service frontend is the user-visible part of the Internet Identity Service, and where it all comes together. It communicates with
 
@@ -461,11 +461,11 @@ The Internet Identity Service frontend is the user-visible part of the Internet 
 
 -   client application frontends, via the OAUTH protocol
 
-### [Storage used](#_storage_used)
+### Storage used
 
 The frontend only stores a single piece of local storage, namely the current Identity Anchor, if known under the key `user_number`.
 
-### [Flows](#_flows)
+### Flows
 
 The following flows are not prescriptive of the UI, e.g. "the frontend asks the user for X" may also mean that on the previous shown page, there is already a field for X.
 
@@ -483,7 +483,7 @@ All update calls to the Internet Identity Service Backend are made under the `de
 
 The steps marked with 👆 are the steps where the user presses the security device.
 
-### [Subflow: Login as returning user](#_subflow_login_as_returning_user)
+### Subflow: Login as returning user
 
 1.  The frontend notices that `user_number` is present in local storage.
 
@@ -507,7 +507,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 8.  Login complete
 
-### [Subflow: Login via initial registration](#_subflow_login_via_initial_registration)
+### Subflow: Login via initial registration
 
 1.  The frontend notices that no `user_number` is present in local storage.
 
@@ -541,7 +541,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 13. Login complete
 
-### [Subflow: Login via existing device](#_subflow_login_via_existing_device)
+### Subflow: Login via existing device
 
 1.  The frontend notices that no `user_number` is present in local storage. (Or user said "log in as different user" in returning flow.)
 
@@ -559,7 +559,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 5.  Continue as in "Subflow: Login as returning user"
 
-### [Subflow: Login via new device](#_subflow_login_via_new_device)
+### Subflow: Login via new device
 
 1.  The frontend notices that no `user_number` is present in local storage.
 
@@ -589,7 +589,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 (See "Flow: adding remote device" for what happens on the other device.)
 
-### [Flow: Direct access to the frontend](#_flow_direct_access_to_the_frontend)
+### Flow: Direct access to the frontend
 
 This flow is the boring default
 
@@ -609,7 +609,7 @@ This flow is the boring default
 
 (One could imagine additional information, such as the last time a device was used, or even a list of recent client applications that the user logged into.)
 
-### [Flow: adding remote device](#_flow_adding_remote_device)
+### Flow: adding remote device
 
 1.  The user accesses `https://identity.ic0.app/`
 
@@ -629,7 +629,7 @@ This flow is the boring default
 
     -   Call `verify_tentative_device()` to complete the flow
 
-### [Flow: Setup recovery](#_flow_setup_recovery)
+### Flow: Setup recovery
 
 1.  The user is offered two options for recovery and the option to skip
 
@@ -641,7 +641,7 @@ This flow is the boring default
 
 3.  The device is added to the users account with the purpose `#recovery` set
 
-### [Flow: Use recovery](#_flow_use_recovery)
+### Flow: Use recovery
 
 1.  On the login page the user selects \"Recover my account\"
 
@@ -653,7 +653,7 @@ This flow is the boring default
 
 5.  The management page is shown
 
-### [Flow: authenticating client applications](#_flow_authenticating_client_applications)
+### Flow: authenticating client applications
 
 1.  The user accesses `/#authorize`
 
@@ -661,10 +661,10 @@ This flow is the boring default
 
 3.  The frontend listens to a `message` event (as per [`postMessage` API](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage))
 
-4.  The `event.data` should be a message as per our [Client authentication protocol](#client-auth-protocol).
+4.  The `event.data` should be a message as per our [Client authentication protocol](#client-authentication-protocol).
 
 5.  If the `message` contains a value for `derivationOrigin`:
-    * If the `derivationOrigin` value does not match the format specified in the section [Client authentication protocol](#client-auth-protocol), the process flow is aborted with a failure message.
+    * If the `derivationOrigin` value does not match the format specified in the section [Client authentication protocol](#client-authentication-protocol), the process flow is aborted with a failure message.
     * The frontend calls `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` to retrieve the allowed alter native origins.
     * If there is no such _certified_ asset the flow is aborted with a failure message.
     * The frontend validates the retrieved data as per schema specified in section [JSON Schema](#alternative-frontend-origins-schema)
@@ -678,11 +678,11 @@ This flow is the boring default
 
 9.  The frontend queries `get_delegation()` to get the delegation data
 
-10. It posts that data to the client application, using `event.source.postMessage` and the types specified in [Client authentication protocol](#client-auth-protocol).
+10. It posts that data to the client application, using `event.source.postMessage` and the types specified in [Client authentication protocol](#client-authentication-protocol).
 
 11. After receiving the data the client application is expected to close the Internet Identity window / tab.
 
-### [Flow: Deleting devices](#_flow_deleting_devices)
+### Flow: Deleting devices
 
 1.  The user is logged in, on the management view, and selects a device to delete.
 
@@ -696,7 +696,7 @@ This flow is the boring default
 
 6.  Else, refresh the device view.
 
-### [Flow: Logging out](#_flow_logging_out)
+### Flow: Logging out
 
 1.  The user is logged in, on the management view, and clicks the logout button.
 
@@ -704,7 +704,7 @@ This flow is the boring default
 
 3.  The page is reloaded (to send the user back to the beginning of "Flow: Direct access").
 
-## [Deployment](#_deployment)
+## Deployment
 
 This section needs to describe aspects like
 
@@ -712,7 +712,7 @@ This section needs to describe aspects like
 
 -   how the Internet Identity Service canister id stays predictable and well-known
 
-### [Installation of ic-admin](#_installation_of_ic_admin)
+### Installation of ic-admin
 
 You will need the `ic-admin` tool. You have various options
 
@@ -730,11 +730,11 @@ You will need the `ic-admin` tool. You have various options
     nix-env -iA dfinity.rs.ic-admin-unwrapped -f .
     ```
 
-### [Canister id reservation during NNS bootstrap](#_canister_id_reservation_during_nns_bootstrap)
+### Canister id reservation during NNS bootstrap
 
 The Internet Identity canister is created as an empty canister (i.e. no wasm module installed) during NNS bootstrap and its controller is set to the root canister. This is necessary to ensure that we can install/upgrade it later via a NNS proposal.
 
-### [Official build](#_official_build)
+### Official build
 
 For installation or upgrade, you should build it the "official" way.
 
@@ -754,7 +754,7 @@ shasum -a 256 internet_identity.wasm
 
 Double-check that this is the same SHA256 that is observed on CI. Go to the corresponding commit, find the CI job "docker build" and look at the output of step "Run sha256sum out/internet_identity.wasm".
 
-### [Initial installation (should happen only once)](#_initial_installation_should_happen_only_once)
+### Initial installation
 
 Next, you will need `didc` to be able to produce the binary encoded Candid argument needed for installation. Either download it from [the latest candid release](https://github.com/dfinity/candid/releases/) or build it from source.
 
@@ -764,11 +764,11 @@ The canister accepts a range of user ids that it's responsible for in `canister_
 didc encode '(null)' | xxd -r -p > arg.in
 ```
 
-#### [Submitting proposal for installation and voting on mainnet](#_submitting_proposal_for_installation_and_voting_on_mainnet)
+#### Submitting proposal for installation and voting on mainnet
 
 (This section was removed. We have deployed to mainnet, and should not have to do it again. Please see git history if you need to know this.)
 
-### [Upgrading on Mainnet](#_upgrading_on_mainnet)
+### Upgrading on Mainnet
 
 Write a proposal description like those in <https://github.com/dfinity/nns-proposals/blob/main/proposals/network_canister_management/>. Use a recent Internet Identity upgrade proposal as a template. It contains a condensed `git log` of the changes since the last release.
 
@@ -803,9 +803,9 @@ dfx canister --network mainnet --no-wallet info internet_identity
 
 Once the deployment went through, tag the commit with `mainnet-<date-from-proposal-url>`.
 
-### [Deploying on testnets](#_deploying_on_testnets)
+### Deploying on testnets
 
-#### [Building the canister for the identity testnet](#_building_the_canister_for_the_identity_testnet}
+#### Building the canister for the identity testnet
 
 Because we need to fetch the root key for all networks that are not mainnet, we need to build with `II_FETCH_ROOT_KEY=1`:
 
@@ -816,7 +816,7 @@ II_FETCH_ROOT_KEY=1 ./scripts/docker-build
 
 This will create the Wasm file you want to use for the following deployment steps at `./internet_identity.wasm`.
 
-#### [Installing on testnets](#_installing_on_testnets)
+#### Installing on testnets
 
 Submit the proposal to install the canister on our `identity` testnet (replace for other testnets as appropriate):
 
@@ -826,7 +826,7 @@ ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose
 
 You can check http://\[2a00:fb01:400:42:5000:60ff:fed5:8464\]:8080/\_/dashboard\[our testnet's dashboard\] to confirm the hash of the wasm installed on the canister matches the one you took note of in the previous steps.
 
-#### [Upgrading on testnets](#_upgrading_on_testnets)
+#### Upgrading on testnets
 
 Similar to the steps during initial installation. The main difference is that you need to pass in a different mode to `ic-admin` and we don't need any arguments in this case.
 
@@ -834,7 +834,7 @@ Similar to the steps during initial installation. The main difference is that yo
 ic-admin --nns-url "http://[2a00:fb01:400:42:5000:60ff:fed5:8464]:8080/" propose-to-change-nns-canister --test-neuron-proposer --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --mode upgrade --wasm-module-path internet_identity.wasm
 ```
 
-### [Disaster recovery](#_disaster_recovery)
+### Disaster recovery
 
 If the Internet Computer goes down and has to be re-boot-strapped, or else the backend canister is lost, we can recover as long as
 
