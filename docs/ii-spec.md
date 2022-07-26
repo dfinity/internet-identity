@@ -61,9 +61,7 @@ Some noteworthy security assumptions are:
 
 -   The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
 
-    :::note
-    Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation.
-    :::
+    - _note: Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation._
 
 -   The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
@@ -78,9 +76,8 @@ The Internet Computer serves this frontend under hostname `https://identity.ic0.
 
 The canister maintains a salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer's source of secure randomness.
 
-:::note
-Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
-:::
+
+_note: Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities._
 
 A user account is identified by a unique *Identity Anchor*, a smallish natural number chosen by the canister.
 
@@ -188,14 +185,14 @@ The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/authenticati
 
 The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
-:::note
+_note:
 The Internet Identity frontend will use `event.origin` as the "Frontend URL" to base the user identity on. This includes protocol, full hostname and port. This means
 
 -   Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
     - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
-:::
+_
 
 ## [Alternative Frontend Origins](#alternative-frontend-origins)
 
