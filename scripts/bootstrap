@@ -23,8 +23,8 @@ echo "using rust version '$rust_version'"
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
 
 echo "looking for ic-cdk-optimizer"
-if ! command -v ic-cdk-optimizer
+if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" == "ic-cdk-optimizer 0.3.4" ]]
 then
     echo "installing ic-cdk-optimizer"
-    run cargo install ic-cdk-optimizer --version 0.3.1
+    run cargo install ic-cdk-optimizer --version 0.3.4
 fi
