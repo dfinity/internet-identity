@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    🔗 <a href="https://identity.ic0.app">https://identity.ic0.app</a> | 📜 <a href="https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification">Specification</a> | 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> | 📞 <a href="https://discord.gg/E9FxceAg2j">Discord</a>
+    🔗 <a href="https://identity.ic0.app">https://identity.ic0.app</a> | 📜 <a href="https://github.com/dfinity/internet-identity/blob/main/docs/ii-spec.md">Specification</a> | 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> | 📞 <a href="https://discord.gg/E9FxceAg2j">Discord</a>
 </p>
 
 ---
@@ -21,7 +21,7 @@ Internet Identity is:
 * **Flexible**: Integrating Internet Identity in a Dapp (or even Web 2 app) is as simple as opening the Internet Identity's HTTP interface, https://identity.ic0.app, in a new tab. No need to interact with the canister smart contract directly.
 * **Secure**: Different identities are issued for each app a user authenticates to and cannot be linked back to the user.
 
-For more information, see [What is Internet Identity?](https://smartcontracts.org/docs/ic-identity-guide/what-is-ic-identity.html#id-overview) on [smartcontracts.org](https://smartcontracts.org).
+For more information, see [What is Internet Identity?](https://internetcomputer.org/docs/current/tokenomics/identity-auth/what-is-ic-identity) on [internetcomputer.org](https://internetcomputer.org).
 
 ### Table of Contents
 
@@ -58,13 +58,13 @@ For information on how Internet Identity works in more detail, please refer to t
 
 ### Building with Docker
 
-To get the canister (Wasm module) for Internet Identity, you can either **download a release** from the [releases] page, or build the code yourself. The simplest way to build the code yourself is to use [Docker] and the [`docker-build`](./scripts/docker-build) script:
+To get the canister (Wasm module) for Internet Identity, you can either download a release from the [releases] page, or build the code yourself. The simplest way to build the code yourself is to use [Docker].
+
+The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm`. The following will build the `Dockerfile`:
 
 ``` bash
-$ ./scripts/docker-build
+$ docker build .
 ```
-
-The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm`.
 
 > 💡 The build can be customized with [build features](#build-features-and-flavors).
 
@@ -74,7 +74,7 @@ We recommend using the [`docker-build`](./scripts/docker-build) script. It simpl
 
 ### Integration with Internet Identity
 
-The [`using-dev-build`](./demos/using-dev-build) demo shows a documented example project that integrates Internet Identity. For more, please refer to the [Client Authentication Protocol section](docs/internet-identity-spec.adoc#client-auth-protocol) of the [Internet Identity Specification][spec] to integration Internet Identity in your app from scratch. For a just-add-water approach using the [agent-js](https://github.com/dfinity/agent-js) library (also used by `using-dev-build`), check out Kyle Peacock's [blogpost](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/).
+The [`using-dev-build`](./demos/using-dev-build) demo shows a documented example project that integrates Internet Identity. For more, please refer to the [Client Authentication Protocol section](docs/ii-spec.md#client-auth-protocol) of the [Internet Identity Specification][spec] to integration Internet Identity in your app from scratch. For a just-add-water approach using the [agent-js](https://github.com/dfinity/agent-js) library (also used by `using-dev-build`), check out Kyle Peacock's [blogpost](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/).
 
 If you're interested in the infrastructure of how to get the Internet Identity canister and how to test it within your app, check out [`using-dev-build`](./demos/using-dev-build), which uses the Internet Identity development canister.
 
@@ -134,7 +134,7 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 
 * [Internet Identity Specification][spec], the official Internet Identity Specification
 * [Integration with Internet Identity](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/) by Kyle Peacock
-* [What is Internet Identity?](https://smartcontracts.org/docs/ic-identity-guide/what-is-ic-identity.html) on [smartcontracts.org](https://smartcontracts.org)
+* [What is Internet Identity?](https://internetcomputer.org/docs/current/tokenomics/identity-auth/what-is-ic-identity) on [internetcomputer.org](https://internetcomputer.org)
 * [Internet Identity presentation 📼](https://youtu.be/oxEr8UzGeBo) on YouTube, streamed during the Genesis Event
 * [Excalidraw](https://excalidraw.com), used to make diagrams
 
@@ -144,8 +144,8 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 
 [HACKING]: ./HACKING.md#running-locally
 [ic]: https://internetcomputer.org
-[spec]: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#the-internet-identity-specification
+[spec]: https://github.com/dfinity/internet-identity/blob/main/docs/ii-spec.md
 [releases]: https://github.com/dfinity/internet-identity/releases
 [Docker]: https://docker.io
 [links]: #links
-[candid]: https://smartcontracts.org/docs/candid-guide/candid-concepts.html
+[candid]: https://internetcomputer.org/docs/current/developer-docs/build/languages/candid/candid-concepts/
