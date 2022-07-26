@@ -43,6 +43,7 @@ Some functional requirements are
 -   these identities are stable, i.e., do not depend on a user's security devices
 
 -   the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
+    -   the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
 
 -   users do not need ever to remember secret information (but possibly per-user non-secret information)
 
@@ -141,6 +142,7 @@ This section describes the Internet Identity Service from the point of view of a
           kind: "authorize-client";
           sessionPublicKey: Uint8Array;
           maxTimeToLive?: bigint;
+          derivationOrigin?: string;
         }
 
     where
@@ -148,6 +150,9 @@ This section describes the Internet Identity Service from the point of view of a
     -   the `sessionPublicKey` contains the public key of the session key pair.
 
     -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a larger.
+
+    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.ic0\.app$`. Internet Identity will onl y accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` o f the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+
 
 6.  Now the client application window expects a message back, with data `event`.
 
@@ -187,9 +192,67 @@ The client application frontend should support delegation chains of length more 
 The Internet Identity frontend will use `event.origin` as the "Frontend URL" to base the user identity on. This includes protocol, full hostname and port. This means
 
 -   Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
+    - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
 :::
+
+## [Alternative Frontend Origins](#alternative-frontend-origins)
+
+
+To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-auth-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
+
+> **IMPORTANT**: This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this featu re to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+
+*Note:* `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` princip als or vice versa.
+
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol[here]).
+
+
+## [JSON Schema](#alternative-frontend-origins-schema)
+
+
+``` json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "II Alternative Origins Principal Derivation Origins",
+  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use a can
+nical canister URL (https://<canister_id>.ic0.app or https://<canister_id>.raw.ic0.app) for principal derivation.",
+  "type": "object",
+  "properties": {
+    "alternativeOrigins": {
+      "description": "List of allowed alternative frontend origins",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0,
+      "maxItems": 10,
+      "uniqueItems": true
+    }
+  },
+  "required": [ "alternativeOrigins" ]
+}
+```
+
+
+
+### Example
+``` json
+{
+  "alternativeOrigins": [
+    "https://alternative-1.com",
+    "https://www.nice-frontend-name.org"
+  ]
+}
+```
+
+*Note:* The path `/.well-known/ii-alternative-origins` will always be requested using the non-raw `https://<canister_id>.ic0. app` domain (even if the `derivationOrigin` uses a `.raw`) and _must_ be delivered as a certified asset. Requests to `/.well-k nown/ii-alternative-origins` _must_ be answered with a `200` HTTP status code. More specifically Internet Identity _will not_ follow redirects and fail with an error instead. These measures are required in order to prevent malicious boundary nodes or r eplicas from tampering with `ii-alternative-origins`.
+
+
+*Note:* To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
+
+*Note:* In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin[`Access-Control-Allow-Origin`] must be set and allow the Internet Identity origin `https://identity.ic0.app`.
 
 ## [The Internet Identity Service Backend interface](#_the_internet_identity_service_backend_interface)
 
@@ -604,11 +667,16 @@ This flow is the boring default
 
 4.  The `event.data` should be a message as per our [Client authentication protocol](#client-auth-protocol).
 
-5.  The `event.origin` is used as the Application Frontend's hostname
+5.  If the `message` contains a value for `derivationOrigin`:
+    * If the `derivationOrigin` value does not match the format specified in the section [Client authentication protocol](#client-auth-protocol), the process flow is aborted with a failure message.
+    * The frontend calls `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` to retrieve the allowed alter native origins.
+    * If there is no such _certified_ asset the flow is aborted with a failure message.
+    * The frontend validates the retrieved data as per schema specified in section [JSON Schema](#alternative-frontend-origins-schema)
+    * If the `event.origin` is contained in the array value of the property `alternativeOrigins` the `derivationOrigin` will be used as the Application Frontend’s hostname.
 
-6.  The front end calls `get_principal()` to obtain the user- and front-end-specific principal.
+6. If the `message` does _not_ contain a value for `derivationOrigin` the `event.origin` is used as the Application Frontend’s hostname
 
-7.  The user is asked if they want to log into the client application, showing the client application frontend's hostname and the used principal.
+7. The user is asked if they want to log into the client application, showing the client application frontend’s hostname.
 
 8.  The frontend calls `prepare_delegation()` with the client application frontend hostname, client application provided session key and desired time to live.
 
@@ -616,7 +684,7 @@ This flow is the boring default
 
 10. It posts that data to the client application, using `event.source.postMessage` and the types specified in [Client authentication protocol](#client-auth-protocol).
 
-11. It shows a message indicating that the login is complete.
+11. After receiving the data the client application is expected to close the Internet Identity window / tab.
 
 ### [Flow: Deleting devices](#_flow_deleting_devices)
 
@@ -778,6 +846,4 @@ If the Internet Computer goes down and has to be re-boot-strapped, or else the b
 
 -   we have a copy of the stable memory (`/var/lib/dfinity-node/ic_state/tip/canister_states/00000000000000070101/stable_memory.bin`)
 
-We can then install a temporary upload canister that does nothing but set the stable memory to that binary (something like `backend-tests/stable-memory-setter.wat`, but extended to allow the upload in chunks, if it is larger than 2Mb), and upgrade from that.
-
-The backend tests have a test that exercises this. See `backend-tests/test-stable-memory-rdmx6-jaaaa-aaaaa-aaadq-cai.md` for notes about that test.
+We can then install a temporary upload canister that does nothing but set the stable memory to that binary. The canister tests have a test that exercises this. See `src/canister_tests/stable_memory/genesis-memory-layout.md` for notes about that test.
