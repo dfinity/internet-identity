@@ -58,13 +58,13 @@ For information on how Internet Identity works in more detail, please refer to t
 
 ### Building with Docker
 
-To get the canister (Wasm module) for Internet Identity, you can either download a release from the [releases] page, or build the code yourself. The simplest way to build the code yourself is to use [Docker].
-
-The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm`. The following will build the `Dockerfile`:
+To get the canister (Wasm module) for Internet Identity, you can either **download a release** from the [releases] page, or build the code yourself. The simplest way to build the code yourself is to use [Docker] and the [`docker-build`](./scripts/docker-build) script:
 
 ``` bash
-$ docker build .
+$ ./scripts/docker-build
 ```
+
+The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm`.
 
 > 💡 The build can be customized with [build features](#build-features-and-flavors).
 
