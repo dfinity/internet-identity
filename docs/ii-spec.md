@@ -213,8 +213,7 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "II Alternative Origins Principal Derivation Origins",
-  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use a can
-nical canister URL (https://<canister_id>.ic0.app or https://<canister_id>.raw.ic0.app) for principal derivation.",
+  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use a canonical canister URL (https://<canister_id>.ic0.app or https://<canister_id>.raw.ic0.app) for principal derivation.",
   "type": "object",
   "properties": {
     "alternativeOrigins": {
