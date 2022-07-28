@@ -651,3 +651,9 @@ nav {
 button[data-action="protect"] {
   margin-bottom: 0;
 }
+
+button[data-action="remove"],
+button[data-action="back"] {
+  min-width: 347px;
+  align-self: center;
+}
