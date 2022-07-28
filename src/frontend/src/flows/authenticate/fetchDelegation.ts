@@ -29,7 +29,6 @@ export const fetchDelegation = async (
       : authContext.requestOrigin;
 
   const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
-    loginResult.userNumber,
     derivationOrigin,
     sessionKey,
     authContext.authRequest.maxTimeToLive
@@ -70,12 +69,7 @@ const retryGetDelegation = async (
     await new Promise((resolve) => {
       setInterval(resolve, 1000 * i);
     });
-    const res = await connection.getDelegation(
-      userNumber,
-      hostname,
-      sessionKey,
-      timestamp
-    );
+    const res = await connection.getDelegation(hostname, sessionKey, timestamp);
     if (hasOwnProperty(res, "signed_delegation")) {
       return res.signed_delegation;
     }
