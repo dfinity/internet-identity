@@ -92,7 +92,7 @@ const init = (
   ) as HTMLButtonElement;
   cancelButton.onclick = async () => {
     countdown.stop();
-    await withLoader(() => connection.exitDeviceRegistrationMode(userNumber));
+    await withLoader(() => connection.exitDeviceRegistrationMode());
     await renderManage(userNumber, connection);
   };
 
@@ -118,7 +118,7 @@ const init = (
       return;
     }
     const result = await withLoader(() =>
-      connection.verifyTentativeDevice(userNumber, pinInput.value)
+      connection.verifyTentativeDevice(pinInput.value)
     );
 
     if (hasOwnProperty(result, "verified")) {

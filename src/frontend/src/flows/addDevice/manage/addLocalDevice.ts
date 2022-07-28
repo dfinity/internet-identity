@@ -47,7 +47,6 @@ export const addLocalDevice = async (
   try {
     await withLoader(() =>
       connection.add(
-        userNumber,
         deviceName,
         { unknown: null },
         { authentication: null },
