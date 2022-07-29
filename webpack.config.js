@@ -7,6 +7,34 @@ const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
+const execSync = require('child_process').execSync;
+
+/**
+ * Try to come up with meaningful version info based on Git status.
+ *
+ * This returns either:
+ *  * 'unknown' on error
+ *  * 'dirty' if dirty or not on branch 'main'
+ *  * the commit sha1 otherwise
+ */
+function versionInfo() {
+    try {
+        // Grab the branch and trim newline; on failure (for instance not a git repo, git not installed, etc)
+        // just say "unknown"
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8'} ).replace(/^\s+|\s+$/g, '');
+        try {
+            if (branch !== "main") { throw Error('not on main'); }
+            execSync('git status --porcelain'); // we don't care about the output, just the return code
+            const sha1 = execSync('git rev-parse HEAD', { encoding: 'utf-8'} );
+            return sha1;
+        } catch (e)  {
+            return "dirty";
+        }
+    } catch (e)  {
+        return "unknown";
+    }
+}
+
 /**
  * Generate a webpack configuration for a canister.
  */
@@ -126,6 +154,7 @@ function generateWebpackConfigForCanister(name, info) {
         "II_FETCH_ROOT_KEY": "0",
         "II_DUMMY_AUTH": "0",
         "II_DUMMY_CAPTCHA": "0",
+        "II_VERSION_INFO": versionInfo(),
       }),
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,

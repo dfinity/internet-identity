@@ -10,7 +10,27 @@ import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
 import authorizeAuthentication from "./flows/authenticate";
 
+/**
+ * Show some version info inferred from II_VERSION_INFO
+ */
+const showVersionInfo = () => {
+  const versionInfo =
+    process.env.II_VERSION_INFO !== null
+      ? process.env.II_VERSION_INFO
+      : "unknown";
+  console.log(`Internet Identity - ${versionInfo}`);
+
+  // Assume that anything that looks like a commit hash is a commit hash
+  if (versionInfo.match(/\b([a-f0-9]{40})\b/)) {
+    console.log(
+      `https://github.com/dfinity/internet-identity/commit/${versionInfo}`
+    );
+  }
+};
+
 const init = async () => {
+  showVersionInfo();
+
   const url = new URL(document.URL);
 
   // If the build is not "official", show a warning
