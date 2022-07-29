@@ -38,7 +38,7 @@ The Internet Identity service allows users to
 
 Some functional requirements are
 
--   users have separate identities (or \"pseudonyms\") per client application (more precisely, per client application frontend \"hostname\", though see [Alternative Frontend Origins](#alternative-frontend-origins) for caveat about `.raw` domains)
+-   users have separate identities (or "pseudonyms") per client application (more precisely, per client application frontend "hostname", though see [Alternative Frontend Origins](#alternative-frontend-origins) for caveat about `.raw` domains)
 
 -   these identities are stable, i.e., do not depend on a user's security devices
 
@@ -61,7 +61,7 @@ Some noteworthy security assumptions are:
 -   The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
 
 :::note
-Just for background: At launch this means we will rely on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. Eventually, but after launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) will improve this situation._
+Just for background: At launch this meant we relied on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. After launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) have improved this situation.
 :::
 
 -   The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
@@ -79,7 +79,7 @@ The canister maintains a salt (in the following the `salt`), a 32 byte long blob
 
 
 :::note
-Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities._
+Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
 :::
 
 A user account is identified by a unique *Identity Anchor*, a smallish natural number chosen by the canister.
@@ -106,7 +106,7 @@ The Internet Identity Service Backend stores the following data in user accounts
 
     -   an optional *credential id*, which is necessary for WebAuthn authentication
 
-When a client application frontend wants to log in as a user, it uses a *session key* (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [*delegation chain*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) that allows the session key to sign for the user's main identity.
+When a client application frontend wants to authenticate as a user, it uses a *session key* (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [*delegation chain*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) that allows the session key to sign for the user's main identity.
 
 The delegation chain consists of one delegation, called the *client delegation*. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a [canister signature](https://hydra.dfinity.systems/latest/dfinity-ci-build/ic-ref.pr-319/interface-spec/1/index.html#canister-signatures). This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 8 days, with a default of 30 minutes.
 
@@ -184,7 +184,7 @@ This section describes the Internet Identity Service from the point of view of a
 
     The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
-The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/auth-client) and The [`@dfinity/authentication`](https://www.npmjs.com/package/@dfinity/authentication) NPM packages provide helpful functionality here.
+The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/auth-client) and the [`@dfinity/authentication`](https://www.npmjs.com/package/@dfinity/authentication) NPM packages provide helpful functionality here.
 
 The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
@@ -204,7 +204,11 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
 
 :::caution
-This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this featu re to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+:::
+
+:::caution
+This feature is experimental and may be removed at any point without prior notice!
 :::
 
 :::note
@@ -392,7 +396,7 @@ Since this cannot be done during `canister_init` (no calls from canister init), 
 
 ### Why we do not use `canister_inspect_message`
 
-The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see [the interface spec](https://smartcontracts.org/docs/interface-spec/index.html#system-api-inspect-message)). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
+The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see [the interface spec](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-inspect-message)). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
 
 It seems that this implies that we should use `canister_inspect_message` to reject messages that would, for example, not pass authentication.
 
@@ -408,7 +412,7 @@ Therefore the Internet Identity Canister intentionally does not implement `canis
 
 ### Internal data model and data structures used
 
-The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage for is limited to 2KiB bytes per user. With the stable memory size of 4GiB we can store around 2 \* 10\^6 user records in a single canister.
+The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage for is limited to 2KiB bytes per user. With the stable memory size of 4GiB we can store around `2 * 10^6` user records in a single canister.
 
 #### Stable memory layout
 
@@ -502,7 +506,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 2.  The frontend offers the choices
 
-    -   Welcome \<Identity Anchor\>. Do you want to log in?
+    -   Welcome `<Identity Anchor>`. Do you want to log in?
 
     -   Log in as a different user
 
@@ -600,7 +604,7 @@ The steps marked with 👆 are the steps where the user presses the security dev
 
 10. Login complete
 
-(See "Flow: adding remote device" for what happens on the other device.)
+(See ["Flow: adding remote device"](#flow-adding-remote-device) for what happens on the other device.)
 
 ### Flow: Direct access to the frontend
 
@@ -658,7 +662,7 @@ One could imagine additional information, such as the last time a device was use
 
 ### Flow: Use recovery
 
-1.  On the login page the user selects \"Recover my account\"
+1.  On the login page the user selects "Recover my account"
 
 2.  The user is prompted for their Identity Anchor
 
