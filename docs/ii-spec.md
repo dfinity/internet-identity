@@ -271,7 +271,11 @@ This section describes the interface that the backend canister provides.
 
 This interface is currently only used by its own frontend. This tight coupling means that this interface may change, even in incompatible ways. We therefore do not have to apply Candid best practices for backward-compatibility (such as using records for arguments and results).
 
-The summary is given by the [Candid interface](./_attachments/internet_identity.did).
+The summary is given by the Candid interface:
+
+
+``` candid name=ii-interface file=../src/internet_identity/internet_identity.did
+```
 
 
 The `init_salt` method is mostly internal, see [Salt](#salt).
