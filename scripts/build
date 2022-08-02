@@ -64,18 +64,23 @@ done
 # XXX: we currently cannot check for the exact version of ic-cdk-optimizer
 # because of https://github.com/dfinity/cdk-rs/issues/181
 # Once the issue is fixed, we can ensure that the correct version is installed
-if ! command -v ic-cdk-optimizer
+if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
 then
-    echo could not find ic-cdk-optimizer
-    echo "ic-cdk-optimizer version 0.3.1 is needed, please run the following command:"
-    echo "  cargo install ic-cdk-optimizer --version 0.3.1"
-    exit 1
+    cargo install ic-cdk-optimizer --version 0.3.4
 fi
 
 if [ "$ONLY_DEPS" != "1" ]
 then
     # Compile frontend assets to dist
     echo Compiling frontend assets
+    export NODE_VERSION=14.15.4
+    curl --fail -sSf https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
+    export NVM_DIR=${HOME}/.nvm
+    . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
+    . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
+    . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
+    export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}"
+    npm ci
     npm run build
 fi
 
@@ -112,7 +117,8 @@ if [ "$ONLY_DEPS" != "1" ]
 then
     CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
 
+    mkdir -p .dfx/ic/canisters/internet_identity
     ic-cdk-optimizer \
         "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-        -o "./internet_identity.wasm"
+        -o ".dfx/ic/canisters/internet_identity/internet_identity.wasm"
 fi

@@ -70,7 +70,7 @@ RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
 RUN ./scripts/build
-RUN sha256sum /internet_identity.wasm
+RUN sha256sum .dfx/ic/canisters/internet_identity/internet_identity.wasm
 
 FROM scratch AS scratch
-COPY --from=build /internet_identity.wasm /
+COPY --from=build .dfx/ic/canisters/internet_identity/internet_identity.wasm /
