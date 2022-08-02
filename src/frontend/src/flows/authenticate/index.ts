@@ -19,7 +19,11 @@ import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
 import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import { validateDerivationOrigin } from "./validateDerivationOrigin";
+import {
+  validateDerivationOrigin,
+  ValidationResult,
+} from "./validateDerivationOrigin";
+import { unreachable } from "../../utils/utils";
 
 const pageContent = (
   hostName: string,
@@ -189,50 +193,57 @@ export interface AuthSuccess {
  * Internet Identity window.
  */
 export default async (): Promise<AuthSuccess> => {
-  const authContext = await withLoader(() => waitForAuthRequest());
-  if (authContext === null) {
-    // The user has manually navigated to "/#authorize".
-    window.location.hash = "";
-    window.location.reload();
-    return new Promise((_resolve) => {
-      // never resolve, window is being reloaded
-    });
-  }
+  const [authContext, validationResult]: [AuthContext, ValidationResult] =
+    await withLoader(async () => {
+      const authContext = await waitForAuthRequest();
 
-  const validationResult = await withLoader(
-    async () =>
-      await validateDerivationOrigin(
+      if (authContext === null) {
+        // The user has manually navigated to "/#authorize".
+        window.location.hash = "";
+        window.location.reload();
+        return new Promise((_resolve) => {
+          // never resolve, window is being reloaded
+        });
+      }
+
+      const validationResult = await validateDerivationOrigin(
         authContext.requestOrigin,
         authContext.authRequest.derivationOrigin
-      )
-  );
-  if (validationResult.result === "invalid") {
-    await displayError({
-      title: "Invalid Derivation Origin",
-      message: `"${authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${authContext.requestOrigin}"`,
-      detail: validationResult.message,
-      primaryButton: "Close",
+      );
+      return [authContext, validationResult];
     });
-
-    // notify the client application
-    // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
-    authContext.postMessageCallback({
-      kind: "authorize-client-failure",
-      text: `Invalid derivation origin: ${validationResult.message}`,
-    });
-
-    // we cannot recover from this, retrying or reloading won't help
-    // close the window as it returns the user to the offending application that opened II for authentication
-    window.close();
-    return new Promise((_resolve) => {
-      // never resolve, do not call init
-    });
-  }
 
   const userNumber = getUserNumber();
-  return new Promise((resolve) => {
-    init(authContext, userNumber).then(resolve);
-  });
+  switch (validationResult.result) {
+    case "invalid":
+      await displayError({
+        title: "Invalid Derivation Origin",
+        message: `"${authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${authContext.requestOrigin}"`,
+        detail: validationResult.message,
+        primaryButton: "Close",
+      });
+
+      // notify the client application
+      // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
+      authContext.postMessageCallback({
+        kind: "authorize-client-failure",
+        text: `Invalid derivation origin: ${validationResult.message}`,
+      });
+
+      // we cannot recover from this, retrying or reloading won't help
+      // close the window as it returns the user to the offending application that opened II for authentication
+      window.close();
+      return new Promise((_resolve) => {
+        // never resolve, do not call init
+      });
+    case "valid":
+      return new Promise((resolve) => {
+        init(authContext, userNumber).then(resolve);
+      });
+    default:
+      unreachable(validationResult);
+      break;
+  }
 };
 
 const init = (

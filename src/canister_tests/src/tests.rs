@@ -35,8 +35,8 @@ fn ii_upgrade_retains_anchors() {
 mod rollback_tests {
     use crate::framework::{device_data_1, device_data_2, principal_1, CallError};
     use crate::{api, flows, framework};
+    use candid::Principal;
     use ic_state_machine_tests::StateMachine;
-    use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
 
     /// Tests simple upgrade and downgrade.
@@ -129,13 +129,13 @@ mod registration_tests {
         device_data_1, expect_user_error_with_message, principal_1, principal_2, CallError,
     };
     use crate::{api, flows, framework};
+    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{
         ChallengeAttempt, DeviceProtection, InternetIdentityInit, RegisterResponse,
     };
     use regex::Regex;
-    use sdk_ic_types::Principal;
     use std::time::Duration;
 
     /// Tests user registration with cross checks for lookup, get_anchor_info and get_principal.
@@ -337,6 +337,7 @@ mod stable_memory_tests {
         recovery_device_data_1, recovery_device_data_2, CallError,
     };
     use crate::{api, framework};
+    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::{PrincipalId, StateMachine};
     use internet_identity_interface::DeviceData;
@@ -344,7 +345,6 @@ mod stable_memory_tests {
     use internet_identity_interface::KeyType::Unknown;
     use internet_identity_interface::Purpose::Authentication;
     use regex::Regex;
-    use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
     use std::path::PathBuf;
 
@@ -1142,11 +1142,11 @@ mod delegation_tests {
         CallError,
     };
     use crate::{api, flows, framework};
+    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::GetDelegationResponse;
     use regex::Regex;
-    use sdk_ic_types::Principal;
     use serde_bytes::ByteBuf;
     use std::ops::Add;
     use std::time::{Duration, UNIX_EPOCH};

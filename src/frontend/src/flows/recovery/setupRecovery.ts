@@ -44,7 +44,6 @@ export const setupRecovery = async (
 
         return await withLoader(() =>
           connection.add(
-            userNumber,
             name,
             { cross_platform: null },
             { recovery: null },
@@ -63,7 +62,6 @@ export const setupRecovery = async (
         );
         await withLoader(() =>
           connection.add(
-            userNumber,
             name,
             { seed_phrase: null },
             { recovery: null },
