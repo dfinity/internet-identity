@@ -7,6 +7,7 @@ const pageContent = () => html`
     <form id="deviceAliasForm">
       <p>Please provide a name for your new device</p>
       <input
+        class="inputDeviceAlias"
         aria-label="device name"
         id="deviceAlias"
         placeholder="Device alias"
