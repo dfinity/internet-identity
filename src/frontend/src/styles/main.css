@@ -1,8 +1,96 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 
+/***
+The new CSS reset - version 1.7.2 (last updated 23.6.2022)
+GitHub page: https://github.com/elad2412/the-new-css-reset
+***/
+
+/*
+Remove all the styles of the "User-Agent-Stylesheet", except for the 'display' property
+- The "symbol *" part is to solve Firefox SVG sprite bug
+*/
+*:where(:not(html, iframe, canvas, img, svg, video):not(svg *, symbol *)) {
+  all: unset;
+  display: revert;
+}
+
+/* Preferred box-sizing value */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Reapply the pointer cursor for anchor tags */
+a, button {
+  cursor: revert;
+}
+
+/* Remove list styles (bullets/numbers) */
+ol, ul, menu {
+  list-style: none;
+}
+
+/* For images to not be able to exceed their container */
+img {
+  max-width: 100%;
+}
+
+/* removes spacing between cells in tables */
+table {
+  border-collapse: collapse;
+}
+
+/* Safari - solving issue when using user-select:none on the <body> text input doesn't working */
+input, textarea {
+  -webkit-user-select: auto;
+}
+
+/* revert the 'white-space' property for textarea elements on Safari */
+textarea {
+  white-space: revert;
+}
+
+/* minimum style to allow to style meter element */
+meter {
+  -webkit-appearance: revert;
+  appearance: revert;
+}
+
+/* reset default text opacity of input placeholder */
+::placeholder {
+  color: unset;
+}
+
+/* fix the feature of 'hidden' attribute.
+display:revert; revert to element instead of attribute */
+:where([hidden]) {
+  display: none;
+}
+
+/* revert for bug in Chromium browsers
+- fix for the content editable attribute will work properly.
+- webkit-user-select: auto; added for Safari in case of using user-select:none on wrapper element*/
+:where([contenteditable]:not([contenteditable="false"])) {
+  -moz-user-modify: read-write;
+  -webkit-user-modify: read-write;
+  overflow-wrap: break-word;
+  -webkit-line-break: after-white-space;
+  -webkit-user-select: auto;
+}
+
+/* apply back the draggable feature - exist only in Chromium and Safari */
+:where([draggable="true"]) {
+  -webkit-user-drag: element;
+}
+
+/* user authored styles */
+
 :root {
   font-family: "Montserrat", sans-serif;
+  
   font-size: 16px;
+  
   --flamingo-500: #f15a24;
   --grey-050: #efefef;
   --grey-100: #d9d9da;
@@ -14,14 +102,14 @@
   --grey-700: #555659;
   --grey-800: #3f4043;
   --grey-900: #292a2e;
-
+  
   --text-color: var(--grey-900);
   --background-color: #fff;
   --primary: black;
   --secondary: #cdcdcd;
   --accent: #323232;
   --rainbow-orange: rgba(237, 186, 152, 1);
-
+  
   background: var(--background-color);
   color: var(--text-color);
   box-sizing: border-box;
@@ -36,6 +124,7 @@ body {
 footer {
   padding: 1em 2em 0.5rem;
 }
+
 @media (min-width: 512px) {
   footer {
     padding: 2em 2em 1rem;
@@ -81,7 +170,7 @@ input {
   border: 2px var(--grey-100) solid;
   width: auto;
   background-color: var(--background-color);
-
+  
   line-height: 1.25rem;
   letter-spacing: 0.005em;
 }
@@ -156,7 +245,7 @@ button {
   margin-bottom: 1rem;
   padding: 0.6rem 1rem;
   border-radius: 4px;
-
+  
   line-height: 1.25rem;
   letter-spacing: 0.005em;
 }
@@ -408,20 +497,20 @@ nav {
 
 .faq__question-underline {
   background: -webkit-gradient(
-    linear,
-    left top,
-    right top,
-    from(#29abe2),
-    color-stop(33%, #fbb03b),
-    color-stop(66%, #f15a24),
-    to(#ed1e79)
+  linear,
+  left top,
+  right top,
+  from(#29abe2),
+  color-stop(33%, #fbb03b),
+  color-stop(66%, #f15a24),
+  to(#ed1e79)
   );
   background: linear-gradient(
-    90deg,
-    #29abe2,
-    #fbb03b 33%,
-    #f15a24 66%,
-    #ed1e79
+  90deg,
+  #29abe2,
+  #fbb03b 33%,
+  #f15a24 66%,
+  #ed1e79
   );
   height: 1px;
   bottom: 0;
@@ -542,20 +631,20 @@ nav {
 
 .about__section-title-underline {
   background: -webkit-gradient(
-    linear,
-    left top,
-    right top,
-    from(#29abe2),
-    color-stop(33%, #fbb03b),
-    color-stop(66%, #f15a24),
-    to(#ed1e79)
+  linear,
+  left top,
+  right top,
+  from(#29abe2),
+  color-stop(33%, #fbb03b),
+  color-stop(66%, #f15a24),
+  to(#ed1e79)
   );
   background: linear-gradient(
-    90deg,
-    #29abe2,
-    #fbb03b 33%,
-    #f15a24 66%,
-    #ed1e79
+  90deg,
+  #29abe2,
+  #fbb03b 33%,
+  #f15a24 66%,
+  #ed1e79
   );
   height: 1px;
   bottom: 0;
@@ -623,12 +712,12 @@ nav {
   border-image-slice: 1;
   outline: none;
   border-image-source: linear-gradient(
-    270.05deg,
-    #29abe2 10.78%,
-    #522785 22.2%,
-    #ed1e79 42.46%,
-    #f15a24 59.41%,
-    #fbb03b 77.09%
+  270.05deg,
+  #29abe2 10.78%,
+  #522785 22.2%,
+  #ed1e79 42.46%,
+  #f15a24 59.41%,
+  #fbb03b 77.09%
   );
 }
 .warnIcon {
