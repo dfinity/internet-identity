@@ -15,7 +15,7 @@ import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
 const pageContent = html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please provide a name for your device.</p>
@@ -27,7 +27,7 @@ const pageContent = html`
 `;
 
 const constructingContent = html`
-  <div class="container flex center">
+  <div class="l-container flex center">
     <h1>Constructing new Identity Anchor</h1>
     ${icLogo}
     <p>This may take a while. Please wait and do not refresh the page.</p>

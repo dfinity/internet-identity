@@ -3,12 +3,7 @@ import { compatibilityChart } from "../components/compatibilityChart";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = (reason: string) => html`
-  <style>
-    ul {
-      list-style-type: none;
-    }
-  </style>
-  <div class="container">
+  <div class="l-container c-card">
     <h1 id="compatibilityNotice">
       Your browser isn't supported for<br />Internet Identity
     </h1>

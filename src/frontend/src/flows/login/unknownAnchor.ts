@@ -46,7 +46,7 @@ const pageContent = () => html` <style>
       width: 100%;
     }
   </style>
-  <section class="container" aria-label="Authentication">
+  <section class="l-container c-card" aria-label="Authentication">
     ${icLogo}
     
     <article>

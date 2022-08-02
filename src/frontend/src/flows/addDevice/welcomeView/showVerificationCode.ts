@@ -17,7 +17,7 @@ const pageContent = (
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Device Verification Required</h1>
     <p>
       This device was added tentatively to the Identity Anchor

@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { warningIcon } from "../components/icons";
 
 const pageContent = html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Create a new Internet Identity Anchor</h1>
     <div class="warnBox">
       <div class="warnIcon">${warningIcon}</div>

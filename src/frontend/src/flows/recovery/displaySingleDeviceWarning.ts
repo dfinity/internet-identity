@@ -27,7 +27,7 @@ const pageContent = () => html`
       min-height: 48px;
     }
   </style>
-  <article id="warningContainer" class="container">
+  <article id="warningContainer" class="l-container c-card">
     <div aria-hidden>${warningIcon}</div>
     <h1 id="warningHeading">Warning</h1>
     <p>

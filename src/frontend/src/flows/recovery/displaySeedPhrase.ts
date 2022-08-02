@@ -7,7 +7,7 @@ const pageContent = (seedPhrase: string) => html`
       font-size: 1rem;
     }
   </style>
-  <article class="container">
+  <article class="l-container c-card">
     <h1>Seedphrase</h1>
     <p>Your seed phrase makes it easy to recover this Identity Anchor.</p>
     <aside class="warningBox" aria-label="warning">

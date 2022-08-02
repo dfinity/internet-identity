@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { parseUserNumber } from "../utils/userNumber";
 
 const pageContent = (title: string, userNumber: bigint | null) => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>${title}</h1>
     <p>Please provide an Identity Anchor.</p>
     <input

@@ -11,7 +11,7 @@ import {
 import { displayError } from "../../../components/displayError";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Add New Remote Device</h1>
     <p>
       Device registration mode enabled for Identity Anchor

@@ -14,7 +14,7 @@ const pageContent = (userNumber: bigint) => html` <style>
       height: 2rem;
     }
   </style>
-  <div class="container">
+  <div class="l-container c-card">
     ${icLogo}
     <h1>Welcome back!</h1>
     <p>Authenticate using Internet Identity.</p>

@@ -5,7 +5,7 @@ import {
 } from "./registerTentativeDevice";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Device Registration Not Enabled</h1>
     <p>
       Device registration is not enabled for the Identity Anchor

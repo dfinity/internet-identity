@@ -17,7 +17,7 @@ import {
 } from "../utils/iiConnection";
 
 const pageContent = html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Confirm new device</h1>
     <form id="confirmForm">
       <p class="captcha-status-text">…</p>

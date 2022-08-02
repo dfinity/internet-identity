@@ -114,18 +114,8 @@ const pageContent = (
     .host-name {
       padding: 1rem 0.5rem;
     }
-
-    .container {
-      padding: 3.5rem 1rem 2rem;
-    }
-
-    @media (min-width: 512px) {
-      .container {
-        padding: 3.5rem 2.5rem 2rem;
-      }
-    }
   </style>
-  <div class="container">
+  <div class="l-container c-card">
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>

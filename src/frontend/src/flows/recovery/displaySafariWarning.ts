@@ -27,7 +27,7 @@ const pageContent = () => html`
       min-height: 48px;
     }
   </style>
-  <div id="warningContainer" class="container">
+  <div id="warningContainer" class="l-container c-card">
     ${warningIcon}
     <h1 id="warningHeading">Warning</h1>
     <p>It looks like you are using Safari or iOS.</p>

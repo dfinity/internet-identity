@@ -4,7 +4,7 @@ import { IIConnection } from "../utils/iiConnection";
 import { renderManage } from "./manage";
 
 const pageContent = (name: string) => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Success!</h1>
     <p>You have successfully added your new device.</p>
     <label>Device name:</label>

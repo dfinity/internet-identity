@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../../../components/logout";
 
 const pageContent = () => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>New Device</h1>
     <p>Please provide a name for your new device</p>
     <input id="deviceAlias" placeholder="Device alias" />

@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 
 const pageContent = () => html`
-  <div class="container">
+  <div class="l-container c-card">
     <h1>Choose a device</h1>
     <label>Recovery devices</label>
     <div id="deviceList"></div>

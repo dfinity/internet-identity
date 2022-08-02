@@ -16,7 +16,7 @@ const pageContent = (userNumber: bigint) => html`
       width: 100%;
     }
   </style>
-  <div class="container full-width">
+  <div class="l-container  c-card full-width">
     <h1>Recovery for ${userNumber}</h1>
     <p>
       You are about to recover your anchor using a recovery device. Please click

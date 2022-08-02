@@ -152,7 +152,7 @@ const style = () => html`<style>
 // recovery devices.
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${style()}
-  <section class="container">
+  <section class="l-container c-card">
     <h1>Anchor Management</h1>
     <p>
       You can view and manage this Identity Anchor and its added devices here.
