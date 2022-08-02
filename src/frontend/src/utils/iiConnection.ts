@@ -64,7 +64,7 @@ export class DummyIdentity
 }
 
 // Check if the canister ID was defined before we even try to read it
-if (typeof canisterId !== undefined) {
+if (typeof canisterId === "undefined") {
   displayError({
     title: "Canister ID not set",
     message:
@@ -73,6 +73,7 @@ if (typeof canisterId !== undefined) {
   }).then(() => {
     window.location.reload();
   });
+  throw new Error("canisterId is undefined"); // abort further execution of this script
 }
 
 export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
@@ -116,6 +117,7 @@ export class IIConnection {
   protected constructor(
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
+    public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {}
 
@@ -173,7 +175,12 @@ export class IIConnection {
       console.log(`registered Identity Anchor ${userNumber}`);
       return {
         kind: "loginSuccess",
-        connection: new IIConnection(identity, delegationIdentity, actor),
+        connection: new IIConnection(
+          identity,
+          delegationIdentity,
+          userNumber,
+          actor
+        ),
         userNumber,
       };
     } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
@@ -248,6 +255,7 @@ export class IIConnection {
         // eslint-disable-next-line
         identity,
         delegationIdentity,
+        userNumber,
         actor
       ),
     };
@@ -278,7 +286,12 @@ export class IIConnection {
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IIConnection(identity, delegationIdentity, actor),
+      connection: new IIConnection(
+        identity,
+        delegationIdentity,
+        userNumber,
+        actor
+      ),
     };
   }
 
@@ -369,37 +382,29 @@ export class IIConnection {
     return this.actor;
   }
 
-  getAnchorInfo = async (
-    userNumber: UserNumber
-  ): Promise<IdentityAnchorInfo> => {
+  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
     const actor = await this.getActor();
-    return await actor.get_anchor_info(userNumber);
+    return await actor.get_anchor_info(this.userNumber);
   };
 
-  enterDeviceRegistrationMode = async (
-    userNumber: UserNumber
-  ): Promise<Timestamp> => {
+  enterDeviceRegistrationMode = async (): Promise<Timestamp> => {
     const actor = await this.getActor();
-    return await actor.enter_device_registration_mode(userNumber);
+    return await actor.enter_device_registration_mode(this.userNumber);
   };
 
-  exitDeviceRegistrationMode = async (
-    userNumber: UserNumber
-  ): Promise<void> => {
+  exitDeviceRegistrationMode = async (): Promise<void> => {
     const actor = await this.getActor();
-    return await actor.exit_device_registration_mode(userNumber);
+    return await actor.exit_device_registration_mode(this.userNumber);
   };
 
   verifyTentativeDevice = async (
-    userNumber: UserNumber,
     pin: string
   ): Promise<VerifyTentativeDeviceResponse> => {
     const actor = await this.getActor();
-    return await actor.verify_tentative_device(userNumber, pin);
+    return await actor.verify_tentative_device(this.userNumber, pin);
   };
 
   add = async (
-    userNumber: UserNumber,
     alias: string,
     keyType: KeyType,
     purpose: Purpose,
@@ -408,7 +413,7 @@ export class IIConnection {
     credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
-    return await actor.add(userNumber, {
+    return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
       credential_id: credentialId
@@ -421,7 +426,6 @@ export class IIConnection {
   };
 
   update = async (
-    userNumber: UserNumber,
     publicKey: PublicKey,
     alias: string,
     keyType: KeyType,
@@ -430,7 +434,7 @@ export class IIConnection {
     credentialId: [] | [CredentialId]
   ): Promise<void> => {
     const actor = await this.getActor();
-    return await actor.update(userNumber, publicKey, {
+    return await actor.update(this.userNumber, publicKey, {
       alias,
       pubkey: publicKey,
       credential_id: credentialId,
@@ -440,34 +444,22 @@ export class IIConnection {
     });
   };
 
-  remove = async (
-    userNumber: UserNumber,
-    publicKey: PublicKey
-  ): Promise<void> => {
+  remove = async (publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
-    await actor.remove(userNumber, publicKey);
-  };
-
-  getPrincipal = async (
-    userNumber: UserNumber,
-    frontend: FrontendHostname
-  ): Promise<Principal> => {
-    const actor = await this.getActor();
-    return await actor.get_principal(userNumber, frontend);
+    await actor.remove(this.userNumber, publicKey);
   };
 
   prepareDelegation = async (
-    userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     maxTimeToLive?: bigint
   ): Promise<[PublicKey, bigint]> => {
     console.log(
-      `prepare_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
+      `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
     );
     const actor = await this.getActor();
     return await actor.prepare_delegation(
-      userNumber,
+      this.userNumber,
       hostname,
       sessionKey,
       maxTimeToLive !== undefined ? [maxTimeToLive] : []
@@ -475,17 +467,16 @@ export class IIConnection {
   };
 
   getDelegation = async (
-    userNumber: UserNumber,
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
   ): Promise<GetDelegationResponse> => {
     console.log(
-      `get_delegation(user: ${userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+      `get_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
     );
     const actor = await this.getActor();
     return await actor.get_delegation(
-      userNumber,
+      this.userNumber,
       hostname,
       sessionKey,
       timestamp

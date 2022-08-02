@@ -1,9 +1,22 @@
 import { Principal } from "@dfinity/principal";
 
+const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
+const MAX_ALTERNATIVE_ORIGINS = 10;
 export type ValidationResult =
   | { result: "valid" }
   | { result: "invalid"; message: string };
 
+/**
+ * Function to validate the derivationOrigin. The derivationOrigin allows an application to request principals of a
+ * different origin, given that origin allows this by listing the requesting application origin in the
+ * .well-known/ii-alternative-origins resource.
+ * See the spec for more details: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#alternative-frontend-origins
+ *
+ * This feature is currently experimental and for now limited in scope:
+ * - only URLs matching the {@link ORIGIN_VALIDATION_REGEX} are allowed
+ * @param authRequestOrigin Origin of the application requesting a delegation
+ * @param derivationOrigin Origin to use for the principal derivation for this delegation
+ */
 export const validateDerivationOrigin = async (
   authRequestOrigin: string,
   derivationOrigin?: string
@@ -17,25 +30,37 @@ export const validateDerivationOrigin = async (
   }
 
   // check format of derivationOrigin
-  const matches = /^https:\/\/([\w-]*)(\.raw)?\.ic0\.app$/.exec(
-    derivationOrigin
-  );
+  const matches = ORIGIN_VALIDATION_REGEX.exec(derivationOrigin);
   if (matches === null) {
     return {
       result: "invalid",
-      message:
-        'derivationOrigin does not match regex "^https:\\/\\/([\\w-]*)(\\.raw)?\\.ic0\\.app$"',
+      message: `derivationOrigin does not match regex ${ORIGIN_VALIDATION_REGEX.toString()}`,
     };
   }
 
   try {
-    const canisterId = Principal.fromText(matches[1]); // verifies that a valid canister id was matched
+    if (matches.length < 2) {
+      return {
+        result: "invalid",
+        message: "invalid regex match result. No value for capture group 1.",
+      };
+    }
+    // verifies that a valid principal id was matched
+    // (canister ids must be valid principal ids)
+    const canisterId = Principal.fromText(matches[1]);
     const alternativeOriginsUrl = `https://${canisterId.toText()}.ic0.app/.well-known/ii-alternative-origins`;
     const response = await fetch(
       // always fetch non-raw
       alternativeOriginsUrl,
       // fail on redirects
-      { redirect: "error" }
+      {
+        redirect: "error",
+        headers: {
+          Accept: "application/json",
+        },
+        // do not send cookies or other credentials
+        credentials: "omit",
+      }
     );
 
     if (response.status !== 200) {
@@ -57,6 +82,16 @@ export const validateDerivationOrigin = async (
       };
     }
 
+    // check number of entries
+    if (
+      alternativeOriginsObj.alternativeOrigins.length > MAX_ALTERNATIVE_ORIGINS
+    ) {
+      return {
+        result: "invalid",
+        message: `Resource ${alternativeOriginsUrl} has too many entries: To prevent misuse at most ${MAX_ALTERNATIVE_ORIGINS} alternative origins are allowed.`,
+      };
+    }
+
     // check allowed alternative origins
     if (!alternativeOriginsObj.alternativeOrigins.includes(authRequestOrigin)) {
       return {
@@ -67,7 +102,7 @@ export const validateDerivationOrigin = async (
   } catch (e) {
     return {
       result: "invalid",
-      message: `An error occurred while validation the derivationOrigin "${derivationOrigin}": ${e.message}`,
+      message: `An error occurred while validating the derivationOrigin "${derivationOrigin}": ${e.message}`,
     };
   }
 

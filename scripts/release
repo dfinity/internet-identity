@@ -163,12 +163,12 @@ function do_release() {
         echo "uploading assets"
         for filename in "${filenames[@]}"
         do
+            filepath="$filename"
             filename=$(basename "$filename")
-            echo -n " - $filename"
-            echo "$release_json" | jq
+            echo -n " - $filename ($filepath)"
             local upload_url; upload_url=$(echo "$release_json" | jq -cMr '.upload_url' | sed "s/{.*}/?name=$filename/")
-            echo "upload url: $upload_url"
-            gh_post_tgz "$upload_url" "$filename" >/dev/null
+            echo -n "upload url: $upload_url"
+            gh_post_tgz "$upload_url" "$filepath" >/dev/null
             echo " (done)"
         done
     fi

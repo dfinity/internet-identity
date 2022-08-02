@@ -24,7 +24,7 @@ export interface AuthResponseSuccess {
   userPublicKey: Uint8Array;
 }
 
-interface AuthResponseFailure {
+export interface AuthResponseFailure {
   kind: "authorize-client-failure";
   text: string;
 }
