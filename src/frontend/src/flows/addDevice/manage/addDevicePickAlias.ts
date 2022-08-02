@@ -46,7 +46,8 @@ const init = (): Promise<string | null> =>
     deviceAliasCancel.onclick = () => {
       resolve(null);
     };
-    deviceAliasForm.onsubmit = () => {
+    deviceAliasForm.onsubmit = (event) => {
+      event.preventDefault();
       resolve(deviceAlias.value);
     };
   });
