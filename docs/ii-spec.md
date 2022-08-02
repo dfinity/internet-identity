@@ -274,7 +274,7 @@ This interface is currently only used by its own frontend. This tight coupling m
 The summary is given by the Candid interface:
 
 
-``` candid name=ii-interface file=../src/internet_identity/internet_identity.did
+``` candid name=ii-interface file=_attachments/internet_identity.did
 ```
 
 
