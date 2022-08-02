@@ -211,7 +211,7 @@ export const renderManage = async (
 
   let anchorInfo: IdentityAnchorInfo;
   try {
-    anchorInfo = await withLoader(() => connection.getAnchorInfo(userNumber));
+    anchorInfo = await withLoader(() => connection.getAnchorInfo());
   } catch (error: unknown) {
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
