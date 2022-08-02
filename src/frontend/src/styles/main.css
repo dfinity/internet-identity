@@ -642,6 +642,7 @@ nav {
 .warnTitle {
   font-weight: 600;
   font-size: 1.1rem;
+  margin: 0;
 }
 .warnMessage {
   margin-top: 0.5rem;
