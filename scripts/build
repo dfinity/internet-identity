@@ -61,15 +61,9 @@ do
 done
 
 # Checking for dependencies
-# XXX: we currently cannot check for the exact version of ic-cdk-optimizer
-# because of https://github.com/dfinity/cdk-rs/issues/181
-# Once the issue is fixed, we can ensure that the correct version is installed
-if ! command -v ic-cdk-optimizer
+if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
 then
-    echo could not find ic-cdk-optimizer
-    echo "ic-cdk-optimizer version 0.3.1 is needed, please run the following command:"
-    echo "  cargo install ic-cdk-optimizer --version 0.3.1"
-    exit 1
+    cargo install ic-cdk-optimizer --version 0.3.4
 fi
 
 if [ "$ONLY_DEPS" != "1" ]
