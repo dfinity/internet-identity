@@ -244,7 +244,7 @@ main {
 
 .container {
   padding: 3.5rem 1rem 2rem;
-  width: 365px;
+  width: min(calc(100vw), 365px);
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -653,5 +653,5 @@ button[data-action="protect"] {
 }
 
 .container h1 {
-  word-break: break-all;
+  word-break: break-word;
 }
