@@ -26,7 +26,10 @@ lazy_static! {
     // The <script> tag that sets the canister ID and loads the 'index.js'
     static ref INDEX_HTML_SETUP_JS: String = {
         let canister_id = api::id();
-        format!(r#"var canisterId = '{canister_id}';let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);"#)
+
+        let version_info = crate::arg_data().version_info.unwrap_or("no version info".to_string());
+
+        format!(r#"console.log('{version_info}');var canisterId = '{canister_id}';let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);"#)
     };
 
     // The SRI sha256 hash of the script tag, used by the CSP policy.

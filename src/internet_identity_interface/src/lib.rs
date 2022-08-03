@@ -171,5 +171,6 @@ pub struct HttpResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
-    pub assigned_user_number_range: (UserNumber, UserNumber),
+    pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
+    pub version_info: Option<String>,
 }
