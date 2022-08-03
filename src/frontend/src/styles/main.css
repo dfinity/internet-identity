@@ -655,3 +655,7 @@ button[data-action="protect"] {
 .container h1 {
   word-break: break-word;
 }
+
+input.inputDeviceAlias {
+  line-height: 1;
+}
