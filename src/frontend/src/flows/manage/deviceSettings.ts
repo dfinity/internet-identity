@@ -152,7 +152,6 @@ const init = async (
           }
 
           await newConnection.update(
-            userNumber,
             device.pubkey,
             device.alias,
             device.key_type,
@@ -207,7 +206,7 @@ const init = async (
             await resolve();
             return;
           }
-          await removalConnection.remove(userNumber, device.pubkey);
+          await removalConnection.remove(device.pubkey);
         });
 
         if (sameDevice) {

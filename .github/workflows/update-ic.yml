@@ -32,6 +32,12 @@ jobs:
 
           cat ./src/canister_tests/Cargo.toml
 
+      - uses: ./.github/actions/bootstrap
+
+        # Make sure Cargo.lock is up-to-date
+      - name: Update lockfile
+        run: cargo generate-lockfile
+
         # If the ic commit was updated, create a PR.
       - name: Create Pull Request
         if: ${{ steps.update.outputs.updated == '1' }}
@@ -39,7 +45,9 @@ jobs:
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
-          add-paths: ./src/canister_tests/Cargo.toml
+          add-paths: |
+            ./src/canister_tests/Cargo.toml
+            Cargo.lock
           commit-message: Update commit of IC dependencies
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>
