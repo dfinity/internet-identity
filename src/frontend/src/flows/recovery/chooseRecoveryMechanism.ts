@@ -50,7 +50,7 @@ const pageContent = (devices: DeviceData[]) => html`
       font-size: 1rem;
     }
   </style>
-  <div class="container">
+  <article class="container">
     <h1>Recovery Mechanism</h1>
     <p>
       You can use a recovery mechanism to recover your anchor if your other
@@ -63,7 +63,7 @@ const pageContent = (devices: DeviceData[]) => html`
         class="recoveryOption"
         id="seedPhrase"
       >
-        <span class="recoveryIcon">${seedPhraseIcon}</span>
+        <span class="recoveryIcon" aria-hidden>${seedPhraseIcon}</span>
         <div class="recoveryTitle">Seed Phrase</div>
         <div class="recoveryDescription">Use your own storage</div>
       </button>
@@ -72,13 +72,13 @@ const pageContent = (devices: DeviceData[]) => html`
         class="recoveryOption"
         id="securityKey"
       >
-        <span class="recoveryIcon">${securityKeyIcon}</span>
+        <span class="recoveryIcon" aria-hidden>${securityKeyIcon}</span>
         <div class="recoveryTitle">Security Key</div>
         <div class="recoveryDescription">Use an extra security key</div>
       </button>
     </div>
     <button id="skipRecovery" class="linkStyle">Add recovery later</button>
-  </div>
+  </article>
 `;
 
 export type RecoveryMechanism = "securityKey" | "seedPhrase";

@@ -29,7 +29,7 @@ export const showWarningIfNecessary = (): void => {
 export const showWarning = (message: TemplateResult): void => {
   const container = document.createElement("div");
   container.className = "features-warning-container";
-  container.setAttribute("role", "banner");
+  container.setAttribute("role", "alert");
   const razzmatazz = "#ED1E79";
   const white = "#FFFFFF";
 

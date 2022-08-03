@@ -40,27 +40,29 @@ const numAuthenticators = (devices: DeviceData[]) =>
 const style = () => html`<style>
   .labelWithAction {
     margin-top: 1rem;
+    margin-bottom: 0.5rem;
     display: flex;
     justify-content: space-between;
+    
   }
 
   .labelWithAction button {
     text-align: right;
   }
 
-  .labelWithAction label {
+  .labelWithAction .labelWithAction {
     margin: 0;
     display: flex;
     flex-direction: row;
     align-items: center;
   }
 
-  .labelWithAction label span {
+  .labelWithAction .labelWithAction span {
     /* global span selector is set to 1.2rem (...), which is too big */
     font-size: 1rem;
   }
 
-  .labelWithAction label span.addedDevicesCounter {
+  .labelWithAction .labelWithAction span.addedDevicesCounter {
     /* we can't just select the class because the previous selector is more specific */
     font-size: 0.7rem;
   }
@@ -83,7 +85,9 @@ const style = () => html`<style>
   }
 
   .addedDevices {
-    margin-right: 0.2rem;
+    font-weight: 500;
+    font-size: 1rem;
+    margin: 0 0 0.2rem;
   }
 
   .labelActionText::before {
@@ -114,11 +118,29 @@ const style = () => html`<style>
     opacity: 1;
     transition: opacity 0.2s ease-in;
   }
+  .addedDevicesCounter {
+    margin-left: 0.1em;
+  }
 
   .addedDevicesCounter:hover .tooltip {
     visibility: visible;
     opacity: 1;
     transition: opacity 0.2s ease-in;
+  }
+
+  .label {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .highlightBox {
+    margin-top: 1rem;
+  }
+
+  .labelAddedDevices {
+    flex-grow: 1;
+    display: flex;
   }
 </style> `;
 
@@ -130,50 +152,57 @@ const style = () => html`<style>
 // recovery devices.
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
   ${style()}
-  <div class="container">
+  <section class="container">
     <h1>Anchor Management</h1>
     <p>
       You can view and manage this Identity Anchor and its added devices here.
     </p>
     ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
-    <label>Identity Anchor</label>
-    <div class="highlightBox">${userNumber}</div>
-    <div class="labelWithAction">
-      <label class="labelAddedDevices"
-        ><span class="addedDevices">Added devices</span>
-        <span class="addedDevicesCounter"
-          ><span class="tooltip"
-            >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
-            (recovery devices excluded)</span
-          >(${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</span
-        ></label
-      >
-      <button
-        ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-        class="labelAction"
-        id="addAdditionalDevice"
-      >
-        <span class="tooltip"
-          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
-          Remove a device before you can add a new one.</span
+    <aside>
+      <h2 class="label">Identity Anchor</h2>
+      <div class="highlightBox">${userNumber}</div>
+    </aside>
+    
+    <aside>
+      <div class="labelWithAction">
+        <div class="labelAddedDevices"
+          ><h2 class="label addedDevices">Added devices</h2>
+          <span class="addedDevicesCounter"
+            ><span class="tooltip"
+              >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
+              (recovery devices excluded)</span
+            >(${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</span
+          ></div
         >
-        <span class="labelActionText">ADD NEW DEVICE</span>
-      </button>
-    </div>
-    <div id="deviceList"></div>
+        <button
+          ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+          class="labelAction"
+          id="addAdditionalDevice"
+        >
+          <span class="tooltip"
+            >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+            Remove a device before you can add a new one.</span
+          >
+          <span class="labelActionText">ADD NEW DEVICE</span>
+        </button>
+      </div>
+      <div id="deviceList"></div>
+    </aside>
+    <aside>
     ${!hasRecoveryDevice(devices)
       ? undefined
       : html`
           <div class="labelWithAction">
-            <label>Recovery mechanisms</label>
+            <h2 class="label">Recovery mechanisms</h2>
             <button class="labelAction" id="addRecovery">
               <span class="labelActionText">ADD RECOVERY MECHANISM</span>
             </button>
           </div>
           <div id="recoveryList"></div>
         `}
+    </aside>
     ${logoutSection()} ${navbar}
-  </div>
+  </section>
   ${footer}
 `;
 

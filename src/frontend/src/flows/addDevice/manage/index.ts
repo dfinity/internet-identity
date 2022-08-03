@@ -42,12 +42,12 @@ const pageContent = () => html`
       font-size: 1rem;
     }
   </style>
-  <div class="container">
+  <article class="container">
     <h1>Add New Device</h1>
-    <div class="warnBox">
+    <aside class="warnBox">
       <div class="warnIcon">${warningIcon}</div>
       <div class="warnContent">
-        <div class="warnTitle">Security Warning</div>
+        <h2 class="warnTitle">Security Warning</h2>
         <div class="warnMessage">
           You are in the process of adding a new device. Any device added here
           will have <strong>full control over your identity</strong>. Only
@@ -55,17 +55,17 @@ const pageContent = () => html`
           <em>personally own</em>.
         </div>
       </div>
-    </div>
-    <div class="warnBox">
+    </aside>
+    <aside class="warnBox">
       <div class="warnIcon">${warningIcon}</div>
       <div class="warnContent">
-        <div class="warnTitle">Security Warning</div>
+        <h2 class="warnTitle">Security Warning</h2>
         <div class="warnMessage">
           Do not continue if you were prompted to do this by any website other
           than <strong>https://identity.ic0.app</strong>!
         </div>
       </div>
-    </div>
+    </aside>
     <p>
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?
@@ -87,7 +87,7 @@ const pageContent = () => html`
       </button>
     </div>
     <button id="cancelAddDevice" class="linkStyle">Cancel</button>
-  </div>
+  </article>
 `;
 
 export type DeviceAddFlow = "local" | "remote";

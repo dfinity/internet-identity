@@ -7,10 +7,10 @@ const pageContent = (seedPhrase: string) => html`
       font-size: 1rem;
     }
   </style>
-  <div class="container">
+  <article class="container">
     <h1>Seedphrase</h1>
     <p>Your seed phrase makes it easy to recover this Identity Anchor.</p>
-    <div class="warningBox">
+    <aside class="warningBox" aria-label="warning">
       <span class="warningIcon">${warningIcon}</span>
       <div class="warningMessage">
         Do <b>NOT</b> forget to save this seed phrase. Save a backup on a
@@ -18,14 +18,14 @@ const pageContent = (seedPhrase: string) => html`
         Keep it secret &mdash; knowledge of the seed phrase will enable access
         to this Identity Anchor!
       </div>
-    </div>
+    </aside>
     <label>Your seed phrase</label>
     <div id="seedPhrase" translate="no" class="highlightBox">${seedPhrase}</div>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
     <button id="displaySeedPhraseContinue" class="primary hidden">
       Continue
     </button>
-  </div>
+  </article>
 `;
 
 export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
