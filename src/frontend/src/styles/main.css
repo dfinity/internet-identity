@@ -243,8 +243,8 @@ main {
 }
 
 .container {
-  padding: 3.5rem 0.5rem 2rem;
-  max-width: 365px;
+  padding: 3.5rem 1rem 2rem;
+  width: 365px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -255,7 +255,6 @@ main {
   .container {
     padding: 3.5rem 2.5rem 2rem;
     border: 2px var(--grey-100) solid;
-    min-width: 300px;
     border-radius: 4px;
     box-sizing: inherit;
   }
@@ -375,10 +374,11 @@ nav {
   height: 40px;
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   margin-right: 0.5rem;
   margin-bottom: 16px;
   padding-left: 1rem;
+  overflow: auto;
 }
 
 .deviceItemAction {
@@ -650,4 +650,8 @@ nav {
 
 button[data-action="protect"] {
   margin-bottom: 0;
+}
+
+.container h1 {
+  word-break: break-all;
 }
