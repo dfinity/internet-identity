@@ -205,10 +205,6 @@ To allow flexibility regarding the canister frontend URL, the client may choose 
 This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
 :::
 
-:::caution
-This feature is experimental and may be removed at any point without prior notice!
-:::
-
 :::note
 `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` princip als or vice versa.
 :::
@@ -273,6 +269,7 @@ This interface is currently only used by its own frontend. This tight coupling m
 
 The summary is given by the Candid interface:
 
+<!-- The '_attachments/` bit is an implementation detail of the docusaurus deploy -->
 
 ``` candid name=ii-interface file=_attachments/internet_identity.did
 ```
