@@ -182,7 +182,8 @@ mod registration_tests {
             &env,
             framework::II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: (127, 129),
+                assigned_user_number_range: Some((127, 129)),
+                version_info: None,
             }),
         );
 
@@ -1844,7 +1845,8 @@ mod http_tests {
             &env,
             framework::II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: (127, 129),
+                assigned_user_number_range: Some((127, 129)),
+                version_info: None,
             }),
         );
 

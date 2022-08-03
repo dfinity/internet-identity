@@ -125,7 +125,8 @@ type InternetIdentityStats = record {
 };
 
 type InternetIdentityInit = record {
-  assigned_user_number_range : record { nat64; nat64; };
+  assigned_user_number_range : opt record { nat64; nat64; };
+  version_info : opt text;
 };
 
 type ChallengeKey = text;

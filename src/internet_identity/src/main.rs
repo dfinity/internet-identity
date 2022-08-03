@@ -51,6 +51,20 @@ const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
+/// Returns the init/upgrade arguments
+///
+/// We use a single function (as opposed to using macro mechanism) to read the arguments to avoid any mistakes
+/// when deserializing the data. We also normalize the data by unwrapping the outer-most Option for ease of use.
+fn arg_data() -> InternetIdentityInit {
+    match ic_cdk::api::call::arg_data() {
+        (None,) => InternetIdentityInit {
+            assigned_user_number_range: None,
+            version_info: None,
+        },
+        (Some(x),) => x,
+    }
+}
+
 /// This is an internal version of `DeviceData` primarily useful to provide a
 /// backwards compatible level between older device data stored in stable memory
 /// (that might not contain purpose or key_type) and new ones added.
@@ -923,13 +937,15 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[init]
-fn init(maybe_arg: Option<InternetIdentityInit>) {
+fn init() {
     init_assets();
     STATE.with(|state| {
-        if let Some(arg) = maybe_arg {
-            state
-                .storage
-                .replace(Storage::new(arg.assigned_user_number_range));
+        if let InternetIdentityInit {
+            assigned_user_number_range: Some(arg),
+            version_info: _,
+        } = arg_data()
+        {
+            state.storage.replace(Storage::new(arg));
         }
         state.storage.borrow().flush();
         update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
