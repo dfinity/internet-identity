@@ -17,7 +17,7 @@ const MOBILE_SCREEN: ScreenConfiguration = {
 // desktop resolution is used when env variable SCREEN=desktop is set
 const DESKTOP_SCREEN: ScreenConfiguration = {
   screenType: "desktop",
-  windowSize: "1928,1209", // increased from 1920,1080 when the headless flag was removed to account for the GUI border of 8,129.
+  windowSize: "1920,1080",
 };
 
 export async function runInBrowser(
