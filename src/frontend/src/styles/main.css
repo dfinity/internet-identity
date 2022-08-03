@@ -243,8 +243,8 @@ main {
 }
 
 .container {
-  padding: 3.5rem 0.5rem 2rem;
-  max-width: 365px;
+  padding: 3.5rem 1rem 2rem;
+  width: 365px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -255,7 +255,6 @@ main {
   .container {
     padding: 3.5rem 2.5rem 2rem;
     border: 2px var(--grey-100) solid;
-    min-width: 300px;
     border-radius: 4px;
     box-sizing: inherit;
   }
