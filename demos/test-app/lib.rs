@@ -39,6 +39,10 @@ fn whoami() -> Principal {
     api::caller()
 }
 
+/// Function to update the asset /.well-known/ii-alternative-origins.
+/// # Arguments
+/// * content: new value of this asset. The content type will always be set to application/json.
+/// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(content: String, mode: AlternativeOriginsMode) {
     ASSETS.with(|a| {
@@ -83,6 +87,10 @@ pub struct HttpResponse {
     pub body: Cow<'static, Bytes>,
 }
 
+/// Enum of the available asset behaviours of /.well-known/ii-alternative-origins:
+/// * CertifiedContent: Valid certification on the payload. This mode is required to successfully use one of the listed alternative origins.
+/// * UncertifiedContent: No `IC-Certificate` header will be sent back with the response. This mode can be used to validate that II rejects uncertified assets when validating alternative origins.
+/// * Redirect: This will set the response status code to 302 and a `Location` header with the value provided. This mode can be used to validate that II rejects redirects when validating alternative origins.
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum AlternativeOriginsMode {
     CertifiedContent,
@@ -205,9 +213,11 @@ lazy_static! {
     static ref INDEX_HTML_STR: String = {
         let canister_id = api::id();
         let index_html = include_str!("dist/index.html");
+
+        // the string we are replacing here is inserted by webpack during the front-end build
         let index_html = index_html.replace(
             r#"<script defer="defer" src="bundle.js"></script>"#,
-            &format!(r#"<script id="setupJs">var canisterId = '{canister_id}';</script><script defer="defer" src="bundle.js"></script>"#).to_string()
+            &format!(r#"<script>var canisterId = '{canister_id}';</script><script defer="defer" src="bundle.js"></script>"#).to_string()
         );
         index_html
     };
@@ -225,11 +235,13 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentType); 5] {
             include_bytes!("dist/bundle.js"),
             ContentType::JS,
         ),
+        // initially empty alternative origins, but can be populated using the update_alternative_origins call
         (
             "/.well-known/ii-alternative-origins",
             b"{\"alternativeOrigins\":[]}",
             ContentType::JSON,
         ),
+        // convenience asset to have an url to point to when testing with the redirect alternative origins behaviour
         (
             "/.well-known/evil-alternative-origins",
             b"{\"alternativeOrigins\":[\"https://evil.com\"]}",
