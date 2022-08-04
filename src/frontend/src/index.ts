@@ -10,8 +10,23 @@ import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
 import authorizeAuthentication from "./flows/authenticate";
 
+/**
+ * Shows some version information, retrieved from /version
+ */
+const showVersion = async () => {
+  const response = await fetch("/version");
+  if (response.ok) {
+    const versionInfo = await response.text();
+    console.log(`version: ${versionInfo}`);
+  } else {
+    throw Error(`Could not read version info from /version: ${response}`);
+  }
+};
+
 const init = async () => {
   const url = new URL(document.URL);
+
+  showVersion().catch((e) => console.log(e));
 
   // If the build is not "official", show a warning
   // https://github.com/dfinity/internet-identity#build-features

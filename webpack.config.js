@@ -68,7 +68,7 @@ function generateWebpackConfigForCanister(name, info) {
           }
 
           // basically everything _except_ for index.js, because we want live reload
-          devServer.app.get(['/', '/index.html', '/faq', '/faq', 'about' ], HttpProxyMiddlware.createProxyMiddleware( {
+          devServer.app.get(['/', '/index.html', '/faq', '/faq', '/about', '/version' ], HttpProxyMiddlware.createProxyMiddleware( {
               target: replicaHost,
               pathRewrite: (pathAndParams, req) => {
                   let queryParamsString = `?`;
