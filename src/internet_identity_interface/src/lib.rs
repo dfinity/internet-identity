@@ -13,6 +13,7 @@ pub type Timestamp = u64; // in nanos since epoch
 pub type Signature = ByteBuf;
 pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
+pub type VersionInfo = String;
 
 pub struct Base64(pub String);
 
@@ -171,5 +172,6 @@ pub struct HttpResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
-    pub assigned_user_number_range: (UserNumber, UserNumber),
+    pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
+    pub version_info: Option<VersionInfo>,
 }

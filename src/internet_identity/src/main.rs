@@ -175,6 +175,9 @@ struct Challenge {
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>> = RefCell::new(HashMap::default());
+    /// This build's version info, provided on startup through arguments.
+    /// The value is typically set in init and post_upgrade.
+    static VERSION_INFO: RefCell<String> = RefCell::new("no version information".to_string());
 }
 
 #[update]
@@ -924,12 +927,14 @@ fn stats() -> InternetIdentityStats {
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
+
+    init_version_info(&maybe_arg);
     init_assets();
     STATE.with(|state| {
-        if let Some(arg) = maybe_arg {
+        if let Some(range) = maybe_arg.map(|x| x.assigned_user_number_range).flatten() {
             state
                 .storage
-                .replace(Storage::new(arg.assigned_user_number_range));
+                .replace(Storage::new(range));
         }
         state.storage.borrow().flush();
         update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
@@ -937,7 +942,9 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 #[post_upgrade]
-fn retrieve_data() {
+fn retrieve_data(maybe_arg: Option<InternetIdentityInit>) {
+
+    init_version_info(&maybe_arg);
     init_assets();
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time() as u64);
@@ -1207,6 +1214,15 @@ fn check_frontend_length(frontend: &FrontendHostname) {
             "frontend hostname {} exceeds the limit of {} bytes",
             n, FRONTEND_HOSTNAME_LIMIT,
         ));
+    }
+}
+
+/// Initializes the version info global based on the init argument provided.
+fn init_version_info(maybe_arg: &Option<InternetIdentityInit>) {
+    if let Some(version_info) = maybe_arg.as_ref().map(|x| x.version_info.as_ref()).flatten() {
+        VERSION_INFO.with(|v| {
+            v.replace(version_info.clone());
+        });
     }
 }
 

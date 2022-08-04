@@ -53,6 +53,27 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 },
             }
         }
+
+        // the /version endpoint returns information about the version.
+        // Technically this should only accept requests with 'accept: text/plain' but we don't
+        // check headers anywhere else so neither do we here.
+        "/version" => {
+            let version_info = crate::VERSION_INFO.with(|version_info| { version_info.borrow().clone() });
+            let mut headers = vec![
+                (
+                    "Content-Type".to_string(),
+                    "text/plain; version=0.0.4".to_string(),
+                    ),
+                    ("Content-Length".to_string(), version_info.len().to_string()),
+            ];
+            headers.append(&mut security_headers());
+            HttpResponse {
+                status_code: 200,
+                headers,
+                body: Cow::Owned(ByteBuf::from(version_info)),
+                streaming_strategy: None,
+            }
+        }
         probably_an_asset => {
             let certificate_header = STATE.with(|s| {
                 make_asset_certificate_header(

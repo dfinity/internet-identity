@@ -6,6 +6,7 @@ type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
+type VersionInfo = text;
 
 type HeaderField = record { text; text; };
 
@@ -125,7 +126,8 @@ type InternetIdentityStats = record {
 };
 
 type InternetIdentityInit = record {
-  assigned_user_number_range : record { nat64; nat64; };
+  assigned_user_number_range: opt record { nat64; nat64; };
+  version_info: opt VersionInfo;
 };
 
 type ChallengeKey = text;
