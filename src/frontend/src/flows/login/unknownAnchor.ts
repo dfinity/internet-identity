@@ -59,23 +59,21 @@ const pageContent = () => html` <style>
       </button>
     </article>
 
-    <aside aria-label="Other actions">
-      <ul class="list-reset">
+    <aside class="l-section" aria-label="Other actions">
+      <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?
-          <button id="registerButton" class="linkStyle">
-            Create an Internet Identity Anchor.
-          </button>
+          <button id="registerButton" class="t-link">Create an Internet Identity Anchor.</button>
         </li>
         <li class="textLink">
           Already have an anchor
-          <button id="addNewDeviceButton" class="linkStyle">
+          <button id="addNewDeviceButton" class="t-link">
             but using a new device?
           </button>
         </li>
         <li class="textLink">
           Lost access
-          <button id="recoverButton" class="linkStyle">
+          <button id="recoverButton" class="t-link">
             and want to recover?
           </button>
         </li>

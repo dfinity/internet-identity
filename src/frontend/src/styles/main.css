@@ -193,7 +193,12 @@ body {
   text-align: center;
 }
 
+.t-discreet {
+  font-size: 0.8em;
+}
+
 a, .t-link {
+  display: inline;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -419,4 +424,9 @@ a:hover,
 .page-signature:hover,
 .page-signature:focus {
   background: var(--grey-050);
+}
+
+
+.c-list li + li {
+  margin-top: var(--s-gutter);
 }
