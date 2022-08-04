@@ -43,7 +43,6 @@ const style = () => html`<style>
     margin-bottom: 0.5rem;
     display: flex;
     justify-content: space-between;
-    
   }
 
   .labelWithAction button {
@@ -162,18 +161,18 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       <h2 class="label">Identity Anchor</h2>
       <div class="highlightBox">${userNumber}</div>
     </aside>
-    
+
     <aside>
       <div class="labelWithAction">
-        <div class="labelAddedDevices"
-          ><h2 class="label addedDevices">Added devices</h2>
+        <div class="labelAddedDevices">
+          <h2 class="label addedDevices">Added devices</h2>
           <span class="addedDevicesCounter"
             ><span class="tooltip"
-              >You can register up to ${MAX_AUTHENTICATORS} authenticator devices
-              (recovery devices excluded)</span
+              >You can register up to ${MAX_AUTHENTICATORS} authenticator
+              devices (recovery devices excluded)</span
             >(${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</span
-          ></div
-        >
+          >
+        </div>
         <button
           ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
           class="labelAction"
@@ -189,17 +188,17 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       <div id="deviceList"></div>
     </aside>
     <aside>
-    ${!hasRecoveryDevice(devices)
-      ? undefined
-      : html`
-          <div class="labelWithAction">
-            <h2 class="label">Recovery mechanisms</h2>
-            <button class="labelAction" id="addRecovery">
-              <span class="labelActionText">ADD RECOVERY MECHANISM</span>
-            </button>
-          </div>
-          <div id="recoveryList"></div>
-        `}
+      ${!hasRecoveryDevice(devices)
+        ? undefined
+        : html`
+            <div class="labelWithAction">
+              <h2 class="label">Recovery mechanisms</h2>
+              <button class="labelAction" id="addRecovery">
+                <span class="labelActionText">ADD RECOVERY MECHANISM</span>
+              </button>
+            </div>
+            <div id="recoveryList"></div>
+          `}
     </aside>
     ${logoutSection()} ${navbar}
   </section>
