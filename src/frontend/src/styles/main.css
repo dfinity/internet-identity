@@ -660,3 +660,7 @@ nav {
 button[data-action="protect"] {
   margin-bottom: 0;
 }
+
+input.inputDeviceAlias {
+  line-height: 1;
+}
