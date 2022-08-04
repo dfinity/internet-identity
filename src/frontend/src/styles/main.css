@@ -155,9 +155,6 @@ display:revert; revert to element instead of attribute */
 
     --c-button: var(--c-snow);
     --c-onButton: var(--c-raven);
-
-    --c-input: var(--c-raven);
-    --c-onInput: var(--c-snow);
   }
 }
 
