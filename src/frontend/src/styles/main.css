@@ -115,6 +115,9 @@ display:revert; revert to element instead of attribute */
   --c-button: var(--c-raven);
   --c-onButton: var(--c-snow);
 
+  --c-input: var(--c-snow);
+  --c-onInput: var(--c-raven);
+
   background: var(--c-background);
   color: var(--c-text);
 
@@ -136,6 +139,9 @@ display:revert; revert to element instead of attribute */
   --s-button-bezel: var(--s-card-bezel-narrow);
   --s-button-stack: var(--s-stack);
 
+  --s-input-bezel: var(--s-button-bezel);
+  --s-input-stack: var(--s-button-stack);
+
   --s-line-height: 1.35;
 }
 
@@ -149,6 +155,9 @@ display:revert; revert to element instead of attribute */
 
     --c-button: var(--c-snow);
     --c-onButton: var(--c-raven);
+
+    --c-input: var(--c-raven);
+    --c-onInput: var(--c-snow);
   }
 }
 
@@ -313,6 +322,7 @@ a:hover,
   border: var(--s-line) var(--c-line-inverted) solid;
 }
 
+
 /**
  *  logo component 
  */
@@ -362,6 +372,15 @@ a:hover,
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+.c-input {
+  display: block;
+  width: 100%;
+  padding: var(--s-input-bezel);
+  margin-top: var(--s-input-stack);
+  background: var(--c-input);
+  color: var(--c-onInput);
 }
 
 /**

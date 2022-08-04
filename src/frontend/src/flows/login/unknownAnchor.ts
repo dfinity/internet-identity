@@ -12,7 +12,6 @@ import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
 const pageContent = () => html` <style>
     #registerUserNumber:focus {
-      box-sizing: border-box;
       border-style: double;
       border-width: 2px;
       border-radius: 4px;
@@ -43,18 +42,19 @@ const pageContent = () => html` <style>
     }
   </style>
   <section class="l-container c-card" aria-label="Authentication">
-    ${icLogo}
-
+    <div class="c-logo">${icLogo}</div>
     <article>
-      <h1 id="loginWelcome">Welcome to<br />Internet Identity</h1>
-      <p>Provide an Identity Anchor to authenticate.</p>
+      <hgroup>
+        <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
+        <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
+      <hgroup>
       <input
         type="text"
-        class="input input--fullwidth"
+        class="c-input"
         id="registerUserNumber"
         placeholder="Enter Identity Anchor"
       />
-      <button type="button" id="loginButton" class="primary">
+      <button type="button" id="loginButton" class="c-button">
         Authenticate
       </button>
     </article>
