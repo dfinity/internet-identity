@@ -18,17 +18,22 @@ const pageContent = (userNumber: bigint) => html`
     <hgroup>
     <data class="c-card c-card--narrow c-card--outline t-vip" aria-label="User Number">${userNumber}</data>
     <button type="button" id="login" class="c-button">Authenticate</button>
-    
+    <div class="l-divider l-divider--text" aria-label="Other Options">
+      <span class="l-divider__label" aria-hidden>Or</span>
+    </div>
     <button type="button" id="loginDifferent" class="c-button c-button--secondary">
       Use a different Identity Anchor
     </button>
-    <div class="c-section">
+    <div class="l-section">
       <p>
         Lost access
         <button id="recoverButton" class="t-link">and want to recover?</button>
       </p>
     </div>
-    ${logoutSection("Clear Identity Anchor from browser")} ${navbar}
+    <div class="l-section">
+      ${logoutSection("Clear Identity Anchor from browser")}
+    </div>
+    ${navbar}
   </div>
   ${footer}`;
 
