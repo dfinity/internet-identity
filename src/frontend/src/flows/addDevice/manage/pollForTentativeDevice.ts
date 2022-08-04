@@ -57,8 +57,8 @@ export const pollForTentativeDevice = async (
 ): Promise<void> => {
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
-      connection.enterDeviceRegistrationMode(userNumber),
-      connection.getAnchorInfo(userNumber),
+      connection.enterDeviceRegistrationMode(),
+      connection.getAnchorInfo(),
     ]);
     const tentativeDevice = getTentativeDevice(userInfo);
     if (tentativeDevice) {
@@ -77,7 +77,7 @@ const poll = (
   userNumber: bigint,
   shouldStop: () => boolean
 ): Promise<DeviceData | null> => {
-  return connection.getAnchorInfo(userNumber).then((response) => {
+  return connection.getAnchorInfo().then((response) => {
     if (shouldStop()) {
       return null;
     }
@@ -122,7 +122,7 @@ const init = (
   ) as HTMLButtonElement;
   cancelButton.onclick = async () => {
     countdown.stop();
-    await withLoader(() => connection.exitDeviceRegistrationMode(userNumber));
+    await withLoader(() => connection.exitDeviceRegistrationMode());
     await renderManage(userNumber, connection);
   };
 };

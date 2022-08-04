@@ -48,7 +48,7 @@ const pageContent = () => html` <style>
   </style>
   <section class="l-container c-card" aria-label="Authentication">
     ${icLogo}
-    
+
     <article>
       <h1 id="loginWelcome">Welcome to<br />Internet Identity</h1>
       <p>Provide an Identity Anchor to authenticate.</p>
@@ -58,7 +58,9 @@ const pageContent = () => html` <style>
         id="registerUserNumber"
         placeholder="Enter Identity Anchor"
       />
-      <button type="button" id="loginButton" class="primary">Authenticate</button>
+      <button type="button" id="loginButton" class="primary">
+        Authenticate
+      </button>
     </article>
 
     <aside aria-label="Other actions">
@@ -77,7 +79,9 @@ const pageContent = () => html` <style>
         </li>
         <li class="textLink">
           Lost access
-          <button id="recoverButton" class="linkStyle">and want to recover?</button>
+          <button id="recoverButton" class="linkStyle">
+            and want to recover?
+          </button>
         </li>
       </ul>
     </aside>

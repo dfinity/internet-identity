@@ -4,10 +4,21 @@ import { initLogout, logoutSection } from "../../../components/logout";
 const pageContent = () => html`
   <div class="l-container c-card">
     <h1>New Device</h1>
-    <p>Please provide a name for your new device</p>
-    <input id="deviceAlias" placeholder="Device alias" />
-    <button id="deviceAliasContinue" class="primary">Add Device</button>
-    <button id="deviceAliasCancel">Cancel</button>
+    <form id="deviceAliasForm">
+      <p>Please provide a name for your new device</p>
+      <input
+        class="inputDeviceAlias"
+        aria-label="device name"
+        id="deviceAlias"
+        placeholder="Device alias"
+        type="text"
+        required
+      />
+      <button type="submit" id="deviceAliasContinue" class="primary">
+        Add Device
+      </button>
+      <button type="button" id="deviceAliasCancel">Cancel</button>
+    </form>
     ${logoutSection()}
   </div>
 `;
@@ -27,8 +38,8 @@ const init = (): Promise<string | null> =>
     const deviceAlias = document.getElementById(
       "deviceAlias"
     ) as HTMLInputElement;
-    const deviceAliasContinue = document.getElementById(
-      "deviceAliasContinue"
+    const deviceAliasForm = document.getElementById(
+      "deviceAliasForm"
     ) as HTMLButtonElement;
     const deviceAliasCancel = document.getElementById(
       "deviceAliasCancel"
@@ -36,7 +47,8 @@ const init = (): Promise<string | null> =>
     deviceAliasCancel.onclick = () => {
       resolve(null);
     };
-    deviceAliasContinue.onclick = () => {
+    deviceAliasForm.onsubmit = (event) => {
+      event.preventDefault();
       resolve(deviceAlias.value);
     };
   });

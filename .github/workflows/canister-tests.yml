@@ -527,7 +527,7 @@ jobs:
     needs: docker-build
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, macos-12 ]
+        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-11, macos-12 ]
     steps:
       - uses: actions/checkout@v2
       - name: 'Download wasm'
