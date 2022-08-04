@@ -17,9 +17,9 @@ const pageContent = (userNumber: bigint) => html`
       <p class="t-lead">Authenticate using Internet Identity.</p>
     <hgroup>
     <data class="c-card c-card--narrow c-card--outline t-vip" aria-label="User Number">${userNumber}</data>
-    <button type="button" id="login" class="button">Authenticate</button>
+    <button type="button" id="login" class="c-button">Authenticate</button>
     
-    <button type="button" id="loginDifferent" class="button button--secondary">
+    <button type="button" id="loginDifferent" class="c-button c-button--secondary">
       Use a different Identity Anchor
     </button>
     <div class="c-section">

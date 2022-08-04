@@ -129,7 +129,7 @@ display:revert; revert to element instead of attribute */
 
   --s-card-bezel: calc(var(--s-gutter) * 5);
   --s-card-stack: calc(var(--s-stack) * 1.5);
-  --s-card-bezel-narrow: calc(var(--s-card-bezel) * 0.25);
+  --s-card-bezel-narrow: calc(var(--s-card-bezel) * 0.35);
 
   --s-button-bezel: var(--s-card-bezel-narrow);
   --s-button-stack: var(--s-stack);
@@ -289,7 +289,7 @@ a:hover,
  *  Forms and Buttons 
  */
 
-.button {
+.c-button {
   background: var(--c-button);
   color: var(--c-onButton);
   padding: var(--s-button-bezel);
@@ -300,13 +300,13 @@ a:hover,
   border-radius: 0.4rem;
 }
 
-.button--secondary {
+.c-button--secondary {
   background: var(--c-onButton);
   color: var(--c-button);
 }
 
-.button:not([disabled]):focus,
-.button:not([disabled]):hover {
+.c-button:not([disabled]):focus,
+.c-button:not([disabled]):hover {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
   outline: 2px dotted transparent;
@@ -320,6 +320,19 @@ a:hover,
 .l-footer {
   padding: var(--s-footer-gutter);
   margin-top: var(--s-footer-stack);
+}
+
+.c-nav-links {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: calc(var(--s-gutter) * 4);
+}
+
+.c-nav-links li + li::before {
+  content: "·";
+  margin: 0 calc(var(--s-gutter) * 2);
 }
 
 .page-signature {
