@@ -121,6 +121,7 @@ h1 {
   margin-top: 0;
   font-size: 1.8rem;
   margin: auto;
+  font-weight: bold;
 }
 @media (min-width: 1024px) {
   h1 {
@@ -156,9 +157,9 @@ button {
   margin-bottom: 1rem;
   padding: 0.6rem 1rem;
   border-radius: 4px;
-
   line-height: 1.25rem;
   letter-spacing: 0.005em;
+  font-family: Arial;
 }
 
 button:not([disabled]):hover,
@@ -182,6 +183,8 @@ a:focus {
 ul {
   width: 100%;
   padding: 0;
+  margin-block-start: 1em;
+  margin-block-end: 1em;
 }
 
 form,
@@ -257,7 +260,7 @@ main {
     border: 2px var(--grey-100) solid;
     min-width: 300px;
     border-radius: 4px;
-    box-sizing: inherit;
+    box-sizing: content-box;
   }
 }
 
