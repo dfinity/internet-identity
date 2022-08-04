@@ -9,25 +9,24 @@ import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
 
-const pageContent = (userNumber: bigint) => html` <style>
-    .spacer {
-      height: 2rem;
-    }
-  </style>
+const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card">
-    ${icLogo}
-    <h1>Welcome back!</h1>
-    <p>Authenticate using Internet Identity.</p>
-    <div class="highlightBox">${userNumber}</div>
-    <button type="button" id="login" class="primary">Authenticate</button>
-    <p style="text-align: center;">Or</p>
-    <button type="button" id="loginDifferent">
+    <div class="c-logo">${icLogo}</div>
+    <hgroup>
+      <h1 class="t-title t-title--main">Welcome back!</h1>
+      <p class="t-lead">Authenticate using Internet Identity.</p>
+    <hgroup>
+    <data class="c-card c-card--narrow c-card--outline t-vip" aria-label="User Number">${userNumber}</data>
+    <button type="button" id="login" class="button">Authenticate</button>
+    
+    <button type="button" id="loginDifferent" class="button button--secondary">
       Use a different Identity Anchor
     </button>
-    <div class="spacer"></div>
-    <div class="textLink">
-      Lost access
-      <button id="recoverButton" class="linkStyle">and want to recover?</button>
+    <div class="c-section">
+      <p>
+        Lost access
+        <button id="recoverButton" class="t-link">and want to recover?</button>
+      </p>
     </div>
     ${logoutSection("Clear Identity Anchor from browser")} ${navbar}
   </div>

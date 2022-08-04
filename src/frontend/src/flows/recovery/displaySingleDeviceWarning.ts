@@ -23,9 +23,6 @@ const pageContent = () => html`
     #warningContainer a {
       margin-bottom: 1rem;
     }
-    .spacer {
-      min-height: 48px;
-    }
   </style>
   <article id="warningContainer" class="l-container c-card">
     <div aria-hidden>${warningIcon}</div>
@@ -48,7 +45,6 @@ const pageContent = () => html`
     <button id="displayWarningRemindLater" class="primary">
       Skip, I understand the risks
     </button>
-    <div class="spacer"></div>
   </article>
 `;
 

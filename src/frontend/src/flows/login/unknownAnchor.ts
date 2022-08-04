@@ -32,10 +32,6 @@ const pageContent = () => html` <style>
       margin-top: 4rem;
     }
 
-    .spacer {
-      height: 2rem;
-    }
-
     .list-reset li {
       list-style: none;
     }
