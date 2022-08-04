@@ -26,6 +26,8 @@ const showVersion = async () => {
 const init = async () => {
   const url = new URL(document.URL);
 
+  // Note: we don't await anything here because we don't want to block anything while
+  // waiting for the version information to be shown
   showVersion().catch((e) => console.log(e));
 
   // If the build is not "official", show a warning
