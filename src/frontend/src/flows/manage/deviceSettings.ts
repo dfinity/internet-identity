@@ -19,7 +19,7 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean
 ) => html`
-  <div id="deviceSettings" class="container">
+  <article id="deviceSettings" class="container">
     <h1 style="margin: 0 0 1.5rem">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
@@ -48,7 +48,7 @@ const pageContent = (
           <p>Without devices your anchor would be inaccessible.</p>`
       : ""}
     <button data-action="back">Back</button>
-  </div>
+  </article>
   ${footer}
 `;
 
