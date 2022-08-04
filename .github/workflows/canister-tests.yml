@@ -498,9 +498,15 @@ jobs:
       - name: "Deploy"
         run: |
           mv internet_identity_production.wasm internet_identity.wasm
+          version_info="Built from https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA"
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          # NOTE: The `$version_info` in `--argument` is a bit awkward since we need to wrap it in double quotes
+          # see https://github.com/dfinity/sdk/issues/2399 for a better solution
+          #
+          # NOTE: We don't force the upgrade even if the arguments has changed, meaning the version_info may show an
+          # outdated commit, if the more recent commits have not modified the actual wasm.
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument '(null)' \
+            --argument '(opt record { version_info = opt "'"$version_info"'"; assigned_user_number_range = null })' \
             internet_identity
 
 
