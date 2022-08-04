@@ -7,11 +7,11 @@ import { logoutIcon } from "./icons";
 export const logoutSection = (
   alternativeLabel?: string
 ): TemplateResult => html`<div id="logoutBox">
-    <button type="button" class="t-link" id="logoutButton">
-      <i class="t-link__icon">${logoutIcon}</i>
-      ${alternativeLabel !== undefined ? alternativeLabel : "Logout"}
-    </button>
-  </div>`;
+  <button type="button" class="t-link" id="logoutButton">
+    <i class="t-link__icon">${logoutIcon}</i>
+    ${alternativeLabel !== undefined ? alternativeLabel : "Logout"}
+  </button>
+</div>`;
 
 export const initLogout = (): void => {
   const logoutButton = document.getElementById("logoutButton") as HTMLElement;

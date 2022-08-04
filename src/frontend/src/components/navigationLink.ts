@@ -6,7 +6,7 @@ export const navigationLink = (
     uuid: "aboutLink",
     url: "/about",
   }
-):TemplateResult => html`<a
+): TemplateResult => html`<a
   id="${props.uuid}"
   class="c-nav-links__link t-link t-link--discreet"
   href="${props.url}"
