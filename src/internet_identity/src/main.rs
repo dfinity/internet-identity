@@ -927,14 +927,11 @@ fn stats() -> InternetIdentityStats {
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
-
     init_version_info(&maybe_arg);
     init_assets();
     STATE.with(|state| {
         if let Some(range) = maybe_arg.map(|x| x.assigned_user_number_range).flatten() {
-            state
-                .storage
-                .replace(Storage::new(range));
+            state.storage.replace(Storage::new(range));
         }
         state.storage.borrow().flush();
         update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
@@ -943,7 +940,6 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
 #[post_upgrade]
 fn retrieve_data(maybe_arg: Option<InternetIdentityInit>) {
-
     init_version_info(&maybe_arg);
     init_assets();
     STATE.with(|s| {
@@ -1219,7 +1215,11 @@ fn check_frontend_length(frontend: &FrontendHostname) {
 
 /// Initializes the version info global based on the init argument provided.
 fn init_version_info(maybe_arg: &Option<InternetIdentityInit>) {
-    if let Some(version_info) = maybe_arg.as_ref().map(|x| x.version_info.as_ref()).flatten() {
+    if let Some(version_info) = maybe_arg
+        .as_ref()
+        .map(|x| x.version_info.as_ref())
+        .flatten()
+    {
         VERSION_INFO.with(|v| {
             v.replace(version_info.clone());
         });

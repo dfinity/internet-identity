@@ -58,13 +58,14 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         // Technically this should only accept requests with 'accept: text/plain' but we don't
         // check headers anywhere else so neither do we here.
         "/version" => {
-            let version_info = crate::VERSION_INFO.with(|version_info| { version_info.borrow().clone() });
+            let version_info =
+                crate::VERSION_INFO.with(|version_info| version_info.borrow().clone());
             let mut headers = vec![
                 (
                     "Content-Type".to_string(),
                     "text/plain; version=0.0.4".to_string(),
-                    ),
-                    ("Content-Length".to_string(), version_info.len().to_string()),
+                ),
+                ("Content-Length".to_string(), version_info.len().to_string()),
             ];
             headers.append(&mut security_headers());
             HttpResponse {
