@@ -2,7 +2,7 @@ describe("authentication", () => {
   it("works without webauthn", async () => {
     await browser.url("/");
 
-    await browser.$("h2").waitForExist();
+    await browser.$("h1").waitForExist();
 
     // Click on "Create an Internet Identity Anchor"
     await browser.$("#registerButton").click();

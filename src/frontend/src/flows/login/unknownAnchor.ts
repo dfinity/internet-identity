@@ -35,35 +35,58 @@ const pageContent = () => html` <style>
     .spacer {
       height: 2rem;
     }
+
+    .list-reset li {
+      list-style: none;
+    }
+    .input {
+      box-sizing: border-box;
+    }
+    .input--fullwidth {
+      width: 100%;
+    }
   </style>
-  <div class="container">
+  <section class="container" aria-label="Authentication">
     ${icLogo}
-    <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide an Identity Anchor to authenticate.</p>
-    <input
-      type="text"
-      id="registerUserNumber"
-      placeholder="Enter Identity Anchor"
-    />
-    <button type="button" id="loginButton" class="primary">Authenticate</button>
-    <div class="textLink" id="registerSection">
-      New?
-      <button id="registerButton" class="linkStyle">
-        Create an Internet Identity Anchor.
+
+    <article>
+      <h1 id="loginWelcome">Welcome to<br />Internet Identity</h1>
+      <p>Provide an Identity Anchor to authenticate.</p>
+      <input
+        type="text"
+        class="input input--fullwidth"
+        id="registerUserNumber"
+        placeholder="Enter Identity Anchor"
+      />
+      <button type="button" id="loginButton" class="primary">
+        Authenticate
       </button>
-    </div>
-    <div class="textLink">
-      Already have an anchor
-      <button id="addNewDeviceButton" class="linkStyle">
-        but using a new device?
-      </button>
-    </div>
-    <div class="textLink">
-      Lost access
-      <button id="recoverButton" class="linkStyle">and want to recover?</button>
-    </div>
+    </article>
+
+    <aside aria-label="Other actions">
+      <ul class="list-reset">
+        <li class="textLink" id="registerSection">
+          New?
+          <button id="registerButton" class="linkStyle">
+            Create an Internet Identity Anchor.
+          </button>
+        </li>
+        <li class="textLink">
+          Already have an anchor
+          <button id="addNewDeviceButton" class="linkStyle">
+            but using a new device?
+          </button>
+        </li>
+        <li class="textLink">
+          Lost access
+          <button id="recoverButton" class="linkStyle">
+            and want to recover?
+          </button>
+        </li>
+      </ul>
+    </aside>
     ${navbar}
-  </div>
+  </section>
   ${footer}`;
 
 export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {

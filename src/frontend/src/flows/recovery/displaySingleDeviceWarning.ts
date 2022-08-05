@@ -9,10 +9,10 @@ const pageContent = () => html`
       min-height: 15rem;
     }
     .warningIcon {
-      align-self: center;
+      display: block;
       width: 3rem;
       height: 3rem;
-      margin-bottom: 1.5rem;
+      margin: 0 auto 1.5rem;
     }
     #warningHeading {
       text-align: center;
@@ -27,8 +27,8 @@ const pageContent = () => html`
       min-height: 48px;
     }
   </style>
-  <div id="warningContainer" class="container">
-    ${warningIcon}
+  <article id="warningContainer" class="container">
+    <div aria-hidden>${warningIcon}</div>
     <h1 id="warningHeading">Warning</h1>
     <p>
       If you lose all the devices assigned to your Internet Identity anchor,
@@ -49,7 +49,7 @@ const pageContent = () => html`
       Skip, I understand the risks
     </button>
     <div class="spacer"></div>
-  </div>
+  </article>
 `;
 
 export const displaySingleDeviceWarning = async (
