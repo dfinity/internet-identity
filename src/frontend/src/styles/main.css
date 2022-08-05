@@ -93,72 +93,122 @@ display:revert; revert to element instead of attribute */
  **/
 
 :root {
+  /* 
+   * value tokens 
+   *
+   * raw basic values that should not be used within your components.
+   * they control the design system on a higher level and should be used only 
+   * in the root element.
+   *
+   */
+
+  /* value tokens: colors (--vc => valueColor) */
+  --vc-raven: #202124;
+  --vc-snow: #ffffff;
+
+  --vc-vapour: rgba(255, 255, 255, 0.5);
+  --vc-shadow: rgba(32, 33, 36, 0.6);
+  
+  --vc-silver: #d9d9d9;
+
+  --vc-brand-orange: #f15a24;
+  --vc-brand-yellow: #fbb03b;
+  --vc-brand-pink: #ed1e79;
+  --vc-brand-purple: #522785;
+  --vc-brand-blue: #29abe2;
+
+  /**
+   * value tokens: sizes (--vs => valueSize)
+   * 1) general purpose spacer unit
+   * 2) vertical spaces outside of an element
+   * 3) horizontal spaces outside of an element
+   * 4) space inside an element (usually used for padding)
+   * 5) borders and lines (using PX here because we don't want lines to scale)
+  **/
+  --vs-gutter: 0.5rem;                      /* 1 */
+  --vs-stack: calc(var(--vs-gutter) * 2);   /* 2 */
+  --vs-inline: calc(var(--vs-gutter) * 2);  /* 3 */
+  --vs-bezel: calc(var(--vs-gutter) * 2);   /* 4 */
+  --vs-line: 1px;                           /* 5 */
+
+
+  /*
+   * reference tokens
+   * 
+   * pointers to value tokens or other reference tokens. They control the actual
+   * design rules.
+   *
+   */
+
+  /* reference tokens: colors (--rc => referenceColor) */
+  --rc-dark: var(--vc-raven);
+  --rc-light: var(--vc-snow);
+
+  --rc-dark-transparent: var(--vc-shadow);
+  --rc-light-transparent: var(--vc-vapour);
+
+  --rc-text: var(--rc-dark);
+
+  --rc-background: var(--rc-light);
+  --rc-background-transparent: var(--rc-light-transparent);
+  
+  --rc-line: var(--rc-light);
+  --rc-line-inverted: var(--rc-dark);
+
+  --rc-interaction: var(--vc-brand-blue);
+
+  --rc-button: var(--rc-dark);
+  --rc-onButton: var(--rc-light);
+
+  --rc-input: var(--rc-light);
+  --rc-onInput: var(--rc-dark);
+
+  /* reference tokens: gradients */
+  --rg-brand: var(--vc-brand-yellow) 10%,
+              var(--vc-brand-orange) 40%,
+              var(--vc-brand-pink) 50%,
+              var(--vc-brand-purple) 90%;
+
+  /* reference tokens: sizes */
+  --rs-footer-stack: calc(var(--vs-stack) * 1.5);
+
+  --rs-footer-gutter: var(--vs-gutter);
+  --rs-logo-stack: calc(var(--vs-gutter) * 8);
+
+  --rs-card-bezel: calc(var(--vs-gutter) * 5);
+  --rs-card-bezel-x: calc(var(--vs-gutter) * 7);
+
+  --rs-card-stack: calc(var(--vs-stack) * 1.5);
+  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.35);
+
+  --rs-button-bezel: var(--rs-card-bezel-narrow);
+  --rs-button-stack: var(--vs-stack);
+
+  --rs-input-bezel: var(--rs-button-bezel);
+  --rs-input-stack: var(--rs-button-stack);
+
+  --vs-line-height: 1.35;
+
+  /* general styles */
   font-family: "Montserrat", sans-serif;
   font-size: max(62.5%, calc(17.5% + 0.6vw)); /* 10px / 1200px min 10px */
 
-  --c-raven: #202124;
-  --c-snow: #ffffff;
-  --c-vapour: rgba(255, 255, 255, 0.5);
-  --c-shadow: rgba(32, 33, 36, 0.6);
-  --c-silver: #d9d9d9;
-
-  --c-brand-orange: #f15a24;
-  --c-brand-yellow: #fbb03b;
-  --c-brand-pink: #ed1e79;
-  --c-brand-purple: #522785;
-  --c-brand-blue: #29abe2;
-
-  --c-text: var(--c-raven);
-  --c-background: var(--c-snow);
-  --c-background-transparent: var(--c-vapour);
-  --c-line: var(--c-snow);
-  --c-line-inverted: var(--c-raven);
-
-  --c-interaction: var(--c-brand-blue);
-
-  --c-button: var(--c-raven);
-  --c-onButton: var(--c-snow);
-
-  --c-input: var(--c-snow);
-  --c-onInput: var(--c-raven);
-
-  background: var(--c-background);
-  color: var(--c-text);
-
-  --s-line: 1px;
-  --s-stack: 1rem;
-  --s-footer-stack: calc(var(--s-stack) * 1.5);
-
-  --s-gutter: 0.5rem;
-
-  --s-footer-gutter: var(--s-gutter);
-  --s-logo-stack: calc(var(--s-gutter) * 8);
-
-  --s-card-bezel: calc(var(--s-gutter) * 5);
-  --s-card-bezel-x: calc(var(--s-gutter) * 7);
-
-  --s-card-stack: calc(var(--s-stack) * 1.5);
-  --s-card-bezel-narrow: calc(var(--s-card-bezel) * 0.35);
-
-  --s-button-bezel: var(--s-card-bezel-narrow);
-  --s-button-stack: var(--s-stack);
-
-  --s-input-bezel: var(--s-button-bezel);
-  --s-input-stack: var(--s-button-stack);
-
-  --s-line-height: 1.35;
+  background: var(--rc-background);
+  color: var(--rc-text);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --c-text: var(--c-snow);
-    --c-background: var(--c-raven);
-    --c-background-transparent: var(--c-shadow);
-    --c-line: var(--c-raven);
-    --c-line-inverted: var(--c-snow);
+    --rc-text: var(--rc-light);
 
-    --c-button: var(--c-snow);
-    --c-onButton: var(--c-raven);
+    --rc-background: var(--rc-dark);
+    --rc-background-transparent: var(--rc-dark-transparent);
+
+    --rc-line: var(--rc-dark);
+    --rc-line-inverted: var(--c-li);
+
+    --rc-button: var(--rc-light);
+    --rc-onButton: var(--rrc-drark);
   }
 }
 
@@ -167,17 +217,19 @@ display:revert; revert to element instead of attribute */
  */
 body {
   font-size: 1.6rem;
-  line-height: var(--s-line-height);
+  line-height: var(--vs-line-height);
 }
 
 .t-title {
   font-weight: bold;
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   line-height: 1.1;
+  margin-top: 1em;
 }
 
 .t-title--main {
   font-size: 2.8rem;
+  margin-top: 0.5em;
 }
 
 .t-lead {
@@ -220,7 +272,7 @@ a:hover,
 .t-link__icon {
   display: inline-block;
   position: relative;
-  height: calc(1em * var(--s-line-height));
+  height: calc(1em * var(--vs-line-height));
   aspect-ratio: 1;
   vertical-align: middle;
 }
@@ -267,36 +319,33 @@ a:hover,
   border-radius: 50%;
   background: linear-gradient(
     145deg,
-    var(--c-brand-yellow) 10%,
-    var(--c-brand-orange) 40%,
-    var(--c-brand-pink) 50%,
-    var(--c-brand-purple) 90%
+    var(--rg-brand)
   );
   filter: blur(8rem);
 }
 
 .l-divider {
   display: block;
-  margin-top: calc(var(--s-stack) * 2);
-  margin-bottom: calc(var(--s-stack) * 2);
-  border-top: var(--s-line) var(--c-line) solid;
+  margin-top: calc(var(--vs-stack) * 2);
+  margin-bottom: calc(var(--vs-stack) * 2);
+  border-top: var(--vs-line) var(--rc-line) solid;
 }
 
 .l-divider--text {
   display: flex;
-  gap: calc(var(--s-gutter) * 2);
+  gap: calc(var(--vs-gutter) * 2);
   align-items: center;
-  margin-top: calc(var(--s-stack) * 2);
-  margin-bottom: calc(var(--s-stack) * 2);
+  margin-top: calc(var(--vs-stack) * 2);
+  margin-bottom: calc(var(--vs-stack) * 2);
   border-top: none;
-  height: calc(1em * var(--s-line-height));
+  height: calc(1em * var(--vs-line-height));
 }
 
 .l-divider--text::before,
 .l-divider--text::after {
   content: "";
   flex-grow: 1;
-  border-top: var(--s-line) var(--c-line) solid;
+  border-top: var(--vs-line) var(--rc-line) solid;
 }
 
 .l-divider__label {
@@ -305,7 +354,7 @@ a:hover,
 
 .l-section {
   display: block;
-  margin-top: calc(var(--s-stack) * 3);
+  margin-top: calc(var(--vs-stack) * 3);
 }
 
 /**
@@ -315,19 +364,19 @@ a:hover,
 .c-card {
   display: block;
   position: relative;
-  padding: var(--s-card-bezel) var(--s-card-bezel-x);
-  border: var(--s-line) var(--c-line) solid;
-  background-color: var(--c-background-transparent);
+  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+  border: var(--vs-line) var(--rc-line) solid;
+  background-color: var(--rc-background-transparent);
   border-radius: 0.4rem;
-  margin-top: var(--s-card-stack);
+  margin-top: var(--rs-card-stack);
 }
 
 .c-card--narrow {
-  padding: var(--s-card-bezel-narrow);
+  padding: var(--rs-card-bezel-narrow);
 }
 
 .c-card--outline {
-  border: var(--s-line) var(--c-line-inverted) solid;
+  border: var(--vs-line) var(--rc-line-inverted) solid;
 }
 
 /**
@@ -357,10 +406,10 @@ a:hover,
  */
 
 .c-button {
-  background: var(--c-button);
-  color: var(--c-onButton);
-  padding: var(--s-button-bezel);
-  margin-top: var(--s-button-stack);
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  padding: var(--rs-button-bezel);
+  margin-top: var(--rs-button-stack);
   display: block;
   width: 100%;
   text-align: center;
@@ -368,14 +417,14 @@ a:hover,
 }
 
 .c-button--secondary {
-  background: var(--c-onButton);
-  color: var(--c-button);
+  background: var(--rc-onButton);
+  color: var(--rc-button);
 }
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
   opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
 }
@@ -383,10 +432,10 @@ a:hover,
 .c-input {
   display: block;
   width: 100%;
-  padding: var(--s-input-bezel);
-  margin-top: var(--s-input-stack);
-  background: var(--c-input);
-  color: var(--c-onInput);
+  padding: var(--rs-input-bezel);
+  margin-top: var(--rs-input-stack);
+  background: var(--rc-input);
+  color: var(--rc-onInput);
 }
 
 /**
@@ -394,8 +443,8 @@ a:hover,
  */
 
 .l-footer {
-  padding: var(--s-footer-gutter);
-  margin-top: var(--s-footer-stack);
+  padding: var(--rs-footer-gutter);
+  margin-top: var(--rs-footer-stack);
 }
 
 .c-nav-links {
@@ -403,17 +452,17 @@ a:hover,
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: calc(var(--s-gutter) * 10);
+  margin-top: calc(var(--vs-gutter) * 10);
 }
 
 .c-nav-links li + li::before {
   content: "·";
-  margin: 0 calc(var(--s-gutter) * 2);
+  margin: 0 calc(var(--vs-gutter) * 2);
 }
 
 .page-signature {
   display: block;
-  padding: var(--s-footer-gutter);
+  padding: var(--rs-footer-gutter);
   transition: background 0.2s;
 }
 
@@ -428,5 +477,5 @@ a:hover,
 }
 
 .c-list li + li {
-  margin-top: var(--s-gutter);
+  margin-top: var(--vs-gutter);
 }
