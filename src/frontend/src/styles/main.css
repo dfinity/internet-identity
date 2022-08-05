@@ -32,9 +32,16 @@ button {
  */
 ol,
 ul,
+li,
 menu,
 summary {
   list-style: revert;
+}
+
+em,
+strong,
+b {
+  all: revert;
 }
 
 /* For images to not be able to exceed their container */
@@ -156,6 +163,10 @@ p,
   color: var(--grey-700);
   font-size: 1rem;
   margin: 1rem 0;
+}
+
+.instruction-steps li {
+  margin-inline-start: 25px;
 }
 
 input,
@@ -581,7 +592,7 @@ nav {
 
 .faq__container {
   background-color: rgba(243, 244, 246, 1);
-  max-width: 42rem;
+  max-width: 45rem;
   height: 100%;
 }
 
