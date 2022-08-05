@@ -1,96 +1,53 @@
+/*
+                                    _  _____  __    __   __
+                                   | |  | |  / /`  ( (` ( (`
+                                   |_|  |_|  \_\_, _)_) _)_)
+
+                                          `-.` '.-'
+                                       `-.    A   .-'.
+                                    `-.    -./_\.-    .-'
+                                        -.  /___\  .-
+                                    `-.   `/__|__\'   .-'.
+                                 `-.    -./.-"^"-.\.-      '
+                                    `-.  / <`(o)*> \  .-'
+                                 .-   .`/__`-...-'__\'   .-
+                                ,...`-./_/____|____\_\.-'.,.
+                                   ,-'    ,` . . ',   `-,
+                               _,-' /____/____.____\____\ `-,_
+                                       ,      |      .
+                                      /     ,.+.,     \
+
+   -<# ITCSS (Inverted Triangle CSS) -> (https://csswizardry.com/2018/11/itcss-and-skillshare/) #>-
+  __________________________________________________________________________________________________
+   \---------------------------/------------                          Generic CSS (Low specificity)
+    \                         /  I)   Settings (Design)                            Y
+     \-----------------------/----------------                                     |
+      \                     /    II)  Theme Settings                               |
+       \-------------------/--------------------                                   |
+        \                 /      III) Generic                                      |
+         \---------------/------------------------                                 |
+          \             /        IV)  Elements                                     |
+           \-----------/----------------------------                               |
+            \         /          V)   Objects                                      |
+             \-------/--------------------------------                             |
+              \     /            VI)  Components                                   |
+               \---/------------------------------------                           |
+                \ /              VII) Utilities (Trumps)                           V
+                 V                                                   Explicit CSS (High specificity)
+                 
+  I)   Settings:             Global variables, config switches.
+  II)  Theme Settings:       DarkMode, LightMode, Product Specific stuff
+  III) Generic:              Ground-zero styles (Normalize.css, resets, box-sizing).
+  IV)  Base:                 Un-classed HTML elements (type selectors).
+  V)   Objects:              Cosmetic-free design patterns (grids, layouts, etc).
+  VI)  Components:           Designed components, chunks of UI.
+  VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, etc)
+
+*/
+
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 
-/***
-The new CSS reset - version 1.7.2 (last updated 23.6.2022)
-GitHub page: https://github.com/elad2412/the-new-css-reset
-***/
-
-/*
-Remove all the styles of the "User-Agent-Stylesheet", except for the 'display' property
-- The "symbol *" part is to solve Firefox SVG sprite bug
-*/
-*:where(:not(html, iframe, canvas, img, svg, video):not(svg *, symbol *)) {
-  all: unset;
-  display: revert;
-}
-
-/* Preferred box-sizing value */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-/* Reapply the pointer cursor for anchor tags */
-a,
-button {
-  cursor: revert;
-}
-
-/* Remove list styles (bullets/numbers) */
-ol,
-ul,
-menu {
-  list-style: none;
-}
-
-/* For images to not be able to exceed their container */
-img {
-  max-width: 100%;
-}
-
-/* removes spacing between cells in tables */
-table {
-  border-collapse: collapse;
-}
-
-/* Safari - solving issue when using user-select:none on the <body> text input doesn't working */
-input,
-textarea {
-  -webkit-user-select: auto;
-}
-
-/* revert the 'white-space' property for textarea elements on Safari */
-textarea {
-  white-space: revert;
-}
-
-/* minimum style to allow to style meter element */
-meter {
-  -webkit-appearance: revert;
-  appearance: revert;
-}
-
-/* reset default text opacity of input placeholder */
-::placeholder {
-  color: unset;
-}
-
-/* fix the feature of 'hidden' attribute.
-display:revert; revert to element instead of attribute */
-:where([hidden]) {
-  display: none;
-}
-
-/* revert for bug in Chromium browsers
-- fix for the content editable attribute will work properly.
-- webkit-user-select: auto; added for Safari in case of using user-select:none on wrapper element*/
-:where([contenteditable]:not([contenteditable="false"])) {
-  -moz-user-modify: read-write;
-  -webkit-user-modify: read-write;
-  overflow-wrap: break-word;
-  -webkit-line-break: after-white-space;
-  -webkit-user-select: auto;
-}
-
-/* apply back the draggable feature - exist only in Chromium and Safari */
-:where([draggable="true"]) {
-  -webkit-user-drag: element;
-}
-
-/**
- * Internet Identity Specific Styles
- **/
+/* I) Settings: Global variables, config switches. */
 
 :root {
   /* 
@@ -188,14 +145,9 @@ display:revert; revert to element instead of attribute */
   --rs-input-stack: var(--rs-button-stack);
 
   --vs-line-height: 1.35;
-
-  /* general styles */
-  font-family: "Montserrat", sans-serif;
-  font-size: max(62.5%, calc(17.5% + 0.6vw)); /* 10px / 1200px min 10px */
-
-  background: var(--rc-background);
-  color: var(--rc-text);
 }
+
+/* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -212,13 +164,134 @@ display:revert; revert to element instead of attribute */
   }
 }
 
+/***
+ * III) Generic: Ground-zero styles (Normalize.css, resets, box-sizing)
+ *
+ * The new CSS reset - version 1.7.2 (last updated 23.6.2022)
+ * GitHub page: https://github.com/elad2412/the-new-css-reset
+***/
+
+/*
+Remove all the styles of the "User-Agent-Stylesheet", except for the 'display' property
+- The "symbol *" part is to solve Firefox SVG sprite bug
+*/
+*:where(:not(html, iframe, canvas, img, svg, video):not(svg *, symbol *)) {
+  all: unset;
+  display: revert;
+}
+
+/* Preferred box-sizing value */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Reapply the pointer cursor for anchor tags */
+a,
+button {
+  cursor: revert;
+}
+
+/* Remove list styles (bullets/numbers) */
+ol,
+ul,
+menu {
+  list-style: none;
+}
+
+/* For images to not be able to exceed their container */
+img {
+  max-width: 100%;
+}
+
+/* removes spacing between cells in tables */
+table {
+  border-collapse: collapse;
+}
+
+/* Safari - solving issue when using user-select:none on the <body> text input doesn't working */
+input,
+textarea {
+  -webkit-user-select: auto;
+}
+
+/* revert the 'white-space' property for textarea elements on Safari */
+textarea {
+  white-space: revert;
+}
+
+/* minimum style to allow to style meter element */
+meter {
+  -webkit-appearance: revert;
+  appearance: revert;
+}
+
+/* reset default text opacity of input placeholder */
+::placeholder {
+  color: unset;
+}
+
+/* fix the feature of 'hidden' attribute.
+display:revert; revert to element instead of attribute */
+:where([hidden]) {
+  display: none;
+}
+
+/* revert for bug in Chromium browsers
+- fix for the content editable attribute will work properly.
+- webkit-user-select: auto; added for Safari in case of using user-select:none on wrapper element*/
+:where([contenteditable]:not([contenteditable="false"])) {
+  -moz-user-modify: read-write;
+  -webkit-user-modify: read-write;
+  overflow-wrap: break-word;
+  -webkit-line-break: after-white-space;
+  -webkit-user-select: auto;
+}
+
+/* apply back the draggable feature - exist only in Chromium and Safari */
+:where([draggable="true"]) {
+  -webkit-user-drag: element;
+}
+
 /**
- * Typography
- */
+ * IV) Base: Un-classed HTML elements (type selectors)
+ *
+ * Internet Identity Styles
+ **/
+
+:root {
+  /* general styles */
+  font-family: "Montserrat", sans-serif;
+  font-size: max(62.5%, calc(17.5% + 0.6vw)); /* 10px / 1200px min 10px */
+
+  background: var(--rc-background);
+  color: var(--rc-text);
+}
+
 body {
   font-size: 1.6rem;
   line-height: var(--vs-line-height);
 }
+
+/**
+ * V) Objects: Cosmetic-free design patterns
+ * 
+ * We generally use the BEM methodology.
+ * http://getbem.com/
+ *
+ * We prefix classes with the following convention:
+ * - `.c-` component
+ * - `.l-` layout
+ * - `.t-` typography
+ *
+ * We avoid element, id and attribute selectors when it is saint to do so. 
+ * Use classes when possible. 
+ */
+
+ /**
+ * V) Objects
+ */
 
 .t-title {
   font-weight: bold;
@@ -358,7 +431,7 @@ a:hover,
 }
 
 /**
- * Cards
+ * Card components
  */
 
 .c-card {
@@ -382,7 +455,6 @@ a:hover,
 /**
  *  logo component 
  */
-
 .c-logo {
   display: block;
   overflow: hidden;
@@ -404,7 +476,6 @@ a:hover,
 /**
  *  Forms and Buttons 
  */
-
 .c-button {
   background: var(--rc-button);
   color: var(--rc-onButton);

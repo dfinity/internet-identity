@@ -35,114 +35,6 @@ const numAuthenticators = (devices: DeviceData[]) =>
   devices.filter((device) => hasOwnProperty(device.purpose, "authentication"))
     .length;
 
-// The styling of the page
-
-const style = () => html`<style>
-  .labelWithAction {
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .labelWithAction button {
-    text-align: right;
-  }
-
-  .labelWithAction .labelWithAction {
-    margin: 0;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .labelWithAction .labelWithAction span {
-    /* global span selector is set to 1.2rem (...), which is too big */
-    font-size: 1rem;
-  }
-
-  .labelWithAction .labelWithAction span.addedDevicesCounter {
-    /* we can't just select the class because the previous selector is more specific */
-    font-size: 0.7rem;
-  }
-
-  .labelAction {
-    padding: 0;
-    border: none;
-    display: inline;
-    width: auto;
-    margin: 0;
-    cursor: pointer;
-  }
-
-  .labelActionText {
-    font-size: 12px;
-    font-family: "Montserrat", sans-serif;
-    text-align: right;
-    font-weight: 600;
-    color: #1f6ef4;
-  }
-
-  .addedDevices {
-    font-weight: 500;
-    font-size: 1rem;
-    margin: 0 0 0.2rem;
-  }
-
-  .labelActionText::before {
-    content: "+";
-    margin-right: 3px;
-  }
-
-  .labelAction:disabled .labelActionText {
-    color: var(--grey-100);
-  }
-
-  .tooltip {
-    visibility: hidden;
-    opacity: 0;
-    display: inline-block;
-    max-width: 200px;
-    font-size: 12px;
-    position: absolute;
-    z-index: 1;
-    background: var(--grey-100);
-    padding: 10px;
-    border-radius: 10px;
-    text-align: center;
-  }
-
-  .labelAction:disabled:hover .tooltip {
-    visibility: visible;
-    opacity: 1;
-    transition: opacity 0.2s ease-in;
-  }
-  .addedDevicesCounter {
-    margin-left: 0.1em;
-  }
-
-  .addedDevicesCounter:hover .tooltip {
-    visibility: visible;
-    opacity: 1;
-    transition: opacity 0.2s ease-in;
-  }
-
-  .label {
-    font-size: 1.2rem;
-    font-weight: 500;
-    margin: 0;
-  }
-
-  .highlightBox {
-    margin-top: 1rem;
-  }
-
-  .labelAddedDevices {
-    flex-grow: 1;
-    display: flex;
-  }
-</style> `;
-
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
 // recovery devices, we display a warning "nag box" and suggest to the user
@@ -150,19 +42,20 @@ const style = () => html`<style>
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
-  ${style()}
   <section class="l-container c-card">
-    <h1>Anchor Management</h1>
-    <p>
-      You can view and manage this Identity Anchor and its added devices here.
-    </p>
+    <hgroup>
+      <h1 class="t-title t-title--main">Anchor Management</h1>
+      <p class="t-lead">
+        You can view and manage this Identity Anchor and its added devices here.
+      </p>
+    </hgroup>
     ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
-    <aside>
-      <h2 class="label">Identity Anchor</h2>
-      <div class="highlightBox">${userNumber}</div>
+    <aside class="l-section">
+      <h2 class="t-title">Identity Anchor</h2>
+      <data class="c-card c-card--narrow c-card--outline t-vip" aria-label="User Number">${userNumber}</data>
     </aside>
 
-    <aside>
+    <aside class="l-section">
       <div class="labelWithAction">
         <div class="labelAddedDevices">
           <h2 class="label addedDevices">Added devices</h2>
