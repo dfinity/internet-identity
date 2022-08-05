@@ -14,6 +14,9 @@ export const logoutSection = (
     #logoutBox {
       margin-top: 3rem;
     }
+    #logoutButton {
+      font-size: 1rem;
+    }
   </style>
   <div id="logoutBox">
     <hr />
