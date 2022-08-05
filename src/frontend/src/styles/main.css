@@ -25,11 +25,16 @@ button {
   cursor: revert;
 }
 
-/* Remove list styles (bullets/numbers) */
+/* Retain list styles (bullets/numbers) */
+/* This is to retain "FAQ page" and
+    "Device Registration Not Enabled" page
+    that utilizes bullets & numbers
+ */
 ol,
 ul,
-menu {
-  list-style: none;
+menu,
+summary {
+  list-style: revert;
 }
 
 /* For images to not be able to exceed their container */
