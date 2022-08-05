@@ -163,11 +163,17 @@ button {
 
 button:not([disabled]):hover,
 button:not([disabled]):focus,
-a:focus {
+a:focus,
+.linkStyle:hover {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
   outline: 2px dotted transparent;
   outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.linkStyle:hover {
+  cursor: pointer;
 }
 
 #captchaImg {
@@ -309,7 +315,7 @@ main {
   margin-bottom: 0.7rem;
   font-size: 0.95rem;
 }
-.textLink button {
+.textLink a {
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
