@@ -926,7 +926,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
       '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      '"https://nice-name.com" is not listed in the list of allowed alternative origins. Allowed alternative origins: '
+      '"https://nice-name.com" is not listed in the list of allowed alternative origins. Allowed alternative origins:'
     );
   });
 }, 300_000);
