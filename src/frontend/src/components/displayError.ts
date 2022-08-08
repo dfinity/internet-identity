@@ -9,26 +9,7 @@ export type ErrorOptions = {
 };
 
 const pageContent = (options: ErrorOptions) => html`
-  <style>
-    #errorContainer {
-      min-height: 15rem;
-    }
-    .displayErrorDetail {
-      overflow: auto;
-      margin-bottom: 2rem;
-      flex-grow: 1;
-    }
-    .displayErrorMessage {
-      flex-grow: 1;
-    }
-    .warningIcon {
-      align-self: center;
-      width: 3rem;
-      height: 3rem;
-      margin-bottom: 1.5rem;
-    }
-  </style>
-  <div id="errorContainer" class="l-container c-card c-card--highlight">
+  <div id="errorContainer" class="l-container c-card c-card--highlight c-card--warning">
     ${warningIcon}
     <h1>${options.title}</h1>
     <p class="displayErrorMessage">${options.message}</p>

@@ -20,34 +20,38 @@ const pageContent = (
   isOnlyDevice: boolean
 ) => html`
   <article id="deviceSettings" class="l-container c-card c-card--highlight">
-    <h1 style="margin: 0 0 1.5rem">
+    <h1 class="t-title">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
 
-    ${shouldOfferToProtect(device)
-      ? html` <p>
-            By making your recovery phrase protected, you will need to input
-            your recovery phrase to delete it.
-          </p>
-          <button data-action="protect">Protect</button>
-          <hr />`
-      : ""}
-    ${!isOnlyDevice
-      ? html`<button data-action="remove">
-          Delete ${isRecovery(device) ? "Recovery" : "Device"}
-        </button>`
-      : ""}
-    ${!isOnlyDevice && isProtected(device)
-      ? html`<p>
-          This ${isRecovery(device) ? device.alias : "device"} is protected and
-          you will be prompted to authenticate with it before removal.
-        </p>`
-      : ""}
-    ${isOnlyDevice
-      ? html`<p>This is your last device. You cannot remove it.</p>
-          <p>Without devices your anchor would be inaccessible.</p>`
-      : ""}
-    <button data-action="back">Back</button>
+    <div class="l-section">
+      ${shouldOfferToProtect(device)
+        ? html` <p class="t-paragraph">
+              By making your recovery phrase protected, you will need to input
+              your recovery phrase to delete it.
+            </p>
+            <button data-action="protect" class="c-button">Protect</button>
+            <hr />`
+        : ""}
+      ${!isOnlyDevice
+        ? html`<button data-action="remove" class="c-button c-button--warning">
+            Delete ${isRecovery(device) ? "Recovery" : "Device"}
+          </button>`
+        : ""}
+      ${!isOnlyDevice && isProtected(device)
+        ? html`<p class="t-paragraph">
+            This ${isRecovery(device) ? device.alias : "device"} is protected and
+            you will be prompted to authenticate with it before removal.
+          </p>`
+        : ""}
+      ${isOnlyDevice
+        ? html`<p class="t-paragraph">This is your last device. You cannot remove it.</p>
+            <p class="t-paragraph">Without devices your anchor would be inaccessible.</p>`
+        : ""}
+      <div class="l-section">
+        <button data-action="back" class="c-button">Back</button>
+      </div>
+    </div>
   </article>
   ${footer}
 `;

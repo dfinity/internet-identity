@@ -4,47 +4,31 @@ import { setupRecovery } from "./setupRecovery";
 import { IIConnection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
-  <style>
-    #warningContainer {
-      min-height: 15rem;
-    }
-    .warningIcon {
-      align-self: center;
-      width: 3rem;
-      height: 3rem;
-      margin-bottom: 1.5rem;
-    }
-    #warningHeading {
-      text-align: center;
-    }
-    #warningContainer p {
-      font-size: 1.2rem;
-    }
-    #warningContainer a {
-      margin-bottom: 1rem;
-    }
-  </style>
-  <div id="warningContainer" class="l-container c-car c-card--highlightd">
-    ${warningIcon}
-    <h1 id="warningHeading">Warning</h1>
-    <p>It looks like you are using Safari or iOS.</p>
-    <p>
+  <div id="warningContainer" class="l-container c-car c-card--highlight">
+    <hgroup>
+      <div aria-hidden>${warningIcon}</div>
+      <h1 id="class="t-title t-title--main">Warning</h1>
+      <p class="t-lead">It looks like you are using Safari or iOS.</p>
+    </hgroup>
+    <p class="t-paragraph">
       If you “Clear History and Website Data” via system preferences, all web
       authentication keys will be <em>deleted</em> from this device. This means
       that you will no longer have access to your identity anchor (and all
       associated resources and tokens) with this device.
     </p>
-    <p>
+    <p class="t-paragraph">
       As a best practice, we recommend you assign multiple devices to an
       Identity Anchor and add at least one recovery mechanism such as an
       external key fob or a seedphrase
     </p>
-    <button id="displayWarningAddRecovery" class="primary">
-      Add a recovery mechanism to an Identity Anchor
-    </button>
-    <button id="displayWarningRemindLater" class="primary">
-      Skip, I understand the risks
-    </button>
+    <div class="l-section">
+      <button id="displayWarningAddRecovery" class="c-button">
+        Add a recovery mechanism to an Identity Anchor
+      </button>
+      <button id="displayWarningRemindLater" class="c-button c-button--secondary">
+        Skip, I understand the risks
+      </button>
+    </div>
   </div>
 `;
 

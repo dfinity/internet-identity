@@ -119,6 +119,9 @@
   --rc-button: var(--rc-dark);
   --rc-onButton: var(--rc-light);
 
+  --rc-warning: var(--vc-brand-pink);
+  --rc-onWarning: var(--vc-snow);
+
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
@@ -578,6 +581,11 @@ a:hover,
 .c-button--disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.c-button--warning {
+  background: var(--rc-warning);
+  color: var(--rc-onWarning);
 }
 
 .c-input {

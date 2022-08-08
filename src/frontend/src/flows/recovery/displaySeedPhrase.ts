@@ -2,27 +2,25 @@ import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon } from "../../components/icons";
 
 const pageContent = (seedPhrase: string) => html`
-  <style>
-    #seedPhrase {
-      font-size: 1rem;
-    }
-  </style>
   <article class="l-container c-card c-card--highlight">
-    <h1>Seedphrase</h1>
-    <p>Your seed phrase makes it easy to recover this Identity Anchor.</p>
-    <aside class="warningBox" aria-label="warning">
-      <span class="warningIcon">${warningIcon}</span>
-      <div class="warningMessage">
-        Do <b>NOT</b> forget to save this seed phrase. Save a backup on a
+    <hgroup>
+      <h1 class="t-title t-title--lead">Seedphrase</h1>
+      <p class="t-lead">Your seed phrase makes it easy to recover this Identity Anchor.</p>
+    </hgroup>
+    <aside class="c-card c-card--icon c-card--warning" aria-label="Warning">
+      <span class="c-card__icon">${warningIcon}</span>
+      <p class="c-card__content">
+        Do <b class="t-strong">NOT</b> forget to save this seed phrase. Save a backup on a
         storage medium and write it down.<br />
         Keep it secret &mdash; knowledge of the seed phrase will enable access
         to this Identity Anchor!
-      </div>
+      </p>
     </aside>
-    <label>Your seed phrase</label>
-    <div id="seedPhrase" translate="no" class="highlightBox">${seedPhrase}</div>
-    <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
-    <button id="displaySeedPhraseContinue" class="primary hidden">
+
+    <h2 class="t-title">Your seed phrase</h2>
+    <data id="seedPhrase" translate="no" class="c-card c-card--narrow c-card--outline t-vip">${seedPhrase}</data>
+    <button id="seedCopy" data-clipboard-target="#seedPhrase" class="c-button">Copy</button>
+    <button id="displaySeedPhraseContinue" class="c-button hidden">
       Continue
     </button>
   </article>

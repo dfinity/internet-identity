@@ -117,14 +117,14 @@ const deviceListItem = (device: DeviceData) => html`
 `;
 
 const recoveryNag = () => html`
-  <div class="warnBox">
-    <div class="warnIcon">${warningIcon}</div>
-    <div class="warnContent">
-      <div class="warnTitle">Recovery Mechanism</div>
-      <div class="warnMessage">
+  <div class="c-card c-card--warning c-card--icon">
+    <div class="c-card__icon">${warningIcon}</div>
+    <div class="c-card__content">
+      <div class="t-title">Recovery Mechanism</div>
+      <p class="t-paragraph">
         Add a recovery mechanism to help protect this Identity Anchor.
-      </div>
-      <button id="addRecovery" class="primary warnButton">Add Recovery</button>
+      </p>
+      <button id="addRecovery" class="c-button">Add Recovery</button>
     </div>
   </div>
 `;
