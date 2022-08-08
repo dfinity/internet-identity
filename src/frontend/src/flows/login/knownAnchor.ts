@@ -12,7 +12,7 @@ import { useRecovery } from "../recovery/useRecovery";
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--highlight">
     <div class="c-logo">${icLogo}</div>
-    <hgroup>
+    <hgroup class="l-section">
       <h1 class="t-title t-title--main">Welcome back!</h1>
       <p class="t-lead">Authenticate using Internet Identity.</p>
     <hgroup>
