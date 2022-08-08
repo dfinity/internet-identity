@@ -14,8 +14,9 @@ const pageContent = () => html`
         <h2 class="t-title">Security Warning</h2>
         <p class="t-paragraph">
           You are in the process of adding a new device. Any device added here
-          will have <strong class="t-strong">full control over your identity</strong>. Only
-          continue the process if you want to add a new device that you
+          will have
+          <strong class="t-strong">full control over your identity</strong>.
+          Only continue the process if you want to add a new device that you
           <em>personally own</em>.
         </p>
       </div>
@@ -53,7 +54,6 @@ const pageContent = () => html`
     <div class="l-section">
       <button id="cancelAddDevice" class="c-button">Cancel</button>
     </div>
-    
   </article>
 `;
 

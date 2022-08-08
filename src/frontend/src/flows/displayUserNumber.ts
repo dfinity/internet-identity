@@ -19,7 +19,9 @@ const pageContent = (userNumber: bigint) => html`
       </div>
     </div>
     <h2 class="t-title">Identity Anchor</h2>
-    <data class="c-card c-card--narrow c-card--outline t-vip">${userNumber}</data>
+    <data class="c-card c-card--narrow c-card--outline t-vip"
+      >${userNumber}</data
+    >
     <button id="displayUserContinue" class="c-button">Continue</button>
   </article>
 `;

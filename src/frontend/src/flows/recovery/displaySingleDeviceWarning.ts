@@ -11,9 +11,9 @@ const pageContent = () => html`
       <p class="t-lead">
         If you lose all the devices assigned to your Internet Identity anchor,
         then you will <em>lose access</em> to the anchor, and all associated
-        resources and tokens, unless you have a recovery mechanism setup. This can
-        be an external key fob or a secure seedphrase, which you must make sure is
-        not stolen.
+        resources and tokens, unless you have a recovery mechanism setup. This
+        can be an external key fob or a secure seedphrase, which you must make
+        sure is not stolen.
       </p>
     </hgroup>
     <p class="t-paragraph">
@@ -25,7 +25,10 @@ const pageContent = () => html`
       <button id="displayWarningAddRecovery" class="c-button">
         Add a recovery mechanism to an Identity Anchor
       </button>
-      <button id="displayWarningRemindLater" class="c-button c-button--secondary">
+      <button
+        id="displayWarningRemindLater"
+        class="c-button c-button--secondary"
+      >
         Skip, I understand the risks
       </button>
     </div>

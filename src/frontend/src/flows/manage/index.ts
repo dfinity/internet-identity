@@ -85,18 +85,25 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     </aside>
 
     <aside class="l-section">
-      ${!hasRecoveryDevice(devices)
-        ? undefined
-        : html`
-            <div class="t-title t-title--complications">
-              <h2>Recovery mechanisms</h2>
-              <button class="t-title__complication t-title__complication--end" id="addRecovery">
-                <i class="t-link__icon" aria-hidden>+</i>
-                <span class="t-link t-link--discreet">Add recovery mechanism</span>
-              </button>
-            </div>
-            <div id="recoveryList" class="c-action-list"></div>
-          `}
+      ${
+        !hasRecoveryDevice(devices)
+          ? undefined
+          : html`
+              <div class="t-title t-title--complications">
+                <h2>Recovery mechanisms</h2>
+                <button
+                  class="t-title__complication t-title__complication--end"
+                  id="addRecovery"
+                >
+                  <i class="t-link__icon" aria-hidden>+</i>
+                  <span class="t-link t-link--discreet"
+                    >Add recovery mechanism</span
+                  >
+                </button>
+              </div>
+              <div id="recoveryList" class="c-action-list"></div>
+            `
+      }
     </aside>
     
     ${logoutSection()} ${navbar}

@@ -40,13 +40,17 @@ const pageContent = (
         : ""}
       ${!isOnlyDevice && isProtected(device)
         ? html`<p class="t-paragraph">
-            This ${isRecovery(device) ? device.alias : "device"} is protected and
-            you will be prompted to authenticate with it before removal.
+            This ${isRecovery(device) ? device.alias : "device"} is protected
+            and you will be prompted to authenticate with it before removal.
           </p>`
         : ""}
       ${isOnlyDevice
-        ? html`<p class="t-paragraph">This is your last device. You cannot remove it.</p>
-            <p class="t-paragraph">Without devices your anchor would be inaccessible.</p>`
+        ? html`<p class="t-paragraph">
+              This is your last device. You cannot remove it.
+            </p>
+            <p class="t-paragraph">
+              Without devices your anchor would be inaccessible.
+            </p>`
         : ""}
       <div class="l-section">
         <button data-action="back" class="c-button">Back</button>

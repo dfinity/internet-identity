@@ -9,7 +9,10 @@ export type ErrorOptions = {
 };
 
 const pageContent = (options: ErrorOptions) => html`
-  <div id="errorContainer" class="l-container c-card c-card--highlight c-card--warning">
+  <div
+    id="errorContainer"
+    class="l-container c-card c-card--highlight c-card--warning"
+  >
     ${warningIcon}
     <h1>${options.title}</h1>
     <p class="displayErrorMessage">${options.message}</p>
