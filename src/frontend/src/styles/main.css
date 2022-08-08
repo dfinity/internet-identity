@@ -73,6 +73,7 @@
   --vc-brand-pink: #ed1e79;
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
+  --vc-brand-blue--dark: #1f6ef4;
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -113,6 +114,7 @@
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
+  --rc-interaction-text: var(--vc-brand-blue--dark);
 
   --rc-button: var(--rc-dark);
   --rc-onButton: var(--rc-light);
@@ -157,7 +159,7 @@
     --rc-background-transparent: var(--rc-dark-transparent);
 
     --rc-line: var(--rc-dark);
-    --rc-line-inverted: var(--c-li);
+    --rc-line-inverted: var(--c-light);
 
     --rc-button: var(--rc-light);
     --rc-onButton: var(--rrc-drark);
@@ -289,15 +291,29 @@ body {
  * Use classes when possible. 
  */
 
- /**
- * V) Objects
- */
 
 .t-title {
   font-weight: bold;
   font-size: 1.8rem;
   line-height: 1.1;
   margin-top: 1em;
+}
+
+.t-title--complications {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.t-title__complication {
+  font-weight: 300;
+  font-size: 0.8em;
+  flex-grow: 1;
+}
+
+.t-title__complication--end {
+  flex-grow: 0;
+  text-align: right;
 }
 
 .t-title--main {
@@ -310,7 +326,7 @@ body {
 }
 
 .t-title + .t-lead {
-  margin-top: 0.5em;
+  margin-top: 0.75em;
 }
 
 .t-vip {
@@ -326,6 +342,8 @@ body {
 a,
 .t-link {
   display: inline;
+  color: var(--rc-interaction-text);
+  color: inherit;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -358,9 +376,8 @@ a:hover,
   width: 100%;
 }
 
-/**
- * Layout
- */
+
+
 #pageContent,
 .l-wrap {
   position: relative;
@@ -377,24 +394,6 @@ a:hover,
   min-width: 30rem;
   max-width: 40rem;
   margin: 0 auto;
-}
-
-.l-container::before {
-  /* colored blob in the background */
-  content: " ";
-  position: absolute;
-  z-index: -1;
-  top: 50%;
-  left: 50%;
-  width: 120%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: linear-gradient(
-    145deg,
-    var(--rg-brand)
-  );
-  filter: blur(8rem);
 }
 
 .l-divider {
@@ -431,6 +430,10 @@ a:hover,
 }
 
 /**
+ * Title with counter and Actions
+ */
+
+/**
  * Card components
  */
 
@@ -438,8 +441,8 @@ a:hover,
   display: block;
   position: relative;
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
-  border: var(--vs-line) var(--rc-line) solid;
-  background-color: var(--rc-background-transparent);
+  border: var(--vs-line) solid var(--rc-line);
+  background-color: var(--rc-background);
   border-radius: 0.4rem;
   margin-top: var(--rs-card-stack);
 }
@@ -450,6 +453,29 @@ a:hover,
 
 .c-card--outline {
   border: var(--vs-line) var(--rc-line-inverted) solid;
+}
+
+.c-card--highlight {
+  background-color: var(--rc-background-transparent);
+  border: var(--vs-line) solid var(--rc-line);
+}
+
+.c-card--highlight::before {
+  /* colored blob in the background */
+  content: " ";
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: linear-gradient(
+    145deg,
+    var(--rg-brand)
+  );
+  filter: blur(8rem);
 }
 
 /**
@@ -476,6 +502,7 @@ a:hover,
 /**
  *  Forms and Buttons 
  */
+
 .c-button {
   background: var(--rc-button);
   color: var(--rc-onButton);
@@ -549,4 +576,61 @@ a:hover,
 
 .c-list li + li {
   margin-top: var(--vs-gutter);
+}
+
+/* Tooltip */
+
+.c-tooltip {
+  position: relative;
+}
+
+.c-tooltip:hover .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.2s ease-in;
+}
+
+.c-tooltip__message {
+  position: absolute;
+  left: 0;
+
+  opacity: 0;
+  visibility: hidden;
+  z-index: 2;
+  text-align: left;
+  min-width: 15rem;
+  max-width: 20rem;
+
+  /**
+    this is the width of the tooltip
+    we might add this to the card component later
+  **/
+}
+
+.c-tooltip__message--right {
+  right: 0;
+  left: auto;
+}
+
+.c-action-list {
+  margin-top: 1rem;
+}
+
+.c-action-list__item {
+  display: flex;
+  gap: var(--vs-gutter);
+}
+
+.c-action-list__label {
+  flex-grow: 1;
+}
+
+.c-action-list__action,
+.c-action-list__label {
+  display: flex;
+  align-items: center;
+  border: var(--vs-line) solid var(--rc-line);
+  border-radius: 4px;
+  padding: var(--rs-button-bezel);
+  background: var(--rc-background);
 }
