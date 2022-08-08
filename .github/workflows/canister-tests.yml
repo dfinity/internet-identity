@@ -469,6 +469,41 @@ jobs:
           default_author: github_actions
           message: "🤖 Selenium screenshots auto-update"
 
+  # This deploys the production build to mainnet, to a canister that we use for testing.
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 'Install dfx'
+        run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: internet_identity_production.wasm
+          path: .
+
+      - name: 'Install key'
+        env:
+          DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
+        run: |
+          key_pem=$(mktemp)
+          printenv "DFX_DEPLOY_KEY" > "$key_pem"
+          dfx identity import --disable-encryption --force default "$key_pem"
+          rm "$key_pem"
+
+      - name: "Deploy"
+        run: |
+          mv internet_identity_production.wasm internet_identity.wasm
+          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --argument '(null)' \
+            internet_identity
+
+
   # This ... releases
   release:
     runs-on: ubuntu-latest
