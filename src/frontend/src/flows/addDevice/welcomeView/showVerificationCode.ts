@@ -26,9 +26,12 @@ const pageContent = (
       verification this page will automatically refresh.
     </p>
     <label>Alias</label>
-    <div class="highlightBox">${alias}</div>
+    <div class="c-card c-card--narrow c-card--outline t-vip">${alias}</div>
     <label>Device Verification Code</label>
-    <div id="verificationCode" class="highlightBox">
+    <div
+      id="verificationCode"
+      class="c-card c-card--narrow c-card--outline t-vip"
+    >
       ${tentativeRegistrationInfo.verification_code}
     </div>
     <p>Time remaining: <span id="timer"></span></p>

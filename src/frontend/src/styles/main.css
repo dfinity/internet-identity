@@ -162,7 +162,7 @@
     --rc-line-inverted: var(--c-light);
 
     --rc-button: var(--rc-light);
-    --rc-onButton: var(--rrc-drark);
+    --rc-onButton: var(--rc-dark);
   }
 }
 

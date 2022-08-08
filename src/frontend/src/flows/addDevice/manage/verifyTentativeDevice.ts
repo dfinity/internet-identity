@@ -38,7 +38,7 @@ const pageContent = (alias: string) => html`
     </div>
     <p>Verify that this is your device:</p>
     <label>Alias</label>
-    <div class="highlightBox">${alias}</div>
+    <div class="c-card c-card--narrow c-card--outline t-vip">${alias}</div>
     <label>Device Verification Code</label>
     <div id="wrongCodeMessage" class="error-message-hidden">
       The entered verification code was invalid. Please try again.

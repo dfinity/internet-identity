@@ -29,97 +29,11 @@ const pageContent = (
   hostName: string,
   userNumber?: bigint,
   derivationOrigin?: string
-) => html` <style>
-    .anchorText {
-      font-size: 1.5rem;
-    }
-
-    #userNumberInput {
-      margin: 0;
-      text-align: center;
-      width: 100%;
-      box-sizing: border-box;
-      padding: 0.5rem 2rem;
-    }
-
-    #userNumberInput:focus {
-      box-sizing: border-box;
-      border-style: double;
-      border-width: 2px;
-      border-radius: 4px;
-      border-image-slice: 1;
-      outline: none;
-      border-image-source: linear-gradient(
-        270.05deg,
-        #29abe2 10.78%,
-        #522785 22.2%,
-        #ed1e79 42.46%,
-        #f15a24 59.41%,
-        #fbb03b 77.09%
-      );
-    }
-
-    .childContainer {
-      position: relative;
-      margin-bottom: 0.5rem;
-    }
-
-    #editAnchorButton {
-      display: flex;
-      flex-direction: column;
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      right: 0;
-      padding: 0.3rem;
-      margin: 0;
-      width: 2rem;
-      background: transparent;
-      border: none;
-    }
-
-    #registerButton {
-      margin: 0.5rem 0 1rem 0;
-    }
-
-    .hostName {
-      padding: 1rem 0;
-      font-size: 0.8rem;
-      font-weight: 400;
-    }
-
-    .buttonContainer {
-      margin: 0.5rem 0;
-    }
-
-    button.primary {
-      margin-top: 1rem;
-    }
-
-    hr {
-      border: none;
-      border-top-color: var(--grey-050);
-      border-top-style: solid;
-      margin: 0.5rem 0;
-    }
-
-    .anchor-error-message .error-message {
-      margin-bottom: 1rem;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .host-name {
-      padding: 1rem 0.5rem;
-    }
-  </style>
-  <div class="l-container c-card c-card--highlight">
+) => html` <div class="l-container c-card c-card--highlight">
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>
-    <div class="host-name highlightBox hostName">${hostName}</div>
+    <div class="c-card c-card--narrow c-card--outline t-vip">${hostName}</div>
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
@@ -169,7 +83,9 @@ const pageContent = (
 const derivationOriginSection = (derivationOrigin: string) => html` <p>
     This service is an alias of:
   </p>
-  <div class="host-name highlightBox hostName">${derivationOrigin}</div>`;
+  <div class="c-card c-card--narrow c-card--outline t-vip">
+    ${derivationOrigin}
+  </div>`;
 
 export interface AuthSuccess {
   userNumber: bigint;
@@ -271,7 +187,7 @@ const init = (
 
   // only use non-edit mode if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
-    userNumberInput.classList.add("highlightBox");
+    userNumberInput.classList.add("t-vip");
     registerSection.classList.add("hidden");
     userNumberInput.disabled = true;
     authorizeButton.focus();
@@ -282,7 +198,7 @@ const init = (
   editAnchorButton.onclick = () => {
     editAnchorButton.classList.add("hidden");
     registerSection.classList.remove("hidden");
-    userNumberInput.classList.remove("highlightBox");
+    userNumberInput.classList.remove("t-vip");
     userNumberInput.disabled = false;
     userNumberInput.select();
   };
