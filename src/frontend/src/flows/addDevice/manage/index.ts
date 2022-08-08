@@ -6,87 +6,54 @@ import {
 } from "../../../components/icons";
 
 const pageContent = () => html`
-  <style>
-    .flowChoiceContainer {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    .flowOption {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: center;
-      border: 1px solid gray;
-      border-radius: 4px;
-      width: 100%;
-      padding: 1rem;
-      font-family: "Montserrat", sans-serif;
-      font-size: 1.2rem;
-      margin-bottom: 2rem;
-    }
-    .flowOption:hover,
-    .flowOption:focus {
-      outline: none;
-      box-shadow: none;
-    }
-    .flowIcon {
-      height: 52px;
-    }
-    .flowOptionTitle {
-      font-weight: 500;
-      margin: 0.5rem;
-    }
-    .flowOptionDescription {
-      text-align: center;
-      font-size: 1rem;
-    }
-  </style>
   <article class="l-container c-card c-card--highlight">
-    <h1>Add New Device</h1>
-    <aside class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <h2 class="warnTitle">Security Warning</h2>
-        <div class="warnMessage">
+    <h1 class="t-title">Add New Device</h1>
+    <aside class="c-card c-card--warning c-card--icon">
+      <div class="c-card__icon">${warningIcon}</div>
+      <div class="c-card__content">
+        <h2 class="t-title">Security Warning</h2>
+        <p class="t-paragraph">
           You are in the process of adding a new device. Any device added here
-          will have <strong>full control over your identity</strong>. Only
+          will have <strong class="t-strong">full control over your identity</strong>. Only
           continue the process if you want to add a new device that you
           <em>personally own</em>.
-        </div>
+        </p>
       </div>
     </aside>
-    <aside class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <h2 class="warnTitle">Security Warning</h2>
-        <div class="warnMessage">
+    <aside class="c-card c-card--warning c-card--icon">
+      <div class="c-card__icon">${warningIcon}</div>
+      <div class="c-card__content">
+        <h2 class="t-title">Security Warning</h2>
+        <p class="t-paragraph">
           Do not continue if you were prompted to do this by any website other
-          than <strong>https://identity.ic0.app</strong>!
-        </div>
+          than <strong class="t-strong">https://identity.ic0.app</strong>!
+        </p>
       </div>
     </aside>
-    <p>
+    <p class="t-paragraph">
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?
     </p>
-    <div class="flowChoiceContainer">
-      <button class="flowOption" id="local">
+    <div class="l-horizontal l-section">
+      <button class="c-button c-button--secondary" id="local">
         <span class="flowIcon">${securityKeyIcon}</span>
-        <div class="flowOptionTitle">Local Device</div>
-        <div class="flowOptionDescription">
+        <div class="t-strong">Local Device</div>
+        <div class="t-weak">
           Add a new device available on <em>this machine</em>.
         </div>
       </button>
-      <button class="flowOption" id="remote">
+      <button class="c-button c-button--secondary" id="remote">
         <span class="flowIcon">${networkIcon}</span>
-        <div class="flowOptionTitle">Remote Device</div>
-        <div class="flowOptionDescription">
+        <div class="t-strong">Remote Device</div>
+        <div class="t-weak">
           Add a new device available on <em>another machine</em>.
         </div>
       </button>
     </div>
-    <button id="cancelAddDevice" class="linkStyle">Cancel</button>
+    <div class="l-section">
+      <button id="cancelAddDevice" class="c-button">Cancel</button>
+    </div>
+    
   </article>
 `;
 

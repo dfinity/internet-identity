@@ -2,26 +2,26 @@ import { html, render } from "lit-html";
 import { warningIcon } from "../components/icons";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--highlight">
     <h1>Congratulations!</h1>
     <p>Your new Identity Anchor has been created.</p>
-    <div class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <div class="warnTitle">Record Your Identity Anchor</div>
-        <div class="warnMessage">
+    <div class="c-card c-card--warning c-card--icon">
+      <div class="c-card__icon">${warningIcon}</div>
+      <div class="c-card__content">
+        <div class="t-title">Record Your Identity Anchor</div>
+        <p class="t-paragraph">
           Please record your new Identity Anchor. Keep a backup on a storage
           medium and write it down. You will need it later to use Internet
           Identity or to add additional devices. If you lose your Identity
           Anchor, you will no longer be able to use this identity to
           authenticate to dApps.
-        </div>
+        </p>
       </div>
     </div>
-    <label>Identity Anchor:</label>
-    <div class="highlightBox">${userNumber}</div>
-    <button id="displayUserContinue" class="primary">Continue</button>
-  </div>
+    <h2 class="t-title">Identity Anchor</h2>
+    <data class="c-card c-card--narrow c-card--outline t-vip">${userNumber}</data>
+    <button id="displayUserContinue" class="c-button">Continue</button>
+  </article>
 `;
 
 export const displayUserNumber = async (userNumber: bigint): Promise<void> => {

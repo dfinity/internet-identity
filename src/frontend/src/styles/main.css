@@ -307,6 +307,10 @@ body {
   margin-top: 1em;
 }
 
+.t-title:first-child {
+  margin-top: 0;
+}
+
 .t-title--complications {
   display: flex;
   align-items: center;
@@ -335,6 +339,14 @@ body {
 
 .t-title + .t-lead {
   margin-top: 0.75em;
+}
+
+.t-paragraph {
+  margin-top: 1em;
+}
+
+.t-paragraph:first-child {
+  margin-top: 0;
 }
 
 .t-vip {
@@ -490,6 +502,28 @@ a:hover,
   );
   filter: blur(8rem);
 }
+
+.c-card--icon {
+  padding-left: calc(var(--rs-card-bezel) * 2 + 2rem);
+}
+
+.c-card__icon {
+  position: absolute;
+  left: var(--rs-card-bezel);
+  top: var(--rs-card-bezel);
+}
+
+.c-card--warning {
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
+  border-radius: 4px;
+  border-image-slice: 1;
+  border-image-source: linear-gradient(
+    270deg,
+    var(--rg-brand)
+  )
+}
+
 
 /**
  *  logo component 

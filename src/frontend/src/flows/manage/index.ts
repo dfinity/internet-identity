@@ -84,7 +84,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
       <div id="deviceList" class="c-action-list"></div>
     </aside>
 
-    <aside>
+    <aside class="l-section">
       ${!hasRecoveryDevice(devices)
         ? undefined
         : html`
