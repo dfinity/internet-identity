@@ -291,6 +291,14 @@ body {
  * Use classes when possible. 
  */
 
+.t-strong {
+  font-weight: bold;
+}
+
+.t-weak {
+  font-weight: normal;
+  font-size: 0.8em;
+}
 
 .t-title {
   font-weight: bold;
@@ -429,6 +437,11 @@ a:hover,
   margin-top: calc(var(--vs-stack) * 3);
 }
 
+.l-horizontal {
+  display: flex;
+  gap: var(--vs-inline);
+}
+
 /**
  * Title with counter and Actions 
  */
@@ -525,6 +538,12 @@ a:hover,
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+.c-button[disabled],
+.c-button--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .c-input {
