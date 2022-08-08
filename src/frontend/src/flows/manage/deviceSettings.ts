@@ -19,7 +19,7 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean
 ) => html`
-  <article id="deviceSettings" class="l-container c-card">
+  <article id="deviceSettings" class="l-container c-card c-card--highlight">
     <h1 style="margin: 0 0 1.5rem">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>

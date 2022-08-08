@@ -10,7 +10,7 @@ import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     <div class="c-logo">${icLogo}</div>
     <hgroup>
       <h1 class="t-title t-title--main">Welcome back!</h1>

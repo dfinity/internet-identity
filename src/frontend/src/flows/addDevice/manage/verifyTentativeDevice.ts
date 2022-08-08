@@ -10,7 +10,7 @@ import { setupCountdown } from "../../../utils/countdown";
 import { warningIcon } from "../../../components/icons";
 
 const pageContent = (alias: string) => html`
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     <h1>Verify New Device</h1>
     <div class="warnBox">
       <div class="warnIcon">${warningIcon}</div>

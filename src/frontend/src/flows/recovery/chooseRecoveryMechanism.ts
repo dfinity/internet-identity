@@ -50,7 +50,7 @@ const pageContent = (devices: DeviceData[]) => html`
       font-size: 1rem;
     }
   </style>
-  <article class="l-container c-card">
+  <article class="l-container c-card c-card--highlight">
     <h1>Recovery Mechanism</h1>
     <p>
       You can use a recovery mechanism to recover your anchor if your other

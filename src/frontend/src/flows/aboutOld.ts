@@ -3,7 +3,7 @@ import { compatibilityChart } from "../components/compatibilityChart";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = html`
-  <div class="l-container c-card" id="about">
+  <div class="l-container c-card c-card--highlight" id="about">
     <h1>About Internet Identity</h1>
     <p>
       Internet Identity is the identity provider for the Internet Computer: A

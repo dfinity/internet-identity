@@ -90,7 +90,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
     }
 
   </style>
-  <div class="l-container c-card full-width">
+  <div class="l-container c-card  c-card--highlight full-width">
     <h1>Your seed phrase</h1>
     <p>${
       message !== undefined ? message : "Please provide your seed phrase"

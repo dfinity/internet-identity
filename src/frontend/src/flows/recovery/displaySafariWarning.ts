@@ -24,7 +24,7 @@ const pageContent = () => html`
       margin-bottom: 1rem;
     }
   </style>
-  <div id="warningContainer" class="l-container c-card">
+  <div id="warningContainer" class="l-container c-car c-card--highlightd">
     ${warningIcon}
     <h1 id="warningHeading">Warning</h1>
     <p>It looks like you are using Safari or iOS.</p>

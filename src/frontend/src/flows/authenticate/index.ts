@@ -115,7 +115,7 @@ const pageContent = (
       padding: 1rem 0.5rem;
     }
   </style>
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>

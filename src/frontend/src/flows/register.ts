@@ -15,7 +15,7 @@ import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 
 const pageContent = html`
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please provide a name for your device.</p>

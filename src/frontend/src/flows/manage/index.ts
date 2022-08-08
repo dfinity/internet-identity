@@ -42,7 +42,7 @@ const numAuthenticators = (devices: DeviceData[]) =>
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
-  <section class="l-container c-card">
+  <section class="l-container c-card c-card--highlight">
     <hgroup>
       <h1 class="t-title t-title--main">Anchor Management</h1>
       <p class="t-lead">
@@ -56,55 +56,61 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     </aside>
 
     <aside class="l-section">
-      <div class="labelWithAction">
-        <div class="labelAddedDevices">
-          <h2 class="label addedDevices">Added devices</h2>
-          <span class="addedDevicesCounter"
-            ><span class="tooltip"
-              >You can register up to ${MAX_AUTHENTICATORS} authenticator
-              devices (recovery devices excluded)</span
-            >(${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})</span
-          >
-        </div>
+      <div class="t-title t-title--complications">
+        <h2>Added devices</h2>
+        <span class="t-title__complication c-tooltip">
+          <span class="c-tooltip__message c-card c-card--narrow">
+            You can register up to ${MAX_AUTHENTICATORS} authenticator
+            devices (recovery devices excluded)</span>
+            (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})
+          </span>
+        </span>
         <button
           ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-          class="labelAction"
+          class="t-title__complication t-title__complication--end c-tooltip"
           id="addAdditionalDevice"
         >
-          <span class="tooltip"
+          <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
             >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
             Remove a device before you can add a new one.</span
           >
-          <span class="labelActionText">ADD NEW DEVICE</span>
+          <span class="t-link t-link--discreet">
+            <i class="t-link__icon" aria-hidden>+</i>
+            Add new device
+          </span>
         </button>
       </div>
-      <div id="deviceList"></div>
+
+      <div id="deviceList" class="c-action-list"></div>
     </aside>
+
     <aside>
       ${!hasRecoveryDevice(devices)
         ? undefined
         : html`
-            <div class="labelWithAction">
-              <h2 class="label">Recovery mechanisms</h2>
-              <button class="labelAction" id="addRecovery">
-                <span class="labelActionText">ADD RECOVERY MECHANISM</span>
+            <div class="t-title t-title--complications">
+              <h2>Recovery mechanisms</h2>
+              <button class="t-title__complication t-title__complication--end" id="addRecovery">
+                <i class="t-link__icon" aria-hidden>+</i>
+                <span class="t-link t-link--discreet">Add recovery mechanism</span>
               </button>
             </div>
-            <div id="recoveryList"></div>
+            <div id="recoveryList" class="c-action-list"></div>
           `}
     </aside>
+    
     ${logoutSection()} ${navbar}
   </section>
   ${footer}
 `;
 
 const deviceListItem = (device: DeviceData) => html`
-  <div class="deviceItemAlias">${device.alias}</div>
+  <div class="c-action-list__label">${device.alias}</div>
   <button
     type="button"
     aria-label="settings"
     data-action="settings"
-    class="deviceItemAction"
+    class="c-action-list__action"
   >
     ${settingsIcon}
   </button>
@@ -204,7 +210,7 @@ const renderDevices = async (
 
   devices.forEach((device) => {
     const identityElement = document.createElement("li");
-    identityElement.className = "deviceItem";
+    identityElement.className = "c-action-list__item";
 
     render(deviceListItem(device), identityElement);
     const buttonSettings = identityElement.querySelector(

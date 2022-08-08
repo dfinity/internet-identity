@@ -14,7 +14,7 @@ import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 
 const pageContent = () => html`
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     <h1>New Device</h1>
     <p>Please provide an alias for this device.</p>
     <div id="invalidAliasMessage" class="error-message-hidden">

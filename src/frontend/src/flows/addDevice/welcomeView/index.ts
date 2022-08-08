@@ -4,7 +4,7 @@ import { registerTentativeDevice } from "./registerTentativeDevice";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 
 const pageContent = (userNumber: bigint | null) => html`
-  <div class="l-container c-card">
+  <div class="l-container c-card c-card--highlight">
     <h1>New Device</h1>
     <p>
       Please provide the Identity Anchor to which you want to add your device.

@@ -42,7 +42,7 @@ const pageContent = () => html`
       font-size: 1rem;
     }
   </style>
-  <article class="l-container c-card">
+  <article class="l-container c-card c-card--highlight">
     <h1>Add New Device</h1>
     <aside class="warnBox">
       <div class="warnIcon">${warningIcon}</div>

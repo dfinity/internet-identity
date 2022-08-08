@@ -24,7 +24,7 @@ const pageContent = () => html`
       margin-bottom: 1rem;
     }
   </style>
-  <article id="warningContainer" class="l-container c-card">
+  <article id="warningContainer" class="l-container c-card c-card--highlight">
     <div aria-hidden>${warningIcon}</div>
     <h1 id="warningHeading">Warning</h1>
     <p>

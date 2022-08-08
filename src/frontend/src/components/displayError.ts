@@ -28,7 +28,7 @@ const pageContent = (options: ErrorOptions) => html`
       margin-bottom: 1.5rem;
     }
   </style>
-  <div id="errorContainer" class="l-container c-card">
+  <div id="errorContainer" class="l-container c-card c-card--highlight">
     ${warningIcon}
     <h1>${options.title}</h1>
     <p class="displayErrorMessage">${options.message}</p>

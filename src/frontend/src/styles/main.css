@@ -430,7 +430,7 @@ a:hover,
 }
 
 /**
- * Title with counter and Actions
+ * Title with counter and Actions 
  */
 
 /**
@@ -593,16 +593,16 @@ a:hover,
 .c-tooltip__message {
   position: absolute;
   left: 0;
-
+  
   opacity: 0;
   visibility: hidden;
   z-index: 2;
   text-align: left;
   min-width: 15rem;
-  max-width: 20rem;
-
-  /**
-    this is the width of the tooltip
+  max-width: 20rem; 
+  
+  /** 
+    this is the width of the tooltip 
     we might add this to the card component later
   **/
 }
