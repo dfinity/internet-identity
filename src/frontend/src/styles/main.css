@@ -89,6 +89,12 @@
   --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
   --vs-line: 1px; /* 5 */
 
+  /* value tokens: z-index (--vz => valueZindex */
+
+  --vz-backdrop: -1;
+  --vz-tooltip: 10;
+  --vz-modal: 20;
+
   /*
    * reference tokens
    * 
@@ -487,7 +493,7 @@ a:hover,
   /* colored blob in the background */
   content: " ";
   position: absolute;
-  z-index: -1;
+  z-index: var(--vz-backdrop);
   top: 50%;
   left: 50%;
   width: 120%;
@@ -645,7 +651,7 @@ a:hover,
 
   opacity: 0;
   visibility: hidden;
-  z-index: 2;
+  z-index: var(--vz-tooltip);
   text-align: left;
   min-width: 15rem;
   max-width: 20rem;
