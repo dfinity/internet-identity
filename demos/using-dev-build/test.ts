@@ -61,10 +61,11 @@ function parseReplicaHost(): string {
   const DFX_JSON_PATH = `${__dirname}/dfx.json`;
   try {
     const dfx_json = JSON.parse(fs.readFileSync(DFX_JSON_PATH, "utf8"));
-    const replicaHost = dfx_json.networks.local.bind;
+    let replicaHost = dfx_json.networks.local.bind;
     if (!replicaHost.startsWith("http://")) {
-      return `http://${replicaHost}`;
+      replicaHost = `http://${replicaHost}`;
     }
+    return replicaHost;
   } catch (e) {
     console.log(`Could not read replica host from ${DFX_JSON_PATH}`);
     throw e;
