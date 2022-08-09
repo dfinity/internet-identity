@@ -116,6 +116,7 @@
   --rc-background-transparent: var(--rc-light-transparent);
 
   --rc-line: var(--rc-light);
+  --rc-line: var(--vc-silver);
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
@@ -484,13 +485,15 @@ a:hover,
   border: var(--vs-line) var(--rc-line-inverted) solid;
 }
 
+/*
+ * Highlighted card will be deployed later
+ *
 .c-card--highlight {
   background-color: var(--rc-background-transparent);
   border: var(--vs-line) solid var(--rc-line);
 }
 
 .c-card--highlight::before {
-  /* colored blob in the background */
   content: " ";
   position: absolute;
   z-index: var(--vz-backdrop);
@@ -503,6 +506,7 @@ a:hover,
   background: linear-gradient(145deg, var(--rg-brand));
   filter: blur(8rem);
 }
+*/
 
 .c-card--icon {
   padding-left: calc(var(--rs-card-bezel) * 2 + 2rem);
@@ -670,7 +674,7 @@ a:hover,
 .c-action-list {
   margin-top: 1rem;
 }
-<<<<<<< HEAD .c-action-list__item {
+.c-action-list__item {
   display: flex;
   gap: var(--vs-gutter);
 }
