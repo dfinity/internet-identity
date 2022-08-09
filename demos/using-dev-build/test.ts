@@ -21,11 +21,11 @@ type Arguments = { noRun: boolean };
 /** Parse CLI arguments
  */
 function parseArguments(): Arguments {
-  if (!(process.argv.length == 2 || process.argv.length == 3)) {
+  if (![2, 3].includes(process.argv.length)) {
     throw new Error("Usage: test.ts [--no-run]");
   }
 
-  if (process.argv.length == 3) {
+  if (process.argv.length === 3) {
     if (process.argv[2] !== "--no-run") {
       throw new Error("Usage: test.ts [--no-run]");
     }
@@ -92,7 +92,6 @@ function spawnProxy(
 }
 
 function main() {
-
   // Read values and spawn proxy
   const canisterIds = parseCanisterIDs();
   console.log(
@@ -106,10 +105,8 @@ function main() {
 
   const runTests = !parseArguments().noRun;
 
-
   let testsStarted = false;
   let proxyOutput = "";
-
 
   proxy.stdout.on("data", (data) => {
     console.log(`proxy: ${data}`);
