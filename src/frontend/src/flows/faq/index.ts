@@ -310,7 +310,9 @@ const pageContent = html`
       animation-duration: 3000ms;
     }
   </style>
-  <div class="faq__container l-container l-container--wide c-card c-card--highlight">
+  <div
+    class="faq__container l-container l-container--wide c-card c-card--highlight"
+  >
     <h1 class="faq__title t-title t-title--main">FAQ</h1>
     <ul class="faq__questions c-list l-section">
       ${questionsArray.map((faq) => renderQuestion(faq))}

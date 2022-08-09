@@ -23,11 +23,24 @@ const pageContent = html`
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" />
       <input id="captchaInput" class="c-input" />
-      <p class="t-paragraph confirm-paragraph">Please confirm to add your device.</p>
-      <button type="submit" class="c-button" id="confirmRegisterButton" disabled>
+      <p class="t-paragraph confirm-paragraph">
+        Please confirm to add your device.
+      </p>
+      <button
+        type="submit"
+        class="c-button"
+        id="confirmRegisterButton"
+        disabled
+      >
         Confirm
       </button>
-      <button type="button" id="cancelButton" class="c-button c-button--secondary">Cancel</button>
+      <button
+        type="button"
+        id="cancelButton"
+        class="c-button c-button--secondary"
+      >
+        Cancel
+      </button>
     </form>
   </div>
 `;

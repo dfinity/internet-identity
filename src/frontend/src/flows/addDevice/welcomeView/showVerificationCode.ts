@@ -18,24 +18,26 @@ const pageContent = (
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
   <div class="l-container c-card c-card--highlight">
-    <h1>Device Verification Required</h1>
-    <p>
-      This device was added tentatively to the Identity Anchor
-      <strong>${userNumber}</strong>. Log in on an existing device and verify
-      this device using the verification code below. After successful
-      verification this page will automatically refresh.
-    </p>
-    <label>Alias</label>
-    <div class="c-card c-card--narrow c-card--outline t-vip">${alias}</div>
-    <label>Device Verification Code</label>
-    <div
+    <hgroup>  
+      <h1 class="t-title t-title--main">Device Verification Required</h1>
+      <p class="t-lead">
+        This device was added tentatively to the Identity Anchor
+        <strong>${userNumber}</strong>. Log in on an existing device and verify
+        this device using the verification code below. After successful
+        verification this page will automatically refresh.
+      </p>
+    </hgroup>
+    <h2 class="t-title">Alias</h2>
+    <data class="c-input c-input--readonly t-vip">${alias}</data>
+    <h2 class="t-title">Device Verification Code</hs>
+    <data
       id="verificationCode"
-      class="c-card c-card--narrow c-card--outline t-vip"
+      class="c-input c-input--readonly t-vip"
     >
       ${tentativeRegistrationInfo.verification_code}
-    </div>
+    </data>
     <p>Time remaining: <span id="timer"></span></p>
-    <button id="showCodeCancel">Cancel</button>
+    <button id="showCodeCancel" class="button button--secondary">Cancel</button>
   </div>
 `;
 

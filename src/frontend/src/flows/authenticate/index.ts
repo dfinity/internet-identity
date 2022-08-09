@@ -33,7 +33,7 @@ const pageContent = (
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>
-    <div class="c-card c-card--narrow c-card--outline t-vip">${hostName}</div>
+    <div class="c-input c-input--readonly t-vip">${hostName}</div>
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
@@ -56,7 +56,7 @@ const pageContent = (
       The Identity Anchor is not valid. Please try again.
     </div>
 
-    <button type="button" id="authorizeButton" class="primary">
+    <button type="button" id="authorizeButton" class="c-button">
       Start Session
     </button>
     <div id="registerSection">
@@ -80,12 +80,12 @@ const pageContent = (
   </div>
   ${footer}`;
 
-const derivationOriginSection = (derivationOrigin: string) => html` <p>
+const derivationOriginSection = (derivationOrigin: string) => html` <p
+    class="t-paragraph"
+  >
     This service is an alias of:
   </p>
-  <div class="c-card c-card--narrow c-card--outline t-vip">
-    ${derivationOrigin}
-  </div>`;
+  <data class="c-input c-input--readonly t-vip"> ${derivationOrigin} </data>`;
 
 export interface AuthSuccess {
   userNumber: bigint;

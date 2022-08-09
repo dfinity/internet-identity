@@ -16,8 +16,8 @@ const pageContent = (userNumber: bigint) => html`
       <h1 class="t-title t-title--main">Add New Remote Device</h1>
       <p class="t-lead">
         Device registration mode enabled for Identity Anchor
-        <strong>${userNumber}</strong>. Please follow these steps to add your new
-        device:
+        <strong>${userNumber}</strong>. Please follow these steps to add your
+        new device:
       </p>
     </hgroup>
     <ol class="c-list c-list--bulleted">
@@ -28,7 +28,9 @@ const pageContent = (userNumber: bigint) => html`
       <li>
         On your <em>new</em> device:<br />
         Chose
-        <strong class="t-strong">Already have an anchor but using a new device?</strong>
+        <strong class="t-strong"
+          >Already have an anchor but using a new device?</strong
+        >
       </li>
       <li>
         On your <em>new</em> device:<br />
@@ -44,7 +46,9 @@ const pageContent = (userNumber: bigint) => html`
       This page will automatically refresh after completing the above steps.
     </p>
     <p class="t-paragraph">Time remaining: <span id="timer"></span></p>
-    <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">Cancel</button>
+    <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">
+      Cancel
+    </button>
   </div>
 `;
 

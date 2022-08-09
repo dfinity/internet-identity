@@ -19,10 +19,16 @@ const pageContent = html`
     <h1 class="t-title t-title--main">Create a new Internet Identity Anchor</h1>
     <p class="t-lead">Please provide a name for your device.</p>
     <form id="registerForm" class="l-section">
-      <input id="registerAlias" placeholder="Device name" class="c-input"/>
+      <input id="registerAlias" placeholder="Device name" class="c-input" />
       <div class="l-section">
         <button type="submit" class="c-button">Create</button>
-        <button id="registerCancel" type="button" class="c-button c-button--secondary">Cancel</button>
+        <button
+          id="registerCancel"
+          type="button"
+          class="c-button c-button--secondary"
+        >
+          Cancel
+        </button>
       </div>
     </form>
   </div>
@@ -32,7 +38,9 @@ const constructingContent = html`
   <div class="l-container c-card  c-card--highlight">
     <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
     ${icLogo}
-    <p class="t-paragraph">This may take a while. Please wait and do not refresh the page.</p>
+    <p class="t-paragraph">
+      This may take a while. Please wait and do not refresh the page.
+    </p>
   </div>
 `;
 
