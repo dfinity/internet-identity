@@ -421,6 +421,11 @@ a:hover,
   margin: 0 auto;
 }
 
+.l-container--wide {
+
+  max-width: 60rem;
+}
+
 @media (max-width: 512px) {
   #pageContent,
  .l-wrap {
