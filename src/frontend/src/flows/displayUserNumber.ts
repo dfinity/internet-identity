@@ -22,7 +22,11 @@ const pageContent = (userNumber: bigint) => html`
     </div>
     <div class="l-section">
       <h2 class="t-title">Identity Anchor</h2>
-      <data class="c-input c-input--readonly t-vip" data-usernumber="${userNumber}">${userNumber}</data>
+      <data
+        class="c-input c-input--readonly t-vip"
+        data-usernumber="${userNumber}"
+        >${userNumber}</data
+      >
       <button id="displayUserContinue" class="c-button">Continue</button>
     </div>
   </article>
