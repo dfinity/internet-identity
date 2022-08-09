@@ -10,47 +10,17 @@ import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
-const pageContent = () => html` <style>
-    #registerUserNumber:focus {
-      border-style: double;
-      border-width: 2px;
-      border-radius: 4px;
-      border-image-slice: 1;
-      outline: none;
-      border-image-source: linear-gradient(
-        270.05deg,
-        #29abe2 10.78%,
-        #522785 22.2%,
-        #ed1e79 42.46%,
-        #f15a24 59.41%,
-        #fbb03b 77.09%
-      );
-    }
-
-    #registerSection {
-      margin-top: 4rem;
-    }
-
-    .list-reset li {
-      list-style: none;
-    }
-    .input {
-      box-sizing: border-box;
-    }
-    .input--fullwidth {
-      width: 100%;
-    }
-  </style>
+const pageContent = () => html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
     <div class="c-logo">${icLogo}</div>
-    <article>
+    <article class="l-section">
       <hgroup>
         <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
         <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
       <hgroup>
       <input
         type="text"
-        class="c-input"
+        class="c-input c-input--vip"
         id="registerUserNumber"
         placeholder="Enter Identity Anchor"
       />
@@ -59,7 +29,7 @@ const pageContent = () => html` <style>
       </button>
     </article>
 
-    <aside class="l-section" aria-label="Other actions">
+    <aside class="l-section l-section--spacious" aria-label="Other actions">
       <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?

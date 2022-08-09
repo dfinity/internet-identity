@@ -3,8 +3,10 @@ import { warningIcon } from "../components/icons";
 
 const pageContent = (userNumber: bigint) => html`
   <article class="l-container c-card c-card--highlight">
-    <h1>Congratulations!</h1>
-    <p>Your new Identity Anchor has been created.</p>
+    <hgroup>
+      <h1 class="t-title t-title--main">Congratulations!</h1>
+      <p class="t-lead">Your new Identity Anchor has been created.</p>
+    </hgroup>
     <div class="c-card c-card--warning c-card--icon">
       <div class="c-card__icon">${warningIcon}</div>
       <div class="c-card__content">
@@ -18,11 +20,13 @@ const pageContent = (userNumber: bigint) => html`
         </p>
       </div>
     </div>
-    <h2 class="t-title">Identity Anchor</h2>
-    <data class="c-card c-card--narrow c-card--outline t-vip"
-      >${userNumber}</data
-    >
-    <button id="displayUserContinue" class="c-button">Continue</button>
+    <div class="l-section">
+      <h2 class="t-title">Identity Anchor</h2>
+      <data class="c-card c-card--narrow c-card--outline t-vip"
+        >${userNumber}</data
+      >
+      <button id="displayUserContinue" class="c-button">Continue</button>
+    </div>
   </article>
 `;
 

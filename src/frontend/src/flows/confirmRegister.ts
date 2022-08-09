@@ -22,7 +22,7 @@ const pageContent = html`
     <form id="confirmForm">
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" />
-      <input id="captchaInput" />
+      <input id="captchaInput" class="c-input" />
       <p class="t-paragraph confirm-paragraph">Please confirm to add your device.</p>
       <button type="submit" class="c-button" id="confirmRegisterButton" disabled>
         Confirm

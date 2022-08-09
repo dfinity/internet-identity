@@ -20,7 +20,7 @@ const pageContent = (userNumber: bigint) => html`
         device:
       </p>
     </hgroup>
-    <ol class="t-list">
+    <ol class="c-list c-list--bulleted">
       <li>
         On your <em>new</em> device:<br />
         Open <strong class="t-strong">https://identity.ic0.app</strong>
