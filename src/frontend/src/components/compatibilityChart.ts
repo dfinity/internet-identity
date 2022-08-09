@@ -19,11 +19,11 @@ export const compatibilityData = {
 };
 
 export const compatibilityChart = html`<p>${compatibilityData.note}</p>
-  <h3>For Desktop</h3>
+  <h3 class="compatibilityChart_type">For Desktop</h3>
   <ul>
     ${compatibilityData.desktop.map((browser) => html`<li>${browser}</li>`)}
   </ul>
-  <h3>For Mobile</h3>
+  <h3 class="compatibilityChart_type">For Mobile</h3>
   <ul>
     ${compatibilityData.mobile.map((browser) => html`<li>${browser}</li>`)}
   </ul>`;
