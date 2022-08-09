@@ -421,6 +421,16 @@ a:hover,
   margin: 0 auto;
 }
 
+@media (max-width: 512px) {
+  #pageContent,
+ .l-wrap {
+    justify-content: flex-start;
+  } 
+  .l-container {
+    max-width: 100%;
+  }
+}
+
 .l-divider {
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
@@ -487,6 +497,13 @@ a:hover,
 
 .c-card--outline {
   border: var(--vs-line) var(--rc-line-inverted) solid;
+}
+
+
+@media (max-width: 512px) {
+  .c-card--highlight {
+    border: none;
+  }
 }
 
 /*
