@@ -20,7 +20,11 @@ const pageContent = (seedPhrase: string) => html`
     </aside>
 
     <h2 class="t-title">Your seed phrase</h2>
-    <data id="seedPhrase" translate="no" class="c-input c-input--readonly t-vip"
+    <data 
+      id="seedPhrase" 
+      data-seenPhrase="${seedPhrase}" 
+      translate="no" 
+      class="c-input c-input--readonly"
       >${seedPhrase}</data
     >
 

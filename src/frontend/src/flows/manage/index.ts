@@ -52,7 +52,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
     <aside class="l-section">
       <h2 class="t-title">Identity Anchor</h2>
-      <data class="c-input c-input--readonly t-vip" aria-label="User Number">${userNumber}</data>
+      <data class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber="${userNumber}">${userNumber}</data>
     </aside>
 
     <aside class="l-section">

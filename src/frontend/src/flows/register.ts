@@ -16,8 +16,10 @@ import { icLogo } from "../components/icons";
 
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
-    <h1 class="t-title t-title--main">Create a new Internet Identity Anchor</h1>
-    <p class="t-lead">Please provide a name for your device.</p>
+    <hgroup>
+      <h1 class="t-title t-title--main">Create a new Internet Identity Anchor</h1>
+      <p class="t-lead">Please provide a name for your device.</p>
+    </hgroup>
     <form id="registerForm" class="l-section">
       <input id="registerAlias" placeholder="Device name" class="c-input" />
       <div class="l-section">

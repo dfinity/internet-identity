@@ -16,7 +16,7 @@ const pageContent = (userNumber: bigint) => html`
       <h1 class="t-title t-title--main">Welcome back!</h1>
       <p class="t-lead">Authenticate using Internet Identity.</p>
     <hgroup>
-    <data class="c-input c-input--readonly t-vip" aria-label="User Number">${userNumber}</data>
+    <data class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber="${userNumber}">${userNumber}</data>
     <button type="button" id="login" class="c-button">Authenticate</button>
     <div class="l-divider l-divider--text" aria-label="Other Options">
       <span class="l-divider__label" aria-hidden>Or</span>

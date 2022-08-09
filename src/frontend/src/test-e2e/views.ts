@@ -73,7 +73,7 @@ export class RegisterView extends View {
   }
 
   async registerGetIdentity(): Promise<string> {
-    return await this.browser.$(".t-vip").getText();
+    return await this.browser.$("[data-usernumber]").getText();
   }
 
   async registerConfirmIdentity(): Promise<void> {
@@ -81,7 +81,7 @@ export class RegisterView extends View {
   }
 
   async registerIdentityFixup(): Promise<void> {
-    const elem = await this.browser.$(".t-vip");
+    const elem = await this.browser.$("[data-usernumber]");
     await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
@@ -185,7 +185,7 @@ export class MainView extends View {
   }
 
   async fixup(): Promise<void> {
-    const elem = await this.browser.$(".t-vip");
+    const elem = await this.browser.$("[data-usernumber]");
     await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
@@ -405,7 +405,7 @@ export class WelcomeBackView extends View {
   }
 
   async getIdentityAnchor(): Promise<string> {
-    return await this.browser.$(".t-vip").getText();
+    return await this.browser.$("[data-usernumber]").getText();
   }
 
   async login(): Promise<void> {
@@ -413,7 +413,7 @@ export class WelcomeBackView extends View {
   }
 
   async fixup(): Promise<void> {
-    const elem = await this.browser.$(".t-vip");
+    const elem = await this.browser.$("[data-usernumber]");
     await this.browser.execute(
       "arguments[0].innerText = arguments[1];",
       elem,
