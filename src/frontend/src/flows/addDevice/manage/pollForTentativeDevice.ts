@@ -11,38 +11,40 @@ import {
 import { displayError } from "../../../components/displayError";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="l-container c-card">
-    <h1>Add New Remote Device</h1>
-    <p>
-      Device registration mode enabled for Identity Anchor
-      <strong>${userNumber}</strong>. Please follow these steps to add your new
-      device:
-    </p>
-    <ol class="instruction-steps">
+  <div class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">Add New Remote Device</h1>
+      <p class="t-lead">
+        Device registration mode enabled for Identity Anchor
+        <strong>${userNumber}</strong>. Please follow these steps to add your new
+        device:
+      </p>
+    </hgroup>
+    <ol class="t-list">
       <li>
         On your <em>new</em> device:<br />
-        Open <strong>https://identity.ic0.app</strong>
+        Open <strong class="t-strong">https://identity.ic0.app</strong>
       </li>
       <li>
         On your <em>new</em> device:<br />
         Chose
-        <b>Already have an anchor but using a new device?</b>
+        <strong class="t-strong">Already have an anchor but using a new device?</strong>
       </li>
       <li>
         On your <em>new</em> device:<br />
         Enter your Identity Anchor
-        <strong>${userNumber}</strong>
+        <strong class="t-strong">${userNumber}</strong>
       </li>
       <li>
         On your <em>new</em> device:<br />
         Choose an alias for your new device
       </li>
     </ol>
-    <p>
+    <p class="t-paragraph">
       This page will automatically refresh after completing the above steps.
     </p>
-    <p>Time remaining: <span id="timer"></span></p>
-    <button id="cancelAddRemoteDevice" class="linkStyle">Cancel</button>
+    <p class="t-paragraph">Time remaining: <span id="timer"></span></p>
+    <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">Cancel</button>
   </div>
 `;
 

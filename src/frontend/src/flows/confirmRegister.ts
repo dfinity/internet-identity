@@ -18,16 +18,16 @@ import {
 
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
-    <h1>Confirm new device</h1>
+    <h1 class="t-title t-title--main">Confirm new device</h1>
     <form id="confirmForm">
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" />
       <input id="captchaInput" />
-      <p class="confirm-paragraph">Please confirm to add your device.</p>
-      <button type="submit" class="primary" id="confirmRegisterButton" disabled>
+      <p class="t-paragraph confirm-paragraph">Please confirm to add your device.</p>
+      <button type="submit" class="c-button" id="confirmRegisterButton" disabled>
         Confirm
       </button>
-      <button type="button" id="cancelButton">Cancel</button>
+      <button type="button" id="cancelButton" class="c-button c-button--secondary">Cancel</button>
     </form>
   </div>
 `;

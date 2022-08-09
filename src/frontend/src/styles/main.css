@@ -403,6 +403,15 @@ a:hover,
   width: 100%;
 }
 
+.t-list {
+  list-style-type: disc; 
+}
+
+.t-list li {
+  margin-top: var(--vs-stack);
+  margin-left: calc(var(--vs-inline) * 2);
+}
+
 #pageContent,
 .l-wrap {
   position: relative;
@@ -487,7 +496,7 @@ a:hover,
 
 /*
  * Highlighted card will be deployed later
- *
+ * 
 .c-card--highlight {
   background-color: var(--rc-background-transparent);
   border: var(--vs-line) solid var(--rc-line);

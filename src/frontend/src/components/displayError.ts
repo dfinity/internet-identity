@@ -14,15 +14,17 @@ const pageContent = (options: ErrorOptions) => html`
     class="l-container c-card c-card--highlight c-card--warning"
   >
     ${warningIcon}
-    <h1>${options.title}</h1>
-    <p class="displayErrorMessage">${options.message}</p>
+    <hgroup>
+      <h1 class="t-title t-title--primary">${options.title}</h1>
+      <p class="displayErrorMessage t-lead">${options.message}</p>
+    </hgroup>
     ${options.detail !== undefined
       ? html` <details class="displayErrorDetail">
           <summary>Error details</summary>
           <pre>${options.detail}</pre>
         </details>`
       : ""}
-    <button id="displayErrorPrimary" class="primary">
+    <button id="displayErrorPrimary" class="c-button c-button--primary">
       ${options.primaryButton}
     </button>
   </div>
