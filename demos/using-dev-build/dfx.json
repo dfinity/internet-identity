@@ -31,7 +31,7 @@
       "source": ["dist/"],
 
       "__6": "NOTE: the 'frontend' value is needed otherwise HTTP calls are not proxied; value can be anything though.",
-      "frontend": "foo"
+      "frontend": {}
     }
   },
   "defaults": {
