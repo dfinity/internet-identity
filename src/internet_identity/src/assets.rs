@@ -41,10 +41,11 @@ lazy_static! {
     // injected
     static ref INDEX_HTML_STR: String = {
         let index_html = include_str!("../../../dist/index.html");
+        let canister_id = api::id();
         let setup_js: String = INDEX_HTML_SETUP_JS.to_string();
         let index_html = index_html.replace(
             r#"<script id="setupJs"></script>"#,
-            &format!(r#"<script id="setupJs">{setup_js}</script>"#).to_string()
+            &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#).to_string()
         );
         index_html
     };

@@ -113,6 +113,8 @@ export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
 }
 
+// TODO: Split between "connection" and "authenticatedConnection" and make sure connection 
+// has canister ID baked in (read from readCanisterId() in index.ts)
 export class IIConnection {
   protected constructor(
     public identity: SignIdentity,

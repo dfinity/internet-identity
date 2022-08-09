@@ -9,6 +9,40 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
 import authorizeAuthentication from "./flows/authenticate";
+import { displayError } from "./components/displayError";
+
+const readCanisterId = (): string => {
+
+    const setupJs = document.querySelector("#setupJs") as HTMLElement;
+    if(setupJs === null) {
+
+        displayError({
+            title: "Canister ID not set",
+            message:
+                "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+            primaryButton: "Reload",
+        }).then(() => {
+            window.location.reload();
+        });
+        throw new Error("canisterId is undefined"); // abort further execution of this script
+    }
+
+    const canisterId = setupJs.dataset.canisterId;
+
+    if(canisterId === undefined) {
+        displayError({
+            title: "Canister ID not set",
+            message:
+                "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+            primaryButton: "Reload",
+        }).then(() => {
+            window.location.reload();
+        });
+        throw new Error("canisterId is undefined"); // abort further execution of this script
+    }
+
+    return canisterId;
+}
 
 const init = async () => {
   const url = new URL(document.URL);
