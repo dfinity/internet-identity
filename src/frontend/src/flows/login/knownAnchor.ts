@@ -27,7 +27,7 @@ const pageContent = (userNumber: bigint) => html` <style>
     <div class="spacer"></div>
     <div class="textLink">
       Lost access
-      <button id="recoverButton" class="linkStyle">and want to recover?</button>
+      <a id="recoverButton" class="linkStyle">and want to recover?</a>
     </div>
     ${logoutSection("Clear Identity Anchor from browser")} ${navbar}
   </div>
@@ -63,7 +63,7 @@ const init = async (userNumber: bigint): Promise<LoginFlowResult> => {
     };
     const recoverButton = document.getElementById(
       "recoverButton"
-    ) as HTMLButtonElement;
+    ) as HTMLAnchorElement;
     recoverButton.onclick = () => useRecovery(userNumber);
   });
 };

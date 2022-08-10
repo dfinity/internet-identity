@@ -79,7 +79,7 @@ const pageContent = () => html` <style>
         </li>
         <li class="textLink">
           Lost access
-          <a id="recoverLink" class="linkStyle"> and want to recover? </a>
+          <a id="recoverButton" class="linkStyle"> and want to recover? </a>
         </li>
       </ul>
     </aside>
@@ -119,10 +119,10 @@ const initRegister = (
 };
 
 const initRecovery = () => {
-  const recoverLink = document.getElementById(
-    "recoverLink"
+  const recoverButton = document.getElementById(
+    "recoverButton"
   ) as HTMLAnchorElement;
-  recoverLink.onclick = () => useRecovery();
+  recoverButton.onclick = () => useRecovery();
 };
 
 const initLogin = (resolve: (res: LoginFlowResult) => void) => {
