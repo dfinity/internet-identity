@@ -385,21 +385,21 @@ nav {
 .deviceItemAlias {
   border: 1px solid var(--grey-200);
   border-radius: 2px;
-  height: 40px;
   display: flex;
   align-items: center;
   flex: 1 1 100%;
   margin-right: 0.5rem;
   margin-bottom: 16px;
-  padding-left: 1rem;
+  padding: 0.5rem 1rem;
   overflow: auto;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .deviceItemAction {
   border-radius: 2px;
   padding: 0;
   width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
