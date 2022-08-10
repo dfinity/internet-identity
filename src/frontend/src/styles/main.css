@@ -555,12 +555,12 @@ nav {
   line-height: 1;
   text-align: center;
   letter-spacing: 0.025em;
-  margin: 1rem 0 7rem 0;
+  margin: 2rem 0 6rem 0;
 }
 
 @media only screen and (max-width: 512px) {
   .faq__title {
-    margin: 1rem 0 0 0;
+    margin: 2rem 0 0 0;
   }
 }
 
@@ -592,7 +592,7 @@ nav {
 
 .faq__container {
   background-color: rgba(243, 244, 246, 1);
-  max-width: 45rem;
+  max-width: 50rem;
   height: 100%;
 }
 
@@ -615,7 +615,7 @@ nav {
 
 .about__container {
   background-color: rgba(243, 244, 246, 1);
-  max-width: 42rem;
+  max-width: 50rem;
   height: 100%;
 }
 
@@ -637,12 +637,12 @@ nav {
   line-height: 1;
   text-align: center;
   letter-spacing: 0.025em;
-  margin: 1rem 0 7rem 0;
+  margin: 2rem 0 6rem 0;
 }
 
 @media only screen and (max-width: 512px) {
   .about__title {
-    margin: 1rem 0 0 0;
+    margin: 2rem 0 0 0;
   }
 }
 
@@ -706,14 +706,16 @@ nav {
 .about__compatibility-flexparent {
   display: flex;
   flex-flow: wrap;
-  justify-content: center;
+  justify-content: space-evenly;
   background-color: var(--rainbow-orange);
   border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 2rem 0;
 }
 
 .about__compatibility-flexchild {
   min-width: 1rem;
-  padding: 1rem;
+  margin-top: 1.5rem;
 }
 
 .warnBox {
