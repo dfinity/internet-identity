@@ -67,21 +67,19 @@ const pageContent = () => html` <style>
       <ul class="list-reset">
         <li class="textLink" id="registerSection">
           New?
-          <button id="registerButton" class="linkStyle">
+          <a id="registerButton" class="linkStyle">
             Create an Internet Identity Anchor.
-          </button>
+          </a>
         </li>
         <li class="textLink">
           Already have an anchor
-          <button id="addNewDeviceButton" class="linkStyle">
+          <a id="addNewDeviceButton" class="linkStyle">
             but using a new device?
-          </button>
+          </a>
         </li>
         <li class="textLink">
           Lost access
-          <button id="recoverButton" class="linkStyle">
-            and want to recover?
-          </button>
+          <a id="recoverButton" class="linkStyle"> and want to recover? </a>
         </li>
       </ul>
     </aside>
@@ -123,7 +121,7 @@ const initRegister = (
 const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
-  ) as HTMLButtonElement;
+  ) as HTMLAnchorElement;
   recoverButton.onclick = () => useRecovery();
 };
 
