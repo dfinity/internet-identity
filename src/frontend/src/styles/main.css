@@ -24,7 +24,10 @@ a,
 button {
   cursor: revert;
 }
-
+/* Reapply text-decoration underline for links */
+a {
+  text-decoration: revert;
+}
 /* Retain list styles (bullets/numbers) */
 /* This is to retain "FAQ page" and
     "Device Registration Not Enabled" page
