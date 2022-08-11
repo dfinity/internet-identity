@@ -1,3 +1,6 @@
+/**
+ * This module contains everything related to connecting to the canister.
+ */
 import {
   Actor,
   ActorSubclass,
@@ -173,7 +176,7 @@ export class Connection {
       return {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
-          this,
+          this.canisterId,
           identity,
           delegationIdentity,
           userNumber,
@@ -250,7 +253,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection: new AuthenticatedConnection(
-        this,
+        this.canisterId,
         // eslint-disable-next-line
         identity,
         delegationIdentity,
@@ -286,7 +289,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection: new AuthenticatedConnection(
-        this,
+        this.canisterId,
         identity,
         delegationIdentity,
         userNumber,
@@ -371,13 +374,13 @@ export class Connection {
 export class AuthenticatedConnection extends Connection {
   // TODO shouldn't be public
   public constructor(
-    public connection: Connection, // TODO: don't need this, only canisterId
+    public canisterId: string,
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {
-    super(connection.canisterId);
+    super(canisterId);
   }
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
@@ -392,7 +395,7 @@ export class AuthenticatedConnection extends Connection {
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await requestFEDelegation(this.identity);
-      this.actor = await this.connection.createActor(this.delegationIdentity);
+      this.actor = await this.createActor(this.delegationIdentity);
     }
 
     return this.actor;
