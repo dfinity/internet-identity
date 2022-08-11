@@ -67,18 +67,17 @@ const init = async () => {
   const userIntent = intentFromUrl(url);
 
   // TODO: proper error handling
-  const conn = new Connection(readCanisterId());
+  const connection = new Connection(readCanisterId());
 
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
       // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
-      const authSuccess = await authorizeAuthentication(conn);
+      const authSuccess = await authorizeAuthentication(connection);
       // show the recovery wizard before sending the window post message, otherwise the II window will be closed
       await recoveryWizard(
-        conn,
+        authSuccess.connection,
         authSuccess.userNumber,
-        authSuccess.connection
       );
       // send the delegation back to the dapp window (which will then close the II window)
       authSuccess.sendDelegationMessage();
@@ -87,12 +86,12 @@ const init = async () => {
     // Open the management page
     case "manage": {
       // Go through the login flow, potentially creating an anchor.
-      const { userNumber, connection } = await login(conn);
+      const { userNumber, connection } = await login(connection);
       // Here, if the user doesn't have any recovery device, we prompt them to add
       // one. The exact flow depends on the device they use.
-      await recoveryWizard(conn, userNumber, connection);
+      await recoveryWizard(connection, userNumber);
       // From here on, the user is authenticated to II.
-      return renderManage(conn, userNumber, connection);
+      return renderManage(connection, userNumber);
     }
   }
 };

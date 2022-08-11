@@ -8,7 +8,7 @@ import {
   setUserNumber,
 } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { IIConnection, Connection } from "../../utils/iiConnection";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,
@@ -183,7 +183,7 @@ const derivationOriginSection = (derivationOrigin: string) => html` <p>
 
 export interface AuthSuccess {
   userNumber: bigint;
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
   sendDelegationMessage: () => void;
 }
 
@@ -192,8 +192,7 @@ export interface AuthSuccess {
  * the delegation to the application window. After having received the delegation the application will close the
  * Internet Identity window.
  */
-// TODO: no default export
-export default async (conn: Connection): Promise<AuthSuccess> => {
+export default async (connection: Connection): Promise<AuthSuccess> => {
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -239,7 +238,7 @@ export default async (conn: Connection): Promise<AuthSuccess> => {
       });
     case "valid":
       return new Promise((resolve) => {
-        init(conn, authContext, userNumber).then(resolve);
+        init(connection, authContext, userNumber).then(resolve);
       });
     default:
       unreachable(validationResult);
@@ -248,7 +247,7 @@ export default async (conn: Connection): Promise<AuthSuccess> => {
 };
 
 const init = (
-  conn: Connection,
+  connection: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -258,7 +257,7 @@ const init = (
     authContext.authRequest.derivationOrigin
   );
   initManagementBtn();
-  initRecovery(conn);
+  initRecovery(connection);
 
   const authorizeButton = document.getElementById(
     "authorizeButton"
@@ -301,9 +300,9 @@ const init = (
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
-    initRegistration(conn, authContext, userNumber).then(resolve);
+    initRegistration(connection, authContext, userNumber).then(resolve);
     authorizeButton.onclick = () => {
-      authenticateUser(conn, authContext).then((authSuccess) => {
+      authenticateUser(connection, authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -323,7 +322,7 @@ function initManagementBtn() {
 }
 
 const initRegistration = async (
-  conn: Connection,
+  connection: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -332,11 +331,11 @@ const initRegistration = async (
   ) as HTMLButtonElement;
   return new Promise((resolve) => {
     registerButton.onclick = () => {
-      registerIfAllowed(conn)
+      registerIfAllowed(connection)
         .then((result) => {
           if (result === null) {
             // user canceled registration
-            return init(conn, authContext, userNumber);
+            return init(connection, authContext, userNumber);
           }
           if (result.tag === "ok") {
             return handleAuthSuccess(result, authContext);
@@ -347,7 +346,7 @@ const initRegistration = async (
             message: result.message,
             detail: result.detail !== "" ? result.detail : undefined,
             primaryButton: "Try again",
-          }).then(() => init(conn, authContext, userNumber));
+          }).then(() => init(connection, authContext, userNumber));
         })
         .then(resolve);
     };
@@ -355,7 +354,7 @@ const initRegistration = async (
 };
 
 const authenticateUser = async (
-  conn: Connection,
+  connection: Connection,
   authContext: AuthContext
 ): Promise<AuthSuccess | null> => {
   const userNumber = readUserNumber();
@@ -364,7 +363,7 @@ const authenticateUser = async (
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
     }
-    const result = await withLoader(() => conn.login(userNumber));
+    const result = await withLoader(() => connection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
       return await withLoader(() =>
@@ -385,7 +384,7 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return init(conn, authContext, userNumber);
+  return init(connection, authContext, userNumber);
 };
 
 const displayPage = (
@@ -419,11 +418,11 @@ async function handleAuthSuccess(
   };
 }
 
-const initRecovery = (conn: Connection) => {
+const initRecovery = (connection: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(conn, readUserNumber());
+  recoverButton.onclick = () => useRecovery(connection, readUserNumber());
 };
 
 /**

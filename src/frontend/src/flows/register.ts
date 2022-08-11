@@ -36,11 +36,11 @@ const constructingContent = html`
 `;
 
 export const register = async (
-  conn: Connection
+  connection: Connection
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return init(conn);
+  return init(connection);
 };
 
 const renderConstructing = () => {
@@ -48,7 +48,7 @@ const renderConstructing = () => {
   render(constructingContent, container);
 };
 
-const init = (conn: Connection): Promise<LoginFlowResult | null> =>
+const init = (connection: Connection): Promise<LoginFlowResult | null> =>
   new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
@@ -81,7 +81,7 @@ const init = (conn: Connection): Promise<LoginFlowResult | null> =>
       try {
         // Kick-start both the captcha creation and the identity
         Promise.all([
-          makeCaptcha(conn),
+          makeCaptcha(connection),
           createIdentity() as Promise<IdentifiableIdentity>,
         ])
           .catch((error) => {
@@ -91,7 +91,7 @@ const init = (conn: Connection): Promise<LoginFlowResult | null> =>
           })
           .then(([captcha, identity]) => {
             confirmRegister(
-              conn,
+              connection,
               Promise.resolve(captcha),
               identity,
               alias

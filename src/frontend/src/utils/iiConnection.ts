@@ -373,12 +373,12 @@ export type AuthenticatedConnection = IIConnection;
 export class IIConnection extends Connection {
   // TODO shouldn't be public
   public constructor(
-    public conn: Connection, // TODO: don't need this, only canisterId
+    public connection: Connection, // TODO: don't need this, only canisterId
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
-  ) { super(conn.canisterId); }
+  ) { super(connection.canisterId); }
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
@@ -392,7 +392,7 @@ export class IIConnection extends Connection {
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await requestFEDelegation(this.identity);
-      this.actor = await this.conn.createActor(this.delegationIdentity);
+      this.actor = await this.connection.createActor(this.delegationIdentity);
     }
 
     return this.actor;

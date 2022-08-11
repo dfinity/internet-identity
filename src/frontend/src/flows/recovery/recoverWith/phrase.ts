@@ -108,7 +108,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
 `;
 
 export const phraseRecoveryPage = async (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string,
@@ -116,11 +116,11 @@ export const phraseRecoveryPage = async (
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, message), container);
-  return init(conn, userNumber, device, prefilledPhrase);
+  return init(connection, userNumber, device, prefilledPhrase);
 };
 
 const init = (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string /* if set, prefilled as input */,
@@ -187,7 +187,7 @@ const init = (
       const inputValue = inputSeedPhraseInput.value.trim();
       const mnemonic = dropLeadingUserNumber(inputValue);
       const result = apiResultToLoginFlowResult(
-        await conn.fromSeedPhrase(userNumber, mnemonic, device)
+        await connection.fromSeedPhrase(userNumber, mnemonic, device)
       );
 
       switch (result.tag) {
@@ -197,7 +197,7 @@ const init = (
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
           phraseRecoveryPage(
-            conn,
+            connection,
             userNumber,
             device,
             inputValue,

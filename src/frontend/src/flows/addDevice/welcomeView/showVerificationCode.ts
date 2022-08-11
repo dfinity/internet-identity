@@ -44,7 +44,7 @@ const pageContent = (
  * @param credentialToBeVerified Credential id of the device to be verified. When this id appears in the list of authenticators, verification was successful.
  */
 export const showVerificationCode = async (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
@@ -53,7 +53,7 @@ export const showVerificationCode = async (
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, alias, tentativeRegistrationInfo), container);
   return init(
-    conn,
+    connection,
     userNumber,
     tentativeRegistrationInfo.device_registration_timeout,
     credentialToBeVerified
@@ -61,12 +61,12 @@ export const showVerificationCode = async (
 };
 
 function poll(
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   credentialToBeVerified: Array<number>,
   shouldStop: () => boolean
 ): Promise<boolean> {
-  return conn.lookupAuthenticators(userNumber).then((deviceData) => {
+  return connection.lookupAuthenticators(userNumber).then((deviceData) => {
     if (shouldStop()) {
       return false;
     }
@@ -79,12 +79,12 @@ function poll(
         }
       }
     }
-    return poll(conn, userNumber, credentialToBeVerified, shouldStop);
+    return poll(connection, userNumber, credentialToBeVerified, shouldStop);
   });
 }
 
 const init = async (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   endTimestamp: bigint,
   credentialToBeVerified: CredentialId
@@ -103,7 +103,7 @@ const init = async (
       window.location.reload();
     }
   );
-  poll(conn, userNumber, credentialToBeVerified, () =>
+  poll(connection, userNumber, credentialToBeVerified, () =>
     countdown.hasStopped()
   ).then((verified) => {
     if (verified) {

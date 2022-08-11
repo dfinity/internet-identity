@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../components/logout";
-import { IIConnection, Connection } from "../utils/iiConnection";
+import { AuthenticatedConnection, Connection } from "../utils/iiConnection";
 import { renderManage } from "./manage";
 
 const pageContent = (name: string) => html`
@@ -15,25 +15,23 @@ const pageContent = (name: string) => html`
 `;
 
 export const successfullyAddedDevice = async (
-  conn: Connection,
+  connection: AuthenticatedConnection,
   name: string,
   userNumber: bigint,
-  connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(name), container);
   initLogout();
-  init(conn, userNumber, connection);
+  init(connection, userNumber);
 };
 
 const init = async (
-  conn: Connection,
+  connection: AuthenticatedConnection,
   userNumber: bigint,
-  connection: IIConnection
 ) => {
   const manageDevicesButton = document.getElementById(
     "manageDevicesButton"
   ) as HTMLButtonElement;
   manageDevicesButton.onclick = () =>
-    renderManage(conn, userNumber, connection);
+    renderManage(connection, userNumber);
 };

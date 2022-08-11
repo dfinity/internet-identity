@@ -88,20 +88,20 @@ const pageContent = () => html` <style>
   ${footer}`;
 
 export const loginUnknownAnchor = async (
-  conn: Connection
+  connection: Connection
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return new Promise((resolve, reject) => {
-    initLogin(conn, resolve);
-    initLinkDevice(conn);
-    initRegister(conn, resolve, reject);
-    initRecovery(conn);
+    initLogin(connection, resolve);
+    initLinkDevice(connection);
+    initRegister(connection, resolve, reject);
+    initRecovery(connection);
   });
 };
 
 const initRegister = (
-  conn: Connection,
+  connection: Connection,
   resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
@@ -109,7 +109,7 @@ const initRegister = (
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
-    registerIfAllowed(conn)
+    registerIfAllowed(connection)
       .then((res) => {
         if (res === null) {
           window.location.reload();
@@ -121,15 +121,15 @@ const initRegister = (
   };
 };
 
-const initRecovery = (conn: Connection) => {
+const initRecovery = (connection: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(conn);
+  recoverButton.onclick = () => useRecovery(connection);
 };
 
 const initLogin = (
-  conn: Connection,
+  connection: Connection,
   resolve: (res: LoginFlowResult) => void
 ) => {
   const userNumberInput = document.getElementById(
@@ -156,7 +156,7 @@ const initLogin = (
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => conn.login(userNumber));
+    const result = await withLoader(() => connection.login(userNumber));
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
@@ -164,7 +164,7 @@ const initLogin = (
   };
 };
 
-const initLinkDevice = (conn: Connection) => {
+const initLinkDevice = (connection: Connection) => {
   const addNewDeviceButton = document.getElementById(
     "addNewDeviceButton"
   ) as HTMLButtonElement;
@@ -175,6 +175,6 @@ const initLinkDevice = (conn: Connection) => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    await addRemoteDevice(conn, userNumber);
+    await addRemoteDevice(connection, userNumber);
   };
 };

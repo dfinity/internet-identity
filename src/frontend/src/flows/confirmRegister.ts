@@ -11,7 +11,6 @@ import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
 import {
   IdentifiableIdentity,
-  IIConnection,
   canisterIdPrincipal,
   ChallengeResult,
   Connection,
@@ -34,25 +33,25 @@ const pageContent = html`
 `;
 
 export const confirmRegister = (
-  conn: Connection,
+  connection: Connection,
   captcha: Promise<Challenge>,
   identity: IdentifiableIdentity,
   alias: string
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return init(conn, canisterIdPrincipal, identity, alias, captcha);
+  return init(connection, canisterIdPrincipal, identity, alias, captcha);
 };
 
 const tryRegister = (
-  conn: Connection,
+  connection: Connection,
   identity: IdentifiableIdentity,
   alias: string,
   challengeResult: ChallengeResult,
   func: (result: LoginFlowResult) => void
 ) => {
   withLoader(async () => {
-    return conn.register(identity, alias, challengeResult);
+    return connection.register(identity, alias, challengeResult);
   }).then((result) => {
     if (result.kind == "loginSuccess") {
       // Write user number to storage
@@ -68,7 +67,7 @@ const tryRegister = (
       ) as HTMLElement;
       confirmParagraph.innerHTML =
         "The value you entered is incorrect. A new challenge is generated.";
-      requestCaptcha(conn);
+      requestCaptcha(connection);
     } else if (result.kind == "registerNoSpace") {
       // Currently, if something goes wrong we only tell the user that
       // something went wrong and then reload the page.
@@ -99,7 +98,7 @@ const tryRegister = (
 
 // Request a captcha and, when received, update the DOM elements accordingly.
 const requestCaptcha = (
-  conn: Connection,
+  connection: Connection,
   captcha?: Promise<Challenge>
 ): void => {
   const form = document.getElementById("confirmForm") as HTMLFormElement;
@@ -118,7 +117,7 @@ const requestCaptcha = (
   ) as HTMLFormElement;
   confirmRegisterButton.disabled = true;
 
-  captcha = captcha || makeCaptcha(conn);
+  captcha = captcha || makeCaptcha(connection);
 
   captcha.then((captchaResp) => {
     const captchaImg = document.querySelector("#captchaImg");
@@ -140,23 +139,23 @@ const requestCaptcha = (
 };
 
 // This requests a challenge from the II backend.
-export const makeCaptcha = (conn: Connection): Promise<Challenge> =>
+export const makeCaptcha = (connection: Connection): Promise<Challenge> =>
   new Promise((resolve) => {
     setTimeout(() => {
-      conn.createChallenge().then((cha) => {
+      connection.createChallenge().then((cha) => {
         resolve(cha);
       });
     });
   });
 
 const init = (
-  conn: Connection,
+  connection: Connection,
   canisterIdPrincipal: Principal,
   identity: IdentifiableIdentity,
   alias: string,
   captcha: Promise<Challenge>
 ): Promise<LoginFlowResult | null> => {
-  requestCaptcha(conn, captcha);
+  requestCaptcha(connection, captcha);
 
   // since the index expects to regain control we unfortunately have to wrap
   // this whole logic in a promise that then resolves (giving control back to
@@ -191,7 +190,7 @@ const init = (
 
       if (captchaKey === undefined) {
         console.log("Something went wrong: no captcha key found");
-        requestCaptcha(conn);
+        requestCaptcha(connection);
         return;
       }
 
@@ -200,7 +199,7 @@ const init = (
         chars: captchaChars,
       };
 
-      tryRegister(conn, identity, alias, challengeResult, resolve);
+      tryRegister(connection, identity, alias, challengeResult, resolve);
     };
   });
 };

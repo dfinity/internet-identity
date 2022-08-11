@@ -29,17 +29,17 @@ const pageContent = (userNumber: bigint) => html`
 `;
 
 export const deviceRecoveryPage = async (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init(conn, userNumber, device);
+  return init(connection, userNumber, device);
 };
 
 const init = (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
@@ -50,7 +50,7 @@ const init = (
     if (buttonContinue !== null) {
       buttonContinue.onclick = async () => {
         const result = apiResultToLoginFlowResult(
-          await conn.fromWebauthnDevices(userNumber, [device])
+          await connection.fromWebauthnDevices(userNumber, [device])
         );
 
         switch (result.tag) {
@@ -59,7 +59,7 @@ const init = (
             break;
           case "err":
             await displayError({ ...result, primaryButton: "Try again" });
-            deviceRecoveryPage(conn, userNumber, device).then((res) =>
+            deviceRecoveryPage(connection, userNumber, device).then((res) =>
               resolve(res)
             );
             break;

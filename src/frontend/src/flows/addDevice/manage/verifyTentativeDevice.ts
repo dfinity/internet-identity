@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { IIConnection, Connection } from "../../../utils/iiConnection";
+import { AuthenticatedConnection, Connection } from "../../../utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { hasOwnProperty } from "../../../utils/utils";
@@ -58,21 +58,19 @@ const pageContent = (alias: string) => html`
  * @param connection authenticated II connection
  */
 export const verifyDevice = async (
-  conn: Connection,
+  connection: AuthenticatedConnection,
   userNumber: bigint,
   tentativeDevice: DeviceData,
   endTimestamp: bigint,
-  connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDevice.alias), container);
-  init(conn, userNumber, connection, endTimestamp);
+  init(connection, userNumber, endTimestamp);
 };
 
 const init = (
-  conn: Connection,
+  connection: AuthenticatedConnection,
   userNumber: bigint,
-  connection: IIConnection,
   endTimestamp: bigint
 ) => {
   const countdown = setupCountdown(
@@ -85,7 +83,7 @@ const init = (
           'The timeout has been reached. For security reasons the "add device" process has been aborted.',
         primaryButton: "Ok",
       });
-      await renderManage(conn, userNumber, connection);
+      await renderManage(connection, userNumber);
     }
   );
 
@@ -95,7 +93,7 @@ const init = (
   cancelButton.onclick = async () => {
     countdown.stop();
     await withLoader(() => connection.exitDeviceRegistrationMode());
-    await renderManage(conn, userNumber, connection);
+    await renderManage(connection, userNumber);
   };
 
   const pinInput = document.getElementById(
@@ -126,7 +124,7 @@ const init = (
     if (hasOwnProperty(result, "verified")) {
       countdown.stop();
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
-      await renderManage(conn, userNumber, connection);
+      await renderManage(connection, userNumber);
     } else if (hasOwnProperty(result, "wrong_code")) {
       if (result.wrong_code.retries_left > 0) {
         toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
@@ -137,7 +135,7 @@ const init = (
             "Adding the device has been aborted due to too many invalid code entries.",
           primaryButton: "Continue",
         });
-        await renderManage(conn, userNumber, connection);
+        await renderManage(connection, userNumber);
       }
     } else if (hasOwnProperty(result, "device_registration_mode_off")) {
       await displayError({
@@ -146,7 +144,7 @@ const init = (
           "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
         primaryButton: "Continue",
       });
-      await renderManage(conn, userNumber, connection);
+      await renderManage(connection, userNumber);
     } else if (hasOwnProperty(result, "no_device_to_verify")) {
       await displayError({
         title: "No Device To Verify",
@@ -154,7 +152,7 @@ const init = (
           "Verification not possible because the device is no longer in a state to be verified.",
         primaryButton: "Continue",
       });
-      await renderManage(conn, userNumber, connection);
+      await renderManage(connection, userNumber);
     } else {
       await displayError({
         title: "Something Went Wrong",

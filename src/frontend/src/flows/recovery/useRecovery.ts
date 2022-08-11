@@ -8,15 +8,15 @@ import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 
 export const useRecovery = async (
-  conn: Connection,
+  connection: Connection,
   userNumber?: bigint
 ): Promise<void> => {
   if (userNumber !== undefined) {
-    return runRecovery(conn, userNumber);
+    return runRecovery(connection, userNumber);
   } else {
     const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
     if (pUserNumber !== null) {
-      return runRecovery(conn, pUserNumber);
+      return runRecovery(connection, pUserNumber);
     } else {
       return window.location.reload();
     }
@@ -24,10 +24,10 @@ export const useRecovery = async (
 };
 
 const runRecovery = async (
-  conn: Connection,
+  connection: Connection,
   userNumber: bigint
 ): Promise<void> => {
-  const recoveryDevices = await conn.lookupRecovery(userNumber);
+  const recoveryDevices = await connection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
@@ -44,13 +44,13 @@ const runRecovery = async (
       : await pickRecoveryDevice(recoveryDevices);
 
   const res = hasOwnProperty(device.key_type, "seed_phrase")
-    ? await phraseRecoveryPage(conn, userNumber, device)
-    : await deviceRecoveryPage(conn, userNumber, device);
+    ? await phraseRecoveryPage(connection, userNumber, device)
+    : await deviceRecoveryPage(connection, userNumber, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {
     return window.location.reload();
   }
 
-  renderManage(conn, res.userNumber, res.connection);
+  renderManage(res.connection, res.userNumber);
 };

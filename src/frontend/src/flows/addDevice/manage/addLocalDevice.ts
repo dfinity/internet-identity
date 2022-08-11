@@ -1,7 +1,7 @@
 import {
   creationOptions,
-  IIConnection,
   Connection,
+  AuthenticatedConnection,
 } from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -23,14 +23,13 @@ const displayFailedToAddDevice = (error: Error) =>
  * Add a new device (i.e. a device connected to the browser the user is
  * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
  * add e.g. _another_ browser, macbook or iPhone.)
- * @param userNumber anchor to add the device to
  * @param connection authenticated II connection
+ * @param userNumber anchor to add the device to
  * @param devices already existing devices
  */
 export const addLocalDevice = async (
-  conn: Connection,
+  connection: AuthenticatedConnection,
   userNumber: bigint,
-  connection: IIConnection,
   devices: DeviceData[]
 ): Promise<void> => {
   let newDevice: WebAuthnIdentity;
@@ -42,12 +41,12 @@ export const addLocalDevice = async (
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(conn, userNumber, connection);
+    return renderManage(connection, userNumber);
   }
   const deviceName = await pickDeviceAlias();
   if (deviceName === null) {
     // user clicked "cancel", so we go back to "manage"
-    return await renderManage(conn, userNumber, connection);
+    return await renderManage(connection, userNumber);
   }
   try {
     await withLoader(() =>
@@ -65,7 +64,7 @@ export const addLocalDevice = async (
       error instanceof Error ? error : unknownError()
     );
   }
-  await renderManage(conn, userNumber, connection);
+  await renderManage(connection, userNumber);
 };
 
 const unknownError = (): Error => {

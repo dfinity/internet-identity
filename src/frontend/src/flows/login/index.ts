@@ -1,5 +1,5 @@
 import { displayError } from "../../components/displayError";
-import { IIConnection, Connection } from "../../utils/iiConnection";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { getUserNumber } from "../../utils/userNumber";
 import { unknownToString } from "../../utils/utils";
 import { loginUnknownAnchor } from "./unknownAnchor";
@@ -9,13 +9,13 @@ import { LoginFlowResult } from "./flowResult";
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
-  conn: Connection
+  connection: Connection
 ): Promise<{
   userNumber: bigint;
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
 }> => {
   try {
-    const x = await tryLogin(conn);
+    const x = await tryLogin(connection);
 
     switch (x.tag) {
       case "ok": {
@@ -23,7 +23,7 @@ export const login = async (
       }
       case "err": {
         await displayError({ ...x, primaryButton: "Try again" });
-        return login(conn);
+        return login(connection);
       }
     }
   } catch (err: unknown) {
@@ -39,11 +39,11 @@ export const login = async (
   }
 };
 
-const tryLogin = async (conn: Connection): Promise<LoginFlowResult> => {
+const tryLogin = async (connection: Connection): Promise<LoginFlowResult> => {
   const userNumber = getUserNumber();
   if (userNumber === undefined) {
-    return loginUnknownAnchor(conn);
+    return loginUnknownAnchor(connection);
   } else {
-    return loginKnownAnchor(conn, userNumber);
+    return loginKnownAnchor(connection, userNumber);
   }
 };
