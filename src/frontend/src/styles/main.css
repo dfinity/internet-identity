@@ -501,6 +501,7 @@ a:hover,
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
 }
+*/
 
 .c-card--outline {
   border: var(--vs-line) var(--rc-line-inverted) solid;

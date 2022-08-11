@@ -33,19 +33,19 @@ const pageContent = () => html`
       <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?
-          <button id="registerButton" class="t-link">Create an Internet Identity Anchor.</button>
+          <a id="registerButton" class="t-link">Create an Internet Identity Anchor.</button>
         </li>
         <li class="textLink">
           Already have an anchor
-          <button id="addNewDeviceButton" class="t-link">
+          <a id="addNewDeviceButton" class="t-link">
             but using a new device?
-          </button>
+          </a>
         </li>
         <li class="textLink">
           Lost access
-          <button id="recoverButton" class="t-link">
+          <a id="recoverButton" class="t-link">
             and want to recover?
-          </button>
+          </a>
         </li>
       </ul>
     </aside>
@@ -87,7 +87,7 @@ const initRegister = (
 const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
-  ) as HTMLButtonElement;
+  ) as HTMLAnchorElement;
   recoverButton.onclick = () => useRecovery();
 };
 

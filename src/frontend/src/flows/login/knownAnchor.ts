@@ -27,7 +27,7 @@ const pageContent = (userNumber: bigint) => html`
     <div class="l-section">
       <p>
         Lost access
-        <button id="recoverButton" class="t-link">and want to recover?</button>
+        <a id="recoverButton" class="t-link">and want to recover?</a>
       </p>
     </div>
     <div class="l-section">
@@ -67,7 +67,7 @@ const init = async (userNumber: bigint): Promise<LoginFlowResult> => {
     };
     const recoverButton = document.getElementById(
       "recoverButton"
-    ) as HTMLButtonElement;
+    ) as HTMLAnchorElement;
     recoverButton.onclick = () => useRecovery(userNumber);
   });
 };

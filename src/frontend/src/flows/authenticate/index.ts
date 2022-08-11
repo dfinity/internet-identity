@@ -67,12 +67,12 @@ const pageContent = (
     <div class="textLink">
       <hr />
       <div class="buttonContainer">
-        <button id="recoverButton" class="linkStyle">Lost access?</button>
+        <a id="recoverButton" class="linkStyle">Lost access?</a>
       </div>
       <div class="buttonContainer">
-        <button type="button" class="linkStyle" id="manageButton">
+        <a type="button" class="linkStyle" id="manageButton">
           Manage your Identity Anchor
-        </button>
+        </a>
       </div>
       <hr />
     </div>
@@ -219,7 +219,7 @@ const init = (
 function initManagementBtn() {
   const manageButton = document.getElementById(
     "manageButton"
-  ) as HTMLButtonElement;
+  ) as HTMLAnchorElement;
   manageButton.onclick = () => {
     window.location.hash = "";
     window.location.reload();
@@ -324,7 +324,7 @@ async function handleAuthSuccess(
 const initRecovery = () => {
   const recoverButton = document.getElementById(
     "recoverButton"
-  ) as HTMLButtonElement;
+  ) as HTMLAnchorElement;
   recoverButton.onclick = () => useRecovery(readUserNumber());
 };
 
