@@ -1,8 +1,5 @@
 import { html, render } from "lit-html";
-import {
-  AuthenticatedConnection,
-  Connection,
-} from "../../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";

@@ -1,6 +1,5 @@
 import {
   creationOptions,
-  Connection,
   AuthenticatedConnection,
 } from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";

@@ -1,13 +1,16 @@
 import { render, html } from "lit-html";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { bufferEqual, IIConnection } from "../../utils/iiConnection";
+import {
+  bufferEqual,
+  AuthenticatedConnection,
+  Connection,
+} from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { footer } from "../../components/footer";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
-import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 // The "device settings" page where users can view information about a device,
@@ -86,7 +89,7 @@ const deviceConnection = async (
   userNumber: bigint,
   device: DeviceData,
   recoveryPhraseMessage: string
-): Promise<IIConnection | null> => {
+): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await phraseRecoveryPage(
       userNumber,

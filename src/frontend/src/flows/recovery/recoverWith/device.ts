@@ -8,7 +8,7 @@ import {
   LoginFlowCanceled,
 } from "../../login/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
-import { IIConnection, Connection } from "../../../utils/iiConnection";
+import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (userNumber: bigint) => html`
   <style>

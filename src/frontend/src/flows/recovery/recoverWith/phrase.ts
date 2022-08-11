@@ -7,7 +7,7 @@ import {
   LoginFlowSuccess,
 } from "../../login/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
-import { IIConnection, Connection } from "../../../utils/iiConnection";
+import { Connection } from "../../../utils/iiConnection";
 import { displayError } from "../../../components/displayError";
 import { unreachable } from "../../../utils/utils";
 import {

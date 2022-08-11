@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { Connection, IIConnection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { icLogo } from "../../components/icons";

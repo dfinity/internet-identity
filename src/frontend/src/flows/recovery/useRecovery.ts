@@ -1,5 +1,5 @@
 import { displayError } from "../../components/displayError";
-import { IIConnection, Connection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { hasOwnProperty } from "../../utils/utils";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";

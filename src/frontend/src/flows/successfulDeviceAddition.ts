@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../components/logout";
-import { AuthenticatedConnection, Connection } from "../utils/iiConnection";
+import { AuthenticatedConnection } from "../utils/iiConnection";
 import { renderManage } from "./manage";
 
 const pageContent = (name: string) => html`

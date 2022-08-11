@@ -1,9 +1,5 @@
 import { html, render } from "lit-html";
-import {
-  creationOptions,
-  IIConnection,
-  Connection,
-} from "../../../utils/iiConnection";
+import { creationOptions, Connection } from "../../../utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { DerEncodedPublicKey } from "@dfinity/agent";

@@ -96,7 +96,7 @@ export type RegisterResult =
 
 type LoginSuccess = {
   kind: "loginSuccess";
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
   userNumber: bigint;
 };
 
@@ -172,7 +172,7 @@ export class Connection {
       console.log(`registered Identity Anchor ${userNumber}`);
       return {
         kind: "loginSuccess",
-        connection: new IIConnection(
+        connection: new AuthenticatedConnection(
           this,
           identity,
           delegationIdentity,
@@ -249,7 +249,7 @@ export class Connection {
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IIConnection(
+      connection: new AuthenticatedConnection(
         this,
         // eslint-disable-next-line
         identity,
@@ -285,7 +285,7 @@ export class Connection {
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IIConnection(
+      connection: new AuthenticatedConnection(
         this,
         identity,
         delegationIdentity,
@@ -366,11 +366,9 @@ export class Connection {
   };
 }
 
-export type AuthenticatedConnection = IIConnection;
-
 // TODO: Split between "connection" and "authenticatedConnection" and make sure connection
 // has canister ID baked in (read from readCanisterId() in index.ts)
-export class IIConnection extends Connection {
+export class AuthenticatedConnection extends Connection {
   // TODO shouldn't be public
   public constructor(
     public connection: Connection, // TODO: don't need this, only canisterId

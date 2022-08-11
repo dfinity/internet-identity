@@ -4,7 +4,7 @@ import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
 import { logoutSection, initLogout } from "../../components/logout";
-import { IIConnection, Connection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
