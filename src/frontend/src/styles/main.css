@@ -758,7 +758,7 @@ a:hover,
 }
 
 
-// trumps all other rules
+/* trumps all other rules */
 
 .is-hidden {
   display: none;
