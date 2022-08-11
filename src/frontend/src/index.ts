@@ -17,7 +17,6 @@ import { Connection } from "./utils/iiConnection";
  * The canister injects the canister ID as a `data-canister-id` attribute on the script tag, which we then read to figure out where to make the IC calls.
  */
 const readCanisterId = (): string => {
-
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement;
   if (setupJs === null || setupJs.dataset.canisterId === undefined) {

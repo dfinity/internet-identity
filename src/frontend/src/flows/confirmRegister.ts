@@ -7,7 +7,6 @@ import {
   LoginFlowResult,
 } from "./login/flowResult";
 import { Challenge } from "../../generated/internet_identity_types";
-import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
 import {
   IdentifiableIdentity,

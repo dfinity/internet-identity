@@ -38,7 +38,6 @@ import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
-import { displayError } from "../components/displayError";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 
@@ -348,20 +347,20 @@ export class Connection {
   };
 
   requestFEDelegation = async (
-      identity: SignIdentity
+    identity: SignIdentity
   ): Promise<DelegationIdentity> => {
-      const sessionKey = Ed25519KeyIdentity.generate();
-      const tenMinutesInMsec = 10 * 1000 * 60;
-      // Here the security device is used. Besides creating new keys, this is the only place.
-      const chain = await DelegationChain.create(
-          identity,
-          sessionKey.getPublicKey(),
-          new Date(Date.now() + tenMinutesInMsec),
-          {
-              targets: [Principal.from(this.canisterId)],
-          }
-      );
-      return DelegationIdentity.fromDelegation(sessionKey, chain);
+    const sessionKey = Ed25519KeyIdentity.generate();
+    const tenMinutesInMsec = 10 * 1000 * 60;
+    // Here the security device is used. Besides creating new keys, this is the only place.
+    const chain = await DelegationChain.create(
+      identity,
+      sessionKey.getPublicKey(),
+      new Date(Date.now() + tenMinutesInMsec),
+      {
+        targets: [Principal.from(this.canisterId)],
+      }
+    );
+    return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
 }
 
@@ -495,7 +494,6 @@ export class AuthenticatedConnection extends Connection {
     );
   };
 }
-
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
