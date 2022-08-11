@@ -11,7 +11,6 @@ import { Principal } from "@dfinity/principal";
 import { withLoader } from "../components/loader";
 import {
   IdentifiableIdentity,
-  canisterIdPrincipal,
   ChallengeResult,
   Connection,
 } from "../utils/iiConnection";
@@ -40,7 +39,7 @@ export const confirmRegister = (
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return init(connection, canisterIdPrincipal, identity, alias, captcha);
+  return init(connection, identity, alias, captcha);
 };
 
 const tryRegister = (
@@ -150,7 +149,6 @@ export const makeCaptcha = (connection: Connection): Promise<Challenge> =>
 
 const init = (
   connection: Connection,
-  canisterIdPrincipal: Principal,
   identity: IdentifiableIdentity,
   alias: string,
   captcha: Promise<Challenge>

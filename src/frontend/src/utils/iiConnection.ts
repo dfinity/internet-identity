@@ -42,8 +42,6 @@ import { displayError } from "../components/displayError";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 
-declare const canisterId: string;
-
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
  * generated with a 32-byte \NUL seed.
@@ -65,21 +63,6 @@ export class DummyIdentity
     this.rawId = new Uint8Array(32);
   }
 }
-
-// Check if the canister ID was defined before we even try to read it
-if (typeof canisterId === "undefined") {
-  displayError({
-    title: "Canister ID not set",
-    message:
-      "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-    primaryButton: "Reload",
-  }).then(() => {
-    window.location.reload();
-  });
-  throw new Error("canisterId is undefined"); // abort further execution of this script
-}
-
-export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
@@ -126,7 +109,7 @@ export class Connection {
   ): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(identity);
     } catch (error: unknown) {
       if (error instanceof Error) {
         return { kind: "authFail", error };
@@ -233,7 +216,7 @@ export class Connection {
           );
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
@@ -280,7 +263,7 @@ export class Connection {
         kind: "seedPhraseFail",
       };
     }
-    const delegationIdentity = await requestFEDelegation(identity);
+    const delegationIdentity = await this.requestFEDelegation(identity);
     const actor = await this.createActor(delegationIdentity);
 
     return {
@@ -363,6 +346,23 @@ export class Connection {
     });
     return actor;
   };
+
+  requestFEDelegation = async (
+      identity: SignIdentity
+  ): Promise<DelegationIdentity> => {
+      const sessionKey = Ed25519KeyIdentity.generate();
+      const tenMinutesInMsec = 10 * 1000 * 60;
+      // Here the security device is used. Besides creating new keys, this is the only place.
+      const chain = await DelegationChain.create(
+          identity,
+          sessionKey.getPublicKey(),
+          new Date(Date.now() + tenMinutesInMsec),
+          {
+              targets: [Principal.from(this.canisterId)],
+          }
+      );
+      return DelegationIdentity.fromDelegation(sessionKey, chain);
+  };
 }
 
 export class AuthenticatedConnection extends Connection {
@@ -387,7 +387,7 @@ export class AuthenticatedConnection extends Connection {
 
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
-      this.delegationIdentity = await requestFEDelegation(this.identity);
+      this.delegationIdentity = await this.requestFEDelegation(this.identity);
       this.actor = await this.createActor(this.delegationIdentity);
     }
 
@@ -496,22 +496,6 @@ export class AuthenticatedConnection extends Connection {
   };
 }
 
-const requestFEDelegation = async (
-  identity: SignIdentity
-): Promise<DelegationIdentity> => {
-  const sessionKey = Ed25519KeyIdentity.generate();
-  const tenMinutesInMsec = 10 * 1000 * 60;
-  // Here the security device is used. Besides creating new keys, this is the only place.
-  const chain = await DelegationChain.create(
-    identity,
-    sessionKey.getPublicKey(),
-    new Date(Date.now() + tenMinutesInMsec),
-    {
-      targets: [Principal.from(canisterId)],
-    }
-  );
-  return DelegationIdentity.fromDelegation(sessionKey, chain);
-};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
