@@ -8,7 +8,7 @@ import {
   setUserNumber,
 } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { IIConnection } from "../../utils/iiConnection";
+import { IIConnection, Connection } from "../../utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,
@@ -192,7 +192,8 @@ export interface AuthSuccess {
  * the delegation to the application window. After having received the delegation the application will close the
  * Internet Identity window.
  */
-export default async (): Promise<AuthSuccess> => {
+// TODO: no default export
+export default async (conn: Connection): Promise<AuthSuccess> => {
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -238,7 +239,7 @@ export default async (): Promise<AuthSuccess> => {
       });
     case "valid":
       return new Promise((resolve) => {
-        init(authContext, userNumber).then(resolve);
+        init(conn, authContext, userNumber).then(resolve);
       });
     default:
       unreachable(validationResult);
@@ -247,6 +248,7 @@ export default async (): Promise<AuthSuccess> => {
 };
 
 const init = (
+  conn: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -256,7 +258,7 @@ const init = (
     authContext.authRequest.derivationOrigin
   );
   initManagementBtn();
-  initRecovery();
+  initRecovery(conn);
 
   const authorizeButton = document.getElementById(
     "authorizeButton"
@@ -299,9 +301,9 @@ const init = (
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
-    initRegistration(authContext, userNumber).then(resolve);
+    initRegistration(conn, authContext, userNumber).then(resolve);
     authorizeButton.onclick = () => {
-      authenticateUser(authContext).then((authSuccess) => {
+      authenticateUser(conn, authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -321,6 +323,7 @@ function initManagementBtn() {
 }
 
 const initRegistration = async (
+  conn: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -329,11 +332,11 @@ const initRegistration = async (
   ) as HTMLButtonElement;
   return new Promise((resolve) => {
     registerButton.onclick = () => {
-      registerIfAllowed()
+      registerIfAllowed(conn)
         .then((result) => {
           if (result === null) {
             // user canceled registration
-            return init(authContext, userNumber);
+            return init(conn, authContext, userNumber);
           }
           if (result.tag === "ok") {
             return handleAuthSuccess(result, authContext);
@@ -344,7 +347,7 @@ const initRegistration = async (
             message: result.message,
             detail: result.detail !== "" ? result.detail : undefined,
             primaryButton: "Try again",
-          }).then(() => init(authContext, userNumber));
+          }).then(() => init(conn, authContext, userNumber));
         })
         .then(resolve);
     };
@@ -352,6 +355,7 @@ const initRegistration = async (
 };
 
 const authenticateUser = async (
+  conn: Connection,
   authContext: AuthContext
 ): Promise<AuthSuccess | null> => {
   const userNumber = readUserNumber();
@@ -360,7 +364,7 @@ const authenticateUser = async (
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
     }
-    const result = await withLoader(() => IIConnection.login(userNumber));
+    const result = await withLoader(() => conn.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
       return await withLoader(() =>
@@ -381,7 +385,7 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return init(authContext, userNumber);
+  return init(conn, authContext, userNumber);
 };
 
 const displayPage = (
@@ -415,11 +419,11 @@ async function handleAuthSuccess(
   };
 }
 
-const initRecovery = () => {
+const initRecovery = (conn: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(readUserNumber());
+  recoverButton.onclick = () => useRecovery(conn, readUserNumber());
 };
 
 /**

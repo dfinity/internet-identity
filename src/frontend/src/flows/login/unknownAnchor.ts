@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { Connection, IIConnection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { icLogo } from "../../components/icons";
@@ -87,18 +87,21 @@ const pageContent = () => html` <style>
   </section>
   ${footer}`;
 
-export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
+export const loginUnknownAnchor = async (
+  conn: Connection
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return new Promise((resolve, reject) => {
-    initLogin(resolve);
-    initLinkDevice();
-    initRegister(resolve, reject);
-    initRecovery();
+    initLogin(conn, resolve);
+    initLinkDevice(conn);
+    initRegister(conn, resolve, reject);
+    initRecovery(conn);
   });
 };
 
 const initRegister = (
+  conn: Connection,
   resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
@@ -106,7 +109,7 @@ const initRegister = (
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
-    registerIfAllowed()
+    registerIfAllowed(conn)
       .then((res) => {
         if (res === null) {
           window.location.reload();
@@ -118,14 +121,17 @@ const initRegister = (
   };
 };
 
-const initRecovery = () => {
+const initRecovery = (conn: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery();
+  recoverButton.onclick = () => useRecovery(conn);
 };
 
-const initLogin = (resolve: (res: LoginFlowResult) => void) => {
+const initLogin = (
+  conn: Connection,
+  resolve: (res: LoginFlowResult) => void
+) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -150,7 +156,7 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => IIConnection.login(userNumber));
+    const result = await withLoader(() => conn.login(userNumber));
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
@@ -158,7 +164,7 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   };
 };
 
-const initLinkDevice = () => {
+const initLinkDevice = (conn: Connection) => {
   const addNewDeviceButton = document.getElementById(
     "addNewDeviceButton"
   ) as HTMLButtonElement;
@@ -169,6 +175,6 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    await addRemoteDevice(userNumber);
+    await addRemoteDevice(conn, userNumber);
   };
 };

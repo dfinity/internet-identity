@@ -10,39 +10,38 @@ import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
 import authorizeAuthentication from "./flows/authenticate";
 import { displayError } from "./components/displayError";
+import { Connection } from "./utils/iiConnection";
 
 const readCanisterId = (): string => {
+  const setupJs = document.querySelector("#setupJs") as HTMLElement;
+  if (setupJs === null) {
+    displayError({
+      title: "Canister ID not set",
+      message:
+        "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
+    }).then(() => {
+      window.location.reload();
+    });
+    throw new Error("canisterId is undefined"); // abort further execution of this script
+  }
 
-    const setupJs = document.querySelector("#setupJs") as HTMLElement;
-    if(setupJs === null) {
+  const canisterId = setupJs.dataset.canisterId;
 
-        displayError({
-            title: "Canister ID not set",
-            message:
-                "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-            primaryButton: "Reload",
-        }).then(() => {
-            window.location.reload();
-        });
-        throw new Error("canisterId is undefined"); // abort further execution of this script
-    }
+  if (canisterId === undefined) {
+    displayError({
+      title: "Canister ID not set",
+      message:
+        "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
+    }).then(() => {
+      window.location.reload();
+    });
+    throw new Error("canisterId is undefined"); // abort further execution of this script
+  }
 
-    const canisterId = setupJs.dataset.canisterId;
-
-    if(canisterId === undefined) {
-        displayError({
-            title: "Canister ID not set",
-            message:
-                "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-            primaryButton: "Reload",
-        }).then(() => {
-            window.location.reload();
-        });
-        throw new Error("canisterId is undefined"); // abort further execution of this script
-    }
-
-    return canisterId;
-}
+  return canisterId;
+};
 
 const init = async () => {
   const url = new URL(document.URL);
@@ -67,13 +66,20 @@ const init = async () => {
 
   const userIntent = intentFromUrl(url);
 
+  // TODO: proper error handling
+  const conn = new Connection(readCanisterId());
+
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
       // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
-      const authSuccess = await authorizeAuthentication();
+      const authSuccess = await authorizeAuthentication(conn);
       // show the recovery wizard before sending the window post message, otherwise the II window will be closed
-      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      await recoveryWizard(
+        conn,
+        authSuccess.userNumber,
+        authSuccess.connection
+      );
       // send the delegation back to the dapp window (which will then close the II window)
       authSuccess.sendDelegationMessage();
       return;
@@ -81,12 +87,12 @@ const init = async () => {
     // Open the management page
     case "manage": {
       // Go through the login flow, potentially creating an anchor.
-      const { userNumber, connection } = await login();
+      const { userNumber, connection } = await login(conn);
       // Here, if the user doesn't have any recovery device, we prompt them to add
       // one. The exact flow depends on the device they use.
-      await recoveryWizard(userNumber, connection);
+      await recoveryWizard(conn, userNumber, connection);
       // From here on, the user is authenticated to II.
-      return renderManage(userNumber, connection);
+      return renderManage(conn, userNumber, connection);
     }
   }
 };

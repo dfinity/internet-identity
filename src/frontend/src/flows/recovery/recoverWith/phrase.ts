@@ -7,7 +7,7 @@ import {
   LoginFlowSuccess,
 } from "../../login/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
-import { IIConnection } from "../../../utils/iiConnection";
+import { IIConnection, Connection } from "../../../utils/iiConnection";
 import { displayError } from "../../../components/displayError";
 import { unreachable } from "../../../utils/utils";
 import {
@@ -108,6 +108,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
 `;
 
 export const phraseRecoveryPage = async (
+  conn: Connection,
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string,
@@ -115,10 +116,11 @@ export const phraseRecoveryPage = async (
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, message), container);
-  return init(userNumber, device, prefilledPhrase);
+  return init(conn, userNumber, device, prefilledPhrase);
 };
 
 const init = (
+  conn: Connection,
   userNumber: bigint,
   device: DeviceData,
   prefilledPhrase?: string /* if set, prefilled as input */,
@@ -185,7 +187,7 @@ const init = (
       const inputValue = inputSeedPhraseInput.value.trim();
       const mnemonic = dropLeadingUserNumber(inputValue);
       const result = apiResultToLoginFlowResult(
-        await IIConnection.fromSeedPhrase(userNumber, mnemonic, device)
+        await conn.fromSeedPhrase(userNumber, mnemonic, device)
       );
 
       switch (result.tag) {
@@ -194,9 +196,13 @@ const init = (
           break;
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
-          phraseRecoveryPage(userNumber, device, inputValue, message).then(
-            (res) => resolve(res)
-          );
+          phraseRecoveryPage(
+            conn,
+            userNumber,
+            device,
+            inputValue,
+            message
+          ).then((res) => resolve(res));
           break;
         default:
           unreachable(result);

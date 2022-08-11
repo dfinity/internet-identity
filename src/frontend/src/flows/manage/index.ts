@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { IIConnection, Connection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { initLogout, logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
@@ -232,6 +232,7 @@ const recoveryNag = () => html`
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection
 ): Promise<void> => {
@@ -244,19 +245,20 @@ export const renderManage = async (
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(userNumber, connection);
+    return renderManage(conn, userNumber, connection);
   }
   if (anchorInfo.device_registration.length !== 0) {
     // we are actually in a device registration process
-    await pollForTentativeDevice(userNumber, connection);
+    await pollForTentativeDevice(conn, userNumber, connection);
   } else {
     render(pageContent(userNumber, anchorInfo.devices), container);
-    init(userNumber, connection, anchorInfo.devices);
+    init(conn, userNumber, connection, anchorInfo.devices);
   }
 };
 
 // Initializes the management page.
 const init = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection,
   devices: DeviceData[]
@@ -274,16 +276,16 @@ const init = async (
     const nextAction = await chooseDeviceAddFlow();
     if (nextAction === null) {
       // user clicked 'cancel'
-      await renderManage(userNumber, connection);
+      await renderManage(conn, userNumber, connection);
       return;
     }
     switch (nextAction) {
       case "local": {
-        await addLocalDevice(userNumber, connection, devices);
+        await addLocalDevice(conn, userNumber, connection, devices);
         return;
       }
       case "remote": {
-        await pollForTentativeDevice(userNumber, connection);
+        await pollForTentativeDevice(conn, userNumber, connection);
         return;
       }
     }
@@ -294,13 +296,14 @@ const init = async (
     "#addRecovery"
   ) as HTMLButtonElement;
   setupRecoveryButton.onclick = async () => {
-    await setupRecovery(userNumber, connection);
-    renderManage(userNumber, connection);
+    await setupRecovery(conn, userNumber, connection);
+    renderManage(conn, userNumber, connection);
   };
-  renderDevices(userNumber, connection, devices);
+  renderDevices(conn, userNumber, connection, devices);
 };
 
 const renderDevices = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection,
   devices: DeviceData[]
@@ -320,6 +323,7 @@ const renderDevices = async (
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
         await deviceSettings(
+          conn,
           userNumber,
           connection,
           device,
@@ -332,7 +336,7 @@ const renderDevices = async (
             primaryButton: "Ok",
           })
         );
-        await renderManage(userNumber, connection);
+        await renderManage(conn, userNumber, connection);
       };
     }
     hasOwnProperty(device.purpose, "recovery")

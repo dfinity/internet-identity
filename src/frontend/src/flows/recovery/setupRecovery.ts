@@ -7,16 +7,18 @@ import {
   creationOptions,
   IC_DERIVATION_PATH,
   IIConnection,
+  Connection,
 } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection
 ): Promise<void> => {
-  const devices = await IIConnection.lookupAll(userNumber);
+  const devices = await conn.lookupAll(userNumber);
   const recoveryMechanism = await chooseRecoveryMechanism(devices);
   if (recoveryMechanism === null) {
     return;
@@ -39,7 +41,7 @@ export const setupRecovery = async (
             detail: unknownToString(err, "Unknown error"),
             primaryButton: "Try a different method",
           });
-          return setupRecovery(userNumber, connection);
+          return setupRecovery(conn, userNumber, connection);
         }
 
         return await withLoader(() =>

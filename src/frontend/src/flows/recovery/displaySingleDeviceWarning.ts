@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { warningIcon } from "../../components/icons";
 import { setupRecovery } from "./setupRecovery";
-import { IIConnection } from "../../utils/iiConnection";
+import { IIConnection, Connection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
   <style>
@@ -53,21 +53,26 @@ const pageContent = () => html`
 `;
 
 export const displaySingleDeviceWarning = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init(userNumber, connection);
+  return init(conn, userNumber, connection);
 };
 
-const init = (userNumber: bigint, connection: IIConnection): Promise<void> =>
+const init = (
+  conn: Connection,
+  userNumber: bigint,
+  connection: IIConnection
+): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(
       "displayWarningAddRecovery"
     ) as HTMLButtonElement;
     displayWarningAddRecovery.onclick = () => {
-      setupRecovery(userNumber, connection).then(() => resolve());
+      setupRecovery(conn, userNumber, connection).then(() => resolve());
     };
     const displayWarningRemindLater = document.getElementById(
       "displayWarningRemindLater"

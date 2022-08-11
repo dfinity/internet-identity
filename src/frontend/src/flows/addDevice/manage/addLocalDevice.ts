@@ -1,4 +1,8 @@
-import { creationOptions, IIConnection } from "../../../utils/iiConnection";
+import {
+  creationOptions,
+  IIConnection,
+  Connection,
+} from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { pickDeviceAlias } from "./addDevicePickAlias";
@@ -24,6 +28,7 @@ const displayFailedToAddDevice = (error: Error) =>
  * @param devices already existing devices
  */
 export const addLocalDevice = async (
+  conn: Connection,
   userNumber: bigint,
   connection: IIConnection,
   devices: DeviceData[]
@@ -37,12 +42,12 @@ export const addLocalDevice = async (
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(userNumber, connection);
+    return renderManage(conn, userNumber, connection);
   }
   const deviceName = await pickDeviceAlias();
   if (deviceName === null) {
     // user clicked "cancel", so we go back to "manage"
-    return await renderManage(userNumber, connection);
+    return await renderManage(conn, userNumber, connection);
   }
   try {
     await withLoader(() =>
@@ -60,7 +65,7 @@ export const addLocalDevice = async (
       error instanceof Error ? error : unknownError()
     );
   }
-  await renderManage(userNumber, connection);
+  await renderManage(conn, userNumber, connection);
 };
 
 const unknownError = (): Error => {

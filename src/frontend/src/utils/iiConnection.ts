@@ -113,21 +113,16 @@ export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
 }
 
-// TODO: Split between "connection" and "authenticatedConnection" and make sure connection 
-// has canister ID baked in (read from readCanisterId() in index.ts)
-export class IIConnection {
-  protected constructor(
-    public identity: SignIdentity,
-    public delegationIdentity: DelegationIdentity,
-    public userNumber: bigint,
-    public actor?: ActorSubclass<_SERVICE>
+export class Connection {
+  public constructor(
+    readonly canisterId: string // TODO: should this be an actor?
   ) {}
 
-  static async register(
+  register = async (
     identity: IdentifiableIdentity,
     alias: string,
     challengeResult: ChallengeResult
-  ): Promise<RegisterResult> {
+  ): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await requestFEDelegation(identity);
@@ -142,7 +137,7 @@ export class IIConnection {
       }
     }
 
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const actor = await this.createActor(delegationIdentity);
     const credential_id = Array.from(new Uint8Array(identity.rawId));
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
 
@@ -178,6 +173,7 @@ export class IIConnection {
       return {
         kind: "loginSuccess",
         connection: new IIConnection(
+          this,
           identity,
           delegationIdentity,
           userNumber,
@@ -191,9 +187,9 @@ export class IIConnection {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");
     }
-  }
+  };
 
-  static async login(userNumber: bigint): Promise<LoginResult> {
+  login = async (userNumber: bigint): Promise<LoginResult> => {
     let devices: DeviceData[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
@@ -213,12 +209,12 @@ export class IIConnection {
     }
 
     return this.fromWebauthnDevices(userNumber, devices);
-  }
+  };
 
-  static async fromWebauthnDevices(
+  fromWebauthnDevices = async (
     userNumber: bigint,
     devices: DeviceData[]
-  ): Promise<LoginResult> {
+  ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
      * that is used in the register flow.
@@ -248,12 +244,13 @@ export class IIConnection {
       }
     }
 
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const actor = await this.createActor(delegationIdentity);
 
     return {
       kind: "loginSuccess",
       userNumber,
       connection: new IIConnection(
+        this,
         // eslint-disable-next-line
         identity,
         delegationIdentity,
@@ -261,13 +258,13 @@ export class IIConnection {
         actor
       ),
     };
-  }
+  };
 
-  static async fromSeedPhrase(
+  fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string,
     expected: DeviceData
-  ): Promise<LoginResult> {
+  ): Promise<LoginResult> => {
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
       IC_DERIVATION_PATH
@@ -283,51 +280,52 @@ export class IIConnection {
       };
     }
     const delegationIdentity = await requestFEDelegation(identity);
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const actor = await this.createActor(delegationIdentity);
 
     return {
       kind: "loginSuccess",
       userNumber,
       connection: new IIConnection(
+        this,
         identity,
         delegationIdentity,
         userNumber,
         actor
       ),
     };
-  }
+  };
 
-  static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  lookupAll = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     return await actor.lookup(userNumber);
-  }
+  };
 
-  static async createChallenge(): Promise<Challenge> {
+  createChallenge = async (): Promise<Challenge> => {
     const actor = await this.createActor();
     const challenge = await actor.create_challenge();
     console.log("Challenge Created");
     return challenge;
-  }
+  };
 
-  static async lookupAuthenticators(
+  lookupAuthenticators = async (
     userNumber: UserNumber
-  ): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  ): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "authentication")
     );
-  }
+  };
 
-  static async addTentativeDevice(
+  addTentativeDevice = async (
     userNumber: UserNumber,
     alias: string,
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
     credentialId?: ArrayBuffer
-  ): Promise<AddTentativeDeviceResponse> {
-    const actor = await IIConnection.createActor();
+  ): Promise<AddTentativeDeviceResponse> => {
+    const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -338,20 +336,22 @@ export class IIConnection {
       purpose,
       protection: { unprotected: null },
     });
-  }
+  };
 
-  static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  lookupRecovery = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "recovery")
     );
-  }
+  };
 
   // Create an actor representing the backend
-  static async createActor(
+  // TODO: why is this part of 'Connection'?
+  // Can this actor be re-used?
+  createActor = async (
     delegationIdentity?: DelegationIdentity
-  ): Promise<ActorSubclass<_SERVICE>> {
+  ): Promise<ActorSubclass<_SERVICE>> => {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
     // Only fetch the root key when we're not in prod
@@ -360,11 +360,25 @@ export class IIConnection {
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
-      canisterId: canisterId,
+      canisterId: this.canisterId,
     });
     return actor;
-  }
+  };
+}
 
+export type AuthenticatedConnection = IIConnection;
+
+// TODO: Split between "connection" and "authenticatedConnection" and make sure connection
+// has canister ID baked in (read from readCanisterId() in index.ts)
+export class IIConnection extends Connection {
+  // TODO shouldn't be public
+  public constructor(
+    public conn: Connection, // TODO: don't need this, only canisterId
+    public identity: SignIdentity,
+    public delegationIdentity: DelegationIdentity,
+    public userNumber: bigint,
+    public actor?: ActorSubclass<_SERVICE>
+  ) { super(conn.canisterId); }
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
@@ -378,7 +392,7 @@ export class IIConnection {
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await requestFEDelegation(this.identity);
-      this.actor = await IIConnection.createActor(this.delegationIdentity);
+      this.actor = await this.conn.createActor(this.delegationIdentity);
     }
 
     return this.actor;

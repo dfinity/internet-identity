@@ -4,7 +4,7 @@ import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
 import { logoutSection, initLogout } from "../../components/logout";
-import { IIConnection } from "../../utils/iiConnection";
+import { IIConnection, Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
@@ -34,14 +34,18 @@ const pageContent = (userNumber: bigint) => html` <style>
   ${footer}`;
 
 export const loginKnownAnchor = async (
+  conn: Connection,
   userNumber: bigint
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init(userNumber);
+  return init(conn, userNumber);
 };
 
-const init = async (userNumber: bigint): Promise<LoginFlowResult> => {
+const init = async (
+  conn: Connection,
+  userNumber: bigint
+): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
@@ -52,18 +56,18 @@ const init = async (userNumber: bigint): Promise<LoginFlowResult> => {
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const result = await withLoader(() => IIConnection.login(userNumber));
+      const result = await withLoader(() => conn.login(userNumber));
       resolve(apiResultToLoginFlowResult(result));
     };
 
     loginDifferentButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      resolve(await loginUnknownAnchor());
+      resolve(await loginUnknownAnchor(conn));
     };
     const recoverButton = document.getElementById(
       "recoverButton"
     ) as HTMLAnchorElement;
-    recoverButton.onclick = () => useRecovery(userNumber);
+    recoverButton.onclick = () => useRecovery(conn, userNumber);
   });
 };
