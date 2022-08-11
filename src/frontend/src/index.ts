@@ -12,9 +12,15 @@ import authorizeAuthentication from "./flows/authenticate";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
 
+/** Reads the canister ID from the <script> tag.
+ *
+ * The canister injects the canister ID as a `data-canister-id` attribute on the script tag, which we then read to figure out where to make the IC calls.
+ */
 const readCanisterId = (): string => {
+
+  // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement;
-  if (setupJs === null) {
+  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     displayError({
       title: "Canister ID not set",
       message:
@@ -26,21 +32,7 @@ const readCanisterId = (): string => {
     throw new Error("canisterId is undefined"); // abort further execution of this script
   }
 
-  const canisterId = setupJs.dataset.canisterId;
-
-  if (canisterId === undefined) {
-    displayError({
-      title: "Canister ID not set",
-      message:
-        "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-      primaryButton: "Reload",
-    }).then(() => {
-      window.location.reload();
-    });
-    throw new Error("canisterId is undefined"); // abort further execution of this script
-  }
-
-  return canisterId;
+  return setupJs.dataset.canisterId;
 };
 
 const init = async () => {
@@ -66,7 +58,7 @@ const init = async () => {
 
   const userIntent = intentFromUrl(url);
 
-  // TODO: proper error handling
+  // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
   switch (userIntent.kind) {

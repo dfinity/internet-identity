@@ -22,13 +22,10 @@ pub enum ContentType {
     SVG,
 }
 
-lazy_static! {
-    // The <script> tag that sets the canister ID and loads the 'index.js'
-    static ref INDEX_HTML_SETUP_JS: String = {
-        let canister_id = api::id();
-        format!(r#"var canisterId = '{canister_id}';let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);"#)
-    };
+// The <script> tag that loads the 'index.js'
+const INDEX_HTML_SETUP_JS: &str = "let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);";
 
+lazy_static! {
     // The SRI sha256 hash of the script tag, used by the CSP policy.
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
     pub static ref INDEX_HTML_SETUP_JS_SRI_HASH: String = {
