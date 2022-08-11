@@ -31,7 +31,7 @@ const pageContent = (seedPhrase: string) => html`
     <button id="seedCopy" data-clipboard-target="#seedPhrase" class="c-button">
       Copy
     </button>
-    <button id="displaySeedPhraseContinue" class="c-button hidden">
+    <button id="displaySeedPhraseContinue" class="c-button is-hidden">
       Continue
     </button>
   </article>
@@ -70,7 +70,7 @@ const init = (): Promise<void> =>
           const seedPhraseDiv = document.getElementById("seedPhrase");
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           selectText(seedPhraseDiv!);
-          displaySeedPhraseContinue.classList.toggle("hidden", false);
+          displaySeedPhraseContinue.classList.toggle("is-hidden", false);
           render(checkmarkIcon, seedCopy);
           seedCopy.title = "copied";
         })

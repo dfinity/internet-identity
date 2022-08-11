@@ -756,3 +756,14 @@ a:hover,
   padding: var(--rs-button-bezel);
   background: var(--rc-background);
 }
+
+
+// trumps all other rules
+
+.is-hidden {
+  display: none;
+}
+
+.is-visible {
+  display: block;
+}
