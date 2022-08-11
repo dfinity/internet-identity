@@ -18,7 +18,7 @@ import { Connection } from "./utils/iiConnection";
  */
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
-  const setupJs = document.querySelector("#setupJs") as HTMLElement;
+  const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
   if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     displayError({
       title: "Canister ID not set",
