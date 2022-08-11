@@ -1,3 +1,6 @@
+/**
+ * This module contains everything related to connecting to the canister.
+ */
 import {
   Actor,
   ActorSubclass,
@@ -35,11 +38,8 @@ import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { hasOwnProperty } from "./utils";
 import * as tweetnacl from "tweetnacl";
-import { displayError } from "../components/displayError";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
-
-declare const canisterId: string;
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -63,21 +63,6 @@ export class DummyIdentity
   }
 }
 
-// Check if the canister ID was defined before we even try to read it
-if (typeof canisterId === "undefined") {
-  displayError({
-    title: "Canister ID not set",
-    message:
-      "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-    primaryButton: "Reload",
-  }).then(() => {
-    window.location.reload();
-  });
-  throw new Error("canisterId is undefined"); // abort further execution of this script
-}
-
-export const canisterIdPrincipal: Principal = Principal.fromText(canisterId);
-
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 export type ApiResult = LoginResult | RegisterResult;
@@ -96,7 +81,7 @@ export type RegisterResult =
 
 type LoginSuccess = {
   kind: "loginSuccess";
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
   userNumber: bigint;
 };
 
@@ -113,22 +98,17 @@ export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
 }
 
-export class IIConnection {
-  protected constructor(
-    public identity: SignIdentity,
-    public delegationIdentity: DelegationIdentity,
-    public userNumber: bigint,
-    public actor?: ActorSubclass<_SERVICE>
-  ) {}
+export class Connection {
+  public constructor(readonly canisterId: string) {}
 
-  static async register(
+  register = async (
     identity: IdentifiableIdentity,
     alias: string,
     challengeResult: ChallengeResult
-  ): Promise<RegisterResult> {
+  ): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(identity);
     } catch (error: unknown) {
       if (error instanceof Error) {
         return { kind: "authFail", error };
@@ -140,7 +120,7 @@ export class IIConnection {
       }
     }
 
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const actor = await this.createActor(delegationIdentity);
     const credential_id = Array.from(new Uint8Array(identity.rawId));
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
 
@@ -175,7 +155,8 @@ export class IIConnection {
       console.log(`registered Identity Anchor ${userNumber}`);
       return {
         kind: "loginSuccess",
-        connection: new IIConnection(
+        connection: new AuthenticatedConnection(
+          this.canisterId,
           identity,
           delegationIdentity,
           userNumber,
@@ -189,9 +170,9 @@ export class IIConnection {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");
     }
-  }
+  };
 
-  static async login(userNumber: bigint): Promise<LoginResult> {
+  login = async (userNumber: bigint): Promise<LoginResult> => {
     let devices: DeviceData[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
@@ -211,12 +192,12 @@ export class IIConnection {
     }
 
     return this.fromWebauthnDevices(userNumber, devices);
-  }
+  };
 
-  static async fromWebauthnDevices(
+  fromWebauthnDevices = async (
     userNumber: bigint,
     devices: DeviceData[]
-  ): Promise<LoginResult> {
+  ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
      * that is used in the register flow.
@@ -234,7 +215,7 @@ export class IIConnection {
           );
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
@@ -246,12 +227,13 @@ export class IIConnection {
       }
     }
 
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const actor = await this.createActor(delegationIdentity);
 
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IIConnection(
+      connection: new AuthenticatedConnection(
+        this.canisterId,
         // eslint-disable-next-line
         identity,
         delegationIdentity,
@@ -259,13 +241,13 @@ export class IIConnection {
         actor
       ),
     };
-  }
+  };
 
-  static async fromSeedPhrase(
+  fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string,
     expected: DeviceData
-  ): Promise<LoginResult> {
+  ): Promise<LoginResult> => {
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
       IC_DERIVATION_PATH
@@ -280,52 +262,53 @@ export class IIConnection {
         kind: "seedPhraseFail",
       };
     }
-    const delegationIdentity = await requestFEDelegation(identity);
-    const actor = await IIConnection.createActor(delegationIdentity);
+    const delegationIdentity = await this.requestFEDelegation(identity);
+    const actor = await this.createActor(delegationIdentity);
 
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new IIConnection(
+      connection: new AuthenticatedConnection(
+        this.canisterId,
         identity,
         delegationIdentity,
         userNumber,
         actor
       ),
     };
-  }
+  };
 
-  static async lookupAll(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  lookupAll = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     return await actor.lookup(userNumber);
-  }
+  };
 
-  static async createChallenge(): Promise<Challenge> {
+  createChallenge = async (): Promise<Challenge> => {
     const actor = await this.createActor();
     const challenge = await actor.create_challenge();
     console.log("Challenge Created");
     return challenge;
-  }
+  };
 
-  static async lookupAuthenticators(
+  lookupAuthenticators = async (
     userNumber: UserNumber
-  ): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  ): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "authentication")
     );
-  }
+  };
 
-  static async addTentativeDevice(
+  addTentativeDevice = async (
     userNumber: UserNumber,
     alias: string,
     keyType: KeyType,
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
     credentialId?: ArrayBuffer
-  ): Promise<AddTentativeDeviceResponse> {
-    const actor = await IIConnection.createActor();
+  ): Promise<AddTentativeDeviceResponse> => {
+    const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -336,20 +319,20 @@ export class IIConnection {
       purpose,
       protection: { unprotected: null },
     });
-  }
+  };
 
-  static async lookupRecovery(userNumber: UserNumber): Promise<DeviceData[]> {
-    const actor = await IIConnection.createActor();
+  lookupRecovery = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+    const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) =>
       hasOwnProperty(device.purpose, "recovery")
     );
-  }
+  };
 
   // Create an actor representing the backend
-  static async createActor(
+  createActor = async (
     delegationIdentity?: DelegationIdentity
-  ): Promise<ActorSubclass<_SERVICE>> {
+  ): Promise<ActorSubclass<_SERVICE>> => {
     const agent = new HttpAgent({ identity: delegationIdentity });
 
     // Only fetch the root key when we're not in prod
@@ -358,11 +341,39 @@ export class IIConnection {
     }
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
-      canisterId: canisterId,
+      canisterId: this.canisterId,
     });
     return actor;
-  }
+  };
 
+  requestFEDelegation = async (
+    identity: SignIdentity
+  ): Promise<DelegationIdentity> => {
+    const sessionKey = Ed25519KeyIdentity.generate();
+    const tenMinutesInMsec = 10 * 1000 * 60;
+    // Here the security device is used. Besides creating new keys, this is the only place.
+    const chain = await DelegationChain.create(
+      identity,
+      sessionKey.getPublicKey(),
+      new Date(Date.now() + tenMinutesInMsec),
+      {
+        targets: [Principal.from(this.canisterId)],
+      }
+    );
+    return DelegationIdentity.fromDelegation(sessionKey, chain);
+  };
+}
+
+export class AuthenticatedConnection extends Connection {
+  public constructor(
+    public canisterId: string,
+    public identity: SignIdentity,
+    public delegationIdentity: DelegationIdentity,
+    public userNumber: bigint,
+    public actor?: ActorSubclass<_SERVICE>
+  ) {
+    super(canisterId);
+  }
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
@@ -375,8 +386,8 @@ export class IIConnection {
 
     if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
-      this.delegationIdentity = await requestFEDelegation(this.identity);
-      this.actor = await IIConnection.createActor(this.delegationIdentity);
+      this.delegationIdentity = await this.requestFEDelegation(this.identity);
+      this.actor = await this.createActor(this.delegationIdentity);
     }
 
     return this.actor;
@@ -483,23 +494,6 @@ export class IIConnection {
     );
   };
 }
-
-const requestFEDelegation = async (
-  identity: SignIdentity
-): Promise<DelegationIdentity> => {
-  const sessionKey = Ed25519KeyIdentity.generate();
-  const tenMinutesInMsec = 10 * 1000 * 60;
-  // Here the security device is used. Besides creating new keys, this is the only place.
-  const chain = await DelegationChain.create(
-    identity,
-    sessionKey.getPublicKey(),
-    new Date(Date.now() + tenMinutesInMsec),
-    {
-      targets: [Principal.from(canisterId)],
-    }
-  );
-  return DelegationIdentity.fromDelegation(sessionKey, chain);
-};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device

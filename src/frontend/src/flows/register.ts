@@ -5,6 +5,7 @@ import {
   IdentifiableIdentity,
   DummyIdentity,
   creationOptions,
+  Connection,
 } from "../utils/iiConnection";
 import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import {
@@ -34,10 +35,12 @@ const constructingContent = html`
   </div>
 `;
 
-export const register = async (): Promise<LoginFlowResult | null> => {
+export const register = async (
+  connection: Connection
+): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  return init();
+  return init(connection);
 };
 
 const renderConstructing = () => {
@@ -45,7 +48,7 @@ const renderConstructing = () => {
   render(constructingContent, container);
 };
 
-const init = (): Promise<LoginFlowResult | null> =>
+const init = (connection: Connection): Promise<LoginFlowResult | null> =>
   new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
@@ -78,7 +81,7 @@ const init = (): Promise<LoginFlowResult | null> =>
       try {
         // Kick-start both the captcha creation and the identity
         Promise.all([
-          makeCaptcha(),
+          makeCaptcha(connection),
           createIdentity() as Promise<IdentifiableIdentity>,
         ])
           .catch((error) => {
@@ -87,9 +90,12 @@ const init = (): Promise<LoginFlowResult | null> =>
             return 0 as unknown as [Challenge, IdentifiableIdentity];
           })
           .then(([captcha, identity]) => {
-            confirmRegister(Promise.resolve(captcha), identity, alias).then(
-              resolve
-            );
+            confirmRegister(
+              connection,
+              Promise.resolve(captcha),
+              identity,
+              alias
+            ).then(resolve);
           });
       } catch (err) {
         reject(err);

@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { initLogout, logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
@@ -233,7 +233,7 @@ const recoveryNag = () => html`
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -258,7 +258,7 @@ export const renderManage = async (
 // Initializes the management page.
 const init = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ) => {
   // TODO - Check alias for current identity, and populate #nameSpan
@@ -302,7 +302,7 @@ const init = async (
 
 const renderDevices = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ) => {
   const list = document.createElement("ul");

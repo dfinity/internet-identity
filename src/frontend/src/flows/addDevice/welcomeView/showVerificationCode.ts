@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../../utils/iiConnection";
+import { Connection } from "../../../utils/iiConnection";
 import {
   CredentialId,
   Timestamp,
@@ -45,6 +45,7 @@ const pageContent = (
  */
 export const showVerificationCode = async (
   userNumber: bigint,
+  connection: Connection,
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
   credentialToBeVerified: CredentialId
@@ -53,6 +54,7 @@ export const showVerificationCode = async (
   render(pageContent(userNumber, alias, tentativeRegistrationInfo), container);
   return init(
     userNumber,
+    connection,
     tentativeRegistrationInfo.device_registration_timeout,
     credentialToBeVerified
   );
@@ -60,10 +62,11 @@ export const showVerificationCode = async (
 
 function poll(
   userNumber: bigint,
+  connection: Connection,
   credentialToBeVerified: Array<number>,
   shouldStop: () => boolean
 ): Promise<boolean> {
-  return IIConnection.lookupAuthenticators(userNumber).then((deviceData) => {
+  return connection.lookupAuthenticators(userNumber).then((deviceData) => {
     if (shouldStop()) {
       return false;
     }
@@ -76,12 +79,13 @@ function poll(
         }
       }
     }
-    return poll(userNumber, credentialToBeVerified, shouldStop);
+    return poll(userNumber, connection, credentialToBeVerified, shouldStop);
   });
 }
 
 const init = async (
   userNumber: bigint,
+  connection: Connection,
   endTimestamp: bigint,
   credentialToBeVerified: CredentialId
 ): Promise<void> => {
@@ -99,16 +103,16 @@ const init = async (
       window.location.reload();
     }
   );
-  poll(userNumber, credentialToBeVerified, () => countdown.hasStopped()).then(
-    (verified) => {
-      if (verified) {
-        countdown.stop();
-        setUserNumber(userNumber);
-        // TODO L2-309: do this without reload
-        window.location.reload();
-      }
+  poll(userNumber, connection, credentialToBeVerified, () =>
+    countdown.hasStopped()
+  ).then((verified) => {
+    if (verified) {
+      countdown.stop();
+      setUserNumber(userNumber);
+      // TODO L2-309: do this without reload
+      window.location.reload();
     }
-  );
+  });
 
   const cancelButton = document.getElementById(
     "showCodeCancel"
