@@ -378,7 +378,9 @@ export class IIConnection extends Connection {
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
-  ) { super(connection.canisterId); }
+  ) {
+    super(connection.canisterId);
+  }
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {

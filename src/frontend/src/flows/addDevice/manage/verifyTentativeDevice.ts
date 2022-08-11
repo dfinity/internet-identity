@@ -1,5 +1,8 @@
 import { html, render } from "lit-html";
-import { AuthenticatedConnection, Connection } from "../../../utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+} from "../../../utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { hasOwnProperty } from "../../../utils/utils";
@@ -61,7 +64,7 @@ export const verifyDevice = async (
   connection: AuthenticatedConnection,
   userNumber: bigint,
   tentativeDevice: DeviceData,
-  endTimestamp: bigint,
+  endTimestamp: bigint
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDevice.alias), container);

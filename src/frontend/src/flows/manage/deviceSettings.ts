@@ -164,12 +164,7 @@ const init = async (
             device.credential_id
           );
         });
-        await deviceSettings(
-          connection,
-          userNumber,
-          device,
-          isOnlyDevice
-        );
+        await deviceSettings(connection, userNumber, device, isOnlyDevice);
         resolve();
       };
     }

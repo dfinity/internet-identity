@@ -54,7 +54,7 @@ const pageContent = () => html`
 
 export const displaySafariWarning = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
@@ -63,7 +63,7 @@ export const displaySafariWarning = async (
 
 const init = (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(

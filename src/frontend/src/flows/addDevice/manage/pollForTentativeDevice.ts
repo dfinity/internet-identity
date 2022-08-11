@@ -1,5 +1,8 @@
 import { html, render } from "lit-html";
-import { AuthenticatedConnection, Connection } from "../../../utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+} from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";
@@ -53,7 +56,7 @@ const pageContent = (userNumber: bigint) => html`
  */
 export const pollForTentativeDevice = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
@@ -63,12 +66,7 @@ export const pollForTentativeDevice = async (
     const tentativeDevice = getTentativeDevice(userInfo);
     if (tentativeDevice) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(
-        connection,
-        userNumber,
-        tentativeDevice,
-        timestamp,
-      );
+      await verifyDevice(connection, userNumber, tentativeDevice, timestamp);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
       render(pageContent(userNumber), container);
@@ -97,7 +95,7 @@ const poll = (
 const init = (
   connection: AuthenticatedConnection,
   userNumber: bigint,
-  endTimestamp: bigint,
+  endTimestamp: bigint
 ) => {
   const countdown = setupCountdown(
     endTimestamp,

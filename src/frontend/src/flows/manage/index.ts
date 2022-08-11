@@ -233,7 +233,7 @@ const recoveryNag = () => html`
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -244,7 +244,7 @@ export const renderManage = async (
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(connection,userNumber);
+    return renderManage(connection, userNumber);
   }
   if (anchorInfo.device_registration.length !== 0) {
     // we are actually in a device registration process

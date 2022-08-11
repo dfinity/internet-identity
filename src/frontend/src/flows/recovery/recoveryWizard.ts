@@ -6,7 +6,7 @@ import { iOSOrSafari } from "../../utils/utils";
 
 export const recoveryWizard = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> =>
   iOSOrSafari()
     ? await recoveryWizardSafari(connection, userNumber)
@@ -14,7 +14,7 @@ export const recoveryWizard = async (
 
 const recoveryWizardSafari = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   // Here, we let the user know about the quirks of Safari. The menu will take
   // them to the device picker, if they choose to.
@@ -25,7 +25,7 @@ const recoveryWizardSafari = async (
 
 const recoveryWizardDefault = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one. If after returning from the prompt they still haven't added one, then

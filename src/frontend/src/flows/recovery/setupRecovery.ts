@@ -14,7 +14,7 @@ import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   const devices = await connection.lookupAll(userNumber);
   const recoveryMechanism = await chooseRecoveryMechanism(devices);

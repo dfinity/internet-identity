@@ -17,7 +17,7 @@ const pageContent = (name: string) => html`
 export const successfullyAddedDevice = async (
   connection: AuthenticatedConnection,
   name: string,
-  userNumber: bigint,
+  userNumber: bigint
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(name), container);
@@ -27,11 +27,10 @@ export const successfullyAddedDevice = async (
 
 const init = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
+  userNumber: bigint
 ) => {
   const manageDevicesButton = document.getElementById(
     "manageDevicesButton"
   ) as HTMLButtonElement;
-  manageDevicesButton.onclick = () =>
-    renderManage(connection, userNumber);
+  manageDevicesButton.onclick = () => renderManage(connection, userNumber);
 };
