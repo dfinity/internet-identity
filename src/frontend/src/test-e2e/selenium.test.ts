@@ -322,25 +322,6 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
-test("Make recovery protected before unprotected", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await addVirtualAuthenticator(browser);
-    await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
-    const mainView = new MainView(browser);
-    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
-    await mainView.waitForDisplay();
-
-    const recoveryAlias = "Recovery phrase";
-    await mainView.deviceSettings(recoveryAlias);
-
-    const settingsView = new DeviceSettingsView(browser);
-    await settingsView.waitForDisplay();
-    await settingsView.protect(seedPhrase);
-  });
-}, 300_000);
-
 test("Remove unprotected recovery phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
