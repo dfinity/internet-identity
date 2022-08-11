@@ -117,9 +117,7 @@ export interface IdentifiableIdentity extends SignIdentity {
 }
 
 export class Connection {
-  public constructor(
-    readonly canisterId: string // TODO: should this be an actor?
-  ) {}
+  public constructor(readonly canisterId: string) {}
 
   register = async (
     identity: IdentifiableIdentity,
@@ -350,8 +348,6 @@ export class Connection {
   };
 
   // Create an actor representing the backend
-  // TODO: why is this part of 'Connection'?
-  // Can this actor be re-used?
   createActor = async (
     delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
@@ -369,10 +365,7 @@ export class Connection {
   };
 }
 
-// TODO: Split between "connection" and "authenticatedConnection" and make sure connection
-// has canister ID baked in (read from readCanisterId() in index.ts)
 export class AuthenticatedConnection extends Connection {
-  // TODO shouldn't be public
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
