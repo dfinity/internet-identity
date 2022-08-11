@@ -68,15 +68,15 @@ const isRecovery = (device: DeviceData): boolean =>
 
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   device: DeviceData,
   isOnlyDevice: boolean
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
   render(pageContent(userNumber, device, isOnlyDevice), container);
-  return init(connection, userNumber, device, isOnlyDevice);
+  return init(userNumber, connection, device, isOnlyDevice);
 };
 
 // Get a connection that's authenticated with the given device
@@ -89,8 +89,8 @@ const deviceConnection = async (
 ): Promise<IIConnection | null> => {
   try {
     const loginResult = await phraseRecoveryPage(
-      connection,
       userNumber,
+      connection,
       device,
       undefined,
       recoveryPhraseMessage
@@ -118,8 +118,8 @@ const deviceConnection = async (
 
 // Initializes the device settings page
 const init = async (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   device: DeviceData,
   isOnlyDevice: boolean
 ): Promise<void> =>
@@ -164,7 +164,7 @@ const init = async (
             device.credential_id
           );
         });
-        await deviceSettings(connection, userNumber, device, isOnlyDevice);
+        await deviceSettings(userNumber, connection, device, isOnlyDevice);
         resolve();
       };
     }

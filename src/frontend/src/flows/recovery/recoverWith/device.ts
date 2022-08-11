@@ -29,18 +29,18 @@ const pageContent = (userNumber: bigint) => html`
 `;
 
 export const deviceRecoveryPage = async (
-  connection: Connection,
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init(connection, userNumber, device);
+  return init(userNumber, connection, device);
 };
 
 const init = (
-  connection: Connection,
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
@@ -59,7 +59,7 @@ const init = (
             break;
           case "err":
             await displayError({ ...result, primaryButton: "Try again" });
-            deviceRecoveryPage(connection, userNumber, device).then((res) =>
+            deviceRecoveryPage(userNumber, connection, device).then((res) =>
               resolve(res)
             );
             break;

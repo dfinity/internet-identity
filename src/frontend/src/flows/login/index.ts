@@ -44,6 +44,6 @@ const tryLogin = async (connection: Connection): Promise<LoginFlowResult> => {
   if (userNumber === undefined) {
     return loginUnknownAnchor(connection);
   } else {
-    return loginKnownAnchor(connection, userNumber);
+    return loginKnownAnchor(userNumber, connection);
   }
 };

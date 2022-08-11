@@ -232,8 +232,8 @@ const recoveryNag = () => html`
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
@@ -244,21 +244,21 @@ export const renderManage = async (
     await displayFailedToListDevices(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(connection, userNumber);
+    return renderManage(userNumber, connection);
   }
   if (anchorInfo.device_registration.length !== 0) {
     // we are actually in a device registration process
-    await pollForTentativeDevice(connection, userNumber);
+    await pollForTentativeDevice(userNumber, connection);
   } else {
     render(pageContent(userNumber, anchorInfo.devices), container);
-    init(connection, userNumber, anchorInfo.devices);
+    init(userNumber, connection, anchorInfo.devices);
   }
 };
 
 // Initializes the management page.
 const init = async (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ) => {
   // TODO - Check alias for current identity, and populate #nameSpan
@@ -274,16 +274,16 @@ const init = async (
     const nextAction = await chooseDeviceAddFlow();
     if (nextAction === null) {
       // user clicked 'cancel'
-      await renderManage(connection, userNumber);
+      await renderManage(userNumber, connection);
       return;
     }
     switch (nextAction) {
       case "local": {
-        await addLocalDevice(connection, userNumber, devices);
+        await addLocalDevice(userNumber, connection, devices);
         return;
       }
       case "remote": {
-        await pollForTentativeDevice(connection, userNumber);
+        await pollForTentativeDevice(userNumber, connection);
         return;
       }
     }
@@ -294,15 +294,15 @@ const init = async (
     "#addRecovery"
   ) as HTMLButtonElement;
   setupRecoveryButton.onclick = async () => {
-    await setupRecovery(connection, userNumber);
-    renderManage(connection, userNumber);
+    await setupRecovery(userNumber, connection);
+    renderManage(userNumber, connection);
   };
-  renderDevices(connection, userNumber, devices);
+  renderDevices(userNumber, connection, devices);
 };
 
 const renderDevices = async (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ) => {
   const list = document.createElement("ul");
@@ -320,8 +320,8 @@ const renderDevices = async (
     if (buttonSettings !== null) {
       buttonSettings.onclick = async () => {
         await deviceSettings(
-          connection,
           userNumber,
+          connection,
           device,
           isOnlyDevice
         ).catch((e) =>
@@ -332,7 +332,7 @@ const renderDevices = async (
             primaryButton: "Ok",
           })
         );
-        await renderManage(connection, userNumber);
+        await renderManage(userNumber, connection);
       };
     }
     hasOwnProperty(device.purpose, "recovery")

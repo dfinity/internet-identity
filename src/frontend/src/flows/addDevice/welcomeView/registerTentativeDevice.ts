@@ -42,12 +42,12 @@ const pageContent = () => html`
  * @param userNumber anchor to add the tentative device to.
  */
 export const registerTentativeDevice = async (
-  connection: Connection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init(connection, userNumber);
+  return init(userNumber, connection);
 };
 
 export type TentativeDeviceInfo = [
@@ -69,8 +69,8 @@ export const addTentativeDevice = async (
 
   if (hasOwnProperty(result, "added_tentatively")) {
     await showVerificationCode(
-      connection,
       tentativeDeviceInfo[0],
+      connection,
       tentativeDeviceInfo[1],
       result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
@@ -93,7 +93,7 @@ export const addTentativeDevice = async (
   }
 };
 
-const init = async (connection: Connection, userNumber: bigint) => {
+const init = async (userNumber: bigint, connection: Connection) => {
   const existingAuthenticators = await withLoader(() =>
     connection.lookupAuthenticators(userNumber)
   );

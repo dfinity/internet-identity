@@ -22,15 +22,15 @@ export const successfullyAddedDevice = async (
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(name), container);
   initLogout();
-  init(connection, userNumber);
+  init(userNumber, connection);
 };
 
 const init = async (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ) => {
   const manageDevicesButton = document.getElementById(
     "manageDevicesButton"
   ) as HTMLButtonElement;
-  manageDevicesButton.onclick = () => renderManage(connection, userNumber);
+  manageDevicesButton.onclick = () => renderManage(userNumber, connection);
 };

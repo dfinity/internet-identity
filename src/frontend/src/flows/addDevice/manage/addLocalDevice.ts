@@ -23,13 +23,13 @@ const displayFailedToAddDevice = (error: Error) =>
  * Add a new device (i.e. a device connected to the browser the user is
  * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
  * add e.g. _another_ browser, macbook or iPhone.)
- * @param connection authenticated II connection
  * @param userNumber anchor to add the device to
+ * @param connection authenticated II connection
  * @param devices already existing devices
  */
 export const addLocalDevice = async (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ): Promise<void> => {
   let newDevice: WebAuthnIdentity;
@@ -41,12 +41,12 @@ export const addLocalDevice = async (
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(connection, userNumber);
+    return renderManage(userNumber, connection);
   }
   const deviceName = await pickDeviceAlias();
   if (deviceName === null) {
     // user clicked "cancel", so we go back to "manage"
-    return await renderManage(connection, userNumber);
+    return await renderManage(userNumber, connection);
   }
   try {
     await withLoader(() =>
@@ -64,7 +64,7 @@ export const addLocalDevice = async (
       error instanceof Error ? error : unknownError()
     );
   }
-  await renderManage(connection, userNumber);
+  await renderManage(userNumber, connection);
 };
 
 const unknownError = (): Error => {

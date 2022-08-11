@@ -12,11 +12,11 @@ export const useRecovery = async (
   userNumber?: bigint
 ): Promise<void> => {
   if (userNumber !== undefined) {
-    return runRecovery(connection, userNumber);
+    return runRecovery(userNumber, connection);
   } else {
     const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
     if (pUserNumber !== null) {
-      return runRecovery(connection, pUserNumber);
+      return runRecovery(pUserNumber, connection);
     } else {
       return window.location.reload();
     }
@@ -24,8 +24,8 @@ export const useRecovery = async (
 };
 
 const runRecovery = async (
-  connection: Connection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: Connection
 ): Promise<void> => {
   const recoveryDevices = await connection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
@@ -44,13 +44,13 @@ const runRecovery = async (
       : await pickRecoveryDevice(recoveryDevices);
 
   const res = hasOwnProperty(device.key_type, "seed_phrase")
-    ? await phraseRecoveryPage(connection, userNumber, device)
-    : await deviceRecoveryPage(connection, userNumber, device);
+    ? await phraseRecoveryPage(userNumber, connection, device)
+    : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {
     return window.location.reload();
   }
 
-  renderManage(res.connection, res.userNumber);
+  renderManage(res.userNumber, res.connection);
 };

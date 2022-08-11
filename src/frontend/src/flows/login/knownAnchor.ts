@@ -34,17 +34,17 @@ const pageContent = (userNumber: bigint) => html` <style>
   ${footer}`;
 
 export const loginKnownAnchor = async (
-  conn: Connection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: Connection
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init(conn, userNumber);
+  return init(userNumber, connection);
 };
 
 const init = async (
-  conn: Connection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: Connection
 ): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
     initLogout();
@@ -56,18 +56,18 @@ const init = async (
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const result = await withLoader(() => conn.login(userNumber));
+      const result = await withLoader(() => connection.login(userNumber));
       resolve(apiResultToLoginFlowResult(result));
     };
 
     loginDifferentButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      resolve(await loginUnknownAnchor(conn));
+      resolve(await loginUnknownAnchor(connection));
     };
     const recoverButton = document.getElementById(
       "recoverButton"
     ) as HTMLAnchorElement;
-    recoverButton.onclick = () => useRecovery(conn, userNumber);
+    recoverButton.onclick = () => useRecovery(connection, userNumber);
   });
 };

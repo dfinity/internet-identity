@@ -53,24 +53,24 @@ const pageContent = () => html`
 `;
 
 export const displaySafariWarning = async (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init(connection, userNumber);
+  return init(userNumber, connection);
 };
 
 const init = (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(
       "displayWarningAddRecovery"
     ) as HTMLButtonElement;
     displayWarningAddRecovery.onclick = () => {
-      setupRecovery(connection, userNumber).then(() => resolve());
+      setupRecovery(userNumber, connection).then(() => resolve());
     };
     const displayWarningRemindLater = document.getElementById(
       "displayWarningRemindLater"

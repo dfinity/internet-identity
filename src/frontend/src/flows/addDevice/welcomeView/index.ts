@@ -29,8 +29,8 @@ const pageContent = (userNumber: bigint | null) => html`
  * This shows a prompt to enter the identity anchor to add this new device to.
  */
 export const addRemoteDevice = async (
-  connection: Connection,
-  userNumber: bigint | null
+  userNumber: bigint | null,
+  connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
@@ -66,7 +66,7 @@ const init = (connection: Connection) => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
       toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", false);
-      await registerTentativeDevice(connection, userNumber);
+      await registerTentativeDevice(userNumber, connection);
     } else {
       toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", true);
       userNumberInput.placeholder = "Please enter your Identity Anchor first";

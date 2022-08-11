@@ -75,7 +75,7 @@ const init = async () => {
       // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
       const authSuccess = await authorizeAuthentication(connection);
       // show the recovery wizard before sending the window post message, otherwise the II window will be closed
-      await recoveryWizard(authSuccess.connection, authSuccess.userNumber);
+      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
       // send the delegation back to the dapp window (which will then close the II window)
       authSuccess.sendDelegationMessage();
       return;
@@ -83,12 +83,14 @@ const init = async () => {
     // Open the management page
     case "manage": {
       // Go through the login flow, potentially creating an anchor.
-      const { userNumber, connection } = await login(connection);
+      const { userNumber, connection: authenticatedConnection } = await login(
+        connection
+      );
       // Here, if the user doesn't have any recovery device, we prompt them to add
       // one. The exact flow depends on the device they use.
-      await recoveryWizard(connection, userNumber);
+      await recoveryWizard(userNumber, authenticatedConnection);
       // From here on, the user is authenticated to II.
-      return renderManage(connection, userNumber);
+      return renderManage(userNumber, authenticatedConnection);
     }
   }
 };

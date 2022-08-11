@@ -55,8 +55,8 @@ const pageContent = (userNumber: bigint) => html`
  * @param connection authenticated II connection
  */
 export const pollForTentativeDevice = async (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
@@ -66,18 +66,18 @@ export const pollForTentativeDevice = async (
     const tentativeDevice = getTentativeDevice(userInfo);
     if (tentativeDevice) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(connection, userNumber, tentativeDevice, timestamp);
+      await verifyDevice(userNumber, connection, tentativeDevice, timestamp);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
       render(pageContent(userNumber), container);
-      init(connection, userNumber, timestamp);
+      init(userNumber, connection, timestamp);
     }
   });
 };
 
 const poll = (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   shouldStop: () => boolean
 ): Promise<DeviceData | null> => {
   return connection.getAnchorInfo().then((response) => {
@@ -88,13 +88,13 @@ const poll = (
     if (tentativeDevice) {
       return tentativeDevice;
     }
-    return poll(connection, userNumber, shouldStop);
+    return poll(userNumber, connection, shouldStop);
   });
 };
 
 const init = (
-  connection: AuthenticatedConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   endTimestamp: bigint
 ) => {
   const countdown = setupCountdown(
@@ -107,15 +107,15 @@ const init = (
           'The timeout has been reached. For security reasons the "add device" process has been aborted.',
         primaryButton: "Ok",
       });
-      await renderManage(connection, userNumber);
+      await renderManage(userNumber, connection);
     }
   );
 
-  poll(connection, userNumber, () => countdown.hasStopped()).then(
+  poll(userNumber, connection, () => countdown.hasStopped()).then(
     async (device) => {
       if (!countdown.hasStopped() && device) {
         countdown.stop();
-        await verifyDevice(connection, userNumber, device, endTimestamp);
+        await verifyDevice(userNumber, connection, device, endTimestamp);
       }
     }
   );
@@ -126,7 +126,7 @@ const init = (
   cancelButton.onclick = async () => {
     countdown.stop();
     await withLoader(() => connection.exitDeviceRegistrationMode());
-    await renderManage(connection, userNumber);
+    await renderManage(userNumber, connection);
   };
 };
 

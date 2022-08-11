@@ -108,20 +108,20 @@ const pageContent = (userNumber: bigint, message?: string) => html`
 `;
 
 export const phraseRecoveryPage = async (
-  connection: Connection,
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData,
   prefilledPhrase?: string,
   message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, message), container);
-  return init(connection, userNumber, device, prefilledPhrase);
+  return init(userNumber, connection, device, prefilledPhrase);
 };
 
 const init = (
-  connection: Connection,
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData,
   prefilledPhrase?: string /* if set, prefilled as input */,
   message?: string
@@ -197,8 +197,8 @@ const init = (
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
           phraseRecoveryPage(
-            connection,
             userNumber,
+            connection,
             device,
             inputValue,
             message

@@ -13,8 +13,8 @@ import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async (
-  connection: AuthenticatedConnection,
-  userNumber: bigint
+  userNumber: bigint,
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const devices = await connection.lookupAll(userNumber);
   const recoveryMechanism = await chooseRecoveryMechanism(devices);
@@ -39,7 +39,7 @@ export const setupRecovery = async (
             detail: unknownToString(err, "Unknown error"),
             primaryButton: "Try a different method",
           });
-          return setupRecovery(connection, userNumber);
+          return setupRecovery(userNumber, connection);
         }
 
         return await withLoader(() =>
