@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyDevice } from "./verifyTentativeDevice";
@@ -53,7 +53,7 @@ const pageContent = (userNumber: bigint) => html`
  */
 export const pollForTentativeDevice = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   await withLoader(async () => {
     const [timestamp, userInfo] = await Promise.all([
@@ -63,18 +63,18 @@ export const pollForTentativeDevice = async (
     const tentativeDevice = getTentativeDevice(userInfo);
     if (tentativeDevice) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(userNumber, tentativeDevice, timestamp, connection);
+      await verifyDevice(userNumber, connection, tentativeDevice, timestamp);
     } else {
       const container = document.getElementById("pageContent") as HTMLElement;
       render(pageContent(userNumber), container);
-      init(userNumber, timestamp, connection);
+      init(userNumber, connection, timestamp);
     }
   });
 };
 
 const poll = (
-  connection: IIConnection,
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   shouldStop: () => boolean
 ): Promise<DeviceData | null> => {
   return connection.getAnchorInfo().then((response) => {
@@ -85,14 +85,14 @@ const poll = (
     if (tentativeDevice) {
       return tentativeDevice;
     }
-    return poll(connection, userNumber, shouldStop);
+    return poll(userNumber, connection, shouldStop);
   });
 };
 
 const init = (
   userNumber: bigint,
-  endTimestamp: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection,
+  endTimestamp: bigint
 ) => {
   const countdown = setupCountdown(
     endTimestamp,
@@ -108,11 +108,11 @@ const init = (
     }
   );
 
-  poll(connection, userNumber, () => countdown.hasStopped()).then(
+  poll(userNumber, connection, () => countdown.hasStopped()).then(
     async (device) => {
       if (!countdown.hasStopped() && device) {
         countdown.stop();
-        await verifyDevice(userNumber, device, endTimestamp, connection);
+        await verifyDevice(userNumber, connection, device, endTimestamp);
       }
     }
   );

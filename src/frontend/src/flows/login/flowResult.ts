@@ -1,11 +1,11 @@
-import { IIConnection, ApiResult } from "../../utils/iiConnection";
+import { AuthenticatedConnection, ApiResult } from "../../utils/iiConnection";
 
 export type LoginFlowResult = LoginFlowSuccess | LoginFlowError;
 
 export type LoginFlowSuccess = {
   tag: "ok";
   userNumber: bigint;
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
 };
 
 export type LoginFlowError = {
