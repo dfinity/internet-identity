@@ -38,53 +38,54 @@ function generateWebpackConfigForCanister(name, info) {
       path: path.join(__dirname, "dist"),
     },
     devServer: {
-
       // Set up a proxy that redirects API calls and /index.html to the
       // replica; the rest we serve from here.
       onBeforeSetupMiddleware: (devServer) => {
-          const dfxJson = './dfx.json';
-          let replicaHost;
+        const dfxJson = "./dfx.json";
+        let replicaHost;
 
-          try {
-              replicaHost = require(dfxJson).networks.local.bind;
-          } catch (e) {
-              throw Error(`Could get host from ${dfxJson}: ${e}`);
-          }
+        try {
+          replicaHost = require(dfxJson).networks.local.bind;
+        } catch (e) {
+          throw Error(`Could get host from ${dfxJson}: ${e}`);
+        }
 
-          // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
-          // requests are not forwarded properly
-          if(!replicaHost.startsWith("http://")) {
-              replicaHost = `http://${replicaHost}`;
-          }
+        // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
+        // requests are not forwarded properly
+        if (!replicaHost.startsWith("http://")) {
+          replicaHost = `http://${replicaHost}`;
+        }
 
-          const canisterIdsJson = './.dfx/local/canister_ids.json';
+        const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
-          let canisterId;
+        let canisterId;
 
-          try {
-              canisterId = require(canisterIdsJson).internet_identity.local;
-          } catch (e) {
-              throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
-          }
+        try {
+          canisterId = require(canisterIdsJson).internet_identity.local;
+        } catch (e) {
+          throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
+        }
 
-          // basically everything _except_ for index.js, because we want live reload
-          devServer.app.get(['/', '/index.html', '/faq', '/about' ], HttpProxyMiddlware.createProxyMiddleware( {
-              target: replicaHost,
-              pathRewrite: (pathAndParams, req) => {
-                  let queryParamsString = `?`;
+        // basically everything _except_ for index.js, because we want live reload
+        devServer.app.get(
+          ["/", "/index.html", "/faq", "/about"],
+          HttpProxyMiddlware.createProxyMiddleware({
+            target: replicaHost,
+            pathRewrite: (pathAndParams, req) => {
+              let queryParamsString = `?`;
 
-                  const [path, params] = pathAndParams.split("?");
+              const [path, params] = pathAndParams.split("?");
 
-                  if (params) {
-                      queryParamsString += `${params}&`;
-                  }
+              if (params) {
+                queryParamsString += `${params}&`;
+              }
 
-                  queryParamsString += `canisterId=${canisterId}`;
+              queryParamsString += `canisterId=${canisterId}`;
 
-                  return path + queryParamsString;
-              },
-
-          }));
+              return path + queryParamsString;
+            },
+          })
+        );
       },
       port: 8080,
       proxy: {
@@ -123,9 +124,9 @@ function generateWebpackConfigForCanister(name, info) {
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
-        "II_FETCH_ROOT_KEY": "0",
-        "II_DUMMY_AUTH": "0",
-        "II_DUMMY_CAPTCHA": "0",
+        II_FETCH_ROOT_KEY: "0",
+        II_DUMMY_AUTH: "0",
+        II_DUMMY_CAPTCHA: "0",
       }),
       new CompressionPlugin({
         test: /\.js(\?.*)?$/i,
