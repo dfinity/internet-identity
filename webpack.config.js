@@ -7,7 +7,6 @@ const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
-
 /** Read the replica host from dfx.json */
 function readReplicaHost() {
   const dfxJson = "./dfx.json";
@@ -30,7 +29,6 @@ function readReplicaHost() {
 
 /** Read the II canister ID from dfx's local state */
 function readCanisterId() {
-    console.log("Summoned");
   const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
   let canisterId;
@@ -41,7 +39,7 @@ function readCanisterId() {
     throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
   }
 
-  console.log("Reading can id", canisterId);
+  console.log("Read canister ID:", canisterId);
 
   return canisterId;
 }
@@ -80,7 +78,6 @@ function generateWebpackConfigForCanister(name, info) {
       // Set up a proxy that redirects API calls and /index.html to the
       // replica; the rest we serve from here.
       onBeforeSetupMiddleware: (devServer) => {
-
         // canisterId singleton, read lazily
         let canisterId = null;
 
