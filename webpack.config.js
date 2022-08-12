@@ -28,6 +28,24 @@ function readReplicaHost() {
   return replicaHost;
 }
 
+/** Read the II canister ID from dfx's local state */
+function readCanisterId() {
+    console.log("Summoned");
+  const canisterIdsJson = "./.dfx/local/canister_ids.json";
+
+  let canisterId;
+
+  try {
+    canisterId = require(canisterIdsJson).internet_identity.local;
+  } catch (e) {
+    throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
+  }
+
+  console.log("Reading can id", canisterId);
+
+  return canisterId;
+}
+
 /**
  * Generate a webpack configuration for a canister.
  */
@@ -62,24 +80,21 @@ function generateWebpackConfigForCanister(name, info) {
       // Set up a proxy that redirects API calls and /index.html to the
       // replica; the rest we serve from here.
       onBeforeSetupMiddleware: (devServer) => {
-        const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
-        let canisterId;
-
-        try {
-          canisterId = require(canisterIdsJson).internet_identity.local;
-        } catch (e) {
-          throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
-        }
+        // canisterId singleton, read lazily
+        let canisterId = null;
 
         // basically everything _except_ for index.js, because we want live reload
         devServer.app.get(
           ["/", "/index.html", "/faq", "/about"],
           HttpProxyMiddlware.createProxyMiddleware({
-
             // Read the replica host from dfx.json. The replica does not need to be running, which is convenient
             // in case we just load pages that don't talk to the canister (then we wouldn't want to have to start the replica or build the canister)
             target: readReplicaHost(),
+
+            // For path rewriting we use a function that lazily (i.e. when first called, using a singleton) reads
+            // the canister ID from the local dfx state and returns a new request path that includes
+            // the ?canisterId=foo atrocity
             pathRewrite: (pathAndParams, req) => {
               let queryParamsString = `?`;
 
@@ -87,6 +102,10 @@ function generateWebpackConfigForCanister(name, info) {
 
               if (params) {
                 queryParamsString += `${params}&`;
+              }
+
+              if (canisterId === null) {
+                canisterId = readCanisterId();
               }
 
               queryParamsString += `canisterId=${canisterId}`;
