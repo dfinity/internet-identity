@@ -7,6 +7,27 @@ const HttpProxyMiddlware = require("http-proxy-middleware");
 const dfxJson = require("./dfx.json");
 require("dotenv").config();
 
+
+/** Read the replica host from dfx.json */
+function readReplicaHost() {
+  const dfxJson = "./dfx.json";
+  let replicaHost;
+
+  try {
+    replicaHost = require(dfxJson).networks.local.bind;
+  } catch (e) {
+    throw Error(`Could get host from ${dfxJson}: ${e}`);
+  }
+
+  // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
+  // requests are not forwarded properly
+  if (!replicaHost.startsWith("http://")) {
+    replicaHost = `http://${replicaHost}`;
+  }
+
+  return replicaHost;
+}
+
 /**
  * Generate a webpack configuration for a canister.
  */
@@ -41,21 +62,6 @@ function generateWebpackConfigForCanister(name, info) {
       // Set up a proxy that redirects API calls and /index.html to the
       // replica; the rest we serve from here.
       onBeforeSetupMiddleware: (devServer) => {
-        const dfxJson = "./dfx.json";
-        let replicaHost;
-
-        try {
-          replicaHost = require(dfxJson).networks.local.bind;
-        } catch (e) {
-          throw Error(`Could get host from ${dfxJson}: ${e}`);
-        }
-
-        // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
-        // requests are not forwarded properly
-        if (!replicaHost.startsWith("http://")) {
-          replicaHost = `http://${replicaHost}`;
-        }
-
         const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
         let canisterId;
@@ -70,7 +76,10 @@ function generateWebpackConfigForCanister(name, info) {
         devServer.app.get(
           ["/", "/index.html", "/faq", "/about"],
           HttpProxyMiddlware.createProxyMiddleware({
-            target: replicaHost,
+
+            // Read the replica host from dfx.json. The replica does not need to be running, which is convenient
+            // in case we just load pages that don't talk to the canister (then we wouldn't want to have to start the replica or build the canister)
+            target: readReplicaHost(),
             pathRewrite: (pathAndParams, req) => {
               let queryParamsString = `?`;
 
