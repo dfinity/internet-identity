@@ -1,9 +1,5 @@
 import { html, render } from "lit-html";
-import {
-  networkIcon,
-  securityKeyIcon,
-  warningIcon,
-} from "../../../components/icons";
+import { networkIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
 
 const pageContent = () => html`
