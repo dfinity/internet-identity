@@ -686,9 +686,17 @@ a:hover,
   pointer-events: none;
 }
 
+.c-nav-links li {
+  position: relative;
+  padding: 0 var(--vs-inline);
+}
+
 .c-nav-links li + li::before {
+  position: absolute;
   content: "·";
-  margin: 0 calc(var(--vs-gutter) * 2);
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
 }
 
 .page-signature {
