@@ -1,7 +1,6 @@
 import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 
-html`<svg slot="warnIcon">${warningIcon}</svg>`;
 interface warnBoxProps {
   title: string;
   message: string | TemplateResult;
@@ -17,8 +16,8 @@ export const warnBox = (
     componentType: "div",
     slot: html`<button></button>`,
   }
-) => {
-  return html`${props.componentType === "div"
+): TemplateResult =>
+  html`${props.componentType === "div"
     ? html` <div class="warnBox">
         <div class="warnIcon">${warningIcon}</div>
         <div class="warnContent">
@@ -35,4 +34,3 @@ export const warnBox = (
           ${props.slot}
         </div>
       </aside>`}`;
-};
