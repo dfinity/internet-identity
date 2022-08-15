@@ -57,8 +57,8 @@ const iiPages: Record<string, () => void> = {
 // The showcase
 const pageContent = html`
   <div>
-    <h1>showcase</h1>
-    <ul>
+    <h1 class="t-title t-title--main">showcase</h1>
+    <ul class="c-list l-section">
       ${Object.entries(iiPages).map(([key, _]) => {
         return html`<li><a href="/${key}">${key}</a></li>`;
       })}
