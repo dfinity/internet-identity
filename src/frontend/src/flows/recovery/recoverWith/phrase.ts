@@ -39,7 +39,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
       animation-duration: 600ms;
     }
   </style>
-  <div class="l-container c-card  c-card--highlight full-width">
+  <div class="l-container c-card c-card--highlight full-width">
     <h1 class="t-title t-title--main">Your seed phrase</h1>
     <p class="t-lead">${
       message !== undefined ? message : "Please provide your seed phrase"

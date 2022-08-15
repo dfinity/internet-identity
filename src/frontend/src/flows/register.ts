@@ -40,7 +40,7 @@ const pageContent = html`
 `;
 
 const constructingContent = html`
-  <div class="l-container c-card  c-card--highlight">
+  <div class="l-container c-card c-card--highlight">
     <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
     ${icLogo}
     <p class="t-paragraph">
