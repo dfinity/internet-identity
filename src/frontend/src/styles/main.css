@@ -437,6 +437,7 @@ a:hover,
     max-width: 100%;
   }
 }
+*/
 
 .l-divider {
   display: block;
@@ -470,6 +471,7 @@ a:hover,
   display: block;
   margin-top: calc(var(--vs-stack) * 3);
 }
+*/
 
 .l-section--spacious {
   margin-top: calc(var(--vs-stack) * 5);

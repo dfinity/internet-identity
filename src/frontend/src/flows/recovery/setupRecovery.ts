@@ -6,7 +6,7 @@ import { generate } from "../../crypto/mnemonic";
 import {
   creationOptions,
   IC_DERIVATION_PATH,
-  IIConnection,
+  AuthenticatedConnection,
 } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
@@ -14,9 +14,9 @@ import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection
 ): Promise<void> => {
-  const devices = await IIConnection.lookupAll(userNumber);
+  const devices = await connection.lookupAll(userNumber);
   const recoveryMechanism = await chooseRecoveryMechanism(devices);
   if (recoveryMechanism === null) {
     return;

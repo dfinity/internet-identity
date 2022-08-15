@@ -8,7 +8,7 @@ import {
   LoginFlowCanceled,
 } from "../../login/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
-import { IIConnection } from "../../../utils/iiConnection";
+import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (userNumber: bigint) => html`
   <style>
@@ -30,15 +30,17 @@ const pageContent = (userNumber: bigint) => html`
 
 export const deviceRecoveryPage = async (
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init(userNumber, device);
+  return init(userNumber, connection, device);
 };
 
 const init = (
   userNumber: bigint,
+  connection: Connection,
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
@@ -48,7 +50,7 @@ const init = (
     if (buttonContinue !== null) {
       buttonContinue.onclick = async () => {
         const result = apiResultToLoginFlowResult(
-          await IIConnection.fromWebauthnDevices(userNumber, [device])
+          await connection.fromWebauthnDevices(userNumber, [device])
         );
 
         switch (result.tag) {
@@ -57,7 +59,9 @@ const init = (
             break;
           case "err":
             await displayError({ ...result, primaryButton: "Try again" });
-            deviceRecoveryPage(userNumber, device).then((res) => resolve(res));
+            deviceRecoveryPage(userNumber, connection, device).then((res) =>
+              resolve(res)
+            );
             break;
           default:
             unreachable(result);

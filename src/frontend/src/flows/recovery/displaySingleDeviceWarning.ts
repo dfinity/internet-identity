@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { warningIcon } from "../../components/icons";
 import { setupRecovery } from "./setupRecovery";
-import { IIConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
   <article id="warningContainer" class="l-container c-card c-card--highlight">
@@ -37,14 +37,17 @@ const pageContent = () => html`
 
 export const displaySingleDeviceWarning = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init(userNumber, connection);
 };
 
-const init = (userNumber: bigint, connection: IIConnection): Promise<void> =>
+const init = (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(
       "displayWarningAddRecovery"

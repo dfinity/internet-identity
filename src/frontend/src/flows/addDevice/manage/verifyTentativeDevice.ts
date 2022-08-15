@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { IIConnection } from "../../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { hasOwnProperty } from "../../../utils/utils";
@@ -59,9 +59,9 @@ const pageContent = (alias: string) => html`
  */
 export const verifyDevice = async (
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   tentativeDevice: DeviceData,
-  endTimestamp: bigint,
-  connection: IIConnection
+  endTimestamp: bigint
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDevice.alias), container);
@@ -70,7 +70,7 @@ export const verifyDevice = async (
 
 const init = (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   endTimestamp: bigint
 ) => {
   const countdown = setupCountdown(

@@ -8,7 +8,7 @@ import {
   setUserNumber,
 } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { IIConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,
@@ -89,7 +89,7 @@ const derivationOriginSection = (derivationOrigin: string) => html` <p
 
 export interface AuthSuccess {
   userNumber: bigint;
-  connection: IIConnection;
+  connection: AuthenticatedConnection;
   sendDelegationMessage: () => void;
 }
 
@@ -98,7 +98,7 @@ export interface AuthSuccess {
  * the delegation to the application window. After having received the delegation the application will close the
  * Internet Identity window.
  */
-export default async (): Promise<AuthSuccess> => {
+export default async (connection: Connection): Promise<AuthSuccess> => {
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -144,7 +144,7 @@ export default async (): Promise<AuthSuccess> => {
       });
     case "valid":
       return new Promise((resolve) => {
-        init(authContext, userNumber).then(resolve);
+        init(connection, authContext, userNumber).then(resolve);
       });
     default:
       unreachable(validationResult);
@@ -153,6 +153,7 @@ export default async (): Promise<AuthSuccess> => {
 };
 
 const init = (
+  connection: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -162,7 +163,7 @@ const init = (
     authContext.authRequest.derivationOrigin
   );
   initManagementBtn();
-  initRecovery();
+  initRecovery(connection);
 
   const authorizeButton = document.getElementById(
     "authorizeButton"
@@ -205,9 +206,9 @@ const init = (
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
-    initRegistration(authContext, userNumber).then(resolve);
+    initRegistration(connection, authContext, userNumber).then(resolve);
     authorizeButton.onclick = () => {
-      authenticateUser(authContext).then((authSuccess) => {
+      authenticateUser(connection, authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
         }
@@ -227,6 +228,7 @@ function initManagementBtn() {
 }
 
 const initRegistration = async (
+  connection: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
@@ -235,11 +237,11 @@ const initRegistration = async (
   ) as HTMLButtonElement;
   return new Promise((resolve) => {
     registerButton.onclick = () => {
-      registerIfAllowed()
+      registerIfAllowed(connection)
         .then((result) => {
           if (result === null) {
             // user canceled registration
-            return init(authContext, userNumber);
+            return init(connection, authContext, userNumber);
           }
           if (result.tag === "ok") {
             return handleAuthSuccess(result, authContext);
@@ -250,7 +252,7 @@ const initRegistration = async (
             message: result.message,
             detail: result.detail !== "" ? result.detail : undefined,
             primaryButton: "Try again",
-          }).then(() => init(authContext, userNumber));
+          }).then(() => init(connection, authContext, userNumber));
         })
         .then(resolve);
     };
@@ -258,6 +260,7 @@ const initRegistration = async (
 };
 
 const authenticateUser = async (
+  connection: Connection,
   authContext: AuthContext
 ): Promise<AuthSuccess | null> => {
   const userNumber = readUserNumber();
@@ -266,7 +269,7 @@ const authenticateUser = async (
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
     }
-    const result = await withLoader(() => IIConnection.login(userNumber));
+    const result = await withLoader(() => connection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
       return await withLoader(() =>
@@ -287,7 +290,7 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return init(authContext, userNumber);
+  return init(connection, authContext, userNumber);
 };
 
 const displayPage = (
@@ -321,11 +324,11 @@ async function handleAuthSuccess(
   };
 }
 
-const initRecovery = () => {
+const initRecovery = (connection: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
   ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(readUserNumber());
+  recoverButton.onclick = () => useRecovery(connection, readUserNumber());
 };
 
 /**

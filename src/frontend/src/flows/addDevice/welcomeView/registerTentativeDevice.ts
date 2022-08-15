@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { creationOptions, IIConnection } from "../../../utils/iiConnection";
+import { creationOptions, Connection } from "../../../utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { DerEncodedPublicKey } from "@dfinity/agent";
@@ -38,11 +38,12 @@ const pageContent = () => html`
  * @param userNumber anchor to add the tentative device to.
  */
 export const registerTentativeDevice = async (
-  userNumber: bigint
+  userNumber: bigint,
+  connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init(userNumber);
+  return init(userNumber, connection);
 };
 
 export type TentativeDeviceInfo = [
@@ -55,21 +56,23 @@ export type TentativeDeviceInfo = [
 ];
 
 export const addTentativeDevice = async (
+  connection: Connection,
   tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const result = await withLoader(() =>
-    IIConnection.addTentativeDevice(...tentativeDeviceInfo)
+    connection.addTentativeDevice(...tentativeDeviceInfo)
   );
 
   if (hasOwnProperty(result, "added_tentatively")) {
     await showVerificationCode(
       tentativeDeviceInfo[0],
+      connection,
       tentativeDeviceInfo[1],
       result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
   } else if (hasOwnProperty(result, "device_registration_mode_off")) {
-    await deviceRegistrationDisabledInfo(tentativeDeviceInfo);
+    await deviceRegistrationDisabledInfo(connection, tentativeDeviceInfo);
   } else if (hasOwnProperty(result, "another_device_tentatively_added")) {
     await displayError({
       title: "Tentative Device Already Exists",
@@ -86,9 +89,9 @@ export const addTentativeDevice = async (
   }
 };
 
-const init = async (userNumber: bigint) => {
+const init = async (userNumber: bigint, connection: Connection) => {
   const existingAuthenticators = await withLoader(() =>
-    IIConnection.lookupAuthenticators(userNumber)
+    connection.lookupAuthenticators(userNumber)
   );
   const cancelButton = document.getElementById(
     "registerTentativeDeviceCancel"
@@ -144,6 +147,6 @@ const init = async (userNumber: bigint) => {
       newDevice.getPublicKey().toDer(),
       newDevice.rawId,
     ];
-    await addTentativeDevice(tentativeDeviceInfo);
+    await addTentativeDevice(connection, tentativeDeviceInfo);
   };
 };
