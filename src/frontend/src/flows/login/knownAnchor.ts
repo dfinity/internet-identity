@@ -30,9 +30,7 @@ const pageContent = (userNumber: bigint) => html`
         <a id="recoverButton" class="t-link">and want to recover?</a>
       </p>
     </div>
-    <div class="l-section">
-      ${logoutSection("Clear Identity Anchor from browser")}
-    </div>
+    ${logoutSection("Clear Identity Anchor from browser")}
     ${navbar}
   </div>
   ${footer}`;

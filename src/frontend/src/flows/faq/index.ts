@@ -256,7 +256,7 @@ function renderQuestion(faq: Question) {
 }
 
 function renderFaqLinks(links: Link[]) {
-  return html` <ul class="faq__answer-links">
+  return html` <ul class="c-list c-list--bulleted l-section">
     ${Object.values(links)
       .sort((a, b) => {
         return a.link < b.link ? -1 : 1;
@@ -264,7 +264,6 @@ function renderFaqLinks(links: Link[]) {
       .map(
         (link) =>
           html`<li>
-            &middot;
             ${mkExternalLink({ href: link.link, text: `${link.name}` })}
           </li>`
       )}
