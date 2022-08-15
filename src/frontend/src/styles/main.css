@@ -556,7 +556,7 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  margin: calc(var(--s-logo-stack) - 1rem) 0 var(--s-logo-stack);
+  margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
 }
 
 .c-logo svg {
