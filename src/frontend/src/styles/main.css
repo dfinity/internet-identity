@@ -161,6 +161,7 @@
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
 
+/*
 @media (prefers-color-scheme: dark) {
   :root {
     --rc-text: var(--rc-light);
@@ -175,6 +176,7 @@
     --rc-onButton: var(--rc-dark);
   }
 }
+*/
 
 /***
  * III) Generic: Ground-zero styles (Normalize.css, resets, box-sizing)
