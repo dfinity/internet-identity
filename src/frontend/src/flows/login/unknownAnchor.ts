@@ -33,7 +33,7 @@ const pageContent = () => html`
       <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?
-          <a id="registerButton" class="t-link">Create an Internet Identity Anchor.</button>
+          <a id="registerButton" class="t-link">Create an Internet Identity Anchor.</a>
         </li>
         <li class="textLink">
           Already have an anchor
