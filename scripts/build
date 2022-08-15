@@ -63,7 +63,10 @@ done
 # Checking for dependencies
 if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
 then
-    cargo install ic-cdk-optimizer --version 0.3.4
+    echo "could not find ic-cdk-optimizer 0.3.4"
+    echo "ic-cdk-optimizer version 0.3.4 is needed, please run the following command:"
+    echo "  cargo install ic-cdk-optimizer --version 0.3.4"
+    exit 1
 fi
 
 if [ "$ONLY_DEPS" != "1" ]
