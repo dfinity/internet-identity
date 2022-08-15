@@ -26,8 +26,7 @@ const pageContent = html`
           <h3 class="t-title">For Desktop</h3>
           <ul class="c-list c-list--bulleted l-section">
             ${compatibilityData.desktop.map(
-              (browser) =>
-                html`<li>${browser}</li>`
+              (browser) => html`<li>${browser}</li>`
             )}
           </ul>
         </div>
@@ -35,8 +34,7 @@ const pageContent = html`
           <h3 class="t-title">For Mobile</h3>
           <ul class="c-list c-list--bulleted l-section">
             ${compatibilityData.mobile.map(
-              (browser) =>
-                html`<li>${browser}</li>`
+              (browser) => html`<li>${browser}</li>`
             )}
           </ul>
         </div>

@@ -437,9 +437,7 @@ a:hover,
     max-width: 100%;
   }
 }
-*/
-
-.l-divider {
+*/ .l-divider {
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
   margin-bottom: calc(var(--vs-stack) * 2);
@@ -471,9 +469,7 @@ a:hover,
   display: block;
   margin-top: calc(var(--vs-stack) * 3);
 }
-*/
-
-.l-section--spacious {
+*/ .l-section--spacious {
   margin-top: calc(var(--vs-stack) * 5);
 }
 
@@ -503,9 +499,7 @@ a:hover,
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
 }
-*/
-
-.c-card--outline {
+*/ .c-card--outline {
   border: var(--vs-line) var(--rc-line-inverted) solid;
 }
 
@@ -759,7 +753,6 @@ a:hover,
   padding: var(--rs-button-bezel);
   background: var(--rc-background);
 }
-
 
 /* trumps all other rules */
 
