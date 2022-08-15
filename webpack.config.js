@@ -138,7 +138,6 @@ module.exports = [
         ],
       }),
       new webpack.ProvidePlugin({
-        Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
@@ -197,7 +196,6 @@ module.exports = [
       }),
       new HtmlWebpackPlugin(),
       new webpack.ProvidePlugin({
-        Buffer: [require.resolve("buffer/"), "Buffer"],
         process: require.resolve("process/browser"),
       }),
       new webpack.EnvironmentPlugin({
