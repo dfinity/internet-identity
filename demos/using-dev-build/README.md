@@ -33,9 +33,10 @@ If the IC actually lets the call (request) through to the `whoami` canister, it 
 
 ### Using the Auth-Client Library To Log In With Internet Identity
 
-DFINITY provides an [easy-to-use library (agent-js)](https://github.com/dfinity/agent-js) to log in with Internet Identity. 
+DFINITY provides an [easy-to-use library (agent-js)](https://github.com/dfinity/agent-js) to log in with Internet Identity.
 
 These are the steps required to log in and use the obtained identity for canister calls:
+
 ```js
 // First we have to create and AuthClient.
 const authClient = await AuthClient.create();
@@ -50,7 +51,9 @@ await new Promise((resolve, reject) => {
   });
 });
 ```
+
 Once the user has been authenticated with Internet Identity we have access to the identity:
+
 ```js
 // Get the identity from the auth client:
 const identity = authClient.getIdentity();
@@ -64,6 +67,7 @@ const webapp = Actor.createActor(webapp_idl, {
 // Call whoami which returns the principal (user id) of the current user.
 const principal = await webapp.whoami();
 ```
+
 See [`index.js`](./webapp/index.js) for the full working example.
 A detailed description of what happens behind the scenes is available in the [client auth protocol specification](https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#client-auth-protocol).
 

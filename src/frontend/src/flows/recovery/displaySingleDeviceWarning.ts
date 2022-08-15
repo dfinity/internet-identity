@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { warningIcon } from "../../components/icons";
 import { setupRecovery } from "./setupRecovery";
-import { IIConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
   <style>
@@ -9,10 +9,10 @@ const pageContent = () => html`
       min-height: 15rem;
     }
     .warningIcon {
-      align-self: center;
+      display: block;
       width: 3rem;
       height: 3rem;
-      margin-bottom: 1.5rem;
+      margin: 0 auto 1.5rem;
     }
     #warningHeading {
       text-align: center;
@@ -27,8 +27,8 @@ const pageContent = () => html`
       min-height: 48px;
     }
   </style>
-  <div id="warningContainer" class="container">
-    ${warningIcon}
+  <article id="warningContainer" class="container">
+    <div aria-hidden>${warningIcon}</div>
     <h1 id="warningHeading">Warning</h1>
     <p>
       If you lose all the devices assigned to your Internet Identity anchor,
@@ -49,19 +49,22 @@ const pageContent = () => html`
       Skip, I understand the risks
     </button>
     <div class="spacer"></div>
-  </div>
+  </article>
 `;
 
 export const displaySingleDeviceWarning = async (
   userNumber: bigint,
-  connection: IIConnection
+  connection: AuthenticatedConnection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init(userNumber, connection);
 };
 
-const init = (userNumber: bigint, connection: IIConnection): Promise<void> =>
+const init = (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(
       "displayWarningAddRecovery"

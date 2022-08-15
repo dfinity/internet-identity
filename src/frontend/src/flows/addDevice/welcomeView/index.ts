@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { parseUserNumber } from "../../../utils/userNumber";
 import { registerTentativeDevice } from "./registerTentativeDevice";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (userNumber: bigint | null) => html`
   <div class="container">
@@ -28,14 +29,15 @@ const pageContent = (userNumber: bigint | null) => html`
  * This shows a prompt to enter the identity anchor to add this new device to.
  */
 export const addRemoteDevice = async (
-  userNumber: bigint | null
+  userNumber: bigint | null,
+  connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
-  return init();
+  return init(connection);
 };
 
-const init = () => {
+const init = (connection: Connection) => {
   const cancelButton = document.getElementById(
     "addDeviceUserNumberCancel"
   ) as HTMLButtonElement;
@@ -64,7 +66,7 @@ const init = () => {
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber !== null) {
       toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", false);
-      await registerTentativeDevice(userNumber);
+      await registerTentativeDevice(userNumber, connection);
     } else {
       toggleErrorMessage("addDeviceUserNumber", "invalidAnchorMessage", true);
       userNumberInput.placeholder = "Please enter your Identity Anchor first";

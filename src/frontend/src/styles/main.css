@@ -163,11 +163,17 @@ button {
 
 button:not([disabled]):hover,
 button:not([disabled]):focus,
-a:focus {
+a:focus,
+.linkStyle:hover {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
   outline: 2px dotted transparent;
   outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.linkStyle:hover {
+  cursor: pointer;
 }
 
 #captchaImg {
@@ -243,8 +249,8 @@ main {
 }
 
 .container {
-  padding: 3.5rem 0.5rem 2rem;
-  max-width: 365px;
+  padding: 3.5rem 1rem 2rem;
+  width: min(calc(100vw), 365px);
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -255,7 +261,6 @@ main {
   .container {
     padding: 3.5rem 2.5rem 2rem;
     border: 2px var(--grey-100) solid;
-    min-width: 300px;
     border-radius: 4px;
     box-sizing: inherit;
   }
@@ -309,7 +314,7 @@ main {
   margin-bottom: 0.7rem;
   font-size: 0.95rem;
 }
-.textLink button {
+.textLink a {
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
@@ -344,7 +349,15 @@ nav {
 }
 
 .nav-links {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+}
+
+.nav-links li + li::before {
+  content: "·";
+  margin: 0 0.5rem;
 }
 
 .nav-link {
@@ -372,20 +385,21 @@ nav {
 .deviceItemAlias {
   border: 1px solid var(--grey-200);
   border-radius: 2px;
-  height: 40px;
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   margin-right: 0.5rem;
   margin-bottom: 16px;
-  padding-left: 1rem;
+  padding: 0.5rem 1rem;
+  overflow: auto;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .deviceItemAction {
   border-radius: 2px;
   padding: 0;
   width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -634,6 +648,7 @@ nav {
 .warnTitle {
   font-weight: 600;
   font-size: 1.1rem;
+  margin: 0;
 }
 .warnMessage {
   margin-top: 0.5rem;
@@ -650,4 +665,12 @@ nav {
 
 button[data-action="protect"] {
   margin-bottom: 0;
+}
+
+.container h1 {
+  word-break: break-word;
+}
+
+input.inputDeviceAlias {
+  line-height: 1;
 }

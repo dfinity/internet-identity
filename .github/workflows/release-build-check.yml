@@ -37,7 +37,7 @@ jobs:
     needs: latest-release
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, macos-12 ]
+        os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-11, macos-12 ]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -47,3 +47,13 @@ jobs:
         with:
           # we check that ubuntu builds match the latest release build
           sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.sha256 || '' }}
+
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        if: ${{ failure() }}
+        run: |
+          echo '{}' | jq --arg text "Release build check failed" '.text = $text' | \
+            curl -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

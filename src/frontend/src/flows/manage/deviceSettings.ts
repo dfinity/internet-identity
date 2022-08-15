@@ -1,6 +1,10 @@
 import { render, html } from "lit-html";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { bufferEqual, IIConnection } from "../../utils/iiConnection";
+import {
+  bufferEqual,
+  AuthenticatedConnection,
+  Connection,
+} from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
@@ -19,7 +23,7 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean
 ) => html`
-  <div id="deviceSettings" class="container">
+  <article id="deviceSettings" class="container">
     <h1 style="margin: 0 0 1.5rem">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
@@ -48,7 +52,7 @@ const pageContent = (
           <p>Without devices your anchor would be inaccessible.</p>`
       : ""}
     <button data-action="back">Back</button>
-  </div>
+  </article>
   ${footer}
 `;
 
@@ -68,7 +72,7 @@ const isRecovery = (device: DeviceData): boolean =>
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   device: DeviceData,
   isOnlyDevice: boolean
 ): Promise<void> => {
@@ -81,13 +85,15 @@ export const deviceSettings = async (
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
+  connection: Connection,
   userNumber: bigint,
   device: DeviceData,
   recoveryPhraseMessage: string
-): Promise<IIConnection | null> => {
+): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await phraseRecoveryPage(
       userNumber,
+      connection,
       device,
       undefined,
       recoveryPhraseMessage
@@ -116,7 +122,7 @@ const deviceConnection = async (
 // Initializes the device settings page
 const init = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   device: DeviceData,
   isOnlyDevice: boolean
 ): Promise<void> =>
@@ -139,6 +145,7 @@ const init = async (
         // but we do it to make sure one last time that the user can actually successfully authenticate
         // with the device.
         const newConnection = await deviceConnection(
+          connection,
           userNumber,
           device,
           "Please input your recovery phrase to protect it."
@@ -152,7 +159,6 @@ const init = async (
           }
 
           await newConnection.update(
-            userNumber,
             device.pubkey,
             device.alias,
             device.key_type,
@@ -195,6 +201,7 @@ const init = async (
         // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
         const removalConnection = isProtected(device)
           ? await deviceConnection(
+              connection,
               userNumber,
               device,
               "Please input your recovery phrase to remove it."
@@ -207,7 +214,7 @@ const init = async (
             await resolve();
             return;
           }
-          await removalConnection.remove(userNumber, device.pubkey);
+          await removalConnection.remove(device.pubkey);
         });
 
         if (sameDevice) {

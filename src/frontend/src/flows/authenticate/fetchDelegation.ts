@@ -1,4 +1,4 @@
-import { IIConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { AuthContext, Delegation } from "./postMessageInterface";
 import {
   PublicKey,
@@ -16,7 +16,7 @@ import { hasOwnProperty } from "../../utils/utils";
 export const fetchDelegation = async (
   loginResult: {
     userNumber: bigint;
-    connection: IIConnection;
+    connection: AuthenticatedConnection;
   },
   authContext: AuthContext
 ): Promise<[PublicKey, Delegation]> => {
@@ -29,7 +29,6 @@ export const fetchDelegation = async (
       : authContext.requestOrigin;
 
   const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
-    loginResult.userNumber,
     derivationOrigin,
     sessionKey,
     authContext.authRequest.maxTimeToLive
@@ -58,7 +57,7 @@ export const fetchDelegation = async (
 };
 
 const retryGetDelegation = async (
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   userNumber: bigint,
   hostname: string,
   sessionKey: PublicKey,
@@ -70,12 +69,7 @@ const retryGetDelegation = async (
     await new Promise((resolve) => {
       setInterval(resolve, 1000 * i);
     });
-    const res = await connection.getDelegation(
-      userNumber,
-      hostname,
-      sessionKey,
-      timestamp
-    );
+    const res = await connection.getDelegation(hostname, sessionKey, timestamp);
     if (hasOwnProperty(res, "signed_delegation")) {
       return res.signed_delegation;
     }

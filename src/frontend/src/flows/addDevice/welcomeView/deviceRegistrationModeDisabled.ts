@@ -1,4 +1,5 @@
 import { html, render } from "lit-html";
+import { Connection } from "../../../utils/iiConnection";
 import {
   addTentativeDevice,
   TentativeDeviceInfo,
@@ -42,14 +43,16 @@ const pageContent = (userNumber: bigint) => html`
  * @param tentativeDeviceInfo Information about the device to be added so that the user does not have to enter everything again after enabling device registration mode.
  */
 export const deviceRegistrationDisabledInfo = async (
+  connection: Connection,
   tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDeviceInfo[0]), container);
-  return init(tentativeDeviceInfo);
+  return init(connection, tentativeDeviceInfo);
 };
 
 const init = async (
+  connection: Connection,
   tentativeDeviceInfo: TentativeDeviceInfo
 ): Promise<void> => {
   const cancelButton = document.getElementById(
@@ -66,6 +69,6 @@ const init = async (
   ) as HTMLButtonElement;
 
   retryButton.onclick = async () => {
-    await addTentativeDevice(tentativeDeviceInfo);
+    await addTentativeDevice(connection, tentativeDeviceInfo);
   };
 };

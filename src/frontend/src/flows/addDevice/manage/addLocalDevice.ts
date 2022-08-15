@@ -1,4 +1,7 @@
-import { creationOptions, IIConnection } from "../../../utils/iiConnection";
+import {
+  creationOptions,
+  AuthenticatedConnection,
+} from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { pickDeviceAlias } from "./addDevicePickAlias";
@@ -25,7 +28,7 @@ const displayFailedToAddDevice = (error: Error) =>
  */
 export const addLocalDevice = async (
   userNumber: bigint,
-  connection: IIConnection,
+  connection: AuthenticatedConnection,
   devices: DeviceData[]
 ): Promise<void> => {
   let newDevice: WebAuthnIdentity;
@@ -47,7 +50,6 @@ export const addLocalDevice = async (
   try {
     await withLoader(() =>
       connection.add(
-        userNumber,
         deviceName,
         { unknown: null },
         { authentication: null },

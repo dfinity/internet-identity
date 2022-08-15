@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { IIConnection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { icLogo } from "../../components/icons";
@@ -35,49 +35,73 @@ const pageContent = () => html` <style>
     .spacer {
       height: 2rem;
     }
+
+    .list-reset li {
+      list-style: none;
+    }
+    .input {
+      box-sizing: border-box;
+    }
+    .input--fullwidth {
+      width: 100%;
+    }
   </style>
-  <div class="container">
+  <section class="container" aria-label="Authentication">
     ${icLogo}
-    <h2 id="loginWelcome">Welcome to<br />Internet Identity</h2>
-    <p>Provide an Identity Anchor to authenticate.</p>
-    <input
-      type="text"
-      id="registerUserNumber"
-      placeholder="Enter Identity Anchor"
-    />
-    <button type="button" id="loginButton" class="primary">Authenticate</button>
-    <div class="textLink" id="registerSection">
-      New?
-      <button id="registerButton" class="linkStyle">
-        Create an Internet Identity Anchor.
+
+    <article>
+      <h1 id="loginWelcome">Welcome to<br />Internet Identity</h1>
+      <p>Provide an Identity Anchor to authenticate.</p>
+      <input
+        type="text"
+        class="input input--fullwidth"
+        id="registerUserNumber"
+        placeholder="Enter Identity Anchor"
+      />
+      <button type="button" id="loginButton" class="primary">
+        Authenticate
       </button>
-    </div>
-    <div class="textLink">
-      Already have an anchor
-      <button id="addNewDeviceButton" class="linkStyle">
-        but using a new device?
-      </button>
-    </div>
-    <div class="textLink">
-      Lost access
-      <button id="recoverButton" class="linkStyle">and want to recover?</button>
-    </div>
+    </article>
+
+    <aside aria-label="Other actions">
+      <ul class="list-reset">
+        <li class="textLink" id="registerSection">
+          New?
+          <a id="registerButton" class="linkStyle">
+            Create an Internet Identity Anchor.
+          </a>
+        </li>
+        <li class="textLink">
+          Already have an anchor
+          <a id="addNewDeviceButton" class="linkStyle">
+            but using a new device?
+          </a>
+        </li>
+        <li class="textLink">
+          Lost access
+          <a id="recoverButton" class="linkStyle"> and want to recover? </a>
+        </li>
+      </ul>
+    </aside>
     ${navbar}
-  </div>
+  </section>
   ${footer}`;
 
-export const loginUnknownAnchor = async (): Promise<LoginFlowResult> => {
+export const loginUnknownAnchor = async (
+  connection: Connection
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return new Promise((resolve, reject) => {
-    initLogin(resolve);
-    initLinkDevice();
-    initRegister(resolve, reject);
-    initRecovery();
+    initLogin(connection, resolve);
+    initLinkDevice(connection);
+    initRegister(connection, resolve, reject);
+    initRecovery(connection);
   });
 };
 
 const initRegister = (
+  connection: Connection,
   resolve: (res: LoginFlowResult) => void,
   reject: (err: Error) => void
 ) => {
@@ -85,7 +109,7 @@ const initRegister = (
     "registerButton"
   ) as HTMLButtonElement;
   registerButton.onclick = () => {
-    registerIfAllowed()
+    registerIfAllowed(connection)
       .then((res) => {
         if (res === null) {
           window.location.reload();
@@ -97,14 +121,17 @@ const initRegister = (
   };
 };
 
-const initRecovery = () => {
+const initRecovery = (connection: Connection) => {
   const recoverButton = document.getElementById(
     "recoverButton"
-  ) as HTMLButtonElement;
-  recoverButton.onclick = () => useRecovery();
+  ) as HTMLAnchorElement;
+  recoverButton.onclick = () => useRecovery(connection);
 };
 
-const initLogin = (resolve: (res: LoginFlowResult) => void) => {
+const initLogin = (
+  connection: Connection,
+  resolve: (res: LoginFlowResult) => void
+) => {
   const userNumberInput = document.getElementById(
     "registerUserNumber"
   ) as HTMLInputElement;
@@ -129,7 +156,7 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => IIConnection.login(userNumber));
+    const result = await withLoader(() => connection.login(userNumber));
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }
@@ -137,7 +164,7 @@ const initLogin = (resolve: (res: LoginFlowResult) => void) => {
   };
 };
 
-const initLinkDevice = () => {
+const initLinkDevice = (connection: Connection) => {
   const addNewDeviceButton = document.getElementById(
     "addNewDeviceButton"
   ) as HTMLButtonElement;
@@ -148,6 +175,6 @@ const initLinkDevice = () => {
     ) as HTMLInputElement;
 
     const userNumber = parseUserNumber(userNumberInput.value);
-    await addRemoteDevice(userNumber);
+    await addRemoteDevice(userNumber, connection);
   };
 };
