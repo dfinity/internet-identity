@@ -4,18 +4,19 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "start": "II_FETCH_ROOT_KEY=1 webpack serve",
+    "start": "II_FETCH_ROOT_KEY=1 webpack serve --config-name app",
     "generate": "npm run generate:types && npm run generate:js",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "build": "NODE_ENV=production webpack",
+    "build": "NODE_ENV=production webpack --config-name app",
+    "showcase": "II_FETCH_ROOT_KEY=1 webpack serve --config-name showcase",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
     "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend .eslintrc.json",
-    "format-check": "prettier --check src/frontend .eslintrc.json"
+    "format": "prettier --write src/frontend .eslintrc.json webpack.config.js",
+    "format-check": "prettier --check src/frontend .eslintrc.json webpack.config.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",
@@ -34,7 +35,7 @@
     "eslint": "^7.31.0",
     "events": "3.3.0",
     "file-loader": "^6.2.0",
-    "html-webpack-plugin": "5.3.2",
+    "html-webpack-plugin": "^5.3.2",
     "jest": "^27.0.6",
     "jest-cli": "^27.0.6",
     "prettier": "2.3.2",

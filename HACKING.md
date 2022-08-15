@@ -16,6 +16,8 @@ The build requires the following dependencies:
 * Node.js v16+
 * CMake
 
+> NOTE! If you're only going to hack on the HTML and CSS code, just run `npm run showcase`. This will start a minimal web server which serves a showcase of the pages used in the app.
+
 ## Running Locally
 
 To run the internet_identity canisters, proceed as follows after cloning the repository
