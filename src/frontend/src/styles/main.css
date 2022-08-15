@@ -720,7 +720,6 @@ a:hover,
 }
 
 /* Tooltip */
-
 .c-tooltip {
   position: relative;
 }
@@ -775,12 +774,11 @@ a:hover,
   background: var(--rc-background);
 }
 
-/* trumps all other rules */
-
+/* VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, */
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 .is-visible {
-  display: block;
+  display: block !important;
 }
