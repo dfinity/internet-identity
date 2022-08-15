@@ -64,13 +64,9 @@ module.exports = [
       minimize: isProduction,
     },
     resolve: {
-      extensions: [".js", ".ts", ".jsx", ".tsx"],
+      extensions: [".js", ".ts"],
       fallback: {
-        assert: require.resolve("assert/"),
-        buffer: require.resolve("buffer/"),
-        events: require.resolve("events/"),
         stream: require.resolve("stream-browserify/"),
-        util: require.resolve("util/"),
       },
     },
     output: {
@@ -97,8 +93,6 @@ module.exports = [
             // the ?canisterId=foo atrocity
             pathRewrite: (pathAndParams, req) => {
               let queryParamsString = `?`;
-              console.log("One");
-
               const [path, params] = pathAndParams.split("?");
 
               if (params) {
@@ -126,7 +120,7 @@ module.exports = [
 
     module: {
       rules: [
-        { test: /\.(ts|tsx)$/, loader: "ts-loader" },
+        { test: /\.(ts)$/, loader: "ts-loader" },
         { test: /\.css$/, use: ["style-loader", "css-loader"] },
         {
           test: /\.(png|jpg|gif)$/i,
@@ -166,13 +160,9 @@ module.exports = [
     },
     devtool,
     resolve: {
-      extensions: [".js", ".ts", ".jsx", ".tsx"],
+      extensions: [".js", ".ts"],
       fallback: {
-        assert: require.resolve("assert/"),
-        buffer: require.resolve("buffer/"),
-        events: require.resolve("events/"),
         stream: require.resolve("stream-browserify/"),
-        util: require.resolve("util/"),
       },
     },
     output: {
@@ -185,7 +175,7 @@ module.exports = [
     },
     module: {
       rules: [
-        { test: /\.(ts|tsx)$/, loader: "ts-loader" },
+        { test: /\.(ts)$/, loader: "ts-loader" },
         { test: /\.css$/, use: ["style-loader", "css-loader"] },
         {
           test: /\.(png|jpg|gif)$/i,
