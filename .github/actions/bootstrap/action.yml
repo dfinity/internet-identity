@@ -35,7 +35,7 @@ runs:
     - uses: actions/cache@v2
       with:
         path: ~/.cargo/bin
-        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-2
 
     - name: Bootstrap
       shell: bash
