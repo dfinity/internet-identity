@@ -437,16 +437,6 @@ a:hover,
   max-width: 60rem;
 }
 
-@media (max-width: 512px) {
-  #pageContent,
-  .l-wrap {
-    justify-content: flex-start;
-  }
-  .l-container {
-    max-width: 100%;
-  }
-}
-
 .l-divider {
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
@@ -782,6 +772,20 @@ a:hover,
   border-radius: 4px;
   padding: var(--rs-button-bezel);
   background: var(--rc-background);
+}
+
+/** responsiveness */
+
+@media (max-width: 512px) {
+  #pageContent,
+  .l-wrap {
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .l-container {
+    max-width: 100%;
+    padding: calc(var(--rs-card-bezel) * 0.8) calc(var(--rs-card-bezel-x) * 0.8);
+  }
 }
 
 /* VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, */
