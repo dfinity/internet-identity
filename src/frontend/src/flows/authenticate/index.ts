@@ -31,23 +31,23 @@ const pageContent = (
   derivationOrigin?: string
 ) => html` <div class="l-container c-card c-card--highlight">
     ${icLogo}
-    <h1>Internet Identity</h1>
-    <p>Authenticate to service:</p>
+    <h1 class="t-title t-title--main">Internet Identity</h1>
+    <p class="t-lead">Authenticate to service:</p>
     <div class="c-input c-input--readonly t-vip">${hostName}</div>
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
-    <p>Use Identity Anchor:</p>
+    <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <div class="childContainer">
+    <div class="childContainer l-section">
       <input
-        class="anchorText"
+        class="anchorText c-input"
         type="text"
         id="userNumberInput"
         placeholder="Enter anchor"
         value="${userNumber !== undefined ? userNumber : ""}"
       />
-      <button id="editAnchorButton">${editIcon}</button>
+      <button id="editAnchorButton" class="c-button c-button--secondary">${editIcon}</button>
     </div>
     <div
       id="invalidAnchorMessage"
@@ -60,21 +60,15 @@ const pageContent = (
       Start Session
     </button>
     <div id="registerSection">
-      <button type="button" id="registerButton">
+      <button type="button" id="registerButton" class="c-button c-button--secondary">
         Create New Identity Anchor
       </button>
     </div>
-    <div class="textLink">
-      <hr />
-      <div class="buttonContainer">
-        <a id="recoverButton" class="linkStyle">Lost access?</a>
-      </div>
-      <div class="buttonContainer">
-        <a type="button" class="linkStyle" id="manageButton">
+    <div class="l-section">
+      <a id="recoverButton" class="t-link">Lost access?</a>
+      <a class="t-link" id="manageButton">
           Manage your Identity Anchor
-        </a>
-      </div>
-      <hr />
+      </a>
     </div>
     ${navbar}
   </div>
@@ -189,16 +183,16 @@ const init = (
   // only use non-edit mode if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
     userNumberInput.classList.add("t-vip");
-    registerSection.classList.add("hidden");
+    registerSection.classList.add("is-hidden");
     userNumberInput.disabled = true;
     authorizeButton.focus();
   } else {
-    editAnchorButton.classList.add("hidden");
+    editAnchorButton.classList.add("is-hidden");
     userNumberInput.select();
   }
   editAnchorButton.onclick = () => {
-    editAnchorButton.classList.add("hidden");
-    registerSection.classList.remove("hidden");
+    editAnchorButton.classList.add("is-hidden");
+    registerSection.classList.remove("is-hidden");
     userNumberInput.classList.remove("t-vip");
     userNumberInput.disabled = false;
     userNumberInput.select();
