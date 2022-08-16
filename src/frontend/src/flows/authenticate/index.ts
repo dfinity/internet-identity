@@ -47,7 +47,9 @@ const pageContent = (
         placeholder="Enter anchor"
         value="${userNumber !== undefined ? userNumber : ""}"
       />
-      <button id="editAnchorButton" class="c-button c-button--secondary">${editIcon}</button>
+      <button id="editAnchorButton" class="c-button c-button--secondary">
+        ${editIcon}
+      </button>
     </div>
     <div
       id="invalidAnchorMessage"
@@ -60,15 +62,17 @@ const pageContent = (
       Start Session
     </button>
     <div id="registerSection">
-      <button type="button" id="registerButton" class="c-button c-button--secondary">
+      <button
+        type="button"
+        id="registerButton"
+        class="c-button c-button--secondary"
+      >
         Create New Identity Anchor
       </button>
     </div>
     <div class="l-section">
       <a id="recoverButton" class="t-link">Lost access?</a>
-      <a class="t-link" id="manageButton">
-          Manage your Identity Anchor
-      </a>
+      <a class="t-link" id="manageButton"> Manage your Identity Anchor </a>
     </div>
     ${navbar}
   </div>
