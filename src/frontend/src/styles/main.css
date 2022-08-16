@@ -377,18 +377,24 @@ a,
   color: var(--rc-interaction-text);
   color: inherit;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
   cursor: pointer;
 }
 
 .t-link--discreet {
   font-weight: normal;
+  text-decoration: none;
 }
 
 a:focus,
 a:hover,
 .t-link:not([disabled]):focus,
 .t-link:not([disabled]):hover {
+  text-decoration: none;
+}
+
+.t-link--discreet:not([disabled]):focus,
+.t-link--discreet:not([disabled]):hover {
   text-decoration: underline;
 }
 
