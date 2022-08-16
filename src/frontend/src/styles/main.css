@@ -570,15 +570,9 @@ a:hover,
 }
 
 .c-logo svg {
-  /* 
-    this was done because the logo is oddly strangely positioned within the SVG
-    to account of the that there is some whitespace on top and on the bottom of 
-    log we cut it uff by removing 40% in height.
-
-    We need a logo that is just the logo at some point.
-  */
-  margin-top: -20%;
-  margin-bottom: -20%;
+  display: block;
+  width: 50%;
+  margin: 0 auto;
 }
 
 /**
