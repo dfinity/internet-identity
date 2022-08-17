@@ -13,6 +13,8 @@ const pageContent = () => html`
         placeholder="Device alias"
         type="text"
         required
+        maxlength="30"
+        pattern="^[A-Za-z0-9_]+((-|\\s)*[A-Za-z0-9_])*$"
       />
       <button type="submit" id="deviceAliasContinue" class="primary">
         Add Device
@@ -51,4 +53,26 @@ const init = (): Promise<string | null> =>
       event.preventDefault();
       resolve(deviceAlias.value);
     };
+    const deviceInput = document.getElementById(
+      "deviceAlias"
+    ) as HTMLInputElement;
+
+    deviceInput.addEventListener("invalid", () => {
+      const firstChar = deviceInput.value[0];
+      const lastChar = deviceInput.value.slice(-1);
+
+      if (firstChar === " ") {
+        deviceInput.setCustomValidity(
+          "Name can't start with a space."
+        );
+      } else if (lastChar === "-" || lastChar === " ") {
+        deviceInput.setCustomValidity("Name can't end with a hyphen or a space.");
+      } else {
+        deviceInput.setCustomValidity("Name can't contain special characters.");
+      }
+    });
+    deviceInput.addEventListener("input", () => {
+      deviceInput.setCustomValidity("");
+      deviceInput.checkValidity();
+    });
   });
