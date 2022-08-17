@@ -39,21 +39,23 @@ const pageContent = (
       : ""}
     <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <div class="childContainer l-section">
+    <div class="childContainer l-section c-input c-input--readonly">
       <input
-        class="anchorText c-input"
+        class="anchorText"
         type="text"
         id="userNumberInput"
         placeholder="Enter anchor"
+        class="c-input__input"
         value="${userNumber !== undefined ? userNumber : ""}"
       />
-      <button id="editAnchorButton" class="c-button c-button--secondary">
-        ${editIcon}
-      </button>
+      <button id="editAnchorButton" class="c-input__button">${editIcon}</button>
     </div>
-    <div id="invalidAnchorMessage" class="anchor-error-message is-hidden">
+    <p
+      id="invalidAnchorMessage"
+      class="anchor-error-message is-hidden t-paragraph t-strong"
+    >
       The Identity Anchor is not valid. Please try again.
-    </div>
+    </p>
 
     <button type="button" id="authorizeButton" class="c-button">
       Start Session
@@ -68,10 +70,15 @@ const pageContent = (
         Create New Identity Anchor
       </button>
     </div>
-    <div class="l-section">
-      <a id="recoverButton" class="t-link">Lost access?</a>
-      <a class="t-link" id="manageButton"> Manage your Identity Anchor </a>
-    </div>
+
+    <ul class="c-list l-section">
+      <li>
+        <a id="recoverButton" class="t-link">Lost access?</a>
+      </li>
+      <li>
+        <a class="t-link" id="manageButton">Manage your Identity Anchor</a>
+      </li>
+    </ul>
     ${navbar}
   </div>
   ${footer}`;

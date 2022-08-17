@@ -610,6 +610,7 @@ a:hover,
 }
 
 .c-input {
+  position: relative;
   display: block;
   width: 100%;
   padding: var(--rs-input-bezel);
@@ -640,6 +641,22 @@ a:hover,
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
   border: var(--vs-line) var(--rc-line) solid;
+}
+
+.c-input__input {
+  position: absolute;
+  display: block;
+  width: 100%;
+  background: transparent;
+  height: 100%;
+  inset: 0;
+}
+
+.c-input__button {
+  position: absolute;
+  top: 50%;
+  right: var(--rs-input-bezel);
+  transform: translateY(-50%);
 }
 
 /**
