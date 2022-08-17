@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Launch docker based Selenium test infrastructure (selenium and nginx containers)"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Launches docker based Selenium test infrastructure (selenium and nginx containers).
+Run "docker compose down" in the docker-test-env folder to stop again.
+
+NOTE: This requires docker, a running dfx replica with II and the test app deployed and running II dev server (npm run start).
+EOF
+
+}
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'start-selenium-env --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+II_CANISTER_ID=$( jq -r .internet_identity.local .dfx/local/canister_ids.json )
+TEST_APP_CANISTER_ID=$( jq -r .test_app.local demos/test-app/.dfx/local/canister_ids.json )
+
+cd "docker-test-env"
+COMPOSE_CONIFIG=$(sed -u "s/II_CANISTER_ID/$II_CANISTER_ID/g; s/TEST_APP_CANISTER_ID/$TEST_APP_CANISTER_ID/g" docker-compose.yml)
+echo "$COMPOSE_CONIFIG" | docker compose -f - build --build-arg II_CANISTER_ID="$II_CANISTER_ID" --build-arg TEST_APP_CANISTER_ID="$TEST_APP_CANISTER_ID"
+echo "$COMPOSE_CONIFIG" | docker compose -f - up -d --wait
