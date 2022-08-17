@@ -25,7 +25,6 @@ const pageContent = html`
             >here</a
           >.
         </p>`,
-      componentType: "div",
     })}
     <button id="deviceAliasCancel">Cancel</button>
   </div>

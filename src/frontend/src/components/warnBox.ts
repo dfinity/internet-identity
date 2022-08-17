@@ -1,36 +1,25 @@
 import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 
+// The Warning Component can be reused with following custom properties: title, message, and slot.
+// Slot is for a custom element if needed, such as a button, that gets appended at the end.
+
 interface warnBoxProps {
   title: string;
   message: string | TemplateResult;
-  componentType: string;
   slot?: TemplateResult;
 }
 
-export const warnBox = (
-  props: warnBoxProps = {
-    title: "Warning",
-    message: html`Somewhere unsafe string that can also contain html
-      <b>Evil HTML</b>`,
-    componentType: "div",
-    slot: html`<button></button>`,
-  }
-): TemplateResult =>
-  html`${props.componentType === "div"
-    ? html` <div class="warnBox">
-        <div class="warnIcon">${warningIcon}</div>
-        <div class="warnContent">
-          <div class="warnTitle">${props.title}</div>
-          <div class="warnMessage">${props.message}</div>
-          ${props.slot}
-        </div>
-      </div>`
-    : html` <aside class="warnBox">
-        <div class="warnIcon">${warningIcon}</div>
-        <div class="warnContent">
-          <div class="warnTitle">${props.title}</div>
-          <div class="warnMessage">${props.message}</div>
-          ${props.slot}
-        </div>
-      </aside>`}`;
+export const warnBox = ({
+  title,
+  message,
+  slot,
+}: warnBoxProps): TemplateResult =>
+  html`<aside class="warnBox">
+    <div class="warnIcon">${warningIcon}</div>
+    <div class="warnContent">
+      <div class="warnTitle">${title}</div>
+      <div class="warnMessage">${message}</div>
+      ${slot}
+    </aside>
+  </div>`;

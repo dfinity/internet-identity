@@ -47,13 +47,11 @@ const pageContent = () => html`
         added here will have <strong>full control over your identity</strong>.
         Only continue the process if you want to add a new device that you
         <em>personally own</em>.`,
-      componentType: "aside",
     })}
     ${warnBox({
       title: "Security Warning",
       message: html`Do not continue if you were prompted to do this by any
         website other than <strong>https://identity.ic0.app</strong>!`,
-      componentType: "aside",
     })}
     <p>
       Is the device you want to add available on this machine (local device) or

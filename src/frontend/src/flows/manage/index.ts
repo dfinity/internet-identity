@@ -219,14 +219,13 @@ const deviceListItem = (device: DeviceData) => html`
 `;
 
 const recoveryNag = () =>
-  html`${warnBox({
+  warnBox({
     title: "Recovery Mechanism",
-    message: html`Add a recovery mechanism to help protect this Identity Anchor.`,
-    componentType: "div",
+    message: "Add a recovery mechanism to help protect this Identity Anchor.",
     slot: html`<button id="addRecovery" class="primary warnButton">
       Add Recovery
     </button>`,
-  })}`;
+  });
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (

@@ -18,14 +18,12 @@ const pageContent = (alias: string) => html`
         It will have <strong>full control over your identity</strong>. Only
         enter a verification code here if you are sure that you
         <em>personally own</em> this device.`,
-      componentType: "div",
     })}
     ${warnBox({
       title: "Security Warning",
       message: html`Enter only codes that were displayed on
         <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
         verification codes that you received any other way.`,
-      componentType: "div",
     })}
     <p>Verify that this is your device:</p>
     <label>Alias</label>
