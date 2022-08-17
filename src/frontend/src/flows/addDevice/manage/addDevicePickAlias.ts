@@ -62,11 +62,11 @@ const init = (): Promise<string | null> =>
       const lastChar = deviceInput.value.slice(-1);
 
       if (firstChar === " ") {
-        deviceInput.setCustomValidity(
-          "Name can't start with a space."
-        );
+        deviceInput.setCustomValidity("Name can't start with a space.");
       } else if (lastChar === "-" || lastChar === " ") {
-        deviceInput.setCustomValidity("Name can't end with a hyphen or a space.");
+        deviceInput.setCustomValidity(
+          "Name can't end with a hyphen or a space."
+        );
       } else {
         deviceInput.setCustomValidity("Name can't contain special characters.");
       }
