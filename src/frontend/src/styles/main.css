@@ -774,6 +774,11 @@ a:hover,
   background: var(--rc-background);
 }
 
+.c-img-block {
+  width: 100%;
+  display: block;
+}
+
 /** responsiveness */
 
 @media (max-width: 512px) {
