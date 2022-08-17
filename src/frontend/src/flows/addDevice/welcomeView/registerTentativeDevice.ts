@@ -14,23 +14,37 @@ import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 
 const pageContent = () => html`
-  <div class="l-container c-card c-card--highlight">
-    <h1>New Device</h1>
-    <p>Please provide an alias for this device.</p>
-    <div id="invalidAliasMessage" class="error-message-hidden">
-      The device alias must not be empty.
-    </div>
+  <article class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">New Device</h1>
+      <p class="t-lead">Please provide an alias for this device.</p>
+      <p id="invalidAliasMessage" class="is-hidden">
+        The device alias must not be empty.
+      </p>
+    </hgroup>
     <input
       type="text"
       id="tentativeDeviceAlias"
       placeholder="Device Alias"
       maxlength="64"
+      class="c-input"
     />
-    <button id="registerTentativeDeviceContinue" class="primary">
-      Continue
-    </button>
-    <button id="registerTentativeDeviceCancel">Cancel</button>
-  </div>
+    <div class="l-section">
+      <button
+        class="c-button"
+        id="registerTentativeDeviceContinue"
+        class="primary"
+      >
+        Continue
+      </button>
+      <button
+        class="c-button c-button--secondary"
+        id="registerTentativeDeviceCancel"
+      >
+        Cancel
+      </button>
+    </div>
+  </article>
 `;
 
 /**

@@ -11,8 +11,8 @@ import { warningIcon } from "../../../components/icons";
 
 const pageContent = (alias: string) => html`
   <div class="l-container c-card c-card--highlight">
-    <h1>Verify New Device</h1>
-    <div class="warnBox">
+    <h1 class="t-title t-title--main">Verify New Device</h1>
+    <aside class="c-card c-card c-card--warning c-card--icon">
       <div class="warnIcon">${warningIcon}</div>
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
@@ -23,8 +23,8 @@ const pageContent = (alias: string) => html`
           <em>personally own</em> this device.
         </div>
       </div>
-    </div>
-    <div class="warnBox">
+    </aside>
+    <aside class="warnBox">
       <div class="warnIcon">${warningIcon}</div>
       <div class="warnContent">
         <div class="warnTitle">Security Warning</div>
@@ -35,18 +35,29 @@ const pageContent = (alias: string) => html`
           other way.
         </div>
       </div>
-    </div>
+    </aside>
     <p>Verify that this is your device:</p>
     <label>Alias</label>
     <div class="c-input c-input--readonly t-vip">${alias}</div>
     <label>Device Verification Code</label>
-    <div id="wrongCodeMessage" class="error-message-hidden">
+    <div id="wrongCodeMessage" class="is-hidden">
       The entered verification code was invalid. Please try again.
     </div>
-    <input id="tentativeDeviceCode" placeholder="Verification Code" />
-    <p>Time remaining: <span id="timer"></span></p>
-    <button id="verifyDevice" class="primary">Verify Device</button>
-    <button id="cancelVerifyDevice" class="linkStyle">Cancel</button>
+    <input
+      id="tentativeDeviceCode"
+      class="c-input"
+      placeholder="Verification Code"
+    />
+    <p class="t-paragraph">
+      Time remaining: <span id="timer" class="t-strong"></span>
+    </p>
+
+    <div class="l-section">
+      <button id="verifyDevice" class="c-button">Verify Device</button>
+      <button id="cancelVerifyDevice" class="c-button c-button--secondary">
+        Cancel
+      </button>
+    </div>
   </div>
 `;
 

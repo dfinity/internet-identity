@@ -51,17 +51,15 @@ const pageContent = (
         ${editIcon}
       </button>
     </div>
-    <div
-      id="invalidAnchorMessage"
-      class="anchor-error-message error-message-hidden"
-    >
+    <div id="invalidAnchorMessage" class="anchor-error-message is-hidden">
       The Identity Anchor is not valid. Please try again.
     </div>
 
     <button type="button" id="authorizeButton" class="c-button">
       Start Session
     </button>
-    <div id="registerSection">
+
+    <div id="registerSection" class="l-section">
       <button
         type="button"
         id="registerButton"
