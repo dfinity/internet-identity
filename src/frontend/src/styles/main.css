@@ -89,7 +89,7 @@
   --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
   --vs-line: 1px; /* 5 */
 
-  /* value tokens: z-index (--vz => valueZindex */
+  /* value tokens: z-index (--vz => valueZindex) */
 
   --vz-backdrop: -1;
   --vz-tooltip: 10;
