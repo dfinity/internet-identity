@@ -1,5 +1,9 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../../../components/logout";
+// Regex Pattern for input: All characters, including starting(^) single character or more(+),
+// must be alphabet, number or underscore. Can have hyphen(s) or space(s) in the middle.
+// Good examples: "2019_macbook", "2019-Macbook", "_2019 Macbook"
+// Bad examples: "2019 macbook!", " 2010: macbook", "space trails at end "
 
 const pageContent = () => html`
   <div class="container">
@@ -15,6 +19,7 @@ const pageContent = () => html`
         required
         maxlength="30"
         pattern="^[A-Za-z0-9_]+((-|\\s)*[A-Za-z0-9_])*$"
+        spellcheck="false"
       />
       <button type="submit" id="deviceAliasContinue" class="primary">
         Add Device
@@ -58,21 +63,25 @@ const init = (): Promise<string | null> =>
     ) as HTMLInputElement;
 
     deviceInput.addEventListener("invalid", () => {
-      const firstChar = deviceInput.value[0];
-      const lastChar = deviceInput.value.slice(-1);
-
-      if (firstChar === " ") {
-        deviceInput.setCustomValidity("Name can't start with a space.");
-      } else if (lastChar === "-" || lastChar === " ") {
-        deviceInput.setCustomValidity(
-          "Name can't end with a hyphen or a space."
-        );
-      } else {
-        deviceInput.setCustomValidity("Name can't contain special characters.");
+      let message = "";
+      if (deviceInput.validity.valueMissing) {
+        message = "Please fill out this field.";
+      } else if (deviceInput.validity.patternMismatch) {
+        if (deviceInput.value.startsWith(" ")) {
+          message = "Name can't start with a space.";
+        } else if (
+          deviceInput.value.endsWith(" ") ||
+          deviceInput.value.endsWith("-")
+        ) {
+          message = "Name can't end with a space or hyphen.";
+        } else {
+          message = "Name can't contain special characters.";
+        }
       }
+      deviceInput.setCustomValidity(message);
     });
     deviceInput.addEventListener("input", () => {
       deviceInput.setCustomValidity("");
-      deviceInput.checkValidity();
+      deviceInput.reportValidity();
     });
   });
