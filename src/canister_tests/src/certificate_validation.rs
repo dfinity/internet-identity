@@ -7,7 +7,7 @@ use crate::certificate_validation::ValidationError::{
 use candid::types::ic_types::hash_tree::LookupResult;
 use candid::types::ic_types::HashTree;
 use flate2::read::GzDecoder;
-use ic_certified_vars::{verify_certificate, CertificateValidationError};
+use ic_certification::{verify_certificate, CertificateValidationError};
 use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey, Time};
 use regex::Regex;
 use serde::Deserialize;
