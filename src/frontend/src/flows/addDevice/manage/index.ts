@@ -1,9 +1,6 @@
 import { html, render } from "lit-html";
-import {
-  networkIcon,
-  securityKeyIcon,
-  warningIcon,
-} from "../../../components/icons";
+import { networkIcon, securityKeyIcon } from "../../../components/icons";
+import { warnBox } from "../../../components/warnBox";
 
 const pageContent = () => html`
   <style>
@@ -44,28 +41,18 @@ const pageContent = () => html`
   </style>
   <article class="container">
     <h1>Add New Device</h1>
-    <aside class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <h2 class="warnTitle">Security Warning</h2>
-        <div class="warnMessage">
-          You are in the process of adding a new device. Any device added here
-          will have <strong>full control over your identity</strong>. Only
-          continue the process if you want to add a new device that you
-          <em>personally own</em>.
-        </div>
-      </div>
-    </aside>
-    <aside class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <h2 class="warnTitle">Security Warning</h2>
-        <div class="warnMessage">
-          Do not continue if you were prompted to do this by any website other
-          than <strong>https://identity.ic0.app</strong>!
-        </div>
-      </div>
-    </aside>
+    ${warnBox({
+      title: "Security Warning",
+      message: html`You are in the process of adding a new device. Any device
+        added here will have <strong>full control over your identity</strong>.
+        Only continue the process if you want to add a new device that you
+        <em>personally own</em>.`,
+    })}
+    ${warnBox({
+      title: "Security Warning",
+      message: html`Do not continue if you were prompted to do this by any
+        website other than <strong>https://identity.ic0.app</strong>!`,
+    })}
     <p>
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?

@@ -9,13 +9,14 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { settingsIcon, warningIcon } from "../../components/icons";
+import { settingsIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import { setupRecovery } from "../recovery/setupRecovery";
 import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
+import { warnBox } from "../../components/warnBox";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -217,18 +218,14 @@ const deviceListItem = (device: DeviceData) => html`
   </button>
 `;
 
-const recoveryNag = () => html`
-  <div class="warnBox">
-    <div class="warnIcon">${warningIcon}</div>
-    <div class="warnContent">
-      <div class="warnTitle">Recovery Mechanism</div>
-      <div class="warnMessage">
-        Add a recovery mechanism to help protect this Identity Anchor.
-      </div>
-      <button id="addRecovery" class="primary warnButton">Add Recovery</button>
-    </div>
-  </div>
-`;
+const recoveryNag = () =>
+  warnBox({
+    title: "Recovery Mechanism",
+    message: "Add a recovery mechanism to help protect this Identity Anchor.",
+    slot: html`<button id="addRecovery" class="primary warnButton">
+      Add Recovery
+    </button>`,
+  });
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
