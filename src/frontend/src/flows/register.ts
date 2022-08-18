@@ -20,7 +20,16 @@ const pageContent = html`
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please provide a name for your device.</p>
-      <input id="registerAlias" placeholder="Device name" />
+      <input
+        id="registerAlias"
+        placeholder="Device name"
+        aria-label="device name"
+        type="text"
+        required
+        maxlength="30"
+        pattern="^[A-Za-z0-9_]+((-|\\s)*[A-Za-z0-9_])*$"
+        spellcheck="false"
+      />
       <button type="submit" class="primary">Create</button>
       <button id="registerCancel" type="button">Cancel</button>
     </form>
@@ -101,6 +110,35 @@ const init = (connection: Connection): Promise<LoginFlowResult | null> =>
         reject(err);
       }
     };
+
+    const registerAlias = document.getElementById(
+      "registerAlias"
+    ) as HTMLInputElement;
+
+    registerAlias.addEventListener("invalid", () => {
+      if (registerAlias.validity.valueMissing) {
+        registerAlias.setCustomValidity("Please fill out this field.");
+      } else if (registerAlias.validity.patternMismatch) {
+        if (registerAlias.value.startsWith(" ")) {
+          registerAlias.setCustomValidity("Name can't start with a space.");
+        } else if (
+          registerAlias.value.endsWith(" ") ||
+          registerAlias.value.endsWith("-")
+        ) {
+          registerAlias.setCustomValidity(
+            "Name can't end with a space or hyphen."
+          );
+        } else {
+          registerAlias.setCustomValidity(
+            "Name can't contain special characters."
+          );
+        }
+      }
+    });
+    registerAlias.addEventListener("input", () => {
+      registerAlias.setCustomValidity("");
+      registerAlias.reportValidity();
+    });
   });
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));
