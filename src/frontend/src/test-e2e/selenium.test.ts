@@ -609,14 +609,6 @@ test("Screenshots", async () => {
       await aboutView.waitForDisplay();
       await screenshots.take("about", browser);
 
-      // About page, legacy link
-      await browser.url("about:blank");
-      await browser.url(II_URL + "#about");
-      await removeFeaturesWarning(browser);
-      const aboutViewLegacy = new AboutView(browser);
-      await aboutViewLegacy.waitForDisplay();
-      await screenshots.take("about-legacy", browser);
-
       // Test device removal
       await browser.url(II_URL);
       await removeFeaturesWarning(browser);
