@@ -221,9 +221,7 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     env:
-      DFX_VERSION: 0.8.3
-      REPLICA_URL: https://ic0.app
-      II_ORIGIN: https://identity.ic0.app
+      DFX_VERSION: 0.11.1
 
     steps:
       - uses: actions/checkout@v2
@@ -232,13 +230,25 @@ jobs:
         with:
           node-version: 16.x
 
+      # This step hangs on Github actions on Darwin for some reason, that
+      # is why we run this only on Linux for now
+      - name: Install DFX
+        run: |
+          echo Install DFX Version: "$DFX_VERSION"
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
       # Helps with debugging
       - name: Show versions
         run: |
+          echo dfx --version
+          dfx --version
           echo node --version
           node --version
           echo docker --version
           docker --version
+
+      - name: 'Run dfx'
+        run: dfx start --background
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v2
@@ -250,28 +260,38 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: test_app.wasm
-          path: .
+          path: demos/test-app
 
-      - name: Prepare Canister WASM Files
+      - name: Deploy Internet Identity
         run: |
-          mv internet_identity_test.wasm docker-test-env/dfx-docker/canisters/internet_identity.wasm
-          cp src/internet_identity/internet_identity.did docker-test-env/dfx-docker/canisters/internet_identity.did
-          mv test_app.wasm docker-test-env/dfx-docker/canisters/test_app.wasm
-          cp demos/test-app/test_app.did docker-test-env/dfx-docker/canisters/test_app.did
+          dfx canister create --all
+          dfx canister install internet_identity --wasm internet_identity_test.wasm
 
-      - name: Build and start docker compose
-        working-directory: docker-test-env
+      - name: Deploy test app
+        working-directory: demos/test-app
         run: |
-          docker compose build
-          docker compose up -d --wait
+          dfx canister create --all
+          dfx canister install test_app --wasm test_app.wasm
+
+      - name: Run II dev front-end
+        run: |
+          npm ci
+          npm run start &
+          sleep 10 # crude
+
+      - name: Start docker compose
+        run: scripts/start-selenium-env
+
       - run: rm -v -f screenshots/*.png
-      - run: npm ci
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
       - name: Collect docker logs
         working-directory: docker-test-env
         if: ${{ always() }}
         run: docker compose logs > ../docker-compose.log
+
+      - name: Stop dfx
+        run: dfx stop
 
       - name: Shut down docker services
         working-directory: docker-test-env
