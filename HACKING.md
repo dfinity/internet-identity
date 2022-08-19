@@ -103,7 +103,7 @@ into the following issues:
 
 #### Test suites
 
-We have a set of Selenium tests that run through the various flows. To set up a local deployment follow the steps of the `selenium` job in `.github/workflows/canister-tests.yml`.
+We have a set of Selenium tests that run through the various flows. To set up a local deployment follow the steps in [docker-test-env/README.md](docker-test-env/README.md).
 The tests can be executed by running:
 
 ```bash
