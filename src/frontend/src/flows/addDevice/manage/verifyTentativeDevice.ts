@@ -7,35 +7,24 @@ import { displayError } from "../../../components/displayError";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { setupCountdown } from "../../../utils/countdown";
-import { warningIcon } from "../../../components/icons";
+import { warnBox } from "../../../components/warnBox";
 
 const pageContent = (alias: string) => html`
   <div class="container">
     <h1>Verify New Device</h1>
-    <div class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <div class="warnTitle">Security Warning</div>
-        <div class="warnMessage">
-          Verifying will add the shown device to your Identity Anchor. It will
-          have <strong>full control over your identity</strong>. Only enter a
-          verification code here if you are sure that you
-          <em>personally own</em> this device.
-        </div>
-      </div>
-    </div>
-    <div class="warnBox">
-      <div class="warnIcon">${warningIcon}</div>
-      <div class="warnContent">
-        <div class="warnTitle">Security Warning</div>
-        <div class="warnMessage">
-          Enter only codes that were displayed on
-          <strong>https://identity.ic0.app</strong>. Do
-          <strong>not</strong> enter verification codes that you received any
-          other way.
-        </div>
-      </div>
-    </div>
+    ${warnBox({
+      title: "Security Warning",
+      message: html`Verifying will add the shown device to your Identity Anchor.
+        It will have <strong>full control over your identity</strong>. Only
+        enter a verification code here if you are sure that you
+        <em>personally own</em> this device.`,
+    })}
+    ${warnBox({
+      title: "Security Warning",
+      message: html`Enter only codes that were displayed on
+        <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
+        verification codes that you received any other way.`,
+    })}
     <p>Verify that this is your device:</p>
     <label>Alias</label>
     <div class="highlightBox">${alias}</div>
