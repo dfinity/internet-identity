@@ -14,6 +14,7 @@ import {
 } from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
+import { validateAlias } from "./addDevice/validateAlias";
 
 const pageContent = html`
   <div class="container">
@@ -27,7 +28,7 @@ const pageContent = html`
         type="text"
         required
         maxlength="30"
-        pattern="^[A-Za-z0-9_]+((-|\\s)*[A-Za-z0-9_])*$"
+        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
       />
       <button type="submit" class="primary">Create</button>
@@ -116,25 +117,13 @@ const init = (connection: Connection): Promise<LoginFlowResult | null> =>
     ) as HTMLInputElement;
 
     registerAlias.addEventListener("invalid", () => {
-      if (registerAlias.validity.valueMissing) {
-        registerAlias.setCustomValidity("Please fill out this field.");
-      } else if (registerAlias.validity.patternMismatch) {
-        if (registerAlias.value.startsWith(" ")) {
-          registerAlias.setCustomValidity("Name can't start with a space.");
-        } else if (
-          registerAlias.value.endsWith(" ") ||
-          registerAlias.value.endsWith("-")
-        ) {
-          registerAlias.setCustomValidity(
-            "Name can't end with a space or hyphen."
-          );
-        } else {
-          registerAlias.setCustomValidity(
-            "Name can't contain special characters."
-          );
-        }
-      }
+      const message = validateAlias(
+        registerAlias.validity,
+        registerAlias.value
+      );
+      registerAlias.setCustomValidity(message);
     });
+
     registerAlias.addEventListener("input", () => {
       registerAlias.setCustomValidity("");
       registerAlias.reportValidity();
