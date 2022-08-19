@@ -1,9 +1,10 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../../../components/logout";
-// Regex Pattern for input: All characters, including starting(^) single character or more(+),
-// must be alphabet, number or underscore. Can have hyphen(s) or space(s) in the middle.
-// Good examples: "2019_macbook", "2019-Macbook", "_2019 Macbook"
-// Bad examples: "2019 macbook!", " 2010: macbook", "space trails at end "
+import { validateAlias } from "../validateAlias";
+// Regex Pattern for input: All characters, must be alphabet or number
+// Can have hyphen(s), space(s) or underscore(s) in the middle.
+// Good examples: "2019_macbook", "2019-Macbook", "2019 Macbook"
+// Bad examples: "2019 macbook!", "2010 macbook_", "space trails at end "
 
 const pageContent = () => html`
   <div class="container">
@@ -18,7 +19,7 @@ const pageContent = () => html`
         type="text"
         required
         maxlength="30"
-        pattern="^[A-Za-z0-9_]+((-|\\s)*[A-Za-z0-9_])*$"
+        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
       />
       <button type="submit" id="deviceAliasContinue" class="primary">
@@ -63,21 +64,7 @@ const init = (): Promise<string | null> =>
     ) as HTMLInputElement;
 
     deviceInput.addEventListener("invalid", () => {
-      let message = "";
-      if (deviceInput.validity.valueMissing) {
-        message = "Please fill out this field.";
-      } else if (deviceInput.validity.patternMismatch) {
-        if (deviceInput.value.startsWith(" ")) {
-          message = "Name can't start with a space.";
-        } else if (
-          deviceInput.value.endsWith(" ") ||
-          deviceInput.value.endsWith("-")
-        ) {
-          message = "Name can't end with a space or hyphen.";
-        } else {
-          message = "Name can't contain special characters.";
-        }
-      }
+      const message = validateAlias(deviceInput.validity, deviceInput.value);
       deviceInput.setCustomValidity(message);
     });
     deviceInput.addEventListener("input", () => {
