@@ -19,8 +19,10 @@ const pageContent = (seedPhrase: string) => html`
         to this Identity Anchor!
       </div>
     </aside>
-    <label>Your seed phrase</label>
-    <div id="seedPhrase" translate="no" class="highlightBox">${seedPhrase}</div>
+    <label>
+      <strong>Your seed phrase</strong>
+      <textarea id="seedPhrase" translate="no" class="highlightBox">${seedPhrase}</textarea>
+    </label>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
     <button id="displaySeedPhraseContinue" class="primary hidden">
       Continue

@@ -226,6 +226,10 @@ label {
   margin-bottom: 0.5rem;
 }
 
+label strong {
+  margin-bottom: 0.5rem;
+}
+
 main::before,
 main::after {
   content: "";
@@ -291,6 +295,10 @@ main {
   overflow-wrap: break-word;
   font-size: 1.5rem;
   font-weight: 500;
+}
+
+textarea.highlightBox {
+  min-height: 6.5rem;
 }
 
 .warningBox {
