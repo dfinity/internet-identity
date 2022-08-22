@@ -8,7 +8,7 @@ import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import authorizeAuthentication from "./flows/authenticate";
+import { authorizeAuthentication } from "./flows/authenticate";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
 
