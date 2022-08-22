@@ -299,8 +299,11 @@ body {
  * - `.l-` layout
  * - `.t-` typography
  *
- * We avoid element, id and attribute selectors when it is saint to do so. 
+ * We avoid element, id and attribute selectors when it is saint to do so¹. 
  * Use classes when possible. 
+ *
+ * ¹ For example when needing to style the paths of an SVG it might be difficult
+ * to do because the SVG are made by people with little to no XML know-how. 
  */
 
 .t-strong {
