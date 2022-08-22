@@ -39,5 +39,5 @@ ret=0
 echo "'$*' returned with $ret"
 
 cd docker-test-env
-docker compose down
+docker compose down || echo "docker compose failed to shut down!"
 exit "$ret"
