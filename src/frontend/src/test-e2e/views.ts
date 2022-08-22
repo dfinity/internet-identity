@@ -73,7 +73,7 @@ export class RegisterView extends View {
   }
 
   async registerGetIdentity(): Promise<string> {
-    return await this.browser.$(".highlightBox").getAttribute("value");
+    return await this.browser.$(".highlightBox").getValue();
   }
 
   async registerConfirmIdentity(): Promise<void> {
@@ -405,7 +405,7 @@ export class WelcomeBackView extends View {
   }
 
   async getIdentityAnchor(): Promise<string> {
-    return await this.browser.$(".highlightBox").getAttribute("value");
+    return await this.browser.$(".highlightBox").getValue();
   }
 
   async login(): Promise<void> {
