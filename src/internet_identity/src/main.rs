@@ -120,6 +120,14 @@ enum RegistrationState {
     },
 }
 
+#[derive(Default)]
+struct UsageMetrics {
+    // number of prepare_delegation calls since last upgrade
+    delegation_counter: u64,
+    // number of anchor operations (register, add, remove, update) since last upgrade
+    anchor_operation_counter: u64,
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
     sigs: RefCell<SignatureMap>,
@@ -131,6 +139,8 @@ struct State {
     // tentative device registrations, not persisted across updates
     // if a user number is present in this map then registration mode is active until expiration
     tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
+    // additional usage metrics, NOT persisted across updates (but probably should be in the future)
+    usage_metrics: RefCell<UsageMetrics>,
 }
 
 impl Default for State {
@@ -146,6 +156,7 @@ impl Default for State {
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
             tentative_device_registrations: RefCell::new(HashMap::new()),
+            usage_metrics: RefCell::new(UsageMetrics::default()),
         }
     }
 }
@@ -427,6 +438,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
                     .unwrap_or_else(|err| {
                         trap(&format!("failed to store user device data: {}", err))
                     });
+                s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -478,6 +490,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
             });
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
     })
 }
 
@@ -550,6 +563,7 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
             });
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
     })
 }
 
@@ -579,6 +593,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
                     user_number, err
                 ))
             });
+        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
     })
 }
 
@@ -855,6 +870,8 @@ async fn prepare_delegation(
         add_signature(&mut sigs, session_key, seed, expiration);
         update_root_hash(&s.asset_hashes.borrow(), &sigs);
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut sigs);
+
+        s.usage_metrics.borrow_mut().delegation_counter += 1;
 
         (
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),

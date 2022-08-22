@@ -132,6 +132,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             s.tentative_device_registrations.borrow().len() as f64,
             "The number of users in registration mode",
         )?;
+        w.encode_gauge(
+            "internet_identity_delegation_counter",
+            s.usage_metrics.borrow().delegation_counter as f64,
+            "The number of delegations created since last upgrade",
+        )?;
+        w.encode_gauge(
+            "internet_identity_anchor_operations_counter",
+            s.usage_metrics.borrow().anchor_operation_counter as f64,
+            "The number of anchor operations since last upgrade",
+        )?;
         Ok(())
     })
 }
