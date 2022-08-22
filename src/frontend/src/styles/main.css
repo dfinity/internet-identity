@@ -303,6 +303,7 @@ textarea.highlightBox {
 
 input.highlightBox {
   font: inherit;
+  font-weight: 600;
 }
 
 .warningBox {
