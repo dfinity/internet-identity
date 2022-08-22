@@ -249,9 +249,9 @@ function renderQuestion(faq: Question) {
       ${
         faq.links !== undefined && faq.links.length > 0
           ? renderFaqLinks(faq.links)
-          : ""
-      }
-    </div>
+          : ""}
+      </div>
+    </details>
   </li>`;
 }
 
