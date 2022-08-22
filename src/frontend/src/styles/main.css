@@ -334,9 +334,9 @@ hr {
 }
 
 #icLogo {
-  width: 80%;
+  width: 45%;
   align-self: center;
-  margin-top: -3rem;
+  margin: 0.5rem auto 3.25rem;
 }
 
 nav {
