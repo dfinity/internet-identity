@@ -129,7 +129,13 @@ const pageContent = (
     ${icLogo}
     <h1>Internet Identity</h1>
     <p>Authenticate to service:</p>
-    <div class="host-name highlightBox hostName">${hostName}</div>
+    <input
+      type="text"
+      aria-label="host name"
+      readonly="readonly"
+      class="highlightBox host-name hostName"
+      value="${hostName}"
+    />
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
@@ -179,8 +185,13 @@ const pageContent = (
 const derivationOriginSection = (derivationOrigin: string) => html` <p>
     This service is an alias of:
   </p>
-  <div class="host-name highlightBox hostName">${derivationOrigin}</div>`;
-
+  <input
+    type="text"
+    aria-label="host name"
+    readonly="readonly"
+    class="highlightBox host-name hostName"
+    value="${derivationOrigin}"
+  />`;
 export interface AuthSuccess {
   userNumber: bigint;
   connection: AuthenticatedConnection;

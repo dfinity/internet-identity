@@ -7,8 +7,15 @@ const pageContent = (name: string) => html`
   <div class="container">
     <h1>Success!</h1>
     <p>You have successfully added your new device.</p>
-    <label>Device name:</label>
-    <div class="highlightBox">${name}</div>
+    <label>
+      <strong>Device name:</strong>
+      <input
+        type="text"
+        readonly="readonly"
+        class="highlightBox"
+        value="${name}"
+      />
+    </label>
     <button id="manageDevicesButton" class="primary">Manage devices</button>
     ${logoutSection()}
   </div>

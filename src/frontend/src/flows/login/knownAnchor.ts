@@ -18,7 +18,13 @@ const pageContent = (userNumber: bigint) => html` <style>
     ${icLogo}
     <h1>Welcome back!</h1>
     <p>Authenticate using Internet Identity.</p>
-    <div class="highlightBox">${userNumber}</div>
+    <input
+      type="text"
+      aria-label="Internet Identity user number"
+      readonly="readonly"
+      class="highlightBox"
+      value="${userNumber}"
+    />
     <button type="button" id="login" class="primary">Authenticate</button>
     <p style="text-align: center;">Or</p>
     <button type="button" id="loginDifferent">

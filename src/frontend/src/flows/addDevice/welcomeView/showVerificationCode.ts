@@ -25,12 +25,24 @@ const pageContent = (
       this device using the verification code below. After successful
       verification this page will automatically refresh.
     </p>
-    <label>Alias</label>
-    <div class="highlightBox">${alias}</div>
+    <label>
+      <strong>Alias</strong>
+      <input
+        type="text"
+        readonly="readonly"
+        class="highlightBox"
+        value="${alias}"
+      />
+    </label>
     <label>Device Verification Code</label>
-    <div id="verificationCode" class="highlightBox">
-      ${tentativeRegistrationInfo.verification_code}
-    </div>
+    <input
+      id="verificationCode"
+      type="text"
+      aria-label="host name"
+      readonly="readonly"
+      class="highlightBox host-name hostName"
+      value="${tentativeRegistrationInfo.verification_code}"
+    />
     <p>Time remaining: <span id="timer"></span></p>
     <button id="showCodeCancel">Cancel</button>
   </div>

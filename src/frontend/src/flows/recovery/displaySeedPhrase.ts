@@ -21,7 +21,14 @@ const pageContent = (seedPhrase: string) => html`
     </aside>
     <label>
       <strong>Your seed phrase</strong>
-      <textarea id="seedPhrase" translate="no" class="highlightBox">${seedPhrase}</textarea>
+      <textarea
+        id="seedPhrase"
+        translate="no"
+        class="highlightBox"
+        readonly="readonly"
+      >
+${seedPhrase}</textarea
+      >
     </label>
     <button id="seedCopy" data-clipboard-target="#seedPhrase">Copy</button>
     <button id="displaySeedPhraseContinue" class="primary hidden">

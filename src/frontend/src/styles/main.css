@@ -301,6 +301,10 @@ textarea.highlightBox {
   min-height: 6.5rem;
 }
 
+input.highlightBox {
+  font: inherit;
+}
+
 .warningBox {
   border: 1px var(--grey-200) solid;
   border-radius: 4px;

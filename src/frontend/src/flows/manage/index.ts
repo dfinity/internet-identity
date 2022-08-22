@@ -159,8 +159,14 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
     </p>
     ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
     <aside>
-      <h2 class="label">Identity Anchor</h2>
-      <div class="highlightBox">${userNumber}</div>
+      <h2 id="ii-anchor-title" class="label">Identity Anchor</h2>
+      <input
+        type="text"
+        readonly="readonly"
+        aria-labelledby="ii-anchor-title"
+        class="highlightBox"
+        value="${userNumber}"
+      />
     </aside>
 
     <aside>

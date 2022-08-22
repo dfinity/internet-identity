@@ -26,8 +26,15 @@ const pageContent = (alias: string) => html`
         verification codes that you received any other way.`,
     })}
     <p>Verify that this is your device:</p>
-    <label>Alias</label>
-    <div class="highlightBox">${alias}</div>
+    <label>
+      <strong>Alias</strong>
+      <input
+        type="text"
+        readonly="readonly"
+        class="highlightBox"
+        value="${alias}"
+      />
+    </label>
     <label>Device Verification Code</label>
     <div id="wrongCodeMessage" class="error-message-hidden">
       The entered verification code was invalid. Please try again.
