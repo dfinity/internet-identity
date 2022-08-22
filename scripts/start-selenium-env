@@ -17,7 +17,10 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0
+  $0 [--no-hot-reload]
+
+Options:
+  --no-hot-reload   Uses dfx as the II host thus removing the dependency on the II dev server. By doing so, II will no longer hot reload front-end changes.
 EOF
 }
 
@@ -31,7 +34,7 @@ NOTE: This requires docker, docker-compose, a running dfx replica with II and th
 EOF
 
 }
-
+II_PORT=8080
 while [[ $# -gt 0  ]]
 do
     case "$1" in
@@ -41,6 +44,10 @@ do
             help
             exit 0
             ;;
+        --no-hot-reload)
+          II_PORT=8000
+          shift
+          ;;
         *)
             echo "ERROR: unknown argument $1"
             usage
@@ -55,7 +62,6 @@ II_CANISTER_ID=$( jq -r .internet_identity.local .dfx/local/canister_ids.json )
 TEST_APP_CANISTER_ID=$( jq -r .test_app.local demos/test-app/.dfx/local/canister_ids.json )
 
 cd "docker-test-env"
-sed "s/II_CANISTER_ID/$II_CANISTER_ID/g; s/TEST_APP_CANISTER_ID/$TEST_APP_CANISTER_ID/g" docker-compose.yml \
-    | docker compose -f - build --build-arg II_CANISTER_ID="$II_CANISTER_ID" --build-arg TEST_APP_CANISTER_ID="$TEST_APP_CANISTER_ID"
-sed "s/II_CANISTER_ID/$II_CANISTER_ID/g; s/TEST_APP_CANISTER_ID/$TEST_APP_CANISTER_ID/g" docker-compose.yml \
-    | docker compose -f - up -d --wait
+COMPOSE_CONFIG=$(sed "s/II_CANISTER_ID/$II_CANISTER_ID/g; s/TEST_APP_CANISTER_ID/$TEST_APP_CANISTER_ID/g" docker-compose.yml)
+echo "$COMPOSE_CONFIG" | docker compose -f - build --build-arg II_CANISTER_ID="$II_CANISTER_ID" --build-arg II_PORT="$II_PORT" --build-arg TEST_APP_CANISTER_ID="$TEST_APP_CANISTER_ID"
+echo "$COMPOSE_CONFIG" | docker compose -f - up -d --wait

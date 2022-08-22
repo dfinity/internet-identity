@@ -273,16 +273,11 @@ jobs:
           dfx canister create --all
           dfx canister install test_app --wasm test_app.wasm
 
-      - name: Run II dev front-end
-        run: |
-          npm ci
-          npm run start &
-          sleep 10 # crude
-
       - name: Start docker compose
-        run: scripts/start-selenium-env
+        run: scripts/start-selenium-env --no-hot-reload
 
       - run: rm -v -f screenshots/*.png
+      - run: npm ci
       - run: npm test
       - run: npm run test:e2e-${{ matrix.device }}
       - name: Collect docker logs
