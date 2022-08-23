@@ -163,6 +163,9 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v2
+        with:
+          # Pull a deep copy so that we can set meaningful timestamps across builds, based on the commit history
+          fetch-depth: '0'
 
       - uses: ./.github/actions/bootstrap
 
@@ -184,21 +187,24 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}-2
 
-      - name: Create fake assets
-        run : |
-          mkdir dist
-          touch dist/index.html
-          touch dist/index.js
-          touch dist/index.js.gz
-          touch dist/loader.webp
-          touch dist/favicon.ico
-          touch dist/ic-badge.svg
-
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
         with:
           name: internet_identity_test.wasm
           path: .
+
+        # For each file involved in the build, set the mtime back to the commit date of the last edit. This means we get
+        # meaningful mtimes that cargo can work use to decide what part of the target/ cache to invalidate as opposed
+        # to just thrashing everything. This means that the build is a no-op for anything that doesn't change the actual test code.
+      - name: 'Set timestamps'
+        run: |
+          git ls-tree -r --name-only HEAD ./src/canister_tests/ ./src/internet_identity_interface/ Cargo.* | \
+            while read filename
+            do
+              git_time=$(TZ=UTC0 git log -1 --date='format-local:%Y%m%d%H%M' --format='%cd' -- "$filename")
+              echo "Setting $filename to $git_time"
+              TZ=UTC0 touch -t "$git_time" "$filename"
+            done
 
       # We split the test build and run so that it's clear from the GHA steps how long each took
       - name: Build Tests
