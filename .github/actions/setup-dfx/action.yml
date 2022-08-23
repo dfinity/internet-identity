@@ -1,0 +1,31 @@
+name: 'Setup DFX'
+description: Setup DFX
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/dfx
+          ~/.cache/dfinity
+        key: dfx-cache-0.11.1-2
+    # This step hangs on Github actions on Darwin for some reason, that
+    # is why we run this only on Linux for now
+    - name: Install DFX
+      shell: bash
+      env:
+        DFX_VERSION: 0.11.1
+      run: |
+        if [ -f ~/dfx/dfx ]
+        then
+          echo "DFX restored from cache"
+          ~/dfx/dfx --version
+        else
+          export DFX_INSTALL_ROOT=~/dfx
+          echo DFX not restored from cache, running install script:
+          echo DFX Version: "$DFX_VERSION"
+          echo DFX location: "$DFX_INSTALL_ROOT"
+          (yes || true) | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+        fi
+        # create symlink so that dfx can be called without the path in the workflow
+        ln -s ~/dfx/dfx /usr/local/bin/dfx
