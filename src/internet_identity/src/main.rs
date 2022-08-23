@@ -12,9 +12,10 @@ use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::ops::Deref;
 use storage::{Salt, Storage};
 
 use internet_identity_interface::*;
@@ -26,6 +27,7 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
+use crate::storage::StorageError;
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
 
@@ -433,12 +435,13 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         let mut store = s.storage.borrow_mut();
         match store.allocate_user_number() {
             Some(user_number) => {
-                store
-                    .write(user_number, vec![DeviceDataInternal::from(device_data)])
-                    .unwrap_or_else(|err| {
-                        trap(&format!("failed to store user device data: {}", err))
-                    });
-                s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
+                write_anchor_data(
+                    store.deref(),
+                    user_number,
+                    vec![DeviceDataInternal::from(device_data)],
+                    s.usage_metrics.borrow_mut(),
+                )
+                .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -479,18 +482,20 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         }
 
         entries.push(DeviceDataInternal::from(device_data));
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to write device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        )
+        .unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write device data of user {}: {}",
+                user_number, err
+            ))
+        });
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
-        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
     })
 }
 
@@ -552,18 +557,20 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
 
         mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to write device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        )
+        .unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write device data of user {}: {}",
+                user_number, err
+            ))
+        });
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
-        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
     })
 }
 
@@ -584,17 +591,30 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
         mutate_device_or_trap(&mut entries, device_key, None);
 
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to persist device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-        s.usage_metrics.borrow_mut().anchor_operation_counter += 1;
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        )
+        .unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to persist device data of user {}: {}",
+                user_number, err
+            ))
+        });
     })
+}
+
+/// Writes the supplied entries to stable memory and updates the anchor operation metric.
+fn write_anchor_data(
+    storage: &Storage<Vec<DeviceDataInternal>>,
+    user_number: UserNumber,
+    entries: Vec<DeviceDataInternal>,
+    mut usage_metrics: RefMut<UsageMetrics>,
+) -> Result<(), StorageError> {
+    usage_metrics.anchor_operation_counter += 1;
+    storage.write(user_number, entries)
 }
 
 #[update]
