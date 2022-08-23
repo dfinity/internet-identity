@@ -448,6 +448,12 @@ jobs:
           for modified in $(git ls-files --modified ./screenshots)
           do
             echo found modified screenshot "$modified"
+            if [ ! -f "$modified" ]; then
+              # if the file cannot be found then git is probably just telling us that it was deleted.
+              # in that case we do _not_ revert the file and skip checking for its size.
+              echo "'$modified' not found, assuming it was deleted"
+              continue
+            fi
             old=$(mktemp)
             git show HEAD:$modified > $old
             magick_out=$(mktemp)
