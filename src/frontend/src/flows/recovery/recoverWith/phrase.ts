@@ -90,11 +90,13 @@ const pageContent = (userNumber: bigint, message?: string) => html`
     }
 
   </style>
-  <div class="container">
-    <h1>Your seed phrase</h1>
-    <p>${
-      message !== undefined ? message : "Please provide your seed phrase"
-    }</p>
+  <article class="container">
+    <hgroup>
+      <h1>Your seed phrase</h1>
+      <p>${
+        message !== undefined ? message : "Please provide your seed phrase"
+      }</p>
+    </hgroup>
     <textarea id="inputSeedPhrase" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
@@ -102,9 +104,11 @@ const pageContent = (userNumber: bigint, message?: string) => html`
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
     </details>
-    <button id="inputSeedPhraseContinue" class="primary">Continue</button>
-    <button id="inputSeedPhraseCancel">Cancel</button>
-  </div>
+    <div>
+      <button id="inputSeedPhraseContinue" class="primary">Continue</button>
+      <button id="inputSeedPhraseCancel">Cancel</button>
+    </div>
+  </article>
 `;
 
 export const phraseRecoveryPage = async (
