@@ -11,6 +11,7 @@ import { displayUserNumber } from "./flows/displayUserNumber";
 import { loginKnownAnchor } from "./flows/login/knownAnchor";
 import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
+import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { displayPage } from "./flows/authenticate";
 import { DeviceData } from "../generated/internet_identity_types";
 import { register } from "./flows/register";
@@ -54,6 +55,8 @@ const iiPages: Record<string, () => void> = {
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
   authenticate: () => displayPage("https://nowhere.com", BigInt(10000)),
+  recoverWithPhrase: () =>
+    phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
 };
 
 // The showcase
