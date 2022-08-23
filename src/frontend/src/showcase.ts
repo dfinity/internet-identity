@@ -14,7 +14,7 @@ import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { displayPage } from "./flows/authenticate";
 import { DeviceData } from "../generated/internet_identity_types";
-import { register } from "./flows/register";
+import { register, renderConstructing } from "./flows/register";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as Connection;
@@ -57,6 +57,7 @@ const iiPages: Record<string, () => void> = {
   authenticate: () => displayPage("https://nowhere.com", BigInt(10000)),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
+  constructing: () => renderConstructing(),
 };
 
 // The showcase

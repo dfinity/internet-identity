@@ -53,7 +53,7 @@ export const register = async (
   return init(connection);
 };
 
-const renderConstructing = () => {
+export const renderConstructing = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(constructingContent, container);
 };
