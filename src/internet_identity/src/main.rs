@@ -27,7 +27,6 @@ const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
 
-use crate::storage::StorageError;
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
 
