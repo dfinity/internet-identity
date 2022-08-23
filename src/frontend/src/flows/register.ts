@@ -14,13 +14,23 @@ import {
 } from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
+import { validateAlias } from "./addDevice/validateAlias";
 
 const pageContent = html`
   <div class="container">
     <h1>Create a new Internet Identity Anchor</h1>
     <form id="registerForm">
       <p>Please provide a name for your device.</p>
-      <input id="registerAlias" placeholder="Device name" />
+      <input
+        id="registerAlias"
+        placeholder="Device name"
+        aria-label="device name"
+        type="text"
+        required
+        maxlength="30"
+        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
+        spellcheck="false"
+      />
       <button type="submit" class="primary">Create</button>
       <button id="registerCancel" type="button">Cancel</button>
     </form>
@@ -101,6 +111,23 @@ const init = (connection: Connection): Promise<LoginFlowResult | null> =>
         reject(err);
       }
     };
+
+    const registerAlias = document.getElementById(
+      "registerAlias"
+    ) as HTMLInputElement;
+
+    registerAlias.addEventListener("invalid", () => {
+      const message = validateAlias(
+        registerAlias.validity,
+        registerAlias.value
+      );
+      registerAlias.setCustomValidity(message);
+    });
+
+    registerAlias.addEventListener("input", () => {
+      registerAlias.setCustomValidity("");
+      registerAlias.reportValidity();
+    });
   });
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));
