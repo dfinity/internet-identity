@@ -157,13 +157,18 @@ jobs:
   # (note: this runs _all_ cargo tests)
   canister-tests:
     runs-on: ${{ matrix.os }}
-    needs:
-      - docker-build
+    needs: docker-build
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v2
+
+      - uses: ./.github/actions/bootstrap
+
+      # Rustup only installs cargo on the first call, so we use a dedicated step to get a good idea of how
+      # time is spent in each step separately
+      - run: cargo check --help
 
         # NOTE: the top-level crate "canister_tests" still gets recompiled (~4mn)
         # due to the mtime changing on the checkout. Can be worked around by storing
@@ -171,13 +176,13 @@ jobs:
         # (and then restoring the mtime).
       - uses: actions/cache@v2
         with:
+          # note on paths: we include the whole ~/.cargo/. (as opposed to juse .cargo/git, etc) because cargo stores crate
+          # data as .crates(2?).{json,toml} without which the whole cache is invalidated. We may accumulate unnecessary
+          # stuff but the cache is anyway invalidated on every toolchain update.
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - uses: ./.github/actions/bootstrap
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}-2
 
       - name: Create fake assets
         run : |
@@ -195,6 +200,11 @@ jobs:
           name: internet_identity_test.wasm
           path: .
 
+      # We split the test build and run so that it's clear from the GHA steps how long each took
+      - name: Build Tests
+        shell: bash
+        run: cargo build --tests --release --package canister_tests
+
       - name: Run Tests
         shell: bash
         run: |
@@ -203,8 +213,7 @@ jobs:
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
-          # the "rand" features are needed for the captcha crate to compile
-          cargo test --release --all-targets --features 'rand/std,rand/std_rng'
+          cargo test --release --package canister_tests
         env:
           RUST_BACKTRACE: 1
 
