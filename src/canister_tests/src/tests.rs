@@ -1886,7 +1886,7 @@ mod http_tests {
 
     /// Verifies that the signature count metric is updated correctly.
     #[test]
-    fn metrics_signature_count() -> Result<(), CallError> {
+    fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let frontend_hostname = "https://some-dapp.com";
@@ -1910,6 +1910,12 @@ mod http_tests {
                 "internet_identity_signature_count",
                 count + 1,
             );
+            assert_metric(
+                &env,
+                canister_id,
+                "internet_identity_delegation_counter",
+                count + 1,
+            );
         }
 
         // long after expiry (we don't want this test to break, if we change the default delegation expiration)
@@ -1925,10 +1931,18 @@ mod http_tests {
             None,
         )?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
-        let (signature_count, _) =
-            framework::parse_metric(&metrics, "internet_identity_signature_count");
-        assert_eq!(signature_count, 1); // old ones pruned and a new one created
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_signature_count",
+            1, // old ones pruned and a new one created
+        );
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_delegation_counter",
+            4, // delegation counter is not affected by pruning
+        );
         Ok(())
     }
 
@@ -2081,6 +2095,75 @@ mod http_tests {
         let (challenge_count, _) =
             framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
         assert_eq!(challenge_count, 0);
+
+        Ok(())
+    }
+
+    /// Verifies that the anchor operation count metric is updated correctly.
+    #[test]
+    fn metrics_anchor_operations() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
+
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_anchor_operations_counter",
+            0,
+        );
+
+        let user_number = flows::register_anchor(&env, canister_id);
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_anchor_operations_counter",
+            1,
+        );
+
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_anchor_operations_counter",
+            2,
+        );
+
+        let mut device = device_data_2();
+        device.alias = "new alias".to_string();
+        api::update(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device.pubkey.clone(),
+            device,
+        )?;
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_anchor_operations_counter",
+            3,
+        );
+
+        api::remove(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2().pubkey,
+        )?;
+        assert_metric(
+            &env,
+            canister_id,
+            "internet_identity_anchor_operations_counter",
+            4,
+        );
 
         Ok(())
     }
