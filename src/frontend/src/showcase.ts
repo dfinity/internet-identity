@@ -102,6 +102,7 @@ const pageContent = html`
       color: #202124;
       backdrop-filter: blur(10px);
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+      font-size: 1.25rem;
     }
   </style>
   <h1>showcase</h1>
