@@ -440,8 +440,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
                     user_number,
                     vec![DeviceDataInternal::from(device_data)],
                     s.usage_metrics.borrow_mut(),
-                )
-                .unwrap_or_else(|err| trap(&format!("failed to store user device data: {}", err)));
+                );
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -487,14 +486,7 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
             user_number,
             entries,
             s.usage_metrics.borrow_mut(),
-        )
-        .unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to write device data of user {}: {}",
-                user_number, err
-            ))
-        });
-
+        );
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
 }
@@ -562,13 +554,7 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
             user_number,
             entries,
             s.usage_metrics.borrow_mut(),
-        )
-        .unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to write device data of user {}: {}",
-                user_number, err
-            ))
-        });
+        );
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
@@ -590,19 +576,12 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         mutate_device_or_trap(&mut entries, device_key, None);
-
         write_anchor_data(
             s.storage.borrow().deref(),
             user_number,
             entries,
             s.usage_metrics.borrow_mut(),
-        )
-        .unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to persist device data of user {}: {}",
-                user_number, err
-            ))
-        });
+        );
     })
 }
 
@@ -612,9 +591,14 @@ fn write_anchor_data(
     user_number: UserNumber,
     entries: Vec<DeviceDataInternal>,
     mut usage_metrics: RefMut<UsageMetrics>,
-) -> Result<(), StorageError> {
+) {
+    storage.write(user_number, entries).unwrap_or_else(|err| {
+        trap(&format!(
+            "failed to write device data of user {}: {}",
+            user_number, err
+        ))
+    });
     usage_metrics.anchor_operation_counter += 1;
-    storage.write(user_number, entries)
 }
 
 #[update]
