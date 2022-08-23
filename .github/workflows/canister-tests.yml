@@ -490,10 +490,10 @@ jobs:
           default_author: github_actions
           message: "🤖 Selenium screenshots auto-update"
 
-  # This deploys the production build to mainnet, to a canister that we use for testing.
+  # This deploys the production build to mainnet, to a canister that we use for release testing.
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: startsWith(github.ref, 'refs/tags/release-')
     needs: docker-build
     steps:
       - uses: actions/checkout@v2
