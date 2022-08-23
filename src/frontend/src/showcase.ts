@@ -62,13 +62,60 @@ const iiPages: Record<string, () => void> = {
 
 // The showcase
 const pageContent = html`
-  <div>
-    <h1>showcase</h1>
-    <ul>
-      ${Object.entries(iiPages).map(([key, _]) => {
-        return html`<li><a href="/${key}">${key}</a></li>`;
-      })}
-    </ul>
+  <style>
+    .showcase-grid {
+      display: grid;
+      list-style-type: none;
+      width: 100vw;
+      grid-template-columns: repeat(auto-fill, minmax(25rem, 1fr));
+    }
+    .showcase-grid > aside {
+      position: relative;
+      aspect-ratio: 0.75;
+    }
+    .showcase-grid a {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      outline: 1px solid #ccc;
+    }
+
+    .showcase-grid iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 200%;
+      transform-origin: 0 0;
+      transform: scale(0.5);
+      border: none;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .showcase-grid h2 {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.25);
+      margin: 0;
+      color: #202124;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+      font-size: 1.25rem;
+    }
+  </style>
+  <h1>showcase</h1>
+  <div class="showcase-grid">
+    ${Object.entries(iiPages).map(([key, _]) => {
+      return html`<aside>
+        <a href="/${key}">
+          <iframe src="/${key}" title="${key}"></iframe>
+          <h2>${key}</h2>
+        </a>
+      </aside>`;
+    })}
   </div>
 `;
 
