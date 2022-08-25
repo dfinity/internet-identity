@@ -17,7 +17,7 @@ runs:
     - name: Install DFX
       shell: bash
       run: |
-        if [[ "$(command -v dfx)" ]]
+        if command -v dfx
         then
           echo "DFX restored from cache"
         else
