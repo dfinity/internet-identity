@@ -21,7 +21,7 @@ runs:
           echo "DFX restored from cache"
         else
           echo "DFX not restored from cache, running install script:"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          (yes || true) | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
         fi
         echo "DFX version"
         dfx --version
