@@ -1,18 +1,19 @@
 name: 'Setup DFX'
 description: Setup DFX
+inputs:
+  dfx-version:
+    default: 0.11.1
+    description: The dfx version to be installed or loaded from cache.
+    required: true
 runs:
   using: "composite"
   steps:
-    - name: Set DFX version
-      shell: bash
-      run: |
-        echo "DFX_VERSION=0.11.1" >> $GITHUB_ENV
     - uses: actions/cache@v2
       with:
         path: |
           /usr/local/bin/dfx
           ~/.cache/dfinity
-        key: dfx-cache-${{ env.DFX_VERSION }}-3
+        key: dfx-cache-${{ inputs.dfx-version }}-3
     - name: Install DFX
       shell: bash
       run: |
@@ -21,7 +22,7 @@ runs:
           echo "DFX restored from cache"
         else
           echo "DFX not restored from cache, running install script:"
-          (yes || true) | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          (yes || true) | DFX_VERSION=${{ inputs.dfx-version }} sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
         fi
         echo "DFX version"
         dfx --version
