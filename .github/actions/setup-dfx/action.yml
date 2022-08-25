@@ -3,18 +3,18 @@ description: Setup DFX
 runs:
   using: "composite"
   steps:
+    - name: Set DFX version
+      shell: bash
+      run: |
+        echo "DFX_VERSION=0.11.1" >> $GITHUB_ENV
     - uses: actions/cache@v2
       with:
         path: |
           /usr/local/bin/dfx
           ~/.cache/dfinity
-        key: dfx-cache-0.11.1-3
-    # This step hangs on Github actions on Darwin for some reason, that
-    # is why we run this only on Linux for now
+        key: dfx-cache-${{ env.DFX_VERSION }}-3
     - name: Install DFX
       shell: bash
-      env:
-        DFX_VERSION: 0.11.1
       run: |
         if [[ "$(command -v dfx)" ]]
         then
