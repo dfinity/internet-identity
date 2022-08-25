@@ -231,3 +231,6 @@ pub fn verify_tentative_device(
     )
     .map(|(x,)| x)
 }
+
+/// A "compatibility" module for the previous version of II to handle API changes.
+pub mod compat {}
