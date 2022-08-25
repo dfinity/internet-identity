@@ -235,8 +235,6 @@ jobs:
         device: [ 'desktop', 'mobile' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
-    env:
-      DFX_VERSION: 0.11.1
 
     steps:
       - uses: actions/checkout@v2
@@ -245,12 +243,7 @@ jobs:
         with:
           node-version: 16.x
 
-      # This step hangs on Github actions on Darwin for some reason, that
-      # is why we run this only on Linux for now
-      - name: Install DFX
-        run: |
-          echo Install DFX Version: "$DFX_VERSION"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+      - uses: ./.github/actions/setup-dfx
 
       # Helps with debugging
       - name: Show versions
@@ -335,8 +328,6 @@ jobs:
   using-dev-build:
     runs-on: ubuntu-latest
     needs: docker-build
-    env:
-      DFX_VERSION: 0.8.3
     steps:
       - uses: actions/checkout@v2
 
@@ -352,10 +343,7 @@ jobs:
           # using https (for dfx-proxy)
           node-version: 16.x
 
-      - name: Install DFX
-        run: |
-          echo Install DFX Version: "$DFX_VERSION"
-          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+      - uses: ./.github/actions/setup-dfx
 
       # Helps with debugging
       - name: Show versions
