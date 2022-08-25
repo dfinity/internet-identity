@@ -21,6 +21,7 @@ runs:
           echo "DFX restored from cache"
           ~/dfx/dfx --version
         else
+          # sent env variable here so that '~' gets expanded
           export DFX_INSTALL_ROOT=~/dfx
           echo DFX not restored from cache, running install script:
           echo DFX Version: "$DFX_VERSION"
