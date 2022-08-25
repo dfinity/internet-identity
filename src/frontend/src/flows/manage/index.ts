@@ -232,8 +232,6 @@ export const renderManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-
   let anchorInfo: IdentityAnchorInfo;
   try {
     anchorInfo = await withLoader(() => connection.getAnchorInfo());
@@ -247,9 +245,18 @@ export const renderManage = async (
     // we are actually in a device registration process
     await pollForTentativeDevice(userNumber, connection);
   } else {
-    render(pageContent(userNumber, anchorInfo.devices), container);
-    init(userNumber, connection, anchorInfo.devices);
+    displayManage(userNumber, connection, anchorInfo.devices);
   }
+};
+
+export const displayManage = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
+  devices: DeviceData[]
+): Promise<void> => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(pageContent(userNumber, devices), container);
+  init(userNumber, connection, devices);
 };
 
 // Initializes the management page.
