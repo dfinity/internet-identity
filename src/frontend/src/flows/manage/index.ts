@@ -249,18 +249,18 @@ export const renderManage = async (
   }
 };
 
-export const displayManage = async (
+export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
-): Promise<void> => {
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, devices), container);
   init(userNumber, connection, devices);
 };
 
 // Initializes the management page.
-const init = async (
+const init = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
