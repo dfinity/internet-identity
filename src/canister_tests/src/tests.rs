@@ -56,15 +56,14 @@ mod rollback_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
-        let mut devices_before = api::compat::lookup(&env, canister_id, user_number).unwrap();
+        let mut devices_before = api::lookup(&env, canister_id, user_number).unwrap();
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
         api::health_check(&env, canister_id);
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
         api::health_check(&env, canister_id);
-        let mut devices_after =
-            api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
-                .unwrap()
-                .devices;
+        let mut devices_after = api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+            .unwrap()
+            .devices;
 
         devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
         devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
@@ -94,7 +93,7 @@ mod rollback_tests {
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
 
         // use anchor
-        let devices = api::compat::lookup(&env, canister_id, user_number)?;
+        let devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices, [device_data_1()]);
 
         let (user_key, _) = api::prepare_delegation(
@@ -1098,7 +1097,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::compat::lookup(&env, canister_id, user_number)?;
+        let devices = api::lookup(&env, canister_id, user_number)?;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
