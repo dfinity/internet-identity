@@ -20,15 +20,15 @@ export const warnBox = ({
   htmlElement = "aside",
 }: warnBoxProps): TemplateResult => {
   const contents: TemplateResult = html`
-    <div class="warnIcon">${warningIcon}</div>
-    <div class="warnContent">
-      <div class="warnTitle">${title}</div>
-      <div class="warnMessage">${message}</div>
+    <span class="c-card__icon">${warningIcon}</span>
+    <div class="c-card__content">
+      <div class="t-title">${title}</div>
+      <div class="t-paragraph">${message}</div>
       ${slot}
     </div>
   `;
 
   return html`${htmlElement === "aside"
-    ? html` <aside class="warnBox">${contents}</aside>`
-    : html` <div class="warnBox">${contents}</div> `}`;
+    ? html` <aside class="c-card c-card--narrow c-card--warning">${contents}</aside>`
+    : html` <div class="c-card c-card--narrow c-card--warning">${contents}</div> `}`;
 };

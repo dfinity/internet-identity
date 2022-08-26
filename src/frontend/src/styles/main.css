@@ -502,7 +502,8 @@ a:hover,
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
 }
-*/ .c-card--outline {
+
+.c-card--outline {
   border: var(--vs-line) var(--rc-line-inverted) solid;
 }
 
@@ -543,6 +544,10 @@ a:hover,
   position: absolute;
   left: var(--rs-card-bezel);
   top: var(--rs-card-bezel);
+}
+
+.c-card__content {
+  margin-left: calc(var(--rs-card-bezel) * 2 + 1rem);
 }
 
 .c-card--warning {
