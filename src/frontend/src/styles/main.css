@@ -542,28 +542,26 @@ a:hover,
   position: absolute;
   right: 0;
   top: 0;
-  width: 15%;
+  width: 10%;
   aspect-ratio: 1;
   z-index: var(--vz-background);
-  background: var(--rc-background);
-  transform: translate(20%, -20%);
-
-  border-style: double;
-  border-width: calc(var(--vs-line) * 2);
-  border-radius: 4px;
-  border-image-slice: 1;
-
-  border-image-source: linear-gradient(-270deg, var(--rg-brand));
+  transform: translate(40%, -40%);
 }
 
 .c-card__icon svg {
   position: absolute;
   display: block;
-  width: 70%;
-  height: 70%;
+  width: 100%;
+  height: 100%;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+.c-card__icon svg * {
+  fill: var(--rc-background);
+  stroke-width: 3px;
+  stroke: var(--rc-warning);
 }
 
 .c-card__content {
