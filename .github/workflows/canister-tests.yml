@@ -133,10 +133,7 @@ jobs:
             demos/test-app/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/test-app/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
-      - name: Use Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: 16.x
+      - uses: ./.github/actions/setup-node
       - name: "Build test app canister"
         working-directory: demos/test-app
         run: ./build.sh
@@ -238,10 +235,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
-        with:
-          node-version: 16.x
+      - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-dfx
 
@@ -336,13 +330,7 @@ jobs:
           sudo apt-get --only-upgrade install google-chrome-stable
           google-chrome --version
 
-      - name: Use Node.js
-        uses: actions/setup-node@v2
-        with:
-          # must use 16.x because 14.x doesn't understand how to pull repos
-          # using https (for dfx-proxy)
-          node-version: 16.x
-
+      - uses: ./.github/actions/setup-node
       - uses: ./.github/actions/setup-dfx
 
       # Helps with debugging
