@@ -10,8 +10,8 @@ import { setupCountdown } from "../../../utils/countdown";
 import { warnBox } from "../../../components/warnBox";
 
 const pageContent = (alias: string) => html`
-  <div class="container">
-    <h1>Verify New Device</h1>
+  <div class="l-container c-card c-card--highlight">
+    <h1 class="t-title t-title--main">Verify New Device</h1>
     ${warnBox({
       title: "Security Warning",
       message: html`Verifying will add the shown device to your Identity Anchor.
@@ -25,18 +25,22 @@ const pageContent = (alias: string) => html`
         <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
         verification codes that you received any other way.`,
     })}
-    <p>Verify that this is your device:</p>
-    <label>Alias</label>
-    <div class="c-input c-input--readonly t-vip">${alias}</div>
-    <label>Device Verification Code</label>
-    <div id="wrongCodeMessage" class="is-hidden">
-      The entered verification code was invalid. Please try again.
-    </div>
-    <input
-      id="tentativeDeviceCode"
-      class="c-input"
-      placeholder="Verification Code"
-    />
+    <h2 class="t-title">Verify that this is your device:</h2>
+    <label class="l-section">
+      <strong class="t-title">Alias</strong>
+      <div class="c-input c-input--readonly t-vip">${alias}</div>
+    </label>
+    <label class="l-section">
+      <strong class="t-title">Device Verification Code</strong>
+      <p id="wrongCodeMessage" class="is-hidden t-paragraph">
+        The entered verification code was invalid. Please try again.
+      </p>
+      <input
+        id="tentativeDeviceCode"
+        class="c-input"
+        placeholder="Verification Code"
+      />
+    </label>
     <p class="t-paragraph">
       Time remaining: <span id="timer" class="t-strong"></span>
     </p>
