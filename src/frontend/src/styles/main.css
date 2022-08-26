@@ -301,7 +301,7 @@ body {
  * - `.l-` layout
  * - `.t-` typography
  *
- * We avoid element, id and attribute selectors when it is saint to do so¹. 
+ * We avoid element, id and attribute selectors when it is sane to do so¹. 
  * Use classes when possible. 
  *
  * ¹ For example when needing to style the paths of an SVG it might be difficult
