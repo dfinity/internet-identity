@@ -1,5 +1,10 @@
 import { html, render } from "lit-html";
 import { initLogout, logoutSection } from "../../../components/logout";
+import { validateAlias } from "../validateAlias";
+// Regex Pattern for input: All characters, must be alphabet or number
+// Can have hyphen(s), space(s) or underscore(s) in the middle.
+// Good examples: "2019_macbook", "2019-Macbook", "2019 Macbook"
+// Bad examples: "2019 macbook!", "2010 macbook_", "space trails at end "
 
 const pageContent = () => html`
   <article class="l-container c-card c-card--highlight">
@@ -15,6 +20,9 @@ const pageContent = () => html`
         placeholder="Device alias"
         type="text"
         required
+        maxlength="30"
+        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
+        spellcheck="false"
       />
       <div class="l-section">
         <button type="submit" id="deviceAliasContinue" class="c-button">
@@ -61,4 +69,16 @@ const init = (): Promise<string | null> =>
       event.preventDefault();
       resolve(deviceAlias.value);
     };
+    const deviceInput = document.getElementById(
+      "deviceAlias"
+    ) as HTMLInputElement;
+
+    deviceInput.addEventListener("invalid", () => {
+      const message = validateAlias(deviceInput.validity, deviceInput.value);
+      deviceInput.setCustomValidity(message);
+    });
+    deviceInput.addEventListener("input", () => {
+      deviceInput.setCustomValidity("");
+      deviceInput.reportValidity();
+    });
   });

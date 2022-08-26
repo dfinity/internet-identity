@@ -38,8 +38,12 @@ import {
   waitToClose,
 } from "./util";
 
-const TEST_APP_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
-const TEST_APP_CANONICAL_URL = "https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app";
+// Read canister ids from the corresponding dfx files.
+// This assumes that they have been successfully dfx-deployed
+import test_app_canister_ids from "../../../../demos/test-app/.dfx/local/canister_ids.json";
+
+const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
+const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
 const REPLICA_URL = "https://ic0.app";
 const II_URL = "https://identity.ic0.app";
@@ -605,14 +609,6 @@ test("Screenshots", async () => {
       await aboutView.waitForDisplay();
       await screenshots.take("about", browser);
 
-      // About page, legacy link
-      await browser.url("about:blank");
-      await browser.url(II_URL + "#about");
-      await removeFeaturesWarning(browser);
-      const aboutViewLegacy = new AboutView(browser);
-      await aboutViewLegacy.waitForDisplay();
-      await screenshots.take("about-legacy", browser);
-
       // Test device removal
       await browser.url(II_URL);
       await removeFeaturesWarning(browser);
@@ -923,7 +919,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
       '"https://nice-name.com" is not listed in the list of allowed alternative origins. Allowed alternative origins:'
@@ -1003,10 +999,10 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      "Resource https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed."
+      `Resource ${TEST_APP_CANONICAL_URL}/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed.`
     );
   });
 }, 300_000);
@@ -1043,10 +1039,10 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      '"https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app" is not a valid derivation origin for "https://nice-name.com"'
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      'An error occurred while validating the derivationOrigin "https://ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app": Failed to fetch'
+      `An error occurred while validating the derivationOrigin "${TEST_APP_CANONICAL_URL}": Failed to fetch`
     );
   });
 }, 300_000);
@@ -1092,7 +1088,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     );
     let logs = (await browser.getLogs("browser")) as { message: string }[];
     expect(logs[logs.length - 1].message).toEqual(
-      "https://ryjl3-tyaaa-aaaaa-aaaba-cai.raw.ic0.app/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 404 ()"
+      `https://${TEST_APP_CANISTER_ID}.raw.ic0.app/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 400 (Bad Request)`
     );
 
     // This works anyway --> fetched using non-raw

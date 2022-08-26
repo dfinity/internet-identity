@@ -2,45 +2,33 @@ version: "3.9"
 services:
   # service hosting dfx running II and the test app
   # canister ids are assigned deterministically on startup, so we can hardcode them
-  ic:
-    build: dfx-docker
-    ports:
-      - "8000:8000"
-    volumes:
-      - "./dfx-docker/canisters:/canisters:ro"
-    # we consider the canister ready, once the II page is reachable
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    networks:
-      ic:
-        aliases:
-          # dfx starts icx-proxy with a configuration that allows canister based domains only on localhost,
-          # so we make this canister available using <canister_id>.localhost domains
-          - rrkah-fqaaa-aaaaa-aaaaq-cai.localhost
-          - ryjl3-tyaaa-aaaaa-aaaba-cai.localhost
 
   # Nginx proxy to terminate tls and transform domains to *.localhost
   nginx:
     build: reverse_proxy
     ports:
       - "8443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       ic:
         aliases:
           - ic0.app
-          # internet identity
-          - rrkah-fqaaa-aaaaa-aaaaq-cai.ic0.app
+          # internet identity, II_CANISTER_ID is substituted by the start-selenium-env script
+          - II_CANISTER_ID.ic0.app
           - identity.ic0.app
-          # test app
-          - ryjl3-tyaaa-aaaaa-aaaba-cai.ic0.app
+          # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
+          - TEST_APP_CANISTER_ID.ic0.app
           - nice-name.com
+          # also handle the *.raw origins, but nginx will just respond with status 400
+          - identity.raw.ic0.app
+          - II_CANISTER_ID.raw.ic0.app
+          - TEST_APP_CANISTER_ID.raw.ic0.app
 
-  # Selenium container with chromdriver and chrome
+  # Selenium container with chromedriver and chrome
   selenium:
-    image: selenium/standalone-chrome:102.0
+    # use the seleniarm image that provides multiple architecture variants including one for M1 chips
+    image: seleniarm/standalone-chromium:104.0
     ports:
       - "4444:4444" # port for the test runner to connect to chromedriver
       - "7900:7900" # port to access the page to watch what chrome is doing (http://localhost:7900, pw is secret)

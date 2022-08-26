@@ -1,35 +1,19 @@
 import { html, render } from "lit-html";
-import { warningIcon } from "../components/icons";
+import { warnBox } from "../components/warnBox";
 
 const pageContent = (userNumber: bigint) => html`
-  <article class="l-container c-card c-card--highlight">
-    <hgroup>
-      <h1 class="t-title t-title--main">Congratulations!</h1>
-      <p class="t-lead">Your new Identity Anchor has been created.</p>
-    </hgroup>
-    <div class="c-card c-card--warning c-card--icon">
-      <div class="c-card__icon">${warningIcon}</div>
-      <div class="c-card__content">
-        <div class="t-title">Record Your Identity Anchor</div>
-        <p class="t-paragraph">
-          Please record your new Identity Anchor. Keep a backup on a storage
-          medium and write it down. You will need it later to use Internet
-          Identity or to add additional devices. If you lose your Identity
-          Anchor, you will no longer be able to use this identity to
-          authenticate to dApps.
-        </p>
-      </div>
-    </div>
-    <div class="l-section">
-      <h2 class="t-title">Identity Anchor</h2>
-      <data
-        class="c-input c-input--readonly t-vip"
-        data-usernumber="${userNumber}"
-        >${userNumber}</data
-      >
-      <button id="displayUserContinue" class="c-button">Continue</button>
-    </div>
-  </article>
+  <div class="container">
+    <h1>Congratulations!</h1>
+    <p>Your new Identity Anchor has been created.</p>
+    ${warnBox({
+      title: "Record Your Identity Anchor",
+      message:
+        "Please record your new Identity Anchor. Keep a backup on a storage medium and write it down. You will need it later to use Internet Identity or to add additional devices. If you lose your Identity Anchor, you will no longer be able to use this identity to authenticate to dApps.",
+    })}
+    <label>Identity Anchor:</label>
+    <div class="highlightBox">${userNumber}</div>
+    <button id="displayUserContinue" class="primary">Continue</button>
+  </div>
 `;
 
 export const displayUserNumber = async (userNumber: bigint): Promise<void> => {

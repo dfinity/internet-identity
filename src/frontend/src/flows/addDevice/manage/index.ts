@@ -1,36 +1,22 @@
 import { html, render } from "lit-html";
-import {
-  networkIcon,
-  securityKeyIcon,
-  warningIcon,
-} from "../../../components/icons";
+import { networkIcon, securityKeyIcon } from "../../../components/icons";
+import { warnBox } from "../../../components/warnBox";
 
 const pageContent = () => html`
   <article class="l-container c-card c-card--highlight">
     <h1 class="t-title">Add New Device</h1>
-    <aside class="c-card c-card--warning c-card--icon">
-      <div class="c-card__icon">${warningIcon}</div>
-      <div class="c-card__content">
-        <h2 class="t-title">Security Warning</h2>
-        <p class="t-paragraph">
-          You are in the process of adding a new device. Any device added here
-          will have
-          <strong class="t-strong">full control over your identity</strong>.
-          Only continue the process if you want to add a new device that you
-          <em>personally own</em>.
-        </p>
-      </div>
-    </aside>
-    <aside class="c-card c-card--warning c-card--icon">
-      <div class="c-card__icon">${warningIcon}</div>
-      <div class="c-card__content">
-        <h2 class="t-title">Security Warning</h2>
-        <p class="t-paragraph">
-          Do not continue if you were prompted to do this by any website other
-          than <strong class="t-strong">https://identity.ic0.app</strong>!
-        </p>
-      </div>
-    </aside>
+    ${warnBox({
+      title: "Security Warning",
+      message: html`You are in the process of adding a new device. Any device
+        added here will have <strong>full control over your identity</strong>.
+        Only continue the process if you want to add a new device that you
+        <em>personally own</em>.`,
+    })}
+    ${warnBox({
+      title: "Security Warning",
+      message: html`Do not continue if you were prompted to do this by any
+        website other than <strong>https://identity.ic0.app</strong>!`,
+    })}
     <p class="t-paragraph">
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?

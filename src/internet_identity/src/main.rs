@@ -12,9 +12,10 @@ use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::ops::Deref;
 use storage::{Salt, Storage};
 
 use internet_identity_interface::*;
@@ -120,6 +121,14 @@ enum RegistrationState {
     },
 }
 
+#[derive(Default)]
+struct UsageMetrics {
+    // number of prepare_delegation calls since last upgrade
+    delegation_counter: u64,
+    // number of anchor operations (register, add, remove, update) since last upgrade
+    anchor_operation_counter: u64,
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
     sigs: RefCell<SignatureMap>,
@@ -131,6 +140,8 @@ struct State {
     // tentative device registrations, not persisted across updates
     // if a user number is present in this map then registration mode is active until expiration
     tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
+    // additional usage metrics, NOT persisted across updates (but probably should be in the future)
+    usage_metrics: RefCell<UsageMetrics>,
 }
 
 impl Default for State {
@@ -146,6 +157,7 @@ impl Default for State {
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
             tentative_device_registrations: RefCell::new(HashMap::new()),
+            usage_metrics: RefCell::new(UsageMetrics::default()),
         }
     }
 }
@@ -422,11 +434,12 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
         let mut store = s.storage.borrow_mut();
         match store.allocate_user_number() {
             Some(user_number) => {
-                store
-                    .write(user_number, vec![DeviceDataInternal::from(device_data)])
-                    .unwrap_or_else(|err| {
-                        trap(&format!("failed to store user device data: {}", err))
-                    });
+                write_anchor_data(
+                    store.deref(),
+                    user_number,
+                    vec![DeviceDataInternal::from(device_data)],
+                    s.usage_metrics.borrow_mut(),
+                );
                 RegisterResponse::Registered { user_number }
             }
             None => RegisterResponse::CanisterFull,
@@ -467,16 +480,12 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         }
 
         entries.push(DeviceDataInternal::from(device_data));
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to write device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        );
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
 }
@@ -539,15 +548,12 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
 
         mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to write device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        );
 
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
     })
@@ -569,17 +575,29 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
         trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
         mutate_device_or_trap(&mut entries, device_key, None);
-
-        s.storage
-            .borrow()
-            .write(user_number, entries)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to persist device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+        write_anchor_data(
+            s.storage.borrow().deref(),
+            user_number,
+            entries,
+            s.usage_metrics.borrow_mut(),
+        );
     })
+}
+
+/// Writes the supplied entries to stable memory and updates the anchor operation metric.
+fn write_anchor_data(
+    storage: &Storage<Vec<DeviceDataInternal>>,
+    user_number: UserNumber,
+    entries: Vec<DeviceDataInternal>,
+    mut usage_metrics: RefMut<UsageMetrics>,
+) {
+    storage.write(user_number, entries).unwrap_or_else(|err| {
+        trap(&format!(
+            "failed to write device data of user {}: {}",
+            user_number, err
+        ))
+    });
+    usage_metrics.anchor_operation_counter += 1;
 }
 
 #[update]
@@ -855,6 +873,8 @@ async fn prepare_delegation(
         add_signature(&mut sigs, session_key, seed, expiration);
         update_root_hash(&s.asset_hashes.borrow(), &sigs);
         prune_expired_signatures(&s.asset_hashes.borrow(), &mut sigs);
+
+        s.usage_metrics.borrow_mut().delegation_counter += 1;
 
         (
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),

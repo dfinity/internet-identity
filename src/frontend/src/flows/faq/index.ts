@@ -229,25 +229,19 @@ export const questionsArray = Object.values(questions)
 
 // The rendered (list item) question
 function renderQuestion(faq: Question) {
-  return html`<li
-    class="faq__question c-card"
-  >
-    <details
-    id=${faq.anchor} >
-    <summary class="faq__question-summary">
-    <span class="faq__question-summary-text t-link">
-      ${faq.question}
-    </span>
-    <div class="faq__question-underline"></div>
-    </summary>
-    <div class="l-section">
-      <p class="faq__answer">${
-        faq.answer instanceof TemplateResult
-          ? faq.answer
-          : html`<p>${faq.answer}</p>`
-      }</p>
-      ${
-        faq.links !== undefined && faq.links.length > 0
+  return html`<li class="faq__question c-card">
+    <details id=${faq.anchor}>
+      <summary class="faq__question-summary">
+        <span class="faq__question-summary-text t-link"> ${faq.question} </span>
+        <div class="faq__question-underline"></div>
+      </summary>
+      <div class="l-section">
+        <p class="faq__answer">
+          ${faq.answer instanceof TemplateResult
+            ? faq.answer
+            : html`<p>${faq.answer}</p>`}
+        </p>
+        ${faq.links !== undefined && faq.links.length > 0
           ? renderFaqLinks(faq.links)
           : ""}
       </div>

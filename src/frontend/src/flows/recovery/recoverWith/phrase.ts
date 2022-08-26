@@ -39,11 +39,13 @@ const pageContent = (userNumber: bigint, message?: string) => html`
       animation-duration: 600ms;
     }
   </style>
-  <div class="l-container c-card c-card--highlight full-width">
-    <h1 class="t-title t-title--main">Your seed phrase</h1>
-    <p class="t-lead">${
-      message !== undefined ? message : "Please provide your seed phrase"
-    }</p>
+  <article class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">Your seed phrase</h1>
+      <p class="t-lead">${
+        message !== undefined ? message : "Please provide your seed phrase"
+      }</p>
+    </hgroup>
     <textarea id="inputSeedPhrase" class="c-input" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
@@ -51,9 +53,11 @@ const pageContent = (userNumber: bigint, message?: string) => html`
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
     </details>
-    <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
-    <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">Cancel</button>
-  </div>
+    <div class="l-section">
+      <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
+      <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">Cancel</button>
+    </div>
+  </article>
 `;
 
 export const phraseRecoveryPage = async (

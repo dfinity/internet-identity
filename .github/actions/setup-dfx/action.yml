@@ -1,0 +1,28 @@
+name: 'Setup DFX'
+description: Setup DFX
+inputs:
+  dfx-version:
+    default: 0.11.1
+    description: The dfx version to be installed or loaded from cache.
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/cache@v2
+      with:
+        path: |
+          /usr/local/bin/dfx
+          ~/.cache/dfinity
+        key: dfx-cache-${{ inputs.dfx-version }}-4
+    - name: Install DFX
+      shell: bash
+      run: |
+        if command -v dfx
+        then
+          echo "DFX restored from cache"
+        else
+          echo "DFX not restored from cache, running install script:"
+          DFX_VERSION=${{ inputs.dfx-version }} sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+        fi
+        echo "DFX version"
+        dfx --version

@@ -73,11 +73,15 @@ export const pollForTentativeDevice = async (
       // directly show the verification screen if the tentative device already exists
       await verifyDevice(userNumber, connection, tentativeDevice, timestamp);
     } else {
-      const container = document.getElementById("pageContent") as HTMLElement;
-      render(pageContent(userNumber), container);
+      renderPollForTentativeDevicePage(userNumber);
       init(userNumber, connection, timestamp);
     }
   });
+};
+
+export const renderPollForTentativeDevicePage = (userNumber: bigint): void => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(pageContent(userNumber), container);
 };
 
 const poll = (

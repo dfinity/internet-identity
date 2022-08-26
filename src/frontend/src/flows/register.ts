@@ -14,6 +14,7 @@ import {
 } from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
+import { validateAlias } from "./addDevice/validateAlias";
 
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
@@ -24,7 +25,17 @@ const pageContent = html`
       <p class="t-lead">Please provide a name for your device.</p>
     </hgroup>
     <form id="registerForm" class="l-section">
-      <input id="registerAlias" placeholder="Device name" class="c-input" />
+      <input
+        id="registerAlias"
+        placeholder="Device name"
+        aria-label="device name"
+        type="text"
+        required
+        maxlength="30"
+        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
+        spellcheck="false"
+        class="c-input"
+      />
       <div class="l-section">
         <button type="submit" class="c-button">Create</button>
         <button
@@ -57,7 +68,7 @@ export const register = async (
   return init(connection);
 };
 
-const renderConstructing = () => {
+export const renderConstructing = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(constructingContent, container);
 };
@@ -115,6 +126,23 @@ const init = (connection: Connection): Promise<LoginFlowResult | null> =>
         reject(err);
       }
     };
+
+    const registerAlias = document.getElementById(
+      "registerAlias"
+    ) as HTMLInputElement;
+
+    registerAlias.addEventListener("invalid", () => {
+      const message = validateAlias(
+        registerAlias.validity,
+        registerAlias.value
+      );
+      registerAlias.setCustomValidity(message);
+    });
+
+    registerAlias.addEventListener("input", () => {
+      registerAlias.setCustomValidity("");
+      registerAlias.reportValidity();
+    });
   });
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));

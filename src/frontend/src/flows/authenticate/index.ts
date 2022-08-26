@@ -101,7 +101,9 @@ export interface AuthSuccess {
  * the delegation to the application window. After having received the delegation the application will close the
  * Internet Identity window.
  */
-export default async (connection: Connection): Promise<AuthSuccess> => {
+export const authorizeAuthentication = async (
+  connection: Connection
+): Promise<AuthSuccess> => {
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -296,11 +298,11 @@ const authenticateUser = async (
   return init(connection, authContext, userNumber);
 };
 
-const displayPage = (
+export const displayPage = (
   origin: string,
   userNumber?: bigint,
   derivationOrigin?: string
-) => {
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
 };

@@ -9,13 +9,14 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { settingsIcon, warningIcon } from "../../components/icons";
+import { settingsIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import { setupRecovery } from "../recovery/setupRecovery";
 import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
+import { warnBox } from "../../components/warnBox";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -123,26 +124,18 @@ const deviceListItem = (device: DeviceData) => html`
   </button>
 `;
 
-const recoveryNag = () => html`
-  <div class="c-card c-card--warning c-card--icon">
-    <div class="c-card__icon">${warningIcon}</div>
-    <div class="c-card__content">
-      <div class="t-title">Recovery Mechanism</div>
-      <p class="t-paragraph">
-        Add a recovery mechanism to help protect this Identity Anchor.
-      </p>
-      <button id="addRecovery" class="c-button">Add Recovery</button>
-    </div>
-  </div>
-`;
+const recoveryNag = () =>
+  warnBox({
+    title: "Recovery Mechanism",
+    message: "Add a recovery mechanism to help protect this Identity Anchor.",
+    slot: html`<button id="addRecovery" class="c-button">Add Recovery</button>`,
+  });
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-
   let anchorInfo: IdentityAnchorInfo;
   try {
     anchorInfo = await withLoader(() => connection.getAnchorInfo());
@@ -156,13 +149,22 @@ export const renderManage = async (
     // we are actually in a device registration process
     await pollForTentativeDevice(userNumber, connection);
   } else {
-    render(pageContent(userNumber, anchorInfo.devices), container);
-    init(userNumber, connection, anchorInfo.devices);
+    displayManage(userNumber, connection, anchorInfo.devices);
   }
 };
 
+export const displayManage = (
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
+  devices: DeviceData[]
+): void => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(pageContent(userNumber, devices), container);
+  init(userNumber, connection, devices);
+};
+
 // Initializes the management page.
-const init = async (
+const init = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
