@@ -4,10 +4,15 @@ import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
-  <article id="warningContainer" class="l-container c-card c-card--highlight">
+  <article
+    id="warningContainer"
+    class="l-container c-card c-card--highlight c-card--warning"
+  >
     <hgroup>
-      <div aria-hidden>${warningIcon}</div>
-      <h1 id="warningHeading" class="t-title t-title--lead">Warning</h1>
+      <div aria-hidden class="c-card__icon">${warningIcon}</div>
+      <h1 id="warningHeading" class="t-title t-title--main c-card__title">
+        Warning
+      </h1>
       <p class="t-lead">
         If you lose all the devices assigned to your Internet Identity anchor,
         then you will <em>lose access</em> to the anchor, and all associated
