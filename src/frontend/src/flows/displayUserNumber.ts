@@ -2,17 +2,21 @@ import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="container">
-    <h1>Congratulations!</h1>
-    <p>Your new Identity Anchor has been created.</p>
+  <div class="l-container l-card">
+    <hgroup>
+      <h1 class="t-title t-title--main">Congratulations!</h1>
+      <p class="t-paragraph">Your new Identity Anchor has been created.</p>
+    </hgroup>
     ${warnBox({
       title: "Record Your Identity Anchor",
       message:
         "Please record your new Identity Anchor. Keep a backup on a storage medium and write it down. You will need it later to use Internet Identity or to add additional devices. If you lose your Identity Anchor, you will no longer be able to use this identity to authenticate to dApps.",
     })}
-    <label>Identity Anchor:</label>
-    <div class="highlightBox">${userNumber}</div>
-    <button id="displayUserContinue" class="primary">Continue</button>
+    <h2 class="t-title">Identity Anchor:</h2>
+    
+    <div class="c-input c-input--readonly t-vip" data-usernumber>${userNumber}</div>
+    
+    <button id="displayUserContinue" class="button">Continue</button>
   </div>
 `;
 
