@@ -18,7 +18,7 @@ const pageContent = (userNumber: bigint) => html`
       ${userNumber}
     </div>
 
-    <button id="displayUserContinue" class="button">Continue</button>
+    <button id="displayUserContinue" class="c-button">Continue</button>
   </div>
 `;
 
