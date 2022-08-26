@@ -29,6 +29,10 @@ export const warnBox = ({
   `;
 
   return html`${htmlElement === "aside"
-    ? html` <aside class="c-card c-card--narrow c-card--warning">${contents}</aside>`
-    : html` <div class="c-card c-card--narrow c-card--warning">${contents}</div> `}`;
+    ? html` <aside class="c-card c-card--narrow c-card--warning">
+        ${contents}
+      </aside>`
+    : html`
+        <div class="c-card c-card--narrow c-card--warning">${contents}</div>
+      `}`;
 };
