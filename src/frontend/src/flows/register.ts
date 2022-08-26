@@ -53,9 +53,7 @@ const pageContent = html`
 const constructingContent = html`
   <div class="l-container c-card c-card--highlight">
     <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
-    <div class="c-logo">
-      ${icLogo}
-    </div>
+    <div class="c-logo">${icLogo}</div>
     <p class="t-paragraph">
       This may take a while. Please wait and do not refresh the page.
     </p>
