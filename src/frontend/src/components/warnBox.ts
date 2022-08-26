@@ -20,10 +20,10 @@ export const warnBox = ({
   htmlElement = "aside",
 }: warnBoxProps): TemplateResult => {
   const contents: TemplateResult = html`
-    <span class="c-card__icon">${warningIcon}</span>
+    <span class="c-card__icon" aria-hidden>${warningIcon}</span>
     <div class="c-card__content">
-      <div class="t-title">${title}</div>
-      <div class="t-paragraph">${message}</div>
+      <h3 class="t-title c-card__title">${title}</h3>
+      <div class="t-paragraph c-card__paragraph">${message}</div>
       ${slot}
     </div>
   `;

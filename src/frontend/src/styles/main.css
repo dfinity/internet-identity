@@ -92,6 +92,8 @@
   /* value tokens: z-index (--vz => valueZindex) */
 
   --vz-backdrop: -1;
+  --vz-background: 1;
+  --vz-foreground: 2;
   --vz-tooltip: 10;
   --vz-modal: 20;
 
@@ -148,7 +150,7 @@
   --rs-card-bezel-x: calc(var(--vs-gutter) * 7);
 
   --rs-card-stack: calc(var(--vs-stack) * 1.5);
-  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.35);
+  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
 
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
@@ -536,18 +538,49 @@ a:hover,
 }
 */
 
-.c-card--icon {
-  padding-left: calc(var(--rs-card-bezel) * 2 + 2rem);
-}
-
 .c-card__icon {
   position: absolute;
-  left: var(--rs-card-bezel);
-  top: var(--rs-card-bezel);
+  right: 0;
+  top: 0;
+  width: 15%;
+  aspect-ratio: 1;
+  z-index: var(--vz-background);
+  background: var(--rc-background);
+  transform: translate(20%, -20%);
+
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
+  border-radius: 4px;
+  border-image-slice: 1;
+
+  border-image-source: linear-gradient(-270deg, var(--rg-brand));
+}
+
+.c-card__icon svg {
+  position: absolute;
+  display: block;
+  width: 70%;
+  height: 70%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .c-card__content {
-  margin-left: calc(var(--rs-card-bezel) * 2 + 1rem);
+  position: relative;
+  z-index: var(--vz-foreground);
+}
+
+.c-card__title {
+  /* 
+    approximation: to make sure the title 
+    does not collide with the icon on the left
+  */
+  padding-right: 10%;
+}
+
+.c-card__paragraph {
+  margin-top: calc(var(--vs-stack) * 0.75);
 }
 
 .c-card--warning {
