@@ -253,6 +253,12 @@ display:revert; revert to element instead of attribute */
   -webkit-user-drag: element;
 }
 
+/* (not included in vanilla reset) Hide carets in summary/details on Safari */
+
+::-webkit-details-marker {
+  display: none;
+}
+
 /**
  * IV) Base: Un-classed HTML elements (type selectors)
  *
@@ -262,7 +268,7 @@ display:revert; revert to element instead of attribute */
 :root {
   /* general styles */
   font-family: "Montserrat", sans-serif;
-  font-size: max(62.5%, calc(17.5% + 0.6vw)); /* 10px / 1200px min 10px */
+  font-size: 62.5%; /* 10px */
 
   background: var(--rc-background);
   color: var(--rc-text);
@@ -765,8 +771,13 @@ a:hover,
   list-style-type: disc;
 }
 
-.c-list--bulleted li {
+.c-list--bulleted li,
+.c-list--numbered li {
   margin-left: calc(var(--vs-inline) * 2);
+}
+
+.c-list--numbered {
+  list-style-type: decimal;
 }
 
 /** 
