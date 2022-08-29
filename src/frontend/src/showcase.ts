@@ -3,6 +3,7 @@
  * working on HTML and CSS. */
 import "./styles/main.css";
 import { html, render } from "lit-html";
+import { styleguide } from "./styleguide";
 import {
   Challenge,
   DeviceData,
@@ -190,8 +191,8 @@ const pageContent = html`
       font-size: 1.25rem;
     }
   </style>
-  <h1>showcase</h1>
-  <div class="showcase-grid">
+  <h1 class="t-title t-title--main">showcase</h1>
+  <div class="showcase-grid l-section">
     ${Object.entries(iiPages).map(([key, _]) => {
       return html`<aside>
         <a href="/${key}">
@@ -201,6 +202,7 @@ const pageContent = html`
       </aside>`;
     })}
   </div>
+  ${styleguide}
 `;
 
 const init = async () => {
