@@ -4,10 +4,13 @@ import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => html`
-  <div id="warningContainer" class="l-container c-car c-card--highlight">
+  <article
+    id="warningContainer"
+    class="l-container c-card c-card--highlight c-card--warning"
+  >
     <hgroup>
-      <div aria-hidden>${warningIcon}</div>
-      <h1 id="class="t-title t-title--main">Warning</h1>
+      <div aria-hidden class="c-card__icon">${warningIcon}</div>
+      <h1 id="warningHeading" class="t-title t-title--main">Warning</h1>
       <p class="t-lead">It looks like you are using Safari or iOS.</p>
     </hgroup>
     <p class="t-paragraph">
@@ -25,11 +28,14 @@ const pageContent = () => html`
       <button id="displayWarningAddRecovery" class="c-button">
         Add a recovery mechanism to an Identity Anchor
       </button>
-      <button id="displayWarningRemindLater" class="c-button c-button--secondary">
+      <button
+        id="displayWarningRemindLater"
+        class="c-button c-button--secondary"
+      >
         Skip, I understand the risks
       </button>
     </div>
-  </div>
+  </article>
 `;
 
 export const displaySafariWarning = async (
