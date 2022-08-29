@@ -695,6 +695,11 @@ a:hover,
   margin-top: var(--rs-footer-stack);
 }
 
+/**
+ *  Footer Navigation component
+ *  1) radial shadow underneath the line below the links
+ */
+
 .c-nav-links {
   position: relative;
   text-align: center;
@@ -708,6 +713,7 @@ a:hover,
 }
 
 .c-nav-links::before {
+  /* 1 */
   content: "";
   display: block;
   height: 100%;
@@ -763,7 +769,13 @@ a:hover,
   margin-left: calc(var(--vs-inline) * 2);
 }
 
-/* Tooltip */
+/** 
+ *  Tooltip component
+ *  This is a CSS only tooltip that shows on hover
+ *  The element that triggers the tooltip must have a .c-tooltip class
+ *  and the element that appears on hover must have a .c-tooltip__content class.
+ */
+
 .c-tooltip {
   position: relative;
 }
@@ -784,11 +796,6 @@ a:hover,
   text-align: left;
   min-width: 15rem;
   max-width: 20rem;
-
-  /** 
-    this is the width of the tooltip 
-    we might add this to the card component later
-  **/
 }
 
 .c-tooltip__message--right {
