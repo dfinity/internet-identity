@@ -564,6 +564,10 @@ a:hover,
   margin: 0 auto;
 }
 
+.t-title + .c-logo {
+  margin: var(--rs-logo-stack) 0;
+}
+
 /**
  *  Forms and Buttons 
  */
