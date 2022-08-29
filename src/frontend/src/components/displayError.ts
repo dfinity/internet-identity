@@ -20,7 +20,7 @@ const pageContent = (options: ErrorOptions) => html`
     </hgroup>
     ${options.detail !== undefined
       ? html` <details class="displayErrorDetail">
-          <summary>Error details</summary>
+          <summary class="t-link">Error details</summary>
           <pre>${options.detail}</pre>
         </details>`
       : ""}

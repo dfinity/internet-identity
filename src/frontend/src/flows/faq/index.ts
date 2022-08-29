@@ -231,8 +231,10 @@ export const questionsArray = Object.values(questions)
 function renderQuestion(faq: Question) {
   return html`<li class="faq__question c-card">
     <details id=${faq.anchor}>
-      <summary class="faq__question-summary">
-        <span class="faq__question-summary-text t-link"> ${faq.question} </span>
+      <summary class="faq__question-summary c-summary">
+        <span class="faq__question-summary-text t-link c-summary__link"
+          >${faq.question}</span
+        >
         <div class="faq__question-underline"></div>
       </summary>
       <div class="l-section">
