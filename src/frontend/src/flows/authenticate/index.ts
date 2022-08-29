@@ -88,7 +88,7 @@ const derivationOriginSection = (derivationOrigin: string) => html` <p
   >
     This service is an alias of:
   </p>
-  <output class="c-input c-input--readonly t-vip">
+  <output class="c-input c-input--readonly t-vip t-vip--small">
     ${derivationOrigin}
   </output>`;
 

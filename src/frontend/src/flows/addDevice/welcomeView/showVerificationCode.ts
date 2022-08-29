@@ -28,7 +28,7 @@ const pageContent = (
       </p>
     </hgroup>
     <h2 class="t-title">Alias</h2>
-    <output class="c-input c-input--readonly t-vip">${alias}</output>
+    <output class="c-input c-input--readonly t-vip t-vip--small">${alias}</output>
     <h2 class="t-title">Device Verification Code</hs>
     <output
       id="verificationCode"

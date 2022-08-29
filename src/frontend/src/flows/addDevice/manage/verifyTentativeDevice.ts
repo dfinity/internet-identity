@@ -28,7 +28,7 @@ const pageContent = (alias: string) => html`
     <h2 class="t-title">Verify that this is your device:</h2>
     <label class="l-section">
       <strong class="t-title">Alias</strong>
-      <div class="c-input c-input--readonly t-vip">${alias}</div>
+      <div class="c-input c-input--readonly t-vip t-vip--small">${alias}</div>
     </label>
     <label class="l-section">
       <strong class="t-title">Device Verification Code</strong>
