@@ -80,13 +80,21 @@ export const styleguide = html`
         
         <section class="demo" aria-label="Verious elements Demo">
           <p class="t-paragraph">
-            <a href="#">This is an actual a tag</a>
-            <button class="t-link">This is a button element that looks like a link</button> 
-            <button class="t-link t-link--discreet">This is a link that is not underlined</button>
-            <a href="#" class="t-link"><i class="t-link__icon">+</i>Link with icon</a> 
+            <a href="#">This is an actual a tag</a><br />
+            <button class="t-link">This is a button element that looks like a link</button><br />
+            <button class="t-link t-link--discreet">This is a link that is not underlined</button><br />
+            <a href="#" class="t-link"><i class="t-link__icon">+</i>Link with icon</a><br />
           </p>
         </section>
       </aside>
+    </article>
+
+    <article class="l-section">
+      <h1 class="t-title">Layout</h1>
+      <p class="t-lead">
+        We use a bunch of layout classes to style the layout of the app. They just
+        define where elements are placed.
+      </p>
     </article>
   </section>
 `;
