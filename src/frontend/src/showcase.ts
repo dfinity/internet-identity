@@ -38,6 +38,7 @@ import {
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -142,6 +143,7 @@ const iiPages: Record<string, () => void> = {
     ),
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevice, false),
+  displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
 };
 
 // The showcase
