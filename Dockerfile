@@ -7,9 +7,6 @@
 # sha256:... accordingly.
 FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
 
-ARG rust_version=1.58.1
-ENV NODE_VERSION=14.15.4
-
 ENV TZ=UTC
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
@@ -20,10 +17,12 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
 # Install node
 RUN curl --fail -sSf https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
 ENV NVM_DIR=/root/.nvm
-RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
-RUN . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
-RUN . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
-ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
+COPY .node-version .node-version
+RUN . "$NVM_DIR/nvm.sh" && nvm install "$(cat .node-version)"
+RUN . "$NVM_DIR/nvm.sh" && nvm use "v$(cat .node-version)"
+RUN . "$NVM_DIR/nvm.sh" && nvm alias default "v$(cat .node-version)"
+RUN ln -s "/root/.nvm/versions/node/v$(cat .node-version)" /root/.nvm/versions/node/default
+ENV PATH="/root/.nvm/versions/node/default/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 

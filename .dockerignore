@@ -17,3 +17,6 @@ Dockerfile
 # filter out all "hidden" files and directories
 # (.git, .dfx, .*ignore, etc)
 .*
+
+# except for the ones we really want
+!.node-version
