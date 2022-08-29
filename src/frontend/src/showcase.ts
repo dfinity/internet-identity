@@ -38,6 +38,7 @@ import {
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
@@ -143,6 +144,7 @@ const iiPages: Record<string, () => void> = {
     ),
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevice, false),
+  loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
 };
 
