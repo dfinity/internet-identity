@@ -33,7 +33,7 @@ const pageContent = (
     <div class="c-logo">${icLogo}</div>
     <h1 class="t-title t-title--main">Internet Identity</h1>
     <p class="t-lead">Authenticate to service:</p>
-    <div class="c-input c-input--readonly t-vip">${hostName}</div>
+    <div class="c-input c-input--readonly">${hostName}</div>
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
