@@ -20,12 +20,12 @@ const pageContent = (seedPhrase: string) => html`
     </aside>
 
     <h2 class="t-title">Your seed phrase</h2>
-    <data
+    <output
       id="seedPhrase"
-      data-seenPhrase="${seedPhrase}"
+      data-seenPhrase
       translate="no"
       class="c-input c-input--readonly"
-      >${seedPhrase}</data
+      >${seedPhrase}</output
     >
 
     <button id="seedCopy" data-clipboard-target="#seedPhrase" class="c-button">

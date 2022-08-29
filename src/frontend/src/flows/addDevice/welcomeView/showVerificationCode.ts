@@ -28,14 +28,14 @@ const pageContent = (
       </p>
     </hgroup>
     <h2 class="t-title">Alias</h2>
-    <data class="c-input c-input--readonly t-vip">${alias}</data>
+    <output class="c-input c-input--readonly t-vip">${alias}</output>
     <h2 class="t-title">Device Verification Code</hs>
-    <data
+    <output
       id="verificationCode"
       class="c-input c-input--readonly t-vip"
     >
       ${tentativeRegistrationInfo.verification_code}
-    </data>
+    </output>
     <div class="l-section">
       <p>Time remaining: <span id="timer"></span></p>
       <div class="l-section">

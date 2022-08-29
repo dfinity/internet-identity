@@ -88,7 +88,9 @@ const derivationOriginSection = (derivationOrigin: string) => html` <p
   >
     This service is an alias of:
   </p>
-  <data class="c-input c-input--readonly t-vip"> ${derivationOrigin} </data>`;
+  <output class="c-input c-input--readonly t-vip">
+    ${derivationOrigin}
+  </output>`;
 
 export interface AuthSuccess {
   userNumber: bigint;
