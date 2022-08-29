@@ -19,9 +19,11 @@ const pageContent = (options: ErrorOptions) => html`
       <p class="displayErrorMessage t-lead">${options.message}</p>
     </hgroup>
     ${options.detail !== undefined
-      ? html` <details class="displayErrorDetail">
-          <summary class="t-link">Error details</summary>
-          <pre>${options.detail}</pre>
+      ? html`<details class="displayErrorDetail">
+          <summary class="c-summary">
+            <span class="c-summary__link t-link">Error details</span>
+          </summary>
+          <pre class="t-paragraph">${options.detail}</pre>
         </details>`
       : ""}
     <button id="displayErrorPrimary" class="c-button c-button--primary">
