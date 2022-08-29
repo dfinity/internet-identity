@@ -1,0 +1,13 @@
+name: 'Setup nodejs'
+description: Setup nodejs
+runs:
+  using: "composite"
+  steps:
+    - name: Read .node-version
+      shell: bash
+      id: read-node-version
+      run: echo "::set-output name=version::$(cat .node-version)"
+
+    - uses: actions/setup-node@v2
+      with:
+        node-version: ${{ steps.read-node-version.version }}
