@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="l-container l-card">
+  <div class="l-container c-card">
     <hgroup>
       <h1 class="t-title t-title--main">Congratulations!</h1>
       <p class="t-paragraph">Your new Identity Anchor has been created.</p>
