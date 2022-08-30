@@ -673,6 +673,10 @@ a:hover,
   transform: translateY(-50%);
 }
 
+.c-summary {
+  list-style: none;
+}
+
 .c-summary__link {
   display: block;
   position: relative;
