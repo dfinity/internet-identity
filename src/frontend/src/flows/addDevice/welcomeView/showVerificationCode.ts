@@ -17,22 +17,31 @@ const pageContent = (
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
-  <div class="container">
-    <h1>Device Verification Required</h1>
-    <p>
-      This device was added tentatively to the Identity Anchor
-      <strong>${userNumber}</strong>. Log in on an existing device and verify
-      this device using the verification code below. After successful
-      verification this page will automatically refresh.
-    </p>
-    <label>Alias</label>
-    <div class="highlightBox">${alias}</div>
-    <label>Device Verification Code</label>
-    <div id="verificationCode" class="highlightBox">
+  <div class="l-container c-card c-card--highlight">
+    <hgroup>  
+      <h1 class="t-title t-title--main">Device Verification Required</h1>
+      <p class="t-lead">
+        This device was added tentatively to the Identity Anchor
+        <strong>${userNumber}</strong>. Log in on an existing device and verify
+        this device using the verification code below. After successful
+        verification this page will automatically refresh.
+      </p>
+    </hgroup>
+    <h2 class="t-title">Alias</h2>
+    <output class="c-input c-input--readonly t-vip t-vip--small">${alias}</output>
+    <h2 class="t-title">Device Verification Code</hs>
+    <output
+      id="verificationCode"
+      class="c-input c-input--readonly t-vip"
+    >
       ${tentativeRegistrationInfo.verification_code}
+    </output>
+    <div class="l-section">
+      <p>Time remaining: <span id="timer"></span></p>
+      <div class="l-section">
+        <button id="showCodeCancel" class="c-button c-button--secondary">Cancel</button>
+      </div>
     </div>
-    <p>Time remaining: <span id="timer"></span></p>
-    <button id="showCodeCancel">Cancel</button>
   </div>
 `;
 

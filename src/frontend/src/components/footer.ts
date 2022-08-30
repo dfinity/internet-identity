@@ -1,8 +1,8 @@
 import { html } from "lit-html";
 
-export const footer = html`<footer>
+export const footer = html`<footer class="l-footer">
   <a
-    class="powered-by-link"
+    class="page-signature"
     aria-label="DFINITY homepage"
     href="https://dfinity.org"
     target="_blank"

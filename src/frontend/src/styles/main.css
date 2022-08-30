@@ -1,676 +1,919 @@
+/*
+                                    _  _____  __    __   __
+                                   | |  | |  / /`  ( (` ( (`
+                                   |_|  |_|  \_\_, _)_) _)_)
+
+                                          `-.` '.-'
+                                       `-.    A   .-'.
+                                    `-.    -./_\.-    .-'
+                                        -.  /___\  .-
+                                    `-.   `/__|__\'   .-'.
+                                 `-.    -./.-"^"-.\.-      '
+                                    `-.  / <`(o)*> \  .-'
+                                 .-   .`/__`-...-'__\'   .-
+                                ,...`-./_/____|____\_\.-'.,.
+                                   ,-'    ,` . . ',   `-,
+                               _,-' /____/____.____\____\ `-,_
+                                       ,      |      .
+                                      /     ,.+.,     \
+
+   -<# ITCSS (Inverted Triangle CSS) -> (https://csswizardry.com/2018/11/itcss-and-skillshare/) #>-
+  __________________________________________________________________________________________________
+   \---------------------------/------------                          Generic CSS (Low specificity)
+    \                         /  I)   Settings (Design)                            Y
+     \-----------------------/----------------                                     |
+      \                     /    II)  Theme Settings                               |
+       \-------------------/--------------------                                   |
+        \                 /      III) Generic                                      |
+         \---------------/------------------------                                 |
+          \             /        IV)  Elements                                     |
+           \-----------/----------------------------                               |
+            \         /          V)   Objects                                      |
+             \-------/--------------------------------                             |
+              \     /            VI)  Components                                   |
+               \---/------------------------------------                           |
+                \ /              VII) Utilities (Trumps)                           V
+                 V                                                   Explicit CSS (High specificity)
+                 
+  I)   Settings:             Global variables, config switches.
+  II)  Theme Settings:       DarkMode, LightMode, Product Specific stuff
+  III) Generic:              Ground-zero styles (Normalize.css, resets, box-sizing).
+  IV)  Base:                 Un-classed HTML elements (type selectors).
+  V)   Objects:              Cosmetic-free design patterns (grids, layouts, etc).
+  VI)  Components:           Designed components, chunks of UI.
+  VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, etc)
+
+*/
+
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 
+/* I) Settings: Global variables, config switches. */
+
 :root {
-  font-family: "Montserrat", sans-serif;
-  font-size: 16px;
-  --flamingo-500: #f15a24;
-  --grey-050: #efefef;
-  --grey-100: #d9d9da;
-  --grey-200: #c3c3c4;
-  --grey-300: #adadaf;
-  --grey-400: #979799;
-  --grey-500: #818284;
-  --grey-600: #6b6c6e;
-  --grey-700: #555659;
-  --grey-800: #3f4043;
-  --grey-900: #292a2e;
+  /* 
+   * value tokens 
+   *
+   * raw basic values that should not be used within your components.
+   * they control the design system on a higher level and should be used only 
+   * in the root element.
+   *
+   */
 
-  --text-color: var(--grey-900);
-  --background-color: #fff;
-  --primary: black;
-  --secondary: #cdcdcd;
-  --accent: #323232;
-  --rainbow-orange: rgba(237, 186, 152, 1);
+  /* value tokens: colors (--vc => valueColor) */
+  --vc-raven: #202124;
+  --vc-snow: #ffffff;
 
-  background: var(--background-color);
-  color: var(--text-color);
+  --vc-vapour: rgba(255, 255, 255, 0.5);
+  --vc-shadow: rgba(32, 33, 36, 0.6);
+
+  --vc-silver: #d9d9d9;
+
+  --vc-brand-orange: #f15a24;
+  --vc-brand-yellow: #fbb03b;
+  --vc-brand-pink: #ed1e79;
+  --vc-brand-purple: #522785;
+  --vc-brand-blue: #29abe2;
+  --vc-brand-blue--dark: #1f6ef4;
+
+  /**
+   * value tokens: sizes (--vs => valueSize)
+   * 1) general purpose spacer unit
+   * 2) vertical spaces outside of an element
+   * 3) horizontal spaces outside of an element
+   * 4) space inside an element (usually used for padding)
+   * 5) borders and lines (using PX here because we don't want lines to scale)
+  **/
+  --vs-gutter: 0.5rem; /* 1 */
+  --vs-stack: calc(var(--vs-gutter) * 2); /* 2 */
+  --vs-inline: calc(var(--vs-gutter) * 2); /* 3 */
+  --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
+  --vs-line: 1px; /* 5 */
+
+  /* value tokens: z-index (--vz => valueZindex) */
+
+  --vz-backdrop: -1;
+  --vz-background: 1;
+  --vz-foreground: 2;
+  --vz-tooltip: 10;
+  --vz-modal: 20;
+  --vz-loader: 30;
+
+  /*
+   * reference tokens
+   * 
+   * pointers to value tokens or other reference tokens. They control the actual
+   * design rules.
+   *
+   */
+
+  /* reference tokens: colors (--rc => referenceColor) */
+  --rc-dark: var(--vc-raven);
+  --rc-light: var(--vc-snow);
+
+  --rc-dark-transparent: var(--vc-shadow);
+  --rc-light-transparent: var(--vc-vapour);
+
+  --rc-text: var(--rc-dark);
+  --rc-text--disabled: var(--vc-shadow);
+
+  --rc-background: var(--rc-light);
+  --rc-background-transparent: var(--rc-light-transparent);
+
+  --rc-line: var(--rc-light);
+  --rc-line: var(--vc-silver);
+  --rc-line-inverted: var(--rc-dark);
+
+  --rc-interaction: var(--vc-brand-blue);
+  --rc-interaction-text: var(--vc-brand-blue--dark);
+
+  --rc-button: var(--rc-dark);
+  --rc-onButton: var(--rc-light);
+
+  --rc-warning: var(--vc-brand-pink);
+  --rc-onWarning: var(--vc-snow);
+
+  --rc-input: var(--rc-light);
+  --rc-onInput: var(--rc-dark);
+
+  --rc-input-readonly: var(--vc-silver);
+  --rc-input-onReadonly: var(--rc-dark);
+
+  /* reference tokens: gradients */
+  --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
+    var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
+
+  /* reference tokens: sizes */
+  --rs-footer-stack: calc(var(--vs-stack) * 1.5);
+
+  --rs-footer-gutter: var(--vs-gutter);
+  --rs-logo-stack: calc(var(--vs-gutter) * 8);
+
+  --rs-card-bezel: calc(var(--vs-gutter) * 5);
+  --rs-card-bezel-x: calc(var(--vs-gutter) * 7);
+
+  --rs-card-stack: calc(var(--vs-stack) * 1.5);
+  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
+
+  --rs-button-bezel: var(--rs-card-bezel-narrow);
+  --rs-button-stack: var(--vs-stack);
+
+  --rs-input-bezel: var(--rs-button-bezel);
+  --rs-input-stack: var(--rs-button-stack);
+
+  --vs-line-height: 1.35;
+}
+
+/* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
+
+/***
+ * III) Generic: Ground-zero styles (Normalize.css, resets, box-sizing)
+ *
+ * The new CSS reset - version 1.7.2 (last updated 23.6.2022)
+ * GitHub page: https://github.com/elad2412/the-new-css-reset
+***/
+
+/*
+Remove all the styles of the "User-Agent-Stylesheet", except for the 'display' property
+- The "symbol *" part is to solve Firefox SVG sprite bug
+*/
+*:where(:not(html, iframe, canvas, img, svg, video):not(svg *, symbol *)) {
+  all: unset;
+  display: revert;
+}
+
+/* Preferred box-sizing value */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html,
-body {
-  margin: 0;
-  width: 100vw;
-}
-
-footer {
-  padding: 1em 2em 0.5rem;
-}
-@media (min-width: 512px) {
-  footer {
-    padding: 2em 2em 1rem;
-  }
-}
-
-.powered-by-link {
-  padding: 0.5em;
-  display: inline-block;
-  transition: background 0.2s;
-}
-.powered-by-link img {
-  max-width: 100%;
-}
-
-.powered-by-link:hover,
-.powered-by-link:focus {
-  background: var(--grey-050);
-  border-radius: 0.3em;
-}
-
-p,
-.instruction-steps {
-  line-height: 22px;
-  color: var(--grey-700);
-  font-size: 1rem;
-  margin: 1rem 0;
-}
-
-input,
-button,
-div,
-section,
-span {
-  font-size: 1.2rem;
-  color: var(--text-color);
-}
-
-input {
-  margin-bottom: 1rem;
-  padding: 0.4rem 1rem;
-  border-radius: 4px;
-  border: 2px var(--grey-100) solid;
-  width: auto;
-  background-color: var(--background-color);
-
-  line-height: 1.25rem;
-  letter-spacing: 0.005em;
-}
-
-input.errored {
-  border: double 2px var(--flamingo-500);
-}
-input.errored::placeholder {
-  color: var(--flamingo-500);
-}
-
-.error-message-hidden {
-  visibility: hidden;
-  height: 0;
-  margin: 0;
-}
-
-.error-message {
-  color: var(--flamingo-500);
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-
-textarea {
-  width: 100%;
-  height: 6rem;
-  box-sizing: border-box;
-  margin-bottom: 1rem;
-  font-weight: 400;
-  font-family: inherit;
-  resize: none;
-  padding: 0.3rem;
-  text-align: center;
-}
-
-h1 {
-  margin-top: 0;
-  font-size: 1.8rem;
-  margin: auto;
-}
-@media (min-width: 1024px) {
-  h1 {
-    margin: inherit;
-  }
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p {
-  margin: 0 0 1rem;
-}
-
-details summary {
-  cursor: pointer;
-}
-
-summary::marker {
-  content: none;
-}
-
+/* Reapply the pointer cursor for anchor tags */
+a,
 button {
-  border: 1px solid var(--grey-200);
-  background: var(--background-color);
-  display: flex;
-  width: 100%;
-  text-align: center;
-  justify-content: center;
-  margin-bottom: 1rem;
-  padding: 0.6rem 1rem;
-  border-radius: 4px;
-
-  line-height: 1.25rem;
-  letter-spacing: 0.005em;
+  cursor: revert;
 }
 
-button:not([disabled]):hover,
-button:not([disabled]):focus,
-a:focus,
-.linkStyle:hover {
-  opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px #29abe2;
-  outline: 2px dotted transparent;
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.linkStyle:hover {
-  cursor: pointer;
-}
-
-#captchaImg {
-  height: 120px;
-  width: 220px;
-  min-width: 0px;
-  max-width: 220px;
-  display: block;
-  margin: auto;
-}
-
-ul {
-  width: 100%;
-  padding: 0;
-}
-
-form,
-label {
-  display: flex;
-}
-
-form {
-  margin-bottom: 2rem;
-  flex-direction: column;
-}
-
-button:disabled.primary {
-  background-color: grey;
-}
-
-button.primary {
-  background-color: var(--primary);
-  color: var(--background-color);
-  border: none;
-}
-
-button.linkStyle {
-  cursor: pointer;
-  display: inline;
-  border: none;
-  padding: 0;
-  margin: 0;
-  width: auto;
-}
-
-label {
-  font-size: 1rem;
-  font-weight: 500;
-  flex-direction: column;
-  margin-bottom: 0.5rem;
-}
-
-main::before,
-main::after {
-  content: "";
-  display: block;
-  flex-grow: 1;
-  height: 24px;
-}
-
-main {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-@media (min-width: 512px) {
-  main {
-    height: auto;
-    min-height: 100vh;
-  }
-}
-
-.container {
-  padding: 3.5rem 1rem 2rem;
-  width: min(calc(100vw), 365px);
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-@media (min-width: 512px) {
-  .container {
-    padding: 3.5rem 2.5rem 2rem;
-    border: 2px var(--grey-100) solid;
-    border-radius: 4px;
-    box-sizing: inherit;
-  }
-}
-
-.hidden {
-  visibility: hidden;
-}
-
-#timer {
-  font-size: 1rem;
-}
-
-#logout-button {
-  display: flex;
-  padding: 8px;
-  margin: 1rem 1rem 1rem auto;
-  font-size: 0.8rem;
-  width: auto;
-}
-
-.highlightBox {
-  background-color: var(--grey-100);
-  padding: 0.7rem 0.5rem;
-  text-align: center;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  overflow-wrap: break-word;
-  font-size: 1.5rem;
-  font-weight: 500;
-}
-
-.warningBox {
-  border: 1px var(--grey-200) solid;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  margin-bottom: 2rem;
-}
-.warningIcon {
-  height: 2rem;
-  width: 2rem;
-}
-.warningMessage {
-  font-size: 1rem;
-}
-
-.textLink {
-  margin-bottom: 0.7rem;
-  font-size: 0.95rem;
-}
-.textLink a {
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-decoration: none;
-  color: black;
-}
-
-@media (min-width: 512px) {
-  .textLink {
-    white-space: nowrap;
-  }
-}
-
-hr {
-  margin: 1rem auto;
-  width: 60%;
-  border-top: 1px solid var(--grey-100);
-}
-
-#icLogo {
-  width: 45%;
-  align-self: center;
-  margin: 0.5rem auto 3.25rem;
-}
-
-nav {
-  margin-top: 1.5em;
-}
-@media (min-width: 512px) {
-  nav {
-    margin-top: 2em;
-  }
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Remove list styles (bullets/numbers) */
+ol,
+ul,
+menu {
   list-style: none;
 }
 
-.nav-links li + li::before {
-  content: "·";
-  margin: 0 0.5rem;
+/* For images to not be able to exceed their container */
+img {
+  max-width: 100%;
 }
 
-.nav-link {
-  text-decoration: none;
-  color: var(--grey-600);
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  padding: 0 0.5em;
+/* removes spacing between cells in tables */
+table {
+  border-collapse: collapse;
 }
 
-.nav-link:hover,
-.nav-link:focus {
-  border-bottom: 2px solid var(--grey-100);
-  text-decoration: none;
-  color: var(--grey-800);
-  font-size: 0.875rem;
+/* Safari - solving issue when using user-select:none on the <body> text input doesn't working */
+input,
+textarea {
+  -webkit-user-select: auto;
 }
 
-.deviceItem {
+/* revert the 'white-space' property for textarea elements on Safari */
+textarea {
+  white-space: revert;
+}
+
+/* minimum style to allow to style meter element */
+meter {
+  -webkit-appearance: revert;
+  appearance: revert;
+}
+
+/* reset default text opacity of input placeholder */
+::placeholder {
+  color: unset;
+}
+
+/* fix the feature of 'hidden' attribute.
+display:revert; revert to element instead of attribute */
+:where([hidden]) {
+  display: none;
+}
+
+/* revert for bug in Chromium browsers
+- fix for the content editable attribute will work properly.
+- webkit-user-select: auto; added for Safari in case of using user-select:none on wrapper element*/
+:where([contenteditable]:not([contenteditable="false"])) {
+  -moz-user-modify: read-write;
+  -webkit-user-modify: read-write;
+  overflow-wrap: break-word;
+  -webkit-line-break: after-white-space;
+  -webkit-user-select: auto;
+}
+
+/* apply back the draggable feature - exist only in Chromium and Safari */
+:where([draggable="true"]) {
+  -webkit-user-drag: element;
+}
+
+/* (not included in vanilla reset) Hide carets in summary/details on Safari */
+
+::-webkit-details-marker {
+  display: none;
+}
+
+/**
+ * IV) Base: Un-classed HTML elements (type selectors)
+ *
+ * Internet Identity Styles
+ **/
+
+:root {
+  /* general styles */
+  font-family: "Montserrat", sans-serif;
+  font-size: 62.5%; /* 10px */
+
+  background: var(--rc-background);
+  color: var(--rc-text);
+}
+
+body {
+  font-size: 1.6rem;
+  line-height: var(--vs-line-height);
+}
+
+/**
+ * V) Objects: Cosmetic-free design patterns
+ * 
+ * We generally use the BEM methodology.
+ * http://getbem.com/
+ *
+ * We prefix classes with the following convention:
+ * - `.c-` component
+ * - `.l-` layout
+ * - `.t-` typography
+ *
+ * We avoid element, id and attribute selectors when it is sane to do so¹. 
+ * Use classes when possible. 
+ *
+ * ¹ For example when needing to style the paths of an SVG it might be difficult
+ * to do because the SVG are made by people with little to no XML know-how. 
+ */
+
+.t-strong {
+  font-weight: bold;
+}
+
+.t-weak {
+  font-weight: normal;
+  font-size: 0.8em;
+}
+
+.t-title {
+  font-weight: bold;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  margin-top: 1em;
+}
+
+.t-title:first-child {
+  margin-top: 0;
+}
+
+.t-title--complications {
   display: flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.t-title__complication {
+  font-weight: 300;
+  font-size: 0.8em;
+  flex-grow: 1;
+}
+
+.t-title__complication:disabled {
+  color: var(--rc-text--disabled);
+}
+
+.t-title__complication--end {
+  flex-grow: 0;
+  text-align: right;
+}
+
+.t-title--main {
+  font-size: 2.8rem;
+  margin-top: 0.5em;
+}
+
+.t-lead {
+  font-size: 1.6rem;
+}
+
+.t-title + .t-lead {
+  margin-top: 0.75em;
+}
+
+.t-paragraph {
+  margin-top: 1em;
+}
+
+.t-paragraph:first-child {
+  margin-top: 0;
+}
+
+.t-vip {
+  font-size: 2.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.t-vip--small {
+  font-size: 1.5rem;
+}
+
+.t-discreet {
+  font-size: 0.8em;
+}
+
+a,
+.t-link {
+  display: inline;
+  color: var(--rc-interaction-text);
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.t-link:disabled,
+:disabled .t-link {
+  pointer-events: none;
+}
+
+.t-link--discreet {
+  font-weight: normal;
+  text-decoration: none;
+}
+
+a:focus,
+a:hover,
+.t-link:not([disabled]):focus,
+.t-link:not([disabled]):hover {
+  text-decoration: none;
+}
+
+.t-link--discreet:not([disabled]):focus,
+.t-link--discreet:not([disabled]):hover {
+  text-decoration: underline;
+}
+
+.t-link__icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--vs-line-height));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.t-link__icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(-0.1em);
   width: 100%;
 }
 
-.deviceItemAlias {
-  border: 1px solid var(--grey-200);
-  border-radius: 2px;
-  display: flex;
-  align-items: center;
-  flex: 1 1 100%;
-  margin-right: 0.5rem;
-  margin-bottom: 16px;
-  padding: 0.5rem 1rem;
-  overflow: auto;
-  word-break: break-word;
-  line-height: 1.5;
-}
-
-.deviceItemAction {
-  border-radius: 2px;
-  padding: 0;
-  width: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* FAQ related stuff */
-
-.faq__questions {
-  padding: 0;
-  list-style-type: none;
-}
-
-.faq__question-underline {
-  background: -webkit-gradient(
-    linear,
-    left top,
-    right top,
-    from(#29abe2),
-    color-stop(33%, #fbb03b),
-    color-stop(66%, #f15a24),
-    to(#ed1e79)
-  );
-  background: linear-gradient(
-    90deg,
-    #29abe2,
-    #fbb03b 33%,
-    #f15a24 66%,
-    #ed1e79
-  );
-  height: 1px;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  margin: 0.3rem auto;
-}
-
-.faq__question-summary {
-  letter-spacing: -0.01rem;
-  font-weight: 300;
-  font-size: 1.25rem;
-}
-
-.faq__question-summary-text {
-  display: list-item;
-  list-style-position: outside;
-  padding-left: 1rem;
-}
-
-.faq__title {
-  color: rgba(55, 65, 81, 1);
-  font-weight: 700;
-  font-size: 4.5rem;
-  line-height: 1;
-  text-align: center;
-  letter-spacing: 0.025em;
-  margin: 1rem 0 7rem 0;
-}
-
-@media only screen and (max-width: 512px) {
-  .faq__title {
-    margin: 1rem 0 0 0;
-  }
-}
-
-.faq__question-details-container {
-  height: max-content;
-}
-
-.faq__answer {
-  line-height: 2rem;
-  font-weight: 200;
-  padding: 1.2em;
-  margin: auto 0;
-}
-
-.faq__question {
-  margin: 2.5rem 1.2rem;
-}
-
-.faq__answer-links {
-  padding: 1rem;
-  list-style-type: none;
-  width: auto;
-  font-size: 0.9rem;
-}
-
-.faq__answer-link {
-  color: rgba(31, 41, 55, 1);
-}
-
-.faq__container {
-  background-color: rgba(243, 244, 246, 1);
-  max-width: 42rem;
-  height: 100%;
-}
-
-@media only screen and (max-width: 512px) {
-  .faq__container {
-    padding: 0 0.6rem;
-  }
-}
-@media only screen and (min-width: 512px) {
-  .faq__container {
-    padding: 0 4rem;
-  }
-}
-
-.faq__question summary {
-  padding: 0.5rem 1rem;
-}
-
-/* ABOUT stuff */
-
-.about__container {
-  background-color: rgba(243, 244, 246, 1);
-  max-width: 42rem;
-  height: 100%;
-}
-
-@media only screen and (max-width: 512px) {
-  .about_container {
-    padding: 0 0.6rem;
-  }
-}
-@media only screen and (min-width: 512px) {
-  .about__container {
-    padding: 0 4rem;
-  }
-}
-
-.about__title {
-  color: rgba(55, 65, 81, 1);
-  font-weight: 700;
-  font-size: 4.5rem;
-  line-height: 1;
-  text-align: center;
-  letter-spacing: 0.025em;
-  margin: 1rem 0 7rem 0;
-}
-
-@media only screen and (max-width: 512px) {
-  .about__title {
-    margin: 1rem 0 0 0;
-  }
-}
-
-.about__section-title-underline {
-  background: -webkit-gradient(
-    linear,
-    left top,
-    right top,
-    from(#29abe2),
-    color-stop(33%, #fbb03b),
-    color-stop(66%, #f15a24),
-    to(#ed1e79)
-  );
-  background: linear-gradient(
-    90deg,
-    #29abe2,
-    #fbb03b 33%,
-    #f15a24 66%,
-    #ed1e79
-  );
-  height: 1px;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  margin: 0.3rem auto;
-}
-
-.about__section {
-  margin: 2.5rem 1.2rem;
-}
-
-.about__subtitle {
-  letter-spacing: -0.01rem;
-  font-weight: 300;
-  font-size: 1.25rem;
-}
-
-.about__compatibility-type {
-  letter-spacing: -0.01rem;
-  font-weight: 500;
-  font-size: 1rem;
-  margin: 0;
-  text-align: center;
-}
-
-.about__compatibility-list {
-  padding: 1rem;
-  margin: 0;
-  list-style-type: none;
-  width: auto;
-  font-size: 0.9rem;
-}
-
-.about__compatibility-list-item {
-  letter-spacing: -0.01rem;
-  font-weight: 300;
-  font-size: 1rem;
-  color: rgba(31, 41, 55, 1);
-}
-
-.about__compatibility-flexparent {
-  display: flex;
-  flex-flow: wrap;
-  justify-content: center;
-  background-color: var(--rainbow-orange);
-  border-radius: 0.5rem;
-}
-
-.about__compatibility-flexchild {
-  min-width: 1rem;
-  padding: 1rem;
-}
-
-.warnBox {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  margin-bottom: 2rem;
-  box-sizing: border-box;
-  border-style: double;
-  border-width: 2px;
-  border-radius: 4px;
-  border-image-slice: 1;
-  outline: none;
-  border-image-source: linear-gradient(
-    270.05deg,
-    #29abe2 10.78%,
-    #522785 22.2%,
-    #ed1e79 42.46%,
-    #f15a24 59.41%,
-    #fbb03b 77.09%
-  );
-}
-.warnIcon {
-  align-self: flex-start;
-}
-
-.warnContent {
+#pageContent,
+.l-wrap {
+  position: relative;
   display: flex;
   flex-direction: column;
-}
-.warnTitle {
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin: 0;
-}
-.warnMessage {
-  margin-top: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-}
-.warnButton {
-  padding: 0.2rem 0.4rem;
-  border-radius: 2px;
-  width: fit-content;
-  align-self: flex-end;
-  margin: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--rs-card-bezel);
 }
 
-button[data-action="protect"] {
-  margin-bottom: 0;
+.l-container {
+  position: relative;
+  font-size: 1.6rem;
+  min-width: 30rem;
+  max-width: 40rem;
+  margin: 0 auto;
 }
 
-.container h1 {
-  word-break: break-word;
+.l-container--wide {
+  max-width: 60rem;
 }
 
-input.inputDeviceAlias {
-  line-height: 1;
+.l-divider {
+  display: block;
+  margin-top: calc(var(--vs-stack) * 2);
+  margin-bottom: calc(var(--vs-stack) * 2);
+  border-top: var(--vs-line) var(--rc-line) solid;
+}
+
+.l-divider--text {
+  display: flex;
+  gap: calc(var(--vs-gutter) * 2);
+  align-items: center;
+  margin-top: calc(var(--vs-stack) * 2);
+  margin-bottom: calc(var(--vs-stack) * 2);
+  border-top: none;
+  height: calc(1em * var(--vs-line-height));
+}
+
+.l-divider--text::before,
+.l-divider--text::after {
+  content: "";
+  flex-grow: 1;
+  border-top: var(--vs-line) var(--rc-line) solid;
+}
+
+.l-divider__label {
+  display: inline-block;
+}
+
+.l-section {
+  display: block;
+  margin-top: calc(var(--vs-stack) * 3);
+}
+.l-section--spacious {
+  margin-top: calc(var(--vs-stack) * 5);
+}
+
+.l-horizontal {
+  display: flex;
+  gap: var(--vs-inline);
+}
+
+/**
+ * Title with counter and Actions 
+ */
+
+/**
+ * Card components
+ */
+
+.c-card {
+  display: block;
+  position: relative;
+  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+  border: var(--vs-line) solid var(--rc-line);
+  background-color: var(--rc-background);
+  border-radius: 0.4rem;
+  margin-top: var(--rs-card-stack);
+}
+
+.c-card--narrow {
+  padding: var(--rs-card-bezel-narrow);
+}
+
+.c-card--outline {
+  border: var(--vs-line) var(--rc-line-inverted) solid;
+}
+
+@media (max-width: 512px) {
+  .c-card--highlight {
+    border: none;
+  }
+}
+
+.c-card__icon {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 10%;
+  aspect-ratio: 1;
+  z-index: var(--vz-background);
+  transform: translate(40%, -40%);
+}
+
+.c-card__icon svg {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.c-card__icon svg * {
+  fill: var(--rc-background);
+  stroke-width: 3px;
+  stroke: var(--rc-warning);
+}
+
+.c-card__content {
+  position: relative;
+  z-index: var(--vz-foreground);
+}
+
+.c-card__title {
+  /* 
+    approximation: to make sure the title 
+    does not collide with the icon on the left
+  */
+  padding-right: 10%;
+}
+
+.c-card__paragraph {
+  margin-top: calc(var(--vs-stack) * 0.75);
+}
+
+.c-card--warning {
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
+  border-radius: 4px;
+  border-image-slice: 1;
+  border-image-source: linear-gradient(270deg, var(--rg-brand));
+}
+
+/**
+ *  logo component 
+ */
+.c-logo {
+  display: block;
+  overflow: hidden;
+  margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+}
+
+.c-logo svg {
+  display: block;
+  width: 50%;
+  margin: 0 auto;
+}
+
+.t-title + .c-logo {
+  margin: var(--rs-logo-stack) 0;
+}
+
+/**
+ *  Forms and Buttons 
+ */
+
+.c-button {
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  padding: var(--rs-button-bezel);
+  margin-top: var(--rs-button-stack);
+  display: block;
+  width: 100%;
+  text-align: center;
+  border-radius: 0.4rem;
+}
+
+.c-button svg * {
+  fill: currentColor;
+}
+
+.c-button--secondary {
+  background: var(--rc-onButton);
+  color: var(--rc-button);
+  border: var(--vs-line) solid var(--rc-line);
+}
+
+.c-button:not([disabled]):focus,
+.c-button:not([disabled]):hover {
+  opacity: 0.9;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
+.c-button[disabled],
+.c-button--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.c-button--warning {
+  background: var(--rc-warning);
+  color: var(--rc-onWarning);
+}
+
+.c-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: var(--rs-input-bezel);
+  margin-top: var(--rs-input-stack);
+  background: var(--rc-input);
+  color: var(--rc-onInput);
+  border: calc(var(--vs-line) * 2) solid var(--rc-line);
+}
+
+.c-input.has-error,
+.c-input.has-error:focus {
+  color: var(--rc-warning);
+  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-warning);
+  border-image: none;
+}
+
+.c-input:focus {
+  opacity: 0.9;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
+.c-input--vip:focus {
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
+  border-radius: 4px;
+  border-image-slice: 1;
+  border-image-source: linear-gradient(270deg, var(--rg-brand));
+  outline: none;
+  box-shadow: none;
+}
+
+.c-input--readonly {
+  background: var(--rc-input-readonly);
+  color: var(--rc-input-onReadonly);
+  border: var(--vs-line) var(--rc-line) solid;
+}
+
+.c-input__input {
+  position: absolute;
+  display: block;
+  width: 100%;
+  background: transparent;
+  height: 100%;
+  inset: 0;
+}
+
+.c-input__button {
+  position: absolute;
+  top: 50%;
+  right: var(--rs-input-bezel);
+  transform: translateY(-50%);
+}
+
+.c-summary {
+  list-style: none;
+}
+
+.c-summary__link {
+  display: block;
+  position: relative;
+}
+
+.c-summary__link::before {
+  position: absolute;
+  content: "▶";
+  font-size: 0.75em;
+  line-height: 2;
+  left: calc(-1 * var(--vs-inline));
+  text-decoration: none;
+  transform: translateX(-100%);
+  transition: 200ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+[open] .c-summary__link::before {
+  transform: translateX(-100%) rotate(90deg);
+}
+
+/**
+ *  Footer component
+ */
+
+.l-footer {
+  padding: var(--rs-footer-gutter);
+  margin-top: var(--rs-footer-stack);
+}
+
+/**
+ *  Footer Navigation component
+ *  1) radial shadow underneath the line below the links
+ */
+
+.c-nav-links {
+  position: relative;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: calc(var(--vs-gutter) * 10);
+  border-top: var(--vs-line) var(--rc-line) solid;
+  padding-top: var(--vs-bezel);
+  overflow: hidden;
+}
+
+.c-nav-links::before {
+  /* 1 */
+  content: "";
+  display: block;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  opacity: 0.5;
+  top: 0;
+  background: radial-gradient(var(--rc-line), transparent);
+  background-size: 80% 160%;
+  background-repeat: no-repeat;
+  background-position: center 170%;
+  pointer-events: none;
+}
+
+.c-nav-links li {
+  position: relative;
+  padding: 0 var(--vs-inline);
+}
+
+.c-nav-links li + li::before {
+  position: absolute;
+  content: "·";
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.page-signature {
+  display: block;
+  padding: var(--rs-footer-gutter);
+  transition: background 0.2s;
+}
+
+.page-signature img {
+  display: block;
+  max-width: 100%;
+}
+
+.page-signature:hover,
+.page-signature:focus {
+  background: var(--grey-050);
+}
+
+.c-list li + li {
+  margin-top: var(--vs-stack);
+}
+
+.c-list--bulleted {
+  list-style-type: disc;
+}
+
+.c-list--bulleted li,
+.c-list--numbered li {
+  margin-left: calc(var(--vs-inline) * 2);
+}
+
+.c-list--numbered {
+  list-style-type: decimal;
+}
+
+/** 
+ *  Tooltip component
+ *  This is a CSS only tooltip that shows on hover
+ *  The element that triggers the tooltip must have a .c-tooltip class
+ *  and the element that appears on hover must have a .c-tooltip__content class.
+ *  
+ *  In some cases tooltips are only shown when the element is disabled.
+ *  in those cases you can use the `.c-tooltip--onDisabled` modifier
+ */
+
+.c-tooltip {
+  position: relative;
+}
+
+.c-tooltip:hover .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
+}
+
+.c-tooltip--onDisabled:hover .c-tooltip__message {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.c-tooltip--onDisabled:disabled:hover .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
+}
+
+.c-tooltip__message {
+  position: absolute;
+  left: 0;
+
+  opacity: 0;
+  color: var(--rc-text);
+  visibility: hidden;
+  z-index: var(--vz-tooltip);
+  text-align: left;
+  min-width: 15rem;
+  max-width: 20rem;
+  transition: opacity 0.2s ease-in;
+}
+
+.c-tooltip__message--right {
+  right: 0;
+  left: auto;
+}
+
+.c-action-list {
+  margin-top: 1rem;
+}
+
+.c-action-list__item {
+  display: flex;
+  gap: var(--vs-gutter);
+}
+
+.c-action-list__item + .c-action-list__item {
+  margin-top: var(--vs-gutter);
+}
+
+.c-action-list__label {
+  flex-grow: 1;
+}
+
+.c-action-list__action,
+.c-action-list__label {
+  display: flex;
+  align-items: center;
+  border: var(--vs-line) solid var(--rc-line);
+  border-radius: 4px;
+  padding: var(--rs-button-bezel);
+  background: var(--rc-background);
+  transition: 200ms border-color linear;
+}
+
+.c-action-list__action svg {
+  transition: 200ms opacity linear;
+}
+
+.c-action-list__action:hover {
+  border-color: var(--rc-button);
+}
+
+.c-action-list__action:hover svg {
+  opacity: 0.8;
+}
+
+.c-img-block {
+  width: 100%;
+  display: block;
+}
+
+/** responsiveness */
+
+@media (max-width: 512px) {
+  #pageContent,
+  .l-wrap {
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .l-container {
+    max-width: 100%;
+    padding: calc(var(--rs-card-bezel) * 0.8) calc(var(--rs-card-bezel-x) * 0.8);
+  }
+}
+
+/* VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, */
+.is-hidden {
+  display: none !important;
+}
+
+.is-visible {
+  display: block !important;
 }

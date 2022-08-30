@@ -9,38 +9,28 @@ export type ErrorOptions = {
 };
 
 const pageContent = (options: ErrorOptions) => html`
-  <style>
-    #errorContainer {
-      min-height: 15rem;
-    }
-    .displayErrorDetail {
-      overflow: auto;
-      margin-bottom: 2rem;
-      flex-grow: 1;
-    }
-    .displayErrorMessage {
-      flex-grow: 1;
-    }
-    .warningIcon {
-      align-self: center;
-      width: 3rem;
-      height: 3rem;
-      margin-bottom: 1.5rem;
-    }
-  </style>
-  <div id="errorContainer" class="container">
-    ${warningIcon}
-    <h1>${options.title}</h1>
-    <p class="displayErrorMessage">${options.message}</p>
+  <div
+    id="errorContainer"
+    class="l-container c-card c-card--highlight c-card--warning"
+  >
+    <span class="c-card__icon"> ${warningIcon} </span>
+    <hgroup>
+      <h1 class="t-title t-title--primary">${options.title}</h1>
+      <p class="displayErrorMessage t-lead">${options.message}</p>
+    </hgroup>
     ${options.detail !== undefined
-      ? html` <details class="displayErrorDetail">
-          <summary>Error details</summary>
-          <pre>${options.detail}</pre>
+      ? html`<details class="displayErrorDetail">
+          <summary class="c-summary">
+            <span class="c-summary__link t-link">Error details</span>
+          </summary>
+          <pre class="t-paragraph">${options.detail}</pre>
         </details>`
       : ""}
-    <button id="displayErrorPrimary" class="primary">
-      ${options.primaryButton}
-    </button>
+    <div class="l-section">
+      <button id="displayErrorPrimary" class="c-button c-button--primary">
+        ${options.primaryButton}
+      </button>
+    </div>
   </div>
 `;
 

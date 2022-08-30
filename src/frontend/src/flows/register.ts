@@ -17,10 +17,14 @@ import { icLogo } from "../components/icons";
 import { validateAlias } from "./addDevice/validateAlias";
 
 const pageContent = html`
-  <div class="container">
-    <h1>Create a new Internet Identity Anchor</h1>
-    <form id="registerForm">
-      <p>Please provide a name for your device.</p>
+  <div class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">
+        Create a new Internet Identity Anchor
+      </h1>
+      <p class="t-lead">Please provide a name for your device.</p>
+    </hgroup>
+    <form id="registerForm" class="l-section">
       <input
         id="registerAlias"
         placeholder="Device name"
@@ -30,18 +34,29 @@ const pageContent = html`
         maxlength="30"
         pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
+        class="c-input"
       />
-      <button type="submit" class="primary">Create</button>
-      <button id="registerCancel" type="button">Cancel</button>
+      <div class="l-section">
+        <button type="submit" class="c-button">Create</button>
+        <button
+          id="registerCancel"
+          type="button"
+          class="c-button c-button--secondary"
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   </div>
 `;
 
 const constructingContent = html`
-  <div class="container flex center">
-    <h1>Constructing new Identity Anchor</h1>
-    ${icLogo}
-    <p>This may take a while. Please wait and do not refresh the page.</p>
+  <div class="l-container c-card c-card--highlight">
+    <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
+    <div class="c-logo">${icLogo}</div>
+    <p class="t-paragraph">
+      This may take a while. Please wait and do not refresh the page.
+    </p>
   </div>
 `;
 

@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 
 const pageContent = html`
-  <div class="container">
+  <div class="l-container c-card c-card--highlight">
     <h1>Create a new Internet Identity Anchor</h1>
     ${warnBox({
       title: "Registration Disabled",

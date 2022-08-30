@@ -29,157 +29,68 @@ const pageContent = (
   hostName: string,
   userNumber?: bigint,
   derivationOrigin?: string
-) => html` <style>
-    .anchorText {
-      font-size: 1.5rem;
-    }
-
-    #userNumberInput {
-      margin: 0;
-      text-align: center;
-      width: 100%;
-      box-sizing: border-box;
-      padding: 0.5rem 2rem;
-    }
-
-    #userNumberInput:focus {
-      box-sizing: border-box;
-      border-style: double;
-      border-width: 2px;
-      border-radius: 4px;
-      border-image-slice: 1;
-      outline: none;
-      border-image-source: linear-gradient(
-        270.05deg,
-        #29abe2 10.78%,
-        #522785 22.2%,
-        #ed1e79 42.46%,
-        #f15a24 59.41%,
-        #fbb03b 77.09%
-      );
-    }
-
-    .childContainer {
-      position: relative;
-      margin-bottom: 0.5rem;
-    }
-
-    #editAnchorButton {
-      display: flex;
-      flex-direction: column;
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      right: 0;
-      padding: 0.3rem;
-      margin: 0;
-      width: 2rem;
-      background: transparent;
-      border: none;
-    }
-
-    #registerButton {
-      margin: 0.5rem 0 1rem 0;
-    }
-
-    .hostName {
-      padding: 1rem 0;
-      font-size: 0.8rem;
-      font-weight: 400;
-    }
-
-    .buttonContainer {
-      margin: 0.5rem 0;
-    }
-
-    button.primary {
-      margin-top: 1rem;
-    }
-
-    hr {
-      border: none;
-      border-top-color: var(--grey-050);
-      border-top-style: solid;
-      margin: 0.5rem 0;
-    }
-
-    .anchor-error-message .error-message {
-      margin-bottom: 1rem;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .host-name {
-      padding: 1rem 0.5rem;
-    }
-
-    .container {
-      padding: 3.5rem 1rem 2rem;
-    }
-
-    @media (min-width: 512px) {
-      .container {
-        padding: 3.5rem 2.5rem 2rem;
-      }
-    }
-  </style>
-  <div class="container">
-    ${icLogo}
-    <h1>Internet Identity</h1>
-    <p>Authenticate to service:</p>
-    <div class="host-name highlightBox hostName">${hostName}</div>
+) => html` <div class="l-container c-card c-card--highlight">
+    <div class="c-logo">${icLogo}</div>
+    <h1 class="t-title t-title--main">Internet Identity</h1>
+    <p class="t-lead">Authenticate to service:</p>
+    <div class="c-input t-vip t-vip--small c-input--readonly">${hostName}</div>
     ${derivationOrigin !== undefined && derivationOrigin !== hostName
       ? derivationOriginSection(derivationOrigin)
       : ""}
-    <p>Use Identity Anchor:</p>
+    <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <div class="childContainer">
+    <div class="childContainer l-section c-input c-input--readonly">
       <input
         class="anchorText"
         type="text"
         id="userNumberInput"
         placeholder="Enter anchor"
+        class="c-input__input"
         value="${userNumber !== undefined ? userNumber : ""}"
       />
-      <button id="editAnchorButton">${editIcon}</button>
+      <button id="editAnchorButton" class="c-input__button">${editIcon}</button>
     </div>
-    <div
+    <p
       id="invalidAnchorMessage"
-      class="anchor-error-message error-message-hidden"
+      class="anchor-error-message is-hidden t-paragraph t-strong"
     >
       The Identity Anchor is not valid. Please try again.
-    </div>
+    </p>
 
-    <button type="button" id="authorizeButton" class="primary">
+    <button type="button" id="authorizeButton" class="c-button">
       Start Session
     </button>
-    <div id="registerSection">
-      <button type="button" id="registerButton">
+
+    <div id="registerSection" class="l-section">
+      <button
+        type="button"
+        id="registerButton"
+        class="c-button c-button--secondary"
+      >
         Create New Identity Anchor
       </button>
     </div>
-    <div class="textLink">
-      <hr />
-      <div class="buttonContainer">
-        <a id="recoverButton" class="linkStyle">Lost access?</a>
-      </div>
-      <div class="buttonContainer">
-        <a type="button" class="linkStyle" id="manageButton">
-          Manage your Identity Anchor
-        </a>
-      </div>
-      <hr />
-    </div>
+
+    <ul class="c-list l-section">
+      <li>
+        <a id="recoverButton" class="t-link">Lost access?</a>
+      </li>
+      <li>
+        <a class="t-link" id="manageButton">Manage your Identity Anchor</a>
+      </li>
+    </ul>
     ${navbar}
   </div>
   ${footer}`;
 
-const derivationOriginSection = (derivationOrigin: string) => html` <p>
+const derivationOriginSection = (derivationOrigin: string) => html` <p
+    class="t-paragraph"
+  >
     This service is an alias of:
   </p>
-  <div class="host-name highlightBox hostName">${derivationOrigin}</div>`;
+  <output class="c-input c-input--readonly t-vip t-vip--small">
+    ${derivationOrigin}
+  </output>`;
 
 export interface AuthSuccess {
   userNumber: bigint;
@@ -284,18 +195,18 @@ const init = (
 
   // only use non-edit mode if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
-    userNumberInput.classList.add("highlightBox");
-    registerSection.classList.add("hidden");
+    userNumberInput.classList.add("t-vip");
+    registerSection.classList.add("is-hidden");
     userNumberInput.disabled = true;
     authorizeButton.focus();
   } else {
-    editAnchorButton.classList.add("hidden");
+    editAnchorButton.classList.add("is-hidden");
     userNumberInput.select();
   }
   editAnchorButton.onclick = () => {
-    editAnchorButton.classList.add("hidden");
-    registerSection.classList.remove("hidden");
-    userNumberInput.classList.remove("highlightBox");
+    editAnchorButton.classList.add("is-hidden");
+    registerSection.classList.remove("is-hidden");
+    userNumberInput.classList.remove("t-vip");
     userNumberInput.disabled = false;
     userNumberInput.select();
   };

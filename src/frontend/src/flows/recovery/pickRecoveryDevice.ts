@@ -2,10 +2,12 @@ import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 
 const pageContent = () => html`
-  <div class="container">
-    <h1>Choose a device</h1>
-    <label>Recovery devices</label>
-    <div id="deviceList"></div>
+  <div class="l-container c-card c-card--highlight c-card--highlight">
+    <h1 class="t-title t-title--main">Choose a device</h1>
+    <div class="l-section">
+      <h2 class="t-title">Recovery devices</div>
+      <ol class="c-list l-section" id="deviceList"></ol>
+    </div>
   </div>
 `;
 
@@ -28,7 +30,9 @@ export const init = (devices: DeviceData[]): Promise<DeviceData> =>
       const identityElement = document.createElement("li");
       identityElement.className = "deviceItem";
       render(
-        html`<div class="deviceItemAlias">${device.alias}</div>`,
+        html`<li class="deviceItemAlias">
+          <button class="c-button c-button--secondary">${device.alias}</button>
+        </li>`,
         identityElement
       );
       identityElement.onclick = () => resolve(device);

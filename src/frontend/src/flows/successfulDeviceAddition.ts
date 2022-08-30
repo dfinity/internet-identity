@@ -4,12 +4,14 @@ import { AuthenticatedConnection } from "../utils/iiConnection";
 import { renderManage } from "./manage";
 
 const pageContent = (name: string) => html`
-  <div class="container">
-    <h1>Success!</h1>
-    <p>You have successfully added your new device.</p>
-    <label>Device name:</label>
-    <div class="highlightBox">${name}</div>
-    <button id="manageDevicesButton" class="primary">Manage devices</button>
+  <div class="l-container c-card c-card--highlight">
+    <h1 class="t-title t-title--main">Success!</h1>
+    <p class="t-lead">You have successfully added your new device.</p>
+    <div class="l-section">
+      <h2 class="t-title">Device name:</h2>
+      <output class="c-input c-input--readonly t-vip">${name}</output>
+      <button id="manageDevicesButton" class="c-button">Manage devices</button>
+    </div>
     ${logoutSection()}
   </div>
 `;

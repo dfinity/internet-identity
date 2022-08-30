@@ -7,12 +7,14 @@ import { validateAlias } from "../validateAlias";
 // Bad examples: "2019 macbook!", "2010 macbook_", "space trails at end "
 
 const pageContent = () => html`
-  <div class="container">
-    <h1>New Device</h1>
+  <article class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">New Device</h1>
+      <p class="t-lead">Please provide a name for your new device</p>
+    </hgroup>
     <form id="deviceAliasForm">
-      <p>Please provide a name for your new device</p>
       <input
-        class="inputDeviceAlias"
+        class="c-input inputDeviceAlias"
         aria-label="device name"
         id="deviceAlias"
         placeholder="Device alias"
@@ -22,13 +24,21 @@ const pageContent = () => html`
         pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
       />
-      <button type="submit" id="deviceAliasContinue" class="primary">
-        Add Device
-      </button>
-      <button type="button" id="deviceAliasCancel">Cancel</button>
+      <div class="l-section">
+        <button type="submit" id="deviceAliasContinue" class="c-button">
+          Add Device
+        </button>
+        <button
+          type="button"
+          id="deviceAliasCancel"
+          class="c-button c-button--secondary"
+        >
+          Cancel
+        </button>
+      </div>
     </form>
     ${logoutSection()}
-  </div>
+  </article>
 `;
 
 /**

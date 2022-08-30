@@ -1,10 +1,21 @@
 import { html } from "lit-html";
-import { aboutLink } from "../components/aboutLink";
-import { faqLink } from "../components/faqLink";
+import { navigationLink } from "../components/navigationLink";
 
 export const navbar = html` <aside aria-label="General links">
-  <ul class="nav-links">
-    <li>${aboutLink}</li>
-    <li>${faqLink}</li>
+  <ul class="c-nav-links">
+    <li>
+      ${navigationLink({
+        labelText: "About",
+        uuid: "aboutLink",
+        url: "/about",
+      })}
+    </li>
+    <li>
+      ${navigationLink({
+        labelText: "FAQ",
+        uuid: "faqLink",
+        url: "/faq",
+      })}
+    </li>
   </ul>
 </aside>`;

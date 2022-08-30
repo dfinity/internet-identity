@@ -10,76 +10,42 @@ import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 
-const pageContent = () => html` <style>
-    #registerUserNumber:focus {
-      box-sizing: border-box;
-      border-style: double;
-      border-width: 2px;
-      border-radius: 4px;
-      border-image-slice: 1;
-      outline: none;
-      border-image-source: linear-gradient(
-        270.05deg,
-        #29abe2 10.78%,
-        #522785 22.2%,
-        #ed1e79 42.46%,
-        #f15a24 59.41%,
-        #fbb03b 77.09%
-      );
-    }
-
-    #registerSection {
-      margin-top: 4rem;
-    }
-
-    .spacer {
-      height: 2rem;
-    }
-
-    .list-reset li {
-      list-style: none;
-    }
-    .input {
-      box-sizing: border-box;
-    }
-    .input--fullwidth {
-      width: 100%;
-    }
-  </style>
-  <section class="container" aria-label="Authentication">
-    ${icLogo}
-
-    <article>
-      <h1 id="loginWelcome">Welcome to<br />Internet Identity</h1>
-      <p>Provide an Identity Anchor to authenticate.</p>
+const pageContent = () => html`
+  <section class="l-container c-card c-card--highlight" aria-label="Authentication">
+    <div class="c-logo">${icLogo}</div>
+    <article class="l-section">
+      <hgroup>
+        <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
+        <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
+      <hgroup>
       <input
         type="text"
-        class="input input--fullwidth"
+        class="c-input c-input--vip"
         id="registerUserNumber"
         placeholder="Enter Identity Anchor"
       />
-      <button type="button" id="loginButton" class="primary">
+      <button type="button" id="loginButton" class="c-button">
         Authenticate
       </button>
     </article>
 
-    <aside aria-label="Other actions">
-      <ul class="list-reset">
+    <aside class="l-section l-section--spacious" aria-label="Other actions">
+      <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?
-          <a id="registerButton" class="linkStyle">
-            Create an Internet Identity Anchor.
-          </a>
+          <a id="registerButton" class="t-link">Create an Internet Identity Anchor.</a>
         </li>
         <li class="textLink">
           Already have an anchor
-          <a id="addNewDeviceButton" class="linkStyle">
+          <a id="addNewDeviceButton" class="t-link">
             but using a new device?
           </a>
         </li>
         <li class="textLink">
           Lost access
-          <a id="recoverButton" class="linkStyle"> and want to recover? </a>
+          <a id="recoverButton" class="t-link">
+            and want to recover?
+          </a>
         </li>
       </ul>
     </aside>

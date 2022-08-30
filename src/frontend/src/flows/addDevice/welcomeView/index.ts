@@ -5,22 +5,29 @@ import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (userNumber: bigint | null) => html`
-  <div class="container">
-    <h1>New Device</h1>
-    <p>
-      Please provide the Identity Anchor to which you want to add your device.
-    </p>
-    <div id="invalidAnchorMessage" class="error-message-hidden">
-      Please enter a valid Identity Anchor.
-    </div>
+  <div class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">New Device</h1>
+      <p class="t-lead">
+        Please provide the Identity Anchor to which you want to add your device.
+      </p>
+      <p id="invalidAnchorMessage" class="is-hidden">
+        Please enter a valid Identity Anchor.
+      </p>
+    </hgroup>
     <input
+      class="c-input"
       type="text"
       id="addDeviceUserNumber"
       placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
-    <button id="addDeviceUserNumberContinue" class="primary">Continue</button>
-    <button id="addDeviceUserNumberCancel">Cancel</button>
+    <button class="c-button" id="addDeviceUserNumberContinue" class="primary">
+      Continue
+    </button>
+    <button class="c-button c-button--secondary" id="addDeviceUserNumberCancel">
+      Cancel
+    </button>
   </div>
 `;
 
