@@ -114,6 +114,7 @@
   --rc-light-transparent: var(--vc-vapour);
 
   --rc-text: var(--rc-dark);
+  --rc-text--disabled: var(--vc-shadow);
 
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
@@ -328,6 +329,10 @@ body {
   font-weight: 300;
   font-size: 0.8em;
   flex-grow: 1;
+}
+
+.t-title__complication:disabled {
+  color: var(--rc-text--disabled);
 }
 
 .t-title__complication--end {
@@ -790,6 +795,9 @@ a:hover,
  *  This is a CSS only tooltip that shows on hover
  *  The element that triggers the tooltip must have a .c-tooltip class
  *  and the element that appears on hover must have a .c-tooltip__content class.
+ *  
+ *  In some cases tooltips are only shown when the element is disabled.
+ *  in those cases you can use the `.c-tooltip--onDisabled` modifier
  */
 
 .c-tooltip {
@@ -799,7 +807,16 @@ a:hover,
 .c-tooltip:hover .c-tooltip__message {
   visibility: visible;
   opacity: 1;
-  transition: opacity 0.2s ease-in;
+}
+
+.c-tooltip--onDisabled:hover .c-tooltip__message {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.c-tooltip--onDisabled:disabled:hover .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
 }
 
 .c-tooltip__message {
@@ -807,11 +824,13 @@ a:hover,
   left: 0;
 
   opacity: 0;
+  color: var(--rc-text);
   visibility: hidden;
   z-index: var(--vz-tooltip);
   text-align: left;
   min-width: 15rem;
   max-width: 20rem;
+  transition: opacity 0.2s ease-in;
 }
 
 .c-tooltip__message--right {

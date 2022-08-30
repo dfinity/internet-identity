@@ -58,7 +58,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
 
     <aside class="l-section">
       <div class="t-title t-title--complications">
-        <h2>Added devices</h2>
+        <h2 class="t-title">Added devices</h2>
         <span class="t-title__complication c-tooltip">
           <span class="c-tooltip__message c-card c-card--narrow">
             You can register up to ${MAX_AUTHENTICATORS} authenticator
@@ -68,7 +68,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
         </span>
         <button
           ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-          class="t-title__complication t-title__complication--end c-tooltip"
+          class="t-title__complication t-title__complication--end c-tooltip c-tooltip--onDisabled"
           id="addAdditionalDevice"
         >
           <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
