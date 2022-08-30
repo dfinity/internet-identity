@@ -644,6 +644,13 @@ a:hover,
   border: calc(var(--vs-line) * 2) solid var(--rc-line);
 }
 
+.c-input.has-error,
+.c-input.has-error:focus {
+  color: var(--rc-warning);
+  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-warning);
+  border-image: none;
+}
+
 .c-input:focus {
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);

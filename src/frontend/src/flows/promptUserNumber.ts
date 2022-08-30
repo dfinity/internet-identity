@@ -49,7 +49,7 @@ export const promptUserNumber = async (
       if (userNumber !== null) {
         resolve(userNumber);
       } else {
-        userNumberInput.classList.toggle("errored", true);
+        userNumberInput.classList.toggle("has-error", true);
         userNumberInput.placeholder = "Please enter an Identity Anchor first";
       }
     };

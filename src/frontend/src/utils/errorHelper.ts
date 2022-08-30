@@ -13,5 +13,5 @@ export function toggleErrorMessage(
   errorMessage.classList.toggle("is-hidden", !show);
   errorMessage.classList.toggle("error-message", show);
   const input = document.getElementById(inputElementId) as HTMLElement;
-  input.classList.toggle("errored", show);
+  input.classList.toggle("has-error", show);
 }

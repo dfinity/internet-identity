@@ -118,7 +118,7 @@ const init = (
   verifyButton.onclick = async () => {
     if (pinInput.value === "") {
       pinInput.placeholder = "Please enter verification code";
-      pinInput.classList.toggle("errored", true);
+      pinInput.classList.toggle("has-error", true);
       return;
     }
     const result = await withLoader(() =>
