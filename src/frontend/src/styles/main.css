@@ -385,6 +385,11 @@ a,
   cursor: pointer;
 }
 
+.t-link:disabled,
+:disabled .t-link {
+  pointer-events: none;
+}
+
 .t-link--discreet {
   font-weight: normal;
   text-decoration: none;
