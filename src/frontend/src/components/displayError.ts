@@ -13,7 +13,9 @@ const pageContent = (options: ErrorOptions) => html`
     id="errorContainer"
     class="l-container c-card c-card--highlight c-card--warning"
   >
-    ${warningIcon}
+    <span class="c-card__icon">
+      ${warningIcon}
+    </span>
     <hgroup>
       <h1 class="t-title t-title--primary">${options.title}</h1>
       <p class="displayErrorMessage t-lead">${options.message}</p>
@@ -26,9 +28,11 @@ const pageContent = (options: ErrorOptions) => html`
           <pre class="t-paragraph">${options.detail}</pre>
         </details>`
       : ""}
-    <button id="displayErrorPrimary" class="c-button c-button--primary">
-      ${options.primaryButton}
-    </button>
+    <div class="l-section">
+      <button id="displayErrorPrimary" class="c-button c-button--primary">
+        ${options.primaryButton}
+      </button>
+    </div>
   </div>
 `;
 
