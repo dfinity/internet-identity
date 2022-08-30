@@ -853,9 +853,14 @@ a:hover,
 .c-action-list {
   margin-top: 1rem;
 }
+
 .c-action-list__item {
   display: flex;
   gap: var(--vs-gutter);
+}
+
+.c-action-list__item + .c-action-list__item {
+  margin-top: var(--vs-gutter);
 }
 
 .c-action-list__label {
