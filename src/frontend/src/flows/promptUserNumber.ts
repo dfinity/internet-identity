@@ -14,10 +14,10 @@ const pageContent = (title: string, userNumber: bigint | null) => html`
       placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
-    <button id="userNumberContinue" class="c-button c-button--primary">
-      Continue
+    <button id="userNumberContinue" class="c-button">Continue</button>
+    <button id="userNumberCancel" class="c-button c-button--secondary">
+      Cancel
     </button>
-    <button id="userNumberCancel" class="c-button">Cancel</button>
   </div>
 `;
 
