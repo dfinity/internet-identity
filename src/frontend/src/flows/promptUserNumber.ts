@@ -3,16 +3,21 @@ import { parseUserNumber } from "../utils/userNumber";
 
 const pageContent = (title: string, userNumber: bigint | null) => html`
   <div class="l-container c-card c-card--highlight">
-    <h1>${title}</h1>
-    <p>Please provide an Identity Anchor.</p>
+    <hgroup>
+      <h1 class="t-title t-title--main">${title}</h1>
+      <p class="t-lead">Please provide an Identity Anchor.</p>
+    </hgroup>
     <input
       type="text"
       id="userNumberInput"
+      class="c-input c-input--vip"
       placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
-    <button id="userNumberContinue" class="primary">Continue</button>
-    <button id="userNumberCancel">Cancel</button>
+    <button id="userNumberContinue" class="c-button c-button--primary">
+      Continue
+    </button>
+    <button id="userNumberCancel" class="c-button">Cancel</button>
   </div>
 `;
 
