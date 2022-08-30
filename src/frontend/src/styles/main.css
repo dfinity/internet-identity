@@ -858,6 +858,19 @@ a:hover,
   border-radius: 4px;
   padding: var(--rs-button-bezel);
   background: var(--rc-background);
+  transition: 200ms border-color linear;
+}
+
+.c-action-list__action svg {
+  transition: 200ms opacity linear;
+}
+
+.c-action-list__action:hover {
+  border-color: var(--rc-button);
+}
+
+.c-action-list__action:hover svg {
+  opacity: 0.8;
 }
 
 .c-img-block {
