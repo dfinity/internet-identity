@@ -3,6 +3,7 @@ import { html, render } from "lit-html";
 const loader = () => html`<style>
     #loader {
       position: fixed;
+      z-index: var(--vz-loader);
       top: 0;
       left: 0;
       width: 100vw;
