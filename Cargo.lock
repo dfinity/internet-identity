@@ -3297,6 +3297,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "internet_identity_log"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "ic-cdk",
+ "ic-cdk-macros",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

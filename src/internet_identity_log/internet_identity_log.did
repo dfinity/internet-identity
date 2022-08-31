@@ -1,0 +1,54 @@
+type HeaderField = record { text; text; };
+
+type HttpRequest = record {
+  method: text;
+  url: text;
+  headers: vec HeaderField;
+  body: blob;
+};
+
+type HttpResponse = record {
+  status_code: nat16;
+  headers: vec HeaderField;
+  body: blob;
+  upgrade : opt bool;
+  // streaming_strategy left out deliberately as it is unused
+};
+
+type Timestamp = nat64;
+type UserNumber = nat64;
+
+type Cursor = variant {
+    timestamp: Timestamp; // get logs starting from this Timestamp
+    next_token: blob; // submit previously received token to fetch the next page of log entries
+};
+
+type Logs = record {
+  entries: vec blob;
+  next_token: opt blob // cursor to fetch the next page of log entries (if any)
+}
+
+service :  {
+  // Returns the logs for the given user number. If a timestamp is given, only the logs starting from that timestamp are
+  // returned. Use the Cursor to skip to later log entries.
+  // This function can be called anonymously.
+  //
+  // Parameters:
+  // 1. user number to fetch the logs for
+  // 2. optional cursor to specify which logs to fetch
+  // 3. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
+  get_user_logs : (UserNumber, opt Cursor, opt nat16) -> (Logs) query;
+
+  // Returns the latest up to 1000 log entries. If an index is given, entries starting from the given index are returned.
+  //
+  // Parameters:
+  // 1. optional index into the list of log entries
+  // 2. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
+  get_logs : (opt nat64, opt nat16) -> (Logs) query;
+
+  // Writes a log entry. Only the Internet Identity canister is authorized to call this function.
+  write_entry : (UserNumber, Timestamp, blob) -> ();
+
+  // HTTP endpoint to expose metrics for Prometheus.
+  http_request: (request: HttpRequest) -> (HttpResponse) query;
+}

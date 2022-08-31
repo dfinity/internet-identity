@@ -44,12 +44,15 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
+COPY src/internet_identity_log/Cargo.toml src/internet_identity_log/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \
     && touch src/internet_identity_interface/src/lib.rs \
+    && mkdir -p src/internet_identity_log/src \
+    && touch src/internet_identity_log/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
     && ./scripts/build --only-dependencies \
@@ -65,6 +68,7 @@ ARG II_DUMMY_AUTH=
 
 RUN touch src/internet_identity/src/lib.rs
 RUN touch src/internet_identity_interface/src/lib.rs
+RUN touch src/internet_identity_log/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 

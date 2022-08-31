@@ -5,6 +5,11 @@
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm",
       "build": "scripts/build"
+    },
+    "internet_identity_log": {
+      "type": "rust",
+      "package": "internet_identity_log",
+      "candid": "src/anchor_op_log/internet_identity_log.did"
     }
   },
   "defaults": {

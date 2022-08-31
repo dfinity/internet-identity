@@ -3,6 +3,7 @@ members = [
     "src/internet_identity",
     "src/canister_tests",
     "src/internet_identity_interface",
+    "src/internet_identity_log",
 ]
 
 [profile.release]
