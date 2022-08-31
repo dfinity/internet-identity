@@ -41,11 +41,10 @@ const pageContent = (
 
     <div class="childContainer l-section c-input c-input--readonly">
       <input
-        class="anchorText"
         type="text"
         id="userNumberInput"
         placeholder="Enter anchor"
-        class="c-input__input"
+        class="c-input__input anchorText"
         value="${userNumber !== undefined ? userNumber : ""}"
       />
       <button id="editAnchorButton" class="c-input__button">${editIcon}</button>

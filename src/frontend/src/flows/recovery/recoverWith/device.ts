@@ -23,8 +23,15 @@ const pageContent = (userNumber: bigint) => html`
       "continue" and then follow your browser's instructions to connect your
       device.
     </p>
-    <button id="recover-with-device__continue" class="primary">Continue</button>
-    <button id="recover-with-device__cancel">Cancel</button>
+    <button id="recover-with-device__continue" class="c-button">
+      Continue
+    </button>
+    <button
+      id="recover-with-device__cancel"
+      class="c-button c-button--secondary"
+    >
+      Cancel
+    </button>
   </div>
 `;
 
