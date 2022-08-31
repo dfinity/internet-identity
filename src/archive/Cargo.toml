@@ -1,0 +1,25 @@
+[package]
+name = "archive"
+description = "Internet Identity Log Canister"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# local dependencies
+internet_identity_interface = { path = "../internet_identity_interface" }
+metrics_encoder = { path = "../metrics_encoder" }
+# ic dependencies
+candid = "0.7"
+ic-cdk = "0.5"
+ic-cdk-macros = "0.5"
+ic-stable-structures = "0.1"
+# other
+serde = "1"
+serde_bytes = "0.11"
+
+[dev-dependencies]
+canister_tests = { path = "../canister_tests" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }

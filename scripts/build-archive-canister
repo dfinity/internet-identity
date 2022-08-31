@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Build Archive Canister"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 [--only-dependencies]
+
+Options:
+  --only-dependencies   only build rust dependencies (no wasm optimization)
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Builds the Internet Identity Archive canister.
+
+NOTE: This requires a working rust toolchain as well as ic-cdk-optimizer.
+EOF
+
+}
+
+ONLY_DEPS=
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --only-dependencies)
+            ONLY_DEPS=1
+            shift
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'build --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+# Checking for dependencies
+if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
+then
+    echo "could not find ic-cdk-optimizer 0.3.4"
+    echo "ic-cdk-optimizer version 0.3.4 is needed, please run the following command:"
+    echo "  cargo install ic-cdk-optimizer --version 0.3.4"
+    exit 1
+fi
+
+ARCHIVE_DIR="$PWD/src/archive"
+TARGET="wasm32-unknown-unknown"
+
+# standardize source references
+CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
+RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
+
+cargo_build_args=(
+    --manifest-path "$ARCHIVE_DIR/Cargo.toml"
+    --target "$TARGET"
+    --release
+    -j1
+    )
+
+echo Running cargo build "${cargo_build_args[@]}"
+echo RUSTFLAGS: "$RUSTFLAGS"
+RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
+
+if [ "$ONLY_DEPS" != "1" ]
+then
+    CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ARCHIVE_DIR/../../target/}"
+    ic-cdk-optimizer \
+            "$CARGO_TARGET_DIR/$TARGET/release/archive.wasm" \
+            -o "./archive.wasm"
+fi

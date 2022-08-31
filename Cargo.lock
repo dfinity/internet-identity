@@ -65,6 +65,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "983cd8b9d4b02a6dc6ffa557262eb5858a27a0038ffffe21a0f133eaa819a164"
 
 [[package]]
+name = "archive"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "canister_tests",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "ic-stable-structures",
+ "ic-state-machine-tests",
+ "ic-types 0.8.0",
+ "internet_identity_interface",
+ "metrics_encoder",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2921,6 +2938,12 @@ dependencies = [
  "slog",
  "tempfile",
 ]
+
+[[package]]
+name = "ic-stable-structures"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6df7f185b9b65b001eb81e824316275392b972633443e0218bddc7ac384048b"
 
 [[package]]
 name = "ic-state-layout"
