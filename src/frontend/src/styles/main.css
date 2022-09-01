@@ -135,6 +135,7 @@
   --rc-onInput: var(--rc-dark);
 
   --rc-input-readonly: var(--vc-silver);
+  --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
 
   /* reference tokens: gradients */

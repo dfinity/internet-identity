@@ -17,8 +17,9 @@ const pageContent = (userNumber: bigint) => html`
     <div class="c-input c-input--readonly t-vip" data-usernumber>
       ${userNumber}
     </div>
-
-    <button id="displayUserContinue" class="c-button">Continue</button>
+    <div class="l-section">
+      <button id="displayUserContinue" class="c-button">Continue</button>
+    </div>
   </div>
 `;
 
