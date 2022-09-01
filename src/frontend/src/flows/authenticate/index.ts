@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { editIcon, icLogo } from "../../components/icons";
+import { icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -39,17 +39,14 @@ const pageContent = (
       : ""}
     <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <div class="childContainer l-section c-input c-input--readonly">
-      <input
-        class="anchorText"
-        type="text"
-        id="userNumberInput"
-        placeholder="Enter anchor"
-        class="c-input__input"
-        value="${userNumber !== undefined ? userNumber : ""}"
-      />
-      <button id="editAnchorButton" class="c-input__button">${editIcon}</button>
-    </div>
+    <input
+      type="text"
+      id="userNumberInput"
+      placeholder="Enter anchor"
+      class="l-section c-input c-input--vip"
+      value="${userNumber !== undefined ? userNumber : ""}"
+    />
+
     <p
       id="invalidAnchorMessage"
       class="anchor-error-message is-hidden t-paragraph t-strong"
@@ -178,12 +175,6 @@ const init = (
   const userNumberInput = document.getElementById(
     "userNumberInput"
   ) as HTMLInputElement;
-  const editAnchorButton = document.getElementById(
-    "editAnchorButton"
-  ) as HTMLButtonElement;
-  const registerSection = document.getElementById(
-    "registerSection"
-  ) as HTMLInputElement;
 
   userNumberInput.onkeypress = (e) => {
     if (e.key === "Enter") {
@@ -193,23 +184,12 @@ const init = (
     }
   };
 
-  // only use non-edit mode if the anchor is set and was previously used successfully (i.e. is in local storage)
+  // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
-    userNumberInput.classList.add("t-vip");
-    registerSection.classList.add("is-hidden");
-    userNumberInput.disabled = true;
     authorizeButton.focus();
   } else {
-    editAnchorButton.classList.add("is-hidden");
     userNumberInput.select();
   }
-  editAnchorButton.onclick = () => {
-    editAnchorButton.classList.add("is-hidden");
-    registerSection.classList.remove("is-hidden");
-    userNumberInput.classList.remove("t-vip");
-    userNumberInput.disabled = false;
-    userNumberInput.select();
-  };
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
