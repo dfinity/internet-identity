@@ -22,7 +22,7 @@ const pageContent = () => html`
         type="text"
         class="c-input c-input--vip"
         id="registerUserNumber"
-        placeholder="Enter Identity Anchor"
+        placeholder="Enter Anchor"
       />
       <button type="button" id="loginButton" class="c-button">
         Authenticate
@@ -112,6 +112,9 @@ const initLogin = (
       loginButton.click();
     }
   };
+
+  // always select the input
+  userNumberInput.select();
 
   loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);

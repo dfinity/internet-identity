@@ -11,7 +11,7 @@ const pageContent = (title: string, userNumber: bigint | null) => html`
       type="text"
       id="userNumberInput"
       class="c-input c-input--vip"
-      placeholder="Enter Identity Anchor"
+      placeholder="Enter Anchor"
       value=${userNumber ?? ""}
     />
     <button id="userNumberContinue" class="c-button">Continue</button>
@@ -43,6 +43,9 @@ export const promptUserNumber = async (
         userNumberContinue.click();
       }
     };
+
+    // always select the input
+    userNumberInput.select();
 
     userNumberContinue.onclick = () => {
       const userNumber = parseUserNumber(userNumberInput.value);

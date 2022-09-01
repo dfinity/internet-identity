@@ -389,7 +389,7 @@ export class AuthenticateView extends View {
   }
 
   async switchToAnchorInput(): Promise<void> {
-    await this.browser.$("#editAnchorButton").click();
+    await this.browser.$("#userNumberInput").click();
     // deselect input box, so we do not get flaky screenshots due to the blinking cursor
     await this.browser.execute(
       "document.getElementById('authorizeButton').focus();"
