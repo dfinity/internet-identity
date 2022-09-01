@@ -675,12 +675,8 @@ a:hover,
 }
 
 .c-input__input {
-  position: absolute;
-  display: block;
-  width: 100%;
+  position: relative;
   background: transparent;
-  height: 100%;
-  inset: 0;
 }
 
 .c-input__button {
