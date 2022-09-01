@@ -63,7 +63,7 @@
   --vc-raven: #202124;
   --vc-snow: #ffffff;
 
-  --vc-vapour: rgba(255, 255, 255, 0.5);
+  --vc-vapour: rgba(255, 255, 255, 0.6);
   --vc-shadow: rgba(32, 33, 36, 0.6);
 
   --vc-silver: #d9d9d9;
@@ -120,7 +120,6 @@
   --rc-background-transparent: var(--rc-light-transparent);
 
   --rc-line: var(--rc-light);
-  --rc-line: var(--vc-silver);
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
@@ -136,6 +135,7 @@
   --rc-onInput: var(--rc-dark);
 
   --rc-input-readonly: var(--vc-silver);
+  --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
 
   /* reference tokens: gradients */
@@ -158,6 +158,7 @@
   --rs-button-stack: var(--vs-stack);
 
   --rs-input-bezel: var(--rs-button-bezel);
+  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.75);
   --rs-input-stack: var(--rs-button-stack);
 
   --vs-line-height: 1.35;
@@ -500,9 +501,30 @@ a:hover,
   position: relative;
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--vs-line) solid var(--rc-line);
-  background-color: var(--rc-background);
+  background-color: var(--rc-background-transparent);
   border-radius: 0.4rem;
   margin-top: var(--rs-card-stack);
+}
+
+.c-card--highlight {
+  padding: calc(var(--rs-card-bezel) * 1.25);
+  background-color: var(--rc-background-transparent);
+  border: var(--vs-line) solid var(--rc-line);
+}
+
+.c-card--highlight::before {
+  content: " ";
+  position: absolute;
+  z-index: var(--vz-backdrop);
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--rg-brand));
+  filter: blur(6rem); /* anything above has a bug in safari */
+  opacity: 0.8;
 }
 
 .c-card--narrow {
@@ -563,11 +585,18 @@ a:hover,
 }
 
 .c-card--warning {
-  border-style: double;
-  border-width: calc(var(--vs-line) * 2);
+  position: relative;
+  border: var(--vs-line) solid var(--rc-line);
   border-radius: 4px;
-  border-image-slice: 1;
-  border-image-source: linear-gradient(270deg, var(--rg-brand));
+}
+
+.c-card--warning::before {
+  opacity: 0.75;
+  position: absolute;
+  content: "";
+  z-index: var(--vz-backdrop);
+  inset: 0;
+  box-shadow: 0 0 2rem var(--rc-warning);
 }
 
 /**
@@ -637,7 +666,7 @@ a:hover,
   position: relative;
   display: block;
   width: 100%;
-  padding: var(--rs-input-bezel);
+  padding: var(--rs-input-bezel-narrow) var(--rs-input-bezel);
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);

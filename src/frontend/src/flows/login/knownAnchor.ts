@@ -16,10 +16,12 @@ const pageContent = (userNumber: bigint) => html`
       <h1 class="t-title t-title--main">Welcome back!</h1>
       <p class="t-lead">Authenticate using Internet Identity.</p>
     <hgroup>
-    <output class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
-    <button type="button" id="login" class="c-button">Authenticate</button>
-    <div class="l-divider l-divider--text" aria-label="Other Options">
-      <span class="l-divider__label" aria-hidden>Or</span>
+    <div class="l-section">
+      <output class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
+      <button type="button" id="login" class="c-button">Authenticate</button>
+      <div class="l-divider l-divider--text" aria-label="Other Options">
+        <span class="l-divider__label" aria-hidden>Or</span>
+      </div>
     </div>
     <button type="button" id="loginDifferent" class="c-button c-button--secondary">
       Use a different Identity Anchor
