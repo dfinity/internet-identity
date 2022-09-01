@@ -22,7 +22,7 @@ const pageContent = (userNumber: bigint | null) => html`
       placeholder="Enter Identity Anchor"
       value=${userNumber ?? ""}
     />
-    <button class="c-button" id="addDeviceUserNumberContinue" class="primary">
+    <button class="c-button c-button--primary" id="addDeviceUserNumberContinue">
       Continue
     </button>
     <button class="c-button c-button--secondary" id="addDeviceUserNumberCancel">
