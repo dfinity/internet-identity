@@ -158,6 +158,7 @@
   --rs-button-stack: var(--vs-stack);
 
   --rs-input-bezel: var(--rs-button-bezel);
+  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.75);
   --rs-input-stack: var(--rs-button-stack);
 
   --vs-line-height: 1.35;
@@ -506,6 +507,7 @@ a:hover,
 }
 
 .c-card--highlight {
+  padding: calc(var(--rs-card-bezel) * 1.25);
   background-color: var(--rc-background-transparent);
   border: var(--vs-line) solid var(--rc-line);
 }
@@ -664,7 +666,7 @@ a:hover,
   position: relative;
   display: block;
   width: 100%;
-  padding: var(--rs-input-bezel);
+  padding: var(--rs-input-bezel-narrow) var(--rs-input-bezel);
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
