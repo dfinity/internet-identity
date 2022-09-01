@@ -96,7 +96,6 @@ export const closeIcon = html`
 
 export const warningIcon = html`
   <svg
-    class="warningIcon"
     width="24"
     height="24"
     viewBox="0 0 24 24"

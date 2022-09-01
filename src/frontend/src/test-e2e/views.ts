@@ -611,7 +611,7 @@ export class RecoverView extends View {
   }
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
-    await this.browser.$("h1=Invalid Seed Phrase").waitForDisplayed();
+    await this.browser.$("h3=Invalid Seed Phrase").waitForDisplayed();
   }
 }
 
@@ -635,7 +635,7 @@ export class ErrorView extends View {
   }
 
   async getErrorMessage(): Promise<string> {
-    return this.browser.$(".displayErrorMessage").getText();
+    return this.browser.$("[data-role='warning-message']").getText();
   }
 
   async getErrorDetail(): Promise<string> {

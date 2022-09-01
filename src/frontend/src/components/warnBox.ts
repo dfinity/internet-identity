@@ -23,7 +23,9 @@ export const warnBox = ({
     <span class="c-card__icon" aria-hidden>${warningIcon}</span>
     <div class="c-card__content">
       <h3 class="t-title c-card__title">${title}</h3>
-      <div class="t-paragraph c-card__paragraph">${message}</div>
+      <div data-role="warning-message" class="t-paragraph c-card__paragraph">
+        ${message}
+      </div>
       ${slot}
     </div>
   `;
