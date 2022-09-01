@@ -520,10 +520,16 @@ a:hover,
   left: 50%;
   width: 120%;
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  /**
+  * There is no need to have a translate3d here, 
+  * but there is an issue with the blur filter in Safari.
+  * This forces the browser to be rendered on the GPU.
+  */
+  transform: translate3d(-50%, -50%, 0);
+
   border-radius: 50%;
   background: linear-gradient(145deg, var(--rg-brand));
-  filter: blur(6rem); /* anything above has a bug in safari */
+  filter: blur(8rem);
   opacity: 0.8;
 }
 
