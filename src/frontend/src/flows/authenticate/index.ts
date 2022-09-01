@@ -175,9 +175,6 @@ const init = (
   const userNumberInput = document.getElementById(
     "userNumberInput"
   ) as HTMLInputElement;
-  const registerSection = document.getElementById(
-    "registerSection"
-  ) as HTMLInputElement;
 
   userNumberInput.onkeypress = (e) => {
     if (e.key === "Enter") {
