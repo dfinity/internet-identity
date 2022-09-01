@@ -658,6 +658,16 @@ a:hover,
   outline-offset: 2px;
 }
 
+.c-input--vip {
+  font-size: 2.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.c-input--vip::placeholder {
+  font-weight: normal;
+}
+
 .c-input--vip:focus {
   border-style: double;
   border-width: calc(var(--vs-line) * 2);
@@ -672,11 +682,6 @@ a:hover,
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
   border: var(--vs-line) var(--rc-line) solid;
-}
-
-.c-input__input {
-  position: relative;
-  background: transparent;
 }
 
 .c-input__button {
