@@ -521,7 +521,8 @@ a:hover,
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: linear-gradient(145deg, var(--rg-brand));
-  filter: blur(8rem);
+  filter: blur(6rem); /* anything above has a bug in safari */
+  opacity: 0.8;
 }
 
 .c-card--narrow {
