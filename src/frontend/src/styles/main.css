@@ -277,6 +277,14 @@ display:revert; revert to element instead of attribute */
   color: var(--rc-text);
 }
 
+/**
+ * Make sure the backdrop doesn't leak out (which creates a horizontal scroll)
+ **/
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   font-size: 1.6rem;
   line-height: var(--vs-line-height);
