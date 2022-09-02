@@ -1,9 +1,13 @@
 import { html, render } from "lit-html";
 import { networkIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
+import { startCardAnimation } from "../../../utils/animation";
 
 const pageContent = () => html`
-  <article class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <h1 class="t-title">Add New Device</h1>
     ${warnBox({
       title: "Security Warning",
@@ -54,6 +58,7 @@ export type DeviceAddFlow = "local" | "remote";
 export const chooseDeviceAddFlow = async (): Promise<DeviceAddFlow | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  startCardAnimation();
   return init();
 };
 

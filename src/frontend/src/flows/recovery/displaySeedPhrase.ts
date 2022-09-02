@@ -1,8 +1,15 @@
 import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon } from "../../components/icons";
+import { startCardAnimation } from "../../utils/animation";
+
+// TODO: not in the showcase
 
 const pageContent = (seedPhrase: string) => html`
-  <article class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <hgroup>
       <h1 class="t-title t-title--lead">Seedphrase</h1>
       <p class="t-lead">
@@ -20,17 +27,26 @@ const pageContent = (seedPhrase: string) => html`
     </aside>
 
     <h2 class="t-title">Your seed phrase</h2>
-    <output
-      id="seedPhrase"
-      data-seenPhrase
-      translate="no"
-      class="c-input c-input--readonly"
-      >${seedPhrase}</output
-    >
 
-    <button id="seedCopy" data-clipboard-target="#seedPhrase" class="c-button">
-      Copy
-    </button>
+    <div class="c-animated-input">
+      <output
+        id="seedPhrase"
+        data-seenPhrase
+        translate="no"
+        class=" c-animated-input__input  c-input c-input--readonly"
+        >${seedPhrase}</output
+      >
+
+      <button
+        id="seedCopy"
+        data-clipboard-target="#seedPhrase"
+        class="c-animated-input__button c-button"
+      >
+        Copy
+      </button>
+      <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+    </div>
+
     <button id="displaySeedPhraseContinue" class="c-button is-hidden">
       Continue
     </button>
@@ -40,6 +56,7 @@ const pageContent = (seedPhrase: string) => html`
 export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(seedPhrase), container);
+  startCardAnimation();
   return init();
 };
 

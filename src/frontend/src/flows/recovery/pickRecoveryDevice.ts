@@ -1,8 +1,12 @@
 import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = () => html`
-  <div class="l-container c-card c-card--highlight c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+  <div class="c-card-bg">
+<canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+</div>
     <h1 class="t-title t-title--main">Choose a device</h1>
     <div class="l-section">
       <h2 class="t-title">Recovery devices</div>
@@ -16,6 +20,7 @@ export const pickRecoveryDevice = async (
 ): Promise<DeviceData> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  startCardAnimation();
   return init(devices);
 };
 

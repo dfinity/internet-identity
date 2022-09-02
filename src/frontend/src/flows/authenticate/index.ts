@@ -24,12 +24,16 @@ import {
   ValidationResult,
 } from "./validateDerivationOrigin";
 import { unreachable } from "../../utils/utils";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = (
   hostName: string,
   userNumber?: bigint,
   derivationOrigin?: string
-) => html` <div class="l-container c-card c-card--highlight">
+) => html` <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <div class="c-logo">${icLogo}</div>
     <h1 class="t-title t-title--main">Internet Identity</h1>
     <p class="t-lead">Authenticate to service:</p>
@@ -39,13 +43,23 @@ const pageContent = (
       : ""}
     <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <input
-      type="text"
-      id="userNumberInput"
-      placeholder="Enter anchor"
-      class="l-section c-input c-input--vip"
-      value="${userNumber !== undefined ? userNumber : ""}"
-    />
+    <div class="c-animated-input">
+      <input
+        type="text"
+        id="userNumberInput"
+        placeholder="Enter anchor"
+        class="c-animated-input__input l-section c-input c-input--vip"
+        value="${userNumber !== undefined ? userNumber : ""}"
+      />
+      <button
+        type="button"
+        id="authorizeButton"
+        class="c-animated-input__button c-button"
+      >
+        Start Session
+      </button>
+      <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+    </div>
 
     <p
       id="invalidAnchorMessage"
@@ -53,10 +67,6 @@ const pageContent = (
     >
       The Identity Anchor is not valid. Please try again.
     </p>
-
-    <button type="button" id="authorizeButton" class="c-button">
-      Start Session
-    </button>
 
     <div id="registerSection" class="l-section">
       <button
@@ -287,6 +297,7 @@ export const displayPage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
+  startCardAnimation();
 };
 
 async function handleAuthSuccess(

@@ -8,9 +8,14 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { setupCountdown } from "../../../utils/countdown";
 import { warnBox } from "../../../components/warnBox";
+import { startCardAnimation } from "../../../utils/animation";
 
 const pageContent = (alias: string) => html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <h1 class="t-title t-title--main">Verify New Device</h1>
     ${warnBox({
       title: "Security Warning",
@@ -35,18 +40,24 @@ const pageContent = (alias: string) => html`
       <p id="wrongCodeMessage" class="is-hidden t-paragraph">
         The entered verification code was invalid. Please try again.
       </p>
-      <input
-        id="tentativeDeviceCode"
-        class="c-input"
-        placeholder="Verification Code"
-      />
+
+      <div class="c-animated-input">
+        <input
+          id="tentativeDeviceCode"
+          class="c-animated-input__input c-input"
+          placeholder="Verification Code"
+        />
+        <button id="verifyDevice" class="c-animated-input__button c-button">
+          Verify Device
+        </button>
+        <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+      </div>
     </label>
     <p class="t-paragraph">
       Time remaining: <span id="timer" class="t-strong"></span>
     </p>
 
     <div class="l-section">
-      <button id="verifyDevice" class="c-button">Verify Device</button>
       <button id="cancelVerifyDevice" class="c-button c-button--secondary">
         Cancel
       </button>
@@ -69,6 +80,7 @@ export const verifyDevice = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDevice.alias), container);
+  startCardAnimation();
   init(userNumber, connection, endTimestamp);
 };
 

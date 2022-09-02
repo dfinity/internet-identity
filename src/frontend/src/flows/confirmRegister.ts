@@ -13,25 +13,36 @@ import {
   ChallengeResult,
   Connection,
 } from "../utils/iiConnection";
+import { startCardAnimation } from "../utils/animation";
 
 const pageContent = html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <h1 class="t-title t-title--main">Confirm new device</h1>
     <form id="confirmForm">
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" class="c-img-block l-section" alt="captcha image" />
-      <input id="captchaInput" class="c-input" />
+
+      <div class="c-animated-input">
+        <input id="captchaInput" class="c-animated-input__input c-input" />
+        <button
+          type="submit"
+          class="c-animated-input__button c-button"
+          id="confirmRegisterButton"
+          disabled
+        >
+          Confirm
+        </button>
+
+        <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+      </div>
+
       <p class="t-paragraph confirm-paragraph">
         Please confirm to add your device.
       </p>
-      <button
-        type="submit"
-        class="c-button"
-        id="confirmRegisterButton"
-        disabled
-      >
-        Confirm
-      </button>
       <button
         type="button"
         id="cancelButton"
@@ -51,6 +62,7 @@ export const confirmRegister = (
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  startCardAnimation();
   return init(connection, identity, alias, captcha);
 };
 

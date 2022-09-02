@@ -1,9 +1,14 @@
 import { html, render } from "lit-html";
 import { compatibilityData } from "../../components/compatibilityChart";
+import { startCardAnimation } from "../../utils/animation";
 
 // The About page
 const pageContent = html`
-  <div class="l-container l-container--wide c-card c-card--highlight">
+  <div class="l-container l-container--wide c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <h1 class="t-title t-title--main">About</h1>
     <div class="l-section">
       <h2 class="t-title">Internet Identity</h2>
@@ -47,4 +52,5 @@ export const aboutView = (): void => {
   document.title = "About | Internet Identity";
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  startCardAnimation();
 };

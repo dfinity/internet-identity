@@ -1,8 +1,12 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
+import { startCardAnimation } from "../utils/animation";
 
 const pageContent = (userNumber: bigint) => html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <hgroup>
       <h1 class="t-title t-title--main">Congratulations!</h1>
       <p class="t-paragraph">Your new Identity Anchor has been created.</p>
@@ -26,6 +30,7 @@ const pageContent = (userNumber: bigint) => html`
 export const displayUserNumber = async (userNumber: bigint): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
+  startCardAnimation();
   return init();
 };
 

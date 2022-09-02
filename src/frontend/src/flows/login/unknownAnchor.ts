@@ -9,9 +9,13 @@ import { useRecovery } from "../recovery/useRecovery";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = () => html`
-  <section class="l-container c-card c-card--highlight" aria-label="Authentication">
+  <section class="l-container c-card c-card--bg" aria-label="Authentication">
+  <div class="c-card-bg">
+<canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+</div>
     <div class="c-logo">${icLogo}</div>
     <article class="l-section">
       <hgroup>
@@ -19,15 +23,18 @@ const pageContent = () => html`
         <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
       <hgroup>
       <div class="l-section">
-        <input
-          type="text"
-          class="c-input c-input--vip"
-          id="registerUserNumber"
-          placeholder="Enter Anchor"
-        />
-        <button type="button" id="loginButton" class="c-button">
-          Authenticate
-        </button>
+        <div class="c-animated-input">
+          <input
+            type="text"
+            class="c-animated-input__input  c-input c-input--vip"
+            id="registerUserNumber"
+            placeholder="Enter Anchor"
+          />
+          <button type="button" id="loginButton" class="c-animated-input__button c-animated-input__button--vip c-button">
+            Authenticate
+          </button>
+          <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+        </div>
       </div>
     </article>
 
@@ -60,6 +67,7 @@ export const loginUnknownAnchor = async (
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  startCardAnimation();
   return new Promise((resolve, reject) => {
     initLogin(connection, resolve);
     initLinkDevice(connection);

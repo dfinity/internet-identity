@@ -15,9 +15,13 @@ import {
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
 import { validateAlias } from "./addDevice/validateAlias";
+import { startCardAnimation } from "../utils/animation";
 
 const pageContent = html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <hgroup>
       <h1 class="t-title t-title--main">
         Create a new Internet Identity Anchor
@@ -25,19 +29,27 @@ const pageContent = html`
       <p class="t-lead">Please provide a name for your device.</p>
     </hgroup>
     <form id="registerForm" class="l-section">
-      <input
-        id="registerAlias"
-        placeholder="Device name"
-        aria-label="device name"
-        type="text"
-        required
-        maxlength="30"
-        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
-        spellcheck="false"
-        class="c-input"
-      />
+      <div class="c-animated-input">
+        <input
+          id="registerAlias"
+          placeholder="Device name"
+          aria-label="device name"
+          type="text"
+          required
+          maxlength="30"
+          pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
+          spellcheck="false"
+          class="c-animated-input__input c-input"
+        />
+
+        <button type="submit" class="c-animated-input__button c-button">
+          Create
+        </button>
+
+        <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+      </div>
+
       <div class="l-section">
-        <button type="submit" class="c-button">Create</button>
         <button
           id="registerCancel"
           type="button"
@@ -51,7 +63,10 @@ const pageContent = html`
 `;
 
 const constructingContent = html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
     <div class="c-logo">${icLogo}</div>
     <p class="t-paragraph">
@@ -65,11 +80,13 @@ export const register = async (
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  startCardAnimation();
   return init(connection);
 };
 
 export const renderConstructing = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
+  startCardAnimation();
   render(constructingContent, container);
 };
 

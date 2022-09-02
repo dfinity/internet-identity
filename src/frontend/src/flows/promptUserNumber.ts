@@ -1,20 +1,34 @@
 import { html, render } from "lit-html";
+import { startCardAnimation } from "../utils/animation";
 import { parseUserNumber } from "../utils/userNumber";
 
 const pageContent = (title: string, userNumber: bigint | null) => html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <hgroup>
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">Please provide an Identity Anchor.</p>
     </hgroup>
-    <input
-      type="text"
-      id="userNumberInput"
-      class="c-input c-input--vip"
-      placeholder="Enter Anchor"
-      value=${userNumber ?? ""}
-    />
-    <button id="userNumberContinue" class="c-button">Continue</button>
+
+    <div class="c-animated-input">
+      <input
+        type="text"
+        id="userNumberInput"
+        class="c-animated-input__input c-input c-input--vip"
+        placeholder="Enter Anchor"
+        value=${userNumber ?? ""}
+      />
+      <button
+        id="userNumberContinue"
+        class=" c-animated-input__button c-animated-input__button--vip c-button"
+      >
+        Continue
+      </button>
+      <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+    </div>
+
     <button id="userNumberCancel" class="c-button c-button--secondary">
       Cancel
     </button>
@@ -28,6 +42,7 @@ export const promptUserNumber = async (
   new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(pageContent(title, userNumber), container);
+    startCardAnimation();
 
     const userNumberContinue = document.getElementById(
       "userNumberContinue"

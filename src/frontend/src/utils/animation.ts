@@ -1,11 +1,13 @@
 // TODO: implement destroy mechanism
 export const startCardAnimation = () => {
+  console.log("startCardAnimation");
+
   const bgCanvas: null | HTMLCanvasElement =
     document.querySelector(".c-card-bg__canvas");
   const inputCanvas: null | HTMLCanvasElement = document.querySelector(
     ".c-animated-input__bg"
   );
-  const $svg = document.querySelector("svg") as unknown as HTMLElement;
+  // const $svg = document.querySelector("svg") as unknown as HTMLElement;
   const $bg =
     bgCanvas && (bgCanvas.getContext("2d") as CanvasRenderingContext2D);
   const $input =
@@ -45,20 +47,6 @@ export const startCardAnimation = () => {
 
   let t = 0;
 
-  const $img = document.createElement("img");
-  const blob = new Blob([$svg.outerHTML], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-
-  $img.addEventListener(
-    "load",
-    () => {
-      URL.revokeObjectURL(url);
-      //run();
-    },
-    { once: true }
-  );
-  $img.src = url;
-
   const run = function () {
     for (let x = 0; x <= 35; x++) {
       for (let y = 0; y <= 35; y++) {
@@ -73,6 +61,8 @@ export const startCardAnimation = () => {
       }
 
       window.requestAnimationFrame(run);
+    } else {
+      console.error("no bgCanvas");
     }
   };
 

@@ -17,6 +17,7 @@ import {
 } from "../../../crypto/mnemonic";
 import { warningIcon } from "../../../components/icons";
 import { questions } from "../../faq";
+import { startCardAnimation } from "../../../utils/animation";
 
 const pageContent = (userNumber: bigint, message?: string) => html`
   <style>
@@ -39,7 +40,10 @@ const pageContent = (userNumber: bigint, message?: string) => html`
       animation-duration: 600ms;
     }
   </style>
-  <article class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <hgroup>
       <h1 class="t-title t-title--main">Your seed phrase</h1>
       <p class="t-lead">${
@@ -49,7 +53,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
     <textarea id="inputSeedPhrase" class="c-input" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
-    <details data-id="phrase-warnings" class="c-card c-card--highlight is-hidden">
+    <details data-id="phrase-warnings" class="c-card is-hidden">
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
     </details>
@@ -69,6 +73,7 @@ export const phraseRecoveryPage = async (
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, message), container);
+  startCardAnimation();
   return init(userNumber, connection, device, prefilledPhrase);
 };
 

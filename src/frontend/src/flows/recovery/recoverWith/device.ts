@@ -9,6 +9,9 @@ import {
 } from "../../login/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
+import { startCardAnimation } from "../../../utils/animation";
+
+// TODO: not in the showcase
 
 const pageContent = (userNumber: bigint) => html`
   <style>
@@ -16,7 +19,10 @@ const pageContent = (userNumber: bigint) => html`
       width: 100%;
     }
   </style>
-  <div class="l-container c-card c-card--highlight full-width">
+  <div class="l-container c-card c-card--bg full-width">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <h1>Recovery for ${userNumber}</h1>
     <p>
       You are about to recover your anchor using a recovery device. Please click
@@ -45,6 +51,7 @@ export const deviceRecoveryPage = async (
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
+  startCardAnimation();
   return init(userNumber, connection, device);
 };
 

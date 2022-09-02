@@ -17,6 +17,7 @@ import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevi
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
+import { startCardAnimation } from "../../utils/animation";
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({
@@ -43,7 +44,11 @@ const numAuthenticators = (devices: DeviceData[]) =>
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
 const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
-  <section class="l-container c-card c-card--highlight">
+  <section class="l-container c-card c-card--bg">
+  <div class="c-card-bg">
+    <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+  </div>
+
     <hgroup>
       <h1 class="t-title t-title--main">Anchor Management</h1>
       <p class="t-lead">
@@ -160,6 +165,7 @@ export const displayManage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, devices), container);
+  startCardAnimation();
   init(userNumber, connection, devices);
 };
 

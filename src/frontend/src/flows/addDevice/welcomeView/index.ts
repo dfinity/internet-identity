@@ -3,9 +3,13 @@ import { parseUserNumber } from "../../../utils/userNumber";
 import { registerTentativeDevice } from "./registerTentativeDevice";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { Connection } from "../../../utils/iiConnection";
+import { startCardAnimation } from "../../../utils/animation";
 
 const pageContent = (userNumber: bigint | null) => html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <hgroup>
       <h1 class="t-title t-title--main">New Device</h1>
       <p class="t-lead">
@@ -15,16 +19,23 @@ const pageContent = (userNumber: bigint | null) => html`
         Please enter a valid Identity Anchor.
       </p>
     </hgroup>
-    <input
-      class="c-input"
-      type="text"
-      id="addDeviceUserNumber"
-      placeholder="Enter Anchor"
-      value=${userNumber ?? ""}
-    />
-    <button class="c-button c-button--primary" id="addDeviceUserNumberContinue">
-      Continue
-    </button>
+
+    <div class="c-animated-input">
+      <input
+        class="c-animated-input__input c-input"
+        type="text"
+        id="addDeviceUserNumber"
+        placeholder="Enter Anchor"
+        value=${userNumber ?? ""}
+      />
+      <button
+        class="c-animated-input__button c-button c-button--primary"
+        id="addDeviceUserNumberContinue"
+      >
+        Continue
+      </button>
+      <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+    </div>
     <button class="c-button c-button--secondary" id="addDeviceUserNumberCancel">
       Cancel
     </button>
@@ -41,6 +52,7 @@ export const addRemoteDevice = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
+  startCardAnimation();
   return init(connection);
 };
 

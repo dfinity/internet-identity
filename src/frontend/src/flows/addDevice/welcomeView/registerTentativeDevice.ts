@@ -12,9 +12,14 @@ import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
+import { startCardAnimation } from "../../../utils/animation";
 
 const pageContent = () => html`
-  <article class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <hgroup>
       <h1 class="t-title t-title--main">New Device</h1>
       <p class="t-lead">Please provide an alias for this device.</p>
@@ -22,21 +27,25 @@ const pageContent = () => html`
         The device alias must not be empty.
       </p>
     </hgroup>
-    <input
-      type="text"
-      id="tentativeDeviceAlias"
-      placeholder="Device Alias"
-      maxlength="64"
-      class="c-input"
-    />
-    <div class="l-section">
+
+    <div class="c-animated-input">
+      <input
+        type="text"
+        id="tentativeDeviceAlias"
+        placeholder="Device Alias"
+        maxlength="64"
+        class="c-animated-input__input c-input"
+      />
       <button
-        class="c-button"
+        class="c-animated-input__button c-button"
         id="registerTentativeDeviceContinue"
-        class="primary"
       >
         Continue
       </button>
+      <canvas class="c-animated-input__bg" width="32" height="32"></canvas>
+    </div>
+
+    <div class="l-section">
       <button
         class="c-button c-button--secondary"
         id="registerTentativeDeviceCancel"
@@ -57,6 +66,7 @@ export const registerTentativeDevice = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  startCardAnimation();
   return init(userNumber, connection);
 };
 

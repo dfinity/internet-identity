@@ -1,4 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
+import { startCardAnimation } from "../utils/animation";
 import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {
@@ -9,7 +10,11 @@ export type ErrorOptions = {
 };
 
 const pageContent = (options: ErrorOptions) => html`
-  <div id="errorContainer" class="l-container c-card c-card--highlight">
+  <div id="errorContainer" class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     ${warnBox({
       title: options.title,
       message: options.message,
@@ -37,6 +42,7 @@ const pageContent = (options: ErrorOptions) => html`
 export const displayError = async (options: ErrorOptions): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(options), container);
+  startCardAnimation();
   return init();
 };
 

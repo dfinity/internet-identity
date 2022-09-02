@@ -12,6 +12,7 @@ import { footer } from "../../components/footer";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { hasOwnProperty } from "../../utils/utils";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
+import { startCardAnimation } from "../../utils/animation";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -23,7 +24,11 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean
 ) => html`
-  <article id="deviceSettings" class="l-container c-card c-card--highlight">
+  <article id="deviceSettings" class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <h1 class="t-title">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
@@ -85,6 +90,7 @@ export const deviceSettings = async (
   const container = document.getElementById("pageContent") as HTMLElement;
 
   render(pageContent(userNumber, device, isOnlyDevice), container);
+  startCardAnimation();
   return init(userNumber, connection, device, isOnlyDevice);
 };
 

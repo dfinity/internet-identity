@@ -1,9 +1,14 @@
 import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = (devices: DeviceData[]) => html`
-  <article class="l-container c-card c-card--highlight">
+  <article class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     <hgroup>
       <h1 class="t-title t-title--main">Recovery Mechanism</h1>
       <p class="t-lead">
@@ -45,6 +50,7 @@ export const chooseRecoveryMechanism = async (
 ): Promise<RecoveryMechanism | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(devices), container);
+  startCardAnimation();
   return init();
 };
 

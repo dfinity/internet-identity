@@ -7,6 +7,7 @@ import {
 import { setUserNumber } from "../../../utils/userNumber";
 import { setupCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
+import { startCardAnimation } from "../../../utils/animation";
 
 export type TentativeRegistrationInfo = {
   verification_code: string;
@@ -17,7 +18,10 @@ const pageContent = (
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+  <div class="c-card-bg">
+<canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+</div>
     <hgroup>  
       <h1 class="t-title t-title--main">Device Verification Required</h1>
       <p class="t-lead">
@@ -61,6 +65,7 @@ export const showVerificationCode = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber, alias, tentativeRegistrationInfo), container);
+  startCardAnimation();
   return init(
     userNumber,
     connection,

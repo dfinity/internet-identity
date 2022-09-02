@@ -1,8 +1,14 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
+import { startCardAnimation } from "../utils/animation";
+
+// TODO: not in showcase
 
 const pageContent = html`
-  <div class="l-container c-card c-card--highlight">
+  <div class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
     <h1>Create a new Internet Identity Anchor</h1>
     ${warnBox({
       title: "Registration Disabled",
@@ -33,6 +39,7 @@ const pageContent = html`
 export const registerDisabled = async (): Promise<null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
+  startCardAnimation();
   return init();
 };
 

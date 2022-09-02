@@ -119,8 +119,8 @@
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
 
-  --rc-line: var(--rc-light);
-  --rc-line-inverted: var(--rc-dark);
+  --rc-line: var(--vc-raven);
+  --rc-line-inverted: var(--rc-snow);
 
   --rc-interaction: var(--vc-brand-blue);
   --rc-interaction-text: var(--vc-brand-blue--dark);
@@ -129,7 +129,7 @@
   --rc-onButton: var(--rc-light);
 
   --rc-warning: var(--vc-brand-pink);
-  --rc-onWarning: var(--vc-snow);
+  --rc-onWarning: var(--vc-raven);
 
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
@@ -606,13 +606,14 @@ a:hover,
 }
 
 .c-card--bg {
-  background: #fff;
+  background: var(--rc-light);
+  border: none;
 }
 
 .c-card-bg {
   position: absolute;
   z-index: -1;
-  inset: -2rem;
+  inset: -1rem;
   overflow: hidden;
   filter: blur(30px);
 }
@@ -626,6 +627,8 @@ a:hover,
 }
 
 .c-animated-input {
+  margin-top: var(--rs-input-stack);
+
   position: relative;
   overflow: hidden;
   border-radius: 2rem !important;
@@ -647,6 +650,13 @@ a:hover,
   appearance: none !important;
   border: none !important;
 }
+.c-animated-input__input:focus {
+  opacity: 1 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+}
+
 /* rewrite styles */
 .c-animated-input__button {
   cursor: pointer;
@@ -661,11 +671,18 @@ a:hover,
   box-shadow: none !important;
   outline: 0 !important;
   opacity: 1 !important;
+
+  font-weight: 600;
 }
 .c-animated-input__button::after {
   content: "→";
   flex-grow: 1;
   text-align: right;
+}
+.c-animated-input__button--vip {
+  font-size: 2.4rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 /**
@@ -702,7 +719,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 0.4rem;
+  border-radius: 1rem;
 }
 
 .c-button svg * {
@@ -852,7 +869,8 @@ a:hover,
   position: absolute;
   opacity: 0.5;
   top: 0;
-  background: radial-gradient(var(--rc-line), transparent);
+  /* TODO: is broken after card animation */
+  /* background: radial-gradient(var(--rc-line), transparent); */
   background-size: 80% 160%;
   background-repeat: no-repeat;
   background-position: center 170%;

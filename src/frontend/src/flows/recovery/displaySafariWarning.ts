@@ -2,9 +2,14 @@ import { html, render } from "lit-html";
 import { warnBox } from "../../components/warnBox";
 import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = () => html`
-  <article id="warningContainer" class="l-container c-card c-card--highlight">
+  <article id="warningContainer" class="l-container c-card c-card--bg">
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
+    </div>
+
     ${warnBox({
       title: "Warning",
       message: "It looks like you are using Safari or iOS.",
@@ -43,6 +48,7 @@ export const displaySafariWarning = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
+  startCardAnimation();
   return init(userNumber, connection);
 };
 
