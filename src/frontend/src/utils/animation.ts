@@ -1,6 +1,9 @@
 // TODO: implement destroy mechanism
 export const startCardAnimation = () => {
-  console.log("startCardAnimation");
+  const id = Math.round(Math.random() * 1e10)
+    .toString(32)
+    .toUpperCase();
+  console.log("startCardAnimation", id);
 
   const bgCanvas: null | HTMLCanvasElement =
     document.querySelector(".c-card-bg__canvas");
@@ -64,6 +67,8 @@ export const startCardAnimation = () => {
       // stop the loop after element was removed from DOM
       if (document.body.contains(bgCanvas)) {
         window.requestAnimationFrame(run);
+      } else {
+        console.log("stopAnimation", id);
       }
     } else {
       console.error("no bgCanvas");

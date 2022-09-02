@@ -80,7 +80,6 @@ export const register = async (
 ): Promise<LoginFlowResult | null> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
-  connection.register;
   startCardAnimation();
   return init(connection);
 };
