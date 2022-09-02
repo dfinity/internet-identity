@@ -591,9 +591,11 @@ a:hover,
 }
 
 .c-card--warning {
-  position: relative;
-  border: var(--vs-line) solid var(--rc-line);
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
   border-radius: 4px;
+  border-image-slice: 1;
+  border-image-source: linear-gradient(270deg, var(--rg-brand));
 }
 
 .c-card--warning::before {
