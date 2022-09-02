@@ -31,8 +31,15 @@ export const checkmarkIcon = html`
     />
   </svg>
 `;
-
 export const icLogo = html`
+  <picture id="loader">
+    <img src="/loader.webp" alt="loading" />
+  </picture>`;
+
+  /*
+export const icLogo = html`
+
+
   <svg
     id="icLogo"
     xmlns="http://www.w3.org/2000/svg"
@@ -77,6 +84,7 @@ export const icLogo = html`
     />
   </svg>
 `;
+*/
 
 export const closeIcon = html`
   <svg

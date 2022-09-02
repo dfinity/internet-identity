@@ -502,7 +502,7 @@ a:hover,
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--vs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
-  border-radius: 0.4rem;
+  border-radius: 1rem;
   margin-top: var(--rs-card-stack);
 }
 
@@ -605,6 +605,69 @@ a:hover,
   box-shadow: 0 0 2rem var(--rc-warning);
 }
 
+.c-card--bg {
+  background: #fff;
+}
+
+.c-card__bg {
+  position: absolute;
+  z-index: -1;
+  inset: -2rem;
+  overflow: hidden;
+  filter: blur(30px);
+}
+
+.c-bgc {
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  opacity: 0.5;
+  object-fit: cover;
+}
+
+.c-animated-input {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem !important;
+}
+.c-animated-input__bg {
+  position: absolute;
+  width: 100%;
+  /* height: 500%; */
+  top: 0;
+  left: 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  opacity: 0.5;
+}
+/* rewrite styles */
+.c-animated-input__input {
+  background: transparent !important;
+  border: none !important;
+  appearance: none !important;
+  border: none !important;
+}
+/* rewrite styles */
+.c-animated-input__button {
+  cursor: pointer;
+
+  display: flex !important;
+  position: relative !important;
+  background: #202124 !important;
+  color: #fff !important;
+  overflow: hidden !important;
+  border-radius: 2rem !important;
+
+  box-shadow: none !important;
+  outline: 0 !important;
+  opacity: 1 !important;
+}
+.c-animated-input__button::after {
+  content: "→";
+  flex-grow: 1;
+  text-align: right;
+}
+
 /**
  *  logo component 
  */
@@ -612,6 +675,9 @@ a:hover,
   display: block;
   overflow: hidden;
   margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  display: block;
+  width: 50%;
+  margin: 0 auto;
 }
 
 .c-logo svg {
