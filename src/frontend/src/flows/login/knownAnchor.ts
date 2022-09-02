@@ -50,6 +50,7 @@ export const loginKnownAnchor = async (
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
+  startCardAnimation();
   return init(userNumber, connection);
 };
 
@@ -58,7 +59,6 @@ const init = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
-    startCardAnimation();
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
     const loginDifferentButton = document.querySelector(
