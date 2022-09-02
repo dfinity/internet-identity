@@ -609,7 +609,7 @@ a:hover,
   background: #fff;
 }
 
-.c-card__bg {
+.c-card-bg {
   position: absolute;
   z-index: -1;
   inset: -2rem;
@@ -617,7 +617,7 @@ a:hover,
   filter: blur(30px);
 }
 
-.c-bgc {
+.c-card-bg__canvas {
   width: 100%;
   height: 100%;
   z-index: -1;

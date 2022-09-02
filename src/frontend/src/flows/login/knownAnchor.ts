@@ -8,11 +8,12 @@ import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
+import { startCardAnimation } from "../../utils/animation";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--bg">
-    <div class="c-card__bg">
-      <canvas class="c-bgc" width="32" height="32"></canvas>
+    <div class="c-card-bg">
+      <canvas class="c-card-bg__canvas" width="32" height="32"></canvas>
     </div>
     <div class="c-logo">${icLogo}</div>
     <hgroup class="l-section">
@@ -57,7 +58,7 @@ const init = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
-    startBgAnimation();
+    startCardAnimation();
     initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
     const loginDifferentButton = document.querySelector(
@@ -81,80 +82,4 @@ const init = async (
     ) as HTMLAnchorElement;
     recoverButton.onclick = () => useRecovery(connection, userNumber);
   });
-};
-
-const startBgAnimation = async () => {
-  // const logoCanvas = document.querySelector(".can") as unknown as HTMLCanvasElement;
-  const bgCanvas = document.querySelector(
-    ".c-bgc"
-  ) as unknown as HTMLCanvasElement;
-  const inputCanvas = document.querySelector(
-    ".c-animated-input__bg"
-  ) as unknown as HTMLCanvasElement;
-  const $svg = document.querySelector("svg") as unknown as HTMLElement;
-  // const $ = logoCanvas.getContext("2d");
-  const $bg = bgCanvas.getContext("2d") as CanvasRenderingContext2D;
-  const $input = inputCanvas.getContext("2d") as CanvasRenderingContext2D;
-
-  const drawBg = function (
-    x: number,
-    y: number,
-    r: number,
-    g: number,
-    b: number
-  ) {
-    $bg.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
-    $bg.fillRect(x, y, 1, 1);
-  };
-  const R = function (x: number, y: number, t: number) {
-    return Math.floor(192 + 64 * Math.cos((x * x - y * y) / 300 + t));
-  };
-
-  const G = function (x: number, y: number, t: number) {
-    return Math.floor(
-      192 +
-        64 * Math.sin((x * x * Math.cos(t / 4) + y * y * Math.sin(t / 3)) / 300)
-    );
-  };
-
-  const B = function (x: number, y: number, t: number) {
-    return Math.floor(
-      192 +
-        64 *
-          Math.sin(
-            5 * Math.sin(t / 9) +
-              ((x - 100) * (x - 100) + (y - 100) * (y - 100)) / 1100
-          )
-    );
-  };
-
-  let t = 0;
-
-  const $img = document.createElement("img");
-  const blob = new Blob([$svg.outerHTML], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  // const image = document.createElement("img");
-  $img.addEventListener(
-    "load",
-    () => {
-      URL.revokeObjectURL(url);
-      //run();
-    },
-    { once: true }
-  );
-  $img.src = url;
-
-  const run = function () {
-    for (let x = 0; x <= 35; x++) {
-      for (let y = 0; y <= 35; y++) {
-        drawBg(x, y, R(x, y, t), G(x, y, t), B(x, y, t));
-      }
-    }
-    t = t + 0.05;
-    // $bg.drawImage(logoCanvas, 0, 0);
-    $input.drawImage(bgCanvas, 0, 0);
-    window.requestAnimationFrame(run);
-  };
-
-  run();
 };
