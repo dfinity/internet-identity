@@ -60,7 +60,11 @@ export const startCardAnimation = () => {
         $input.drawImage(bgCanvas, 0, 0);
       }
 
-      window.requestAnimationFrame(run);
+      // TODO: implement better onDestroy solution
+      // stop the loop after element was removed from DOM
+      if (document.body.contains(bgCanvas)) {
+        window.requestAnimationFrame(run);
+      }
     } else {
       console.error("no bgCanvas");
     }
