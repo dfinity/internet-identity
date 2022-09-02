@@ -677,6 +677,7 @@ a:hover,
   background: var(--rc-input);
   color: var(--rc-onInput);
   border: calc(var(--vs-line) * 2) solid var(--rc-line);
+  word-break: break-all;
 }
 
 .c-input.has-error,
