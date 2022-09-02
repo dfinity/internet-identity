@@ -414,6 +414,7 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
     await settingsView.protect(seedPhrase);
+    await settingsView.waitForDisplay();
 
     await settingsView.remove();
     await browser.acceptAlert();
@@ -921,7 +922,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
     expect(await errorView.getErrorMessage()).toEqual(
       `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
-    expect(await errorView.getErrorDetail()).toEqual(
+    expect(await errorView.getErrorDetail()).toContain(
       '"https://nice-name.com" is not listed in the list of allowed alternative origins. Allowed alternative origins:'
     );
   });
@@ -961,7 +962,7 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
     expect(await errorView.getErrorMessage()).toEqual(
       '"https://some-random-disallowed-url.com" is not a valid derivation origin for "https://nice-name.com"'
     );
-    expect(await errorView.getErrorDetail()).toEqual(
+    expect(await errorView.getErrorDetail()).toContain(
       "derivationOrigin does not match regex /^https:\\/\\/([\\w-]+)(?:\\.raw)?\\.ic0\\.app$/"
     );
   });
@@ -1001,7 +1002,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     expect(await errorView.getErrorMessage()).toEqual(
       `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
-    expect(await errorView.getErrorDetail()).toEqual(
+    expect(await errorView.getErrorDetail()).toContain(
       `Resource ${TEST_APP_CANONICAL_URL}/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed.`
     );
   });
@@ -1041,7 +1042,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     expect(await errorView.getErrorMessage()).toEqual(
       `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
     );
-    expect(await errorView.getErrorDetail()).toEqual(
+    expect(await errorView.getErrorDetail()).toContain(
       `An error occurred while validating the derivationOrigin "${TEST_APP_CANONICAL_URL}": Failed to fetch`
     );
   });
@@ -1087,7 +1088,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       `console.log(await fetch("https://${TEST_APP_CANISTER_ID}.raw.ic0.app/.well-known/ii-alternative-origins"))`
     );
     let logs = (await browser.getLogs("browser")) as { message: string }[];
-    expect(logs[logs.length - 1].message).toEqual(
+    expect(logs[logs.length - 1].message).toContain(
       `https://${TEST_APP_CANISTER_ID}.raw.ic0.app/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 400 (Bad Request)`
     );
 

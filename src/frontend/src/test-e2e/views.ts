@@ -1,5 +1,19 @@
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
+
+  // There is something really odd happening with the "backdrop" design.
+  // When the card's "::before" is bigger than 110%, wdio fails to click some buttons,
+  // even though it's in view (and can e.g. be clicked on from the browser view).
+  // Clicking from the browser directly fixes the issue.
+  async click(selector: string) {
+    const elem = await this.browser.$(selector);
+
+    const click = (elem: WebdriverIO.Element) => {
+      elem.click();
+    };
+
+    await this.browser.execute(click, elem);
+  }
 }
 
 export class WelcomeView extends View {
@@ -14,19 +28,19 @@ export class WelcomeView extends View {
   }
 
   async login(): Promise<void> {
-    await this.browser.$("#loginButton").click();
+    await this.click("#loginButton");
   }
 
   async register(): Promise<void> {
-    await this.browser.$("#registerButton").click();
+    await this.click("#registerButton");
   }
 
   async addDevice(): Promise<void> {
-    await this.browser.$("#addNewDeviceButton").click();
+    await this.click("#addNewDeviceButton");
   }
 
   async recover(): Promise<void> {
-    await this.browser.$("#recoverButton").click();
+    await this.click("#recoverButton");
   }
 }
 
@@ -42,7 +56,7 @@ export class RegisterView extends View {
   }
 
   async create(): Promise<void> {
-    await this.browser.$('button[type="submit"]').click();
+    await this.click('button[type="submit"]');
   }
 
   // View: Register confirmation
@@ -62,7 +76,7 @@ export class RegisterView extends View {
       // this is a huge timeout because generating the captcha takes a while on
       // the emulator
       .waitForEnabled({ timeout: 30_000 });
-    await this.browser.$("#confirmRegisterButton").click();
+    await this.click("#confirmRegisterButton");
   }
 
   // View: Register Show Number
@@ -77,7 +91,7 @@ export class RegisterView extends View {
   }
 
   async registerConfirmIdentity(): Promise<void> {
-    await this.browser.$("#displayUserContinue").click();
+    await this.click("#displayUserContinue");
   }
 
   async registerIdentityFixup(): Promise<void> {
@@ -105,7 +119,7 @@ export class SingleDeviceWarningView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#displayWarningAddRecovery").click();
+    await this.click("#displayWarningAddRecovery");
   }
 
   async remindLater(): Promise<void> {
@@ -113,7 +127,7 @@ export class SingleDeviceWarningView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#displayWarningRemindLater").click();
+    await this.click("#displayWarningRemindLater");
   }
 }
 
@@ -123,7 +137,7 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async useSeedPhrase(): Promise<void> {
-    await this.browser.$("#seedPhrase").click();
+    await this.click("#seedPhrase");
   }
 
   async waitForSeedPhrase(): Promise<void> {
@@ -137,25 +151,15 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async skipRecovery(): Promise<void> {
-    // There is something really odd happening with the "backdrop" design.
-    // When the card's "::before" is bigger than 110%, wdio fails to click the skipRecovery button,
-    // even though it's in view (and can e.g. be clicked on from the browser view), although only
-    // the second time the page is displayed. Clicking from the browser directly fixes the issue.
-    const button = await this.browser.$("#skipRecovery");
-
-    const click = (elem: WebdriverIO.Element) => {
-      elem.click();
-    };
-
-    await this.browser.execute(click, button);
+    await this.click("#skipRecovery");
   }
 
   async copySeedPhrase(): Promise<void> {
-    await this.browser.$("#seedCopy").click();
+    await this.click("#seedCopy");
   }
 
   async seedPhraseContinue(): Promise<void> {
-    await this.browser.$("#displaySeedPhraseContinue").click();
+    await this.click("#displaySeedPhraseContinue");
   }
 }
 
@@ -179,7 +183,7 @@ export class MainView extends View {
   }
 
   async addAdditionalDevice(): Promise<void> {
-    await this.browser.$("#addAdditionalDevice").click();
+    await this.click("#addAdditionalDevice");
   }
 
   async logout(): Promise<void> {
@@ -187,11 +191,11 @@ export class MainView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#logoutButton").click();
+    await this.click("#logoutButton");
   }
 
   async addRecovery(): Promise<void> {
-    await this.browser.$("#addRecovery").click();
+    await this.click("#addRecovery");
   }
 
   async fixup(): Promise<void> {
@@ -204,9 +208,9 @@ export class MainView extends View {
   }
 
   async deviceSettings(deviceName: string): Promise<void> {
-    await this.browser
-      .$(`//div[string()='${deviceName}']/following-sibling::button`)
-      .click();
+    await this.click(
+      `//div[string()='${deviceName}']/following-sibling::button`
+    );
   }
 }
 
@@ -216,15 +220,15 @@ export class DeviceSettingsView extends View {
   }
 
   async remove(): Promise<void> {
-    await this.browser.$("button[data-action='remove']").click();
+    await this.click("button[data-action='remove']");
   }
 
   async back(): Promise<void> {
-    await this.browser.$("button[data-action='back']").click();
+    await this.click("button[data-action='back']");
   }
 
   async protect(seedPhrase: string): Promise<void> {
-    await this.browser.$("button[data-action='protect']").click();
+    await this.click("button[data-action='protect']");
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -251,7 +255,7 @@ export class AddDeviceAliasView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#deviceAliasContinue").click();
+    await this.click("#deviceAliasContinue");
   }
 }
 
@@ -263,11 +267,11 @@ export class AddDeviceFlowSelectorView extends View {
   }
 
   async selectLocalDevice(): Promise<void> {
-    await this.browser.$("#local").click();
+    await this.click("#local");
   }
 
   async selectRemoteDevice(): Promise<void> {
-    await this.browser.$("#remote").click();
+    await this.click("#remote");
   }
 }
 
@@ -286,7 +290,7 @@ export class AddRemoteDeviceAliasView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#registerTentativeDeviceContinue").click();
+    await this.click("#registerTentativeDeviceContinue");
   }
 }
 
@@ -298,7 +302,7 @@ export class NotInRegistrationModeView extends View {
   }
 
   async retry(): Promise<void> {
-    await this.browser.$("#deviceRegModeDisabledRetry").click();
+    await this.click("#deviceRegModeDisabledRetry");
   }
 }
 
@@ -310,7 +314,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   }
 
   async cancel(): Promise<void> {
-    await this.browser.$("#cancelAddRemoteDevice").click();
+    await this.click("#cancelAddRemoteDevice");
   }
 
   async fixup(): Promise<void> {
@@ -360,7 +364,7 @@ export class VerifyRemoteDeviceView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#verifyDevice").click();
+    await this.click("#verifyDevice");
   }
 
   async fixup(): Promise<void> {
@@ -391,15 +395,15 @@ export class AuthenticateView extends View {
   }
 
   async authenticate(): Promise<void> {
-    await this.browser.$("#authorizeButton").click();
+    await this.click("#authorizeButton");
   }
 
   async register(): Promise<void> {
-    await this.browser.$("#registerButton").click();
+    await this.click("#registerButton");
   }
 
   async switchToAnchorInput(): Promise<void> {
-    await this.browser.$("#userNumberInput").click();
+    await this.click("#userNumberInput");
     // deselect input box, so we do not get flaky screenshots due to the blinking cursor
     await this.browser.execute(
       "document.getElementById('authorizeButton').focus();"
@@ -419,7 +423,7 @@ export class WelcomeBackView extends View {
   }
 
   async login(): Promise<void> {
-    await this.browser.$("#login").click();
+    await this.click("#login");
   }
 
   async fixup(): Promise<void> {
@@ -443,7 +447,7 @@ export class AddIdentityAnchorView extends View {
     if (userNumber !== undefined) {
       await fillText(this.browser, "addDeviceUserNumber", userNumber);
     }
-    await this.browser.$("#addDeviceUserNumberContinue").click();
+    await this.click("#addDeviceUserNumberContinue");
   }
 
   async fixup(): Promise<void> {
@@ -494,11 +498,11 @@ export class DemoAppView extends View {
   }
 
   async signin(): Promise<void> {
-    await this.browser.$("#signinBtn").click();
+    await this.click("#signinBtn");
   }
 
   async signout(): Promise<void> {
-    await this.browser.$("#signoutBtn").click();
+    await this.click("#signoutBtn");
   }
   async setMaxTimeToLive(mttl: BigInt): Promise<void> {
     await fillText(this.browser, "maxTimeToLive", String(mttl));
@@ -511,7 +515,7 @@ export class DemoAppView extends View {
   async whoami(replicaUrl: string, testCanister: string): Promise<string> {
     await fillText(this.browser, "hostUrl", replicaUrl);
     await fillText(this.browser, "canisterId", testCanister);
-    await this.browser.$("#whoamiBtn").click();
+    await this.click("#whoamiBtn");
     const whoamiResponseElem = await this.browser.$("#whoamiResponse");
     await whoamiResponseElem.waitUntil(
       async () => {
@@ -534,8 +538,8 @@ export class DemoAppView extends View {
     await fillText(this.browser, "hostUrl", replicaUrl);
     await fillText(this.browser, "canisterId", testCanister);
     await fillText(this.browser, "newAlternativeOrigins", alternativeOrigins);
-    await this.browser.$(`#${mode}`).click();
-    await this.browser.$("#updateNewAlternativeOrigins").click();
+    await this.click(`#${mode}`);
+    await this.click("#updateNewAlternativeOrigins");
     const alternativeOriginsElem = await this.browser.$("#alternativeOrigins");
     await alternativeOriginsElem.waitUntil(
       async () => {
@@ -574,19 +578,19 @@ export class DemoAppView extends View {
   }
 
   async openIiTab(): Promise<void> {
-    await this.browser.$("#openIiWindowBtn").click();
+    await this.click("#openIiWindowBtn");
   }
 
   async sendInvalidData(): Promise<void> {
-    await this.browser.$("#invalidDataBtn").click();
+    await this.click("#invalidDataBtn");
   }
 
   async sendIncompleteMessage(): Promise<void> {
-    await this.browser.$("#incompleteMessageBtn").click();
+    await this.click("#incompleteMessageBtn");
   }
 
   async sendValidMessage(): Promise<void> {
-    await this.browser.$("#validMessageBtn").click();
+    await this.click("#validMessageBtn");
   }
 }
 
@@ -602,7 +606,7 @@ export class RecoverView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#userNumberContinue").click();
+    await this.click("#userNumberContinue");
   }
 
   // enter seed phrase view
@@ -617,7 +621,7 @@ export class RecoverView extends View {
   }
 
   async enterSeedPhraseContinue(): Promise<void> {
-    await this.browser.$("#inputSeedPhraseContinue").click();
+    await this.click("#inputSeedPhraseContinue");
   }
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
@@ -633,7 +637,7 @@ export class FAQView extends View {
   }
 
   async openQuestion(questionAnchor: string): Promise<void> {
-    await this.browser.$(`#${questionAnchor} summary`).click();
+    await this.click(`#${questionAnchor} summary`);
   }
 }
 
@@ -649,14 +653,14 @@ export class ErrorView extends View {
   }
 
   async getErrorDetail(): Promise<string> {
-    await this.browser.$(".displayErrorDetail").click();
+    await this.click(".displayErrorDetail");
     return (
       await this.browser.$(".displayErrorDetail > pre:nth-child(2)")
-    ).getText();
+    ).getHTML();
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#displayErrorPrimary").click();
+    await this.click("#displayErrorPrimary");
   }
 }
 
