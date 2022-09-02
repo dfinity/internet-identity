@@ -135,7 +135,7 @@
   --rc-onInput: var(--rc-dark);
 
   --rc-input-readonly: var(--vc-silver);
-  --rc-input-readonly: var(--vc-vapour);
+  /* --rc-input-readonly: var(--vc-vapour); */
   --rc-input-onReadonly: var(--rc-dark);
 
   /* reference tokens: gradients */
@@ -799,7 +799,7 @@ a:hover,
 .c-input--readonly {
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
-  border: var(--vs-line) var(--rc-line) solid;
+  border: none;
 }
 
 .c-input__button {
