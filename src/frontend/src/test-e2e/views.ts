@@ -137,7 +137,17 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async skipRecovery(): Promise<void> {
-    await this.browser.$("#skipRecovery").click();
+    // There is something really odd happening with the "backdrop" design.
+    // When the card's "::before" is bigger than 110%, wdio fails to click the skipRecovery button,
+    // even though it's in view (and can e.g. be clicked on from the browser view), although only
+    // the second time the page is displayed. Clicking from the browser directly fixes the issue.
+    const button = await this.browser.$("#skipRecovery");
+
+    const click = (elem: WebdriverIO.Element) => {
+      elem.click();
+    };
+
+    await this.browser.execute(click, button);
   }
 
   async copySeedPhrase(): Promise<void> {
