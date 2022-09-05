@@ -178,6 +178,13 @@
 
     --rc-button: var(--rc-light);
     --rc-onButton: var(--rc-dark);
+
+
+    --rc-input: var(--rc-light);
+    --rc-onInput: var(--rc-dark);
+
+    --rc-input-readonly: var(--vc-shadow);
+    --rc-input-onReadonly: var(--rc-light);
   }
 }
 
@@ -556,6 +563,13 @@ a:hover,
   opacity: 0.8;
 }
 
+
+@media (prefers-color-scheme: dark) {
+  .c-card--highlight::before {
+    opacity: 1;
+  }
+}
+
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
 }
@@ -830,20 +844,15 @@ a:hover,
   transform: translate(-50%, -50%);
 }
 
-.page-signature {
+.c-page-signature {
   display: block;
   padding: var(--rs-footer-gutter);
   transition: background 0.2s;
 }
 
-.page-signature img {
+.c-page-signature__badge {
   display: block;
-  max-width: 100%;
-}
-
-.page-signature:hover,
-.page-signature:focus {
-  background: var(--grey-050);
+  width: 100%;
 }
 
 .c-list li + li {
