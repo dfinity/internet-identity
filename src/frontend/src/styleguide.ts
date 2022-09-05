@@ -139,7 +139,7 @@ export const styleguide = html`
         <h2 class="t-title t-title--sub">Sections</h2>
         <p class="t-lead">
           A section, much like a text-paragraph, is a visually distinct area of
-          the app. In our case in just sets a space to the top. It can be used
+          the app. In our case it just sets a space to the top. It can be used
           with the <code>.l-section</code> class. Sometimes we want there to be
           more spaces between sections. In that case we can use the
           <code>.l-section--spacious</code> modifier class.
