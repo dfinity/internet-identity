@@ -46,6 +46,13 @@ export const styleguide = html`
       background-position: 0 0, 1.5rem 1.5rem;
       border-radius: 0.5em;
     }
+
+    .demo-section {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 0.5em;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    }
   </style>
   <section class="styleguide">
     <h1 class="t-title t-title--main">Design Patterns</h1>
