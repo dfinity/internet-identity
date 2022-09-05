@@ -23,7 +23,7 @@ export const styleguide = html`
       min-height: 15rem;
 
       margin: 2rem 0;
-      border: #202124 1px solid;
+      border: rgba(255,255,255,0) 4px solid;
       padding: 1em;
       background-color: #f7f7f7;
       background-image: linear-gradient(
@@ -45,6 +45,8 @@ export const styleguide = html`
       background-size: 3rem 3rem;
       background-position: 0 0, 1.5rem 1.5rem;
       border-radius: 0.5em;
+
+      box-shadow: inset 0 0 1rem rgba(0, 0, 0, 0.5);
     }
 
     .demo-section {
