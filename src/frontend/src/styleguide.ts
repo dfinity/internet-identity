@@ -121,7 +121,7 @@ export const styleguide = html`
           within a paragraph or anywhere else. One of the rare elements that has
           a default style is a <a href="#">link</a>, but sometimes you might want
           an other element to look like a link. In that case you can use the
-          <code>.t-link</code> class. In some rare cases we don't want links to
+          <code>.t-link</code> class. In some rare cases we want links to
           look less prominent (by removing the underline) you can use the
           <code>.t-link--discreet</code> class.
         </p>
