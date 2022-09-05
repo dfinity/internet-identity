@@ -20,6 +20,8 @@ export const styleguide = html`
       z-index: 0;
       position: relative;
 
+      min-height: 15rem;
+
       margin: 2rem 0;
       border: #202124 1px solid;
       padding: 1em;
@@ -64,43 +66,33 @@ export const styleguide = html`
         styling. To help style text element we have a bunch of utility classes
         that can be used.
       </p>
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Tiltes</h2>
+        <section class="demo" aria-label="Titles Demo">
+          <h1 class="t-title t-title--main">Large Title</h1>
+          <h2 class="t-title">Default regular title</h2>
+        </section>
         <p class="t-lead">
           The <code>.t-title</code> class can be used to style titles. If you
           want to make it a main title, add the
           <code>.t-title--main</code> modifier class.
         </p>
-        <section class="demo" aria-label="Titles Demo">
-          <h1 class="t-title t-title--main">Large Title</h1>
-          <h2 class="t-title">Default regular title</h2>
-        </section>
       </aside>
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Paragraphs</h2>
+        <section class="demo" aria-label="Paragraphs Demo">
+          <p class="t-lead">This is a lead paragraph</p>
+          <p class="t-paragraph">This is a regular paragraph</p>
+        </section>
         <p class="t-lead">
           There are two types of text paragraphs. The <code>.t-lead</code> class
           can be used to style lead paragraphs that follow a title. The
           <code>.t-paragraph</code> class is a more generic class that can be
           used to style any other paragraph.
         </p>
-        <section class="demo" aria-label="Paragraphs Demo">
-          <p class="t-lead">This is a lead paragraph</p>
-          <p class="t-paragraph">This is a regular paragraph</p>
-        </section>
       </aside>
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Various text helpers</h2>
-        <p class="t-lead">
-          There are a bunch of other text helpers that can be used to style text
-          within a paragraph or anywhere else. One of the rare elements that has
-          a default style is a <a href="#">link</a> But sometimes you might want
-          an other element to look like a link. In that case you can use the
-          <code>.t-link</code> class. In some rare cases we don't want links to
-          look less prominent (by removing the underline) you can use the
-          <code>.t-link--discreet</code> class.
-        </p>
-
         <section class="demo" aria-label="Verious elements Demo">
           <p class="t-paragraph">
             <a href="#">This is an actual a tag</a><br />
@@ -115,6 +107,15 @@ export const styleguide = html`
             ><br />
           </p>
         </section>
+        <p class="t-lead">
+          There are a bunch of other text helpers that can be used to style text
+          within a paragraph or anywhere else. One of the rare elements that has
+          a default style is a <a href="#">link</a> But sometimes you might want
+          an other element to look like a link. In that case you can use the
+          <code>.t-link</code> class. In some rare cases we don't want links to
+          look less prominent (by removing the underline) you can use the
+          <code>.t-link--discreet</code> class.
+        </p>
       </aside>
     </article>
 
@@ -125,7 +126,7 @@ export const styleguide = html`
         They just define where elements are placed.
       </p>
 
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Sections</h2>
         <p class="t-lead">
           A section, much like a text-paragraph, is a visually distinct area of
@@ -136,8 +137,14 @@ export const styleguide = html`
         </p>
       </aside>
 
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Divider</h2>
+        <section class="demo" aria-label="Paragraphs Demo">
+          <hr class="l-divider" />
+          <div class="l-divider l-divider--text" aria-label="Other Options">
+            <span class="l-divider__label" aria-hidden>Or</span>
+          </div>
+        </section>
         <p class="t-lead">
           A divider is a horizontal line that can be used to separate sections.
           It can be used with the <code>.l-divider</code> class. Typically it is
@@ -145,29 +152,18 @@ export const styleguide = html`
           to add some text to it. In that case we can use the
           <code>.l-divider--text</code> modifier class.
         </p>
-        <section class="demo" aria-label="Paragraphs Demo">
-          <hr class="l-divider" />
-          <div class="l-divider l-divider--text" aria-label="Other Options">
-            <span class="l-divider__label" aria-hidden>Or</span>
-          </div>
-        </section>
       </aside>
     </article>
 
-    <article class="l-section  c-card c-card--highlight">
+    <article class="l-section c-card c-card--highlight">
       <h1 class="t-title t-title--main">Components</h1>
       <p class="t-lead">
         Components are the building blocks of the app. They consist of visual
         patterns that are used all over the app.
       </p>
 
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Cards</h2>
-        <p class="t-lead">
-          The card component is used to group content. It can be used with the
-          <code>.c-card</code> class. It comes with a few modifiers that can be
-          used to style it differently.
-        </p>
         <section class="demo" aria-label="Cards Demo">
           <div class="c-card">
             <h2 class="t-title">Default card</h2>
@@ -189,14 +185,15 @@ export const styleguide = html`
             </div>
           </div>
         </section>
+        <p class="t-lead">
+          The card component is used to group content. It can be used with the
+          <code>.c-card</code> class. It comes with a few modifiers that can be
+          used to style it differently.
+        </p>
       </aside>
 
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title">Form Elements</h2>
-        <p class="t-lead">
-          Form elements are used to collect information from the user. But we
-          also use the classes to show important numbers and other information.
-        </p>
         <section class="demo" aria-label="Form Elements Demo">
           <input type="text" placeholder="Text Input" class="c-input" />
           <div class="c-input">DIV as c-input</div>
@@ -215,9 +212,13 @@ export const styleguide = html`
           </button>
           <button class="c-button c-button--warning">Warning Button</button>
         </section>
+        <p class="t-lead">
+          Form elements are used to collect information from the user. But we
+          also use the classes to show important numbers and other information.
+        </p>
       </aside>
 
-      <aside class="l-section">
+      <aside class="l-section demo-section">
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
           <div class="c-logo">${icLogo}</div>
