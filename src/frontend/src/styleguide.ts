@@ -119,9 +119,9 @@ export const styleguide = html`
         <p class="t-lead">
           There are a bunch of other text helpers that can be used to style text
           within a paragraph or anywhere else. One of the rare elements that has
-          a default style is a <a href="#">link</a>, but sometimes you might want
-          an other element to look like a link. In that case you can use the
-          <code>.t-link</code> class. In some rare cases we want links to
+          a default style is a <a href="#">link</a>, but sometimes you might
+          want an other element to look like a link. In that case you can use
+          the <code>.t-link</code> class. In some rare cases we want links to
           look less prominent (by removing the underline) you can use the
           <code>.t-link--discreet</code> class.
         </p>
@@ -131,8 +131,9 @@ export const styleguide = html`
     <article class="l-section  c-card c-card--highlight">
       <h1 class="t-title t-title--main">Layout</h1>
       <p class="t-lead">
-        We use a bunch of layout classes to style the <code>.c-card__icon</code> of the app.
-        They just define where elements are placed.
+        We use a bunch of layout classes to style the
+        <code>.c-card__icon</code> of the app. They just define where elements
+        are placed.
       </p>
 
       <aside class="l-section demo-section">
