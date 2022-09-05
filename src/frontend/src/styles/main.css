@@ -563,9 +563,17 @@ a:hover,
 }
 
 @media (prefers-color-scheme: dark) {
+  .c-card--highlight {
+    background-color: rgba(0,0,0,.1);
+    box-shadow: 0 0 5rem var(--rc-background-transparent),
+                0 0 2rem var(--rc-background-transparent),
+                0 0 1rem var(--rc-background-transparent),
+                inset 0 1em 1em var(--rc-background-transparent);
+  }
   .c-card--highlight::before {
     opacity: 1;
-  }
+    filter: blur(6rem);
+  }    
 }
 
 .c-card--narrow {
