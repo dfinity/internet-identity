@@ -119,7 +119,7 @@ export const styleguide = html`
         <p class="t-lead">
           There are a bunch of other text helpers that can be used to style text
           within a paragraph or anywhere else. One of the rare elements that has
-          a default style is a <a href="#">link</a> But sometimes you might want
+          a default style is a <a href="#">link</a>, but sometimes you might want
           an other element to look like a link. In that case you can use the
           <code>.t-link</code> class. In some rare cases we don't want links to
           look less prominent (by removing the underline) you can use the
