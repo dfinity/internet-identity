@@ -28,7 +28,7 @@ fi
 # Starting the "intro" section where we display a short intro
 section_intro=$(mktemp)
 cat > "$section_intro" << EOF
-This is release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
+This is Internet Identity release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
 EOF
 
 # Starting the "build flavors" section where we add the shas of all input assets

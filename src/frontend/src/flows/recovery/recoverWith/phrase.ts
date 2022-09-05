@@ -49,7 +49,7 @@ const pageContent = (userNumber: bigint, message?: string) => html`
     <textarea id="inputSeedPhrase" class="c-input" placeholder="${
       userNumber + " above squirrel ..."
     }"></textarea>
-    <details class="c-card c-card--highlight c-card--warning is-hidden">
+    <details data-id="phrase-warnings" class="c-card c-card--highlight is-hidden">
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
     </details>
@@ -89,7 +89,7 @@ const init = (
     // time and the user may have left the page; we may effectively pick up the wrong element.
     const warningsDiv = document.getElementById("warnings") as HTMLDivElement;
     const warningsBox = document.querySelector(
-      "details.warnings-box"
+      "details[data-id=phrase-warnings]"
     ) as HTMLDetailsElement;
 
     // Debounce the warning generation as not to spam the user

@@ -19,10 +19,10 @@ const pageContent = (userNumber: bigint | null) => html`
       class="c-input"
       type="text"
       id="addDeviceUserNumber"
-      placeholder="Enter Identity Anchor"
+      placeholder="Enter Anchor"
       value=${userNumber ?? ""}
     />
-    <button class="c-button" id="addDeviceUserNumberContinue" class="primary">
+    <button class="c-button c-button--primary" id="addDeviceUserNumberContinue">
       Continue
     </button>
     <button class="c-button c-button--secondary" id="addDeviceUserNumberCancel">

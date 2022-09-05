@@ -15,7 +15,7 @@ const pageContent = (userNumber: bigint) => html`
         registration do the following:
       </p>
     </hgroup>
-    <ol class="c-list c-list--bulleted l-section">
+    <ol class="c-list c-list--numbered l-section">
       <li>
         On an <em>existing</em> device:<br />
         Log into <strong class="t-strong">https://identity.ic0.app</strong> with

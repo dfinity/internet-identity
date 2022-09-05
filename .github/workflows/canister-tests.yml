@@ -179,10 +179,11 @@ jobs:
           # note on paths: we include the whole ~/.cargo/. (as opposed to juse .cargo/git, etc) because cargo stores crate
           # data as .crates(2?).{json,toml} without which the whole cache is invalidated. We may accumulate unnecessary
           # stuff but the cache is anyway invalidated on every toolchain update.
+          # We also include all Cargo tomls and the lockfile
           path: |
             ~/.cargo
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src/**/Cargo.lock', 'rust-toolchain.toml') }}-2
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src/**/Cargo.toml', 'rust-toolchain.toml') }}-2
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
@@ -467,7 +468,7 @@ jobs:
               exit 1
             fi
 
-            if (( metric <= 8 ))
+            if (( metric <= 30 ))
             then
               echo "Pixel difference ($metric) is too small, reverting"
               git checkout HEAD -- "$modified"

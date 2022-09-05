@@ -1,5 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
-import { warningIcon } from "./icons";
+import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {
   title: string;
@@ -9,26 +9,28 @@ export type ErrorOptions = {
 };
 
 const pageContent = (options: ErrorOptions) => html`
-  <div
-    id="errorContainer"
-    class="l-container c-card c-card--highlight c-card--warning"
-  >
-    ${warningIcon}
-    <hgroup>
-      <h1 class="t-title t-title--primary">${options.title}</h1>
-      <p class="displayErrorMessage t-lead">${options.message}</p>
-    </hgroup>
-    ${options.detail !== undefined
-      ? html`<details class="displayErrorDetail">
-          <summary class="c-summary">
-            <span class="c-summary__link t-link">Error details</span>
-          </summary>
-          <pre class="t-paragraph">${options.detail}</pre>
-        </details>`
-      : ""}
-    <button id="displayErrorPrimary" class="c-button c-button--primary">
-      ${options.primaryButton}
-    </button>
+  <div id="errorContainer" class="l-container c-card c-card--highlight">
+    ${warnBox({
+      title: options.title,
+      message: options.message,
+      slot:
+        options.detail !== undefined
+          ? html`<details class="displayErrorDetail">
+              <summary class="c-summary">
+                <span class="c-summary__link t-link">Error details</span>
+              </summary>
+              <pre class="t-paragraph">${options.detail}</pre>
+            </details>`
+          : undefined,
+
+      htmlElement: "div",
+    })}
+
+    <div class="l-section">
+      <button id="displayErrorPrimary" class="c-button c-button--primary">
+        ${options.primaryButton}
+      </button>
+    </div>
   </div>
 `;
 

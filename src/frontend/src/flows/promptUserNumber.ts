@@ -3,16 +3,21 @@ import { parseUserNumber } from "../utils/userNumber";
 
 const pageContent = (title: string, userNumber: bigint | null) => html`
   <div class="l-container c-card c-card--highlight">
-    <h1>${title}</h1>
-    <p>Please provide an Identity Anchor.</p>
+    <hgroup>
+      <h1 class="t-title t-title--main">${title}</h1>
+      <p class="t-lead">Please provide an Identity Anchor.</p>
+    </hgroup>
     <input
       type="text"
       id="userNumberInput"
-      placeholder="Enter Identity Anchor"
+      class="c-input c-input--vip"
+      placeholder="Enter Anchor"
       value=${userNumber ?? ""}
     />
-    <button id="userNumberContinue" class="primary">Continue</button>
-    <button id="userNumberCancel">Cancel</button>
+    <button id="userNumberContinue" class="c-button">Continue</button>
+    <button id="userNumberCancel" class="c-button c-button--secondary">
+      Cancel
+    </button>
   </div>
 `;
 
@@ -39,12 +44,15 @@ export const promptUserNumber = async (
       }
     };
 
+    // always select the input
+    userNumberInput.select();
+
     userNumberContinue.onclick = () => {
       const userNumber = parseUserNumber(userNumberInput.value);
       if (userNumber !== null) {
         resolve(userNumber);
       } else {
-        userNumberInput.classList.toggle("errored", true);
+        userNumberInput.classList.toggle("has-error", true);
         userNumberInput.placeholder = "Please enter an Identity Anchor first";
       }
     };

@@ -39,6 +39,10 @@ import {
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { withLoader } from "./components/loader";
+import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
+import { displayError } from "./components/displayError";
+import { promptUserNumber } from "./flows/promptUserNumber";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -143,6 +147,16 @@ const iiPages: Record<string, () => void> = {
     ),
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevice, false),
+  loader: () => withLoader(() => new Promise(() => renderConstructing())),
+  displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
+  displayError: () =>
+    displayError({
+      title: "Authentication Failed",
+      message: "An error occurred during authentication.",
+      detail: "oh my, so much to say. SO MUCH!",
+      primaryButton: "Try again",
+    }),
+  promptUserNumber: () => promptUserNumber("hello", null),
 };
 
 // The showcase

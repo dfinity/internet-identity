@@ -18,15 +18,17 @@ const pageContent = () => html`
         <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
         <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
       <hgroup>
-      <input
-        type="text"
-        class="c-input c-input--vip"
-        id="registerUserNumber"
-        placeholder="Enter Identity Anchor"
-      />
-      <button type="button" id="loginButton" class="c-button">
-        Authenticate
-      </button>
+      <div class="l-section">
+        <input
+          type="text"
+          class="c-input c-input--vip"
+          id="registerUserNumber"
+          placeholder="Enter Anchor"
+        />
+        <button type="button" id="loginButton" class="c-button">
+          Authenticate
+        </button>
+      </div>
     </article>
 
     <aside class="l-section l-section--spacious" aria-label="Other actions">
@@ -112,6 +114,9 @@ const initLogin = (
       loginButton.click();
     }
   };
+
+  // always select the input
+  userNumberInput.select();
 
   loginButton.onclick = async () => {
     const userNumber = parseUserNumber(userNumberInput.value);

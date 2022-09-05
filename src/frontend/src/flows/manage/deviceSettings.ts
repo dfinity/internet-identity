@@ -56,9 +56,7 @@ const pageContent = (
               Without devices your anchor would be inaccessible.
             </p>`
         : ""}
-      <div class="l-section">
-        <button data-action="back" class="c-button">Back</button>
-      </div>
+      <button data-action="back" class="c-button">Back</button>
     </div>
   </article>
   ${footer}
