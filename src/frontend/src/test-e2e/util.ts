@@ -79,6 +79,7 @@ export async function runInBrowser(
       (accumulator, entry) => accumulator + "\n" + JSON.stringify(entry),
       ""
     );
+
     await fsasync.writeFile(`test-failures/${testName}.log`, printableLogs);
     await browser.saveScreenshot(`test-failures/${testName}.png`);
     console.error(e);
@@ -354,9 +355,14 @@ export class Screenshots {
     // Make sure that all screenshots are prefixed with "01-", "02-", ...
     const countStr: string = this.count.toFixed().padStart(2, "0");
     this.count++;
+
+    // Hide blinking cursor before taking screenshots (otherwise screenshot depends
+    // on the cursor state)
+    await browser.execute('document.body.style.caretColor = "transparent"');
     await browser.saveScreenshot(
       `${this.directory}/${countStr}-${name}-${this.suffix}.png`
     );
+    await browser.execute('document.body.style.removeProperty("caret-color")');
   }
 }
 
