@@ -104,7 +104,7 @@ export const styleguide = html`
         <h2 class="t-title t-title--sub">Various text helpers</h2>
         <section class="demo" aria-label="Verious elements Demo">
           <p class="t-paragraph">
-            <a href="#">This is an actual a tag</a><br />
+            <a href="#">This is an actual "a" tag</a><br />
             <button class="t-link">
               This is a button element that looks like a link</button
             ><br />
