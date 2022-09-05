@@ -568,7 +568,8 @@ a:hover,
     box-shadow: 0 0 5rem var(--rc-background-transparent),
                 0 0 2rem var(--rc-background-transparent),
                 0 0 1rem var(--rc-background-transparent),
-                inset 0 1em 1em var(--rc-background-transparent);
+                inset 0 -.4em .1em var(--rc-background-transparent),
+                inset 0 0 1em var(--rc-background-transparent);
   }
   .c-card--highlight::before {
     opacity: 1;
