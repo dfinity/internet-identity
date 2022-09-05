@@ -131,7 +131,7 @@ export const styleguide = html`
     <article class="l-section  c-card c-card--highlight">
       <h1 class="t-title t-title--main">Layout</h1>
       <p class="t-lead">
-        We use a bunch of layout classes to style the .c-card__icon of the app.
+        We use a bunch of layout classes to style the <code>.c-card__icon</code> of the app.
         They just define where elements are placed.
       </p>
 
