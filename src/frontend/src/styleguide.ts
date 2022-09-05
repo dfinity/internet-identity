@@ -23,7 +23,7 @@ export const styleguide = html`
       min-height: 15rem;
 
       margin: 2rem 0;
-      border: rgba(255,255,255,0) 4px solid;
+      border: rgba(255, 255, 255, 0) 4px solid;
       padding: 1em;
       background-color: #f7f7f7;
       background-image: linear-gradient(
@@ -51,7 +51,7 @@ export const styleguide = html`
 
     .demo-section {
       background: #fff;
-      padding: 1.5rem;
+      padding: 2.5rem;
       border-radius: 0.5em;
       box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
     }
@@ -224,6 +224,50 @@ export const styleguide = html`
         <p class="t-lead">
           Form elements are used to collect information from the user. But we
           also use the classes to show important numbers and other information.
+        </p>
+      </aside>
+
+      <aside class="l-section demo-section">
+        <h2 class="t-title">Lists</h2>
+        <section class="demo" aria-label="List Elements Demo">
+          <ul class="c-list">
+            <li>Default list item I</li>
+            <li>Default list item II</li>
+            <li>Default list item III</li>
+          </ul>
+
+          <ul class="c-list c-list--bulleted l-section">
+            <li>Bulleted list item I</li>
+            <li>Bulleted list item II</li>
+            <li>Bulleted list item III</li>
+          </ul>
+
+          <ul class="c-list c-list--numbered l-section">
+            <li>Numbered list item I</li>
+            <li>Numbered list item II</li>
+            <li>Numbered list item III</li>
+          </ul>
+        </section>
+        <p class="t-lead">
+          The <code>.c-list</code> class is used to style list elements. It
+          expects a <code>&lt;li&gt;</code> element as a direct child.
+        </p>
+      </aside>
+
+      <aside class="l-section demo-section">
+        <h2 class="t-title t-title--sub">Details / Summary</h2>
+        <section class="demo" aria-label="Details / Summary Demo">
+          <details>
+            <summary class="c-summary">
+              <span class="c-summary__link t-link">Click me to open</span>
+            </summary>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed</p>
+          </details>
+        </section>
+        <p class="t-lead">
+          While the <code>&lt;details&gt;</code> element is not a component, it
+          is expected to be used with the <code>.c-summary</code> class, since
+          it relies on the <code>[open]</code> attribute.
         </p>
       </aside>
 
