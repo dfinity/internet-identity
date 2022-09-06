@@ -66,23 +66,25 @@ const recoveryDevice: DeviceData = {
   credential_id: [],
 };
 
-const simpleDevice1: DeviceData = {
-  alias: "Chrome on iPhone",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 4],
-  key_type: { unknown: null },
-  purpose: { authentication: null },
-  credential_id: [],
-};
+const simpleDevices: [DeviceData, DeviceData] = [
+  {
+    alias: "Chrome on iPhone",
+    protection: { unprotected: null },
+    pubkey: [1, 2, 3, 4],
+    key_type: { unknown: null },
+    purpose: { authentication: null },
+    credential_id: [],
+  },
 
-const simpleDevice2: DeviceData = {
-  alias: "Yubikey Blue",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 5],
-  key_type: { unknown: null },
-  purpose: { authentication: null },
-  credential_id: [],
-};
+  {
+    alias: "Yubikey Blue",
+    protection: { unprotected: null },
+    pubkey: [1, 2, 3, 5],
+    key_type: { unknown: null },
+    purpose: { authentication: null },
+    credential_id: [],
+  },
+];
 
 const defaultPage = () => {
   document.title = "Showcase";
@@ -128,8 +130,7 @@ const iiPages: Record<string, () => void> = {
     displaySingleDeviceWarning(userNumber, dummyConnection),
   displayManage: () =>
     displayManage(userNumber, dummyConnection, [
-      simpleDevice1,
-      simpleDevice2,
+      ...simpleDevices,
       recoveryPhrase,
     ]),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
@@ -146,7 +147,7 @@ const iiPages: Record<string, () => void> = {
     showVerificationCode(
       userNumber,
       dummyConnection,
-      simpleDevice1.alias,
+      simpleDevices[0].alias,
       {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
@@ -157,11 +158,11 @@ const iiPages: Record<string, () => void> = {
     verifyDevice(
       userNumber,
       dummyConnection,
-      simpleDevice1,
+      simpleDevices[0],
       undefined as unknown as bigint
     ),
   deviceSettings: () =>
-    deviceSettings(userNumber, dummyConnection, simpleDevice1, false),
+    deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
   displayError: () =>
