@@ -65,10 +65,19 @@ const recoveryDevice: DeviceData = {
   credential_id: [],
 };
 
-const simpleDevice: DeviceData = {
+const simpleDevice1: DeviceData = {
   alias: "Chrome on iPhone",
   protection: { unprotected: null },
   pubkey: [1, 2, 3, 4],
+  key_type: { unknown: null },
+  purpose: { authentication: null },
+  credential_id: [],
+};
+
+const simpleDevice2: DeviceData = {
+  alias: "Yubikey Blue",
+  protection: { unprotected: null },
+  pubkey: [1, 2, 3, 5],
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
@@ -115,7 +124,11 @@ const iiPages: Record<string, () => void> = {
   displaySingleDeviceWarning: () =>
     displaySingleDeviceWarning(userNumber, dummyConnection),
   displayManage: () =>
-    displayManage(userNumber, dummyConnection, [simpleDevice, recoveryPhrase]),
+    displayManage(userNumber, dummyConnection, [
+      simpleDevice1,
+      simpleDevice2,
+      recoveryPhrase,
+    ]),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
@@ -130,7 +143,7 @@ const iiPages: Record<string, () => void> = {
     showVerificationCode(
       userNumber,
       dummyConnection,
-      simpleDevice.alias,
+      simpleDevice1.alias,
       {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
@@ -141,11 +154,11 @@ const iiPages: Record<string, () => void> = {
     verifyDevice(
       userNumber,
       dummyConnection,
-      simpleDevice,
+      simpleDevice1,
       undefined as unknown as bigint
     ),
   deviceSettings: () =>
-    deviceSettings(userNumber, dummyConnection, simpleDevice, false),
+    deviceSettings(userNumber, dummyConnection, simpleDevice1, false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
   displayError: () =>
