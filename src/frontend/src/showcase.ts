@@ -21,6 +21,7 @@ import { loginKnownAnchor } from "./flows/login/knownAnchor";
 import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
+import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { displayPage } from "./flows/authenticate";
 import { register, renderConstructing } from "./flows/register";
 import { confirmRegister } from "./flows/confirmRegister";
@@ -112,6 +113,8 @@ const iiPages: Record<string, () => void> = {
   authenticate: () => displayPage("https://nowhere.com", BigInt(10000)),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
+  recoverWithDevice: () =>
+    deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
   constructing: () => renderConstructing(),
   confirmRegister: () =>
     confirmRegister(
