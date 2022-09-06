@@ -665,6 +665,14 @@ a:hover,
   outline-offset: 2px;
 }
 
+/* Copy pasted from the focus and hover, but with different opacity to show action */
+.c-button:not([disabled]):active {
+  opacity: 0.5;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
 .c-button[disabled],
 .c-button--disabled {
   opacity: 0.5;
