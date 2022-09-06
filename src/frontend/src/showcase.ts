@@ -22,6 +22,7 @@ import { loginKnownAnchor } from "./flows/login/knownAnchor";
 import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
+import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { displayPage } from "./flows/authenticate";
 import { register, renderConstructing } from "./flows/register";
 import { confirmRegister } from "./flows/confirmRegister";
@@ -66,14 +67,25 @@ const recoveryDevice: DeviceData = {
   credential_id: [],
 };
 
-const simpleDevice: DeviceData = {
-  alias: "Chrome on iPhone",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 4],
-  key_type: { unknown: null },
-  purpose: { authentication: null },
-  credential_id: [],
-};
+const simpleDevices: [DeviceData, DeviceData] = [
+  {
+    alias: "Chrome on iPhone",
+    protection: { unprotected: null },
+    pubkey: [1, 2, 3, 4],
+    key_type: { unknown: null },
+    purpose: { authentication: null },
+    credential_id: [],
+  },
+
+  {
+    alias: "Yubikey Blue",
+    protection: { unprotected: null },
+    pubkey: [1, 2, 3, 5],
+    key_type: { unknown: null },
+    purpose: { authentication: null },
+    credential_id: [],
+  },
+];
 
 const defaultPage = () => {
   document.title = "Showcase";
@@ -104,6 +116,8 @@ const iiPages: Record<string, () => void> = {
   authenticate: () => displayPage("https://nowhere.com", BigInt(10000)),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
+  recoverWithDevice: () =>
+    deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
   constructing: () => renderConstructing(),
   confirmRegister: () =>
     confirmRegister(
@@ -116,7 +130,10 @@ const iiPages: Record<string, () => void> = {
   displaySingleDeviceWarning: () =>
     displaySingleDeviceWarning(userNumber, dummyConnection),
   displayManage: () =>
-    displayManage(userNumber, dummyConnection, [simpleDevice, recoveryPhrase]),
+    displayManage(userNumber, dummyConnection, [
+      ...simpleDevices,
+      recoveryPhrase,
+    ]),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
@@ -131,7 +148,7 @@ const iiPages: Record<string, () => void> = {
     showVerificationCode(
       userNumber,
       dummyConnection,
-      simpleDevice.alias,
+      simpleDevices[0].alias,
       {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
@@ -142,11 +159,11 @@ const iiPages: Record<string, () => void> = {
     verifyDevice(
       userNumber,
       dummyConnection,
-      simpleDevice,
+      simpleDevices[0],
       undefined as unknown as bigint
     ),
   deviceSettings: () =>
-    deviceSettings(userNumber, dummyConnection, simpleDevice, false),
+    deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
   displayError: () =>
