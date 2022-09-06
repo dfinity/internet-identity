@@ -113,7 +113,8 @@ const iiPages: Record<string, () => void> = {
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
-  authenticate: () => displayPage("https://nowhere.com", BigInt(10000)),
+  authenticate: () =>
+    displayPage("https://nowhere.com", BigInt(10000), "foobarbaz.com"),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
   recoverWithDevice: () =>

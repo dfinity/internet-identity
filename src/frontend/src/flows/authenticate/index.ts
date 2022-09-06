@@ -30,64 +30,56 @@ const pageContent = (
   userNumber?: bigint,
   derivationOrigin?: string
 ) => html` <div class="l-container c-card c-card--highlight">
+    <!-- The title is hidden but used for accessibility -->
+    <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <h1 class="t-title t-title--main">Internet Identity</h1>
-    <p class="t-lead">Authenticate to service:</p>
-    <div class="c-input t-vip t-vip--small c-input--readonly">${hostName}</div>
-    ${derivationOrigin !== undefined && derivationOrigin !== hostName
-      ? derivationOriginSection(derivationOrigin)
-      : ""}
-    <p class="t-paragraph">Use Identity Anchor:</p>
+    <p class="t-lead">Authenticating to <span class="t-strong">${hostName}</span> ${
+  derivationOrigin !== undefined && derivationOrigin !== hostName
+    ? html`(an alias of <span class="t-strong">${derivationOrigin}</span>)`
+    : ""
+} using <span class="t-strong">Internet Identity</h1>.</p>
 
-    <input
-      type="text"
-      id="userNumberInput"
-      placeholder="Enter anchor"
-      class="l-section c-input c-input--vip"
-      value="${userNumber !== undefined ? userNumber : ""}"
-    />
+    <div class="l-section">
+      <p class="t-paragraph">Enter Anchor:</p>
 
-    <p
-      id="invalidAnchorMessage"
-      class="anchor-error-message is-hidden t-paragraph t-strong"
-    >
-      The Identity Anchor is not valid. Please try again.
-    </p>
+      <input
+        type="text"
+        id="userNumberInput"
+        placeholder="Enter anchor"
+        class="l-section c-input c-input--vip"
+        value="${userNumber !== undefined ? userNumber : ""}"
+      />
 
-    <button type="button" id="authorizeButton" class="c-button">
-      Start Session
-    </button>
-
-    <div id="registerSection" class="l-section">
-      <button
-        type="button"
-        id="registerButton"
-        class="c-button c-button--secondary"
+      <p
+        id="invalidAnchorMessage"
+        class="anchor-error-message is-hidden t-paragraph t-strong"
       >
-        Create New Identity Anchor
+        The Identity Anchor is not valid. Please try again.
+      </p>
+
+      <button type="button" id="authorizeButton" class="c-button">
+        Start Session
       </button>
+    </div>
+
+    <div class="l-divider l-divider--text" aria-label="Other Options">
+      <span class="l-divider__label" aria-hidden>Or</span>
     </div>
 
     <ul class="c-list l-section">
       <li>
-        <a id="recoverButton" class="t-link">Lost access?</a>
+        <a id="registerButton" class="t-link">Create Anchor</a>
       </li>
       <li>
-        <a class="t-link" id="manageButton">Manage your Identity Anchor</a>
+        <a id="recoverButton" class="t-link">Recover Anchor</a>
+      </li>
+      <li>
+        <a class="t-link" id="manageButton">Manage Anchor</a>
       </li>
     </ul>
     ${navbar}
   </div>
   ${footer}`;
-
-const derivationOriginSection = (derivationOrigin: string) => html` <p
-    class="t-paragraph"
-  >
-    This service is an alias of:
-  </p>
-  <output class="c-input c-input--readonly t-vip t-vip--small">
-    ${derivationOrigin}
-  </output>`;
 
 export interface AuthSuccess {
   userNumber: bigint;
