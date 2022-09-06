@@ -11,18 +11,15 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (userNumber: bigint) => html`
-  <style>
-    .full-width {
-      width: 100%;
-    }
-  </style>
-  <div class="l-container c-card c-card--highlight full-width">
-    <h1>Recovery for ${userNumber}</h1>
-    <p>
-      You are about to recover your anchor using a recovery device. Please click
-      "continue" and then follow your browser's instructions to connect your
-      device.
-    </p>
+  <article class="l-container c-card c-card--highlight">
+    <hgroup>
+      <h1 class="t-title t-title--main">Recovery for ${userNumber}</h1>
+      <p class="t-lead">
+        You are about to recover your anchor using a recovery device. Please
+        click "continue" and then follow your browser's instructions to connect
+        your device.
+      </p>
+    </hgroup>
     <button
       id="recover-with-device__continue"
       class="c-button c-button--primary"
@@ -35,7 +32,7 @@ const pageContent = (userNumber: bigint) => html`
     >
       Cancel
     </button>
-  </div>
+  </article>
 `;
 
 export const deviceRecoveryPage = async (
