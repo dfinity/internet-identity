@@ -1,5 +1,6 @@
 import { html } from "lit-html";
 import { navigationLink } from "../components/navigationLink";
+import { colorSchemeToggle } from "../components/colorSchemeToggle";
 
 export const navbar = html` <aside aria-label="General links">
   <ul class="c-nav-links">
