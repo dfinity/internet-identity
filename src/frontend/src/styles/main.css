@@ -525,7 +525,7 @@ a:hover,
 }
 
 .c-card--highlight {
-  padding: calc(var(--rs-card-bezel) * 1.5) calc(var(--rs-card-bezel) * 2.75);
+  padding: calc(var(--rs-card-bezel) * 2) calc(var(--rs-card-bezel) * 2.75);
   /* background-color: var(--rc-background-transparent); */
   /* border: var(--vs-line) solid var(--rc-line); */
   background: none;
@@ -667,7 +667,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 10rem;
+  border-radius: 3rem;
 }
 
 .c-button svg * {
@@ -897,11 +897,16 @@ a:hover,
   display: block;
   padding: var(--rs-footer-gutter);
   transition: background 0.2s;
+  text-align: center;
 }
 
-.page-signature img {
-  display: block;
-  max-width: 100%;
+.page-signature img, .page-signature svg {
+  /* display: block; */
+  /* max-width: 100%; */
+  display: inline-block;
+  width: 270px;
+  height: auto;
+
 }
 
 .page-signature:hover,
