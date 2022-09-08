@@ -22,7 +22,6 @@ const pageContent = html`
       <h1 class="t-title t-title--main">
         Create a new Internet Identity Anchor
       </h1>
-      <p class="t-lead">Please provide a name for your device.</p>
     </hgroup>
     <form id="registerForm" class="l-section">
       <input

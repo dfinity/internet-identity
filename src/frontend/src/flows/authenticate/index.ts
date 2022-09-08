@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { icLogo } from "../../components/icons";
+import { forwardIcon, icLogo, infoIcon } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -32,20 +32,23 @@ const pageContent = (
 ) => html` <div class="l-container c-card c-card--highlight">
     <div class="c-logo">${icLogo}</div>
     <h1 class="t-title t-title--main">Internet Identity</h1>
-    <p class="t-lead">Authenticate to service:</p>
-    <div class="c-input t-vip t-vip--small c-input--readonly">${hostName}</div>
-    ${derivationOrigin !== undefined && derivationOrigin !== hostName
-      ? derivationOriginSection(derivationOrigin)
-      : ""}
-    <p class="t-paragraph">Use Identity Anchor:</p>
 
-    <input
-      type="text"
-      id="userNumberInput"
-      placeholder="Enter anchor"
-      class="l-section c-input c-input--vip"
-      value="${userNumber !== undefined ? userNumber : ""}"
-    />
+    <div class="c-connect-input">
+      <input
+        type="text"
+        class="c-input c-input--vip c-connect-input__input"
+        id="userNumberInput"
+        placeholder="Enter Anchor"
+        value="${userNumber !== undefined ? userNumber : ""}"
+      />
+      <button
+        type="button"
+        id="authorizeButton"
+        class="c-button c-connect-input__button"
+      >
+        ${forwardIcon}
+      </button>
+    </div>
 
     <p
       id="invalidAnchorMessage"
@@ -54,29 +57,40 @@ const pageContent = (
       The Identity Anchor is not valid. Please try again.
     </p>
 
-    <button type="button" id="authorizeButton" class="c-button">
-      Start Session
-    </button>
+    <p id="host-url" onclick="">
+      <span>${hostName}</span>
+      <span>
+        ${derivationOrigin !== undefined && derivationOrigin !== hostName
+          ? derivationOriginSection(derivationOrigin)
+          : "icp://6hsbt-vqaaa-aaaaf-aaafq-cai.ic0.app"}
+      </span>
+    </p>
 
-    <div id="registerSection" class="l-section">
-      <button
-        type="button"
-        id="registerButton"
-        class="c-button c-button--secondary"
-      >
-        Create New Identity Anchor
-      </button>
-    </div>
+    <a href="/about" class="c-button info-button">ℹ</a>
 
-    <ul class="c-list l-section">
-      <li>
-        <a id="recoverButton" class="t-link">Lost access?</a>
-      </li>
-      <li>
-        <a class="t-link" id="manageButton">Manage your Identity Anchor</a>
-      </li>
-    </ul>
-    ${navbar}
+    <aside aria-label="Other actions">
+      <ul class="t-discreet c-list c-list--inline">
+        <li class="textLink" id="registerSection">
+          <a id="registerButton" class="t-link">Create New Anchor</a>
+        </li>
+        <li class="textLink">
+          <a id="addNewDeviceButton" class="t-link">Associate Device</a>
+        </li>
+        <li class="textLink">
+          <a id="browserCompatibilityButton" class="t-link"
+            >Browser Compatibility</a
+          >
+        </li>
+        <li class="textLink">
+          <a id="faqLink" class="t-link" href="/faq">FAQ</a>
+        </li>
+        <li class="textLink">
+          <a id="recoverButton" class="t-link">Lost Access?</a>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- ${navbar} -->
   </div>
   ${footer}`;
 
@@ -287,6 +301,12 @@ export const displayPage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
+
+  // TODO: for demo only
+  const host = document.querySelector("#host-url") as HTMLElement;
+  host.addEventListener("click", () => host.classList.toggle("replaced"));
+  host.addEventListener("mouseenter", () => host.classList.add("replaced"));
+  host.addEventListener("mouseleave", () => host.classList.remove("replaced"));
 };
 
 async function handleAuthSuccess(

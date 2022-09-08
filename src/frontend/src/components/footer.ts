@@ -3,7 +3,6 @@ import { html } from "lit-html";
 export const footer = html`<footer class="l-footer">
   <a
     class="page-signature t-center"
-    style="margin-top: 1rem"
     aria-label="DFINITY homepage"
     href="https://internetcomputer.org/"
     target="_blank"

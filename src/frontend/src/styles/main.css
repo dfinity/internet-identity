@@ -145,7 +145,7 @@
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
-  --rs-footer-stack: calc(var(--vs-stack) * 1.5);
+  --rs-footer-stack: calc(var(--vs-stack) * 1);
 
   --rs-footer-gutter: var(--vs-gutter);
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
@@ -358,7 +358,7 @@ body {
 }
 
 .t-title--main {
-  font-size: 2.8rem;
+  font-size: 2.5rem;
   margin-top: 0.5em;
   text-align: center;
 }
@@ -399,7 +399,7 @@ a,
   display: inline;
   color: var(--rc-interaction-text);
   color: inherit;
-  font-weight: 600;
+  /* font-weight: 600; */
   text-decoration: underline;
   cursor: pointer;
 }
@@ -525,7 +525,7 @@ a:hover,
 }
 
 .c-card--highlight {
-  padding: calc(var(--rs-card-bezel) * 2) calc(var(--rs-card-bezel) * 2.75);
+  padding: calc(var(--rs-card-bezel) * 2) calc(var(--rs-card-bezel) * 1.75);
   /* background-color: var(--rc-background-transparent); */
   /* border: var(--vs-line) solid var(--rc-line); */
   background: none;
@@ -639,11 +639,18 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  margin: calc(-1 * var(--rs-card-bezel)) auto 0 auto;
   display: block;
-  width: 50%;
-  margin: 0 auto;
+  width: 52.5%;
+  max-width: 14rem;
+  font-size: 0;
 }
+@media (max-width: 512px) {
+  .c-logo {
+    margin-top: 0;
+  }
+}
+
 
 .c-logo svg {
   display: block;
@@ -654,6 +661,12 @@ a:hover,
 .t-title + .c-logo {
   margin: var(--rs-logo-stack) auto;
 }
+
+.c-logo + .t-title--main {
+  margin-top: 0;
+  margin-bottom: 2rem;
+}
+
 
 /**
  *  Forms and Buttons 
@@ -667,7 +680,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 3rem;
+  border-radius: .5rem;
 }
 
 .c-button svg * {
@@ -682,10 +695,12 @@ a:hover,
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
-  opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
-  outline: 2px dotted transparent;
-  outline-offset: 2px;
+  /* opacity: 0.9; */
+  /* box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction); */
+  /* outline: 2px dotted transparent; */
+  /* outline-offset: 2px; */
+  background: var(--vc-brand-blue);
+  color: var(--vc-snow);
 }
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
@@ -715,38 +730,6 @@ a:hover,
   /* color: inherit; */
 }
 
-.c-connect-input {
-  position: relative;
-}
-.c-connect-input__input:focus + .c-connect-input__button {
-  color: white;
-  background-color: var(--rc-button);
-  cursor: pointer;
-}
-.c-connect-input__button {
-  position: absolute;
-  top: 50%;
-  right: 1rem;
-  transform: translate(0, -50%);
-  width: auto;
-  margin: 0;
-
-  background-color: transparent;
-  color: currentColor;
-}
-.c-connect-input__button:hover {
-  color: white;
-  background-color: var(--rc-button);
-}
-.c-connect-input__button svg {
-  overflow: visible;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-}
-
 .c-input {
   position: relative;
   display: block;
@@ -757,7 +740,7 @@ a:hover,
   color: var(--rc-onInput);
   border: 3px solid rgba(0, 0, 0, .30);
   /* border: calc(var(--vs-line) * 2) solid var(--rc-line); */
-  border-radius: 10rem;
+  border-radius: 3rem;
   word-break: break-word;
 }
 
@@ -904,7 +887,7 @@ a:hover,
   /* display: block; */
   /* max-width: 100%; */
   display: inline-block;
-  width: 270px;
+  width: 207px;
   height: auto;
 
 }
@@ -932,20 +915,6 @@ a:hover,
 
 .c-list--numbered {
   list-style-type: decimal;
-}
-
-.c-list--inline {
-  text-align: center
-}
-.c-list--inline li {
-  display: inline-block;
-}
-.c-list--inline li::after {
-  content: '|';
-  color: #aaa;
-}
-.c-list--inline li:last-child:after {
-  content: '';
 }
 
 /** 
@@ -1063,3 +1032,110 @@ a:hover,
 .is-visible {
   display: block !important;
 }
+
+/* TODO: remove/refactor demo part */
+
+.c-list--inline {
+  text-align: center;
+  font-size: 16px;
+}
+.c-list--inline li {
+  display: inline-block;
+}
+.c-list--inline li::after {
+  content: '|';
+  color: var(--vc-shadow);
+}
+.c-list--inline li:last-child:after {
+  content: '';
+}
+@media (min-width: 512px) {
+  .c-list--inline li:nth-child(2n)::after {
+    content: '';
+  }
+}
+
+#host-url {
+  margin-top: 1rem;
+  height: 20px;
+}
+#host-url > * {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  white-space: nowrap;
+  color: var(--vc-brand-blue);
+
+  transition: opacity .5s;
+}
+#host-url > *:last-child {
+  opacity: 0;
+}
+#host-url.replaced > *:first-child {
+  opacity: 0;
+}
+#host-url.replaced > *:last-child {
+  opacity: 1;
+}
+
+.info-button {
+  display: inline-block;
+  margin: 6rem auto 1.5rem;
+  padding: 0.2rem 1.4rem 0.7rem;
+  width: auto;
+  
+  font-size: 5rem;
+  line-height: 1;
+  text-decoration: none;
+
+  background-color: var(--vc-silver);
+  color: var(--vc-raven);
+}
+
+.c-connect-input {
+  position: relative;
+  margin: 0 auto;
+  max-width: 24rem;
+}
+.c-connect-input .c-connect-input__input {
+  height: 5rem;
+  transition: font-size .5s ease;
+  font-size: 20px;
+}
+.c-connect-input .c-connect-input__input:not(:focus) {
+  background: transparent;
+}
+.c-connect-input__input:focus {
+  font-size: 24px;
+}
+.c-connect-input__input:focus + .c-connect-input__button {
+  color: white;
+  background-color: var(--rc-button);
+}
+.c-connect-input__button {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  transform: translate(0, -50%);
+  width: auto;
+  margin: 0;
+  border-radius: 10rem;
+
+  background-color: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+.c-connect-input__button:hover {
+  color: white;
+  background-color: var(--rc-button);
+}
+.c-connect-input__button svg {
+  overflow: visible;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
