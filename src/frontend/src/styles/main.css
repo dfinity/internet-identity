@@ -647,6 +647,17 @@ a:hover,
   border-radius: 0.4rem;
 }
 
+.c-button__icon svg {
+  height: 100%;
+}
+
+.c-button__icon:focus,
+.c-button__icon:hover {
+  fill: var(--rc-onButton);
+  stroke-width: 1px;
+  stroke: var(--rc-button);
+}
+
 .c-button svg * {
   fill: currentColor;
 }
@@ -743,11 +754,6 @@ a:hover,
   fill: var(--rc-onButton);
   stroke-width: 1px;
   stroke: var(--rc-button);
-}
-
-.c-input__button:focus svg,
-.c-input__button:hover svg {
-  opacity: 0.7;
 }
 
 .c-summary {

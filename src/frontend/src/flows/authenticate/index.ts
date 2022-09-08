@@ -84,7 +84,9 @@ const pageContent = (
         </li>
       </ul>
 
-      <div class="l-section" style="text-align: center;">${infoIcon}</div>
+      <div class="l-section" style="text-align: center;">
+        <button class="c-button__icon">${infoIcon}</button>
+      </div>
     </div>
   </div>
   ${footer}`;
