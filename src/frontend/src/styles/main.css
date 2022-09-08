@@ -136,7 +136,7 @@
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
-  --rc-input-readonly: var(--vc-silver);
+  /* --rc-input-readonly: var(--vc-shadow); */
   --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
 
@@ -612,7 +612,15 @@ a:hover,
   position: relative;
   border: var(--vs-line) solid var(--rc-line);
   border-radius: 4px;
+  
 }
+@media (min-width: 512px) {
+  .c-card--warning {
+    /* TODO: find a better solution to compensate c-card--highlight extra padding */
+    margin: 0 calc(var(--rs-card-bezel) * -2.5);
+  }
+}
+
 
 .c-card--warning::before {
   opacity: 0.75;
@@ -620,7 +628,8 @@ a:hover,
   content: "";
   z-index: var(--vz-backdrop);
   inset: 0;
-  box-shadow: 0 0 2rem var(--rc-warning);
+  /* box-shadow: 0 0 2rem var(--rc-warning); */
+  border: 2px solid var(--rc-warning);
 }
 
 /**
@@ -751,8 +760,9 @@ a:hover,
 
 .c-input--readonly {
   background: var(--rc-input-readonly);
-  color: var(--rc-input-onReadonly);
-  border: var(--vs-line) var(--rc-line) solid;
+  color: var(--rc-text--disabled);
+  /* border: var(--vs-line) var(--rc-line) solid; */
+  border: 3px solid rgba(0, 0, 0, .30);
 }
 
 .c-input__button {
