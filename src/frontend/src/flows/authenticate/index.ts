@@ -1,5 +1,10 @@
 import { html, render } from "lit-html";
-import { icLogo } from "../../components/icons";
+import {
+  icLogo,
+  checkmarkIcon,
+  closeIcon,
+  forwardIcon,
+} from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -33,21 +38,24 @@ const pageContent = (
     <!-- The title is hidden but used for accessibility -->
     <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <p class="t-lead" style="text-align: center;">Connect to<br/><span class="t-strong">${hostName}</span><br/> ${
-  derivationOrigin !== undefined && derivationOrigin !== hostName
-    ? html`(${derivationOrigin})`
-    : ""
-}
+    <p class="t-lead" style="text-align: center;">
+      Connect to<br /><span class="t-strong">${hostName}</span><br />
+      ${derivationOrigin !== undefined && derivationOrigin !== hostName
+        ? html`(${derivationOrigin})`
+        : ""}
     </p>
 
-    <div class="l-section">
+    <div class="l-section c-input c-input--vip">
       <input
         type="text"
         id="userNumberInput"
         placeholder="Enter anchor"
-        class="l-section c-input c-input--vip"
         value="${userNumber !== undefined ? userNumber : ""}"
+        style="width: 100%;"
       />
+      <button id="authorizeButton" class="c-input__button">
+        ${forwardIcon}
+      </button>
 
       <p
         id="invalidAnchorMessage"
@@ -55,10 +63,6 @@ const pageContent = (
       >
         The Identity Anchor is not valid. Please try again.
       </p>
-
-      <button type="button" id="authorizeButton" class="c-button">
-        Start Session
-      </button>
     </div>
 
     <ul class="c-list l-section">
