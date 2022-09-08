@@ -389,7 +389,6 @@ a,
   display: inline;
   color: var(--rc-interaction-text);
   color: inherit;
-  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
