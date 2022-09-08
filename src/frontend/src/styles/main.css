@@ -46,6 +46,8 @@
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@600&family=Roboto:wght@400;500&display=swap");
+
 
 /* I) Settings: Global variables, config switches. */
 
@@ -270,7 +272,9 @@ display:revert; revert to element instead of attribute */
 
 :root {
   /* general styles */
+  /* font-family: "Roboto", sans-serif; */
   font-family: "Montserrat", sans-serif;
+
   font-size: 62.5%; /* 10px */
 
   background: var(--rc-background);
@@ -310,6 +314,10 @@ body {
 
 .t-strong {
   font-weight: bold;
+}
+
+.t-center {
+  text-align: center;
 }
 
 .t-weak {
@@ -352,10 +360,12 @@ body {
 .t-title--main {
   font-size: 2.8rem;
   margin-top: 0.5em;
+  text-align: center;
 }
 
 .t-lead {
   font-size: 1.6rem;
+  text-align: center;
 }
 
 .t-title + .t-lead {
@@ -515,7 +525,7 @@ a:hover,
 }
 
 .c-card--highlight {
-  padding: calc(var(--rs-card-bezel) * 1.25);
+  padding: calc(var(--rs-card-bezel) * 2.5);
   /* background-color: var(--rc-background-transparent); */
   /* border: var(--vs-line) solid var(--rc-line); */
   background: none;
@@ -647,7 +657,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 0.4rem;
+  border-radius: 10rem;
 }
 
 .c-button svg * {
@@ -695,7 +705,9 @@ a:hover,
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
-  border: calc(var(--vs-line) * 2) solid var(--rc-line);
+  border: 3px solid rgba(0, 0, 0, .30);
+  /* border: calc(var(--vs-line) * 2) solid var(--rc-line); */
+  border-radius: 10rem;
   word-break: break-word;
 }
 
@@ -714,7 +726,7 @@ a:hover,
 }
 
 .c-input--vip {
-  font-size: 2.4rem;
+  font-size: 1.8rem;
   font-weight: 600;
   text-align: center;
 }
@@ -724,11 +736,15 @@ a:hover,
 }
 
 .c-input--vip:focus {
-  border-style: double;
-  border-width: calc(var(--vs-line) * 2);
-  border-radius: 4px;
-  border-image-slice: 1;
-  border-image-source: linear-gradient(270deg, var(--rg-brand));
+  background: linear-gradient(#333, #333) padding-box, linear-gradient(330deg, rgba(240,179,84,1) 0%, rgba(223,100,55,1) 50%, rgba(218,57,120,1) 71%, rgba(92,42,128,1) 100%) border-box;
+  border: 3px solid transparent;
+  color: white;
+
+  /* border-style: double; */
+  /* border-width: calc(var(--vs-line) * 2); */
+  /* border-radius: 4px; */
+  /* border-image-slice: 1; */
+  /* border-image-source: linear-gradient(270deg, var(--rg-brand)); */
   outline: none;
   box-shadow: none;
 }
@@ -857,6 +873,17 @@ a:hover,
 
 .c-list--numbered {
   list-style-type: decimal;
+}
+
+.c-list--inline li {
+  display: inline-block;
+}
+.c-list--inline li::after {
+  content: '|';
+  color: #aaa;
+}
+.c-list--inline li:last-child:after {
+  content: '';
 }
 
 /** 

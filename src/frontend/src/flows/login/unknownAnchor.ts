@@ -13,10 +13,9 @@ import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 const pageContent = () => html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
     <div class="c-logo">${icLogo}</div>
-    <article class="l-section">
+    <article class="">
       <hgroup>
-        <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
-        <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
+        <h1 id="loginWelcome" class="t-title t-title--main t-center">Internet Identity</h1>
       <hgroup>
       <div class="l-section">
         <input
@@ -32,26 +31,25 @@ const pageContent = () => html`
     </article>
 
     <aside class="l-section l-section--spacious" aria-label="Other actions">
-      <ul class="t-discreet c-list">
+      <ul class="t-discreet c-list c-list--inline t-center">
         <li class="textLink" id="registerSection">
-          New?
-          <a id="registerButton" class="t-link">Create an Internet Identity Anchor.</a>
+          <a id="registerButton" class="t-link">Create New Anchor</a>
         </li>
         <li class="textLink">
-          Already have an anchor
-          <a id="addNewDeviceButton" class="t-link">
-            but using a new device?
-          </a>
+          <a id="addNewDeviceButton" class="t-link">Associate Device</a>
         </li>
         <li class="textLink">
-          Lost access
-          <a id="recoverButton" class="t-link">
-            and want to recover?
-          </a>
+          <a id="browserCompatibilityButton" class="t-link">Browser Compatibility</a>
+        </li>
+        <li class="textLink">
+          <a id="faqLink" class="t-link" href="/faq">FAQ</a>
+        </li>
+        <li class="textLink">
+          <a id="recoverButton" class="t-link">Lost Access?</a>
         </li>
       </ul>
     </aside>
-    ${navbar}
+    <!-- ${navbar} -->
   </section>
   ${footer}`;
 
