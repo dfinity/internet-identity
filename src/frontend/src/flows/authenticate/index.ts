@@ -33,15 +33,14 @@ const pageContent = (
     <!-- The title is hidden but used for accessibility -->
     <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <p class="t-lead">Authenticating to <span class="t-strong">${hostName}</span> ${
+    <p class="t-lead" style="text-align: center;">Connect to<br/><span class="t-strong">${hostName}</span><br/> ${
   derivationOrigin !== undefined && derivationOrigin !== hostName
-    ? html`(an alias of <span class="t-strong">${derivationOrigin}</span>)`
+    ? html`(${derivationOrigin})`
     : ""
-} using <span class="t-strong">Internet Identity</h1>.</p>
+}
+    </p>
 
     <div class="l-section">
-      <p class="t-paragraph">Enter Anchor:</p>
-
       <input
         type="text"
         id="userNumberInput"
@@ -60,10 +59,6 @@ const pageContent = (
       <button type="button" id="authorizeButton" class="c-button">
         Start Session
       </button>
-    </div>
-
-    <div class="l-divider l-divider--text" aria-label="Other Options">
-      <span class="l-divider__label" aria-hidden>Or</span>
     </div>
 
     <ul class="c-list l-section">
