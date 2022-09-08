@@ -741,6 +741,8 @@ a:hover,
 .c-input__button:focus,
 .c-input__button:hover {
   fill: var(--rc-onButton);
+  stroke-width: 1px;
+  stroke: var(--rc-button);
 }
 
 .c-input__button:focus svg,

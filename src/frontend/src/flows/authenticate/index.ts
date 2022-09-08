@@ -74,7 +74,7 @@ const pageContent = (
           <a id="registerButton" class="t-link">Create Anchor</a>
         </li>
         <li>
-          <a id="recoverButton" class="t-link">Recover Anchor</a>
+          <a id="recoverButton" class="t-link">Lost Access?</a>
         </li>
         <li>
           <a class="t-link" id="manageButton">Manage Anchor</a>
