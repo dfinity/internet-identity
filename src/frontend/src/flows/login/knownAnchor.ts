@@ -18,22 +18,35 @@ const pageContent = (userNumber: bigint) => html`
     <hgroup>
     <div class="l-section">
       <output class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
-      <button type="button" id="login" class="c-button">Authenticate</button>
-      <div class="l-divider l-divider--text" aria-label="Other Options">
-        <span class="l-divider__label" aria-hidden>Or</span>
-      </div>
+      <button type="button" id="login" class="c-button">Authenticate</button>      
     </div>
-    <button type="button" id="loginDifferent" class="c-button c-button--secondary">
-      Use a different Identity Anchor
-    </button>
-    <div class="l-section">
-      <p>
-        Lost access
-        <a id="recoverButton" class="t-link">and want to recover?</a>
-      </p>
-    </div>
-    ${logoutSection("Clear Identity Anchor from browser")}
-    ${navbar}
+
+
+    <a href="/about" class="c-button info-button">ℹ</a>
+
+    <aside aria-label="Other actions">
+      <ul class="t-discreet c-list c-list--inline">
+        <li class="textLink" id="registerSection">
+          <a id="registerButton" class="t-link">Create New Anchor</a>
+        </li>
+        <li class="textLink">
+          <a id="addNewDeviceButton" class="t-link">Associate Device</a>
+        </li>
+        <li class="textLink">
+          <a id="browserCompatibilityButton" class="t-link"
+            >Browser Compatibility</a
+          >
+        </li>
+        <li class="textLink">
+          <a id="faqLink" class="t-link" href="/faq">FAQ</a>
+        </li>
+        <li class="textLink">
+          <a id="recoverButton" class="t-link">Lost Access?</a>
+        </li>
+      </ul>
+    </aside>
+
+    <!--${navbar}-->
   </div>
   ${footer}`;
 

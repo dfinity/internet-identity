@@ -17,6 +17,7 @@ const pageContent = () => html`
       <hgroup>
         <h1 id="loginWelcome" class="t-title t-title--main">Internet Identity</h1>
       <hgroup>
+      
       <div class="l-section">
         <div class="c-connect-input">
           <input
@@ -31,7 +32,9 @@ const pageContent = () => html`
       </div>
     </article>
 
-    <aside class="l-section l-section--spacious" aria-label="Other actions">
+    <a href="/about" class="c-button info-button">ℹ</a>
+
+    <aside aria-label="Other actions">
       <ul class="t-discreet c-list c-list--inline">
         <li class="textLink" id="registerSection">
           <a id="registerButton" class="t-link">Create New Anchor</a>
@@ -40,7 +43,9 @@ const pageContent = () => html`
           <a id="addNewDeviceButton" class="t-link">Associate Device</a>
         </li>
         <li class="textLink">
-          <a id="browserCompatibilityButton" class="t-link">Browser Compatibility</a>
+          <a id="browserCompatibilityButton" class="t-link"
+            >Browser Compatibility</a
+          >
         </li>
         <li class="textLink">
           <a id="faqLink" class="t-link" href="/faq">FAQ</a>
@@ -50,6 +55,7 @@ const pageContent = () => html`
         </li>
       </ul>
     </aside>
+
     <!-- ${navbar} -->
   </section>
   ${footer}`;
