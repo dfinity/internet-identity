@@ -620,6 +620,9 @@ a:hover,
   display: block;
   overflow: hidden;
   margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  display: block;
+  width: 50%;
+  margin: 0 auto;
 }
 
 .c-logo svg {
