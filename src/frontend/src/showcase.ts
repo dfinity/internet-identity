@@ -247,6 +247,11 @@ const init = async () => {
   const pageContent = html`
     <main id="pageContent" aria-live="polite"></main>
     <div id="loaderContainer"></div>
+    <div id="modalContainer" class="modal">
+      <div id="modalContent" class="modal-content">
+      </div>
+      <button id="modalClose">CLOSE</button>
+    </div>
   `;
 
   render(pageContent, document.body);

@@ -157,8 +157,8 @@
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
 
-  --rs-input-bezel: var(--rs-button-bezel);
-  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.75);
+  --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
+  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
   --vs-line-height: 1.35;
@@ -509,7 +509,7 @@ a:hover,
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--vs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
-  border-radius: 2rem;
+  border-radius: 4rem;
   margin-top: var(--rs-card-stack);
 }
 
@@ -654,7 +654,7 @@ a:hover,
 .c-button__icon:focus,
 .c-button__icon:hover {
   fill: var(--rc-onButton);
-  stroke-width: 1px;
+  stroke-width: 0.5px;
   stroke: var(--rc-button);
 }
 
@@ -752,7 +752,7 @@ a:hover,
 .c-input__button:focus,
 .c-input__button:hover {
   fill: var(--rc-onButton);
-  stroke-width: 1px;
+  stroke-width: 0.5px;
   stroke: var(--rc-button);
 }
 
@@ -994,4 +994,42 @@ a:hover,
 
 .is-visible {
   display: block !important;
+}
+
+/* modal */
+
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgb(0, 0, 0); /* Fallback color */
+  background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 2rem auto; /* 15% from the top and centered */
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
 }

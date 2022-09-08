@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { TemplateResult, html, render } from "lit-html";
 import {
   icLogo,
   checkmarkIcon,
@@ -85,7 +85,7 @@ const pageContent = (
       </ul>
 
       <div class="l-section" style="text-align: center;">
-        <button class="c-button__icon">${infoIcon}</button>
+        <button id="infoButton" class="c-button__icon">${infoIcon}</button>
       </div>
     </div>
   </div>
@@ -168,6 +168,7 @@ const init = (
     userNumber,
     authContext.authRequest.derivationOrigin
   );
+
   initManagementBtn();
   initRecovery(connection);
 
@@ -205,6 +206,13 @@ const init = (
     };
   });
 };
+
+function initInfoBtn() {
+  const infoButton = document.getElementById("infoButton") as HTMLAnchorElement;
+  infoButton.onclick = () => {
+    openModal(modalText);
+  };
+}
 
 function initManagementBtn() {
   const manageButton = document.getElementById(
@@ -289,7 +297,38 @@ export const displayPage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
+  initInfoBtn();
 };
+
+function openModal(template: TemplateResult) {
+  const modalClose = document.getElementById("modalClose") as HTMLElement;
+  const eventListener = () => {
+    const modalContainer = document.getElementById(
+      "modalContainer"
+    ) as HTMLElement;
+    modalContainer.style.display = "none";
+
+    modalClose.removeEventListener("click", eventListener);
+    window.removeEventListener("click", windowEventListener);
+  };
+
+  const windowEventListener = (e: Event) => {
+    if (e.target == modalContainer) {
+      eventListener();
+    }
+  };
+
+  const modalContainer = document.getElementById(
+    "modalContainer"
+  ) as HTMLElement;
+  modalContainer.style.display = "block";
+
+  modalClose.addEventListener("click", eventListener);
+  window.addEventListener("click", windowEventListener);
+
+  const modalContent = document.getElementById("modalContent") as HTMLElement;
+  render(modalText, modalContent);
+}
 
 async function handleAuthSuccess(
   loginResult: LoginFlowSuccess,
@@ -330,3 +369,91 @@ const readUserNumber = () => {
   // get rid of null, we use undefined for 'not set'
   return parsedUserNumber === null ? undefined : parsedUserNumber;
 };
+
+const modalText: TemplateResult = html`
+<div id="info-page-1" class="info-page-shown">
+                        <p class="info-strap-paragraph">
+                            <b>Internet Identity is a new way of securely authenticating yourself to
+                            online services, including web3 services that run from blockchains such as
+                            the Internet Computer.</b>
+                        </p>
+                        <p>
+                            To authenticate you must first create an identity "anchor," which is just a simple
+                            number, and then associate devices you own with the anchor. For example, you can
+                            associate phones and laptops with an anchor.
+                        </p>
+                        <p>
+                            An identity anchor is roughly equivalent to a username, and its associated devices
+                            are roughly equivalent to different passwords that work with that username.
+                        </p>
+                        <p>
+                            For example, after entering an anchor, you might authenticate using your phone's Face ID or
+                            PIN keypad features, or using the fingerprint sensor on your laptop...
+                        </p>
+                    </div>
+                    <div id="info-page-2" class="info-page-hidden">
+                        <p>
+                            Remember, to use an identity anchor, you must have one of the associated devices in your
+                            possession, and you must still have control of that device, as these act as its valid passwords.
+                        </p>
+                        <p>
+                            When you use an anchor to authenticate (i.e. "sign-on") to a service, that service does not
+                            actually see your anchor number. Instead, the Internet Identity system presents the service
+                            with a unique pseudonym, which prevents you being tracked across the different services you
+                            use.
+                        </p>
+                        <p>
+                            Your devices authenticate to online services using "private keys" that they keep
+                            inside special secure hardware, which is built-in to modern devices such as phones and laptops,
+                            and "hardware wallets." Unlike traditional passwords, and private key
+                            "seed phrases," these cannot be stolen, because they cannot be
+                            extracted from the secure hardware...
+                        </p>
+                    </div>
+                    <div id="info-page-3" class="info-page-hidden">
+                        <p>
+                            You can create as many individual anchors as you need. For example, you might create
+                            one anchor for use with social media, and another for DeFi. You might associate your
+                            phones and laptops with the anchor you use for social media, and only a
+                            special hardware wallet (such as
+                            <a href="https://www.ledger.com/" target="_blank">Ledger</a>, or
+                            <a href="https://www.yubico.com/" target="_blank">YubiKey</a>) with the anchor you use for
+                            DeFi, which you keep hidden in a fireproof safe, say.
+                        </p>
+                        <p>
+                            If you already have an identity anchor that you wish to use, but this device (or
+                            a hardware wallet) has not yet been associated with that anchor, you must first
+                            associate your device with that anchor.
+                            <a href="">Click here to associate this device with the anchor you wish to use</a>.
+                        </p>
+                        <p>
+                            If you do not have an identity anchor, you must first create a new one that you
+                            can use to authenticate (i.e. "sign-on") to the service. This is a quick and easy
+                            process...
+                        </p>
+                    </div>
+                    <div id="info-page-4" class="info-page-hidden">
+                        <p>
+                            Remember that to use any anchor you will need at least one of its associated devices,
+                            which act as passwords.
+                            Therefore, consider adding two devices to your new anchor, such as a phone and a laptop,
+                            so that if you lose one device, you can still control it using the other (you can
+                            also associate new devices at any time later).
+                        </p>
+                        <p>
+                            If your new anchor will be very important, you can also create a "recovery seed phrase."
+                            This can be written down and hidden in a safe place, in case all your devices
+                            get lost.
+                        </p>
+                        <p>
+                            <a href="">Click here to create a new identity anchor that you can use to authenticate
+                            to this service, and add device(s)</a>.
+                        </p>
+                        <p>
+                            <a href="">Click here to recover access to an existing anchor when you lost its devices</a>.
+                        </p>
+                        <p>
+                            Visit <a href="https://identity.internetcomputer.org" target="_blank">https://identity.internetcomputer.org</a> to manage your anchors.
+                        </p>
+                    </div>
+                    `;
