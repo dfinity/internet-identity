@@ -706,6 +706,46 @@ a:hover,
   color: var(--rc-onWarning);
 }
 
+.c-button--connect {
+  content: "➡";
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  /* color: inherit; */
+}
+
+.c-connect-input {
+  position: relative;
+}
+.c-connect-input__input:focus + .c-connect-input__button {
+  color: white;
+  background-color: var(--rc-button);
+  cursor: pointer;
+}
+.c-connect-input__button {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translate(0, -50%);
+  width: auto;
+  margin: 0;
+
+  background-color: transparent;
+  color: currentColor;
+}
+.c-connect-input__button:hover {
+  color: white;
+  background-color: var(--rc-button);
+}
+.c-connect-input__button svg {
+  overflow: visible;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
 .c-input {
   position: relative;
   display: block;

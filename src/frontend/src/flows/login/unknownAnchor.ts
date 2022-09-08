@@ -2,7 +2,7 @@ import { render, html } from "lit-html";
 import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
-import { icLogo } from "../../components/icons";
+import { forwardIcon, icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { useRecovery } from "../recovery/useRecovery";
@@ -15,23 +15,24 @@ const pageContent = () => html`
     <div class="c-logo">${icLogo}</div>
     <article class="">
       <hgroup>
-        <h1 id="loginWelcome" class="t-title t-title--main t-center">Internet Identity</h1>
+        <h1 id="loginWelcome" class="t-title t-title--main">Internet Identity</h1>
       <hgroup>
       <div class="l-section">
-        <input
-          type="text"
-          class="c-input c-input--vip"
-          id="registerUserNumber"
-          placeholder="Enter Anchor"
-        />
-        <button type="button" id="loginButton" class="c-button">
-          Authenticate
-        </button>
+        <div class="c-connect-input">
+          <input
+            type="text"
+            class="c-input c-input--vip c-connect-input__input"
+            id="registerUserNumber"
+            placeholder="Enter Anchor"
+          />
+          <button type="button" id="loginButton" class="c-button c-connect-input__button">
+            ${forwardIcon}
+          </button>
       </div>
     </article>
 
     <aside class="l-section l-section--spacious" aria-label="Other actions">
-      <ul class="t-discreet c-list c-list--inline t-center">
+      <ul class="t-discreet c-list c-list--inline">
         <li class="textLink" id="registerSection">
           <a id="registerButton" class="t-link">Create New Anchor</a>
         </li>
