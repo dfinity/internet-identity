@@ -159,7 +159,7 @@
 
   --rs-input-bezel: var(--rs-button-bezel);
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.75);
-  --rs-input-stack: var(--rs-button-stack);
+  --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
   --vs-line-height: 1.35;
 }
@@ -389,7 +389,6 @@ a,
   display: inline;
   color: var(--rc-interaction-text);
   color: inherit;
-  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
@@ -510,7 +509,7 @@ a:hover,
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--vs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
-  border-radius: 0.4rem;
+  border-radius: 2rem;
   margin-top: var(--rs-card-stack);
 }
 
@@ -620,6 +619,7 @@ a:hover,
   display: block;
   overflow: hidden;
   margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  font-weight: 600;
 }
 
 .c-logo svg {
@@ -704,9 +704,8 @@ a:hover,
 
 .c-input--vip {
   font-size: 2.4rem;
-  font-weight: 600;
   text-align: center;
-  border-radius: 2rem;
+  border-radius: 9999px;
 }
 
 .c-input--vip::placeholder {
@@ -737,6 +736,11 @@ a:hover,
   transform: translateY(-50%);
   display: flex;
   align-items: center;
+}
+
+.c-input__button:focus,
+.c-input__button:hover {
+  fill: var(--rc-onButton);
 }
 
 .c-input__button:focus svg,
@@ -838,6 +842,17 @@ a:hover,
 .page-signature:hover,
 .page-signature:focus {
   background: var(--grey-050);
+}
+
+.c-list--flex {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.c-list--flex li {
+  margin: 0.5rem;
 }
 
 .c-list li + li {

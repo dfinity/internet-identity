@@ -4,6 +4,7 @@ import {
   checkmarkIcon,
   closeIcon,
   forwardIcon,
+  infoIcon,
 } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
@@ -38,12 +39,14 @@ const pageContent = (
     <!-- The title is hidden but used for accessibility -->
     <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <p class="t-lead" style="text-align: center;">
-      Connect to<br /><span class="t-strong">${hostName}</span><br />
-      ${derivationOrigin !== undefined && derivationOrigin !== hostName
-        ? html`(${derivationOrigin})`
-        : ""}
-    </p>
+    <div class="l-section">
+      <p class="t-lead" style="text-align: center;">
+        <span class="t-strong">Connect to<br />${hostName}</span><br />
+        ${derivationOrigin !== undefined && derivationOrigin !== hostName
+          ? html`(${derivationOrigin})`
+          : ""}
+      </p>
+    </div>
 
     <div class="l-section c-input c-input--vip">
       <input
@@ -65,18 +68,24 @@ const pageContent = (
       </p>
     </div>
 
-    <ul class="c-list l-section">
-      <li>
-        <a id="registerButton" class="t-link">Create Anchor</a>
-      </li>
-      <li>
-        <a id="recoverButton" class="t-link">Recover Anchor</a>
-      </li>
-      <li>
-        <a class="t-link" id="manageButton">Manage Anchor</a>
-      </li>
-    </ul>
-    ${navbar}
+    <div class="l-section">
+      <ul class="c-list--flex">
+        <li>
+          <a id="registerButton" class="t-link">Create Anchor</a>
+        </li>
+        <li>
+          <a id="recoverButton" class="t-link">Recover Anchor</a>
+        </li>
+        <li>
+          <a class="t-link" id="manageButton">Manage Anchor</a>
+        </li>
+        <li>
+          <a class="t-link">FAQ</a>
+        </li>
+      </ul>
+
+      <div class="l-section" style="text-align: center;">${infoIcon}</div>
+    </div>
   </div>
   ${footer}`;
 
