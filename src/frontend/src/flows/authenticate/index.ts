@@ -123,6 +123,7 @@ export const authorizeAuthentication = async (
     });
 
   const userNumber = getUserNumber();
+
   switch (validationResult.result) {
     case "invalid":
       await displayError({
@@ -201,6 +202,24 @@ const init = (
     // Resolve either on successful authentication or after registration
     initRegistration(connection, authContext, userNumber).then(resolve);
     authorizeButton.onclick = () => {
+      // not empty validation
+      if (userNumberInput.value.length === 0) {
+        beep(200, 150, 35);
+
+        let f = 1;
+        const i = setInterval(function () {
+          if (f >= 6)
+            // even only
+            clearInterval(i);
+          f++;
+          document
+            .getElementById("registerButton")
+            ?.classList.toggle("very-faded");
+        }, 150);
+
+        return;
+      }
+
       authenticateUser(connection, authContext).then((authSuccess) => {
         if (authSuccess !== null) {
           resolve(authSuccess);
@@ -293,6 +312,50 @@ export const displayPage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
+
+  // TODO: REMOVE BEFORE COMMIT!
+  // const userNumberInput = document.getElementById(
+  //   "userNumberInput"
+  // ) as HTMLInputElement;
+
+  // userNumberInput.onkeypress = (e: KeyboardEvent) => {
+  //   if (e.key === "Enter") {
+  //     // authenticate if user hits enter
+  //     e.preventDefault();
+  //     // authorizeButton.click();
+  //     return;
+  //   }
+
+  //   const code = e.which ?? e.keyCode;
+  //   if (code > 31 && (code < 48 || code > 57)) {
+  //     beep(100, 700, 15);
+  //     e.preventDefault();
+  //   }
+  // };
+
+  // const authorizeButton = document.getElementById(
+  //   "authorizeButton"
+  // ) as HTMLButtonElement;
+
+  // authorizeButton.addEventListener("click", () => {
+  //   if (userNumberInput.value.length === 0) {
+  //     beep(200, 150, 35);
+
+  //     let f = 1;
+  //     const i = setInterval(function () {
+  //       if (f >= 6)
+  //         // even only
+  //         clearInterval(i);
+  //       f++;
+  //       document
+  //         .getElementById("registerButton")
+  //         ?.classList.toggle("very-faded");
+  //     }, 150);
+
+  //     return;
+  //   }
+  // });
+  // till here
 
   // about
   initAboutModal();
