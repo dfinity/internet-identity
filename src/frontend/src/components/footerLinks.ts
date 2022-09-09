@@ -2,8 +2,6 @@ import { html, render } from "lit-html";
 
 // The About page
 export const footerLinksContent = html`
-  <a href="/about" class="c-button info-button">ℹ</a>
-
   <aside aria-label="Other actions">
     <ul class="t-discreet c-list c-list--inline">
       <li class="textLink" id="registerSection">

@@ -681,6 +681,8 @@ a:hover,
   width: 100%;
   text-align: center;
   border-radius: .5rem;
+
+  cursor: pointer;
 }
 
 .c-button svg * {
@@ -1139,3 +1141,79 @@ a:hover,
   width: 100%;
 }
 
+
+/* about modal related */
+/* TODO: add mobile version */
+#info-page {
+  position: absolute;
+  top: 45px;
+  border: 1px solid #eee;
+  transform: translate(-50%, 0);
+  left: 50%;
+  height: 500px;
+  background-color: rgba(255, 255, 255, 0.97);
+  padding: 5px 13px 5px 13px;
+  width: 400px;
+  text-align: left;
+  font-size: 15px;
+  display: none;
+}
+#info-page-content {
+  left: 0;
+  right: 0;
+  padding: 0;
+  margin: 0;  
+  pointer-events: none; /* otherwise can click links/button below */ 
+}
+
+#info-page b {
+  font-weight: 600;
+}
+#info-page p {
+  margin: 0px 0px 10px 0px;
+}
+
+.info-page-shown, .info-page-hidden {    
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 42px;      
+  -webkit-transition: 0.5s;
+  transition: 0.5s;
+}
+.info-page-hidden {
+  opacity: 0;
+}                    
+.info-strap-paragraph {
+  color: rgba(92,42,128,1);
+  font-size: 17px;
+}
+.info-close-button {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  right: 0px;
+  text-align: right;
+  cursor: pointer;
+  font-size: 25px;
+  padding: 0px 10px 0px 0px;
+  color: #333;                 
+}
+.info-paginate-buttons {   
+  position: absolute;
+  width: 100px;
+  height: 40px;    
+  transform: translate(-50%, 0);
+  left: 50%;                                    
+  font-size: 25px;
+  text-align: center;
+  padding: 0px;
+  bottom: 0px;               
+}
+.pagination-btn {
+  cursor: pointer;   
+}
+.pagination-btn-disabled {
+  opacity: 0.5;
+  cursor: auto;
+}

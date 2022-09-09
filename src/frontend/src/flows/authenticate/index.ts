@@ -25,6 +25,11 @@ import {
 } from "./validateDerivationOrigin";
 import { unreachable } from "../../utils/utils";
 import { footerLinksContent } from "../../components/footerLinks";
+import {
+  aboutButtonContent,
+  aboutModalContent,
+  initAboutModal,
+} from "../../components/aboutModal";
 
 const pageContent = (
   hostName: string,
@@ -67,7 +72,7 @@ const pageContent = (
       </span>
     </p>
 
-    ${footerLinksContent}
+    ${aboutButtonContent} ${aboutModalContent} ${footerLinksContent}
 
     <!-- ${navbar} -->
   </div>
@@ -281,7 +286,10 @@ export const displayPage = (
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
 
-  // TODO: for demo only
+  // about
+  initAboutModal();
+
+  // host-url switching
   const host = document.querySelector("#host-url") as HTMLElement;
   host.addEventListener("click", () => host.classList.toggle("replaced"));
   host.addEventListener("mouseenter", () => host.classList.add("replaced"));

@@ -3,12 +3,17 @@ import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
-import { logoutSection, initLogout } from "../../components/logout";
+import { initLogout } from "../../components/logout";
 import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
 import { footerLinksContent } from "../../components/footerLinks";
+import {
+  aboutButtonContent,
+  aboutModalContent,
+  initAboutModal,
+} from "../../components/aboutModal";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--highlight">
@@ -23,7 +28,7 @@ const pageContent = (userNumber: bigint) => html`
     </div>
 
 
-    ${footerLinksContent}
+    ${aboutButtonContent} ${aboutModalContent} ${footerLinksContent}
 
     <!--${navbar}-->
   </div>
@@ -35,6 +40,9 @@ export const loginKnownAnchor = async (
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(userNumber), container);
+
+  initAboutModal();
+
   return init(userNumber, connection);
 };
 

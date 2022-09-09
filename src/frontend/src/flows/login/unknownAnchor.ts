@@ -10,6 +10,11 @@ import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 import { footerLinksContent } from "../../components/footerLinks";
+import {
+  aboutButtonContent,
+  aboutModalContent,
+  initAboutModal,
+} from "../../components/aboutModal";
 
 const pageContent = () => html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
@@ -33,7 +38,7 @@ const pageContent = () => html`
       </div>
     </article>
 
-    ${footerLinksContent}
+    ${aboutButtonContent} ${aboutModalContent} ${footerLinksContent}
 
     <!-- ${navbar} -->
   </section>
@@ -49,6 +54,7 @@ export const loginUnknownAnchor = async (
     initLinkDevice(connection);
     initRegister(connection, resolve, reject);
     initRecovery(connection);
+    initAboutModal();
   });
 };
 
