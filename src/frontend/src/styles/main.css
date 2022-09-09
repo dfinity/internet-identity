@@ -645,6 +645,11 @@ a:hover,
   max-width: 14rem;
   font-size: 0;
 }
+/* preserve size during loading */
+.c-logo img {
+  width: 140px;
+  height: 140px;
+}
 @media (max-width: 512px) {
   .c-logo {
     margin-top: 0;

@@ -15,6 +15,7 @@ import {
   aboutModalContent,
   initAboutModal,
 } from "../../components/aboutModal";
+import { beep } from "../../utils/sound";
 
 const pageContent = () => html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
@@ -103,12 +104,36 @@ const initLogin = (
       e.preventDefault();
       loginButton.click();
     }
+
+    const code = e.which ?? e.keyCode;
+    if (code > 31 && (code < 48 || code > 57)) {
+      beep(100, 700, 15);
+      e.preventDefault();
+    }
   };
 
   // always select the input
   userNumberInput.select();
 
   loginButton.onclick = async () => {
+    // not empty validation
+    if (userNumberInput.value.length === 0) {
+      beep(200, 150, 35);
+
+      let f = 1;
+      const i = setInterval(function () {
+        if (f >= 6)
+          // even only
+          clearInterval(i);
+        f++;
+        document
+          .getElementById("registerButton")
+          ?.classList.toggle("very-faded");
+      }, 150);
+
+      return;
+    }
+
     const userNumber = parseUserNumber(userNumberInput.value);
     if (userNumber === null) {
       return resolve({

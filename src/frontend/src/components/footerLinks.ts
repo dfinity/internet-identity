@@ -11,7 +11,7 @@ export const footerLinksContent = html`
         <a id="addNewDeviceButton" class="t-link">Associate Device</a>
       </li>
       <li class="textLink">
-        <a id="browserCompatibilityButton" class="t-link"
+        <a id="browserCompatibilityButton" class="t-link" href="/about"
           >Browser Compatibility</a
         >
       </li>
