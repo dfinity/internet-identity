@@ -518,7 +518,6 @@ a:hover,
   display: block;
   position: relative;
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
-  user-input: none;
   background-color: var(--rc-background-transparent);
   border-radius: 0.4rem;
   margin-top: var(--rs-card-stack);
@@ -530,6 +529,10 @@ a:hover,
   /* border: var(--vs-line) solid var(--rc-line); */
   background: none;
   text-align: center;
+
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
 }
 
 .c-card--highlight::before {
