@@ -30,6 +30,7 @@ import {
   aboutModalContent,
   initAboutModal,
 } from "../../components/aboutModal";
+import { beep } from "../../utils/sound";
 
 const pageContent = (
   hostName: string,
@@ -174,11 +175,18 @@ const init = (
     "userNumberInput"
   ) as HTMLInputElement;
 
-  userNumberInput.onkeypress = (e) => {
+  userNumberInput.onkeypress = (e: KeyboardEvent) => {
     if (e.key === "Enter") {
       // authenticate if user hits enter
       e.preventDefault();
       authorizeButton.click();
+      return;
+    }
+
+    const code = e.which ?? e.keyCode;
+    if (code > 31 && (code < 48 || code > 57)) {
+      beep(100, 700, 15);
+      e.preventDefault();
     }
   };
 
