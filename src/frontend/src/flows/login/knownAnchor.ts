@@ -27,7 +27,10 @@ const pageContent = (userNumber: bigint) => html`
       <button type="button" id="login" class="c-button">Authenticate</button>      
     </div>
 
-
+    <button type="button" id="loginDifferent" class="c-button c-button--secondary">
+      Use a different Identity Anchor
+    </button>
+    
     ${aboutButtonContent} ${aboutModalContent} ${footerLinksContent}
 
     <!--${navbar}-->

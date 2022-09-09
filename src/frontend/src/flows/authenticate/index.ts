@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { forwardIcon, icLogo, infoIcon } from "../../components/icons";
+import { forwardIcon, icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import {
@@ -69,7 +69,7 @@ const pageContent = (
       <span>
         ${derivationOrigin !== undefined && derivationOrigin !== hostName
           ? derivationOriginSection(derivationOrigin)
-          : "icp://6hsbt-vqaaa-aaaaf-aaafq-cai.ic0.app"}
+          : hostName}
       </span>
     </p>
 

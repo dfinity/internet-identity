@@ -1,10 +1,12 @@
 // utility function to make been with specified duration, freq. and volume
-const myAudioContext = new AudioContext();
 export const beep = (
   duration?: number,
   frequency?: number,
   volume?: number
 ): Promise<void> => {
+  // The AudioContext is allowed to start or created only after a user gesture on the page
+  const myAudioContext = new AudioContext();
+
   return new Promise((resolve, reject) => {
     duration = duration ?? 200;
     frequency = frequency ?? 440;
