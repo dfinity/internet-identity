@@ -8,6 +8,7 @@ import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { useRecovery } from "../recovery/useRecovery";
+import { footerLinksContent } from "../../components/footerLinks";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--highlight">
@@ -22,29 +23,7 @@ const pageContent = (userNumber: bigint) => html`
     </div>
 
 
-    <a href="/about" class="c-button info-button">ℹ</a>
-
-    <aside aria-label="Other actions">
-      <ul class="t-discreet c-list c-list--inline">
-        <li class="textLink" id="registerSection">
-          <a id="registerButton" class="t-link">Create New Anchor</a>
-        </li>
-        <li class="textLink">
-          <a id="addNewDeviceButton" class="t-link">Associate Device</a>
-        </li>
-        <li class="textLink">
-          <a id="browserCompatibilityButton" class="t-link"
-            >Browser Compatibility</a
-          >
-        </li>
-        <li class="textLink">
-          <a id="faqLink" class="t-link" href="/faq">FAQ</a>
-        </li>
-        <li class="textLink">
-          <a id="recoverButton" class="t-link">Lost Access?</a>
-        </li>
-      </ul>
-    </aside>
+    ${footerLinksContent}
 
     <!--${navbar}-->
   </div>
