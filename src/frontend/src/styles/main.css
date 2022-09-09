@@ -707,10 +707,10 @@ a:hover,
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
 .c-button:not([disabled]):active {
-  opacity: 0.5;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
-  outline: 2px dotted transparent;
-  outline-offset: 2px;
+  /* opacity: 0.5; */
+  /* box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction); */
+  /* outline: 2px dotted transparent; */
+  /* outline-offset: 2px; */
 }
 
 .c-button[disabled],
@@ -1144,6 +1144,7 @@ a:hover,
 
 /* about modal related */
 /* TODO: add mobile version */
+/* TODO: adapt modal to content size */
 #info-page {
   position: absolute;
   top: 45px;
@@ -1158,6 +1159,14 @@ a:hover,
   font-size: 15px;
   display: none;
 }
+
+@media (max-width: 512px) {
+  #info-page {
+    width: 320px;
+    height: 620px;
+  }
+}
+
 #info-page-content {
   left: 0;
   right: 0;
