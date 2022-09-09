@@ -3,8 +3,9 @@ import { html } from "lit-html";
 export const footer = html`<footer class="l-footer">
   <a
     class="page-signature t-center"
-    aria-label="DFINITY homepage"
+    aria-label="Internet Computer homepage"
     href="https://internetcomputer.org/"
+    rel="noopener noreferrer"
     target="_blank"
     ><svg
       id="ic-on-chain-logo"
