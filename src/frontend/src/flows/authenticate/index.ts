@@ -233,10 +233,12 @@ function initManagementBtn() {
   const manageButton = document.getElementById(
     "manageButton"
   ) as HTMLAnchorElement;
-  manageButton.onclick = () => {
-    window.location.hash = "";
-    window.location.reload();
-  };
+  if( manageButton !== null ) {
+      manageButton.onclick = () => {
+          window.location.hash = "";
+          window.location.reload();
+      };
+  }
 }
 
 const initRegistration = async (
