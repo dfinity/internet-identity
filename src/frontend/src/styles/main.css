@@ -550,6 +550,8 @@ a:hover,
   background-color: black;
   opacity: .027;
   box-shadow: 0px 0px 5px 5px black;
+
+  transition: all .5s ease;
 }
 
 .c-card--narrow {
@@ -644,6 +646,8 @@ a:hover,
   width: 52.5%;
   max-width: 14rem;
   font-size: 0;
+
+  transition: all .15s ease;
 }
 /* preserve size during loading */
 .c-logo img {
@@ -835,6 +839,8 @@ a:hover,
 .l-footer {
   padding: var(--rs-footer-gutter);
   margin-top: var(--rs-footer-stack);
+
+  transition: all .15s ease;
 }
 
 /**
@@ -1098,6 +1104,8 @@ a:hover,
 
   background-color: var(--vc-silver);
   color: var(--vc-raven);
+
+  transition: all .15s ease;
 }
 
 .c-connect-input {
@@ -1119,6 +1127,7 @@ a:hover,
 .c-connect-input__input:focus + .c-connect-input__button {
   color: white;
   background-color: var(--rc-button);
+  transition: all .15s ease;
 }
 .c-connect-input__button {
   position: absolute;
@@ -1237,3 +1246,26 @@ a:hover,
   transition: 0.05s;                
   opacity: 0.15;
 }
+
+/* loading animation */
+
+.loading {
+  pointer-events: none;
+}
+.loading .c-card--highlight::before {
+  height: 0%;
+}
+.loading .c-logo,
+.loading .c-card--highlight .info-button,
+.loading .c-card--highlight aside,
+.loading .l-footer {
+  opacity: 0;
+}
+.loading .c-connect-input .c-connect-input__button {
+  opacity: 0;
+}
+.loading .c-connect-input .c-connect-input__input {
+  border: 0;
+}
+  
+

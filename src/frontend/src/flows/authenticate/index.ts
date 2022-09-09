@@ -102,6 +102,10 @@ export interface AuthSuccess {
 export const authorizeAuthentication = async (
   connection: Connection
 ): Promise<AuthSuccess> => {
+  const title = document.querySelector(".t-title--main") as HTMLElement;
+  const titleValue = title.innerText;
+  title.innerText = "Connecting...";
+
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -120,7 +124,9 @@ export const authorizeAuthentication = async (
         authContext.authRequest.derivationOrigin
       );
       return [authContext, validationResult];
-    });
+    }, false);
+
+  title.innerText = titleValue;
 
   const userNumber = getUserNumber();
 

@@ -35,11 +35,17 @@ const endLoader = () => {
   render(html``, container);
 };
 
-export const withLoader = async <A>(action: () => Promise<A>): Promise<A> => {
-  startLoader();
+export const withLoader = async <A>(
+  action: () => Promise<A>,
+  showLoader = true
+): Promise<A> => {
+  document.body.classList.add("loading");
+
+  if (showLoader) startLoader();
   try {
     return await action();
   } finally {
-    endLoader();
+    document.body.classList.remove("loading");
+    if (showLoader) endLoader();
   }
 };

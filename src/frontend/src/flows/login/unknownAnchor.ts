@@ -1,5 +1,5 @@
 import { render, html } from "lit-html";
-import { Connection } from "../../utils/iiConnection";
+import { Connection, LoginResult } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { forwardIcon, icLogo } from "../../components/icons";
@@ -142,7 +142,24 @@ const initLogin = (
         message: `${userNumber} doesn't parse as a number`,
       });
     }
-    const result = await withLoader(() => connection.login(userNumber));
+
+    const title = document.querySelector(".t-title--main") as HTMLElement;
+    const titleValue = title.innerText;
+    title.innerText = "Connecting...";
+
+    let result: LoginResult | undefined;
+    try {
+      result = await withLoader(() => connection.login(userNumber), false);
+    } catch (err) {
+      console.error(err);
+    }
+
+    title.innerText = titleValue;
+
+    if (result === undefined) {
+      throw new Error("no result");
+    }
+
     if (result.kind === "loginSuccess") {
       setUserNumber(userNumber);
     }

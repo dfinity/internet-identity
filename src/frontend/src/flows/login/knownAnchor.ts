@@ -63,7 +63,18 @@ const init = async (
     loginButton.onclick = async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const result = await withLoader(() => connection.login(userNumber));
+
+      const title = document.querySelector(".t-title--main") as HTMLElement;
+      const titleValue = title.innerText;
+      title.innerText = "Connecting...";
+
+      const result = await withLoader(
+        () => connection.login(userNumber),
+        false
+      );
+
+      title.innerText = titleValue;
+
       resolve(apiResultToLoginFlowResult(result));
     };
 
