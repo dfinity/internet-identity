@@ -102,10 +102,6 @@ export interface AuthSuccess {
 export const authorizeAuthentication = async (
   connection: Connection
 ): Promise<AuthSuccess> => {
-  const title = document.querySelector(".t-title--main") as HTMLElement;
-  const titleValue = title.innerText;
-  title.innerText = "Connecting...";
-
   const [authContext, validationResult]: [AuthContext, ValidationResult] =
     await withLoader(async () => {
       const authContext = await waitForAuthRequest();
@@ -125,8 +121,6 @@ export const authorizeAuthentication = async (
       );
       return [authContext, validationResult];
     }, false);
-
-  title.innerText = titleValue;
 
   const userNumber = getUserNumber();
 
@@ -239,11 +233,11 @@ function initManagementBtn() {
   const manageButton = document.getElementById(
     "manageButton"
   ) as HTMLAnchorElement;
-  if( manageButton !== null ) {
-      manageButton.onclick = () => {
-          window.location.hash = "";
-          window.location.reload();
-      };
+  if (manageButton !== null) {
+    manageButton.onclick = () => {
+      window.location.hash = "";
+      window.location.reload();
+    };
   }
 }
 
@@ -289,11 +283,17 @@ const authenticateUser = async (
       toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
       return null;
     }
-    const result = await withLoader(() => connection.login(userNumber));
+
+    // TODO: update not happy path
+    (document.querySelector(".t-title--main") as HTMLElement).innerText =
+      "Connecting...";
+
+    const result = await withLoader(() => connection.login(userNumber), false);
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
-      return await withLoader(() =>
-        handleAuthSuccess(loginResult, authContext)
+      return await withLoader(
+        () => handleAuthSuccess(loginResult, authContext),
+        false
       );
     }
     await displayError({
