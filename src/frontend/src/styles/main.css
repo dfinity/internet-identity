@@ -388,10 +388,10 @@ a,
   color: inherit;
   cursor: pointer;
   background-image: linear-gradient(
-          to right,
-          var(--vc-brand-pink),
-          var(--vc-brand-pink) 50%,
-          #000 50%
+    to right,
+    var(--vc-brand-pink),
+    var(--vc-brand-pink) 50%,
+    #000 50%
   );
   background-size: 200% 100%;
   background-position: -100%;
