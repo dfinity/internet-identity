@@ -73,7 +73,6 @@
   --vc-brand-pink: #ed1e79;
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
-  --vc-brand-blue--dark: #1f6ef4;
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -122,13 +121,12 @@
   --rc-line: var(--rc-light);
   --rc-line-inverted: var(--rc-dark);
 
-  --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--vc-brand-blue--dark);
+  --rc-interaction: var(--vc-brand-pink);
 
   --rc-button: var(--rc-dark);
   --rc-onButton: var(--rc-light);
 
-  --rc-warning: var(--vc-brand-pink);
+  --rc-warning: var(--vc-brand-orange);
   --rc-onWarning: var(--vc-snow);
 
   --rc-input: var(--rc-light);
@@ -387,10 +385,21 @@ body {
 a,
 .t-link {
   display: inline;
-  color: var(--rc-interaction-text);
   color: inherit;
-  text-decoration: underline;
   cursor: pointer;
+  background-image: linear-gradient(
+          to right,
+          var(--vc-brand-pink),
+          var(--vc-brand-pink) 50%,
+          #000 50%
+  );
+  background-size: 200% 100%;
+  background-position: -100%;
+  position: relative;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: all 0.2s ease-in-out;
+  border-bottom: 1px solid #000;
 }
 
 .t-link:disabled,
@@ -401,18 +410,27 @@ a,
 .t-link--discreet {
   font-weight: normal;
   text-decoration: none;
+  border-bottom-color: transparent;
 }
 
 a:focus,
 a:hover,
 .t-link:not([disabled]):focus,
 .t-link:not([disabled]):hover {
-  text-decoration: none;
+  background-position: 0;
+  border-bottom-color: var(--vc-brand-pink);
 }
 
 .t-link--discreet:not([disabled]):focus,
 .t-link--discreet:not([disabled]):hover {
-  text-decoration: underline;
+  border-bottom-color: transparent;
+}
+
+a:focus .t-link__icon,
+a:hover .t-link__icon,
+.t-link:not([disabled]):focus .t-link__icon,
+.t-link:not([disabled]):hover .t-link__icon {
+  color: var(--vc-brand-pink);
 }
 
 .t-link__icon {
@@ -421,6 +439,7 @@ a:hover,
   height: calc(1em * var(--vs-line-height));
   aspect-ratio: 1;
   vertical-align: middle;
+  transition: color 0.2s ease-out;
 }
 
 .t-link__icon svg {
@@ -644,6 +663,7 @@ a:hover,
   width: 100%;
   text-align: center;
   border-radius: 0.4rem;
+  transition: box-shadow 0.2s ease-in-out;
 }
 
 .c-button svg * {
@@ -659,17 +679,26 @@ a:hover,
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
   opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  box-shadow: 0 0 0 2px var(--rc-button), 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+.c-button.c-button--secondary:not([disabled]):focus,
+.c-button.c-button--secondary:not([disabled]):hover {
+  box-shadow: 0 0 0 2px var(--rc-onButton), 0 0 3px 5px var(--rc-interaction);
 }
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
 .c-button:not([disabled]):active {
   opacity: 0.5;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  box-shadow: 0 0 0 2px var(--rc-button), 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+.c-button:not([disabled]):active {
+  box-shadow: 0 0 0 2px var(--rc-onButton), 0 0 3px 5px var(--rc-interaction);
 }
 
 .c-button[disabled],
@@ -820,22 +849,6 @@ a:hover,
   top: 50%;
   left: 0;
   transform: translate(-50%, -50%);
-}
-
-.page-signature {
-  display: block;
-  padding: var(--rs-footer-gutter);
-  transition: background 0.2s;
-}
-
-.page-signature img {
-  display: block;
-  max-width: 100%;
-}
-
-.page-signature:hover,
-.page-signature:focus {
-  background: var(--grey-050);
 }
 
 .c-list li + li {
