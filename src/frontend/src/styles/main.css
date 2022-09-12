@@ -398,7 +398,7 @@ a,
   position: relative;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  transition: all 0.2s ease-in-out;
+  transition: background-position 0.2s ease-in-out;
   border-bottom: 1px solid #000;
 }
 
@@ -439,7 +439,7 @@ a:hover .t-link__icon,
   height: calc(1em * var(--vs-line-height));
   aspect-ratio: 1;
   vertical-align: middle;
-  transition: color 0.2s ease-out;
+  transition: color 0.2s linear;
 }
 
 .t-link__icon svg {
