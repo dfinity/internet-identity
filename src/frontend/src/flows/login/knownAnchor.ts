@@ -3,7 +3,7 @@ import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
-import { initLogout } from "../../components/logout";
+import { initLogout, logoutSection } from "../../components/logout";
 import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
@@ -32,6 +32,7 @@ const pageContent = (userNumber: bigint) => html`
     </button>
     
     ${aboutButtonContent} ${aboutModalContent} ${footerLinksContent}
+    ${logoutSection("Clear Anchor from browser")}
 
     <!--${navbar}-->
   </div>
