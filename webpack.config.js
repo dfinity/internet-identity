@@ -98,6 +98,8 @@ const defaults = {
 
     new HtmlWebpackPlugin({
       template: "src/frontend/assets/index.html",
+      // Don't inject the index.js in production, because the canister actually injects it (see http.rs for more details)
+      inject: !isProduction,
     }),
   ],
 };
