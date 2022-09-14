@@ -88,8 +88,7 @@ const defaults = {
         {
           from: path.join(__dirname, "src", "frontend", "assets"),
           to: path.join(__dirname, "dist"),
-          // allow HtmlWebpackPlugin to handle serving the index.html file locally
-          // this avoids some Safari issues with the CSP headers served by http.rs
+          // We want the html file from HtmlWebpackPlugin, not the original one
           filter: (resourcePath) => {
             return !resourcePath.endsWith("index.html");
           },
