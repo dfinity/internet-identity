@@ -55,7 +55,7 @@ const defaults = {
   devtool,
   optimization: {
     minimize: isProduction,
-    minimizer: [new CssMinimizerPlugin()],
+    minimizer: [new CssMinimizerPlugin(), "..."],
   },
   output: { clean: true },
   resolve: {
