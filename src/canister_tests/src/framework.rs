@@ -369,7 +369,7 @@ base-uri 'none';\
 frame-ancestors 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
-style-src-elem 'unsafe-inline' https://fonts\\.googleapis\\.com;\
+style-src-elem 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
 font-src https://fonts\\.gstatic\\.com;\
 upgrade-insecure-requests;$"
     )

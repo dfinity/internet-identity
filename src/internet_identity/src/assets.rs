@@ -20,6 +20,7 @@ pub enum ContentType {
     ICO,
     WEBP,
     SVG,
+    CSS,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -75,7 +76,7 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
+fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 9] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     [
         (
@@ -108,6 +109,12 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             include_bytes!("../../../dist/index.js.gz"),
             ContentEncoding::GZip,
             ContentType::JS,
+        ),
+        (
+            "/index.css",
+            include_bytes!("../../../dist/index.css"),
+            ContentEncoding::Identity,
+            ContentType::CSS,
         ),
         (
             "/loader.webp",
