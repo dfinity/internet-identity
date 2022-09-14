@@ -4,6 +4,8 @@ const CopyPlugin = require("copy-webpack-plugin");
 const CompressionPlugin = require("compression-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+
 require("dotenv").config();
 
 /** Read the II canister ID from dfx's local state */
@@ -53,6 +55,7 @@ const defaults = {
   devtool,
   optimization: {
     minimize: isProduction,
+    minimizer: [new CssMinimizerPlugin(), "..."],
   },
   output: { clean: true },
   resolve: {
