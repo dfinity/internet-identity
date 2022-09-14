@@ -15,6 +15,7 @@ impl ContentType {
         match self {
             ContentType::HTML => "text/html".to_string(),
             ContentType::JS => "text/javascript".to_string(),
+            ContentType::CSS => "text/css".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
@@ -190,7 +191,7 @@ fn security_headers() -> Vec<HeaderField> {
              frame-ancestors 'none';\
              form-action 'none';\
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-             style-src-elem 'unsafe-inline' https://fonts.googleapis.com;\
+             style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
              font-src https://fonts.gstatic.com;\
              upgrade-insecure-requests;"
             )

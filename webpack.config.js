@@ -3,6 +3,7 @@ const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const CompressionPlugin = require("compression-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 require("dotenv").config();
 
 /** Read the II canister ID from dfx's local state */
@@ -53,6 +54,7 @@ const defaults = {
   optimization: {
     minimize: isProduction,
   },
+  output: { clean: true },
   resolve: {
     extensions: [".js", ".ts"],
     fallback: {
@@ -62,7 +64,13 @@ const defaults = {
   module: {
     rules: [
       { test: /\.(ts)$/, loader: "ts-loader" },
-      { test: /\.css$/, use: ["style-loader", "css-loader"] },
+      {
+        test: /\.css$/,
+        use: [
+          isProduction ? MiniCssExtractPlugin.loader : "style-loader",
+          "css-loader",
+        ],
+      },
       {
         test: /\.(png|jpg|gif)$/i,
         type: "asset/resource",
@@ -70,6 +78,7 @@ const defaults = {
     ],
   },
   plugins: [
+    ...(isProduction ? [new MiniCssExtractPlugin()] : []),
     new webpack.ProvidePlugin({
       Buffer: [require.resolve("buffer/"), "Buffer"],
       process: require.resolve("process/browser"),
@@ -99,6 +108,8 @@ const defaults = {
     new HtmlWebpackPlugin({
       template: "src/frontend/assets/index.html",
       // Don't inject the index.js in production, because the canister actually injects it (see http.rs for more details)
+      // When true, injects (a hot-reloading version of) the built javascript, which in turn inserts the CSS (through "style-loader").
+      // This value is read by the template; see index.html for more details.
       inject: !isProduction,
     }),
   ],
