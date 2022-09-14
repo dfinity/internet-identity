@@ -90,13 +90,15 @@ const defaults = {
           to: path.join(__dirname, "dist"),
           // allow HtmlWebpackPlugin to handle serving the index.html file locally
           // this avoids some Safari issues with the CSP headers served by http.rs
-          filter: isProduction
-            ? undefined
-            : async (resourcePath) => {
-                return !resourcePath.endsWith("index.html");
-              },
+          filter: (resourcePath) => {
+            return !resourcePath.endsWith("index.html");
+          },
         },
       ],
+    }),
+
+    new HtmlWebpackPlugin({
+      template: "src/frontend/assets/index.html",
     }),
   ],
 };
@@ -119,16 +121,9 @@ module.exports = [
     },
     plugins: [
       ...defaults.plugins,
-      // allow HtmlWebpackPlugin to handle serving the index.html file locally
-      // this avoids some Safari issues with the CSP headers served by http.rs
-      ...(isProduction
-        ? []
-        : [
-            new HtmlWebpackPlugin({
-              template: "src/frontend/assets/index.html",
-            }),
-            new InjectCanisterIdPlugin(),
-          ]),
+      // Inject canister ID when using the dev server, so that the local file can be used
+      // (instead of the HTML served by the canister)
+      ...(isProduction ? [] : [new InjectCanisterIdPlugin()]),
     ],
   },
   {
@@ -141,6 +136,5 @@ module.exports = [
       port: 8080,
       historyApiFallback: true, // serves the app on all routes, which we use because the app itself does the routing
     },
-    plugins: [...defaults.plugins, new HtmlWebpackPlugin()],
   },
 ];

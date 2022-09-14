@@ -237,15 +237,6 @@ const pageContent = html`
 `;
 
 const init = async () => {
-  // Some very simple content, just enough for the II pages to load correctly. The rest of the index.html
-  // is provided in the webpack config by HtmlWebpackPlugin.
-  const pageContent = html`
-    <main id="pageContent" aria-live="polite"></main>
-    <div id="loaderContainer"></div>
-  `;
-
-  render(pageContent, document.body);
-
   // We use the URL's path to route to the correct page.
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a
