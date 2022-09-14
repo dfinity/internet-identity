@@ -437,7 +437,6 @@ dependencies = [
  "ic-certification",
  "ic-crypto-internal-basic-sig-iccsa",
  "ic-error-types",
- "ic-interfaces",
  "ic-state-machine-tests",
  "ic-types 0.8.0",
  "internet_identity_interface",
