@@ -22,12 +22,20 @@ const pageContent = (userNumber: bigint | null) => html`
       placeholder="Enter Anchor"
       value=${userNumber ?? ""}
     />
-    <button class="c-button c-button--primary" id="addDeviceUserNumberContinue">
-      Continue
-    </button>
-    <button class="c-button c-button--secondary" id="addDeviceUserNumberCancel">
-      Cancel
-    </button>
+    <div class="c-button-group">
+      <button
+        class="c-button c-button--secondary"
+        id="addDeviceUserNumberCancel"
+      >
+        Cancel
+      </button>
+      <button
+        class="c-button c-button--primary"
+        id="addDeviceUserNumberContinue"
+      >
+        Continue
+      </button>
+    </div>
   </div>
 `;
 

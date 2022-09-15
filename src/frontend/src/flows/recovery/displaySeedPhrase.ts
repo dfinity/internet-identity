@@ -28,12 +28,18 @@ const pageContent = (seedPhrase: string) => html`
       >${seedPhrase}</output
     >
 
-    <button id="seedCopy" data-clipboard-target="#seedPhrase" class="c-button">
-      Copy
-    </button>
-    <button id="displaySeedPhraseContinue" class="c-button is-hidden">
-      Continue
-    </button>
+    <div class="c-button-group">
+      <button
+        id="seedCopy"
+        data-clipboard-target="#seedPhrase"
+        class="c-button"
+      >
+        Copy
+      </button>
+      <button id="displaySeedPhraseContinue" class="c-button is-hidden">
+        Continue
+      </button>
+    </div>
   </article>
 `;
 

@@ -14,10 +14,11 @@ const pageContent = (userNumber: bigint) => html`
     <div class="c-logo">${icLogo}</div>
     <hgroup class="l-section">
       <h1 class="t-title t-title--main">Welcome back!</h1>
-      <p class="t-lead">Authenticate using Internet Identity.</p>
+      <!--  paragraph is hidden but included for accessibility -->
+      <p class="t-lead is-hidden">Authenticate using Internet Identity.</p>
     <hgroup>
     <div class="l-section">
-      <output class="c-input c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
+      <output class="c-input c-input--vip c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
       <button type="button" id="login" class="c-button">Authenticate</button>
       <div class="l-divider l-divider--text" aria-label="Other Options">
         <span class="l-divider__label" aria-hidden>Or</span>
@@ -28,8 +29,7 @@ const pageContent = (userNumber: bigint) => html`
     </button>
     <div class="l-section">
       <p>
-        Lost access
-        <a id="recoverButton" class="t-link">and want to recover?</a>
+        <a id="recoverButton" class="t-link">Lost Access?</a>
       </p>
     </div>
     ${logoutSection("Clear Identity Anchor from browser")}
