@@ -178,9 +178,6 @@ export const styleguide = html`
           <div class="c-card">
             <h2 class="t-title">Default card</h2>
           </div>
-          <div class="c-card c-card--outline">
-            <h2 class="t-title">Outlined Card</h2>
-          </div>
           <div class="c-card c-card--narrow">
             <h2 class="t-title">Narrow Card</h2>
           </div>

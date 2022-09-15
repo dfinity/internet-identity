@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
-import { icLogo } from "../../components/icons";
-import { navbar } from "../../components/navbar";
+import { icLogo, attentionIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import {
   getUserNumber,
@@ -30,64 +29,61 @@ const pageContent = (
   userNumber?: bigint,
   derivationOrigin?: string
 ) => html` <div class="l-container c-card c-card--highlight">
+    <!-- The title is hidden but used for accessibility -->
+    <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <h1 class="t-title t-title--main">Internet Identity</h1>
-    <p class="t-lead">Authenticate to service:</p>
-    <div class="c-input t-vip t-vip--small c-input--readonly">${hostName}</div>
-    ${derivationOrigin !== undefined && derivationOrigin !== hostName
-      ? derivationOriginSection(derivationOrigin)
-      : ""}
-    <p class="t-paragraph">Use Identity Anchor:</p>
-
-    <input
-      type="text"
-      id="userNumberInput"
-      placeholder="Enter anchor"
-      class="l-section c-input c-input--vip"
-      value="${userNumber !== undefined ? userNumber : ""}"
-    />
-
-    <p
-      id="invalidAnchorMessage"
-      class="anchor-error-message is-hidden t-paragraph t-strong"
-    >
-      The Identity Anchor is not valid. Please try again.
-    </p>
-
-    <button type="button" id="authorizeButton" class="c-button">
-      Start Session
-    </button>
-
-    <div id="registerSection" class="l-section">
-      <button
-        type="button"
-        id="registerButton"
-        class="c-button c-button--secondary"
-      >
-        Create New Identity Anchor
-      </button>
+    <div class="l-section">
+      <p class="t-lead" style="text-align: center;">
+        Connect to<br />
+        <span class="t-strong">${hostName}</span>
+        ${derivationOrigin !== undefined && derivationOrigin !== hostName
+          ? html` <span class="c-tooltip t-link__icon"
+              >${attentionIcon}<i
+                class="c-tooltip__message c-card c-card--narrow"
+                >An alternative origin of ${derivationOrigin}</i
+              ></span
+            >`
+          : ""}
+        <br />
+      </p>
     </div>
 
-    <ul class="c-list l-section">
-      <li>
-        <a id="recoverButton" class="t-link">Lost access?</a>
-      </li>
-      <li>
-        <a class="t-link" id="manageButton">Manage your Identity Anchor</a>
-      </li>
-    </ul>
-    ${navbar}
+    <div class="l-section c-input c-input--vip c-input--anchor">
+      <input
+        type="text"
+        id="userNumberInput"
+        placeholder="Enter anchor"
+        value="${userNumber !== undefined ? userNumber : ""}"
+        style="width: 100%;"
+      />
+
+      <p
+        id="invalidAnchorMessage"
+        class="anchor-error-message is-hidden t-paragraph t-strong"
+      >
+        The Identity Anchor is not valid. Please try again.
+      </p>
+    </div>
+
+    <button id="authorizeButton" class="c-button">Authorize</button>
+    <div class="l-section">
+      <ul class="c-list--flex">
+        <li>
+          <a id="registerButton" class="t-link">Create Anchor</a>
+        </li>
+        <li>
+          <a id="recoverButton" class="t-link">Lost Access?</a>
+        </li>
+        <li>
+          <a class="t-link" id="manageButton">Manage Anchor</a>
+        </li>
+        <li>
+          <a class="t-link">FAQ</a>
+        </li>
+      </ul>
+    </div>
   </div>
   ${footer}`;
-
-const derivationOriginSection = (derivationOrigin: string) => html` <p
-    class="t-paragraph"
-  >
-    This service is an alias of:
-  </p>
-  <output class="c-input c-input--readonly t-vip t-vip--small">
-    ${derivationOrigin}
-  </output>`;
 
 export interface AuthSuccess {
   userNumber: bigint;
@@ -287,6 +283,11 @@ export const displayPage = (
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(origin, userNumber, derivationOrigin), container);
+
+  const userNumberInput = document.getElementById(
+    "userNumberInput"
+  ) as HTMLInputElement;
+  setInputFilter(userNumberInput, (c) => /^\d*\.?\d*$/.test(c));
 };
 
 async function handleAuthSuccess(
@@ -328,3 +329,65 @@ const readUserNumber = () => {
   // get rid of null, we use undefined for 'not set'
   return parsedUserNumber === null ? undefined : parsedUserNumber;
 };
+
+/* Adds a filter to the input that only allows the given regex.
+ * For more info see https://stackoverflow.com/questions/469357/html-text-input-allow-only-numeric-input
+ */
+function setInputFilter(
+  textbox: HTMLInputElement,
+  inputFilter: (value: string) => boolean
+): void {
+  [
+    "input",
+    "keydown",
+    "keyup",
+    "mousedown",
+    "mouseup",
+    "select",
+    "contextmenu",
+    "drop",
+    "focusout",
+  ].forEach(function (event) {
+    textbox.addEventListener(
+      event,
+      function (
+        this: (HTMLInputElement | HTMLTextAreaElement) & {
+          oldValue: string;
+          oldSelectionStart: number | null;
+          oldSelectionEnd: number | null;
+        }
+      ) {
+        if (inputFilter(this.value)) {
+          this.oldValue = this.value;
+          this.oldSelectionStart = this.selectionStart;
+          this.oldSelectionEnd = this.selectionEnd;
+        } else {
+          const parent = textbox.parentNode as HTMLElement;
+
+          if (
+            parent !== undefined &&
+            !parent.classList.contains("flash-error")
+          ) {
+            parent.classList.add("flash-error");
+            setTimeout(() => parent.classList.remove("flash-error"), 2000);
+          }
+
+          if (Object.prototype.hasOwnProperty.call(this, "oldValue")) {
+            this.value = this.oldValue;
+            if (
+              this.oldSelectionStart !== null &&
+              this.oldSelectionEnd !== null
+            ) {
+              this.setSelectionRange(
+                this.oldSelectionStart,
+                this.oldSelectionEnd
+              );
+            }
+          } else {
+            this.value = "";
+          }
+        }
+      }
+    );
+  });
+}

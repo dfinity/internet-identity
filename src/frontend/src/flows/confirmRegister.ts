@@ -24,21 +24,23 @@ const pageContent = html`
       <p class="t-paragraph confirm-paragraph">
         Please confirm to add your device.
       </p>
-      <button
-        type="submit"
-        class="c-button"
-        id="confirmRegisterButton"
-        disabled
-      >
-        Confirm
-      </button>
-      <button
-        type="button"
-        id="cancelButton"
-        class="c-button c-button--secondary"
-      >
-        Cancel
-      </button>
+      <div class="c-button-group">
+        <button
+          type="button"
+          id="cancelButton"
+          class="c-button c-button--secondary"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="c-button"
+          id="confirmRegisterButton"
+          disabled
+        >
+          Confirm
+        </button>
+      </div>
     </form>
   </div>
 `;

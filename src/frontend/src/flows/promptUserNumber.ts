@@ -14,10 +14,12 @@ const pageContent = (title: string, userNumber: bigint | null) => html`
       placeholder="Enter Anchor"
       value=${userNumber ?? ""}
     />
-    <button id="userNumberContinue" class="c-button">Continue</button>
-    <button id="userNumberCancel" class="c-button c-button--secondary">
-      Cancel
-    </button>
+    <div class="c-button-group">
+      <button id="userNumberCancel" class="c-button c-button--secondary">
+        Cancel
+      </button>
+      <button id="userNumberContinue" class="c-button">Continue</button>
+    </div>
   </div>
 `;
 

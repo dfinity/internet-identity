@@ -20,18 +20,20 @@ const pageContent = (userNumber: bigint) => html`
         your device.
       </p>
     </hgroup>
-    <button
-      id="recover-with-device__continue"
-      class="c-button c-button--primary"
-    >
-      Continue
-    </button>
-    <button
-      id="recover-with-device__cancel"
-      class="c-button c-button--secondary"
-    >
-      Cancel
-    </button>
+    <div class="c-button-group">
+      <button
+        id="recover-with-device__cancel"
+        class="c-button c-button--secondary"
+      >
+        Cancel
+      </button>
+      <button
+        id="recover-with-device__continue"
+        class="c-button c-button--primary"
+      >
+        Continue
+      </button>
+    </div>
   </article>
 `;
 

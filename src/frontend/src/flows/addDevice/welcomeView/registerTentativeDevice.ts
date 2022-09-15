@@ -29,19 +29,19 @@ const pageContent = () => html`
       maxlength="64"
       class="c-input"
     />
-    <div class="l-section">
+    <div class="c-button-group">
+      <button
+        class="c-button c-button--secondary"
+        id="registerTentativeDeviceCancel"
+      >
+        Cancel
+      </button>
       <button
         class="c-button"
         id="registerTentativeDeviceContinue"
         class="primary"
       >
         Continue
-      </button>
-      <button
-        class="c-button c-button--secondary"
-        id="registerTentativeDeviceCancel"
-      >
-        Cancel
       </button>
     </div>
   </article>

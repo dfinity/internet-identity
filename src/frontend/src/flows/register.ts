@@ -36,8 +36,7 @@ const pageContent = html`
         spellcheck="false"
         class="c-input"
       />
-      <div class="l-section">
-        <button type="submit" class="c-button">Create</button>
+      <div class="c-button-group">
         <button
           id="registerCancel"
           type="button"
@@ -45,6 +44,7 @@ const pageContent = html`
         >
           Cancel
         </button>
+        <button type="submit" class="c-button">Create</button>
       </div>
     </form>
   </div>

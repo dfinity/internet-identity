@@ -53,9 +53,9 @@ const pageContent = (userNumber: bigint, message?: string) => html`
         <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
         <div id="warnings"></div>
     </details>
-    <div class="l-section">
-      <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
+    <div class="c-button-group">
       <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">Cancel</button>
+      <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
     </div>
   </article>
 `;

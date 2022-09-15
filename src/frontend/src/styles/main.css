@@ -74,6 +74,7 @@
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
+  --vc-brand-alt: rgba(215, 205, 235, 1);
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -95,7 +96,6 @@
   --vz-background: 1;
   --vz-foreground: 2;
   --vz-tooltip: 10;
-  --vz-modal: 20;
   --vz-loader: 30;
 
   /*
@@ -125,7 +125,8 @@
   --rc-interaction: var(--vc-brand-blue);
   --rc-interaction-text: var(--vc-brand-blue--dark);
 
-  --rc-button: var(--rc-dark);
+  --rc-button: var(--vc-brand-purple);
+  --rc-button-secondary: rgba(215, 205, 235, 0.5);
   --rc-onButton: var(--rc-light);
 
   --rc-warning: var(--vc-brand-pink);
@@ -142,6 +143,9 @@
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
+  --rg-brand-alt: var(--vc-brand-alt), white;
+  --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
+
   /* reference tokens: sizes */
   --rs-footer-stack: calc(var(--vs-stack) * 1.5);
 
@@ -157,9 +161,9 @@
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
 
-  --rs-input-bezel: var(--rs-button-bezel);
-  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.75);
-  --rs-input-stack: var(--rs-button-stack);
+  --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
+  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
+  --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
   --vs-line-height: 1.35;
 }
@@ -288,6 +292,9 @@ body {
 body {
   font-size: 1.6rem;
   line-height: var(--vs-line-height);
+  background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
+  background-size: 100% 100%;
+  min-height: 100vh;
 }
 
 /**
@@ -458,7 +465,7 @@ a:hover,
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
   margin-bottom: calc(var(--vs-stack) * 2);
-  border-top: var(--vs-line) var(--rc-line) solid;
+  border-top: var(--vs-line) var(--vc-brand-alt) solid;
 }
 
 .l-divider--text {
@@ -475,7 +482,7 @@ a:hover,
 .l-divider--text::after {
   content: "";
   flex-grow: 1;
-  border-top: var(--vs-line) var(--rc-line) solid;
+  border-top: var(--vs-line) var(--vc-brand-alt) solid;
 }
 
 .l-divider__label {
@@ -516,36 +523,12 @@ a:hover,
 .c-card--highlight {
   padding: calc(var(--rs-card-bezel) * 1.25);
   background-color: var(--rc-background-transparent);
-  border: var(--vs-line) solid var(--rc-line);
-}
-
-.c-card--highlight::before {
-  content: " ";
-  position: absolute;
-  z-index: var(--vz-backdrop);
-  top: 50%;
-  left: 50%;
-  width: 120%;
-  aspect-ratio: 1;
-  /**
-  * There is no need to have a translate3d here, 
-  * but there is an issue with the blur filter in Safari.
-  * This forces the browser to be rendered on the GPU.
-  */
-  transform: translate3d(-50%, -50%, 0);
-
-  border-radius: 50%;
-  background: linear-gradient(145deg, var(--rg-brand));
-  filter: blur(8rem);
-  opacity: 0.8;
+  box-shadow: 0 1rem 1rem var(--vc-brand-alt);
+  border-radius: 2rem;
 }
 
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
-}
-
-.c-card--outline {
-  border: var(--vs-line) var(--rc-line-inverted) solid;
 }
 
 @media (max-width: 512px) {
@@ -607,7 +590,7 @@ a:hover,
   opacity: 0.75;
   position: absolute;
   content: "";
-  z-index: var(--vz-backdrop);
+  z-index: 0;
   inset: 0;
   box-shadow: 0 0 2rem var(--rc-warning);
 }
@@ -619,11 +602,12 @@ a:hover,
   display: block;
   overflow: hidden;
   margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  font-weight: 600;
 }
 
 .c-logo svg {
   display: block;
-  width: 50%;
+  width: 25%;
   margin: 0 auto;
 }
 
@@ -638,12 +622,23 @@ a:hover,
 .c-button {
   background: var(--rc-button);
   color: var(--rc-onButton);
-  padding: var(--rs-button-bezel);
+  padding: calc(0.8 * var(--rs-button-bezel)) var(--rs-button-bezel);
   margin-top: var(--rs-button-stack);
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 0.4rem;
+  border-radius: 99999px;
+}
+
+.c-button__icon svg {
+  height: 100%;
+}
+
+.c-button__icon:focus,
+.c-button__icon:hover {
+  fill: var(--rc-onButton);
+  stroke-width: 0.5px;
+  stroke: var(--rc-button);
 }
 
 .c-button svg * {
@@ -651,7 +646,7 @@ a:hover,
 }
 
 .c-button--secondary {
-  background: var(--rc-onButton);
+  background: var(--rc-button-secondary);
   color: var(--rc-button);
   border: var(--vs-line) solid var(--rc-line);
 }
@@ -687,12 +682,18 @@ a:hover,
   position: relative;
   display: block;
   width: 100%;
-  padding: var(--rs-input-bezel-narrow) var(--rs-input-bezel);
+  padding: var(--rs-input-bezel-narrow) calc(3 * var(--rs-input-bezel));
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
   border: calc(var(--vs-line) * 2) solid var(--rc-line);
   word-break: break-word;
+}
+
+.c-button-group {
+  display: flex;
+  gap: var(--vs-inline);
+  margin-top: var(--vs-stack);
 }
 
 .c-input.has-error,
@@ -711,21 +712,22 @@ a:hover,
 
 .c-input--vip {
   font-size: 2.4rem;
-  font-weight: 600;
   text-align: center;
+  border-radius: 999999px;
 }
 
 .c-input--vip::placeholder {
   font-weight: normal;
 }
 
-.c-input--vip:focus {
+.c-input--vip:focus-within {
   border-style: double;
   border-width: calc(var(--vs-line) * 2);
-  border-radius: 4px;
-  border-image-slice: 1;
-  border-image-source: linear-gradient(270deg, var(--rg-brand));
-  outline: none;
+  border-color: transparent;
+  background-image: linear-gradient(white, white),
+    linear-gradient(270deg, var(--rg-brand));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
   box-shadow: none;
 }
 
@@ -740,6 +742,15 @@ a:hover,
   top: 50%;
   right: var(--rs-input-bezel);
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.c-input__button:focus,
+.c-input__button:hover {
+  fill: var(--rc-onButton);
+  stroke-width: 0.5px;
+  stroke: var(--rc-button);
 }
 
 .c-summary {
@@ -788,7 +799,7 @@ a:hover,
   align-items: center;
   justify-content: center;
   margin-top: calc(var(--vs-gutter) * 10);
-  border-top: var(--vs-line) var(--rc-line) solid;
+  border-top: var(--vs-line) var(--vc-brand-alt) solid;
   padding-top: var(--vs-bezel);
   overflow: hidden;
 }
@@ -802,7 +813,7 @@ a:hover,
   position: absolute;
   opacity: 0.5;
   top: 0;
-  background: radial-gradient(var(--rc-line), transparent);
+  background: radial-gradient(var(--vc-brand-alt), transparent);
   background-size: 80% 160%;
   background-repeat: no-repeat;
   background-position: center 170%;
@@ -836,6 +847,17 @@ a:hover,
 .page-signature:hover,
 .page-signature:focus {
   background: var(--grey-050);
+}
+
+.c-list--flex {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.c-list--flex li {
+  margin: 0.5rem;
 }
 
 .c-list li + li {
@@ -896,6 +918,7 @@ a:hover,
   min-width: 15rem;
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
+  background-color: var(--rc-background);
 }
 
 .c-tooltip__message--right {
@@ -969,4 +992,40 @@ a:hover,
 
 .is-visible {
   display: block !important;
+}
+
+@keyframes flash-error {
+  0% {
+    background-image: linear-gradient(white, white),
+      linear-gradient(270deg, var(--rg-brand));
+  }
+  25% {
+    background-image: linear-gradient(white, white),
+      linear-gradient(270deg, var(--rg-brand-bruised));
+  }
+  75% {
+    background-image: linear-gradient(white, white),
+      linear-gradient(270deg, var(--rg-brand-bruised));
+  }
+  100% {
+    background-image: linear-gradient(white, white),
+      linear-gradient(270deg, var(--rg-brand));
+  }
+}
+
+.c-input--anchor.flash-error {
+  animation-name: flash-error;
+  animation-duration: 6s;
+}
+
+.c-input--anchor.flash-error::after {
+  content: "Anchors only consist of digits";
+  padding: var(--rs-card-bezel); /* TODO */
+  position: absolute;
+  background: white;
+  border-radius: 20px;
+  top: 6rem;
+  left: 0px;
+  right: 0px;
+  font-size: 70%;
 }
