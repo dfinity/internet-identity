@@ -433,7 +433,6 @@ dependencies = [
  "candid",
  "flate2",
  "hex",
- "ic-cdk",
  "ic-certification",
  "ic-crypto-internal-basic-sig-iccsa",
  "ic-error-types",
@@ -3080,21 +3079,6 @@ dependencies = [
 
 [[package]]
 name = "ic-types"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e78ec6f58886cdc252d6f912dc794211bd6bbc39ddc9dcda434b2dc16c335b3"
-dependencies = [
- "base32",
- "crc32fast",
- "hex",
- "serde",
- "serde_bytes",
- "sha2 0.9.9",
- "thiserror",
-]
-
-[[package]]
-name = "ic-types"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a7d9569a4c91d5c9c202c1666f799a9761bab70a2b59464ee78c45b005e47b8"
@@ -3245,19 +3229,23 @@ version = "0.1.0"
 dependencies = [
  "base64 0.13.0",
  "candid",
+ "canister_tests",
  "captcha",
  "hex",
  "hex-literal 0.2.2",
  "ic-cdk",
  "ic-cdk-macros",
  "ic-certified-map",
- "ic-types 0.3.0",
+ "ic-error-types",
+ "ic-state-machine-tests",
+ "ic-types 0.8.0",
  "internet_identity_interface",
  "lazy_static",
  "lodepng",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.3",
+ "regex",
  "serde",
  "serde_bytes",
  "serde_cbor",

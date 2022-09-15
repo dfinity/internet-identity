@@ -29,10 +29,15 @@ candid = "0.7"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-certified-map = "0.3"
-ic-types = "0.3"
 
 [dev-dependencies]
+canister_tests = { path = "../canister_tests" }
 hex-literal = "0.2.1"
+ic-error-types = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
+regex = "1.5.6"
+
 
 [features]
 # the dummy_captcha feature which ensures the captcha string is always "a"
