@@ -78,7 +78,13 @@ const pageContent = (
           <a class="t-link" id="manageButton">Manage Anchor</a>
         </li>
         <li>
-          <a class="t-link">FAQ</a>
+          <a
+            class="t-link"
+            href="/faq"
+            target="_blank"
+            rel="noopener noreferrer"
+            >FAQ</a
+          >
         </li>
       </ul>
     </div>
