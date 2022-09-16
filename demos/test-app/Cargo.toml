@@ -3,7 +3,7 @@
 [package]
 name = "test_app"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,14 +12,14 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-base64 = "0.13.0"
+base64 = "0.13"
 lazy_static = "1.4"
 candid = "0.7"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-certified-map = "0.3"
-sha2 = "^0.9" # set bound to match ic-certified-map bound
+sha2 = "^0.10" # set bound to match ic-certified-map bound
 serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"
-serde_with = "1.14"
+serde_with = "2.0"
