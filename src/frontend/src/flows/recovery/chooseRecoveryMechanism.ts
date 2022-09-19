@@ -12,7 +12,7 @@ const pageContent = (devices: DeviceData[]) => html`
         backup now.
       </p>
     </hgroup>
-    <div class="l-horizontal l-section">
+    <div class="l-horizontal l-stack">
       <button
         ?disabled=${hasRecoveryPhrase(devices)}
         class="c-button c-button--secondary"
@@ -32,7 +32,7 @@ const pageContent = (devices: DeviceData[]) => html`
         <div class="t-weak">Use an extra security key</div>
       </button>
     </div>
-    <div class="l-section">
+    <div class="l-stack">
       <button id="skipRecovery" class="c-button">Add recovery later</button>
     </div>
   </article>

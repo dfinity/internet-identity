@@ -25,7 +25,7 @@ const pageContent = () => html`
       `,
       htmlElement: "div",
     })}
-    <div class="l-section">
+    <div class="l-stack">
       <button id="displayWarningAddRecovery" class="c-button">
         Add a recovery mechanism to an Identity Anchor
       </button>

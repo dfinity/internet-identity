@@ -4,9 +4,9 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 const pageContent = () => html`
   <div class="l-container c-card c-card--highlight c-card--highlight">
     <h1 class="t-title t-title--main">Choose a device</h1>
-    <div class="l-section">
+    <div class="l-stack">
       <h2 class="t-title">Recovery devices</div>
-      <ol class="c-list l-section" id="deviceList"></ol>
+      <ol class="c-list l-stack" id="deviceList"></ol>
     </div>
   </div>
 `;

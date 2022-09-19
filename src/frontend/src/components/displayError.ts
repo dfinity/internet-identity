@@ -26,7 +26,7 @@ const pageContent = (options: ErrorOptions) => html`
       htmlElement: "div",
     })}
 
-    <div class="l-section">
+    <div class="l-stack">
       <button id="displayErrorPrimary" class="c-button c-button--primary">
         ${options.primaryButton}
       </button>

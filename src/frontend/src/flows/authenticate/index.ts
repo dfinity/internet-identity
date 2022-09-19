@@ -32,7 +32,7 @@ const pageContent = (
     <!-- The title is hidden but used for accessibility -->
     <h1 class="is-hidden">Internet Identity</h1>
     <div class="c-logo">${icLogo}</div>
-    <div class="l-section">
+    <div class="l-stack">
       <p class="t-lead" style="text-align: center;">
         Connect to<br />
         <span class="t-strong">${hostName}</span>
@@ -48,7 +48,7 @@ const pageContent = (
       </p>
     </div>
 
-    <div class="l-section c-input c-input--vip c-input--anchor">
+    <div class="l-stack c-input c-input--vip c-input--anchor">
       <input
         type="text"
         id="userNumberInput"
@@ -66,7 +66,7 @@ const pageContent = (
     </div>
 
     <button id="authorizeButton" class="c-button">Authorize</button>
-    <div class="l-section">
+    <div class="l-stack">
       <ul class="c-list--flex">
         <li>
           <a id="registerButton" class="t-link">Create Anchor</a>

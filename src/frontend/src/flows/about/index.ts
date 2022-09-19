@@ -5,7 +5,7 @@ import { compatibilityData } from "../../components/compatibilityChart";
 const pageContent = html`
   <div class="l-container l-container--wide c-card c-card--highlight">
     <h1 class="t-title t-title--main">About</h1>
-    <div class="l-section">
+    <div class="l-stack">
       <h2 class="t-title">Internet Identity</h2>
       <p class="t-paragraph">
         Internet Identity is the identity provider for the Internet Computer: A
@@ -17,14 +17,14 @@ const pageContent = html`
         >.
       </p>
     </div>
-    <div class="l-section">
+    <div class="l-stack">
       <h2 class="t-title">Compatibility</h2>
       <p class="t-paragraph">${compatibilityData.note}</p>
 
-      <div class="l-horizontal l-section">
+      <div class="l-horizontal l-stack">
         <div class="about__compatibility-flexchild">
           <h3 class="t-title">For Desktop</h3>
-          <ul class="c-list c-list--bulleted l-section">
+          <ul class="c-list c-list--bulleted l-stack">
             ${compatibilityData.desktop.map(
               (browser) => html`<li>${browser}</li>`
             )}
@@ -32,7 +32,7 @@ const pageContent = html`
         </div>
         <div class="about__compatibility-flexchild">
           <h3 class="t-title">For Mobile</h3>
-          <ul class="c-list c-list--bulleted l-section">
+          <ul class="c-list c-list--bulleted l-stack">
             ${compatibilityData.mobile.map(
               (browser) => html`<li>${browser}</li>`
             )}

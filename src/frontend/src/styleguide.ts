@@ -58,7 +58,7 @@ export const styleguide = html`
   </style>
   <section class="styleguide">
     <h1 class="t-title t-title--main">Design Patterns</h1>
-    <article class="l-section c-card c-card--highlight">
+    <article class="l-stack c-card c-card--highlight">
       <h1 class="t-title t-title--main">Typography</h1>
       <p class="t-lead">
         The font used all over the app is called "Montserrat" and is loaded from
@@ -75,7 +75,7 @@ export const styleguide = html`
         styling. To help style text element we have a bunch of utility classes
         that can be used.
       </p>
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Tiltes</h2>
         <section class="demo" aria-label="Titles Demo">
           <h1 class="t-title t-title--main">Large Title</h1>
@@ -87,7 +87,7 @@ export const styleguide = html`
           <code>.t-title--main</code> modifier class.
         </p>
       </aside>
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Paragraphs</h2>
         <section class="demo" aria-label="Paragraphs Demo">
           <p class="t-lead">This is a lead paragraph</p>
@@ -100,7 +100,7 @@ export const styleguide = html`
           used to style any other paragraph.
         </p>
       </aside>
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Various text helpers</h2>
         <section class="demo" aria-label="Verious elements Demo">
           <p class="t-paragraph">
@@ -128,7 +128,7 @@ export const styleguide = html`
       </aside>
     </article>
 
-    <article class="l-section  c-card c-card--highlight">
+    <article class="l-stack  c-card c-card--highlight">
       <h1 class="t-title t-title--main">Layout</h1>
       <p class="t-lead">
         We use a bunch of layout classes to style the
@@ -136,18 +136,18 @@ export const styleguide = html`
         are placed.
       </p>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Sections</h2>
         <p class="t-lead">
           A section, much like a text-paragraph, is a visually distinct area of
           the app. In our case it just sets a space to the top. It can be used
-          with the <code>.l-section</code> class. Sometimes we want there to be
+          with the <code>.l-stack</code> class. Sometimes we want there to be
           more spaces between sections. In that case we can use the
-          <code>.l-section--spacious</code> modifier class.
+          <code>.l-stack--spacious</code> modifier class.
         </p>
       </aside>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Divider</h2>
         <section class="demo" aria-label="Paragraphs Demo">
           <hr class="l-divider" />
@@ -165,14 +165,14 @@ export const styleguide = html`
       </aside>
     </article>
 
-    <article class="l-section c-card c-card--highlight">
+    <article class="l-stack c-card c-card--highlight">
       <h1 class="t-title t-title--main">Components</h1>
       <p class="t-lead">
         Components are the building blocks of the app. They consist of visual
         patterns that are used all over the app.
       </p>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Cards</h2>
         <section class="demo" aria-label="Cards Demo">
           <div class="c-card">
@@ -199,7 +199,7 @@ export const styleguide = html`
         </p>
       </aside>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title">Form Elements</h2>
         <section class="demo" aria-label="Form Elements Demo">
           <input type="text" placeholder="Text Input" class="c-input" />
@@ -225,7 +225,7 @@ export const styleguide = html`
         </p>
       </aside>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title">Lists</h2>
         <section class="demo" aria-label="List Elements Demo">
           <ul class="c-list">
@@ -234,13 +234,13 @@ export const styleguide = html`
             <li>Default list item III</li>
           </ul>
 
-          <ul class="c-list c-list--bulleted l-section">
+          <ul class="c-list c-list--bulleted l-stack">
             <li>Bulleted list item I</li>
             <li>Bulleted list item II</li>
             <li>Bulleted list item III</li>
           </ul>
 
-          <ul class="c-list c-list--numbered l-section">
+          <ul class="c-list c-list--numbered l-stack">
             <li>Numbered list item I</li>
             <li>Numbered list item II</li>
             <li>Numbered list item III</li>
@@ -252,7 +252,7 @@ export const styleguide = html`
         </p>
       </aside>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Details / Summary</h2>
         <section class="demo" aria-label="Details / Summary Demo">
           <details>
@@ -269,7 +269,7 @@ export const styleguide = html`
         </p>
       </aside>
 
-      <aside class="l-section demo-section">
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
           <div class="c-logo">${icLogo}</div>
