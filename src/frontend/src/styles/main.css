@@ -119,7 +119,7 @@
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
 
-  --rc-line: var(--rc-light);
+  --rc-line: var(--vc-brand-alt);
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
@@ -465,7 +465,7 @@ a:hover,
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
   margin-bottom: calc(var(--vs-stack) * 2);
-  border-top: var(--vs-line) var(--vc-brand-alt) solid;
+  border-top: var(--vs-line) var(--rc-line) solid;
 }
 
 .l-divider--text {
@@ -482,7 +482,7 @@ a:hover,
 .l-divider--text::after {
   content: "";
   flex-grow: 1;
-  border-top: var(--vs-line) var(--vc-brand-alt) solid;
+  border-top: var(--vs-line) var(--rc-line) solid;
 }
 
 .l-divider__label {
@@ -523,7 +523,7 @@ a:hover,
 .c-card--highlight {
   padding: calc(var(--rs-card-bezel) * 1.25);
   background-color: var(--rc-background-transparent);
-  box-shadow: 0 1rem 1rem var(--vc-brand-alt);
+  box-shadow: 0 1rem 1rem var(--rc-line);
   border-radius: 2rem;
 }
 
@@ -799,7 +799,7 @@ a:hover,
   align-items: center;
   justify-content: center;
   margin-top: calc(var(--vs-gutter) * 10);
-  border-top: var(--vs-line) var(--vc-brand-alt) solid;
+  border-top: var(--vs-line) var(---rc-line) solid;
   padding-top: var(--vs-bezel);
   overflow: hidden;
 }
@@ -813,7 +813,7 @@ a:hover,
   position: absolute;
   opacity: 0.5;
   top: 0;
-  background: radial-gradient(var(--vc-brand-alt), transparent);
+  background: radial-gradient(var(--rc-line), transparent);
   background-size: 80% 160%;
   background-repeat: no-repeat;
   background-position: center 170%;
