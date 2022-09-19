@@ -8,7 +8,7 @@ export const logoutSection = (
   alternativeLabel?: string
 ): TemplateResult => html`<div
   id="logoutBox"
-  class="l-section l-section--spacious"
+  class="l-stack l-stack--spacious"
 >
   <button type="button" class="t-link" id="logoutButton">
     <i class="t-link__icon">${logoutIcon}</i>

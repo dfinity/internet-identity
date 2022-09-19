@@ -28,7 +28,7 @@ const pageContent = (
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
 
-    <div class="l-section">
+    <div class="l-stack">
       ${shouldOfferToProtect(device)
         ? html` <p class="t-paragraph">
               By making your recovery phrase protected, you will need to input

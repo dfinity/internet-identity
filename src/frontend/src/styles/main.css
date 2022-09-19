@@ -489,11 +489,11 @@ a:hover,
   display: inline-block;
 }
 
-.l-section {
+.l-stack {
   display: block;
   margin-top: calc(var(--vs-stack) * 3);
 }
-.l-section--spacious {
+.l-stack--spacious {
   margin-top: calc(var(--vs-stack) * 5);
 }
 

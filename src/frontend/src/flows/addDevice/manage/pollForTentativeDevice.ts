@@ -20,7 +20,7 @@ const pageContent = (userNumber: bigint) => html`
         steps to add your new device:
       </p>
     </hgroup>
-    <ol class="c-list c-list--numbered l-section">
+    <ol class="c-list c-list--numbered l-stack">
       <li>
         On your <em>new</em> device:<br />
         Open <strong class="t-strong">https://identity.ic0.app</strong>

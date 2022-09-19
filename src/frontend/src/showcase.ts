@@ -228,7 +228,7 @@ const pageContent = html`
     }
   </style>
   <h1 class="t-title t-title--main">showcase</h1>
-  <div class="showcase-grid l-section">
+  <div class="showcase-grid l-stack">
     ${Object.entries(iiPages).map(([key, _]) => {
       return html`<aside>
         <a href="/${key}">

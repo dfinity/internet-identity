@@ -36,9 +36,9 @@ const pageContent = (
     >
       ${tentativeRegistrationInfo.verification_code}
     </output>
-    <div class="l-section">
+    <div class="l-stack">
       <p>Time remaining: <span id="timer"></span></p>
-      <div class="l-section">
+      <div class="l-stack">
         <button id="showCodeCancel" class="c-button c-button--secondary">Cancel</button>
       </div>
     </div>

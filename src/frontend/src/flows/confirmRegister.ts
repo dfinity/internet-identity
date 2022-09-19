@@ -19,7 +19,7 @@ const pageContent = html`
     <h1 class="t-title t-title--main">Confirm new device</h1>
     <form id="confirmForm">
       <p class="captcha-status-text">…</p>
-      <img id="captchaImg" class="c-img-block l-section" alt="captcha image" />
+      <img id="captchaImg" class="c-img-block l-stack" alt="captcha image" />
       <input id="captchaInput" class="c-input" />
       <p class="t-paragraph confirm-paragraph">
         Please confirm to add your device.

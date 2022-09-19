@@ -24,7 +24,7 @@ const pageContent = html`
       </h1>
       <p class="t-lead">Please provide a name for your device.</p>
     </hgroup>
-    <form id="registerForm" class="l-section">
+    <form id="registerForm" class="l-stack">
       <input
         id="registerAlias"
         placeholder="Device name"

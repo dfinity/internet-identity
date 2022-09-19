@@ -24,7 +24,7 @@ const pageContent = () => html`
         pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
       />
-      <div class="l-section">
+      <div class="l-stack">
         <button type="submit" id="deviceAliasContinue" class="c-button">
           Add Device
         </button>
