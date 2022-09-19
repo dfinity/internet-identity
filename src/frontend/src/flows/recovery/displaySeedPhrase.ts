@@ -25,13 +25,12 @@ const pageContent = (seedPhrase: string) => html`
         id="seedPhrase"
         data-seenPhrase
         translate="no"
-        class="c-input c-input--readonly"
-        style="display: flex;"
+        class="c-input c-input--readonly c-input--icon"
         >${seedPhrase}<i
+          aria-label="Copy phrase to clipboard""
           title="Copy phrase to clipboard"
           id="seedCopy"
-          class="c-button__icon"
-          style="float: right; margin: 0.5rem;"
+          class="c-button__icon c-input__icon"
           >${copyIcon}</i
         ></output
       >
