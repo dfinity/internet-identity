@@ -1029,3 +1029,12 @@ a:hover,
   right: 0px;
   font-size: 70%;
 }
+
+/* TODO: move */
+input[type="checkbox"] {
+  -webkit-appearance: checkbox !important;
+  -moz-appearance: checkbox !important;
+  -ms-appearance: checkbox !important;
+  -o-appearance: checkbox !important;
+  appearance: checkbox !important;
+}
