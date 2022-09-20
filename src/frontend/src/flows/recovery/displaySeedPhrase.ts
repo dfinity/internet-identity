@@ -22,11 +22,8 @@ const pageContent = (seedPhrase: string) => html`
     <h2 class="t-title l-stack">Your seed phrase</h2>
     <div>
       <output
-        id="seedPhrase"
-        data-seenPhrase
-        translate="no"
         class="c-input c-input--textarea c-input--readonly c-input--icon"
-        >${seedPhrase}<i
+        ><i translate="no" id="seedPhrase">${seedPhrase}</i><i
           aria-label="Copy phrase to clipboard""
           title="Copy phrase to clipboard"
           tabindex="0"
