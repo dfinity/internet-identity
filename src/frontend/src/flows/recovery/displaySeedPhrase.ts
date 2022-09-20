@@ -40,7 +40,7 @@ const pageContent = (seedPhrase: string) => html`
 
     <div style="margin: 2rem 0;">
       <input type="checkbox" id="ack-checkbox" name="scales" />
-      <label for="ack-checkbox">I have stored my recovery phrase</label>
+      <label for="ack-checkbox">I have stored my seed phrase</label>
     </div>
 
     <button id="displaySeedPhraseContinue" class="c-button" disabled>
@@ -91,9 +91,9 @@ const init = (): Promise<void> =>
       navigator.clipboard
         .writeText(seedPhrase)
         .then(() => {
-          const seedPhraseDiv = document.getElementById("seedPhrase");
+          const seedPhraseElem = document.getElementById("seedPhrase");
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          selectText(seedPhraseDiv!);
+          selectText(seedPhraseElem!);
           displaySeedPhraseContinue.classList.toggle("is-hidden", false);
           seedCopy.classList.add("is-copied");
         })
