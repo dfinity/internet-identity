@@ -1,5 +1,5 @@
 import { html, render } from "lit";
-import { initLogout, logoutSection } from "../components/logout";
+import { logoutSection } from "../components/logout";
 import { AuthenticatedConnection } from "../utils/iiConnection";
 import { renderManage } from "./manage";
 
@@ -23,7 +23,6 @@ export const successfullyAddedDevice = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(name), container);
-  initLogout();
   init(userNumber, connection);
 };
 
