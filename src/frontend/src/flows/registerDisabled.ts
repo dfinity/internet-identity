@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { warnBox } from "../components/warnBox";
 
 const pageContent = html`

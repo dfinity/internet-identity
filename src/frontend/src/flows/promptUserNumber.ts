@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { parseUserNumber } from "../utils/userNumber";
 
 const pageContent = (title: string, userNumber: bigint | null) => html`
