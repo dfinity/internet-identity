@@ -1092,7 +1092,7 @@ a:hover,
   font-size: 70%;
 }
 
-/* TODO: move */
+/* Needed to override the "reset" rules */
 input[type="checkbox"] {
   -webkit-appearance: checkbox !important;
   -moz-appearance: checkbox !important;
