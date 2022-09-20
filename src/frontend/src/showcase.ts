@@ -59,8 +59,7 @@ const recoveryPhrase: DeviceData = {
   credential_id: [],
 };
 
-// TODO: rename
-const recoveryPhrasePhrase: string =
+const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
 const recoveryDevice: DeviceData = {
@@ -176,7 +175,7 @@ const iiPages: Record<string, () => void> = {
     deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
-  displaySeedPhrase: () => displaySeedPhrase(recoveryPhrasePhrase),
+  displaySeedPhrase: () => displaySeedPhrase(recoveryPhraseText),
   displayError: () =>
     displayError({
       title: "Authentication Failed",
