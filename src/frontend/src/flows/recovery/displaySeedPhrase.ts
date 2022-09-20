@@ -19,26 +19,31 @@ const pageContent = (seedPhrase: string) => html`
       </p>
     </aside>
 
-    <h2 class="t-title">Your seed phrase</h2>
+    <h2 class="t-title l-stack">Your seed phrase</h2>
     <div>
       <output
         id="seedPhrase"
         data-seenPhrase
         translate="no"
-        class="c-input c-input--readonly c-input--icon"
+        class="c-input c-input--textarea c-input--readonly c-input--icon"
         >${seedPhrase}<i
           aria-label="Copy phrase to clipboard""
           title="Copy phrase to clipboard"
+          tabindex="0"
           id="seedCopy"
           class="c-button__icon c-input__icon"
-          >${copyIcon}</i
+          >
+            <span>copy to clipboard</span>
+            ${copyIcon}
+            ${checkmarkIcon}
+          </i
         ></output
       >
     </div>
 
     <div style="margin: 2rem 0;">
       <input type="checkbox" id="my-checkbox" name="scales" />
-      <label for="scales">I have stored my recovery phrase</label>
+      <label for="my-checkbox">I have stored my recovery phrase</label>
     </div>
 
     <button id="displaySeedPhraseContinue" class="c-button" disabled>
@@ -93,7 +98,7 @@ const init = (): Promise<void> =>
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           selectText(seedPhraseDiv!);
           displaySeedPhraseContinue.classList.toggle("is-hidden", false);
-          // render(checkmarkIcon, seedCopy); TODO do this or not?
+          seedCopy.classList.add("is-copied");
         })
         .catch((e) => {
           console.error("Unable to copy seed phrase", e);

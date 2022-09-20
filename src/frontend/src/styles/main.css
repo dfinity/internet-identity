@@ -737,33 +737,66 @@ a:hover,
   border: var(--vs-line) var(--rc-line) solid;
 }
 
-.c-input--icon {
-  --icon-size: 3rem;
+.c-input--textarea {
+  padding: calc(3 * var(--rs-input-bezel));
+}
 
+.c-input--icon {
   position: relative;
+  padding-bottom: calc(4 * var(--rs-input-bezel));
+  margin-bottom: calc(var(--rs-input-stack) * 2);
 }
 
 .c-input__icon {
   position: absolute;
-  top: 0;
-  right: 0;
-
-  width: calc(var(--icon-size) * 1.5);
-  height: calc(var(--icon-size) * 1.5);
-  transform: translate(50%, -50%);
+  bottom: 0;
+  right: 50%;
   z-index: var(--vz-foreground);
   background-color: var(--rc-input);
   border: var(--vs-line) solid var(--rc-line);
-  border-radius: 100%;
+  border-radius: 4px;
+  display: flex;
+  padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
+  border-radius: 5rem;
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  transform: translate(50%, 50%) scale(0.9);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 400ms transform cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-input__icon:hover {
+  transform: translate(50%, 50%) scale(0.99);
 }
 
 .c-input__icon svg {
-  width: 50%;
-  height: 50%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  width: 1.2em;
+  height: 1.2em;
+  margin-left: var(--rs-input-bezel);
+  margin-right: calc(var(--rs-input-bezel) * -0.25);
+}
+
+/* hides and show icons based on a class */
+
+.c-input__icon svg + svg {
+  margin-left: -1em;
+  visibility: hidden;
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
+    opacity 300ms linear;
+  color: greenyellow;
+}
+
+.c-input__icon.is-copied svg {
+  visibility: hidden;
+}
+
+.c-input__icon.is-copied svg + svg {
+  visibility: visible;
+  transform: scale(1.2);
+  opacity: 1;
 }
 
 .c-input__button {
