@@ -12,25 +12,39 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-        # First, check ic GitHub for new commits.
+        # First, iterate over all Cargo.toml files and check against IC GitHub for new commits.
       - name: Check new ic version
         id: update
         run: |
-          current_ic_commit=$(cat ./src/canister_tests/Cargo.toml | sed -n 's/.*{\s*git\s*=\s*"https:\/\/github\.com\/dfinity\/ic",\s*rev\s*=\s*"\([a-z0-9]*\)" }.*/\1/p' | head -n 1)
-          echo "current ic commit '$current_ic_commit'"
+          shopt -s globstar
+          
+          need_update=false
           latest_ic_commit=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/ic/commits/master | jq -cMr .sha)
-          echo "latest ic commit '$latest_ic_commit'"
 
-          if [ "$current_ic_commit" != "$latest_ic_commit" ]
-          then
+          echo "latest ic commit '$latest_ic_commit'"
+          for filename in **/Cargo.toml; do
+            echo Checking "$filename"
+            [ -e "$filename" ] || continue
+            if ! grep -q https://github\.com/dfinity/ic "$filename"; then
+              echo "$filename" does not contain ic dependecy, skipping
+              continue
+            fi
+          
+            current_ic_commit=$(cat "$filename" | sed -n 's/.*{\s*git\s*=\s*"https:\/\/github\.com\/dfinity\/ic",\s*rev\s*=\s*"\([a-z0-9]*\)" }.*/\1/p' | head -n 1)
+            echo "current ic commit '$current_ic_commit'"
+          
+            if [ "$current_ic_commit" != "$latest_ic_commit" ]; then
+              sed -i -e "s/$current_ic_commit/$latest_ic_commit/g" "$filename"
+              need_update=true
+            fi
+          done
+          
+          if $need_update; then
             echo IC dependencies need an update
-            sed -i -e "s/$current_ic_commit/$latest_ic_commit/g" ./src/canister_tests/Cargo.toml
             echo "::set-output name=updated::1"
           else
             echo "::set-output name=updated::0"
           fi
-
-          cat ./src/canister_tests/Cargo.toml
 
       - uses: ./.github/actions/bootstrap
 

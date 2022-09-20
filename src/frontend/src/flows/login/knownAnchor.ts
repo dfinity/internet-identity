@@ -1,9 +1,9 @@
-import { render, html } from "lit-html";
+import { render, html } from "lit";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";
 import { withLoader } from "../../components/loader";
-import { logoutSection, initLogout } from "../../components/logout";
+import { logoutSection } from "../../components/logout";
 import { Connection } from "../../utils/iiConnection";
 import { loginUnknownAnchor } from "./unknownAnchor";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
@@ -51,7 +51,6 @@ const init = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   return new Promise((resolve) => {
-    initLogout();
     const loginButton = document.querySelector("#login") as HTMLButtonElement;
     const loginDifferentButton = document.querySelector(
       "#loginDifferent"

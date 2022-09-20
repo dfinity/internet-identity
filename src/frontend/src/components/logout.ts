@@ -1,4 +1,4 @@
-import { html, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit";
 import { logoutIcon } from "./icons";
 
 // Add a button at the bottom of the page. Clicking the button clears the local
@@ -7,19 +7,16 @@ import { logoutIcon } from "./icons";
 export const logoutSection = (
   alternativeLabel?: string
 ): TemplateResult => html`<div id="logoutBox" class="l-stack l-stack--spacious">
-  <button type="button" class="t-link" id="logoutButton">
+  <button type="button" class="t-link" @click="${logout}" id="logoutButton">
     <i class="t-link__icon">${logoutIcon}</i>
     ${alternativeLabel !== undefined ? alternativeLabel : "Logout"}
   </button>
 </div>`;
 
-export const initLogout = (): void => {
-  const logoutButton = document.getElementById("logoutButton") as HTMLElement;
-  logoutButton.onclick = () => {
-    localStorage.clear();
-    clearHash();
-    window.location.reload();
-  };
+const logout = () => {
+  localStorage.clear();
+  clearHash();
+  window.location.reload();
 };
 
 const clearHash = (): void => {

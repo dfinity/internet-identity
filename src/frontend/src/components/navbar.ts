@@ -1,4 +1,4 @@
-import { html } from "lit-html";
+import { html } from "lit";
 import { navigationLink } from "../components/navigationLink";
 
 export const navbar = html` <aside aria-label="General links">

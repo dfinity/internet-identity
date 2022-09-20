@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 
 const loader = () => html`<style>
     #loader {

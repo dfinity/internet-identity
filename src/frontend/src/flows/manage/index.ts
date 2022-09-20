@@ -1,7 +1,7 @@
-import { render, html } from "lit-html";
+import { render, html } from "lit";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { initLogout, logoutSection } from "../../components/logout";
+import { logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { deviceSettings } from "./deviceSettings";
@@ -170,7 +170,6 @@ const init = (
   devices: DeviceData[]
 ) => {
   // TODO - Check alias for current identity, and populate #nameSpan
-  initLogout();
 
   // Add the buttons for adding devices and recovery mechanism
 

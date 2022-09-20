@@ -1,7 +1,7 @@
 use crate::api::{create_challenge, http_request, register};
-use crate::framework::{device_data_1, principal_1};
-use ic_state_machine_tests::{CanisterId, StateMachine};
-use ic_types::PrincipalId;
+use canister_tests::framework::{device_data_1, principal_1};
+use ic_state_machine_tests::StateMachine;
+use ic_types::{CanisterId, PrincipalId};
 use internet_identity_interface::{
     ChallengeAttempt, DeviceData, HttpRequest, RegisterResponse, UserNumber,
 };

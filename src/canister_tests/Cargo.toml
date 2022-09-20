@@ -3,7 +3,7 @@ name = "canister_tests"
 version = "0.1.0"
 edition = "2021"
 
-[dev-dependencies]
+[dependencies]
 base64 = "0.13.0"
 flate2 = "1.0"
 hex = "0.4.3"
