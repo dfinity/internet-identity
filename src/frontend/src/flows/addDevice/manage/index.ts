@@ -21,7 +21,7 @@ const pageContent = () => html`
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?
     </p>
-    <div class="l-horizontal l-section">
+    <div class="l-horizontal l-stack">
       <button class="c-button c-button--secondary" id="local">
         <span class="flowIcon">${securityKeyIcon}</span>
         <div class="t-strong">Local Device</div>
@@ -37,7 +37,7 @@ const pageContent = () => html`
         </div>
       </button>
     </div>
-    <div class="l-section">
+    <div class="l-stack">
       <button id="cancelAddDevice" class="c-button">Cancel</button>
     </div>
   </article>

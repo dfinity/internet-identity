@@ -20,10 +20,10 @@ export const compatibilityData = {
 
 export const compatibilityChart = html`<p>${compatibilityData.note}</p>
   <h3 class="t-title">For Desktop</h3>
-  <ul class="c-list c-list--bulleted l-section">
+  <ul class="c-list c-list--bulleted l-stack">
     ${compatibilityData.desktop.map((browser) => html`<li>${browser}</li>`)}
   </ul>
   <h3 class="t-title">For Mobile</h3>
-  <ul class="c-list c-list--bulleted l-section">
+  <ul class="c-list c-list--bulleted l-stack">
     ${compatibilityData.mobile.map((browser) => html`<li>${browser}</li>`)}
   </ul>`;

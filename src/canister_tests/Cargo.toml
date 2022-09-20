@@ -1,14 +1,14 @@
 [package]
 name = "canister_tests"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 base64 = "0.13.0"
 flate2 = "1.0"
 hex = "0.4.3"
 lazy_static = "1.4"
-regex = "1.5.6"
+regex = "1.5"
 serde = "1"
 serde_cbor = "0.11"
 serde_bytes = "0.11"
@@ -18,8 +18,8 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.7"
-ic-types = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
-ic-certification = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
-ic-crypto-internal-basic-sig-iccsa = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "9e6e9cb5c00b2c9f0968bb4f3181fe9c3acf5a99" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-certification = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-crypto-internal-basic-sig-iccsa = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-error-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }

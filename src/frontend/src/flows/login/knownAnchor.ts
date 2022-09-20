@@ -12,12 +12,12 @@ import { useRecovery } from "../recovery/useRecovery";
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--highlight">
     <div class="c-logo">${icLogo}</div>
-    <hgroup class="l-section">
+    <hgroup class="l-stack">
       <h1 class="t-title t-title--main">Welcome back!</h1>
       <!--  paragraph is hidden but included for accessibility -->
       <p class="t-lead is-hidden">Authenticate using Internet Identity.</p>
     <hgroup>
-    <div class="l-section">
+    <div class="l-stack">
       <output class="c-input c-input--vip c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
       <button type="button" id="login" class="c-button">Authenticate</button>
       <div class="l-divider l-divider--text" aria-label="Other Options">
@@ -27,7 +27,7 @@ const pageContent = (userNumber: bigint) => html`
     <button type="button" id="loginDifferent" class="c-button c-button--secondary">
       Use a different Identity Anchor
     </button>
-    <div class="l-section">
+    <div class="l-stack">
       <p>
         <a id="recoverButton" class="t-link">Lost Access?</a>
       </p>

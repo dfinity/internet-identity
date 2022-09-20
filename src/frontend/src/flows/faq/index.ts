@@ -237,7 +237,7 @@ function renderQuestion(faq: Question) {
         >
         <div class="faq__question-underline"></div>
       </summary>
-      <div class="l-section">
+      <div class="l-stack">
         <p class="faq__answer">
           ${faq.answer instanceof TemplateResult
             ? faq.answer
@@ -252,7 +252,7 @@ function renderQuestion(faq: Question) {
 }
 
 function renderFaqLinks(links: Link[]) {
-  return html` <ul class="c-list c-list--bulleted l-section">
+  return html` <ul class="c-list c-list--bulleted l-stack">
     ${Object.values(links)
       .sort((a, b) => {
         return a.link < b.link ? -1 : 1;
@@ -309,7 +309,7 @@ const pageContent = html`
     class="faq__container l-container l-container--wide c-card c-card--highlight"
   >
     <h1 class="faq__title t-title t-title--main">FAQ</h1>
-    <ul class="faq__questions c-list l-section">
+    <ul class="faq__questions c-list l-stack">
       ${questionsArray.map((faq) => renderQuestion(faq))}
     </ul>
   </div>

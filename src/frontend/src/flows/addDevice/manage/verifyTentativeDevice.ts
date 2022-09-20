@@ -26,11 +26,11 @@ const pageContent = (alias: string) => html`
         verification codes that you received any other way.`,
     })}
     <h2 class="t-title">Verify that this is your device:</h2>
-    <label class="l-section">
+    <label class="l-stack">
       <strong class="t-title">Alias</strong>
       <div class="c-input c-input--readonly t-vip t-vip--small">${alias}</div>
     </label>
-    <label class="l-section">
+    <label class="l-stack">
       <strong class="t-title">Device Verification Code</strong>
       <p id="wrongCodeMessage" class="is-hidden t-paragraph">
         The entered verification code was invalid. Please try again.
@@ -45,7 +45,7 @@ const pageContent = (alias: string) => html`
       Time remaining: <span id="timer" class="t-strong"></span>
     </p>
 
-    <div class="l-section">
+    <div class="l-stack">
       <button id="verifyDevice" class="c-button">Verify Device</button>
       <button id="cancelVerifyDevice" class="c-button c-button--secondary">
         Cancel

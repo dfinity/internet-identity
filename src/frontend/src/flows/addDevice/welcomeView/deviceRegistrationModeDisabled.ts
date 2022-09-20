@@ -15,7 +15,7 @@ const pageContent = (userNumber: bigint) => html`
         registration do the following:
       </p>
     </hgroup>
-    <ol class="c-list c-list--numbered l-section">
+    <ol class="c-list c-list--numbered l-stack">
       <li>
         On an <em>existing</em> device:<br />
         Log into <strong class="t-strong">https://identity.ic0.app</strong> with
@@ -35,7 +35,7 @@ const pageContent = (userNumber: bigint) => html`
         Press <strong class="t-strong">Retry</strong>
       </li>
     </ol>
-    <div class="l-section">
+    <div class="l-stack">
       <button id="deviceRegModeDisabledRetry" class="c-button">Retry</button>
       <button
         id="deviceRegModeDisabledCancel"

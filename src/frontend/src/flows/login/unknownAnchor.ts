@@ -13,12 +13,12 @@ import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 const pageContent = () => html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
     <div class="c-logo">${icLogo}</div>
-    <article class="l-section">
+    <article class="l-stack">
       <hgroup>
         <h1 id="loginWelcome" class="t-title t-title--main">Welcome to<br />Internet Identity</h1>
         <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
       <hgroup>
-      <div class="l-section">
+      <div class="l-stack">
         <input
           type="text"
           class="c-input c-input--vip"
@@ -31,7 +31,7 @@ const pageContent = () => html`
       </div>
     </article>
 
-    <aside class="l-section l-section--spacious" aria-label="Other actions">
+    <aside class="l-stack l-stack--spacious" aria-label="Other actions">
       <ul class="t-discreet c-list">
         <li class="textLink" id="registerSection">
           New?
