@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { networkIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
 

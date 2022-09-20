@@ -2,7 +2,7 @@
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
 import "./styles/main.css";
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import {
   Challenge,
   DeviceData,

@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { initLogout, logoutSection } from "../../../components/logout";
 import { validateAlias } from "../validateAlias";
 // Regex Pattern for input: All characters, must be alphabet or number

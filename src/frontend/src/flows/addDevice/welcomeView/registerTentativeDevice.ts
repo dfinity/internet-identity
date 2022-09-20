@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { creationOptions, Connection } from "../../../utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
