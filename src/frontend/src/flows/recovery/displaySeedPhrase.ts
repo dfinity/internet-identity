@@ -42,8 +42,8 @@ const pageContent = (seedPhrase: string) => html`
     </div>
 
     <div style="margin: 2rem 0;">
-      <input type="checkbox" id="my-checkbox" name="scales" />
-      <label for="my-checkbox">I have stored my recovery phrase</label>
+      <input type="checkbox" id="ack-checkbox" name="scales" />
+      <label for="ack-checkbox">I have stored my recovery phrase</label>
     </div>
 
     <button id="displaySeedPhraseContinue" class="c-button" disabled>
@@ -65,12 +65,12 @@ const init = (): Promise<void> =>
     ) as HTMLButtonElement;
     displaySeedPhraseContinue.onclick = () => resolve();
 
-    const myCheckbox = document.getElementById(
-      "my-checkbox"
+    const checkbox = document.getElementById(
+      "ack-checkbox"
     ) as HTMLInputElement;
 
-    myCheckbox.onchange = () => {
-      if (myCheckbox.checked) {
+    checkbox.onchange = () => {
+      if (checkbox.checked) {
         displaySeedPhraseContinue.disabled = false;
       } else {
         displaySeedPhraseContinue.disabled = true;

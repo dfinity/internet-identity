@@ -1093,6 +1093,7 @@ a:hover,
 }
 
 /* Needed to override the "reset" rules */
+/* Without this, the checkbox is simply not shown */
 input[type="checkbox"] {
   -webkit-appearance: checkbox !important;
   -moz-appearance: checkbox !important;
