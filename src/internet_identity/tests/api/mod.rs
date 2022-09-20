@@ -1,8 +1,6 @@
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 use candid::Principal;
-use canister_tests::framework::{
-    call_candid, call_candid_as, query_candid, query_candid_as, CallError,
-};
+use canister_tests::framework::*;
 use ic_state_machine_tests::StateMachine;
 use ic_types::{CanisterId, PrincipalId};
 use internet_identity_interface as types;
