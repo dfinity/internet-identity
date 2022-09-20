@@ -144,6 +144,10 @@ export class RecoveryMethodSelectorView extends View {
     await this.browser.$("#seedCopy").click();
   }
 
+  async acknowledgeCheckbox(): Promise<void> {
+    await this.browser.$("#ack-checkbox").click();
+  }
+
   async seedPhraseContinue(): Promise<void> {
     await this.browser.$("#displaySeedPhraseContinue").click();
   }

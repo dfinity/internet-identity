@@ -1,5 +1,5 @@
 import { html, render } from "lit";
-import { checkmarkIcon, warningIcon } from "../../components/icons";
+import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
 
 const pageContent = (seedPhrase: string) => html`
   <article class="l-container c-card c-card--highlight">
@@ -19,27 +19,33 @@ const pageContent = (seedPhrase: string) => html`
       </p>
     </aside>
 
-    <h2 class="t-title">Your seed phrase</h2>
-    <output
-      id="seedPhrase"
-      data-seenPhrase
-      translate="no"
-      class="c-input c-input--readonly"
-      >${seedPhrase}</output
-    >
-
-    <div class="c-button-group">
-      <button
-        id="seedCopy"
-        data-clipboard-target="#seedPhrase"
-        class="c-button"
+    <h2 class="t-title l-stack">Your seed phrase</h2>
+    <div>
+      <output
+        class="c-input c-input--textarea c-input--readonly c-input--icon"
+        ><i translate="no" id="seedPhrase">${seedPhrase}</i><i
+          aria-label="Copy phrase to clipboard""
+          title="Copy phrase to clipboard"
+          tabindex="0"
+          id="seedCopy"
+          class="c-button__icon c-input__icon"
+          >
+            <span>copy to clipboard</span>
+            ${copyIcon}
+            ${checkmarkIcon}
+          </i
+        ></output
       >
-        Copy
-      </button>
-      <button id="displaySeedPhraseContinue" class="c-button is-hidden">
-        Continue
-      </button>
     </div>
+
+    <div style="margin: 2rem 0;">
+      <input type="checkbox" id="ack-checkbox" name="scales" />
+      <label for="ack-checkbox">I have stored my seed phrase</label>
+    </div>
+
+    <button id="displaySeedPhraseContinue" class="c-button" disabled>
+      Continue
+    </button>
   </article>
 `;
 
@@ -55,6 +61,18 @@ const init = (): Promise<void> =>
       "displaySeedPhraseContinue"
     ) as HTMLButtonElement;
     displaySeedPhraseContinue.onclick = () => resolve();
+
+    const checkbox = document.getElementById(
+      "ack-checkbox"
+    ) as HTMLInputElement;
+
+    checkbox.onchange = () => {
+      if (checkbox.checked) {
+        displaySeedPhraseContinue.disabled = false;
+      } else {
+        displaySeedPhraseContinue.disabled = true;
+      }
+    };
 
     const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
     const seedPhrase = document.getElementById("seedPhrase")
@@ -73,12 +91,11 @@ const init = (): Promise<void> =>
       navigator.clipboard
         .writeText(seedPhrase)
         .then(() => {
-          const seedPhraseDiv = document.getElementById("seedPhrase");
+          const seedPhraseElem = document.getElementById("seedPhrase");
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          selectText(seedPhraseDiv!);
+          selectText(seedPhraseElem!);
           displaySeedPhraseContinue.classList.toggle("is-hidden", false);
-          render(checkmarkIcon, seedCopy);
-          seedCopy.title = "copied";
+          seedCopy.classList.add("is-copied");
         })
         .catch((e) => {
           console.error("Unable to copy seed phrase", e);

@@ -81,7 +81,7 @@ export const FLOWS = {
     await recoveryMethodSelectorView.useSeedPhrase();
     await recoveryMethodSelectorView.waitForSeedPhrase();
     const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
-    await recoveryMethodSelectorView.copySeedPhrase();
+    await recoveryMethodSelectorView.acknowledgeCheckbox();
     await recoveryMethodSelectorView.seedPhraseContinue();
 
     return seedPhrase;
