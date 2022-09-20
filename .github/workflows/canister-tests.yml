@@ -176,14 +176,14 @@ jobs:
         # (and then restoring the mtime).
       - uses: actions/cache@v2
         with:
-          # note on paths: we include the whole ~/.cargo/. (as opposed to juse .cargo/git, etc) because cargo stores crate
+          # note on paths: we include the whole ~/.cargo/. (as opposed to just .cargo/git, etc.) because cargo stores crate
           # data as .crates(2?).{json,toml} without which the whole cache is invalidated. We may accumulate unnecessary
           # stuff but the cache is anyway invalidated on every toolchain update.
           # We also include all Cargo tomls and the lockfile
           path: |
             ~/.cargo
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src/**/Cargo.toml', 'rust-toolchain.toml') }}-2
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src/**/Cargo.toml', 'rust-toolchain.toml') }}-3
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v2
@@ -196,7 +196,7 @@ jobs:
         # to just thrashing everything. This means that the build is a no-op for anything that doesn't change the actual test code.
       - name: 'Set timestamps'
         run: |
-          git ls-tree -r --name-only HEAD ./src/canister_tests/ ./src/internet_identity_interface/ Cargo.* | \
+          git ls-tree -r --name-only HEAD ./src/ Cargo.* | \
             while read filename
             do
               git_time=$(TZ=UTC0 git log -1 --date='format-local:%Y%m%d%H%M' --format='%cd' -- "$filename")
@@ -204,10 +204,20 @@ jobs:
               TZ=UTC0 touch -t "$git_time" "$filename"
             done
 
+      - name: Create dummy assets
+        run: |
+          mkdir dist
+          touch dist/index.html
+          touch dist/index.js.gz
+          touch dist/index.css
+          touch dist/loader.webp
+          touch dist/favicon.ico
+          touch dist/ic-badge.svg
+
       # We split the test build and run so that it's clear from the GHA steps how long each took
       - name: Build Tests
         shell: bash
-        run: cargo build --tests --release --package canister_tests
+        run: cargo build --tests --release
 
       - name: Run Tests
         shell: bash
@@ -217,7 +227,7 @@ jobs:
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
-          cargo test --release --package canister_tests
+          cargo test --release
         env:
           RUST_BACKTRACE: 1
 
