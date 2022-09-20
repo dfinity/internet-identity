@@ -115,6 +115,7 @@ const iiPages: Record<string, () => void> = {
   register: () => register(dummyConnection),
   authenticate: () =>
     displayPage(
+      dummyConnection,
       "https://nowhere.com",
       BigInt(10000),
       "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app"
