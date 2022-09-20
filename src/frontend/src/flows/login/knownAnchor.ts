@@ -1,4 +1,4 @@
-import { render, html } from "lit-html";
+import { render, html } from "lit";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { icLogo } from "../../components/icons";

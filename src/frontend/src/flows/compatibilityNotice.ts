@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { compatibilityChart } from "../components/compatibilityChart";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential

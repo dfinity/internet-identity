@@ -1,4 +1,4 @@
-import { render, html, TemplateResult } from "lit-html";
+import { render, html, TemplateResult } from "lit";
 import { anyFeatures } from "./features";
 
 // Show a warning banner if the build is not "official". This happens if either the build

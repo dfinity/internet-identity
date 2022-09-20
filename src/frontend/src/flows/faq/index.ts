@@ -1,4 +1,4 @@
-import { TemplateResult, html, render } from "lit-html";
+import { TemplateResult, html, render } from "lit";
 
 export interface Link {
   name: string;
@@ -239,9 +239,9 @@ function renderQuestion(faq: Question) {
       </summary>
       <div class="l-stack">
         <p class="faq__answer">
-          ${faq.answer instanceof TemplateResult
-            ? faq.answer
-            : html`<p>${faq.answer}</p>`}
+          ${typeof faq.answer === "string"
+            ? html`<p>${faq.answer}</p>`
+            : faq.answer}
         </p>
         ${faq.links !== undefined && faq.links.length > 0
           ? renderFaqLinks(faq.links)

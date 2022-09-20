@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { displayUserNumber } from "./displayUserNumber";
 import { displayError } from "../components/displayError";
 import { setUserNumber } from "../utils/userNumber";

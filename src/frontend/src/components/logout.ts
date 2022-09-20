@@ -1,4 +1,4 @@
-import { html, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit";
 import { logoutIcon } from "./icons";
 
 // Add a button at the bottom of the page. Clicking the button clears the local

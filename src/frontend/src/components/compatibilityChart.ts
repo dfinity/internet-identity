@@ -1,4 +1,4 @@
-import { html } from "lit-html";
+import { html } from "lit";
 
 export const compatibilityData = {
   note: "Browser support for WebAuthentication is constantly evolving. Your preferred browser may not support WebAuthentication, or may only support it using a security key. If you run into issues, please try again with one of our recommended browsers.",

@@ -1,4 +1,4 @@
-import { render, html } from "lit-html";
+import { render, html } from "lit";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import {
   bufferEqual,
