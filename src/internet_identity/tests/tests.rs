@@ -1,4 +1,5 @@
-use canister_tests::framework::*;
+use canister_tests::framework;
+use canister_tests::framework::device_data_1;
 use ic_state_machine_tests::StateMachine;
 
 /**
@@ -18,7 +19,7 @@ mod flows;
 #[test]
 fn ii_canister_can_be_installed() {
     let env = StateMachine::new();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
     api::health_check(&env, canister_id);
 }
@@ -26,17 +27,17 @@ fn ii_canister_can_be_installed() {
 #[test]
 fn ii_upgrade_works() {
     let env = StateMachine::new();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
     api::health_check(&env, canister_id);
 }
 
 #[test]
 fn ii_upgrade_retains_anchors() {
     let env = StateMachine::new();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
     let user_number = flows::register_anchor(&env, canister_id);
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
     let retrieved_device_data = api::lookup(&env, canister_id, user_number).expect("lookup failed");
 
@@ -48,7 +49,8 @@ fn ii_upgrade_retains_anchors() {
 mod rollback_tests {
     use crate::{api, flows};
     use candid::Principal;
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{device_data_1, device_data_2, principal_1, CallError};
     use ic_state_machine_tests::StateMachine;
     use serde_bytes::ByteBuf;
 
@@ -56,10 +58,10 @@ mod rollback_tests {
     #[test]
     fn ii_canister_can_be_upgraded_and_rolled_back() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
         api::health_check(&env, canister_id);
-        upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
         api::health_check(&env, canister_id);
     }
 
@@ -67,12 +69,12 @@ mod rollback_tests {
     #[test]
     fn upgrade_and_rollback_keeps_anchor_intact() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let mut devices_before = api::lookup(&env, canister_id, user_number).unwrap();
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
         api::health_check(&env, canister_id);
-        upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
         api::health_check(&env, canister_id);
         let mut devices_after = api::get_anchor_info(&env, canister_id, principal_1(), user_number)
             .unwrap()
@@ -92,7 +94,7 @@ mod rollback_tests {
         let env = StateMachine::new();
 
         // use the new version to register an anchor
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let principal = api::get_principal(
             &env,
@@ -103,7 +105,7 @@ mod rollback_tests {
         )?;
 
         // roll back
-        upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM_PREVIOUS.clone());
 
         // use anchor
         let devices = api::lookup(&env, canister_id, user_number)?;
@@ -139,7 +141,10 @@ mod rollback_tests {
 mod registration_tests {
     use crate::{api, flows};
     use candid::Principal;
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        device_data_1, expect_user_error_with_message, principal_1, principal_2, CallError,
+    };
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{
@@ -152,7 +157,7 @@ mod registration_tests {
     #[test]
     fn should_register_new_anchor() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let devices = api::lookup(&env, canister_id, user_number)?;
@@ -175,7 +180,7 @@ mod registration_tests {
     #[test]
     fn should_allow_multiple_registrations() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number_1 =
             flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
@@ -188,9 +193,9 @@ mod registration_tests {
     #[test]
     fn should_assign_correct_user_numbers() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister_with_arg(
+        let canister_id = framework::install_ii_canister_with_arg(
             &env,
-            II_WASM.clone(),
+            framework::II_WASM.clone(),
             Some(InternetIdentityInit {
                 assigned_user_number_range: (127, 129),
             }),
@@ -222,7 +227,7 @@ mod registration_tests {
     #[test]
     fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let challenge = api::create_challenge(&env, canister_id)?;
         let result = api::register(
             &env,
@@ -247,7 +252,7 @@ mod registration_tests {
     #[test]
     fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let mut device1 = device_data_1();
         device1.protection = DeviceProtection::Protected;
 
@@ -275,7 +280,7 @@ mod registration_tests {
     #[test]
     fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let challenge = api::create_challenge(&env, canister_id)?;
         let result = api::register(
@@ -298,7 +303,7 @@ mod registration_tests {
     #[test]
     fn should_not_allow_expired_captcha() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let challenge = api::create_challenge(&env, canister_id)?;
         env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
@@ -324,7 +329,7 @@ mod registration_tests {
     #[test]
     fn should_limit_captcha_creation() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         for _ in 0..500 {
             api::create_challenge(&env, canister_id)?;
@@ -344,7 +349,11 @@ mod registration_tests {
 mod stable_memory_tests {
     use crate::api;
     use candid::Principal;
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        expect_user_error_with_message, principal_1, principal_recovery_1, principal_recovery_2,
+        recovery_device_data_1, recovery_device_data_2, CallError,
+    };
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use ic_types::PrincipalId;
@@ -421,13 +430,13 @@ mod stable_memory_tests {
         };
 
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         // check known anchors in the backup
         let devices = api::lookup(&env, canister_id, 10_000)?;
@@ -456,13 +465,13 @@ mod stable_memory_tests {
         ));
 
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         let (user_key, _) = api::prepare_delegation(
             &env,
@@ -497,13 +506,13 @@ mod stable_memory_tests {
         let public_key = hex::decode("305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387").unwrap();
         let principal = PrincipalId(Principal::self_authenticating(public_key.clone()));
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         let devices = api::lookup(&env, canister_id, 10_030)?;
 
@@ -526,7 +535,7 @@ mod stable_memory_tests {
     #[test]
     fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let frontend_hostname = "frontend_hostname".to_string();
         let session_key = ByteBuf::from("session_key");
 
@@ -534,7 +543,7 @@ mod stable_memory_tests {
             std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         api::prepare_delegation(
             &env,
@@ -562,13 +571,13 @@ mod stable_memory_tests {
     #[test]
     fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
         // upgrade again to reset cached header info in II storage module
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         let mut recovery_1 = recovery_device_data_1();
         recovery_1.alias = "new alias".to_string();
@@ -612,7 +621,11 @@ mod stable_memory_tests {
 #[cfg(test)]
 mod device_management_tests {
     use crate::{api, flows};
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+        recovery_device_data_1, recovery_device_data_2, CallError,
+    };
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;
@@ -622,7 +635,7 @@ mod device_management_tests {
     #[test]
     fn should_add_additional_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::add(
@@ -650,7 +663,7 @@ mod device_management_tests {
     #[test]
     fn should_not_add_existing_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result = api::add(
@@ -673,7 +686,7 @@ mod device_management_tests {
     #[test]
     fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::add(
@@ -703,7 +716,7 @@ mod device_management_tests {
     #[test]
     fn should_not_add_device_for_different_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
             flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -727,10 +740,10 @@ mod device_management_tests {
     #[test]
     fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
         api::add(
             &env,
             canister_id,
@@ -748,7 +761,11 @@ mod device_management_tests {
     #[cfg(test)]
     mod update {
         use crate::{api, flows};
-        use canister_tests::framework::*;
+        use canister_tests::framework;
+        use canister_tests::framework::{
+            device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+            CallError, PUBKEY_2,
+        };
         use ic_error_types::ErrorCode::CanisterCalledTrap;
         use ic_state_machine_tests::StateMachine;
         use internet_identity_interface as types;
@@ -759,7 +776,7 @@ mod device_management_tests {
         #[test]
         fn should_update_device() -> Result<(), CallError> {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let principal = principal_1();
             let mut device = device_data_1();
 
@@ -789,7 +806,7 @@ mod device_management_tests {
         #[test]
         fn should_update_protected_device() -> Result<(), CallError> {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let principal = principal_1();
             let mut device = device_data_1();
             device.protection = types::DeviceProtection::Protected;
@@ -821,7 +838,7 @@ mod device_management_tests {
         #[test]
         fn should_not_modify_pubkey() {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let principal = principal_1();
             let mut device = device_data_1();
 
@@ -852,7 +869,7 @@ mod device_management_tests {
         #[test]
         fn should_not_update_device_of_different_user() {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
             let user_number_2 =
                 flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -877,7 +894,7 @@ mod device_management_tests {
         #[test]
         fn should_not_update_protected_with_different_device() {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let mut device1 = device_data_1();
             device1.protection = types::DeviceProtection::Protected;
             device1.key_type = types::KeyType::SeedPhrase;
@@ -915,7 +932,7 @@ mod device_management_tests {
         #[test]
         fn should_not_update_non_recovery_device_to_be_protected() {
             let env = StateMachine::new();
-            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
             let user_number = flows::register_anchor(&env, canister_id);
 
             let mut device1 = device_data_1();
@@ -942,7 +959,7 @@ mod device_management_tests {
     #[test]
     fn should_remove_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::add(
@@ -973,7 +990,7 @@ mod device_management_tests {
     #[test]
     fn should_remove_protected_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let mut device2 = device_data_2();
@@ -1009,7 +1026,7 @@ mod device_management_tests {
     #[test]
     fn should_remove_last_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::remove(
@@ -1029,7 +1046,7 @@ mod device_management_tests {
     #[test]
     fn should_not_remove_device_of_different_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
             flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -1053,7 +1070,7 @@ mod device_management_tests {
     #[test]
     fn should_not_remove_protected_with_different_device() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let mut device1 = device_data_1();
         device1.protection = types::DeviceProtection::Protected;
         device1.key_type = types::KeyType::SeedPhrase;
@@ -1089,7 +1106,7 @@ mod device_management_tests {
     #[test]
     fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::add(
@@ -1102,7 +1119,7 @@ mod device_management_tests {
         let devices = api::lookup(&env, canister_id, user_number)?;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         api::remove(
             &env,
@@ -1122,7 +1139,7 @@ mod device_management_tests {
     #[test]
     fn should_not_allow_get_anchor_info_for_different_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result = api::get_anchor_info(&env, canister_id, principal_2(), user_number);
@@ -1140,7 +1157,11 @@ mod device_management_tests {
 mod delegation_tests {
     use crate::{api, flows};
     use candid::Principal;
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+        CallError,
+    };
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::GetDelegationResponse;
@@ -1153,7 +1174,7 @@ mod delegation_tests {
     #[test]
     fn should_get_valid_delegation() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1189,7 +1210,7 @@ mod delegation_tests {
             GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
         };
 
-        verify_delegation(&env, canister_sig_key, &signed_delegation);
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
         assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
         assert_eq!(signed_delegation.delegation.expiration, expiration);
         Ok(())
@@ -1199,7 +1220,7 @@ mod delegation_tests {
     #[test]
     fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1235,7 +1256,7 @@ mod delegation_tests {
             GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
         };
 
-        verify_delegation(&env, canister_sig_key, &signed_delegation);
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
         assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
         assert_eq!(signed_delegation.delegation.expiration, expiration);
         Ok(())
@@ -1245,7 +1266,7 @@ mod delegation_tests {
     #[test]
     fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1281,7 +1302,7 @@ mod delegation_tests {
             GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
         };
 
-        verify_delegation(&env, canister_sig_key, &signed_delegation);
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
         assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
         assert_eq!(signed_delegation.delegation.expiration, expiration);
         Ok(())
@@ -1291,7 +1312,7 @@ mod delegation_tests {
     #[test]
     fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname_1 = "https://dapp1.com";
         let frontend_hostname_2 = "https://dapp2.com";
@@ -1364,23 +1385,23 @@ mod delegation_tests {
                 GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
             };
 
-            verify_delegation(&env, canister_sig_key, &signed_delegation);
+            framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
             assert_eq!(signed_delegation.delegation.pubkey, session_key.clone());
             assert_eq!(signed_delegation.delegation.expiration, expiration);
         }
         Ok(())
     }
 
-    /// Verifies that an anchor that was registered using II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
+    /// Verifies that an anchor that was registered using framework::II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
     #[test]
     fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
 
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         let (canister_sig_key, expiration) = api::prepare_delegation(
             &env,
@@ -1413,7 +1434,7 @@ mod delegation_tests {
             GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
         };
 
-        verify_delegation(&env, canister_sig_key, &signed_delegation);
+        framework::verify_delegation(&env, canister_sig_key, &signed_delegation);
         assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
         assert_eq!(signed_delegation.delegation.expiration, expiration);
         Ok(())
@@ -1423,7 +1444,7 @@ mod delegation_tests {
     #[test]
     fn should_issue_different_principals() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname_1 = "https://dapp1.com";
         let frontend_hostname_2 = "https://dapp2.com";
@@ -1456,7 +1477,7 @@ mod delegation_tests {
     #[test]
     fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1472,7 +1493,7 @@ mod delegation_tests {
         )?;
 
         // upgrade, even with the same WASM clears non-stable memory
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         match api::get_delegation(
             &env,
@@ -1493,7 +1514,7 @@ mod delegation_tests {
     #[test]
     fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1540,7 +1561,7 @@ mod delegation_tests {
     #[test]
     fn can_not_prepare_delegation_for_different_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result = api::prepare_delegation(
@@ -1564,7 +1585,7 @@ mod delegation_tests {
     #[test]
     fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1600,7 +1621,7 @@ mod delegation_tests {
     #[test]
     fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname = "https://some-dapp.com";
         let pub_session_key = ByteBuf::from("session public key");
@@ -1630,7 +1651,7 @@ mod delegation_tests {
     #[test]
     fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname_1 = "https://dapp-1.com";
         let frontend_hostname_2 = "https://dapp-2.com";
@@ -1659,7 +1680,7 @@ mod delegation_tests {
     #[test]
     fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number_1 =
             flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
@@ -1690,7 +1711,7 @@ mod delegation_tests {
     #[test]
     fn should_not_allow_get_principal_for_other_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =
             flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -1717,7 +1738,10 @@ mod delegation_tests {
 mod http_tests {
     use crate::{api, flows};
     use canister_tests::certificate_validation::validate_certification;
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        assert_metric, device_data_1, device_data_2, principal_1, principal_2, CallError,
+    };
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{ChallengeAttempt, HttpRequest, InternetIdentityInit};
     use serde_bytes::ByteBuf;
@@ -1735,7 +1759,7 @@ mod http_tests {
             ("/ic-badge.svg", None),
         ];
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
         for (asset, encoding) in assets {
@@ -1782,7 +1806,7 @@ mod http_tests {
                 env.time(),
             )
             .expect(&format!("validation for asset \"{}\" failed", asset));
-            verify_security_headers(&http_response.headers);
+            framework::verify_security_headers(&http_response.headers);
         }
         Ok(())
     }
@@ -1802,11 +1826,11 @@ mod http_tests {
         ];
         let env = StateMachine::new();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let metrics_body = flows::get_metrics(&env, canister_id);
         for metric in metrics {
-            let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
+            let (_, metric_timestamp) = framework::parse_metric(&metrics_body, metric);
             assert_eq!(
                 metric_timestamp,
                 env.time(),
@@ -1820,12 +1844,14 @@ mod http_tests {
     #[test]
     fn metrics_should_list_expected_user_range() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
 
-        let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
-        let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
         assert_eq!(min_user_number, 10_000);
         assert_eq!(max_user_number, 3_784_872);
         Ok(())
@@ -1834,28 +1860,32 @@ mod http_tests {
     #[test]
     fn should_widen_user_range_on_upgrade() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister_with_arg(
+        let canister_id = framework::install_ii_canister_with_arg(
             &env,
-            II_WASM.clone(),
+            framework::II_WASM.clone(),
             Some(InternetIdentityInit {
                 assigned_user_number_range: (127, 129),
             }),
         );
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
-        let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
         assert_eq!(min_user_number, 127);
         assert_eq!(max_user_number, 128);
 
         // The storage updates the upper bound on upgrade if it doesn't use the
         // full capacity. This is a hack that has to go away when we start using
         // multiple backend canisters.
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
-        let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
+        let (min_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_min_user_number");
+        let (max_user_number, _) =
+            framework::parse_metric(&metrics, "internet_identity_max_user_number");
         assert_eq!(min_user_number, 127);
         assert_eq!(max_user_number, 3_774_999);
     }
@@ -1864,7 +1894,7 @@ mod http_tests {
     #[test]
     fn metrics_user_count_should_increase_after_register() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         assert_metric(
             &flows::get_metrics(&env, canister_id),
@@ -1886,7 +1916,7 @@ mod http_tests {
     #[test]
     fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let frontend_hostname = "https://some-dapp.com";
         let user_number = flows::register_anchor(&env, canister_id);
 
@@ -1948,10 +1978,11 @@ mod http_tests {
     #[test]
     fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (signature_count, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        let (signature_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_stable_memory_pages");
         // empty II has some metadata in stable memory which requires at least one page
         assert_eq!(signature_count, 1);
 
@@ -1961,7 +1992,8 @@ mod http_tests {
         }
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (signature_count, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        let (signature_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_stable_memory_pages");
         assert_eq!(signature_count, 2);
         Ok(())
     }
@@ -1970,9 +2002,9 @@ mod http_tests {
     #[test]
     fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         // immediately upgrade because installing the canister does not set the metric
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         assert_metric(
             &flows::get_metrics(&env, canister_id),
@@ -1984,7 +2016,7 @@ mod http_tests {
         );
 
         env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         assert_metric(
             &flows::get_metrics(&env, canister_id),
@@ -2001,17 +2033,19 @@ mod http_tests {
     #[test]
     fn metrics_inflight_challenges() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
         assert_eq!(challenge_count, 0);
 
         let challenge_1 = api::create_challenge(&env, canister_id)?;
         api::create_challenge(&env, canister_id)?;
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
         assert_eq!(challenge_count, 2);
 
         // solving a challenge removes it from the inflight pool
@@ -2027,7 +2061,8 @@ mod http_tests {
         )?;
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
         assert_eq!(challenge_count, 1);
 
         // long after expiry (we don't want this test to break, if we change the captcha expiration)
@@ -2036,7 +2071,8 @@ mod http_tests {
         api::create_challenge(&env, canister_id)?;
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
+        let (challenge_count, _) =
+            framework::parse_metric(&metrics, "internet_identity_inflight_challenges");
         assert_eq!(challenge_count, 1); // 1 pruned due to expiry, but also one created
 
         Ok(())
@@ -2046,13 +2082,13 @@ mod http_tests {
     #[test]
     fn metrics_device_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number_1 = flows::register_anchor(&env, canister_id);
         let user_number_2 = flows::register_anchor(&env, canister_id);
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
-            parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
         assert_eq!(challenge_count, 0);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
@@ -2060,14 +2096,14 @@ mod http_tests {
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
-            parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
         assert_eq!(challenge_count, 2);
 
         api::exit_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
-            parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
         assert_eq!(challenge_count, 1);
 
         // long after expiry (we don't want this test to break, if we change the registration mode expiration)
@@ -2083,7 +2119,7 @@ mod http_tests {
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (challenge_count, _) =
-            parse_metric(&metrics, "internet_identity_users_in_registration_mode");
+            framework::parse_metric(&metrics, "internet_identity_users_in_registration_mode");
         assert_eq!(challenge_count, 0);
 
         Ok(())
@@ -2093,7 +2129,7 @@ mod http_tests {
     #[test]
     fn metrics_anchor_operations() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         assert_metric(
             &flows::get_metrics(&env, canister_id),
@@ -2166,7 +2202,10 @@ mod http_tests {
 #[cfg(test)]
 mod remote_device_registration_tests {
     use crate::{api, flows};
-    use canister_tests::framework::*;
+    use canister_tests::framework;
+    use canister_tests::framework::{
+        device_data_2, expect_user_error_with_message, principal_1, principal_2, CallError,
+    };
     use ic_error_types::ErrorCode;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;
@@ -2178,7 +2217,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_enter_device_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result =
@@ -2199,7 +2238,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_not_enter_device_registration_mode_for_other_user() {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         let result =
@@ -2216,7 +2255,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_register_remote_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2252,7 +2291,7 @@ mod remote_device_registration_tests {
     #[test]
     fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2301,7 +2340,7 @@ mod remote_device_registration_tests {
     #[test]
     fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2329,7 +2368,7 @@ mod remote_device_registration_tests {
     #[test]
     fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2354,7 +2393,7 @@ mod remote_device_registration_tests {
     fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallError> {
         const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2379,7 +2418,7 @@ mod remote_device_registration_tests {
     #[test]
     fn reject_verification_without_tentative_device() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -2403,7 +2442,7 @@ mod remote_device_registration_tests {
     fn reject_verification_with_wrong_code() -> Result<(), CallError> {
         const MAX_RETRIES: u8 = 3;
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;

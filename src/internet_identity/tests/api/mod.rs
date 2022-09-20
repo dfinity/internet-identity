@@ -1,6 +1,7 @@
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 use candid::Principal;
-use canister_tests::framework::*;
+use canister_tests::framework;
+use framework::CallError;
 use ic_state_machine_tests::StateMachine;
 use ic_types::{CanisterId, PrincipalId};
 use internet_identity_interface as types;
@@ -11,7 +12,7 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
     let _: (candid::parser::value::IDLValue,) =
-        call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
+        framework::call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
 pub fn http_request(
@@ -19,14 +20,14 @@ pub fn http_request(
     canister_id: CanisterId,
     http_request: types::HttpRequest,
 ) -> Result<types::HttpResponse, CallError> {
-    query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
+    framework::query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
 }
 
 pub fn create_challenge(
     env: &StateMachine,
     canister_id: CanisterId,
 ) -> Result<types::Challenge, CallError> {
-    call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
+    framework::call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
 }
 
 pub fn register(
@@ -36,7 +37,7 @@ pub fn register(
     device_data: &types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
 ) -> Result<types::RegisterResponse, CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -55,7 +56,7 @@ pub fn prepare_delegation(
     session_key: types::SessionKey,
     max_time_to_live: Option<u64>,
 ) -> Result<(types::UserKey, types::Timestamp), CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -78,7 +79,7 @@ pub fn get_delegation(
     session_key: types::SessionKey,
     timestamp: u64,
 ) -> Result<types::GetDelegationResponse, CallError> {
-    query_candid_as(
+    framework::query_candid_as(
         env,
         canister_id,
         sender,
@@ -95,7 +96,7 @@ pub fn get_principal(
     user_number: types::UserNumber,
     frontend_hostname: types::FrontendHostname,
 ) -> Result<Principal, CallError> {
-    query_candid_as(
+    framework::query_candid_as(
         env,
         canister_id,
         sender,
@@ -110,7 +111,7 @@ pub fn lookup(
     canister_id: CanisterId,
     user_number: types::UserNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
-    query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+    framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
 }
 
 pub fn add(
@@ -120,7 +121,7 @@ pub fn add(
     user_number: types::UserNumber,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+    framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
 }
 
 pub fn update(
@@ -131,7 +132,7 @@ pub fn update(
     device_key: types::PublicKey,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -147,7 +148,7 @@ pub fn remove(
     user_number: types::UserNumber,
     device_key: types::PublicKey,
 ) -> Result<(), CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -162,7 +163,8 @@ pub fn get_anchor_info(
     sender: PrincipalId,
     user_number: types::UserNumber,
 ) -> Result<types::IdentityAnchorInfo, CallError> {
-    call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)).map(|(x,)| x)
+    framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
+        .map(|(x,)| x)
 }
 
 pub fn enter_device_registration_mode(
@@ -171,7 +173,7 @@ pub fn enter_device_registration_mode(
     sender: PrincipalId,
     user_number: types::UserNumber,
 ) -> Result<types::Timestamp, CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -187,7 +189,7 @@ pub fn exit_device_registration_mode(
     sender: PrincipalId,
     user_number: types::UserNumber,
 ) -> Result<(), CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -203,7 +205,7 @@ pub fn add_tentative_device(
     user_number: types::UserNumber,
     device_data: types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
@@ -220,7 +222,7 @@ pub fn verify_tentative_device(
     user_number: types::UserNumber,
     verification_code: types::DeviceVerificationCode,
 ) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
-    call_candid_as(
+    framework::call_candid_as(
         env,
         canister_id,
         sender,
