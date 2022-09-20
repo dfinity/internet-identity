@@ -1,29 +1,11 @@
 /**
- * Here you'll find the various modules related to testing the II canister:
- *  * `tests`: The most important module with the actual tests
- *  * `api`: Rust-bindings for the II canister
+ * Here you'll find modules related to testing the canisters:
  *  * `framework`: Helpers of various kinds for writing tests.
- *  * `flows`: Reusable flows consisting of multiple II interactions
  *  * `certificate_validation`: Validation logic for asset certification
  *
- * Most changes should happen in the `tests` module. The split was done this way so that `tests` is a simple
+ * Most changes should happen in the canister specific `tests` folders. The split was done this way so that `tests` is as simple
  * as possible to make tests easy to read and write.
- *
- * Modules are not imported for non-test builds. This crate only contains tests and should not
- * require anything to be built otherwise.
  */
+pub mod framework;
 
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-mod api;
-
-#[cfg(test)]
-mod framework;
-
-#[cfg(test)]
-mod flows;
-
-#[cfg(test)]
-mod certificate_validation;
+pub mod certificate_validation;

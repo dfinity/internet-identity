@@ -1,6 +1,20 @@
-use crate::framework::device_data_1;
-use crate::{api, flows, framework};
+use canister_tests::framework;
+use canister_tests::framework::device_data_1;
 use ic_state_machine_tests::StateMachine;
+
+/**
+ * There are various modules related to testing the II canister:
+ *  * `api`: Rust-bindings for the II canister
+ *  * `flows`: Reusable flows consisting of multiple II interactions
+ *
+ * Most changes should happen in the `tests` module. The split was done this way so that `tests` is a simple
+ * as possible to make tests easy to read and write.
+ *
+ * The submodules modules are split into folders because the tests folder has special rules regarding top level files:
+ * See https://doc.rust-lang.org/book/ch11-03-test-organization.html#submodules-in-integration-tests
+ */
+mod api;
+mod flows;
 
 #[test]
 fn ii_canister_can_be_installed() {
@@ -33,9 +47,10 @@ fn ii_upgrade_retains_anchors() {
 /// Tests for making sure that any release can be rolled back. This tests stable memory compatibility and pre / post install hooks.
 #[cfg(test)]
 mod rollback_tests {
-    use crate::framework::{device_data_1, device_data_2, principal_1, CallError};
-    use crate::{api, flows, framework};
+    use crate::{api, flows};
     use candid::Principal;
+    use canister_tests::framework;
+    use canister_tests::framework::{device_data_1, device_data_2, principal_1, CallError};
     use ic_state_machine_tests::StateMachine;
     use serde_bytes::ByteBuf;
 
@@ -124,11 +139,12 @@ mod rollback_tests {
 /// 2. register: submit the captcha solution and device information to create a new anchor
 #[cfg(test)]
 mod registration_tests {
-    use crate::framework::{
+    use crate::{api, flows};
+    use candid::Principal;
+    use canister_tests::framework;
+    use canister_tests::framework::{
         device_data_1, expect_user_error_with_message, principal_1, principal_2, CallError,
     };
-    use crate::{api, flows, framework};
-    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{
@@ -331,14 +347,16 @@ mod registration_tests {
 
 /// Tests related to stable memory. In particular, the tests in this module make sure that II can be recovered from a stable memory backup.
 mod stable_memory_tests {
-    use crate::framework::{
+    use crate::api;
+    use candid::Principal;
+    use canister_tests::framework;
+    use canister_tests::framework::{
         expect_user_error_with_message, principal_1, principal_recovery_1, principal_recovery_2,
         recovery_device_data_1, recovery_device_data_2, CallError,
     };
-    use crate::{api, framework};
-    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
-    use ic_state_machine_tests::{PrincipalId, StateMachine};
+    use ic_state_machine_tests::StateMachine;
+    use ic_types::PrincipalId;
     use internet_identity_interface::DeviceData;
     use internet_identity_interface::DeviceProtection::Unprotected;
     use internet_identity_interface::KeyType::Unknown;
@@ -602,11 +620,12 @@ mod stable_memory_tests {
 /// Tests for the 'add remote device flow' are in the module [remote_device_registration_tests].
 #[cfg(test)]
 mod device_management_tests {
-    use crate::framework::{
+    use crate::{api, flows};
+    use canister_tests::framework;
+    use canister_tests::framework::{
         device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
         recovery_device_data_1, recovery_device_data_2, CallError,
     };
-    use crate::{api, flows, framework};
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;
@@ -741,12 +760,12 @@ mod device_management_tests {
 
     #[cfg(test)]
     mod update {
-
-        use crate::framework::expect_user_error_with_message;
-        use crate::framework::{
-            device_data_1, device_data_2, principal_1, principal_2, CallError, PUBKEY_2,
+        use crate::{api, flows};
+        use canister_tests::framework;
+        use canister_tests::framework::{
+            device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
+            CallError, PUBKEY_2,
         };
-        use crate::{api, flows, framework};
         use ic_error_types::ErrorCode::CanisterCalledTrap;
         use ic_state_machine_tests::StateMachine;
         use internet_identity_interface as types;
@@ -1136,12 +1155,13 @@ mod device_management_tests {
 /// Tests related to prepare_delegation, get_delegation and get_principal II canister calls.
 #[cfg(test)]
 mod delegation_tests {
-    use crate::framework::{
+    use crate::{api, flows};
+    use candid::Principal;
+    use canister_tests::framework;
+    use canister_tests::framework::{
         device_data_1, device_data_2, expect_user_error_with_message, principal_1, principal_2,
         CallError,
     };
-    use crate::{api, flows, framework};
-    use candid::Principal;
     use ic_error_types::ErrorCode::CanisterCalledTrap;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::GetDelegationResponse;
@@ -1372,7 +1392,7 @@ mod delegation_tests {
         Ok(())
     }
 
-    /// Verifies that an anchor that was registered using II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
+    /// Verifies that an anchor that was registered using framework::II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
     #[test]
     fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
         let env = StateMachine::new();
@@ -1716,11 +1736,12 @@ mod delegation_tests {
 /// Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 #[cfg(test)]
 mod http_tests {
-    use crate::certificate_validation::validate_certification;
-    use crate::framework::{
+    use crate::{api, flows};
+    use canister_tests::certificate_validation::validate_certification;
+    use canister_tests::framework;
+    use canister_tests::framework::{
         assert_metric, device_data_1, device_data_2, principal_1, principal_2, CallError,
     };
-    use crate::{api, flows, framework};
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface::{ChallengeAttempt, HttpRequest, InternetIdentityInit};
     use serde_bytes::ByteBuf;
@@ -1875,10 +1896,18 @@ mod http_tests {
         let env = StateMachine::new();
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
-        assert_metric(&env, canister_id, "internet_identity_user_count", 0);
+        assert_metric(
+            &flows::get_metrics(&env, canister_id),
+            "internet_identity_user_count",
+            0,
+        );
         for count in 0..2 {
             flows::register_anchor(&env, canister_id);
-            assert_metric(&env, canister_id, "internet_identity_user_count", count + 1);
+            assert_metric(
+                &flows::get_metrics(&env, canister_id),
+                "internet_identity_user_count",
+                count + 1,
+            );
         }
         Ok(())
     }
@@ -1891,7 +1920,11 @@ mod http_tests {
         let frontend_hostname = "https://some-dapp.com";
         let user_number = flows::register_anchor(&env, canister_id);
 
-        assert_metric(&env, canister_id, "internet_identity_signature_count", 0);
+        assert_metric(
+            &flows::get_metrics(&env, canister_id),
+            "internet_identity_signature_count",
+            0,
+        );
         for count in 0..3 {
             api::prepare_delegation(
                 &env,
@@ -1904,14 +1937,12 @@ mod http_tests {
             )?;
 
             assert_metric(
-                &env,
-                canister_id,
+                &flows::get_metrics(&env, canister_id),
                 "internet_identity_signature_count",
                 count + 1,
             );
             assert_metric(
-                &env,
-                canister_id,
+                &flows::get_metrics(&env, canister_id),
                 "internet_identity_delegation_counter",
                 count + 1,
             );
@@ -1931,14 +1962,12 @@ mod http_tests {
         )?;
 
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_signature_count",
             1, // old ones pruned and a new one created
         );
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_delegation_counter",
             4, // delegation counter is not affected by pruning
         );
@@ -1978,8 +2007,7 @@ mod http_tests {
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_last_upgrade_timestamp",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -1991,8 +2019,7 @@ mod http_tests {
         framework::upgrade_ii_canister(&env, canister_id, framework::II_WASM.clone());
 
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_last_upgrade_timestamp",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -2105,16 +2132,14 @@ mod http_tests {
         let canister_id = framework::install_ii_canister(&env, framework::II_WASM.clone());
 
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
             0,
         );
 
         let user_number = flows::register_anchor(&env, canister_id);
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
             1,
         );
@@ -2127,8 +2152,7 @@ mod http_tests {
             device_data_2(),
         )?;
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
             2,
         );
@@ -2144,8 +2168,7 @@ mod http_tests {
             device,
         )?;
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
             3,
         );
@@ -2158,8 +2181,7 @@ mod http_tests {
             device_data_2().pubkey,
         )?;
         assert_metric(
-            &env,
-            canister_id,
+            &flows::get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
             4,
         );
@@ -2179,10 +2201,11 @@ mod http_tests {
 /// 2. there is a limit of 3 attempts for step 3 in the above process
 #[cfg(test)]
 mod remote_device_registration_tests {
-    use crate::framework::{
+    use crate::{api, flows};
+    use canister_tests::framework;
+    use canister_tests::framework::{
         device_data_2, expect_user_error_with_message, principal_1, principal_2, CallError,
     };
-    use crate::{api, flows, framework};
     use ic_error_types::ErrorCode;
     use ic_state_machine_tests::StateMachine;
     use internet_identity_interface as types;

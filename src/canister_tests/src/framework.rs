@@ -1,4 +1,3 @@
-use crate::flows;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs, Principal};
 use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
@@ -9,7 +8,6 @@ use ic_types::crypto::Signable;
 use ic_types::messages::Delegation;
 use ic_types::Time;
 use internet_identity_interface as types;
-use internet_identity_interface::{HeaderField, InternetIdentityInit, SignedDelegation, UserKey};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -90,7 +88,7 @@ pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
 pub fn install_ii_canister_with_arg(
     env: &StateMachine,
     wasm: Vec<u8>,
-    arg: Option<InternetIdentityInit>,
+    arg: Option<types::InternetIdentityInit>,
 ) -> CanisterId {
     let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
     env.install_canister(wasm, byts, None).unwrap()
@@ -102,7 +100,6 @@ pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Ve
     let byts = args.to_bytes().unwrap();
     env.upgrade_canister(canister_id, wasm, byts).unwrap()
 }
-
 pub const PUBKEY_1: &str = "test";
 pub const PUBKEY_2: &str = "some other key";
 pub const RECOVERY_PUBKEY_1: &str = "recovery 1";
@@ -296,7 +293,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
     }
 }
 
-pub fn verify_security_headers(headers: &Vec<HeaderField>) {
+pub fn verify_security_headers(headers: &Vec<types::HeaderField>) {
     let expected_headers = vec![
         ("X-Frame-Options", "DENY"),
         ("X-Content-Type-Options", "nosniff"),
@@ -389,16 +386,15 @@ pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
     (metric, metric_timestamp)
 }
 
-pub fn assert_metric(env: &StateMachine, canister_id: CanisterId, metric: &str, expected: u64) {
-    let metrics = flows::get_metrics(env, canister_id);
-    let (value, _) = parse_metric(&metrics, metric);
+pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
+    let (value, _) = parse_metric(&metrics, metric_name);
     assert_eq!(value, expected);
 }
 
 pub fn verify_delegation(
     env: &StateMachine,
-    user_key: UserKey,
-    signed_delegation: &SignedDelegation,
+    user_key: types::UserKey,
+    signed_delegation: &types::SignedDelegation,
 ) {
     // transform delegation into ic typed delegation so that we have access to the signature domain separator
     // (via as_signed_bytes)
