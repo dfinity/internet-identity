@@ -3258,6 +3258,7 @@ dependencies = [
  "internet_identity_interface",
  "lazy_static",
  "lodepng",
+ "metrics_encoder",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
@@ -3533,6 +3534,10 @@ dependencies = [
  "nix",
  "slog",
 ]
+
+[[package]]
+name = "metrics_encoder"
+version = "0.1.0"
 
 [[package]]
 name = "mime"
