@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 
 internet_identity_interface = { path = "../internet_identity_interface" }
+metrics_encoder = { path = "../metrics_encoder" }
 
 hex = "0.4"
 lazy_static = "1.4"
