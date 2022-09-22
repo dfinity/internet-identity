@@ -17,6 +17,7 @@ import { styleguide } from "./styleguide";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
+import { showWarning } from "./banner";
 import { displayUserNumber } from "./flows/displayUserNumber";
 import { loginKnownAnchor } from "./flows/login/knownAnchor";
 import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
@@ -144,6 +145,8 @@ const iiPages: Record<string, () => void> = {
       ...simpleDevices,
       recoveryPhrase,
     ]),
+  displayManageSingle: () =>
+    displayManage(userNumber, dummyConnection, [simpleDevices[0]]),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
@@ -185,6 +188,10 @@ const iiPages: Record<string, () => void> = {
       primaryButton: "Try again",
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
+  banner: () => {
+    loginUnknownAnchor(dummyConnection);
+    showWarning(html`This is a test page, be very careful!`);
+  },
 };
 
 // The showcase
