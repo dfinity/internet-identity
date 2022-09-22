@@ -7,6 +7,7 @@ import {
   setUserNumber,
 } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
+import { mkAnchorInput } from "../../components/anchorInput";
 import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { TemplateRef, renderTemplateRef } from "../../utils/templateRef";
 import { ref, createRef } from "lit/directives/ref.js";
@@ -46,8 +47,8 @@ const pageContent = (
   const onRecoverClick = () => useRecovery(connection, readUserNumber());
 
   const authorizeButton = createRef();
-  const userNumberInput = createRef();
   const registerButton = createRef();
+  const anchorInput = mkAnchorInput("userNumberInput", userNumber);
 
   const template = html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
@@ -69,23 +70,7 @@ const pageContent = (
         </p>
       </div>
 
-      <div class="l-stack c-input c-input--vip c-input--anchor">
-        <input
-          ${ref(userNumberInput)}
-          type="text"
-          id="userNumberInput"
-          placeholder="Enter anchor"
-          value="${userNumber !== undefined ? userNumber : ""}"
-          style="width: 100%;"
-        />
-
-        <p
-          id="invalidAnchorMessage"
-          class="anchor-error-message is-hidden t-paragraph t-strong"
-        >
-          The Identity Anchor is not valid. Please try again.
-        </p>
-      </div>
+      ${anchorInput.template}
 
       <button ${ref(authorizeButton)} id="authorizeButton" class="c-button">
         Authorize
@@ -123,7 +108,11 @@ const pageContent = (
 
   return {
     template,
-    refs: { authorizeButton, userNumberInput, registerButton },
+    refs: {
+      authorizeButton,
+      userNumberInput: anchorInput.refs.userNumberInput,
+      registerButton,
+    },
   };
 };
 
@@ -312,8 +301,6 @@ export const displayPage = (
     container
   );
 
-  setInputFilter(ret.userNumberInput, (c) => /^\d*\.?\d*$/.test(c));
-
   return ret;
 };
 
@@ -349,65 +336,3 @@ const readUserNumber = () => {
   // get rid of null, we use undefined for 'not set'
   return parsedUserNumber === null ? undefined : parsedUserNumber;
 };
-
-/* Adds a filter to the input that only allows the given regex.
- * For more info see https://stackoverflow.com/questions/469357/html-text-input-allow-only-numeric-input
- */
-function setInputFilter(
-  textbox: HTMLInputElement,
-  inputFilter: (value: string) => boolean
-): void {
-  [
-    "input",
-    "keydown",
-    "keyup",
-    "mousedown",
-    "mouseup",
-    "select",
-    "contextmenu",
-    "drop",
-    "focusout",
-  ].forEach(function (event) {
-    textbox.addEventListener(
-      event,
-      function (
-        this: (HTMLInputElement | HTMLTextAreaElement) & {
-          oldValue: string;
-          oldSelectionStart: number | null;
-          oldSelectionEnd: number | null;
-        }
-      ) {
-        if (inputFilter(this.value)) {
-          this.oldValue = this.value;
-          this.oldSelectionStart = this.selectionStart;
-          this.oldSelectionEnd = this.selectionEnd;
-        } else {
-          const parent = textbox.parentNode as HTMLElement;
-
-          if (
-            parent !== undefined &&
-            !parent.classList.contains("flash-error")
-          ) {
-            parent.classList.add("flash-error");
-            setTimeout(() => parent.classList.remove("flash-error"), 2000);
-          }
-
-          if (Object.prototype.hasOwnProperty.call(this, "oldValue")) {
-            this.value = this.oldValue;
-            if (
-              this.oldSelectionStart !== null &&
-              this.oldSelectionEnd !== null
-            ) {
-              this.setSelectionRange(
-                this.oldSelectionStart,
-                this.oldSelectionEnd
-              );
-            }
-          } else {
-            this.value = "";
-          }
-        }
-      }
-    );
-  });
-}
