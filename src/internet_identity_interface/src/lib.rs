@@ -179,6 +179,7 @@ pub struct InternetIdentityInit {
 pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
+    pub archive: Option<Principal>,
 }
 
 // Archive specific types
@@ -216,6 +217,18 @@ pub struct DeviceDataWithoutAlias {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+}
+
+impl From<DeviceData> for DeviceDataWithoutAlias {
+    fn from(device_data: DeviceData) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            credential_id: device_data.credential_id,
+            purpose: device_data.purpose,
+            key_type: device_data.key_type,
+            protection: device_data.protection,
+        }
+    }
 }
 
 // If present, the attribute has been changed to the value given.
@@ -265,4 +278,16 @@ pub enum Cursor {
 pub struct ArchiveInit {
     pub ii_canister: Principal,
     pub max_entries_per_call: u16,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub enum DeployArchiveResult {
+    #[serde(rename = "success")]
+    Success(Principal),
+    #[serde(rename = "creation_in_progress")]
+    CreationInProgress,
+    #[serde(rename = "creation_failed")]
+    CreationFailed(String),
+    #[serde(rename = "upgrade_failed")]
+    UpgradeFailed(String),
 }

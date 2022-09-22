@@ -122,6 +122,7 @@ type GetDelegationResponse = variant {
 type InternetIdentityStats = record {
   users_registered: nat64;
   assigned_user_number_range: record { nat64; nat64; };
+  archive: opt principal;
 };
 
 type InternetIdentityInit = record {
@@ -143,6 +144,18 @@ type DeviceRegistrationInfo = record {
 type IdentityAnchorInfo = record {
     devices : vec DeviceData;
     device_registration: opt DeviceRegistrationInfo;
+};
+
+type DeployArchiveResult = variant {
+  // The archive was deployed successfully and the supplied wasm module has been installed. The principal of the archive
+  // canister is returned.
+  success: principal;
+  // Initial archive creation is already in progress.
+  creation_in_progress;
+  // Archive does not exist and creation of a new one failed.
+  creation_failed: text;
+  // Archive exists and upgrade to the supplied wasm module failed.
+  upgrade_failed: text;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -168,4 +181,6 @@ service : (opt InternetIdentityInit) -> {
   get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
   http_request: (request: HttpRequest) -> (HttpResponse) query;
+
+  deploy_archive: (wasm: blob) -> (DeployArchiveResult);
 }

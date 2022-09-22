@@ -1,5 +1,7 @@
+use crate::api;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs, Principal};
+use flate2::read::GzDecoder;
 use ic_crypto_iccsa::types::SignatureBytes;
 use ic_crypto_iccsa::{public_key_bytes_from_der, verify};
 use ic_state_machine_tests::{
@@ -13,6 +15,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::env;
+use std::fs::File;
+use std::io::Read;
 use std::path;
 use std::time::{Duration, SystemTime};
 
@@ -61,6 +65,9 @@ lazy_static! {
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };
+
+    /** Empty WASM module (without any pre- and post-upgrade hooks. Useful to initialize a canister before loading a stable memory backup. */
+    pub static ref EMPTY_WASM: Vec<u8> = vec![0, 0x61, 0x73, 0x6D, 1, 0, 0, 0];
 }
 
 /** Helper that returns the content of `default_path` if found, or None if the file does not exist.
@@ -95,6 +102,10 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
 }
 
 /* Here are a few useful helpers for writing tests */
+pub fn install_empty_canister(env: &StateMachine) -> CanisterId {
+    env.install_canister(EMPTY_WASM.clone(), vec![], None)
+        .expect("failed to install empty canister.")
+}
 
 pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
     install_ii_canister_with_arg(&env, wasm, None)
@@ -115,6 +126,17 @@ pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Ve
     let byts = args.to_bytes().unwrap();
     env.upgrade_canister(canister_id, wasm, byts).unwrap()
 }
+
+pub fn restore_compressed_stable_memory(env: &StateMachine, canister_id: CanisterId, path: &str) {
+    let file = File::open(path).expect("Failed to open stable memory file");
+    let mut decoder = GzDecoder::new(file);
+    let mut buffer = vec![];
+    decoder
+        .read_to_end(&mut buffer)
+        .expect("error while decoding stable memory file");
+    env.set_stable_memory(canister_id, &buffer);
+}
+
 pub const PUBKEY_1: &str = "test";
 pub const PUBKEY_2: &str = "some other key";
 pub const RECOVERY_PUBKEY_1: &str = "recovery 1";
@@ -427,6 +449,25 @@ pub fn verify_delegation(
         &env.root_key(),
     )
     .expect("signature invalid");
+}
+
+pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
+    match api::internet_identity::deploy_archive(
+        &env,
+        ii_canister,
+        ByteBuf::from(ARCHIVE_WASM.clone()),
+    ) {
+        Ok(types::DeployArchiveResult::Success(archive_principal)) => {
+            canister_id_from_principal(archive_principal)
+        }
+        err => {
+            panic!("archive deployment failed: {:?}", err)
+        }
+    }
+}
+
+pub fn canister_id_from_principal(principal: Principal) -> CanisterId {
+    CanisterId::new(PrincipalId(principal)).unwrap()
 }
 
 pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {

@@ -1,9 +1,12 @@
+use candid::Principal;
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
 use ic_state_machine_tests::ErrorCode::CanisterCalledTrap;
 use ic_state_machine_tests::{CanisterId, StateMachine};
-use internet_identity_interface::ArchiveInit;
-use internet_identity_interface::{Cursor, HttpRequest};
+use internet_identity_interface::{
+    ArchiveInit, Cursor, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
+    HttpRequest, KeyType, Operation, Purpose, Timestamp, UserNumber,
+};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, SystemTime};
@@ -626,6 +629,96 @@ mod metrics_tests {
         );
 
         Ok(())
+    }
+}
+
+/// Verifies that the archive is compatible to stable memory backups.
+#[cfg(test)]
+mod stable_memory_tests {
+    use super::*;
+
+    /// Tests a backup of the initial stable memory layout with all the operations existing at that time.
+    #[test]
+    fn should_restore_backup() {
+        const TIMESTAMP: Timestamp = 1620328630000000000;
+        const ANCHOR: UserNumber = 10_000;
+        let env = StateMachine::new();
+        let canister_id = install_archive_canister(&env, EMPTY_WASM.clone());
+
+        restore_compressed_stable_memory(&env, canister_id, "stable_memory/archive_v1.bin.gz");
+        upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM.clone());
+
+        let entries = api::get_entries(&env, canister_id, None, None).unwrap();
+        assert_eq!(entries.entries.len(), 4);
+
+        let register_entry = Entry {
+            anchor: ANCHOR,
+            operation: Operation::RegisterAnchor {
+                device: DeviceDataWithoutAlias {
+                    pubkey: device_data_1().pubkey,
+                    credential_id: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::Unknown,
+                    protection: DeviceProtection::Unprotected,
+                },
+            },
+            timestamp: TIMESTAMP,
+            caller: Principal::from(principal_1()),
+            sequence_number: 0,
+        };
+        assert_eq!(
+            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            &register_entry
+        );
+
+        let add_entry = Entry {
+            anchor: ANCHOR,
+            operation: Operation::AddDevice {
+                device: DeviceDataWithoutAlias::from(device_data_2()),
+            },
+            timestamp: TIMESTAMP,
+            caller: Principal::from(principal_1()),
+            sequence_number: 1,
+        };
+        assert_eq!(
+            entries.entries.get(1).unwrap().as_ref().unwrap(),
+            &add_entry
+        );
+
+        let update_entry = Entry {
+            anchor: ANCHOR,
+            operation: Operation::UpdateDevice {
+                device: device_data_2().pubkey,
+                new_values: DeviceDataUpdate {
+                    alias: None,
+                    credential_id: None,
+                    purpose: Some(Purpose::Recovery),
+                    key_type: None,
+                    protection: None,
+                },
+            },
+            timestamp: TIMESTAMP,
+            caller: Principal::from(principal_1()),
+            sequence_number: 2,
+        };
+        assert_eq!(
+            entries.entries.get(2).unwrap().as_ref().unwrap(),
+            &update_entry
+        );
+
+        let delete_entry = Entry {
+            anchor: ANCHOR,
+            operation: Operation::RemoveDevice {
+                device: device_data_2().pubkey,
+            },
+            timestamp: TIMESTAMP,
+            caller: Principal::from(principal_1()),
+            sequence_number: 3,
+        };
+        assert_eq!(
+            entries.entries.get(3).unwrap().as_ref().unwrap(),
+            &delete_entry
+        );
     }
 }
 

@@ -392,12 +392,11 @@ mod stable_memory_tests {
         };
 
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
-        // upgrade again to reset cached header info in II storage module
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         // check known anchors in the backup
@@ -427,12 +426,11 @@ mod stable_memory_tests {
         ));
 
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
-        // upgrade again to reset cached header info in II storage module
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let (user_key, _) = api::prepare_delegation(
@@ -468,12 +466,11 @@ mod stable_memory_tests {
         let public_key = hex::decode("305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387").unwrap();
         let principal = PrincipalId(Principal::self_authenticating(public_key.clone()));
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
-        // upgrade again to reset cached header info in II storage module
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let devices = api::lookup(&env, canister_id, 10_030)?;
@@ -497,14 +494,13 @@ mod stable_memory_tests {
     #[test]
     fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
         let frontend_hostname = "frontend_hostname".to_string();
         let session_key = ByteBuf::from("session_key");
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
-        // upgrade again to reset cached header info in II storage module
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         api::prepare_delegation(
@@ -533,12 +529,11 @@ mod stable_memory_tests {
     #[test]
     fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
-        // upgrade again to reset cached header info in II storage module
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let mut recovery_1 = recovery_device_data_1();
@@ -574,6 +569,51 @@ mod stable_memory_tests {
             recovery_1.pubkey.clone(),
             recovery_1,
         )?;
+        Ok(())
+    }
+
+    /// Verifies that a stable memory backup with persistent state v1 can be used for an upgrade.
+    #[test]
+    fn should_read_persistent_state_v1() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/persistent_state_no_archive_v1.bin.gz",
+        );
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let devices = api::lookup(&env, canister_id, 10_005)?;
+        assert_eq!(devices.len(), 4);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert!(stats.archive.is_none());
+        Ok(())
+    }
+
+    /// Verifies that a stable memory backup with persistent state containing archive information is restored correctly.
+    #[test]
+    fn should_read_persistent_state_with_archive_v1() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/persistent_state_archive_v1.bin.gz",
+        );
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let devices = api::lookup(&env, canister_id, 10_000)?;
+        assert_eq!(devices.len(), 1);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats.archive.unwrap(),
+            Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap()
+        );
         Ok(())
     }
 }

@@ -3,6 +3,7 @@ use crate::framework::CallError;
 use candid::Principal;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
+use serde_bytes::ByteBuf;
 
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
@@ -230,6 +231,21 @@ pub fn verify_tentative_device(
         (user_number, verification_code),
     )
     .map(|(x,)| x)
+}
+
+pub fn deploy_archive(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    wasm: ByteBuf,
+) -> Result<types::DeployArchiveResult, CallError> {
+    framework::call_candid(env, canister_id, "deploy_archive", (wasm,)).map(|(x,)| x)
+}
+
+pub fn stats(
+    env: &StateMachine,
+    canister_id: CanisterId,
+) -> Result<types::InternetIdentityStats, CallError> {
+    framework::query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.

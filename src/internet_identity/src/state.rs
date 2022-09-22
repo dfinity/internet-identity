@@ -1,5 +1,6 @@
+use crate::state::ArchiveState::NotCreated;
 use crate::storage::DEFAULT_RANGE_SIZE;
-use crate::{Salt, Storage};
+use crate::{PersistentStateError, Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
@@ -105,6 +106,36 @@ pub struct Challenge {
     pub challenge_key: ChallengeKey,
 }
 
+/// State of the archive canister.
+#[derive(Eq, PartialEq, Clone, CandidType, Deserialize)]
+pub enum ArchiveState {
+    NotCreated,
+    CreationInProgress,
+    Created(ArchiveData),
+}
+
+impl Default for ArchiveState {
+    fn default() -> Self {
+        NotCreated
+    }
+}
+
+/// Management metadata about the archive.
+#[derive(Eq, PartialEq, Clone, CandidType, Deserialize)]
+pub struct ArchiveData {
+    // Sequence number of anchor operations. Using this sequence number missing entries / reliability
+    // can be assessed without having explicit error handling on the II side.
+    pub sequence_number: u64,
+    // Canister id of the archive canister
+    pub archive_canister: Principal,
+}
+
+#[derive(Clone, Default, CandidType, Deserialize)]
+pub struct PersistentStateV1 {
+    // Information related to the archive
+    pub archive_info: ArchiveState,
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
     sigs: RefCell<SignatureMap>,
@@ -118,6 +149,11 @@ struct State {
     tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
     // additional usage metrics, NOT persisted across updates (but probably should be in the future)
     usage_metrics: RefCell<UsageMetrics>,
+    // State that is temporarily persisted in stable memory during upgrades using
+    // pre- and post-upgrade hooks.
+    // This must remain small as it is serialized and deserialized on pre- and post-upgrade.
+    // Be careful when making changes here, as II needs to be able to update and roll back.
+    persistent_state: RefCell<PersistentStateV1>,
 }
 
 impl Default for State {
@@ -134,6 +170,7 @@ impl Default for State {
             inflight_challenges: RefCell::new(HashMap::new()),
             tentative_device_registrations: RefCell::new(HashMap::new()),
             usage_metrics: RefCell::new(UsageMetrics::default()),
+            persistent_state: RefCell::new(PersistentStateV1::default()),
         }
     }
 }
@@ -212,6 +249,32 @@ pub fn initialize_from_stable_memory() {
     });
 }
 
+pub fn save_persistent_state() {
+    STATE.with(|s| {
+        s.storage
+            .borrow()
+            .write_persistent_state(&s.persistent_state.borrow())
+            .expect("failed to save persistent state");
+    })
+}
+
+pub fn load_persistent_state() {
+    STATE.with(|s| {
+        match s.storage.borrow().read_persistent_state() {
+            Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
+            Err(PersistentStateError::NotFound) => {
+                // This is allowed for the first release of this feature only!
+                // After this feature has been deployed, we will panic on this error.
+                *s.persistent_state.borrow_mut() = PersistentStateV1::default()
+            }
+            Err(err) => trap(&format!(
+                "failed to recover persistent state! Err: {:?}",
+                err
+            )),
+        }
+    })
+}
+
 // helper methods to access / modify the state in a convenient way
 
 pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
@@ -222,6 +285,33 @@ pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
                 anchor, err
             ))
         })
+    })
+}
+
+pub fn archive_ready() -> bool {
+    STATE.with(|s| match s.persistent_state.borrow().archive_info {
+        ArchiveState::Created(_) => true,
+        _ => false,
+    })
+}
+
+pub fn archive_data() -> ArchiveData {
+    STATE.with(|s| {
+        if let ArchiveState::Created(ref data) = s.persistent_state.borrow().archive_info {
+            data.clone()
+        } else {
+            trap("no archive deployed")
+        }
+    })
+}
+
+pub fn increment_archive_seq_nr() {
+    STATE.with(|s| {
+        if let ArchiveState::Created(ref mut data) = s.persistent_state.borrow_mut().archive_info {
+            data.sequence_number += 1;
+        } else {
+            trap("no archive deployed")
+        }
     })
 }
 
@@ -287,4 +377,12 @@ pub fn inflight_challenges_mut<R>(
 
 pub fn last_upgrade_timestamp() -> Timestamp {
     STATE.with(|s| s.last_upgrade_timestamp.get())
+}
+
+pub fn persistent_state<R>(f: impl FnOnce(&PersistentStateV1) -> R) -> R {
+    STATE.with(|s| f(&*s.persistent_state.borrow()))
+}
+
+pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentStateV1) -> R) -> R {
+    STATE.with(|s| f(&mut *s.persistent_state.borrow_mut()))
 }

@@ -1,4 +1,6 @@
+use crate::state::PersistentStateV1;
 use candid;
+use ic_cdk::api::stable::{CanisterStableMemory, StableMemoryError, StableReader, StableWriter};
 use ic_cdk::api::{
     stable::{stable64_grow, stable64_read, stable64_size, stable64_write},
     trap,
@@ -16,6 +18,8 @@ const GB: u64 = 1 << 30;
 const STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
 const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
+
+const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// The maximum number of users this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
@@ -265,6 +269,97 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         }
         Ok(record_number)
     }
+
+    /// Returns the address of the first byte not yet allocated to a user.
+    /// This address exists even if the max user number has been reached, because there is a memory
+    /// reserve at the end of stable memory.
+    fn unused_memory_start(&self) -> u64 {
+        let record_number = self.header.num_users as u64;
+        HEADER_SIZE + record_number * self.header.entry_size as u64
+    }
+
+    /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
+    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next user registration.
+    pub fn write_persistent_state(
+        &self,
+        state: &PersistentStateV1,
+    ) -> Result<(), PersistentStateError> {
+        let address = self.unused_memory_start();
+
+        let mut writer =
+            StableWriter::with_memory(CanisterStableMemory::default(), address as usize);
+        let encoded_state =
+            candid::encode_one(state).map_err(|err| PersistentStateError::CandidError(err))?;
+
+        // This block is an additional sanity check to make sure that the calculated address is in
+        // the expected range so that no user data gets overridden.
+        {
+            // plus 1 because memory could lie right on the boundary of one wasm page to the next
+            let max_wasm_pages_affected = div_ceil(encoded_state.len() as u64, WASM_PAGE_SIZE) + 1;
+            let address_page = div_ceil(address, WASM_PAGE_SIZE);
+            // compare with >= to allow for growth when actually writing the data
+            assert!(address_page + max_wasm_pages_affected >= stable64_size());
+        }
+
+        writer
+            .write(&PERSISTENT_STATE_MAGIC)
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+        writer
+            .write(&(encoded_state.len() as u64).to_le_bytes())
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+        writer
+            .write(&encoded_state)
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+        Ok(())
+    }
+
+    /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
+    /// This is only used to restore state in `post_upgrade`.
+    pub fn read_persistent_state(&self) -> Result<PersistentStateV1, PersistentStateError> {
+        let address = self.unused_memory_start();
+        if stable64_size() * WASM_PAGE_SIZE < address {
+            // Handle fresh installs of II: stable memory size is 0 thus the address points out of bounds
+            return Err(PersistentStateError::NotFound);
+        }
+
+        let mut reader =
+            StableReader::with_memory(CanisterStableMemory::default(), address as usize);
+
+        let mut magic_buf: [u8; 4] = [0; 4];
+        reader
+            .read(&mut magic_buf)
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+
+        if magic_buf != PERSISTENT_STATE_MAGIC {
+            return Err(PersistentStateError::NotFound);
+        }
+
+        let mut size_buf: [u8; 8] = [0; 8];
+        reader
+            .read(&mut size_buf)
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+
+        let size = u64::from_le_bytes(size_buf);
+        let mut data_buf = Vec::new();
+        data_buf.resize(size as usize, 0);
+        reader
+            .read(data_buf.as_mut_slice())
+            .map_err(|err| PersistentStateError::StableMemoryError(err))?;
+
+        candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+    }
+}
+
+/// Manual implementation because https://doc.rust-lang.org/std/primitive.u64.html#method.div_ceil is not stable yet.
+fn div_ceil(a: u64, b: u64) -> u64 {
+    (a + b - 1) / b
+}
+
+#[derive(Debug)]
+pub enum PersistentStateError {
+    CandidError(candid::error::Error),
+    NotFound,
+    StableMemoryError(StableMemoryError),
 }
 
 pub enum StorageError {

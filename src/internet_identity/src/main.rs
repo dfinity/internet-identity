@@ -1,13 +1,15 @@
 use crate::assets::init_assets;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
-use crate::state::{AssetHashes, ChallengeInfo, DeviceDataInternal, TentativeDeviceRegistration};
+use crate::state::{
+    ArchiveState, AssetHashes, ChallengeInfo, DeviceDataInternal, TentativeDeviceRegistration,
+};
 use crate::AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
 use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
-use assets::ContentType;
+use archive::{archive_operation, device_diff};
 use candid::Principal;
 use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
-use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree};
 use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
@@ -15,10 +17,11 @@ use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use storage::{Salt, Storage};
+use storage::{PersistentStateError, Salt, Storage};
 
 use internet_identity_interface::*;
 
+mod archive;
 mod assets;
 mod hash;
 mod http;
@@ -231,11 +234,11 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
 
     check_device(&device_data, &vec![]);
 
-    if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+    let caller = caller();
+    if caller != Principal::self_authenticating(device_data.pubkey.clone()) {
         trap(&format!(
             "{} could not be authenticated against {:?}",
-            caller(),
-            device_data.pubkey
+            caller, device_data.pubkey
         ));
     }
 
@@ -245,7 +248,19 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
     let allocation = state::storage_mut(|storage| storage.allocate_user_number());
     match allocation {
         Some(user_number) => {
-            write_anchor_data(user_number, vec![DeviceDataInternal::from(device_data)]);
+            write_anchor_data(
+                user_number,
+                vec![DeviceDataInternal::from(device_data.clone())],
+            );
+            if state::archive_ready() {
+                archive_operation(
+                    user_number,
+                    caller,
+                    Operation::RegisterAnchor {
+                        device: DeviceDataWithoutAlias::from(device_data),
+                    },
+                )
+            }
             RegisterResponse::Registered { user_number }
         }
         None => RegisterResponse::CanisterFull,
@@ -259,6 +274,8 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
     let mut entries = state::anchor_devices(user_number);
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let caller = caller(); // caller is only available before await
+
     state::ensure_salt_set().await;
 
     check_device(&device_data, &entries);
@@ -278,10 +295,20 @@ async fn add(user_number: UserNumber, device_data: DeviceData) {
         ));
     }
 
-    entries.push(DeviceDataInternal::from(device_data));
+    entries.push(DeviceDataInternal::from(device_data.clone()));
     write_anchor_data(user_number, entries);
 
     prune_expired_signatures();
+
+    if state::archive_ready() {
+        archive_operation(
+            user_number,
+            caller,
+            Operation::AddDevice {
+                device: DeviceDataWithoutAlias::from(device_data),
+            },
+        )
+    }
 }
 
 /// Replace or remove an existing device.
@@ -291,7 +318,7 @@ fn mutate_device_or_trap(
     entries: &mut Vec<DeviceDataInternal>,
     device_key: DeviceKey,
     new_value: Option<DeviceData>,
-) {
+) -> Operation {
     let index = match entries.iter().position(|e| e.pubkey == device_key) {
         None => trap("Could not find device to mutate, check device key"),
         Some(index) => index,
@@ -313,12 +340,19 @@ fn mutate_device_or_trap(
 
     match new_value {
         Some(device_data) => {
-            *device = device_data.into();
+            let internal_device = device_data.into();
+            let diff = device_diff(device, &internal_device);
+            *device = internal_device;
+            Operation::UpdateDevice {
+                device: device_key,
+                new_values: diff,
+            }
         }
         None => {
             // NOTE: we void the more efficient remove_swap to ensure device ordering
             // is not changed
             entries.remove(index);
+            Operation::RemoveDevice { device: device_key }
         }
     }
 }
@@ -333,11 +367,15 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
     check_device(&device_data, &entries);
 
-    mutate_device_or_trap(&mut entries, device_key, Some(device_data));
+    let operation = mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
     write_anchor_data(user_number, entries);
 
     prune_expired_signatures();
+
+    if state::archive_ready() {
+        archive_operation(user_number, caller(), operation)
+    }
 }
 
 #[update]
@@ -346,11 +384,16 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
+    let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
     prune_expired_signatures();
 
-    mutate_device_or_trap(&mut entries, device_key, None);
+    let operation = mutate_device_or_trap(&mut entries, device_key, None);
     write_anchor_data(user_number, entries);
+
+    if state::archive_ready() {
+        archive_operation(user_number, caller, operation)
+    }
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
@@ -656,10 +699,30 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
 #[query]
 fn stats() -> InternetIdentityStats {
+    let archive = state::persistent_state(|persistent_state| {
+        if let ArchiveState::Created(ref data) = persistent_state.archive_info {
+            Some(data.archive_canister)
+        } else {
+            None
+        }
+    });
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_user_number_range(),
         users_registered: storage.user_count() as u64,
+        archive,
     })
+}
+
+#[cfg(not(feature = "archive"))]
+#[update]
+async fn deploy_archive(_wasm: ByteBuf) -> DeployArchiveResult {
+    DeployArchiveResult::CreationFailed("archive feature disabled".to_string())
+}
+
+#[cfg(feature = "archive")]
+#[update]
+async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
+    archive::deploy_archive(wasm).await
 }
 
 #[init]
@@ -683,6 +746,13 @@ fn retrieve_data() {
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
     update_root_hash();
+    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
+    state::load_persistent_state();
+}
+
+#[pre_upgrade]
+fn save_persistent_state() {
+    state::save_persistent_state();
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
