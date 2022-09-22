@@ -123,7 +123,7 @@ const pageContent = (
 
   return {
     template,
-    keys: { authorizeButton, userNumberInput, registerButton },
+    refs: { authorizeButton, userNumberInput, registerButton },
   };
 };
 

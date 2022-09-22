@@ -12,7 +12,7 @@ import { Ref } from "lit/directives/ref.js";
 /** A helper type that represents a "lit" template that contains (typed) references. */
 export type TemplateRef<T> = {
   template: TemplateResult;
-  keys: { [Property in keyof T]: Ref };
+  refs: { [Property in keyof T]: Ref };
 };
 
 /** A wrapper around "lit"'s `render` that (blindly) reifies the template references */
@@ -27,8 +27,8 @@ export function renderTemplateRef<T>(
   // eslint-disable-next-line
   const ret = {} as any;
 
-  for (const i in tpl.keys) {
-    const val = tpl.keys[i].value;
+  for (const i in tpl.refs) {
+    const val = tpl.refs[i].value;
     if (val === null) {
       throw Error("Bad reference found in template");
     }
