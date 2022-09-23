@@ -14,14 +14,17 @@ const pageContent = (onCancel: () => void) => html`
         message: html`<p class="t-paragraph t-lead">
             You are <b class="t-strong">not</b> browsing this website on the
             expected URL:
-            <a class="t-link" href="https://identity.ic0.app">https://identity.ic0.app</a>. For
-            security reasons creation of new Internet Identity anchors is
+            <a class="t-link" href="https://identity.ic0.app"
+              >https://identity.ic0.app</a
+            >. For security reasons creation of new Internet Identity anchors is
             disabled on this origin.
           </p>
           <p class="t-paragraph">
             Please switch to
-            <a class="t-link" href="https://identity.ic0.app">https://identity.ic0.app</a> to
-            register a new Internet Identity anchor.
+            <a class="t-link" href="https://identity.ic0.app"
+              >https://identity.ic0.app</a
+            >
+            to register a new Internet Identity anchor.
           </p>
           <p class="t-paragraph">
             If you were redirected here by another website, please inform the
