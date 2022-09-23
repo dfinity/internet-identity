@@ -1,27 +1,31 @@
-import { html, render } from "lit";
+import { html } from "lit";
+import { TemplateRef, renderTemplateRef } from "../utils/templateRef";
 import { parseUserNumber } from "../utils/userNumber";
+import { mkAnchorInput } from "../components/anchorInput";
 
-const pageContent = (title: string, userNumber: bigint | null) => html`
-  <div class="l-container c-card c-card--highlight">
-    <hgroup>
-      <h1 class="t-title t-title--main">${title}</h1>
-      <p class="t-lead">Please provide an Identity Anchor.</p>
-    </hgroup>
-    <input
-      type="text"
-      id="userNumberInput"
-      class="c-input c-input--vip"
-      placeholder="Enter Anchor"
-      value=${userNumber ?? ""}
-    />
-    <div class="c-button-group">
-      <button id="userNumberCancel" class="c-button c-button--secondary">
-        Cancel
-      </button>
-      <button id="userNumberContinue" class="c-button">Continue</button>
+const pageContent = (
+  title: string,
+  userNumber: bigint | null
+): TemplateRef<{ userNumberInput: HTMLInputElement }> => {
+  const anchorInput = mkAnchorInput("userNumberInput", userNumber ?? undefined);
+  const template = html`
+    <div class="l-container c-card c-card--highlight">
+      <hgroup>
+        <h1 class="t-title t-title--main">${title}</h1>
+        <p class="t-lead">Please provide an Identity Anchor.</p>
+      </hgroup>
+      ${anchorInput.template}
+      <div class="c-button-group">
+        <button id="userNumberCancel" class="c-button c-button--secondary">
+          Cancel
+        </button>
+        <button id="userNumberContinue" class="c-button">Continue</button>
+      </div>
     </div>
-  </div>
-`;
+  `;
+
+  return { ...anchorInput, template };
+};
 
 export const promptUserNumber = async (
   title: string,
@@ -29,14 +33,12 @@ export const promptUserNumber = async (
 ): Promise<bigint | null> =>
   new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
-    render(pageContent(title, userNumber), container);
+    const content = pageContent(title, userNumber);
+    const { userNumberInput } = renderTemplateRef(content, container);
 
     const userNumberContinue = document.getElementById(
       "userNumberContinue"
     ) as HTMLButtonElement;
-    const userNumberInput = document.getElementById(
-      "userNumberInput"
-    ) as HTMLInputElement;
 
     userNumberInput.onkeypress = (e) => {
       // submit if user hits enter

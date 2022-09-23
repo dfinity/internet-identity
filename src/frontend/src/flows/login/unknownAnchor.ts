@@ -1,16 +1,20 @@
-import { render, html } from "lit";
+import { html } from "lit";
 import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { icLogo } from "../../components/icons";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
+import { mkAnchorInput } from "../../components/anchorInput";
 import { useRecovery } from "../recovery/useRecovery";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
+import { TemplateRef, renderTemplateRef } from "../../utils/templateRef";
 
-const pageContent = () => html`
+const pageContent = (): TemplateRef<{ userNumberInput: HTMLInputElement }> => {
+  const anchorInput = mkAnchorInput("registerUserNumber");
+  const template = html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
     <div class="c-logo">${icLogo}</div>
     <article class="l-stack">
@@ -19,12 +23,7 @@ const pageContent = () => html`
         <p class="t-lead">Provide an Identity Anchor to authenticate.</p>
       <hgroup>
       <div class="l-stack">
-        <input
-          type="text"
-          class="c-input c-input--vip"
-          id="registerUserNumber"
-          placeholder="Enter Anchor"
-        />
+        ${anchorInput.template}
         <button type="button" id="loginButton" class="c-button">
           Authenticate
         </button>
@@ -55,13 +54,16 @@ const pageContent = () => html`
   </section>
   ${footer}`;
 
+  return { ...anchorInput, template };
+};
+
 export const loginUnknownAnchor = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
+  const { userNumberInput } = renderTemplateRef(pageContent(), container);
   return new Promise((resolve, reject) => {
-    initLogin(connection, resolve);
+    initLogin(connection, { userNumberInput }, resolve);
     initLinkDevice(connection);
     initRegister(connection, resolve, reject);
     initRecovery(connection);
@@ -98,11 +100,9 @@ const initRecovery = (connection: Connection) => {
 
 const initLogin = (
   connection: Connection,
+  { userNumberInput }: { userNumberInput: HTMLInputElement },
   resolve: (res: LoginFlowResult) => void
 ) => {
-  const userNumberInput = document.getElementById(
-    "registerUserNumber"
-  ) as HTMLInputElement;
   const loginButton = document.getElementById(
     "loginButton"
   ) as HTMLButtonElement;

@@ -1056,28 +1056,9 @@ a:hover,
   display: block !important;
 }
 
-@keyframes flash-error {
-  0% {
-    background-image: linear-gradient(white, white),
-      linear-gradient(270deg, var(--rg-brand));
-  }
-  25% {
-    background-image: linear-gradient(white, white),
-      linear-gradient(270deg, var(--rg-brand-bruised));
-  }
-  75% {
-    background-image: linear-gradient(white, white),
-      linear-gradient(270deg, var(--rg-brand-bruised));
-  }
-  100% {
-    background-image: linear-gradient(white, white),
-      linear-gradient(270deg, var(--rg-brand));
-  }
-}
-
 .c-input--anchor.flash-error {
-  animation-name: flash-error;
-  animation-duration: 6s;
+  background-image: linear-gradient(white, white),
+    linear-gradient(270deg, var(--rg-brand-bruised));
 }
 
 .c-input--anchor.flash-error::after {
