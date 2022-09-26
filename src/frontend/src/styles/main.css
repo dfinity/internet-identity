@@ -1057,10 +1057,11 @@ a:hover,
 .c-input--anchor__wrap::before {
   content: "";
   position: absolute;
+  pointer-events: none;
   inset: 0;
   border-radius: 999999px;
   background-image: linear-gradient(270deg, var(--rg-brand));
-  filter: blur(10px);
+  filter: blur(20px);
   opacity: 0;
   transform: scale(0.7) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
