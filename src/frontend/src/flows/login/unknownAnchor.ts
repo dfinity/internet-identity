@@ -145,7 +145,7 @@ const initLinkDevice = (connection: Connection) => {
       "registerUserNumber"
     ) as HTMLInputElement;
 
-    const userNumber = parseUserNumber(userNumberInput.value);
-    await addRemoteDevice(userNumber, connection);
+    const userNumber = parseUserNumber(userNumberInput.value) ?? undefined;
+    await addRemoteDevice(connection, userNumber);
   };
 };

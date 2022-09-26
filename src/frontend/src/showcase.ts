@@ -46,6 +46,7 @@ import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
+import { registerDisabled } from "./flows/registerDisabled";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -150,7 +151,7 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
-  addRemoteDevice: () => addRemoteDevice(null, dummyConnection),
+  addRemoteDevice: () => addRemoteDevice(dummyConnection),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
@@ -192,6 +193,7 @@ const iiPages: Record<string, () => void> = {
     loginUnknownAnchor(dummyConnection);
     showWarning(html`This is a test page, be very careful!`);
   },
+  registerDisabled: () => registerDisabled(),
 };
 
 // The showcase
