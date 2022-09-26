@@ -1075,7 +1075,7 @@ a:hover,
   background-image: linear-gradient(270deg, var(--rg-brand));
   filter: blur(20px);
   opacity: 0;
-  transform: scale(0.7) translateZ(0);
+  transform: scale(1) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
@@ -1098,11 +1098,6 @@ a:hover,
 .c-input--anchor input {
   position: relative;
   z-index: 1;
-}
-
-.c-input--anchor.flash-error {
-  background-image: linear-gradient(white, white),
-    linear-gradient(270deg, var(--rg-brand-bruised));
 }
 
 .c-input--anchor.flash-error::after {

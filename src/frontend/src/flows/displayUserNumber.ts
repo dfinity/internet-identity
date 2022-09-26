@@ -14,7 +14,7 @@ const pageContent = (userNumber: bigint) => html`
     })}
     <h2 class="t-title">Identity Anchor:</h2>
 
-    <div class="c-input c-input--vip c-input--readonly t-vip c" data-usernumber>
+    <div class="c-input c-input--vip c-input--readonly t-vip" data-usernumber>
       ${userNumber}
     </div>
     <div class="l-stack">
