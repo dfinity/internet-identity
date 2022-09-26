@@ -19,27 +19,26 @@ export const mkAnchorInput = (
     }
   };
 
-  const template = html` <div
-    ${ref(divRef)}
-    class="l-stack c-input c-input--vip c-input--anchor"
-  >
-    <input
-      ${ref(userNumberInput)}
-      type="text"
-      id="${inputId}"
-      placeholder="Enter anchor"
-      value="${userNumber !== undefined ? userNumber : ""}"
-      style="width: 100%;"
-      @input=${inputFilter(isDigits, onBadInput)}
-      @keydown=${inputFilter(isDigits, onBadInput)}
-      @keyup=${inputFilter(isDigits, onBadInput)}
-      @mousedown=${inputFilter(isDigits, onBadInput)}
-      @mouseup=${inputFilter(isDigits, onBadInput)}
-      @select=${inputFilter(isDigits, onBadInput)}
-      @contextmenu=${inputFilter(isDigits, onBadInput)}
-      @drop=${inputFilter(isDigits, onBadInput)}
-      @focusout=${inputFilter(isDigits, onBadInput)}
-    />
+  const template = html` <div ${ref(divRef)} class="l-stack c-input--anchor">
+    <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
+      <input
+        ${ref(userNumberInput)}
+        type="text"
+        id="${inputId}"
+        class="c-input c-input--vip"
+        placeholder="Enter anchor"
+        value="${userNumber !== undefined ? userNumber : ""}"
+        @input=${inputFilter(isDigits, onBadInput)}
+        @keydown=${inputFilter(isDigits, onBadInput)}
+        @keyup=${inputFilter(isDigits, onBadInput)}
+        @mousedown=${inputFilter(isDigits, onBadInput)}
+        @mouseup=${inputFilter(isDigits, onBadInput)}
+        @select=${inputFilter(isDigits, onBadInput)}
+        @contextmenu=${inputFilter(isDigits, onBadInput)}
+        @drop=${inputFilter(isDigits, onBadInput)}
+        @focusout=${inputFilter(isDigits, onBadInput)}
+      />
+    </label>
 
     <p
       id="invalidAnchorMessage"
