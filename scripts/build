@@ -11,24 +11,25 @@ cd "$SCRIPTS_DIR/.."
 #########
 
 function title() {
-    echo "Build Internet Identity"
+    echo "Builds Internet Identity and Archive Canisters"
 }
 
 function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies]
+  $0 [--only-dependencies] [--single-canister CANISTER]
 
 Options:
-  --only-dependencies   only build rust dependencies (no js build, no wasm optimization)
+  --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
+  --single-canister CANISTER   only build a single canister. Possible values: [internet_identity, archive]
 EOF
 }
 
 function help() {
     cat << EOF
 
-Builds the Internet Identity canister.
+Builds the Internet Identity and the Archive canister.
 
 NOTE: This requires a working rust toolchain as well as ic-cdk-optimizer.
 EOF
@@ -36,6 +37,7 @@ EOF
 }
 
 ONLY_DEPS=
+CANISTER="all"
 
 while [[ $# -gt 0  ]]
 do
@@ -48,6 +50,19 @@ do
             ;;
         --only-dependencies)
             ONLY_DEPS=1
+            shift
+            ;;
+        --single-canister)
+            if [ "$2" != "internet_identity" ] && [ "$2" != "archive" ]
+            then
+              echo "ERROR: unknown canister $2"
+              usage
+              echo
+              echo "Use 'build --help' for more information"
+              exit 1
+            fi
+            CANISTER=$2
+            shift
             shift
             ;;
         *)
@@ -69,47 +84,72 @@ then
     exit 1
 fi
 
-if [ "$ONLY_DEPS" != "1" ]
+# Builds a single canister
+# build_canister CANISTER EXTRA_BUILD_ARGS...
+# CANISTER: possible values: [internet_identity, archive]
+# EXTRA_BUILD_ARGS: extra arguments supplied to cargo when building the canister
+function build_canister() {
+    local canister=$1
+    shift
+    local extra_build_args=("$@")
+
+    SRC_DIR="$PWD/src/$canister"
+    TARGET="wasm32-unknown-unknown"
+    # standardize source references
+    CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
+    RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
+
+    cargo_build_args=(
+        --manifest-path "$SRC_DIR/Cargo.toml"
+        --target "$TARGET"
+        --release
+        -j1
+        )
+    cargo_build_args+=("${extra_build_args[@]}")
+
+    echo Running cargo build "${cargo_build_args[@]}"
+    echo RUSTFLAGS: "$RUSTFLAGS"
+
+    RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
+
+    if [ "$ONLY_DEPS" != "1" ]
+    then
+        CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$SRC_DIR/../../target/}"
+
+        ic-cdk-optimizer \
+            "$CARGO_TARGET_DIR/$TARGET/release/$canister.wasm" \
+            -o "./$canister.wasm"
+    fi
+}
+
+if [ "$CANISTER" = "internet_identity" ] || [ "$CANISTER" = "all" ]
 then
-    # Compile frontend assets to dist
-    echo Compiling frontend assets
-    npm run build
+  echo "Building internet_identity"
+  echo
+  if [ "$ONLY_DEPS" != "1" ]
+  then
+      # Compile frontend assets to dist
+      echo Compiling frontend assets
+      npm run build
+  fi
+
+  # This enables the "dummy_captcha" feature which makes sure the captcha string
+  # is always "a".
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production,
+  # EVAR.
+  extra_build_args=()
+  if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
+  then
+      echo "USING DUMMY CAPTCHA"
+      extra_build_args+=( --features dummy_captcha )
+  fi
+  build_canister "internet_identity" "${extra_build_args[@]}"
 fi
 
-II_DIR="$PWD/src/internet_identity"
-TARGET="wasm32-unknown-unknown"
-
-# standardize source references
-CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
-RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
-
-cargo_build_args=(
-    --manifest-path "$II_DIR/Cargo.toml"
-    --target "$TARGET"
-    --release
-    -j1
-    )
-
-# This enables the "dummy_captcha" feature which makes sure the captcha string
-# is always "a".
-# WARNING: this MUST be opt-in, because we DO NOT want this in production,
-# EVAR.
-if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
+if [ "$CANISTER" = "archive" ] || [ "$CANISTER" = "all" ]
 then
-    echo "USING DUMMY CAPTCHA"
-    cargo_build_args+=( --features dummy_captcha )
+  echo "Building archive"
+  echo
+  build_canister "archive"
 fi
 
-echo Running cargo build "${cargo_build_args[@]}"
-echo RUSTFLAGS: "$RUSTFLAGS"
-
-RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
-
-if [ "$ONLY_DEPS" != "1" ]
-then
-    CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
-
-    ic-cdk-optimizer \
-        "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-        -o "./internet_identity.wasm"
-fi

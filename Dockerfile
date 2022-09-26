@@ -59,10 +59,9 @@ RUN mkdir -p src/internet_identity/src \
     && mkdir -p src/metrics_encoder/src \
     && touch src/metrics_encoder/src/lib.rs \
     && ./scripts/build --only-dependencies \
-    && ./scripts/build-archive-canister --only-dependencies \
     && rm -rf src
 
-FROM deps as build
+FROM deps as build_internet_identity
 
 COPY . .
 
@@ -76,10 +75,10 @@ RUN touch src/canister_tests/src/lib.rs
 RUN touch src/metrics_encoder/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build
+RUN ./scripts/build --single-canister internet_identity
 RUN sha256sum /internet_identity.wasm
 
-FROM deps as build_archive_canister
+FROM deps as build_archive
 
 COPY . .
 
@@ -87,11 +86,11 @@ RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/archive/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 
-RUN ./scripts/build-archive-canister
+RUN ./scripts/build --single-canister archive
 RUN sha256sum /archive.wasm
 
-FROM scratch AS scratch_ii
-COPY --from=build /internet_identity.wasm /
+FROM scratch AS scratch_internet_identity
+COPY --from=build_internet_identity /internet_identity.wasm /
 
-FROM scratch AS scratch_archive_canister
-COPY --from=build_archive_canister /archive.wasm /
+FROM scratch AS scratch_archive
+COPY --from=build_archive /archive.wasm /

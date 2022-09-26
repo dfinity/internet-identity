@@ -83,7 +83,7 @@ jobs:
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
-          target: scratch_ii
+          target: scratch_internet_identity
 
       - run: sha256sum out/internet_identity.wasm
       - run: mv out/internet_identity.wasm ${{ matrix.name }}
@@ -113,7 +113,7 @@ jobs:
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
-          target: scratch_archive_canister
+          target: scratch_archive
 
       - run: mv out/archive.wasm archive.wasm
       - run: sha256sum archive.wasm
@@ -222,7 +222,7 @@ jobs:
           name: internet_identity_test.wasm
           path: .
 
-      - name: 'Download II archive wasm'
+      - name: 'Download archive wasm'
         uses: actions/download-artifact@v2
         with:
           name: archive.wasm
