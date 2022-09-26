@@ -1,4 +1,4 @@
-import { html, TemplateResult } from "lit";
+import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 
 // The Warning Component can be reused with following custom properties: title, message, slot and htmlElement.

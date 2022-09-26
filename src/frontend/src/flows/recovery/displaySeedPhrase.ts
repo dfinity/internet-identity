@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
 
 const pageContent = (seedPhrase: string) => html`

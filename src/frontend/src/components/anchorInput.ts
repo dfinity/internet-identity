@@ -1,5 +1,5 @@
-import { html } from "lit";
-import { createRef, ref } from "lit/directives/ref.js";
+import { html } from "lit-html";
+import { createRef, ref } from "lit-html/directives/ref.js";
 import { TemplateRef } from "../utils/templateRef";
 
 /** A component for inputting an anchor number */

@@ -1,4 +1,4 @@
-import { html, render, TemplateResult } from "lit";
+import { html, render, TemplateResult } from "lit-html";
 import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {

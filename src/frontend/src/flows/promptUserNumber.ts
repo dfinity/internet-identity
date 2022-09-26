@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from "lit-html";
 import { TemplateRef, renderTemplateRef } from "../utils/templateRef";
 import { parseUserNumber } from "../utils/userNumber";
 import { mkAnchorInput } from "../components/anchorInput";

@@ -1,4 +1,4 @@
-import { html, TemplateResult } from "lit";
+import { html, TemplateResult } from "lit-html";
 
 export const navigationLink = (
   props = {
