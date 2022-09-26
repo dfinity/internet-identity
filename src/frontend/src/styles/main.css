@@ -720,17 +720,6 @@ a:hover,
   font-weight: normal;
 }
 
-.c-input--vip:focus-within {
-  border-style: double;
-  border-width: calc(var(--vs-line) * 2);
-  border-color: transparent;
-  background-image: linear-gradient(white, white),
-    linear-gradient(270deg, var(--rg-brand));
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow: none;
-}
-
 .c-input--readonly {
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
@@ -1054,6 +1043,48 @@ a:hover,
 
 .is-visible {
   display: block !important;
+}
+
+.c-input--anchor {
+  position: relative;
+}
+
+.c-input--anchor__wrap {
+  position: relative;
+  display: block;
+}
+
+.c-input--anchor__wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999999px;
+  background-image: linear-gradient(270deg, var(--rg-brand));
+  filter: blur(10px);
+  opacity: 0;
+  transform: scale(0.7) translateZ(0);
+  transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
+}
+
+.c-input--anchor__wrap:focus-within::before {
+  opacity: 1;
+  transform: scale(1) translateZ(0);
+}
+
+.c-input--anchor:focus-within input {
+  border-style: double;
+  border-width: calc(var(--vs-line) * 2);
+  border-color: transparent;
+  background-image: linear-gradient(white, white),
+    linear-gradient(270deg, var(--rg-brand));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: none;
+}
+
+.c-input--anchor input {
+  position: relative;
+  z-index: 1;
 }
 
 .c-input--anchor.flash-error {
