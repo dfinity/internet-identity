@@ -60,7 +60,7 @@ jobs:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
           add-paths: |
-            ./src/canister_tests/Cargo.toml
+            ./**/Cargo.toml
             Cargo.lock
           commit-message: Update commit of IC dependencies
           committer: GitHub <noreply@github.com>
