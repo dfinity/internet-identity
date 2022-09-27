@@ -1,4 +1,4 @@
-import { html, nothing, render, TemplateResult } from "lit";
+import { html, nothing, render, TemplateResult } from "lit-html";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import {
   apiResultToLoginFlowResult,
