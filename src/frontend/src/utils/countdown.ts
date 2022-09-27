@@ -1,4 +1,4 @@
-import { render } from "lit";
+import { render } from "lit-html";
 
 /**
  * Countdown implementation which calls the supplied update function approximately every second until the endTimestamp is reached.
