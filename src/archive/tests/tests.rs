@@ -1,10 +1,13 @@
 use canister_tests::framework;
 use canister_tests::framework::{
-    assert_metric, log_entry, log_entry_1, log_entry_2, principal_1, CallError, TIMESTAMP_1,
-    TIMESTAMP_2, USER_NUMBER_1, USER_NUMBER_2, USER_NUMBER_3,
+    assert_metric, expect_user_error_with_message, log_entry, log_entry_1, log_entry_2,
+    principal_1, principal_2, CallError, TIMESTAMP_1, TIMESTAMP_2, USER_NUMBER_1, USER_NUMBER_2,
+    USER_NUMBER_3,
 };
+use ic_state_machine_tests::ErrorCode::CanisterCalledTrap;
 use ic_state_machine_tests::{CanisterId, StateMachine};
 use internet_identity_interface::{Cursor, HttpRequest};
+use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, SystemTime};
 mod api;
@@ -16,39 +19,6 @@ fn should_install() -> Result<(), CallError> {
     let canister_id = framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
     let logs = api::get_logs(&env, canister_id, principal_1(), None, None)?;
     assert_eq!(logs.entries.len(), 0);
-    Ok(())
-}
-
-/// Verifies that log entries can be written to the canister.
-/// The canister does intentionally not check the payload on write so that it will never reject a log entry for compatibility reasons.
-#[test]
-fn should_write_entry() -> Result<(), CallError> {
-    let env = StateMachine::new();
-    let canister_id = framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
-
-    api::add_entry(
-        &env,
-        canister_id,
-        principal_1(),
-        USER_NUMBER_1,
-        TIMESTAMP_1,
-        candid::encode_one(log_entry_1()).expect("failed to encode entry"),
-    )?;
-    api::add_entry(
-        &env,
-        canister_id,
-        principal_1(),
-        USER_NUMBER_1,
-        TIMESTAMP_1,
-        vec![1, 2, 3, 4], // not candid
-    )?;
-
-    // assert logs have been written without decoding entries
-    assert_metric(
-        &get_metrics(&env, canister_id),
-        "ii_archive_log_entries_count",
-        2,
-    );
     Ok(())
 }
 
@@ -74,6 +44,70 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     assert_eq!(logs.entries.len(), 1);
     assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
     Ok(())
+}
+
+/// Verifies the write functionality of the archive canister.
+#[cfg(test)]
+mod write_tests {
+    use super::*;
+
+    /// Verifies that log entries can be written to the canister.
+    /// The canister does intentionally not check the payload on write so that it will never reject a log entry for compatibility reasons.
+    #[test]
+    fn should_write_entry() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id =
+            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            candid::encode_one(log_entry_1()).expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            vec![1, 2, 3, 4], // not candid
+        )?;
+
+        // assert logs have been written without decoding entries
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "ii_archive_log_entries_count",
+            2,
+        );
+        Ok(())
+    }
+
+    /// Verifies that only the configured ii_canister principal can write entries.
+    #[test]
+    fn should_reject_write_by_wrong_principal() {
+        let env = StateMachine::new();
+
+        // Configures principal_1 as the allowed principal for writing.
+        let canister_id =
+            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+
+        let result = api::add_entry(
+            &env,
+            canister_id,
+            principal_2(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            candid::encode_one(log_entry_1()).expect("failed to encode entry"),
+        );
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Only [\\w-]+ is allowed to write entries\\.").unwrap(),
+        );
+    }
 }
 
 /// Verifies the read functionality of the archive canister.
