@@ -188,6 +188,7 @@ fn security_headers() -> Vec<HeaderField> {
             "Content-Security-Policy".to_string(),
             format!(
                 "default-src 'none';\
+             manifest-src 'self';\
              connect-src 'self' https://ic0.app https://*.ic0.app;\
              img-src 'self' data:;\
              script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
