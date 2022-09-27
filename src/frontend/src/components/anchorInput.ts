@@ -1,22 +1,80 @@
 import { html, TemplateResult } from "lit-html";
+import { withRef } from "../utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = (props: {
   inputId: string;
   userNumber?: bigint;
-  onKeyPress?: (e: KeyboardEvent) => void;
-}): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
-  const divRef = createRef();
+  onSubmit?: (userNumber: bigint) => void;
+}): {
+  template: TemplateResult;
+  userNumberInput: Ref<HTMLInputElement>;
+  submit: () => void;
+  readUserNumber: () => bigint | undefined;
+} => {
+  const divRef: Ref<HTMLDivElement> = createRef();
   const userNumberInput: Ref<HTMLInputElement> = createRef();
+
+  const showHint = (message: string) => {
+    withRef(divRef, (div) => {
+      if (!div.classList.contains("flash-error")) {
+        div.setAttribute("data-hint", message);
+        div.classList.add("flash-error");
+        setTimeout(() => div.classList.remove("flash-error"), 2000);
+      }
+    });
+  };
+
+  // When "submitting" (either .submit() is called or enter is typed)
+  // parse the value and call onSubmit
+  const submit = () => {
+    const result = readAndParseValue();
+    if (result === "invalid") {
+      return showHint("Invalid Anchor");
+    }
+    if (result === undefined) {
+      return showHint("Please enter an Anchor");
+    }
+    props.onSubmit?.(result);
+  };
 
   // How we react on unexpected (i.e. non-digit) input
   const onBadInput = () => {
-    const div = divRef.value;
-    if (div !== undefined && !div.classList.contains("flash-error")) {
-      div.classList.add("flash-error");
-      setTimeout(() => div.classList.remove("flash-error"), 2000);
+    showHint("Anchors only consist of digits");
+  };
+
+  // When enter is pressed, submit
+  const onKeyPress = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submit();
     }
+  };
+
+  // Helper for reading the anchor/user number from the input
+  const readAndParseValue = (): undefined | "invalid" | bigint => {
+    return withRef(userNumberInput, (userNumberInput) => {
+      const value = userNumberInput.value;
+      if (value === "") {
+        return undefined;
+      }
+      const parsed = parseUserNumber(value);
+      if (parsed === null) {
+        return "invalid";
+      }
+      return parsed;
+    });
+  };
+
+  // Read user number if submit() shouldn't be called for some reason
+  const readUserNumber = () => {
+    const result = readAndParseValue();
+    if (result === "invalid") {
+      return undefined;
+    }
+    return result;
   };
 
   const template = html` <div ${ref(divRef)} class="l-stack c-input--anchor">
@@ -37,19 +95,12 @@ export const mkAnchorInput = (props: {
         @contextmenu=${inputFilter(isDigits, onBadInput)}
         @drop=${inputFilter(isDigits, onBadInput)}
         @focusout=${inputFilter(isDigits, onBadInput)}
-        @keypress=${props.onKeyPress}
+        @keypress=${onKeyPress}
       />
     </label>
-
-    <p
-      id="invalidAnchorMessage"
-      class="anchor-error-message is-hidden t-paragraph t-strong"
-    >
-      The Identity Anchor is not valid. Please try again.
-    </p>
   </div>`;
 
-  return { template, userNumberInput };
+  return { template, userNumberInput, submit, readUserNumber };
 };
 
 const isDigits = (c: string) => /^\d*\.?\d*$/.test(c);

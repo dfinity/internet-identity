@@ -1101,7 +1101,7 @@ a:hover,
 }
 
 .c-input--anchor.flash-error::after {
-  content: "Anchors only consist of digits";
+  content: attr(data-hint);
   padding: var(--rs-card-bezel); /* TODO */
   position: absolute;
   background: white;

@@ -123,6 +123,7 @@ const iiPages: Record<string, () => void> = {
     displayPage(
       dummyConnection,
       "https://nowhere.com",
+      console.log,
       BigInt(10000),
       "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app"
     ),

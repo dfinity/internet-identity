@@ -1,6 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
-import { parseUserNumber } from "../utils/userNumber";
 import { withRef } from "../utils/utils";
 import { mkAnchorInput } from "../components/anchorInput";
 
@@ -13,27 +12,10 @@ const pageContent = (
   const anchorInput = mkAnchorInput({
     inputId: "userNumberInput",
     userNumber: userNumber ?? undefined,
-    onKeyPress: (e) => {
-      // submit if user hits enter
-      if (e.key === "Enter") {
-        e.preventDefault();
-        withRef(userNumberContinue, (userNumberContinue) =>
-          userNumberContinue.click()
-        );
-      }
+    onSubmit: (userNumber: bigint) => {
+      callbacks.onContinue(userNumber);
     },
   });
-
-  const onContinue = () =>
-    withRef(anchorInput.userNumberInput, (userNumberInput) => {
-      const userNumber = parseUserNumber(userNumberInput.value);
-      if (userNumber !== null) {
-        callbacks.onContinue(userNumber);
-      } else {
-        userNumberInput.classList.toggle("has-error", true);
-        userNumberInput.placeholder = "Please enter an Identity Anchor first";
-      }
-    });
 
   const template = html`
     <div class="l-container c-card c-card--highlight">
@@ -52,7 +34,7 @@ const pageContent = (
         </button>
         <button
           ${ref(userNumberContinue)}
-          @click="${onContinue}"
+          @click="${anchorInput.submit}"
           id="userNumberContinue"
           class="c-button"
         >
