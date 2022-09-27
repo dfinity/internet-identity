@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from "lit-html";
 import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";

@@ -1,21 +1,21 @@
-import { TemplateResult, render } from "lit";
-import { Ref } from "lit/directives/ref.js";
+import { TemplateResult, render } from "lit-html";
+import { Ref } from "lit-html/directives/ref.js";
 
 /** This module contains some helpers that bring element lookup closer to the template description.
- * By using "lit" `Ref`s, DOM elements can be bound without needing `id`s. Then, when the `TemplateRef`
+ * By using "lit-html" `Ref`s, DOM elements can be bound without needing `id`s. Then, when the `TemplateRef`
  * is rendered using `renderTemplateRef`, references are resolved returned.
  *
  * This means that, assuming references are given the proper types, element creation
  * is completely type-safe.
  */
 
-/** A helper type that represents a "lit" template that contains (typed) references. */
+/** A helper type that represents a "lit-html" template that contains (typed) references. */
 export type TemplateRef<T> = {
   template: TemplateResult;
   refs: { [Property in keyof T]: Ref };
 };
 
-/** A wrapper around "lit"'s `render` that (blindly) reifies the template references */
+/** A wrapper around "lit-html"'s `render` that (blindly) reifies the template references */
 export function renderTemplateRef<T>(
   tpl: TemplateRef<T>,
   container: HTMLElement

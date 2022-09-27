@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from "lit-html";
 import { icLogo, attentionIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import {
@@ -10,7 +10,7 @@ import { withLoader } from "../../components/loader";
 import { mkAnchorInput } from "../../components/anchorInput";
 import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { TemplateRef, renderTemplateRef } from "../../utils/templateRef";
-import { ref, createRef } from "lit/directives/ref.js";
+import { ref, createRef } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,

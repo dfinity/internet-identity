@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from "lit-html";
 
 export const footer = html`<footer class="l-footer">
   <a
