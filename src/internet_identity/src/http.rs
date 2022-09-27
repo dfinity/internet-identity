@@ -190,7 +190,7 @@ fn security_headers() -> Vec<HeaderField> {
                 "default-src 'none';\
              manifest-src 'self';\
              connect-src 'self' https://ic0.app https://*.ic0.app;\
-             img-src 'self' data:;\
+             img-src 'self' data: https://identity.ic0.app/;\
              script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
              base-uri 'none';\
              frame-ancestors 'none';\
