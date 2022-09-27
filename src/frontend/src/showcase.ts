@@ -2,7 +2,7 @@
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
 import "./styles/main.css";
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import {
   Challenge,
   DeviceData,
@@ -17,6 +17,7 @@ import { styleguide } from "./styleguide";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
+import { showWarning } from "./banner";
 import { displayUserNumber } from "./flows/displayUserNumber";
 import { loginKnownAnchor } from "./flows/login/knownAnchor";
 import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
@@ -45,6 +46,7 @@ import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
+import { registerDisabled } from "./flows/registerDisabled";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -119,6 +121,7 @@ const iiPages: Record<string, () => void> = {
   register: () => register(dummyConnection),
   authenticate: () =>
     displayPage(
+      dummyConnection,
       "https://nowhere.com",
       BigInt(10000),
       "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app"
@@ -143,10 +146,12 @@ const iiPages: Record<string, () => void> = {
       ...simpleDevices,
       recoveryPhrase,
     ]),
+  displayManageSingle: () =>
+    displayManage(userNumber, dummyConnection, [simpleDevices[0]]),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
-  addRemoteDevice: () => addRemoteDevice(null, dummyConnection),
+  addRemoteDevice: () => addRemoteDevice(dummyConnection),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
@@ -184,6 +189,11 @@ const iiPages: Record<string, () => void> = {
       primaryButton: "Try again",
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
+  banner: () => {
+    loginUnknownAnchor(dummyConnection);
+    showWarning(html`This is a test page, be very careful!`);
+  },
+  registerDisabled: () => registerDisabled(),
 };
 
 // The showcase

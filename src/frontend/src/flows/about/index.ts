@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import { compatibilityData } from "../../components/compatibilityChart";
 
 // The About page

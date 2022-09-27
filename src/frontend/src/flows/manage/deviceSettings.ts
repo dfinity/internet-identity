@@ -1,4 +1,4 @@
-import { render, html } from "lit";
+import { render, html } from "lit-html";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import {
   bufferEqual,
@@ -20,8 +20,10 @@ import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 // deleting general devices.
 const pageContent = (
   userNumber: bigint,
+  connection: AuthenticatedConnection,
   device: DeviceData,
-  isOnlyDevice: boolean
+  isOnlyDevice: boolean,
+  back: () => void
 ) => html`
   <article id="deviceSettings" class="l-container c-card c-card--highlight">
     <h1 class="t-title">
@@ -34,11 +36,29 @@ const pageContent = (
               By making your recovery phrase protected, you will need to input
               your recovery phrase to delete it.
             </p>
-            <button data-action="protect" class="c-button">Protect</button>
+            <button
+              @click="${() =>
+                protectDevice(
+                  userNumber,
+                  connection,
+                  device,
+                  isOnlyDevice,
+                  back
+                )}"
+              data-action="protect"
+              class="c-button"
+            >
+              Protect
+            </button>
             <hr />`
         : ""}
       ${!isOnlyDevice
-        ? html`<button data-action="remove" class="c-button c-button--warning">
+        ? html`<button
+            @click="${() =>
+              deleteDevice(userNumber, connection, device, isOnlyDevice, back)}"
+            data-action="remove"
+            class="c-button c-button--warning"
+          >
             Delete ${isRecovery(device) ? "Recovery" : "Device"}
           </button>`
         : ""}
@@ -56,7 +76,7 @@ const pageContent = (
               Without devices your anchor would be inaccessible.
             </p>`
         : ""}
-      <button data-action="back" class="c-button">Back</button>
+      <button @click="${back}" data-action="back" class="c-button">Back</button>
     </div>
   </article>
   ${footer}
@@ -84,8 +104,12 @@ export const deviceSettings = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
 
-  render(pageContent(userNumber, device, isOnlyDevice), container);
-  return init(userNumber, connection, device, isOnlyDevice);
+  return new Promise((resolve) => {
+    render(
+      pageContent(userNumber, connection, device, isOnlyDevice, resolve),
+      container
+    );
+  });
 };
 
 // Get a connection that's authenticated with the given device
@@ -125,112 +149,101 @@ const deviceConnection = async (
   }
 };
 
-// Initializes the device settings page
-const init = async (
+/* Remove the device and return */
+const deleteDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   device: DeviceData,
-  isOnlyDevice: boolean
-): Promise<void> =>
-  new Promise((resolve) => {
-    const backButton = document.querySelector(
-      "button[data-action=back]"
-    ) as HTMLButtonElement;
-    if (backButton !== null) {
-      backButton.onclick = () => resolve();
+  isOnlyDevice: boolean,
+  back: () => void
+) => {
+  const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+    .buffer as DerEncodedPublicKey;
+  const sameDevice = bufferEqual(
+    connection.identity.getPublicKey().toDer(),
+    pubKey
+  );
+
+  const shouldProceed = sameDevice
+    ? confirm(
+        "This will remove your current device and you will be logged out."
+      )
+    : confirm(
+        `Do you really want to remove the ${
+          hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+        }"${device.alias}"?`
+      );
+  if (!shouldProceed) {
+    return;
+  }
+
+  // If the device is protected then we need to be authenticated with the device to remove it
+  // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
+  const removalConnection = isProtected(device)
+    ? await deviceConnection(
+        connection,
+        userNumber,
+        device,
+        "Please input your recovery phrase to remove it."
+      )
+    : connection;
+
+  await withLoader(async () => {
+    // if null then user canceled so we just redraw the manage page
+    if (removalConnection == null) {
+      await back();
+      return;
     }
-
-    const protectButton = document.querySelector(
-      "button[data-action=protect]"
-    ) as HTMLButtonElement;
-    if (protectButton !== null) {
-      protectButton.onclick = async () => {
-        device.protection = { protected: null };
-
-        // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
-        // but we do it to make sure one last time that the user can actually successfully authenticate
-        // with the device.
-        const newConnection = await deviceConnection(
-          connection,
-          userNumber,
-          device,
-          "Please input your recovery phrase to protect it."
-        );
-
-        await withLoader(async () => {
-          // if null then user canceled so we just redraw the manage page
-          if (newConnection == null) {
-            await resolve();
-            return;
-          }
-
-          await newConnection.update(
-            device.pubkey,
-            device.alias,
-            device.key_type,
-            device.purpose,
-            device.protection,
-            device.credential_id
-          );
-        });
-        await deviceSettings(userNumber, connection, device, isOnlyDevice);
-        resolve();
-      };
-    }
-
-    const deleteButton = document.querySelector(
-      "button[data-action=remove]"
-    ) as HTMLButtonElement;
-    if (deleteButton !== null) {
-      deleteButton.onclick = async () => {
-        const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
-          .buffer as DerEncodedPublicKey;
-        const sameDevice = bufferEqual(
-          connection.identity.getPublicKey().toDer(),
-          pubKey
-        );
-
-        const shouldProceed = sameDevice
-          ? confirm(
-              "This will remove your current device and you will be logged out."
-            )
-          : confirm(
-              `Do you really want to remove the ${
-                hasOwnProperty(device.purpose, "recovery") ? "" : "device "
-              }"${device.alias}"?`
-            );
-        if (!shouldProceed) {
-          return;
-        }
-
-        // If the device is protected then we need to be authenticated with the device to remove it
-        // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
-        const removalConnection = isProtected(device)
-          ? await deviceConnection(
-              connection,
-              userNumber,
-              device,
-              "Please input your recovery phrase to remove it."
-            )
-          : connection;
-
-        await withLoader(async () => {
-          // if null then user canceled so we just redraw the manage page
-          if (removalConnection == null) {
-            await resolve();
-            return;
-          }
-          await removalConnection.remove(device.pubkey);
-        });
-
-        if (sameDevice) {
-          // clear anchor and reload the page.
-          // do not resolve, otherwise the management page will try to reload the list of devices which will cause an error
-          localStorage.clear();
-          location.reload();
-          return;
-        }
-        resolve();
-      };
-    }
+    await removalConnection.remove(device.pubkey);
   });
+
+  if (sameDevice) {
+    // clear anchor and reload the page.
+    // do not call "back", otherwise the management page will try to reload the list of devices which will cause an error
+    localStorage.clear();
+    location.reload();
+    return;
+  } else {
+    back();
+  }
+};
+
+/* Protect the device and re-render the device settings (with the updated device) */
+const protectDevice = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
+  device: DeviceData,
+  isOnlyDevice: boolean,
+  back: () => void
+) => {
+  device.protection = { protected: null };
+
+  // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
+  // but we do it to make sure one last time that the user can actually successfully authenticate
+  // with the device.
+  const newConnection = await deviceConnection(
+    connection,
+    userNumber,
+    device,
+    "Please input your recovery phrase to protect it."
+  );
+
+  await withLoader(async () => {
+    // if null then user canceled so we just redraw the manage page
+    if (newConnection == null) {
+      await back();
+      return;
+    }
+
+    await newConnection.update(
+      device.pubkey,
+      device.alias,
+      device.key_type,
+      device.purpose,
+      device.protection,
+      device.credential_id
+    );
+  });
+  await deviceSettings(userNumber, connection, device, isOnlyDevice);
+  back();
+};

@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render, TemplateResult } from "lit-html";
 import { icLogo, attentionIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import {
@@ -7,7 +7,9 @@ import {
   setUserNumber,
 } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
+import { mkAnchorInput } from "../../components/anchorInput";
 import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,
@@ -22,74 +24,100 @@ import {
   validateDerivationOrigin,
   ValidationResult,
 } from "./validateDerivationOrigin";
-import { unreachable } from "../../utils/utils";
+import { unreachable, withRef } from "../../utils/utils";
+
+type PageElements = {
+  authorizeButton: Ref<HTMLButtonElement>;
+  userNumberInput: Ref<HTMLInputElement>;
+  registerButton: Ref<HTMLLinkElement>;
+};
 
 const pageContent = (
+  connection: Connection,
   hostName: string,
   userNumber?: bigint,
   derivationOrigin?: string
-) => html` <div class="l-container c-card c-card--highlight">
-    <!-- The title is hidden but used for accessibility -->
-    <h1 class="is-hidden">Internet Identity</h1>
-    <div class="c-logo">${icLogo}</div>
-    <div class="l-stack">
-      <p class="t-lead" style="text-align: center;">
-        Connect to<br />
-        <span class="t-strong">${hostName}</span>
-        ${derivationOrigin !== undefined && derivationOrigin !== hostName
-          ? html` <span class="c-tooltip t-link__icon"
-              >${attentionIcon}<i
-                class="c-tooltip__message c-card c-card--narrow"
-                >An alternative origin of ${derivationOrigin}</i
-              ></span
-            >`
-          : ""}
-        <br />
-      </p>
-    </div>
+): PageElements & { template: TemplateResult } => {
+  const onManageClick = () => {
+    window.location.hash = "";
+    window.location.reload();
+  };
 
-    <div class="l-stack c-input c-input--vip c-input--anchor">
-      <input
-        type="text"
-        id="userNumberInput"
-        placeholder="Enter anchor"
-        value="${userNumber !== undefined ? userNumber : ""}"
-        style="width: 100%;"
-      />
+  const onRecoverClick = () => useRecovery(connection, readUserNumber());
 
-      <p
-        id="invalidAnchorMessage"
-        class="anchor-error-message is-hidden t-paragraph t-strong"
-      >
-        The Identity Anchor is not valid. Please try again.
-      </p>
-    </div>
+  const authorizeButton: Ref<HTMLButtonElement> = createRef();
+  const registerButton: Ref<HTMLLinkElement> = createRef();
+  const anchorInput = mkAnchorInput("userNumberInput", userNumber, (e) => {
+    if (e.key === "Enter") {
+      // authenticate if user hits enter
+      e.preventDefault();
+      withRef(authorizeButton, (authorizeButton) => authorizeButton.click());
+    }
+  });
 
-    <button id="authorizeButton" class="c-button">Authorize</button>
-    <div class="l-stack">
-      <ul class="c-list--flex">
-        <li>
-          <a id="registerButton" class="t-link">Create Anchor</a>
-        </li>
-        <li>
-          <a id="recoverButton" class="t-link">Lost Access?</a>
-        </li>
-        <li>
-          <a class="t-link" id="manageButton">Manage Anchor</a>
-        </li>
-        <li>
-          <a
-            class="t-link"
-            href="/faq"
-            target="_blank"
-            rel="noopener noreferrer"
-            >FAQ</a
-          >
-        </li>
-      </ul>
+  const template = html` <div class="l-container c-card c-card--highlight">
+      <!-- The title is hidden but used for accessibility -->
+      <h1 class="is-hidden">Internet Identity</h1>
+      <div class="c-logo">${icLogo}</div>
+      <div class="l-stack">
+        <p class="t-lead" style="text-align: center;">
+          Connect to<br />
+          <span class="t-strong">${hostName}</span>
+          ${derivationOrigin !== undefined && derivationOrigin !== hostName
+            ? html` <span class="c-tooltip t-link__icon"
+                >${attentionIcon}<i
+                  class="c-tooltip__message c-card c-card--narrow"
+                  >An alternative origin of ${derivationOrigin}</i
+                ></span
+              >`
+            : ""}
+          <br />
+        </p>
+      </div>
+
+      ${anchorInput.template}
+
+      <button ${ref(authorizeButton)} id="authorizeButton" class="c-button">
+        Authorize
+      </button>
+      <div class="l-stack">
+        <ul class="c-list--flex">
+          <li>
+            <a ${ref(registerButton)} id="registerButton" class="t-link"
+              >Create Anchor</a
+            >
+          </li>
+          <li>
+            <a @click="${onRecoverClick}" id="recoverButton" class="t-link"
+              >Lost Access?</a
+            >
+          </li>
+          <li>
+            <a @click="${onManageClick}" class="t-link" id="manageButton"
+              >Manage Anchor</a
+            >
+          </li>
+          <li>
+            <a
+              class="t-link"
+              href="/faq"
+              target="_blank"
+              rel="noopener noreferrer"
+              >FAQ</a
+            >
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
-  ${footer}`;
+    ${footer}`;
+
+  return {
+    template,
+    authorizeButton,
+    userNumberInput: anchorInput.userNumberInput,
+    registerButton,
+  };
+};
 
 export interface AuthSuccess {
   userNumber: bigint;
@@ -163,67 +191,48 @@ const init = (
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
-  displayPage(
+  const { authorizeButton, userNumberInput, registerButton } = displayPage(
+    connection,
     authContext.requestOrigin,
     userNumber,
     authContext.authRequest.derivationOrigin
   );
-  initManagementBtn();
-  initRecovery(connection);
-
-  const authorizeButton = document.getElementById(
-    "authorizeButton"
-  ) as HTMLButtonElement;
-  const userNumberInput = document.getElementById(
-    "userNumberInput"
-  ) as HTMLInputElement;
-
-  userNumberInput.onkeypress = (e) => {
-    if (e.key === "Enter") {
-      // authenticate if user hits enter
-      e.preventDefault();
-      authorizeButton.click();
-    }
-  };
 
   // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
-    authorizeButton.focus();
+    withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
   } else {
-    userNumberInput.select();
+    withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
   }
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
-    initRegistration(connection, authContext, userNumber).then(resolve);
-    authorizeButton.onclick = () => {
-      authenticateUser(connection, authContext).then((authSuccess) => {
-        if (authSuccess !== null) {
-          resolve(authSuccess);
-        }
-      });
-    };
+    withRef(registerButton, (registerButton) =>
+      initRegistration(
+        connection,
+        authContext,
+        registerButton,
+        userNumber
+      ).then(resolve)
+    );
+    withRef(authorizeButton, (authorizeButton) => {
+      authorizeButton.onclick = () => {
+        authenticateUser(connection, authContext).then((authSuccess) => {
+          if (authSuccess !== null) {
+            resolve(authSuccess);
+          }
+        });
+      };
+    });
   });
 };
-
-function initManagementBtn() {
-  const manageButton = document.getElementById(
-    "manageButton"
-  ) as HTMLAnchorElement;
-  manageButton.onclick = () => {
-    window.location.hash = "";
-    window.location.reload();
-  };
-}
 
 const initRegistration = async (
   connection: Connection,
   authContext: AuthContext,
+  registerButton: HTMLLinkElement,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
-  const registerButton = document.getElementById(
-    "registerButton"
-  ) as HTMLButtonElement;
   return new Promise((resolve) => {
     registerButton.onclick = () => {
       registerIfAllowed(connection)
@@ -283,17 +292,16 @@ const authenticateUser = async (
 };
 
 export const displayPage = (
+  connection: Connection,
   origin: string,
   userNumber?: bigint,
   derivationOrigin?: string
-): void => {
+): PageElements => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(origin, userNumber, derivationOrigin), container);
+  const ret = pageContent(connection, origin, userNumber, derivationOrigin);
+  render(ret.template, container);
 
-  const userNumberInput = document.getElementById(
-    "userNumberInput"
-  ) as HTMLInputElement;
-  setInputFilter(userNumberInput, (c) => /^\d*\.?\d*$/.test(c));
+  return ret;
 };
 
 async function handleAuthSuccess(
@@ -318,13 +326,6 @@ async function handleAuthSuccess(
   };
 }
 
-const initRecovery = (connection: Connection) => {
-  const recoverButton = document.getElementById(
-    "recoverButton"
-  ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(connection, readUserNumber());
-};
-
 /**
  * Read and parse the user number from the input field.
  */
@@ -335,65 +336,3 @@ const readUserNumber = () => {
   // get rid of null, we use undefined for 'not set'
   return parsedUserNumber === null ? undefined : parsedUserNumber;
 };
-
-/* Adds a filter to the input that only allows the given regex.
- * For more info see https://stackoverflow.com/questions/469357/html-text-input-allow-only-numeric-input
- */
-function setInputFilter(
-  textbox: HTMLInputElement,
-  inputFilter: (value: string) => boolean
-): void {
-  [
-    "input",
-    "keydown",
-    "keyup",
-    "mousedown",
-    "mouseup",
-    "select",
-    "contextmenu",
-    "drop",
-    "focusout",
-  ].forEach(function (event) {
-    textbox.addEventListener(
-      event,
-      function (
-        this: (HTMLInputElement | HTMLTextAreaElement) & {
-          oldValue: string;
-          oldSelectionStart: number | null;
-          oldSelectionEnd: number | null;
-        }
-      ) {
-        if (inputFilter(this.value)) {
-          this.oldValue = this.value;
-          this.oldSelectionStart = this.selectionStart;
-          this.oldSelectionEnd = this.selectionEnd;
-        } else {
-          const parent = textbox.parentNode as HTMLElement;
-
-          if (
-            parent !== undefined &&
-            !parent.classList.contains("flash-error")
-          ) {
-            parent.classList.add("flash-error");
-            setTimeout(() => parent.classList.remove("flash-error"), 2000);
-          }
-
-          if (Object.prototype.hasOwnProperty.call(this, "oldValue")) {
-            this.value = this.oldValue;
-            if (
-              this.oldSelectionStart !== null &&
-              this.oldSelectionEnd !== null
-            ) {
-              this.setSelectionRange(
-                this.oldSelectionStart,
-                this.oldSelectionEnd
-              );
-            }
-          } else {
-            this.value = "";
-          }
-        }
-      }
-    );
-  });
-}

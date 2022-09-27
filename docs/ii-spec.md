@@ -134,7 +134,7 @@ This section describes the Internet Identity Service from the point of view of a
 
         identityWindow.postMessage(msg, "https://identity.ic0.app")
 
-    where `msg` is a value with of type
+    where `msg` is a value of type
 
         interface InternetIdentityAuthRequest {
           kind: "authorize-client";

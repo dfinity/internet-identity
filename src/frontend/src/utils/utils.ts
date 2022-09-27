@@ -1,3 +1,20 @@
+import { Ref } from "lit-html/directives/ref.js";
+
+// Read a "lit-html" ref, showing an error message (in the console) in case the
+// element is not available.
+export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
+  const value = ref.value;
+
+  if (value === undefined) {
+    console.error(
+      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
+    );
+    return;
+  } else {
+    return f(value);
+  }
+}
+
 // A `hasOwnProperty` that produces evidence for the typechecker
 export function hasOwnProperty<
   X extends Record<string, unknown>,
