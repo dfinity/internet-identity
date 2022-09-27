@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://identity.ic0.app/sitemap.xml
+Host: https://identity.ic0.app

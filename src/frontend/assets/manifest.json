@@ -1,0 +1,23 @@
+{
+  "name": "Internet Identity - Web3 Authentication",
+  "short_name": "Internet Identity",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#522785",
+  "background_color": "#ffffff",
+  "description": "Web3 sign-on via WebAuth: fingerprint sensor, Face ID etc",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "https://identity.ic0.app/favicons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://identity.ic0.app/favicons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -4,8 +4,86 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Internet Identity</title>
-    <link rel="shortcut icon" type="image/jpg" href="./favicon.ico" />
+
+    <title>Internet Identity - Web3 Authentication</title>
+
+    <meta
+      content="Web3 sign-on via WebAuth: fingerprint sensor, Face ID etc"
+      name="description"
+    />
+    <meta
+      content="Internet Identity - Web3 Authentication"
+      property="og:title"
+    />
+    <meta
+      content="Web3 sign-on via WebAuth: fingerprint sensor, Face ID etc"
+      property="og:description"
+    />
+    <meta content="website" property="og:type" />
+    <meta content="https://identity.ic0.app/" property="og:url" />
+    <meta
+      content="https://identity.ic0.app/social-image.png"
+      property="og:image"
+    />
+    <meta content="summary_large_image" name="twitter:card" />
+    <meta
+      content="Internet Identity - Web3 Authentication"
+      name="twitter:title"
+    />
+    <meta
+      content="Web3 sign-on via WebAuth: fingerprint sensor, Face ID etc"
+      name="twitter:description"
+    />
+    <meta
+      content="https://identity.ic0.app/social-image.png"
+      name="twitter:image"
+    />
+    <meta content="@dfinity" name="twitter:creator" />
+
+    <link href="https://identity.ic0.app/" rel="canonical" />
+
+    <link rel="manifest" href="/manifest.json" crossorigin="anonymous" />
+
+    <link href="/sitemap.xml" rel="sitemap" type="application/xml" />
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="https://identity.ic0.app/favicons/icon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="https://identity.ic0.app/favicons/icon-16x16.png"
+    />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="#522785" />
+    <meta name="apple-mobile-web-app-title" content="Network Nervous System" />
+    <link
+      rel="apple-touch-icon"
+      href="https://identity.ic0.app/favicons/apple-touch-icon.png"
+    />
+    <link
+      rel="mask-icon"
+      href="https://identity.ic0.app/favicons/safari-pinned-tab.svg"
+      color="#e82a7b"
+    />
+
+    <!-- MS -->
+    <meta name="msapplication-TileColor" content="#522785" />
+    <meta
+      name="msapplication-config"
+      content="https://identity.ic0.app/favicons/browserconfig.xml"
+    />
+
+    <meta name="theme-color" content="#522785" />
+
     <!-- We set "inject" to false in production, where we explicitly link to the stylesheet
         with a <link> tag (instead of the "style-loader"-development-loaded one) -->
     <% if (! htmlWebpackPlugin.options.inject) { %>
