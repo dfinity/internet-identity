@@ -2,11 +2,11 @@ import { html, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
-export const mkAnchorInput = (
-  inputId: string,
-  userNumber?: bigint,
-  onKeyPress?: (e: KeyboardEvent) => void
-): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
+export const mkAnchorInput = (props: {
+  inputId: string;
+  userNumber?: bigint;
+  onKeyPress?: (e: KeyboardEvent) => void;
+}): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
   const divRef = createRef();
   const userNumberInput: Ref<HTMLInputElement> = createRef();
 
@@ -24,10 +24,10 @@ export const mkAnchorInput = (
       <input
         ${ref(userNumberInput)}
         type="text"
-        id="${inputId}"
+        id="${props.inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${userNumber !== undefined ? userNumber : ""}"
+        value="${props.userNumber !== undefined ? props.userNumber : ""}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
@@ -37,7 +37,7 @@ export const mkAnchorInput = (
         @contextmenu=${inputFilter(isDigits, onBadInput)}
         @drop=${inputFilter(isDigits, onBadInput)}
         @focusout=${inputFilter(isDigits, onBadInput)}
-        @keypress=${onKeyPress}
+        @keypress=${props.onKeyPress}
       />
     </label>
 

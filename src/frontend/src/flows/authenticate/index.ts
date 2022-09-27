@@ -47,12 +47,16 @@ const pageContent = (
 
   const authorizeButton: Ref<HTMLButtonElement> = createRef();
   const registerButton: Ref<HTMLLinkElement> = createRef();
-  const anchorInput = mkAnchorInput("userNumberInput", userNumber, (e) => {
-    if (e.key === "Enter") {
-      // authenticate if user hits enter
-      e.preventDefault();
-      withRef(authorizeButton, (authorizeButton) => authorizeButton.click());
-    }
+  const anchorInput = mkAnchorInput({
+    inputId: "userNumberInput",
+    userNumber,
+    onKeyPress: (e) => {
+      if (e.key === "Enter") {
+        // authenticate if user hits enter
+        e.preventDefault();
+        withRef(authorizeButton, (authorizeButton) => authorizeButton.click());
+      }
+    },
   });
 
   const template = html` <div class="l-container c-card c-card--highlight">

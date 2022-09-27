@@ -10,10 +10,10 @@ const pageContent = (
   callbacks: { onContinue: (ret: bigint) => void; onCancel: () => void }
 ): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
-  const anchorInput = mkAnchorInput(
-    "userNumberInput",
-    userNumber ?? undefined,
-    (e) => {
+  const anchorInput = mkAnchorInput({
+    inputId: "userNumberInput",
+    userNumber: userNumber ?? undefined,
+    onKeyPress: (e) => {
       // submit if user hits enter
       if (e.key === "Enter") {
         e.preventDefault();
@@ -21,8 +21,8 @@ const pageContent = (
           userNumberContinue.click()
         );
       }
-    }
-  );
+    },
+  });
 
   const onContinue = () =>
     withRef(anchorInput.userNumberInput, (userNumberInput) => {

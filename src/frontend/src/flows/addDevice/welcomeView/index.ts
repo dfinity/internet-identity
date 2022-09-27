@@ -16,7 +16,7 @@ const pageContent = (userNumber?: bigint) => html`
         Please enter a valid Identity Anchor.
       </p>
     </hgroup>
-    ${mkAnchorInput("addDeviceUserNumber", userNumber).template}
+    ${mkAnchorInput({ inputId: "addDeviceUserNumber", userNumber }).template}
     <div class="c-button-group">
       <button
         @click="${

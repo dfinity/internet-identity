@@ -17,7 +17,7 @@ const pageContent = (): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
 } => {
-  const anchorInput = mkAnchorInput("registerUserNumber");
+  const anchorInput = mkAnchorInput({ inputId: "registerUserNumber" });
   const template = html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
     <div class="c-logo">${icLogo}</div>
