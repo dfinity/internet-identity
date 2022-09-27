@@ -604,7 +604,7 @@ a:hover,
   z-index: var(--vz-background);
   background: var(--rc-background);
   border-radius: 4px;
-  box-shadow: 0 0 0 4px rgba(255,255,255, .4);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
 /**
