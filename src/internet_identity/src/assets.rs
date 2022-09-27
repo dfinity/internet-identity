@@ -21,6 +21,10 @@ pub enum ContentType {
     WEBP,
     SVG,
     CSS,
+    JSON,
+    TXT,
+    XML,
+    PNG
 }
 
 // The <script> tag that loads the 'index.js'
@@ -131,6 +135,78 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
         (
             "/ic-badge.svg",
             include_bytes!("../../../dist/ic-badge.svg"),
+            ContentEncoding::Identity,
+            ContentType::SVG,
+        ),
+        (
+            "/manifest.json",
+            include_bytes!("../../../dist/manifest.json"),
+            ContentEncoding::Identity,
+            ContentType::JSON,
+        ),
+        (
+            "/robots.txt",
+            include_bytes!("../../../dist/robots.txt"),
+            ContentEncoding::Identity,
+            ContentType::TXT,
+        ),
+        (
+            "/sitemap.xml",
+            include_bytes!("../../../dist/sitemap.xml"),
+            ContentEncoding::Identity,
+            ContentType::XML,
+        ),
+        (
+            "/social-image.png",
+            include_bytes!("../../../dist/social-image.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/browserconfig.xml",
+            include_bytes!("../../../dist/favicons/browserconfig.xml"),
+            ContentEncoding::Identity,
+            ContentType::XML,
+        ),
+        (
+            "/favicons/apple-touch-icon.png",
+            include_bytes!("../../../dist/favicons/apple-touch-icon.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/icon-16x16.png",
+            include_bytes!("../../../dist/favicons/icon-16x16.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/icon-32x32.png",
+            include_bytes!("../../../dist/favicons/icon-32x32.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/icon-192x192.png",
+            include_bytes!("../../../dist/favicons/icon-192x192.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/icon-512x512.png",
+            include_bytes!("../../../dist/favicons/icon-512x512.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/mstile-150x150.png",
+            include_bytes!("../../../dist/favicons/mstile-150x150.png"),
+            ContentEncoding::Identity,
+            ContentType::PNG,
+        ),
+        (
+            "/favicons/safari-pinned-tab.svg",
+            include_bytes!("../../../dist/favicons/safari-pinned-tab.svg"),
             ContentEncoding::Identity,
             ContentType::SVG,
         ),

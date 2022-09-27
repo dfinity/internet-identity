@@ -19,6 +19,10 @@ impl ContentType {
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
+            ContentType::JSON => "application/json".to_string(),
+            ContentType::TXT => "text/plain".to_string(),
+            ContentType::XML => "application/xml".to_string(),
+            ContentType::PNG => "image/png".to_string(),
         }
     }
 }
