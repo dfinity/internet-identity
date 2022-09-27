@@ -24,7 +24,7 @@ pub enum ContentType {
     JSON,
     TXT,
     XML,
-    PNG
+    PNG,
 }
 
 // The <script> tag that loads the 'index.js'
