@@ -1,6 +1,6 @@
 [package]
 name = "archive"
-description = "Internet Identity Log Canister"
+description = "Internet Identity Archive Canister"
 version = "0.1.0"
 edition = "2021"
 
@@ -21,5 +21,5 @@ serde_bytes = "0.11"
 
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-state-machine-tests = "*"
+ic-types = "*"
