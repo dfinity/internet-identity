@@ -1,4 +1,4 @@
-import { html } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
 import { icLogo, attentionIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import {
@@ -9,8 +9,7 @@ import {
 import { withLoader } from "../../components/loader";
 import { mkAnchorInput } from "../../components/anchorInput";
 import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
-import { TemplateRef, renderTemplateRef } from "../../utils/templateRef";
-import { ref, createRef } from "lit-html/directives/ref.js";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
   LoginFlowSuccess,
@@ -25,12 +24,12 @@ import {
   validateDerivationOrigin,
   ValidationResult,
 } from "./validateDerivationOrigin";
-import { unreachable } from "../../utils/utils";
+import { unreachable, withRef } from "../../utils/utils";
 
 type PageElements = {
-  authorizeButton: HTMLButtonElement;
-  userNumberInput: HTMLInputElement;
-  registerButton: HTMLLinkElement;
+  authorizeButton: Ref<HTMLButtonElement>;
+  userNumberInput: Ref<HTMLInputElement>;
+  registerButton: Ref<HTMLLinkElement>;
 };
 
 const pageContent = (
@@ -38,7 +37,7 @@ const pageContent = (
   hostName: string,
   userNumber?: bigint,
   derivationOrigin?: string
-): TemplateRef<PageElements> => {
+): PageElements & { template: TemplateResult } => {
   const onManageClick = () => {
     window.location.hash = "";
     window.location.reload();
@@ -46,9 +45,15 @@ const pageContent = (
 
   const onRecoverClick = () => useRecovery(connection, readUserNumber());
 
-  const authorizeButton = createRef();
-  const registerButton = createRef();
-  const anchorInput = mkAnchorInput("userNumberInput", userNumber);
+  const authorizeButton: Ref<HTMLButtonElement> = createRef();
+  const registerButton: Ref<HTMLLinkElement> = createRef();
+  const anchorInput = mkAnchorInput("userNumberInput", userNumber, (e) => {
+    if (e.key === "Enter") {
+      // authenticate if user hits enter
+      e.preventDefault();
+      withRef(authorizeButton, (authorizeButton) => authorizeButton.click());
+    }
+  });
 
   const template = html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
@@ -108,11 +113,9 @@ const pageContent = (
 
   return {
     template,
-    refs: {
-      authorizeButton,
-      userNumberInput: anchorInput.refs.userNumberInput,
-      registerButton,
-    },
+    authorizeButton,
+    userNumberInput: anchorInput.userNumberInput,
+    registerButton,
   };
 };
 
@@ -195,33 +198,32 @@ const init = (
     authContext.authRequest.derivationOrigin
   );
 
-  userNumberInput.onkeypress = (e) => {
-    if (e.key === "Enter") {
-      // authenticate if user hits enter
-      e.preventDefault();
-      authorizeButton.click();
-    }
-  };
-
   // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
   if (userNumber !== undefined && userNumber === getUserNumber()) {
-    authorizeButton.focus();
+    withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
   } else {
-    userNumberInput.select();
+    withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
   }
 
   return new Promise((resolve) => {
     // Resolve either on successful authentication or after registration
-    initRegistration(connection, authContext, registerButton, userNumber).then(
-      resolve
+    withRef(registerButton, (registerButton) =>
+      initRegistration(
+        connection,
+        authContext,
+        registerButton,
+        userNumber
+      ).then(resolve)
     );
-    authorizeButton.onclick = () => {
-      authenticateUser(connection, authContext).then((authSuccess) => {
-        if (authSuccess !== null) {
-          resolve(authSuccess);
-        }
-      });
-    };
+    withRef(authorizeButton, (authorizeButton) => {
+      authorizeButton.onclick = () => {
+        authenticateUser(connection, authContext).then((authSuccess) => {
+          if (authSuccess !== null) {
+            resolve(authSuccess);
+          }
+        });
+      };
+    });
   });
 };
 
@@ -296,10 +298,8 @@ export const displayPage = (
   derivationOrigin?: string
 ): PageElements => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const ret = renderTemplateRef(
-    pageContent(connection, origin, userNumber, derivationOrigin),
-    container
-  );
+  const ret = pageContent(connection, origin, userNumber, derivationOrigin);
+  render(ret.template, container);
 
   return ret;
 };

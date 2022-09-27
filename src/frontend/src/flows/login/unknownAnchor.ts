@@ -1,4 +1,5 @@
-import { html } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
+import { Ref } from "lit-html/directives/ref.js";
 import { Connection } from "../../utils/iiConnection";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
@@ -10,9 +11,12 @@ import { useRecovery } from "../recovery/useRecovery";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import { TemplateRef, renderTemplateRef } from "../../utils/templateRef";
+import { withRef } from "../../utils/utils";
 
-const pageContent = (): TemplateRef<{ userNumberInput: HTMLInputElement }> => {
+const pageContent = (): {
+  template: TemplateResult;
+  userNumberInput: Ref<HTMLInputElement>;
+} => {
   const anchorInput = mkAnchorInput("registerUserNumber");
   const template = html`
   <section class="l-container c-card c-card--highlight" aria-label="Authentication">
@@ -61,9 +65,14 @@ export const loginUnknownAnchor = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const { userNumberInput } = renderTemplateRef(pageContent(), container);
+  const content = pageContent();
+  render(content.template, container);
   return new Promise((resolve, reject) => {
-    initLogin(connection, { userNumberInput }, resolve);
+    initLogin(
+      connection,
+      { userNumberInput: content.userNumberInput },
+      resolve
+    );
     initLinkDevice(connection);
     initRegister(connection, resolve, reject);
     initRecovery(connection);
@@ -100,39 +109,41 @@ const initRecovery = (connection: Connection) => {
 
 const initLogin = (
   connection: Connection,
-  { userNumberInput }: { userNumberInput: HTMLInputElement },
+  { userNumberInput }: { userNumberInput: Ref<HTMLInputElement> },
   resolve: (res: LoginFlowResult) => void
 ) => {
   const loginButton = document.getElementById(
     "loginButton"
   ) as HTMLButtonElement;
 
-  userNumberInput.onkeypress = (e) => {
-    // submit if user hits enter
-    if (e.key === "Enter") {
-      e.preventDefault();
-      loginButton.click();
-    }
-  };
+  withRef(userNumberInput, (userNumberInput) => {
+    userNumberInput.onkeypress = (e) => {
+      // submit if user hits enter
+      if (e.key === "Enter") {
+        e.preventDefault();
+        loginButton.click();
+      }
+    };
 
-  // always select the input
-  userNumberInput.select();
+    // always select the input
+    userNumberInput.select();
 
-  loginButton.onclick = async () => {
-    const userNumber = parseUserNumber(userNumberInput.value);
-    if (userNumber === null) {
-      return resolve({
-        tag: "err",
-        title: "Please enter a valid Identity Anchor",
-        message: `${userNumber} doesn't parse as a number`,
-      });
-    }
-    const result = await withLoader(() => connection.login(userNumber));
-    if (result.kind === "loginSuccess") {
-      setUserNumber(userNumber);
-    }
-    resolve(apiResultToLoginFlowResult(result));
-  };
+    loginButton.onclick = async () => {
+      const userNumber = parseUserNumber(userNumberInput.value);
+      if (userNumber === null) {
+        return resolve({
+          tag: "err",
+          title: "Please enter a valid Identity Anchor",
+          message: `${userNumber} doesn't parse as a number`,
+        });
+      }
+      const result = await withLoader(() => connection.login(userNumber));
+      if (result.kind === "loginSuccess") {
+        setUserNumber(userNumber);
+      }
+      resolve(apiResultToLoginFlowResult(result));
+    };
+  });
 };
 
 const initLinkDevice = (connection: Connection) => {

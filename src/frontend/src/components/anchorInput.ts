@@ -1,14 +1,14 @@
-import { html } from "lit-html";
-import { createRef, ref } from "lit-html/directives/ref.js";
-import { TemplateRef } from "../utils/templateRef";
+import { html, TemplateResult } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = (
   inputId: string,
-  userNumber?: bigint
-): TemplateRef<{ userNumberInput: HTMLInputElement }> => {
+  userNumber?: bigint,
+  onKeyPress?: (e: KeyboardEvent) => void
+): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
   const divRef = createRef();
-  const userNumberInput = createRef();
+  const userNumberInput: Ref<HTMLInputElement> = createRef();
 
   // How we react on unexpected (i.e. non-digit) input
   const onBadInput = () => {
@@ -37,6 +37,10 @@ export const mkAnchorInput = (
         @contextmenu=${inputFilter(isDigits, onBadInput)}
         @drop=${inputFilter(isDigits, onBadInput)}
         @focusout=${inputFilter(isDigits, onBadInput)}
+        @keypress=${onKeyPress ??
+        (() => {
+          /* fallback to nothing */
+        })}
       />
     </label>
 
@@ -48,7 +52,7 @@ export const mkAnchorInput = (
     </p>
   </div>`;
 
-  return { template, refs: { userNumberInput } };
+  return { template, userNumberInput };
 };
 
 const isDigits = (c: string) => /^\d*\.?\d*$/.test(c);

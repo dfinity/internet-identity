@@ -1,13 +1,40 @@
-import { html } from "lit-html";
-import { TemplateRef, renderTemplateRef } from "../utils/templateRef";
+import { html, render, TemplateResult } from "lit-html";
+import { Ref, ref, createRef } from "lit-html/directives/ref.js";
 import { parseUserNumber } from "../utils/userNumber";
+import { withRef } from "../utils/utils";
 import { mkAnchorInput } from "../components/anchorInput";
 
 const pageContent = (
   title: string,
-  userNumber: bigint | null
-): TemplateRef<{ userNumberInput: HTMLInputElement }> => {
-  const anchorInput = mkAnchorInput("userNumberInput", userNumber ?? undefined);
+  userNumber: bigint | null,
+  callbacks: { onContinue: (ret: bigint) => void; onCancel: () => void }
+): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
+  const userNumberContinue: Ref<HTMLButtonElement> = createRef();
+  const anchorInput = mkAnchorInput(
+    "userNumberInput",
+    userNumber ?? undefined,
+    (e) => {
+      // submit if user hits enter
+      if (e.key === "Enter") {
+        e.preventDefault();
+        withRef(userNumberContinue, (userNumberContinue) =>
+          userNumberContinue.click()
+        );
+      }
+    }
+  );
+
+  const onContinue = () =>
+    withRef(anchorInput.userNumberInput, (userNumberInput) => {
+      const userNumber = parseUserNumber(userNumberInput.value);
+      if (userNumber !== null) {
+        callbacks.onContinue(userNumber);
+      } else {
+        userNumberInput.classList.toggle("has-error", true);
+        userNumberInput.placeholder = "Please enter an Identity Anchor first";
+      }
+    });
+
   const template = html`
     <div class="l-container c-card c-card--highlight">
       <hgroup>
@@ -16,10 +43,21 @@ const pageContent = (
       </hgroup>
       ${anchorInput.template}
       <div class="c-button-group">
-        <button id="userNumberCancel" class="c-button c-button--secondary">
+        <button
+          @click="${callbacks.onCancel}"
+          id="userNumberCancel"
+          class="c-button c-button--secondary"
+        >
           Cancel
         </button>
-        <button id="userNumberContinue" class="c-button">Continue</button>
+        <button
+          ${ref(userNumberContinue)}
+          @click="${onContinue}"
+          id="userNumberContinue"
+          class="c-button"
+        >
+          Continue
+        </button>
       </div>
     </div>
   `;
@@ -33,41 +71,13 @@ export const promptUserNumber = async (
 ): Promise<bigint | null> =>
   new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
-    const content = pageContent(title, userNumber);
-    const { userNumberInput } = renderTemplateRef(content, container);
-
-    const userNumberContinue = document.getElementById(
-      "userNumberContinue"
-    ) as HTMLButtonElement;
-
-    userNumberInput.onkeypress = (e) => {
-      // submit if user hits enter
-      if (e.key === "Enter") {
-        e.preventDefault();
-        userNumberContinue.click();
-      }
-    };
+    const content = pageContent(title, userNumber, {
+      onContinue: resolve,
+      onCancel: () => resolve(null),
+    });
+    render(content.template, container);
+    const { userNumberInput } = content;
 
     // always select the input
-    userNumberInput.select();
-
-    userNumberContinue.onclick = () => {
-      const userNumber = parseUserNumber(userNumberInput.value);
-      if (userNumber !== null) {
-        resolve(userNumber);
-      } else {
-        userNumberInput.classList.toggle("has-error", true);
-        userNumberInput.placeholder = "Please enter an Identity Anchor first";
-      }
-    };
-
-    const userNumberCancel = document.getElementById(
-      "userNumberCancel"
-    ) as HTMLButtonElement;
-
-    if (userNumberCancel !== null) {
-      userNumberCancel.onclick = async () => {
-        resolve(null);
-      };
-    }
+    withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
   });
