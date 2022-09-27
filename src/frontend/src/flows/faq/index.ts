@@ -1,4 +1,4 @@
-import { TemplateResult, html, render } from "lit";
+import { TemplateResult, html, render } from "lit-html";
 
 export interface Link {
   name: string;

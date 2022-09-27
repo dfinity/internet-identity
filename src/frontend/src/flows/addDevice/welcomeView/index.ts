@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import { parseUserNumber } from "../../../utils/userNumber";
 import { registerTentativeDevice } from "./registerTentativeDevice";
 import { toggleErrorMessage } from "../../../utils/errorHelper";

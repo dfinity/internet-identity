@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import { logoutSection } from "../components/logout";
 import { AuthenticatedConnection } from "../utils/iiConnection";
 import { renderManage } from "./manage";

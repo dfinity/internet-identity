@@ -1,6 +1,6 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
-import { html } from "lit";
+import { html } from "lit-html";
 import { warningIcon, icLogo } from "./components/icons";
 
 export const styleguide = html`

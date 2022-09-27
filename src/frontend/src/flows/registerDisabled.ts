@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 
 const pageContent = (onCancel: () => void) => html`
