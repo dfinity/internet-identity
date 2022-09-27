@@ -37,10 +37,7 @@ export const mkAnchorInput = (
         @contextmenu=${inputFilter(isDigits, onBadInput)}
         @drop=${inputFilter(isDigits, onBadInput)}
         @focusout=${inputFilter(isDigits, onBadInput)}
-        @keypress=${onKeyPress ??
-        (() => {
-          /* fallback to nothing */
-        })}
+        @keypress=${onKeyPress}
       />
     </label>
 
