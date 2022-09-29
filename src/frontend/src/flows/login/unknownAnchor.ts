@@ -11,6 +11,7 @@ import { useRecovery } from "../recovery/useRecovery";
 import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
 import { addRemoteDevice } from "../addDevice/welcomeView";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
+import { withRef } from "../../utils/utils";
 
 const pageContent = (props: {
   onContinue: (res: bigint) => void;
@@ -74,6 +75,10 @@ export const loginUnknownAnchor = async (
       onContinue: (userNumber) => resolve(doLogin(userNumber, connection)),
     });
     render(content.template, container);
+    // always select the input
+    withRef(content.userNumberInput, (userNumberInput) =>
+      userNumberInput.select()
+    );
     initLinkDevice(connection);
     initRegister(connection, resolve, reject);
     initRecovery(connection);
