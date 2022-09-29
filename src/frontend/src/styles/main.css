@@ -1101,7 +1101,7 @@ a:hover,
 }
 
 .c-input--anchor.flash-error::after {
-  content: "Anchors only consist of digits";
+  content: attr(data-hint);
   padding: var(--rs-card-bezel); /* TODO */
   position: absolute;
   background: white;
@@ -1110,6 +1110,7 @@ a:hover,
   left: 0px;
   right: 0px;
   font-size: 70%;
+  z-index: var(--vz-tooltip);
 }
 
 /* Needed to override the "reset" rules */

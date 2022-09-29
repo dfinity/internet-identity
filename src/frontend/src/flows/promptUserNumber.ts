@@ -1,6 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
-import { parseUserNumber } from "../utils/userNumber";
 import { withRef } from "../utils/utils";
 import { mkAnchorInput } from "../components/anchorInput";
 
@@ -10,30 +9,13 @@ const pageContent = (
   callbacks: { onContinue: (ret: bigint) => void; onCancel: () => void }
 ): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
-  const anchorInput = mkAnchorInput(
-    "userNumberInput",
-    userNumber ?? undefined,
-    (e) => {
-      // submit if user hits enter
-      if (e.key === "Enter") {
-        e.preventDefault();
-        withRef(userNumberContinue, (userNumberContinue) =>
-          userNumberContinue.click()
-        );
-      }
-    }
-  );
-
-  const onContinue = () =>
-    withRef(anchorInput.userNumberInput, (userNumberInput) => {
-      const userNumber = parseUserNumber(userNumberInput.value);
-      if (userNumber !== null) {
-        callbacks.onContinue(userNumber);
-      } else {
-        userNumberInput.classList.toggle("has-error", true);
-        userNumberInput.placeholder = "Please enter an Identity Anchor first";
-      }
-    });
+  const anchorInput = mkAnchorInput({
+    inputId: "userNumberInput",
+    userNumber: userNumber ?? undefined,
+    onSubmit: (userNumber: bigint) => {
+      callbacks.onContinue(userNumber);
+    },
+  });
 
   const template = html`
     <div class="l-container c-card c-card--highlight">
@@ -52,7 +34,7 @@ const pageContent = (
         </button>
         <button
           ${ref(userNumberContinue)}
-          @click="${onContinue}"
+          @click="${anchorInput.submit}"
           id="userNumberContinue"
           class="c-button"
         >
