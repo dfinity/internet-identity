@@ -83,13 +83,13 @@ pub fn init_assets() {
 fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 21] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     [
+        /* The actual pages (same page really but served on different routes) */
         (
             "/",
             index_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
-        // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
         (
             "/faq",
             index_html,
@@ -108,6 +108,7 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
+        /* Web assets (js, css, images) */
         (
             "/index.js",
             include_bytes!("../../../dist/index.js.gz"),
@@ -127,17 +128,12 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             ContentType::WEBP,
         ),
         (
-            "/favicon.ico",
-            include_bytes!("../../../dist/favicon.ico"),
-            ContentEncoding::Identity,
-            ContentType::ICO,
-        ),
-        (
             "/ic-badge.svg",
             include_bytes!("../../../dist/ic-badge.svg"),
             ContentEncoding::Identity,
             ContentType::SVG,
         ),
+        /* Metadata pages/assets */
         (
             "/manifest.json",
             include_bytes!("../../../dist/manifest.json"),
@@ -156,11 +152,18 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             ContentEncoding::Identity,
             ContentType::XML,
         ),
+        /* favicons */
         (
             "/social-image.png",
             include_bytes!("../../../dist/social-image.png"),
             ContentEncoding::Identity,
             ContentType::PNG,
+        ),
+        (
+            "/favicon.ico",
+            include_bytes!("../../../dist/favicon.ico"),
+            ContentEncoding::Identity,
+            ContentType::ICO,
         ),
         (
             "/favicons/browserconfig.xml",

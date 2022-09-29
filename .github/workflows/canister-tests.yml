@@ -211,8 +211,21 @@ jobs:
           touch dist/index.js.gz
           touch dist/index.css
           touch dist/loader.webp
-          touch dist/favicon.ico
           touch dist/ic-badge.svg
+          touch dist/manifest.json
+          touch dist/robots.txt
+          touch dist/sitemap.xml
+          touch dist/social-image.png
+          touch dist/favicon.ico
+          mkdir -p dist/favicons
+          touch dist/favicons/browserconfig.xml
+          touch dist/favicons/apple-touch-icon.png
+          touch dist/favicons/icon-16x16.png
+          touch dist/favicons/icon-32x32.png
+          touch dist/favicons/icon-192x192.png
+          touch dist/favicons/icon-512x512.png
+          touch dist/favicons/mstile-150x150.png
+          touch dist/favicons/safari-pinned-tab.svg
 
       # We split the test build and run so that it's clear from the GHA steps how long each took
       - name: Build Tests
