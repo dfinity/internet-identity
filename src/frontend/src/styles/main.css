@@ -1110,6 +1110,7 @@ a:hover,
   left: 0px;
   right: 0px;
   font-size: 70%;
+  z-index: var(--vz-tooltip);
 }
 
 /* Needed to override the "reset" rules */
