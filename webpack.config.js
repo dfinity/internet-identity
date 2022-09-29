@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const CompressionPlugin = require("compression-webpack-plugin");
@@ -48,6 +49,10 @@ class InjectCanisterIdPlugin {
 
 const isProduction = process.env.NODE_ENV === "production";
 const devtool = isProduction ? undefined : "source-map";
+/* Read some predefined CSS variable to be used a brand color for metadata */
+const brandColor = /--vc-brand-purple: #(\d+)/.exec(
+  fs.readFileSync("src/frontend/src/styles/main.css")
+)[1];
 
 /* Default configuration */
 const defaults = {
@@ -104,6 +109,10 @@ const defaults = {
           filter: (resourcePath) => {
             return !resourcePath.endsWith("index.html");
           },
+          // Set the same brand color across all metadata assets
+          transform: (content) => {
+            return content.toString().replace("{II_BRAND_COLOR}", brandColor);
+          },
         },
       ],
     }),
@@ -114,6 +123,7 @@ const defaults = {
       // When true, injects (a hot-reloading version of) the built javascript, which in turn inserts the CSS (through "style-loader").
       // This value is read by the template; see index.html for more details.
       inject: !isProduction,
+      brandColor,
     }),
   ],
 };

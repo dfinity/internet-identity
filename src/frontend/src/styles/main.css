@@ -71,7 +71,7 @@
   --vc-brand-orange: #f15a24;
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
-  --vc-brand-purple: #522785;
+  --vc-brand-purple: #522785; /* note: this is read from the webpack build for metadata */
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-alt: rgba(215, 205, 235, 1);

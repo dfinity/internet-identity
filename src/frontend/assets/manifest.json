@@ -3,7 +3,7 @@
   "short_name": "Internet Identity",
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#522785",
+  "theme_color": "#{II_BRAND_COLOR}",
   "background_color": "#ffffff",
   "description": "Web3 sign-on via WebAuth: fingerprint sensor, Face ID etc",
   "orientation": "portrait-primary",

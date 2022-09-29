@@ -63,7 +63,10 @@
 
     <!-- iOS meta tags & icons -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="#522785" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="#<%= htmlWebpackPlugin.options.brandColor %>"
+    />
     <meta name="apple-mobile-web-app-title" content="Network Nervous System" />
     <link
       rel="apple-touch-icon"
@@ -72,17 +75,23 @@
     <link
       rel="mask-icon"
       href="https://identity.ic0.app/favicons/safari-pinned-tab.svg"
-      color="#522785"
+      color="#<%= htmlWebpackPlugin.options.brandColor %>"
     />
 
     <!-- MS -->
-    <meta name="msapplication-TileColor" content="#522785" />
+    <meta
+      name="msapplication-TileColor"
+      content="#<%= htmlWebpackPlugin.options.brandColor %>"
+    />
     <meta
       name="msapplication-config"
       content="https://identity.ic0.app/favicons/browserconfig.xml"
     />
 
-    <meta name="theme-color" content="#522785" />
+    <meta
+      name="theme-color"
+      content="#<%= htmlWebpackPlugin.options.brandColor %>"
+    />
 
     <!-- We set "inject" to false in production, where we explicitly link to the stylesheet
         with a <link> tag (instead of the "style-loader"-development-loaded one) -->
