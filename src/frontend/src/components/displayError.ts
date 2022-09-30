@@ -13,17 +13,15 @@ const pageContent = (options: ErrorOptions) => html`
     ${warnBox({
       title: options.title,
       message: options.message,
+      htmlElement: "div",
       slot:
         options.detail !== undefined
-          ? html`<details class="displayErrorDetail">
-              <summary class="c-summary">
-                <span class="c-summary__link t-link">Error details</span>
-              </summary>
-              <pre class="t-paragraph">${options.detail}</pre>
-            </details>`
+          ? html`<div class="l-divider"></div>
+              <h4>Error details:</h4>
+              <pre data-role="error-detail" class="t-paragraph">
+${options.detail}</pre
+              >`
           : undefined,
-
-      htmlElement: "div",
     })}
 
     <div class="l-stack">

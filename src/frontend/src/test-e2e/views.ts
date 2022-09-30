@@ -643,10 +643,7 @@ export class ErrorView extends View {
   }
 
   async getErrorDetail(): Promise<string> {
-    await this.browser.$(".displayErrorDetail").click();
-    return (
-      await this.browser.$(".displayErrorDetail > pre:nth-child(2)")
-    ).getText();
+    return (await this.browser.$('[data-role="error-detail"]')).getText();
   }
 
   async continue(): Promise<void> {
