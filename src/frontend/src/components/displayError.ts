@@ -18,7 +18,9 @@ const pageContent = (options: ErrorOptions) => html`
         options.detail !== undefined
           ? html`<div class="l-divider"></div>
               <h4>Error details:</h4>
-              <pre data-role="error-detail" class="t-paragraph">${options.detail}</pre>`
+              <pre data-role="error-detail" class="t-paragraph">
+${options.detail}</pre
+              >`
           : undefined,
     })}
 
