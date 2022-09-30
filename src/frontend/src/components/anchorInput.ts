@@ -85,7 +85,7 @@ export const mkAnchorInput = (props: {
         id="${props.inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${props.userNumber !== undefined ? props.userNumber : ""}"
+        value="${props.userNumber}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
