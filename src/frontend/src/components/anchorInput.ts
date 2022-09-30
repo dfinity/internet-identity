@@ -19,10 +19,16 @@ export const mkAnchorInput = (props: {
 
   const showHint = (message: string) => {
     withRef(divRef, (div) => {
-      if (!div.classList.contains("flash-error")) {
-        div.setAttribute("data-hint", message);
-        div.classList.add("flash-error");
-        setTimeout(() => div.classList.remove("flash-error"), 2000);
+      const error = "c-input__error--errored";
+      const hide = "is-hidden";
+      if (!div.classList.contains(error)) {
+        div.classList.add(error);
+        div.classList.remove(hide);
+        div.textContent = message;
+        setTimeout(() => {
+          div.classList.remove(error);
+          div.classList.add(hide);
+        }, 2000);
       }
     });
   };
@@ -77,7 +83,7 @@ export const mkAnchorInput = (props: {
     return result;
   };
 
-  const template = html` <div ${ref(divRef)} class="l-stack c-input--anchor">
+  const template = html` <div class="l-stack c-input--anchor">
     <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}
@@ -85,7 +91,7 @@ export const mkAnchorInput = (props: {
         id="${props.inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${props.userNumber !== undefined ? props.userNumber : ""}"
+        value="${props.userNumber}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
@@ -97,6 +103,7 @@ export const mkAnchorInput = (props: {
         @focusout=${inputFilter(isDigits, onBadInput)}
         @keypress=${onKeyPress}
       />
+      <div ${ref(divRef)} class="c-card c-input__error is-hidden"></div>
     </label>
   </div>`;
 
