@@ -72,7 +72,7 @@ type LogEntry = record {
     user_number: UserNumber;
     operation: OperationType;
     timestamp: Timestamp;
-    caller: PublicKey;
+    caller: principal;
     sequence_number: nat64;
 };
 
@@ -103,12 +103,12 @@ type Cursor = variant {
 };
 
 type UserLogs = record {
-  entries: vec blob;
+  entries: vec opt LogEntry;
   next_token: opt blob // cursor to fetch the next page of log entries (if any)
 };
 
 type Logs = record {
-  entries: vec blob;
+  entries: vec opt LogEntry;
   next_idx: opt nat64 // next index to fetch the next page of log entries (if any)
 };
 
