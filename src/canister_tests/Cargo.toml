@@ -18,8 +18,8 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.7"
-ic-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-certification = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-crypto-internal-basic-sig-iccsa = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-certification = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-crypto-internal-basic-sig-iccsa = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-error-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
