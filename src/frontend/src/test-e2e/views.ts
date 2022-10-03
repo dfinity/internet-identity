@@ -79,15 +79,6 @@ export class RegisterView extends View {
   async registerConfirmIdentity(): Promise<void> {
     await this.browser.$("#displayUserContinue").click();
   }
-
-  async registerIdentityFixup(): Promise<void> {
-    const elem = await this.browser.$("[data-usernumber]");
-    await this.browser.execute(
-      "arguments[0].innerText = arguments[1];",
-      elem,
-      "12345"
-    );
-  }
 }
 
 export class SingleDeviceWarningView extends View {
@@ -186,15 +177,6 @@ export class MainView extends View {
 
   async addRecovery(): Promise<void> {
     await this.browser.$("#addRecovery").click();
-  }
-
-  async fixup(): Promise<void> {
-    const elem = await this.browser.$("[data-usernumber]");
-    await this.browser.execute(
-      "arguments[0].innerText = arguments[1];",
-      elem,
-      "12345"
-    );
   }
 
   async deviceSettings(deviceName: string): Promise<void> {
@@ -306,15 +288,6 @@ export class AddRemoteDeviceInstructionsView extends View {
   async cancel(): Promise<void> {
     await this.browser.$("#cancelAddRemoteDevice").click();
   }
-
-  async fixup(): Promise<void> {
-    const elem = await this.browser.$("#timer");
-    await this.browser.execute(
-      "arguments[0].outerHTML = arguments[1];",
-      elem,
-      "--:--"
-    );
-  }
 }
 
 export class AddRemoteDeviceVerificationCodeView extends View {
@@ -326,21 +299,6 @@ export class AddRemoteDeviceVerificationCodeView extends View {
 
   async getVerificationCode(): Promise<string> {
     return await this.browser.$("#verificationCode").getText();
-  }
-
-  async fixup(): Promise<void> {
-    const elem = await this.browser.$("#timer");
-    await this.browser.execute(
-      "arguments[0].outerHTML = arguments[1];",
-      elem,
-      "--:--"
-    );
-    const codeElem = await this.browser.$("#verificationCode");
-    await this.browser.execute(
-      "arguments[0].innerText = arguments[1];",
-      codeElem,
-      "123456"
-    );
   }
 }
 
@@ -355,15 +313,6 @@ export class VerifyRemoteDeviceView extends View {
 
   async continue(): Promise<void> {
     await this.browser.$("#verifyDevice").click();
-  }
-
-  async fixup(): Promise<void> {
-    const elem = await this.browser.$("#timer");
-    await this.browser.execute(
-      "arguments[0].outerHTML = arguments[1];",
-      elem,
-      "--:--"
-    );
   }
 }
 
@@ -394,10 +343,6 @@ export class AuthenticateView extends View {
 
   async switchToAnchorInput(): Promise<void> {
     await this.browser.$("#userNumberInput").click();
-    // deselect input box, so we do not get flaky screenshots due to the blinking cursor
-    await this.browser.execute(
-      "document.getElementById('authorizeButton').focus();"
-    );
   }
 }
 
@@ -415,15 +360,6 @@ export class WelcomeBackView extends View {
   async login(): Promise<void> {
     await this.browser.$("#login").click();
   }
-
-  async fixup(): Promise<void> {
-    const elem = await this.browser.$("[data-usernumber]");
-    await this.browser.execute(
-      "arguments[0].innerText = arguments[1];",
-      elem,
-      "12345"
-    );
-  }
 }
 
 export class AddIdentityAnchorView extends View {
@@ -438,16 +374,6 @@ export class AddIdentityAnchorView extends View {
       await fillText(this.browser, "addDeviceUserNumber", userNumber);
     }
     await this.browser.$("#addDeviceUserNumberContinue").click();
-  }
-
-  async fixup(): Promise<void> {
-    // replace the Identity Anchor for a reproducible screenshot
-    const elem = await this.browser.$("#addDeviceUserNumber");
-    await this.browser.execute(
-      "arguments[0].value = arguments[1];",
-      elem,
-      "12345"
-    );
   }
 }
 

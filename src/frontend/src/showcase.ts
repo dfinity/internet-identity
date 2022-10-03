@@ -247,7 +247,7 @@ const pageContent = html`
   <div class="showcase-grid l-stack">
     ${Object.entries(iiPages).map(([key, _]) => {
       return html`<aside>
-        <a href="/${key}">
+        <a data-page-name="${key}" href="/${key}">
           <iframe src="/${key}" title="${key}"></iframe>
           <h2>${key}</h2>
         </a>
