@@ -179,22 +179,20 @@ pub struct InternetIdentityInit {
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum OperationType {
     #[serde(rename = "register_anchor")]
-    RegisterAnchor {
-        initial_device: DeviceDataWithoutAlias,
-    },
+    RegisterAnchor { device: DeviceDataWithoutAlias },
     #[serde(rename = "add_device")]
-    AddDevice { new_device: DeviceDataWithoutAlias },
+    AddDevice { device: DeviceDataWithoutAlias },
     #[serde(rename = "update_device")]
     UpdateDevice {
-        updated_device: PublicKey,
-        changed_data: DeviceDataUpdate,
+        device: PublicKey,
+        new_values: DeviceDataUpdate,
     },
     #[serde(rename = "remove_device")]
-    RemoveDevice { removed_device: PublicKey },
+    RemoveDevice { device: PublicKey },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub struct LogEntry {
+pub struct Entry {
     // store user_number in LogEntry, such that anchor operations can be attributed to a user without consulting the index.
     pub user_number: UserNumber,
     pub operation: OperationType,
@@ -217,7 +215,7 @@ pub struct DeviceDataWithoutAlias {
 // Does not include the pubkey because it cannot be changed.
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceDataUpdate {
-    pub alias: Option<Hidden>,
+    pub alias: Option<Private>,
     pub credential_id: Option<CredentialId>,
     pub purpose: Option<Purpose>,
     pub key_type: Option<KeyType>,
@@ -226,22 +224,22 @@ pub struct DeviceDataUpdate {
 
 // Placeholder for information that has been hidden for privacy reasons.
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub enum Hidden {
+pub enum Private {
     HiddenForPrivacyReasons,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct Logs {
-    // make this a vec of options to keep LogEntry extensible
-    pub entries: Vec<Option<LogEntry>>,
+pub struct Entries {
+    // make this a vec of options to keep Entry extensible
+    pub entries: Vec<Option<Entry>>,
     // index pointing to the next entry not included in this response, if any
     pub next_idx: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct UserLogs {
-    // make this a vec of options to keep LogEntry extensible
-    pub entries: Vec<Option<LogEntry>>,
+pub struct UserEntries {
+    // make this a vec of options to keep Entry extensible
+    pub entries: Vec<Option<Entry>>,
     // cursor pointing to the next entry not included in this response, if any
     pub cursor: Option<Cursor>,
 }
@@ -256,7 +254,7 @@ pub enum Cursor {
     NextToken { next_token: ByteBuf },
 }
 
-/// Init arguments of the II archive canister.
+/// Init arguments of the archive canister.
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct ArchiveInit {
     pub ii_canister: Principal,

@@ -21,29 +21,29 @@ pub fn add_entry(
     )
 }
 
-pub fn get_logs(
+pub fn get_entries(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
     idx: Option<u64>,
     limit: Option<u16>,
-) -> Result<types::Logs, CallError> {
-    framework::call_candid_as(env, canister_id, sender, "get_logs", (idx, limit)).map(|(x,)| x)
+) -> Result<types::Entries, CallError> {
+    framework::call_candid_as(env, canister_id, sender, "get_entries", (idx, limit)).map(|(x,)| x)
 }
 
-pub fn get_user_logs(
+pub fn get_user_entries(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
     user_number: types::UserNumber,
     cursor: Option<types::Cursor>,
     limit: Option<u16>,
-) -> Result<types::UserLogs, CallError> {
+) -> Result<types::UserEntries, CallError> {
     framework::call_candid_as(
         env,
         canister_id,
         sender,
-        "get_user_logs",
+        "get_user_entries",
         (user_number, cursor, limit),
     )
     .map(|(x,)| x)

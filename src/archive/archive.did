@@ -23,21 +23,21 @@ type DeviceProtection = variant {
 
 type OperationType = variant {
     register_anchor: record {
-        initial_device: DeviceDataWithoutAlias;
+        device: DeviceDataWithoutAlias;
     };
     add_device: record {
-        new_device: DeviceDataWithoutAlias;
+        device: DeviceDataWithoutAlias;
     };
     update_device: record {
-        updated_device: PublicKey;
-        changed_data: DeviceDataUpdate;
+        device: PublicKey;
+        new_values: DeviceDataUpdate;
     };
     remove_device: record {
-        removed_device: PublicKey;
+        device: PublicKey;
     };
 };
 
-type LogEntry = record {
+type Entry = record {
     user_number: UserNumber;
     operation: OperationType;
     timestamp: Timestamp;
@@ -62,23 +62,23 @@ type DeviceDataUpdate = record {
 };
 
 // Placeholder for information that has been hidden for privacy reasons.
-type Hidden = variant {
+type Private = variant {
     hidden_for_privacy_reasons;
 };
 
 type Cursor = variant {
-    timestamp: Timestamp; // get logs starting from this Timestamp
-    next_token: blob; // submit previously received token to fetch the next page of log entries
+    timestamp: Timestamp; // get entries starting from this Timestamp
+    next_token: blob; // submit previously received token to fetch the next page of entries
 };
 
-type UserLogs = record {
-  entries: vec opt LogEntry;
-  next_token: opt blob // cursor to fetch the next page of log entries (if any)
+type UserEntries = record {
+  entries: vec opt Entry;
+  next_token: opt blob // cursor to fetch the next page of entries (if any)
 };
 
-type Logs = record {
-  entries: vec opt LogEntry;
-  next_idx: opt nat64 // next index to fetch the next page of log entries (if any)
+type Entries = record {
+  entries: vec opt Entry;
+  next_idx: opt nat64 // next index to fetch the next page of entries (if any)
 };
 
 type ArchiveInit = record {
@@ -121,24 +121,24 @@ type StreamingStrategy = variant {
 
 service : (opt ArchiveInit) -> {
 
-  // Returns the logs for the given user number. If a timestamp is given, only the logs starting from that timestamp are
-  // returned. Use the Cursor to skip to later log entries.
+  // Returns the entries for the given user number. If a timestamp is given, only the entries starting from that timestamp are
+  // returned. Use the Cursor to skip to later entries.
   // This function can be called anonymously.
   //
   // Parameters:
-  // 1. user number to fetch the logs for
-  // 2. optional cursor to specify which logs to fetch
+  // 1. user number to fetch the entries for
+  // 2. optional cursor to specify which entries to fetch
   // 3. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
-  get_user_logs : (UserNumber, opt Cursor, opt nat16) -> (UserLogs) query;
+  get_user_entries : (UserNumber, opt Cursor, opt nat16) -> (UserEntries) query;
 
-  // Returns the latest up to 1000 log entries. If an index is given, entries starting from the given index are returned.
+  // Returns the latest up to 1000 entries. If an index is given, entries starting from the given index are returned.
   //
   // Parameters:
-  // 1. optional index into the list of log entries
+  // 1. optional index into the list of entries
   // 2. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
-  get_logs : (opt nat64, opt nat16) -> (Logs) query;
+  get_entries : (opt nat64, opt nat16) -> (Entries) query;
 
-  // Writes a log entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
+  // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
   write_entry : (UserNumber, Timestamp, blob) -> ();
 
   // HTTP endpoint to expose metrics for Prometheus.

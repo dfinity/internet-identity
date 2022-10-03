@@ -177,7 +177,7 @@ fn write_entry(user_number: UserNumber, timestamp: Timestamp, entry: ByteBuf) {
 }
 
 #[query]
-fn get_logs(index: Option<u64>, limit: Option<u16>) -> Logs {
+fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
     let num_entries = sanitize_limit(limit);
 
     with_log(|log| {
@@ -203,12 +203,12 @@ fn get_logs(index: Option<u64>, limit: Option<u16>) -> Logs {
                 candid::decode_one(&entry).expect("failed to decode log entry"),
             ))
         }
-        Logs { entries, next_idx }
+        Entries { entries, next_idx }
     })
 }
 
 #[query]
-fn get_user_logs(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>) -> UserLogs {
+fn get_user_entries(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>) -> UserEntries {
     let num_entries = sanitize_limit(limit);
 
     with_user_index(|index| {
@@ -245,7 +245,7 @@ fn get_user_logs(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>) -
                 .map(|(_, entry)| candid::decode_one(&entry).expect("failed to decode log entry"))
                 .collect();
 
-            UserLogs { entries, cursor }
+            UserEntries { entries, cursor }
         })
     })
 }

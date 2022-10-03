@@ -453,13 +453,13 @@ pub const USER_NUMBER_3: types::UserNumber = 100003;
 pub const TIMESTAMP_1: types::UserNumber = 999991;
 pub const TIMESTAMP_2: types::UserNumber = 999992;
 
-pub fn log_entry_1() -> types::LogEntry {
-    types::LogEntry {
+pub fn log_entry_1() -> types::Entry {
+    types::Entry {
         timestamp: TIMESTAMP_1,
         user_number: USER_NUMBER_1,
         caller: principal_1().0,
         operation: types::OperationType::RegisterAnchor {
-            initial_device: types::DeviceDataWithoutAlias {
+            device: types::DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
                 purpose: types::Purpose::Authentication,
@@ -471,13 +471,13 @@ pub fn log_entry_1() -> types::LogEntry {
     }
 }
 
-pub fn log_entry_2() -> types::LogEntry {
-    types::LogEntry {
+pub fn log_entry_2() -> types::Entry {
+    types::Entry {
         timestamp: TIMESTAMP_2,
         user_number: USER_NUMBER_2,
         caller: principal_1().0,
         operation: types::OperationType::AddDevice {
-            new_device: types::DeviceDataWithoutAlias {
+            device: types::DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
                 purpose: types::Purpose::Authentication,
@@ -489,14 +489,14 @@ pub fn log_entry_2() -> types::LogEntry {
     }
 }
 
-pub fn log_entry(idx: u64) -> types::LogEntry {
-    types::LogEntry {
+pub fn log_entry(idx: u64) -> types::Entry {
+    types::Entry {
         timestamp: idx,
         user_number: idx,
         caller: PrincipalId::new_user_test_id(idx).0,
         operation: types::OperationType::UpdateDevice {
-            updated_device: ByteBuf::from(PUBKEY_1),
-            changed_data: types::DeviceDataUpdate {
+            device: ByteBuf::from(PUBKEY_1),
+            new_values: types::DeviceDataUpdate {
                 alias: None,
                 credential_id: None,
                 purpose: Some(types::Purpose::Authentication),
