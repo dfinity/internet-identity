@@ -261,25 +261,28 @@ fn sanitize_limit(limit: Option<u16>) -> usize {
 #[init]
 #[post_upgrade]
 fn init(maybe_arg: Option<ArchiveInit>) {
-    if let Some(arg) = maybe_arg {
-        CONFIG.with(|cell| {
-            cell.borrow_mut()
-                .set(ArchiveConfig {
-                    ii_canister: arg.ii_canister,
-                    max_entries_per_call: arg.max_entries_per_call,
-                    last_upgrade_timestamp: time(),
-                })
-                .expect("failed to store archive config");
-        });
-    } else {
-        CONFIG.with(|cell| {
-            let mut config_cell = cell.borrow_mut();
-            let mut config = config_cell.get().clone();
-            config.last_upgrade_timestamp = time();
-            config_cell
-                .set(config)
-                .expect("failed to update last_upgrade_timestamp in archive config");
-        });
+    match maybe_arg {
+        Some(arg) => {
+            CONFIG.with(|cell| {
+                cell.borrow_mut()
+                    .set(ArchiveConfig {
+                        ii_canister: arg.ii_canister,
+                        max_entries_per_call: arg.max_entries_per_call,
+                        last_upgrade_timestamp: time(),
+                    })
+                    .expect("failed to store archive config");
+            });
+        }
+        None => {
+            CONFIG.with(|cell| {
+                let mut config_cell = cell.borrow_mut();
+                let mut config = config_cell.get().clone();
+                config.last_upgrade_timestamp = time();
+                config_cell
+                    .set(config)
+                    .expect("failed to update last_upgrade_timestamp in archive config");
+            });
+        }
     }
 }
 
