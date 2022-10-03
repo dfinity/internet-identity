@@ -1,34 +1,3 @@
-type HeaderField = record { text; text; };
-
-type HttpRequest = record {
-  method: text;
-  url: text;
-  headers: vec HeaderField;
-  body: blob;
-};
-
-type HttpResponse = record {
-  status_code: nat16;
-  headers: vec HeaderField;
-  body: blob;
-  upgrade : opt bool;
-  streaming_strategy: opt StreamingStrategy;
-};
-
-type StreamingCallbackHttpResponse = record {
-  body: blob;
-  token: opt Token;
-};
-
-type Token = record {};
-
-type StreamingStrategy = variant {
-  Callback: record {
-    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
-    token: Token;
-  };
-};
-
 type Timestamp = nat64;
 type UserNumber = nat64;
 type CredentialId = blob;
@@ -113,7 +82,41 @@ type Logs = record {
 };
 
 type ArchiveInit = record {
+  // Principal of the internet identity canister allowed to write entries
+  // This value is configurable to allow dynamic deployments of II
   ii_canister: principal;
+};
+
+// HTTP gateway types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
+type HeaderField = record { text; text; };
+
+type HttpRequest = record {
+  method: text;
+  url: text;
+  headers: vec HeaderField;
+  body: blob;
+};
+
+type HttpResponse = record {
+  status_code: nat16;
+  headers: vec HeaderField;
+  body: blob;
+  upgrade : opt bool;
+  streaming_strategy: opt StreamingStrategy;
+};
+
+type StreamingCallbackHttpResponse = record {
+  body: blob;
+  token: opt Token;
+};
+
+type Token = record {};
+
+type StreamingStrategy = variant {
+  Callback: record {
+    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+    token: Token;
+  };
 };
 
 service : (opt ArchiveInit) -> {
@@ -135,7 +138,7 @@ service : (opt ArchiveInit) -> {
   // 2. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
   get_logs : (opt nat64, opt nat16) -> (Logs) query;
 
-  // Writes a log entry. Only the Internet Identity canister is authorized to call this function.
+  // Writes a log entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
   write_entry : (UserNumber, Timestamp, blob) -> ();
 
   // HTTP endpoint to expose metrics for Prometheus.
