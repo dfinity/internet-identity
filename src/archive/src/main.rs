@@ -48,7 +48,7 @@ thread_local! {
 
     /// Index to efficiently filter entries by user number.
     static USER_INDEX: RefCell<UserIndex> = with_memory_manager(|memory_manager| {
-        RefCell::new(StableBTreeMap::new(memory_manager.get(USER_INDEX_MEMORY_ID), USER_INDEX_KEY_LENGTH as u32, 0))
+        RefCell::new(StableBTreeMap::init(memory_manager.get(USER_INDEX_MEMORY_ID), USER_INDEX_KEY_LENGTH as u32, 0))
     });
 }
 

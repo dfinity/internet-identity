@@ -43,6 +43,9 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     let logs = api::get_logs(&env, canister_id, principal_1(), None, None)?;
     assert_eq!(logs.entries.len(), 1);
     assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
+    let user_logs =
+        api::get_user_logs(&env, canister_id, principal_1(), USER_NUMBER_1, None, None)?;
+    assert_eq!(user_logs.entries.len(), 1);
     Ok(())
 }
 
