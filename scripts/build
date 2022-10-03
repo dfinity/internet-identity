@@ -18,11 +18,12 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies] [--single-canister CANISTER]
+  $0 [--only-dependencies] [CANISTER...]
 
 Options:
   --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
-  --single-canister CANISTER   only build a single canister. Possible values: [internet_identity, archive]
+  --internet_identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet_identity --archive
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet_identity --archive
 EOF
 }
 
@@ -37,7 +38,7 @@ EOF
 }
 
 ONLY_DEPS=
-CANISTER="all"
+CANISTERS=()
 
 while [[ $# -gt 0  ]]
 do
@@ -52,17 +53,12 @@ do
             ONLY_DEPS=1
             shift
             ;;
-        --single-canister)
-            if [ "$2" != "internet_identity" ] && [ "$2" != "archive" ]
-            then
-              echo "ERROR: unknown canister $2"
-              usage
-              echo
-              echo "Use 'build --help' for more information"
-              exit 1
-            fi
-            CANISTER=$2
+        --internet_identity)
+            CANISTERS+=("internet_identity")
             shift
+            ;;
+        --archive)
+            CANISTERS+=("archive")
             shift
             ;;
         *)
@@ -74,6 +70,11 @@ do
             ;;
     esac
 done
+
+# build everything by default
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity" "archive")
+fi
 
 # Checking for dependencies
 if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
@@ -92,6 +93,9 @@ function build_canister() {
     local canister=$1
     shift
     local extra_build_args=("$@")
+
+    echo "Building $canister"
+    echo
 
     SRC_DIR="$PWD/src/$canister"
     TARGET="wasm32-unknown-unknown"
@@ -122,14 +126,11 @@ function build_canister() {
     fi
 }
 
-if [ "$CANISTER" = "internet_identity" ] || [ "$CANISTER" = "all" ]
-then
-  echo "Building internet_identity"
-  echo
+function build_internet_identity() {
   if [ "$ONLY_DEPS" != "1" ]
   then
       # Compile frontend assets to dist
-      echo Compiling frontend assets
+      echo Compiling internet_identity frontend assets
       npm run build
   fi
 
@@ -144,12 +145,14 @@ then
       extra_build_args+=( --features dummy_captcha )
   fi
   build_canister "internet_identity" "${extra_build_args[@]}"
-fi
+}
 
-if [ "$CANISTER" = "archive" ] || [ "$CANISTER" = "all" ]
-then
-  echo "Building archive"
-  echo
-  build_canister "archive"
-fi
-
+for canister in "${CANISTERS[@]}"
+do
+  if [ "$canister" == "internet_identity" ]
+  then
+    build_internet_identity
+  else
+    build_canister "$canister"
+  fi
+done

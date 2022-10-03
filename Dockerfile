@@ -75,7 +75,7 @@ RUN touch src/canister_tests/src/lib.rs
 RUN touch src/metrics_encoder/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build --single-canister internet_identity
+RUN ./scripts/build --internet_identity
 RUN sha256sum /internet_identity.wasm
 
 FROM deps as build_archive
@@ -86,7 +86,7 @@ RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/archive/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 
-RUN ./scripts/build --single-canister archive
+RUN ./scripts/build --archive
 RUN sha256sum /archive.wasm
 
 FROM scratch AS scratch_internet_identity
