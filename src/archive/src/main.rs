@@ -21,9 +21,11 @@ type UserIndex = StableBTreeMap<VirtualMemory<Memory>, UserIndexKey, ()>;
 
 const GIB: u64 = 1 << 30;
 const WASM_PAGE_SIZE: u64 = 65536;
+const MAX_STABLE_MEMORY_SIZE: u64 = 8 * GIB;
 /// The maximum number of Wasm pages that we allow to use for the stable storage.
-const MAX_WASM_PAGES: u64 = 8 * GIB / WASM_PAGE_SIZE;
+const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
 
+/// Memory ids of memory managed by the memory manager.
 const LOG_INDEX_MEMORY_ID: MemoryId = MemoryId::new(0);
 const LOG_DATA_MEMORY_ID: MemoryId = MemoryId::new(1);
 const USER_INDEX_MEMORY_ID: MemoryId = MemoryId::new(2);
@@ -32,7 +34,7 @@ const USER_INDEX_MEMORY_ID: MemoryId = MemoryId::new(2);
 const USER_INDEX_KEY_LENGTH: usize = 24;
 
 thread_local! {
-    /// Static configuration of the archive that init() sets once.
+    /// Static configuration of the archive set by init() or post_upgrade().
     static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), ConfigState::Uninitialized).expect("failed to initialize stable cell"));
 
     /// Static memory manager to manage the memory available for blocks.
@@ -75,7 +77,7 @@ fn with_log<R>(f: impl FnOnce(&StableLog) -> R) -> R {
 }
 
 /// A helper function to access the user index.
-fn with_user_index<R>(f: impl FnOnce(&mut UserIndex) -> R) -> R {
+fn with_user_index_mut<R>(f: impl FnOnce(&mut UserIndex) -> R) -> R {
     USER_INDEX.with(|cell| f(&mut *cell.borrow_mut()))
 }
 
@@ -175,7 +177,7 @@ fn write_entry(user_number: UserNumber, timestamp: Timestamp, entry: ByteBuf) {
             .expect("failed to append log entry")
     });
 
-    with_user_index(|index| {
+    with_user_index_mut(|index| {
         let key = UserIndexKey {
             user_number,
             timestamp,
@@ -223,7 +225,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 fn get_user_entries(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>) -> UserEntries {
     let num_entries = sanitize_limit(limit);
 
-    with_user_index(|index| {
+    with_user_index_mut(|index| {
         let iterator = match cursor {
             None => index.range(user_number.to_le_bytes().to_vec(), None),
             Some(Cursor::NextToken { next_token }) => index.range(next_token.into_vec(), None),
@@ -372,7 +374,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of users registered in this canister.",
         )
     })?;
-    with_user_index(|index| {
+    with_user_index_mut(|index| {
         w.encode_gauge(
             "ii_archive_user_index_entries_count",
             index.len() as f64,
