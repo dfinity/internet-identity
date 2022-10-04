@@ -1,3 +1,41 @@
+//! # Archive canister to Record Anchor Operations Made on Internet Identity
+//!
+//! This canister stores data sent to it by Internet Identity. This data should consist of candid
+//! encoded [Entry] objects. In order to decouple the schema of II and this canister (which might be
+//! useful in case of a rollback) the data is not decoded on write.
+//!
+//! ## Stable Memory Layout
+//! ```text
+//! ---------------------------------------- <- Page 0
+//! Config Memory
+//! ---------------------------------------- <- Page 1
+//! Memory managed by the memory manager:
+//!   - Log Index
+//!   - Log Data
+//!   - User Index
+//! ----------------------------------------
+//! Unallocated space
+//! ```
+//!
+//! ## Data Structures
+//!
+//! ### Log
+//! The archive data is kept in a [Log] ([memory layout described here](https://docs.rs/ic-stable-structures/latest/ic_stable_structures/log/index.html))
+//! with an additional index to efficiently retrieve log entries by anchor (see below).
+//!
+//! ### User Index
+//! The user index is a [StableBTreeMap] for the following reasons:
+//! - it operates directly on stable memory
+//! - it offers prefix scanning on ordered entries
+//!
+//! The entries are key value pairs of (anchor, timestamp, log index) -> (). The log index is chosen
+//! as part of the key (rather than the value) in order to ensure uniqueness of the keys (on the IC
+//! time is not guaranteed to increase between two calls).
+//!
+//! The index enables the following access patterns:
+//! - prefix scan with anchor to retrieve entries by user
+//! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
+//! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
@@ -14,6 +52,8 @@ use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
 
+// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
+// and the managed memory for the archived data & indices.
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type StableLog = Log<VirtualMemory<Memory>, VirtualMemory<Memory>>;
 type ConfigCell = StableCell<ConfigState, Memory>;
@@ -51,12 +91,12 @@ thread_local! {
     });
 }
 
-/// Creates a memory region for the configuration stable cell.
+/// Reserve the first stable memory page for the configuration stable cell.
 fn config_memory() -> Memory {
     RestrictedMemory::new(DefaultMemoryImpl::default(), 0..1)
 }
 
-/// Creates a memory region for the memory managed by the [MemoryManager].
+/// All the memory after the initial config page is managed by the [MemoryManager].
 fn managed_memory() -> Memory {
     RestrictedMemory::new(DefaultMemoryImpl::default(), 1..MAX_WASM_PAGES)
 }
