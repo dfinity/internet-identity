@@ -443,7 +443,7 @@ fn encode_config(authorized_principal: Principal) -> Vec<u8> {
         ii_canister: authorized_principal,
         max_entries_per_call: 10,
     };
-    candid::encode_one(Some(config)).expect("error encoding II installation arg as candid")
+    candid::encode_one(config).expect("error encoding II installation arg as candid")
 }
 
 pub const USER_NUMBER_1: types::UserNumber = 100001;

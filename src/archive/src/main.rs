@@ -16,7 +16,7 @@ use std::cell::RefCell;
 
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type StableLog = Log<VirtualMemory<Memory>, VirtualMemory<Memory>>;
-type ConfigCell = StableCell<ArchiveConfig, Memory>;
+type ConfigCell = StableCell<ConfigState, Memory>;
 type UserIndex = StableBTreeMap<VirtualMemory<Memory>, UserIndexKey, ()>;
 
 const GIB: u64 = 1 << 30;
@@ -33,13 +33,10 @@ const USER_INDEX_KEY_LENGTH: usize = 24;
 
 thread_local! {
     /// Static configuration of the archive that init() sets once.
-    static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(
-        config_memory(),
-        ArchiveConfig::default(),
-    ).expect("failed to initialize stable cell"));
+    static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), ConfigState::Uninitialized).expect("failed to initialize stable cell"));
 
     /// Static memory manager to manage the memory available for blocks.
-    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init(log_memory()));
+    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init(managed_memory()));
 
     /// Append-only list of encoded blocks stored in stable memory.
     static LOG: RefCell<StableLog> = with_memory_manager(|memory_manager| {
@@ -57,14 +54,14 @@ fn config_memory() -> Memory {
     RestrictedMemory::new(DefaultMemoryImpl::default(), 0..1)
 }
 
-/// Creates a memory region for the append-only block list.
-fn log_memory() -> Memory {
+/// Creates a memory region for the memory managed by the [MemoryManager].
+fn managed_memory() -> Memory {
     RestrictedMemory::new(DefaultMemoryImpl::default(), 1..MAX_WASM_PAGES)
 }
 
 /// A helper function to access the configuration.
 fn with_config<R>(f: impl FnOnce(&ArchiveConfig) -> R) -> R {
-    CONFIG.with(|cell| f(cell.borrow().get()))
+    CONFIG.with(|cell| f(&cell.borrow().get().get()))
 }
 
 /// A helper function to access the memory manager.
@@ -82,6 +79,21 @@ fn with_user_index<R>(f: impl FnOnce(&mut UserIndex) -> R) -> R {
     USER_INDEX.with(|cell| f(&mut *cell.borrow_mut()))
 }
 
+/// Configuration state of the archive.
+enum ConfigState {
+    Uninitialized, // This state is only used between wasm module initialization and init().
+    Initialized(ArchiveConfig),
+}
+
+impl ConfigState {
+    fn get(&self) -> &ArchiveConfig {
+        match &self {
+            ConfigState::Uninitialized => trap("archive config not initialized"),
+            ConfigState::Initialized(config) => config,
+        }
+    }
+}
+
 /// Configuration of the archive canister.
 #[derive(Clone, Debug, CandidType, Deserialize)]
 struct ArchiveConfig {
@@ -93,24 +105,24 @@ struct ArchiveConfig {
     last_upgrade_timestamp: Timestamp,
 }
 
-impl Storable for ArchiveConfig {
+impl Storable for ConfigState {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let buf = candid::encode_one(&self).expect("failed to encode log config");
-        Cow::Owned(buf)
+        match &self {
+            ConfigState::Uninitialized => Cow::Borrowed(&[]),
+            ConfigState::Initialized(config) => {
+                let buf = candid::encode_one(config).expect("failed to encode archive config");
+                Cow::Owned(buf)
+            }
+        }
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        candid::decode_one::<ArchiveConfig>(&bytes).expect("failed to decode log options")
-    }
-}
-
-impl Default for ArchiveConfig {
-    fn default() -> Self {
-        Self {
-            ii_canister: Principal::from_text("rdmx6-jaaaa-aaaaa-aaadq-cai").unwrap(),
-            max_entries_per_call: 1000,
-            last_upgrade_timestamp: 0,
+        if bytes.len() == 0 {
+            return ConfigState::Uninitialized;
         }
+        ConfigState::Initialized(
+            candid::decode_one::<ArchiveConfig>(&bytes).expect("failed to decode archive config"),
+        )
     }
 }
 
@@ -259,31 +271,38 @@ fn sanitize_limit(limit: Option<u16>) -> usize {
 }
 
 #[init]
+fn init(arg: ArchiveInit) {
+    write_config(ArchiveConfig {
+        ii_canister: arg.ii_canister,
+        max_entries_per_call: arg.max_entries_per_call,
+        last_upgrade_timestamp: time(),
+    });
+}
+
 #[post_upgrade]
-fn init(maybe_arg: Option<ArchiveInit>) {
-    match maybe_arg {
-        Some(arg) => {
-            CONFIG.with(|cell| {
-                cell.borrow_mut()
-                    .set(ArchiveConfig {
-                        ii_canister: arg.ii_canister,
-                        max_entries_per_call: arg.max_entries_per_call,
-                        last_upgrade_timestamp: time(),
-                    })
-                    .expect("failed to store archive config");
-            });
-        }
-        None => {
-            CONFIG.with(|cell| {
-                let mut config_cell = cell.borrow_mut();
-                let mut config = config_cell.get().clone();
-                config.last_upgrade_timestamp = time();
-                config_cell
-                    .set(config)
-                    .expect("failed to update last_upgrade_timestamp in archive config");
-            });
-        }
-    }
+fn post_upgrade(maybe_arg: Option<ArchiveInit>) {
+    let config = match maybe_arg {
+        Some(arg) => ArchiveConfig {
+            ii_canister: arg.ii_canister,
+            max_entries_per_call: arg.max_entries_per_call,
+            last_upgrade_timestamp: time(),
+        },
+        None => CONFIG.with(|cell| {
+            let config_cell = cell.borrow();
+            let mut archive_config = config_cell.get().get().clone();
+            archive_config.last_upgrade_timestamp = time();
+            archive_config
+        }),
+    };
+    write_config(config);
+}
+
+fn write_config(config: ArchiveConfig) {
+    CONFIG.with(|cell| {
+        cell.borrow_mut()
+            .set(ConfigState::Initialized(config))
+            .expect("failed to write archive config");
+    });
 }
 
 #[query]

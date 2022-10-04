@@ -2942,9 +2942,9 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6df7f185b9b65b001eb81e824316275392b972633443e0218bddc7ac384048b"
+checksum = "8350199eb1cd4cbe548897008d701ee8cc03c3945d7a29b8d19454900ad86ca5"
 
 [[package]]
 name = "ic-state-layout"
