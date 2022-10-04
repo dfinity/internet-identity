@@ -419,7 +419,7 @@ dependencies = [
  "flate2",
  "hex",
  "ic-certification",
- "ic-crypto-internal-basic-sig-iccsa",
+ "ic-crypto-iccsa",
  "ic-error-types",
  "ic-state-machine-tests",
  "ic-types 0.8.0",
@@ -2002,6 +2002,14 @@ version = "0.1.0"
 source = "git+https://github.com/dfinity/ic?rev=016e7d68bff38d921b9dd168fc11ac1f0a98995e#016e7d68bff38d921b9dd168fc11ac1f0a98995e"
 dependencies = [
  "getrandom 0.2.7",
+]
+
+[[package]]
+name = "ic-crypto-iccsa"
+version = "0.1.0"
+source = "git+https://github.com/dfinity/ic?rev=016e7d68bff38d921b9dd168fc11ac1f0a98995e#016e7d68bff38d921b9dd168fc11ac1f0a98995e"
+dependencies = [
+ "ic-crypto-internal-basic-sig-iccsa",
 ]
 
 [[package]]
