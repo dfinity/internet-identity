@@ -8,6 +8,7 @@ use ic_types::crypto::Signable;
 use ic_types::messages::Delegation;
 use ic_types::Time;
 use internet_identity_interface as types;
+use internet_identity_interface::ArchiveInit;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -434,8 +435,12 @@ pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId
 }
 
 pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
-    env.upgrade_canister(canister_id, wasm, encode_config(principal_1().0))
-        .unwrap()
+    env.upgrade_canister(
+        canister_id,
+        wasm,
+        candid::encode_one(None::<ArchiveInit>).unwrap(),
+    )
+    .unwrap()
 }
 
 fn encode_config(authorized_principal: Principal) -> Vec<u8> {

@@ -82,9 +82,11 @@ type Entries = record {
 };
 
 type ArchiveInit = record {
-  // Principal of the internet identity canister allowed to write entries
-  // This value is configurable to allow dynamic deployments of II
+  // Principal of the internet identity canister allowed to write entries.
+  // This value is configurable to allow dynamic deployments of II.
   ii_canister: principal;
+  // The maximum number of entries to be returned per call.
+  max_entries_per_call: nat16;
 };
 
 // HTTP gateway types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
@@ -119,7 +121,7 @@ type StreamingStrategy = variant {
   };
 };
 
-service : (opt ArchiveInit) -> {
+service : (ArchiveInit) -> {
 
   // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
   // returned. Use the Cursor to skip to later entries.
@@ -128,14 +130,15 @@ service : (opt ArchiveInit) -> {
   // Parameters:
   // 1. anchor to fetch the entries for
   // 2. optional cursor to specify which entries to fetch
-  // 3. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
+  // 3. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
   get_anchor_entries : (Anchor, opt Cursor, opt nat16) -> (AnchorEntries) query;
 
-  // Returns the latest up to 1000 entries. If an index is given, entries starting from the given index are returned.
+  // Returns the latest entries. If an index is given, entries starting from the given index are returned.
+  // This function can be called anonymously.
   //
   // Parameters:
   // 1. optional index into the list of entries
-  // 2. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
+  // 2. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
   get_entries : (opt nat64, opt nat16) -> (Entries) query;
 
   // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
