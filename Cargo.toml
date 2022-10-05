@@ -11,10 +11,3 @@ members = [
 debug = false # stripped by ic-cdk-optimizer anyway
 lto = true
 opt-level = 'z'
-
-[patch.crates-io]
-ic-certification = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-crypto-internal-basic-sig-iccsa = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
-ic-types = { git = "https://github.com/dfinity/ic", rev = "50c53c8e996e7b00b88c2f43120c46534cc499f6" }
