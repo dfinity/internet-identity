@@ -279,10 +279,10 @@ mod metrics_tests {
             "ii_archive_log_entries_size",
             "ii_archive_log_index_memory_size",
             "ii_archive_log_data_memory_size",
-            "ii_archive_user_index_entries_count",
+            "ii_archive_anchor_index_entries_count",
             "ii_archive_log_index_virtual_memory_size",
             "ii_archive_log_data_virtual_memory_size",
-            "ii_archive_user_index_virtual_memory_size",
+            "ii_archive_anchor_index_virtual_memory_size",
             "ii_archive_stable_memory_pages",
         ];
         let env = StateMachine::new();
@@ -337,7 +337,7 @@ mod metrics_tests {
     fn should_update_log_entries_count() -> Result<(), CallError> {
         let metrics = vec![
             "ii_archive_log_entries_count",
-            "ii_archive_user_index_entries_count",
+            "ii_archive_anchor_index_entries_count",
         ];
 
         let env = StateMachine::new();
@@ -437,7 +437,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_user_index_virtual_memory_size",
+            "ii_archive_anchor_index_virtual_memory_size",
             1,
         );
         assert_metric(
@@ -467,7 +467,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_user_index_virtual_memory_size",
+            "ii_archive_anchor_index_virtual_memory_size",
             1, // does not change because the index additions are small
         );
         assert_metric(

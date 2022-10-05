@@ -1,5 +1,5 @@
 type Timestamp = nat64;
-type UserNumber = nat64;
+type Anchor = nat64;
 type CredentialId = blob;
 type PublicKey = blob;
 type DeviceKey = PublicKey;
@@ -38,7 +38,7 @@ type OperationType = variant {
 };
 
 type Entry = record {
-    user_number: UserNumber;
+    anchor: Anchor;
     operation: OperationType;
     timestamp: Timestamp;
     caller: principal;
@@ -71,7 +71,7 @@ type Cursor = variant {
     next_token: blob; // submit previously received token to fetch the next page of entries
 };
 
-type UserEntries = record {
+type AnchorEntries = record {
   entries: vec opt Entry;
   next_token: opt blob // cursor to fetch the next page of entries (if any)
 };
@@ -121,15 +121,15 @@ type StreamingStrategy = variant {
 
 service : (opt ArchiveInit) -> {
 
-  // Returns the entries for the given user number. If a timestamp is given, only the entries starting from that timestamp are
+  // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
   // returned. Use the Cursor to skip to later entries.
   // This function can be called anonymously.
   //
   // Parameters:
-  // 1. user number to fetch the entries for
+  // 1. anchor to fetch the entries for
   // 2. optional cursor to specify which entries to fetch
   // 3. optional limit of the number of entries. If no limit is given, at most 1000 entries are returned.
-  get_user_entries : (UserNumber, opt Cursor, opt nat16) -> (UserEntries) query;
+  get_anchor_entries : (Anchor, opt Cursor, opt nat16) -> (AnchorEntries) query;
 
   // Returns the latest up to 1000 entries. If an index is given, entries starting from the given index are returned.
   //
@@ -139,7 +139,7 @@ service : (opt ArchiveInit) -> {
   get_entries : (opt nat64, opt nat16) -> (Entries) query;
 
   // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
-  write_entry : (UserNumber, Timestamp, blob) -> ();
+  write_entry : (Anchor, Timestamp, blob) -> ();
 
   // HTTP endpoint to expose metrics for Prometheus.
   http_request: (request: HttpRequest) -> (HttpResponse) query;

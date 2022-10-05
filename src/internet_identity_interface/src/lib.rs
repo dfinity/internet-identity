@@ -3,6 +3,7 @@ use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
 
 pub type UserNumber = u64;
+pub type Anchor = UserNumber;
 pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
 pub type DeviceKey = PublicKey;
@@ -193,8 +194,8 @@ pub enum OperationType {
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct Entry {
-    // store user_number in LogEntry, such that anchor operations can be attributed to a user without consulting the index.
-    pub user_number: UserNumber,
+    // store anchor in LogEntry, such that anchor operations can be attributed to an anchor without consulting the index.
+    pub anchor: Anchor,
     pub operation: OperationType,
     pub timestamp: Timestamp,
     pub caller: Principal,
@@ -237,7 +238,7 @@ pub struct Entries {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct UserEntries {
+pub struct AnchorEntries {
     // make this a vec of options to keep Entry extensible
     pub entries: Vec<Option<Entry>>,
     // cursor pointing to the next entry not included in this response, if any

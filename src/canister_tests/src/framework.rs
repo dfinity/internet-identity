@@ -456,7 +456,7 @@ pub const TIMESTAMP_2: types::UserNumber = 999992;
 pub fn log_entry_1() -> types::Entry {
     types::Entry {
         timestamp: TIMESTAMP_1,
-        user_number: USER_NUMBER_1,
+        anchor: USER_NUMBER_1,
         caller: principal_1().0,
         operation: types::OperationType::RegisterAnchor {
             device: types::DeviceDataWithoutAlias {
@@ -474,7 +474,7 @@ pub fn log_entry_1() -> types::Entry {
 pub fn log_entry_2() -> types::Entry {
     types::Entry {
         timestamp: TIMESTAMP_2,
-        user_number: USER_NUMBER_2,
+        anchor: USER_NUMBER_2,
         caller: principal_1().0,
         operation: types::OperationType::AddDevice {
             device: types::DeviceDataWithoutAlias {
@@ -492,7 +492,7 @@ pub fn log_entry_2() -> types::Entry {
 pub fn log_entry(idx: u64) -> types::Entry {
     types::Entry {
         timestamp: idx,
-        user_number: idx,
+        anchor: idx,
         caller: PrincipalId::new_user_test_id(idx).0,
         operation: types::OperationType::UpdateDevice {
             device: ByteBuf::from(PUBKEY_1),

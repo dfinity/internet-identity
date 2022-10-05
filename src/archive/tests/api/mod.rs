@@ -38,12 +38,12 @@ pub fn get_user_entries(
     user_number: types::UserNumber,
     cursor: Option<types::Cursor>,
     limit: Option<u16>,
-) -> Result<types::UserEntries, CallError> {
+) -> Result<types::AnchorEntries, CallError> {
     framework::call_candid_as(
         env,
         canister_id,
         sender,
-        "get_user_entries",
+        "get_anchor_entries",
         (user_number, cursor, limit),
     )
     .map(|(x,)| x)

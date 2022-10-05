@@ -12,7 +12,7 @@
 //! Memory managed by the memory manager:
 //!   - Log Index
 //!   - Log Data
-//!   - User Index
+//!   - Anchor Index
 //! ----------------------------------------
 //! Unallocated space
 //! ```
@@ -23,8 +23,8 @@
 //! The archive data is kept in a [Log] ([memory layout described here](https://docs.rs/ic-stable-structures/latest/ic_stable_structures/log/index.html))
 //! with an additional index to efficiently retrieve log entries by anchor (see below).
 //!
-//! ### User Index
-//! The user index is a [StableBTreeMap] for the following reasons:
+//! ### Anchor Index
+//! The anchor index is a [StableBTreeMap] for the following reasons:
 //! - it operates directly on stable memory
 //! - it offers prefix scanning on ordered entries
 //!
@@ -33,7 +33,7 @@
 //! time is not guaranteed to increase between two calls).
 //!
 //! The index enables the following access patterns:
-//! - prefix scan with anchor to retrieve entries by user
+//! - prefix scan with anchor to retrieve entries by anchor
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
 use candid::{CandidType, Deserialize, Principal};
@@ -52,12 +52,13 @@ use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
-// and the managed memory for the archived data & indices.
+/// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
+/// and the managed memory for the archived data & indices.
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type StableLog = Log<VirtualMemory<Memory>, VirtualMemory<Memory>>;
 type ConfigCell = StableCell<ConfigState, Memory>;
-type UserIndex = StableBTreeMap<VirtualMemory<Memory>, UserIndexKey, ()>;
+/// Type of the index to efficiently retrieve entries by anchor.
+type AnchorIndex = StableBTreeMap<VirtualMemory<Memory>, AnchorIndexKey, ()>;
 
 const GIB: u64 = 1 << 30;
 const WASM_PAGE_SIZE: u64 = 65536;
@@ -68,10 +69,7 @@ const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
 /// Memory ids of memory managed by the memory manager.
 const LOG_INDEX_MEMORY_ID: MemoryId = MemoryId::new(0);
 const LOG_DATA_MEMORY_ID: MemoryId = MemoryId::new(1);
-const USER_INDEX_MEMORY_ID: MemoryId = MemoryId::new(2);
-
-/// Length of the user index key. Changing this value requires a stable memory migration.
-const USER_INDEX_KEY_LENGTH: usize = 24;
+const ANCHOR_ACCESS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(2);
 
 thread_local! {
     /// Static configuration of the archive set by init() or post_upgrade().
@@ -80,14 +78,14 @@ thread_local! {
     /// Static memory manager to manage the memory available for blocks.
     static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init(managed_memory()));
 
-    /// Append-only list of encoded blocks stored in stable memory.
+    /// Append-only list of candid encoded entries stored in stable memory.
     static LOG: RefCell<StableLog> = with_memory_manager(|memory_manager| {
         RefCell::new(Log::init(memory_manager.get(LOG_INDEX_MEMORY_ID), memory_manager.get(LOG_DATA_MEMORY_ID)).expect("failed to initialize stable log"))
     });
 
-    /// Index to efficiently filter entries by user number.
-    static USER_INDEX: RefCell<UserIndex> = with_memory_manager(|memory_manager| {
-        RefCell::new(StableBTreeMap::init(memory_manager.get(USER_INDEX_MEMORY_ID), USER_INDEX_KEY_LENGTH as u32, 0))
+    /// Index to efficiently retrieve entries by anchor.
+    static ANCHOR_INDEX: RefCell<AnchorIndex> = with_memory_manager(|memory_manager| {
+        RefCell::new(StableBTreeMap::init(memory_manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID), std::mem::size_of::<AnchorIndexKey>() as u32, 0))
     });
 }
 
@@ -116,9 +114,9 @@ fn with_log<R>(f: impl FnOnce(&StableLog) -> R) -> R {
     LOG.with(|cell| f(&*cell.borrow()))
 }
 
-/// A helper function to access the user index.
-fn with_user_index_mut<R>(f: impl FnOnce(&mut UserIndex) -> R) -> R {
-    USER_INDEX.with(|cell| f(&mut *cell.borrow_mut()))
+/// A helper function to access the anchor-based index.
+fn with_anchor_index_mut<R>(f: impl FnOnce(&mut AnchorIndex) -> R) -> R {
+    ANCHOR_INDEX.with(|cell| f(&mut *cell.borrow_mut()))
 }
 
 /// Configuration state of the archive.
@@ -168,29 +166,28 @@ impl Storable for ConfigState {
     }
 }
 
-/// Index key for the user index.
+/// Index key for the anchor index.
+/// Changing the (serialized) size of this value requires a stable memory migration.
 #[derive(Debug)]
-struct UserIndexKey {
-    user_number: UserNumber,
+struct AnchorIndexKey {
+    anchor: Anchor,
     timestamp: Timestamp,
     log_index: u64,
 }
 
-impl Storable for UserIndexKey {
+impl Storable for AnchorIndexKey {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buf = Vec::with_capacity(USER_INDEX_KEY_LENGTH);
-        buf.extend(&self.user_number.to_le_bytes());
+        let mut buf = Vec::with_capacity(std::mem::size_of::<AnchorIndexKey>());
+        buf.extend(&self.anchor.to_le_bytes());
         buf.extend(&self.timestamp.to_le_bytes());
         buf.extend(&self.log_index.to_le_bytes());
-        assert_eq!(buf.len(), USER_INDEX_KEY_LENGTH);
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        assert_eq!(bytes.len(), USER_INDEX_KEY_LENGTH);
-        UserIndexKey {
-            user_number: u64::from_le_bytes(
-                TryFrom::try_from(&bytes[0..8]).expect("failed to read user_number"),
+        AnchorIndexKey {
+            anchor: u64::from_le_bytes(
+                TryFrom::try_from(&bytes[0..8]).expect("failed to read anchor"),
             ),
             timestamp: u64::from_le_bytes(
                 TryFrom::try_from(&bytes[8..16]).expect("failed to read timestamp"),
@@ -203,7 +200,7 @@ impl Storable for UserIndexKey {
 }
 
 #[update]
-fn write_entry(user_number: UserNumber, timestamp: Timestamp, entry: ByteBuf) {
+fn write_entry(anchor: Anchor, timestamp: Timestamp, entry: ByteBuf) {
     with_config(|config| {
         if config.ii_canister != caller() {
             trap(&format!(
@@ -217,9 +214,9 @@ fn write_entry(user_number: UserNumber, timestamp: Timestamp, entry: ByteBuf) {
             .expect("failed to append log entry")
     });
 
-    with_user_index_mut(|index| {
-        let key = UserIndexKey {
-            user_number,
+    with_anchor_index_mut(|index| {
+        let key = AnchorIndexKey {
+            anchor,
             timestamp,
             log_index: idx as u64,
         };
@@ -262,27 +259,27 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 }
 
 #[query]
-fn get_user_entries(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>) -> UserEntries {
+fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>) -> AnchorEntries {
     let num_entries = sanitize_limit(limit);
 
-    with_user_index_mut(|index| {
+    with_anchor_index_mut(|index| {
         let iterator = match cursor {
-            None => index.range(user_number.to_le_bytes().to_vec(), None),
+            None => index.range(anchor.to_le_bytes().to_vec(), None),
             Some(Cursor::NextToken { next_token }) => index.range(next_token.into_vec(), None),
             Some(Cursor::Timestamp { timestamp }) => index.range(
-                user_number.to_le_bytes().to_vec(),
+                anchor.to_le_bytes().to_vec(),
                 Some(timestamp.to_le_bytes().to_vec()),
             ),
         };
 
         with_log(|log| {
-            let mut entries: Vec<(UserIndexKey, Vec<u8>)> = iterator
+            let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = iterator
                 .take(num_entries + 1) // take one too many to extract the cursor
-                .map(|(user_key, _)| {
+                .map(|(anchor_key, _)| {
                     let entry = log
-                        .get(user_key.log_index as usize)
+                        .get(anchor_key.log_index as usize)
                         .expect("bug: index to non-existing entry");
-                    (user_key, entry)
+                    (anchor_key, entry)
                 })
                 .collect();
 
@@ -299,7 +296,7 @@ fn get_user_entries(user_number: u64, cursor: Option<Cursor>, limit: Option<u16>
                 .map(|(_, entry)| candid::decode_one(&entry).expect("failed to decode log entry"))
                 .collect();
 
-            UserEntries { entries, cursor }
+            AnchorEntries { entries, cursor }
         })
     })
 }
@@ -406,19 +403,19 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         w.encode_gauge(
             "ii_archive_log_index_memory_size",
             log.index_size_bytes() as f64,
-            "Total size of all logged entries in bytes.",
+            "Total size of the log index in bytes.",
         )?;
         w.encode_gauge(
             "ii_archive_log_data_memory_size",
             log.data_size_bytes() as f64,
-            "Number of users registered in this canister.",
+            "Total size of the log data in bytes.",
         )
     })?;
-    with_user_index_mut(|index| {
+    with_anchor_index_mut(|index| {
         w.encode_gauge(
-            "ii_archive_user_index_entries_count",
+            "ii_archive_anchor_index_entries_count",
             index.len() as f64,
-            "Number of entries in the user index.",
+            "Number of entries in the anchor index.",
         )
     })?;
     MEMORY_MANAGER.with(|cell| {
@@ -434,9 +431,9 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of stable memory pages allocated to the log data virtual memory.",
         )?;
         w.encode_gauge(
-            "ii_archive_user_index_virtual_memory_size",
-            manager.get(USER_INDEX_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the user index virtual memory.",
+            "ii_archive_anchor_index_virtual_memory_size",
+            manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID).size() as f64,
+            "Number of stable memory pages allocated to the anchor index virtual memory.",
         )
     })?;
     w.encode_gauge(
