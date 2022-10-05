@@ -244,7 +244,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
             None
         };
 
-        let mut entries = Vec::with_capacity(log.len().min(num_entries));
+        let mut entries = Vec::with_capacity(num_entries);
         for idx in start_idx..start_idx + num_entries {
             let entry = match log.get(idx) {
                 None => break,
