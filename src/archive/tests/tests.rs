@@ -44,7 +44,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     assert_eq!(logs.entries.len(), 1);
     assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
     let user_logs =
-        api::get_user_entries(&env, canister_id, principal_1(), USER_NUMBER_1, None, None)?;
+        api::get_anchor_entries(&env, canister_id, principal_1(), USER_NUMBER_1, None, None)?;
     assert_eq!(user_logs.entries.len(), 1);
     Ok(())
 }
@@ -170,7 +170,7 @@ mod read_tests {
         assert_eq!(logs.entries.len(), 2);
 
         let user_1_logs =
-            api::get_user_entries(&env, canister_id, principal_1(), USER_NUMBER_1, None, None)?;
+            api::get_anchor_entries(&env, canister_id, principal_1(), USER_NUMBER_1, None, None)?;
         assert_eq!(user_1_logs.entries.len(), 1);
         assert_eq!(
             user_1_logs.entries.get(0).unwrap().as_ref().unwrap(),
@@ -178,7 +178,7 @@ mod read_tests {
         );
 
         let user_2_logs =
-            api::get_user_entries(&env, canister_id, principal_1(), USER_NUMBER_2, None, None)?;
+            api::get_anchor_entries(&env, canister_id, principal_1(), USER_NUMBER_2, None, None)?;
         assert_eq!(user_2_logs.entries.len(), 1);
         assert_eq!(
             user_2_logs.entries.get(0).unwrap().as_ref().unwrap(),
@@ -186,7 +186,7 @@ mod read_tests {
         );
 
         let user_3_logs =
-            api::get_user_entries(&env, canister_id, principal_1(), USER_NUMBER_3, None, None)?;
+            api::get_anchor_entries(&env, canister_id, principal_1(), USER_NUMBER_3, None, None)?;
         assert!(user_3_logs.entries.is_empty());
 
         Ok(())
@@ -237,7 +237,7 @@ mod read_tests {
         }
 
         for n in 0..2 {
-            let logs = api::get_user_entries(&env, canister_id, principal_1(), n, None, None)?;
+            let logs = api::get_anchor_entries(&env, canister_id, principal_1(), n, None, None)?;
             assert_eq!(logs.entries.len(), 10);
             assert!(matches!(
                 logs.clone().cursor,
@@ -245,7 +245,7 @@ mod read_tests {
             ));
 
             let logs =
-                api::get_user_entries(&env, canister_id, principal_1(), n, logs.cursor, None)?;
+                api::get_anchor_entries(&env, canister_id, principal_1(), n, logs.cursor, None)?;
             assert_eq!(logs.entries.len(), 1);
             assert_eq!(
                 logs.entries

@@ -7,7 +7,7 @@ pub fn add_entry(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
-    user_number: types::UserNumber,
+    anchor: types::UserNumber,
     timestamp: types::Timestamp,
     entry: Vec<u8>,
 ) -> Result<(), CallError> {
@@ -16,7 +16,7 @@ pub fn add_entry(
         canister_id,
         sender,
         "write_entry",
-        (user_number, timestamp, entry),
+        (anchor, timestamp, entry),
     )
 }
 
@@ -30,11 +30,11 @@ pub fn get_entries(
     framework::call_candid_as(env, canister_id, sender, "get_entries", (idx, limit)).map(|(x,)| x)
 }
 
-pub fn get_user_entries(
+pub fn get_anchor_entries(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: PrincipalId,
-    user_number: types::UserNumber,
+    anchor: types::UserNumber,
     cursor: Option<types::Cursor>,
     limit: Option<u16>,
 ) -> Result<types::AnchorEntries, CallError> {
@@ -43,7 +43,7 @@ pub fn get_user_entries(
         canister_id,
         sender,
         "get_anchor_entries",
-        (user_number, cursor, limit),
+        (anchor, cursor, limit),
     )
     .map(|(x,)| x)
 }
