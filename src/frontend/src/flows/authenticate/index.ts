@@ -1,11 +1,7 @@
 import { html, render, TemplateResult } from "lit-html";
 import { icLogo, attentionIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
-import {
-  getUserNumber,
-  parseUserNumber,
-  setUserNumber,
-} from "../../utils/userNumber";
+import { getUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
 import { mkAnchorInput } from "../../components/anchorInput";
 import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
@@ -17,7 +13,6 @@ import {
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
 import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
-import { toggleErrorMessage } from "../../utils/errorHelper";
 import { fetchDelegation } from "./fetchDelegation";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 import {
@@ -35,6 +30,7 @@ type PageElements = {
 const pageContent = (
   connection: Connection,
   hostName: string,
+  onContinue: (arg: bigint) => void,
   userNumber?: bigint,
   derivationOrigin?: string
 ): PageElements & { template: TemplateResult } => {
@@ -43,17 +39,16 @@ const pageContent = (
     window.location.reload();
   };
 
-  const onRecoverClick = () => useRecovery(connection, readUserNumber());
-
   const authorizeButton: Ref<HTMLButtonElement> = createRef();
   const registerButton: Ref<HTMLLinkElement> = createRef();
-  const anchorInput = mkAnchorInput("userNumberInput", userNumber, (e) => {
-    if (e.key === "Enter") {
-      // authenticate if user hits enter
-      e.preventDefault();
-      withRef(authorizeButton, (authorizeButton) => authorizeButton.click());
-    }
+  const anchorInput = mkAnchorInput({
+    inputId: "userNumberInput",
+    userNumber,
+    onSubmit: onContinue,
   });
+
+  const onRecoverClick = () =>
+    useRecovery(connection, anchorInput.readUserNumber());
 
   const template = html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
@@ -77,7 +72,12 @@ const pageContent = (
 
       ${anchorInput.template}
 
-      <button ${ref(authorizeButton)} id="authorizeButton" class="c-button">
+      <button
+        @click="${anchorInput.submit}"
+        ${ref(authorizeButton)}
+        id="authorizeButton"
+        class="c-button"
+      >
         Authorize
       </button>
       <div class="l-stack">
@@ -191,21 +191,29 @@ const init = (
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
-  const { authorizeButton, userNumberInput, registerButton } = displayPage(
-    connection,
-    authContext.requestOrigin,
-    userNumber,
-    authContext.authRequest.derivationOrigin
-  );
-
-  // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
-  if (userNumber !== undefined && userNumber === getUserNumber()) {
-    withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
-  } else {
-    withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
-  }
-
   return new Promise((resolve) => {
+    const { authorizeButton, userNumberInput, registerButton } = displayPage(
+      connection,
+      authContext.requestOrigin,
+      async (userNumber) => {
+        const authSuccess = await authenticateUser(
+          connection,
+          authContext,
+          userNumber
+        );
+        resolve(authSuccess);
+      },
+      userNumber,
+      authContext.authRequest.derivationOrigin
+    );
+
+    // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
+    if (userNumber !== undefined && userNumber === getUserNumber()) {
+      withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
+    } else {
+      withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
+    }
+
     // Resolve either on successful authentication or after registration
     withRef(registerButton, (registerButton) =>
       initRegistration(
@@ -215,15 +223,6 @@ const init = (
         userNumber
       ).then(resolve)
     );
-    withRef(authorizeButton, (authorizeButton) => {
-      authorizeButton.onclick = () => {
-        authenticateUser(connection, authContext).then((authSuccess) => {
-          if (authSuccess !== null) {
-            resolve(authSuccess);
-          }
-        });
-      };
-    });
   });
 };
 
@@ -259,14 +258,10 @@ const initRegistration = async (
 
 const authenticateUser = async (
   connection: Connection,
-  authContext: AuthContext
-): Promise<AuthSuccess | null> => {
-  const userNumber = readUserNumber();
+  authContext: AuthContext,
+  userNumber: bigint
+): Promise<AuthSuccess> => {
   try {
-    if (userNumber === undefined) {
-      toggleErrorMessage("userNumberInput", "invalidAnchorMessage", true);
-      return null;
-    }
     const result = await withLoader(() => connection.login(userNumber));
     const loginResult = apiResultToLoginFlowResult(result);
     if (loginResult.tag === "ok") {
@@ -294,11 +289,18 @@ const authenticateUser = async (
 export const displayPage = (
   connection: Connection,
   origin: string,
+  onContinue: (arg: bigint) => void,
   userNumber?: bigint,
   derivationOrigin?: string
 ): PageElements => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const ret = pageContent(connection, origin, userNumber, derivationOrigin);
+  const ret = pageContent(
+    connection,
+    origin,
+    onContinue,
+    userNumber,
+    derivationOrigin
+  );
   render(ret.template, container);
 
   return ret;
@@ -325,14 +327,3 @@ async function handleAuthSuccess(
       }),
   };
 }
-
-/**
- * Read and parse the user number from the input field.
- */
-const readUserNumber = () => {
-  const parsedUserNumber = parseUserNumber(
-    (document.getElementById("userNumberInput") as HTMLInputElement).value
-  );
-  // get rid of null, we use undefined for 'not set'
-  return parsedUserNumber === null ? undefined : parsedUserNumber;
-};

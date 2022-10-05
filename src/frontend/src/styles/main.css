@@ -1100,16 +1100,23 @@ a:hover,
   z-index: 1;
 }
 
-.c-input--anchor.flash-error::after {
-  content: "Anchors only consist of digits";
-  padding: var(--rs-card-bezel); /* TODO */
-  position: absolute;
-  background: white;
-  border-radius: 20px;
-  top: 6rem;
+.c-input__error {
   left: 0px;
   right: 0px;
-  font-size: 70%;
+  position: absolute;
+
+  opacity: 0;
+  transition: opacity 0.2s ease-in;
+
+  min-width: 15rem;
+  text-align: left;
+  background-color: var(--rc-background);
+  color: var(--rc-text);
+  z-index: var(--vz-tooltip);
+}
+
+.c-input__error--errored {
+  opacity: 1;
 }
 
 /* Needed to override the "reset" rules */

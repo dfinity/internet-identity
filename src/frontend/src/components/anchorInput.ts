@@ -1,33 +1,97 @@
 import { html, TemplateResult } from "lit-html";
+import { withRef } from "../utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
-export const mkAnchorInput = (
-  inputId: string,
-  userNumber?: bigint,
-  onKeyPress?: (e: KeyboardEvent) => void
-): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
-  const divRef = createRef();
+export const mkAnchorInput = (props: {
+  inputId: string;
+  userNumber?: bigint;
+  onSubmit?: (userNumber: bigint) => void;
+}): {
+  template: TemplateResult;
+  userNumberInput: Ref<HTMLInputElement>;
+  submit: () => void;
+  readUserNumber: () => bigint | undefined;
+} => {
+  const divRef: Ref<HTMLDivElement> = createRef();
   const userNumberInput: Ref<HTMLInputElement> = createRef();
+
+  const showHint = (message: string) => {
+    withRef(divRef, (div) => {
+      const error = "c-input__error--errored";
+      const hide = "is-hidden";
+      if (!div.classList.contains(error)) {
+        div.classList.add(error);
+        div.classList.remove(hide);
+        div.textContent = message;
+        setTimeout(() => {
+          div.classList.remove(error);
+          div.classList.add(hide);
+        }, 2000);
+      }
+    });
+  };
+
+  // When "submitting" (either .submit() is called or enter is typed)
+  // parse the value and call onSubmit
+  const submit = () => {
+    const result = readAndParseValue();
+    if (result === "invalid") {
+      return showHint("Invalid Anchor");
+    }
+    if (result === undefined) {
+      return showHint("Please enter an Anchor");
+    }
+    props.onSubmit?.(result);
+  };
 
   // How we react on unexpected (i.e. non-digit) input
   const onBadInput = () => {
-    const div = divRef.value;
-    if (div !== undefined && !div.classList.contains("flash-error")) {
-      div.classList.add("flash-error");
-      setTimeout(() => div.classList.remove("flash-error"), 2000);
+    showHint("Anchors only consist of digits");
+  };
+
+  // When enter is pressed, submit
+  const onKeyPress = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submit();
     }
   };
 
-  const template = html` <div ${ref(divRef)} class="l-stack c-input--anchor">
+  // Helper for reading the anchor/user number from the input
+  const readAndParseValue = (): undefined | "invalid" | bigint => {
+    return withRef(userNumberInput, (userNumberInput) => {
+      const value = userNumberInput.value;
+      if (value === "") {
+        return undefined;
+      }
+      const parsed = parseUserNumber(value);
+      if (parsed === null) {
+        return "invalid";
+      }
+      return parsed;
+    });
+  };
+
+  // Read user number if submit() shouldn't be called for some reason
+  const readUserNumber = () => {
+    const result = readAndParseValue();
+    if (result === "invalid") {
+      return undefined;
+    }
+    return result;
+  };
+
+  const template = html` <div class="l-stack c-input--anchor">
     <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}
         type="text"
-        id="${inputId}"
+        id="${props.inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${userNumber !== undefined ? userNumber : ""}"
+        value="${props.userNumber}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
@@ -39,17 +103,11 @@ export const mkAnchorInput = (
         @focusout=${inputFilter(isDigits, onBadInput)}
         @keypress=${onKeyPress}
       />
+      <div ${ref(divRef)} class="c-card c-input__error is-hidden"></div>
     </label>
-
-    <p
-      id="invalidAnchorMessage"
-      class="anchor-error-message is-hidden t-paragraph t-strong"
-    >
-      The Identity Anchor is not valid. Please try again.
-    </p>
   </div>`;
 
-  return { template, userNumberInput };
+  return { template, userNumberInput, submit, readUserNumber };
 };
 
 const isDigits = (c: string) => /^\d*\.?\d*$/.test(c);
