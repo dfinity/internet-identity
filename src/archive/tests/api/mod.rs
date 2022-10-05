@@ -23,25 +23,22 @@ pub fn add_entry(
 pub fn get_entries(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
     idx: Option<u64>,
     limit: Option<u16>,
 ) -> Result<types::Entries, CallError> {
-    framework::call_candid_as(env, canister_id, sender, "get_entries", (idx, limit)).map(|(x,)| x)
+    framework::query_candid(env, canister_id, "get_entries", (idx, limit)).map(|(x,)| x)
 }
 
 pub fn get_anchor_entries(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
     anchor: types::UserNumber,
     cursor: Option<types::Cursor>,
     limit: Option<u16>,
 ) -> Result<types::AnchorEntries, CallError> {
-    framework::call_candid_as(
+    framework::query_candid(
         env,
         canister_id,
-        sender,
         "get_anchor_entries",
         (anchor, cursor, limit),
     )
