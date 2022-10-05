@@ -229,7 +229,7 @@ fn write_entry(anchor: Anchor, timestamp: Timestamp, entry: ByteBuf) {
 
 #[query]
 fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
-    let num_entries = sanitize_limit(limit);
+    let num_entries = limit_or_default(limit);
 
     with_log(|log| {
         let length = log.len();
@@ -260,7 +260,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 
 #[query]
 fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>) -> AnchorEntries {
-    let num_entries = sanitize_limit(limit);
+    let num_entries = limit_or_default(limit);
 
     with_anchor_index_mut(|index| {
         let iterator = match cursor {
@@ -301,7 +301,7 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
     })
 }
 
-fn sanitize_limit(limit: Option<u16>) -> usize {
+fn limit_or_default(limit: Option<u16>) -> usize {
     with_config(|config| {
         limit
             .map(|l| l.min(config.max_entries_per_call))
