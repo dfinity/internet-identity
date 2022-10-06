@@ -420,7 +420,7 @@ export class DemoAppView extends View {
   async signout(): Promise<void> {
     await this.browser.$("#signoutBtn").click();
   }
-  async setMaxTimeToLive(mttl: BigInt): Promise<void> {
+  async setMaxTimeToLive(mttl: bigint): Promise<void> {
     await fillText(this.browser, "maxTimeToLive", String(mttl));
   }
 

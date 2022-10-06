@@ -4,7 +4,6 @@ import {
   PublicKey,
   SignedDelegation,
 } from "../../../generated/internet_identity_types";
-import { hasOwnProperty } from "../../utils/utils";
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the application information contained in
@@ -70,7 +69,7 @@ const retryGetDelegation = async (
       setInterval(resolve, 1000 * i);
     });
     const res = await connection.getDelegation(hostname, sessionKey, timestamp);
-    if (hasOwnProperty(res, "signed_delegation")) {
+    if ("signed_delegation" in res) {
       return res.signed_delegation;
     }
   }

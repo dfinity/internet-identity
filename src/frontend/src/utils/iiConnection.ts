@@ -150,8 +150,8 @@ export class Connection {
 
     if (hasOwnProperty(registerResponse, "canister_full")) {
       return { kind: "registerNoSpace" };
-    } else if (hasOwnProperty(registerResponse, "registered")) {
-      const userNumber = registerResponse["registered"].user_number;
+    } else if ("registered" in registerResponse) {
+      const userNumber = registerResponse.registered.user_number;
       console.log(`registered Identity Anchor ${userNumber}`);
       return {
         kind: "loginSuccess",

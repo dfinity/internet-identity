@@ -129,7 +129,7 @@ const init = (
       countdown.stop();
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
       await renderManage(userNumber, connection);
-    } else if (hasOwnProperty(result, "wrong_code")) {
+    } else if ("wrong_code" in result) {
       if (result.wrong_code.retries_left > 0) {
         toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", true);
       } else {
