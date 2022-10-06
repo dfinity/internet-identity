@@ -1,8 +1,8 @@
 use canister_tests::framework;
 use canister_tests::framework::{
     assert_metric, expect_user_error_with_message, log_entry, log_entry_1, log_entry_2,
-    principal_1, principal_2, CallError, TIMESTAMP_1, TIMESTAMP_2, USER_NUMBER_1, USER_NUMBER_2,
-    USER_NUMBER_3,
+    principal_1, principal_2, CallError, TIMESTAMP_1, TIMESTAMP_2, TIMESTAMP_3, USER_NUMBER_1,
+    USER_NUMBER_2, USER_NUMBER_3,
 };
 use ic_state_machine_tests::ErrorCode::CanisterCalledTrap;
 use ic_state_machine_tests::{CanisterId, StateMachine};
@@ -253,6 +253,59 @@ mod read_tests {
             );
         }
 
+        Ok(())
+    }
+
+    /// Verifies that entries can be retrieved filtered by timestamp.
+    #[test]
+    fn should_filter_by_timestamp() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id =
+            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            candid::encode_one(log_entry_1()).expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_2,
+            candid::encode_one(log_entry_2()).expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_3,
+            candid::encode_one(log_entry(3)).expect("failed to encode entry"),
+        )?;
+
+        let logs = api::get_anchor_entries(
+            &env,
+            canister_id,
+            USER_NUMBER_1,
+            Some(Cursor::Timestamp {
+                timestamp: TIMESTAMP_2,
+            }),
+            None,
+        )?;
+        assert_eq!(logs.entries.len(), 2);
+        assert_eq!(
+            logs.entries.get(0).unwrap().as_ref().unwrap(),
+            &log_entry_2()
+        );
+        assert_eq!(
+            logs.entries.get(1).unwrap().as_ref().unwrap(),
+            &log_entry(3)
+        );
         Ok(())
     }
 }

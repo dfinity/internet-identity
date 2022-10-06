@@ -452,6 +452,7 @@ pub const USER_NUMBER_3: types::UserNumber = 100003;
 
 pub const TIMESTAMP_1: types::UserNumber = 999991;
 pub const TIMESTAMP_2: types::UserNumber = 999992;
+pub const TIMESTAMP_3: types::UserNumber = 999993;
 
 pub fn log_entry_1() -> types::Entry {
     types::Entry {
