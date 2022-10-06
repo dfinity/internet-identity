@@ -229,23 +229,23 @@ fn write_entry(anchor: Anchor, timestamp: Timestamp, entry: ByteBuf) {
 
 #[query]
 fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
-    let num_entries = limit_or_default(limit);
+    let limit = limit_or_default(limit);
 
     with_log(|log| {
         let length = log.len();
         let start_idx = match index {
-            None => length.saturating_sub(num_entries),
+            None => length.saturating_sub(limit),
             Some(idx) => idx as usize,
         };
 
-        let next_idx = if start_idx + num_entries < length {
-            Some((start_idx + num_entries) as u64)
+        let next_idx = if start_idx + limit < length {
+            Some((start_idx + limit) as u64)
         } else {
             None
         };
 
-        let mut entries = Vec::with_capacity(num_entries);
-        for idx in start_idx..start_idx + num_entries {
+        let mut entries = Vec::with_capacity(limit);
+        for idx in start_idx..start_idx + limit {
             let entry = match log.get(idx) {
                 None => break,
                 Some(entry) => entry,
@@ -260,7 +260,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 
 #[query]
 fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>) -> AnchorEntries {
-    let num_entries = limit_or_default(limit);
+    let limit = limit_or_default(limit);
 
     with_anchor_index_mut(|index| {
         let iterator = match cursor {
@@ -274,7 +274,7 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
 
         with_log(|log| {
             let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = iterator
-                .take(num_entries + 1) // take one too many to extract the cursor
+                .take(limit + 1) // take one too many to extract the cursor
                 .map(|(anchor_key, _)| {
                     let entry = log
                         .get(anchor_key.log_index as usize)
@@ -283,7 +283,7 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
                 })
                 .collect();
 
-            let cursor = if entries.len() > num_entries {
+            let cursor = if entries.len() > limit {
                 entries.pop().map(|(key, _)| Cursor::NextToken {
                     next_token: ByteBuf::from(key.to_bytes()),
                 })
