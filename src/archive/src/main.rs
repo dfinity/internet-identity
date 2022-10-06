@@ -176,6 +176,8 @@ struct AnchorIndexKey {
 }
 
 impl AnchorIndexKey {
+    /// Returns bytes corresponding only to the timestamp and log_index component of the anchor index key.
+    /// This is useful as an offset when doing a range scan with the anchor component.
     fn to_anchor_offset(&self) -> Vec<u8> {
         let mut buf =
             Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<u64>());
@@ -273,23 +275,30 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
     let limit = limit_or_default(limit);
 
     with_anchor_index_mut(|index| {
+        // Here we take advantage of the range scan and how the index keys are structured.
+        // The index key is a concatenation of (anchor, timestamp, idx). A range scan with
+        // (prefix, offset) allows to iterate over the index while only returning entries that have
+        // the same prefix starting with keys also matching offset and increasing from there.
+        //
+        // Setting the prefix to anchor limits the returned keys to only those corresponding to the
+        // anchor. And depending on the parameters supplied we start iterating at index key
+        // - (anchor, 0, 0): given no cursor
+        // - (anchor, timestamp, 0): given a Timestamp cursor
+        // - (anchor, timestamp, idx): given a NextToken cursor
+        let prefix = anchor.to_le_bytes().to_vec();
         let iterator = match cursor {
-            None => index.range(anchor.to_le_bytes().to_vec(), None),
+            None => index.range(prefix, None),
             Some(Cursor::NextToken { next_token }) => {
                 let index_key = AnchorIndexKey::from_bytes(next_token.into_vec());
                 assert_eq!(
                     anchor, index_key.anchor,
                     "anchor does not match the next_token"
                 );
-                index.range(
-                    anchor.to_le_bytes().to_vec(),
-                    Some(index_key.to_anchor_offset()),
-                )
+                index.range(prefix, Some(index_key.to_anchor_offset()))
             }
-            Some(Cursor::Timestamp { timestamp }) => index.range(
-                anchor.to_le_bytes().to_vec(),
-                Some(timestamp.to_le_bytes().to_vec()),
-            ),
+            Some(Cursor::Timestamp { timestamp }) => {
+                index.range(prefix, Some(timestamp.to_le_bytes().to_vec()))
+            }
         };
 
         with_log(|log| {
