@@ -5,12 +5,6 @@
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm",
       "build": "scripts/build --internet_identity"
-    },
-    "archive": {
-      "type": "custom",
-      "candid": "src/archive/archive.did",
-      "wasm": "archive.wasm",
-      "build": "scripts/build --archive"
     }
   },
   "defaults": {
