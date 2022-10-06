@@ -490,10 +490,10 @@ pub fn log_entry_2() -> types::Entry {
     }
 }
 
-pub fn log_entry(idx: u64) -> types::Entry {
+pub fn log_entry(idx: u64, anchor: types::Anchor) -> types::Entry {
     types::Entry {
         timestamp: idx,
-        anchor: idx,
+        anchor,
         caller: PrincipalId::new_user_test_id(idx).0,
         operation: types::OperationType::UpdateDevice {
             device: ByteBuf::from(PUBKEY_1),

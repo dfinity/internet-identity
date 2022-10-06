@@ -175,6 +175,16 @@ struct AnchorIndexKey {
     log_index: u64,
 }
 
+impl AnchorIndexKey {
+    fn to_anchor_offset(&self) -> Vec<u8> {
+        let mut buf =
+            Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<u64>());
+        buf.extend(&self.timestamp.to_le_bytes());
+        buf.extend(&self.log_index.to_le_bytes());
+        buf
+    }
+}
+
 impl Storable for AnchorIndexKey {
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = Vec::with_capacity(std::mem::size_of::<AnchorIndexKey>());
@@ -265,7 +275,17 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
     with_anchor_index_mut(|index| {
         let iterator = match cursor {
             None => index.range(anchor.to_le_bytes().to_vec(), None),
-            Some(Cursor::NextToken { next_token }) => index.range(next_token.into_vec(), None),
+            Some(Cursor::NextToken { next_token }) => {
+                let index_key = AnchorIndexKey::from_bytes(next_token.into_vec());
+                assert_eq!(
+                    anchor, index_key.anchor,
+                    "anchor does not match the next_token"
+                );
+                index.range(
+                    anchor.to_le_bytes().to_vec(),
+                    Some(index_key.to_anchor_offset()),
+                )
+            }
             Some(Cursor::Timestamp { timestamp }) => index.range(
                 anchor.to_le_bytes().to_vec(),
                 Some(timestamp.to_le_bytes().to_vec()),

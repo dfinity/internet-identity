@@ -202,7 +202,7 @@ mod read_tests {
                 principal_1(),
                 n,
                 n,
-                candid::encode_one(log_entry(n)).expect("failed to encode entry"),
+                candid::encode_one(log_entry(n, n)).expect("failed to encode entry"),
             )?;
         }
 
@@ -221,14 +221,14 @@ mod read_tests {
         let canister_id =
             framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
 
-        for n in 0..22 {
+        for n in 0..24 {
             api::add_entry(
                 &env,
                 canister_id,
                 principal_1(),
                 n % 2,
                 n,
-                candid::encode_one(log_entry(n)).expect("failed to encode entry"),
+                candid::encode_one(log_entry(n, n % 2)).expect("failed to encode entry"),
             )?;
         }
 
@@ -241,7 +241,7 @@ mod read_tests {
             ));
 
             let logs = api::get_anchor_entries(&env, canister_id, n, logs.cursor, None)?;
-            assert_eq!(logs.entries.len(), 1);
+            assert_eq!(logs.entries.len(), 2);
             assert_eq!(
                 logs.entries
                     .get(0)
@@ -252,6 +252,37 @@ mod read_tests {
                 20 + n
             );
         }
+
+        Ok(())
+    }
+
+    /// Verifies that only entries belonging to the same anchor are returned (even if there are less than limit many).
+    #[test]
+    fn should_only_return_entries_belonging_to_anchor() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id =
+            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+
+        for n in 0..22 {
+            api::add_entry(
+                &env,
+                canister_id,
+                principal_1(),
+                n % 2,
+                n,
+                candid::encode_one(log_entry(n, n % 2)).expect("failed to encode entry"),
+            )?;
+        }
+
+        let logs = api::get_anchor_entries(
+            &env,
+            canister_id,
+            0,
+            Some(Cursor::Timestamp { timestamp: 10 }),
+            None,
+        )?;
+        assert_eq!(logs.entries.len(), 6);
+        assert_eq!(logs.entries.get(5).unwrap().as_ref().unwrap().anchor, 0);
 
         Ok(())
     }
@@ -285,7 +316,7 @@ mod read_tests {
             principal_1(),
             USER_NUMBER_1,
             TIMESTAMP_3,
-            candid::encode_one(log_entry(3)).expect("failed to encode entry"),
+            candid::encode_one(log_entry(3, USER_NUMBER_1)).expect("failed to encode entry"),
         )?;
 
         let logs = api::get_anchor_entries(
@@ -304,7 +335,7 @@ mod read_tests {
         );
         assert_eq!(
             logs.entries.get(1).unwrap().as_ref().unwrap(),
-            &log_entry(3)
+            &log_entry(3, USER_NUMBER_1)
         );
         Ok(())
     }
