@@ -78,7 +78,6 @@ type AnchorEntries = record {
 
 type Entries = record {
   entries: vec opt Entry;
-  next_idx: opt nat64 // next index to fetch the next page of entries (if any)
 };
 
 type ArchiveInit = record {
@@ -139,7 +138,7 @@ service : (ArchiveInit) -> {
   // Parameters:
   // 1. optional index into the list of entries
   // 2. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
-  get_entries : (opt nat64, opt nat16) -> (Entries) query;
+  get_entries : (opt nat16) -> (Entries) query;
 
   // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
   write_entry : (Anchor, Timestamp, blob) -> ();

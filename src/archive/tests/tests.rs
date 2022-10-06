@@ -190,7 +190,7 @@ mod read_tests {
 
     /// Verifies that additional entries can be retrieved by supplying next_idx.
     #[test]
-    fn should_return_cursor() -> Result<(), CallError> {
+    fn should_return_only_limit_many_entries() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id =
             framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
@@ -206,11 +206,8 @@ mod read_tests {
             )?;
         }
 
-        let logs = api::get_entries(&env, canister_id, Some(0), None)?;
-        assert_eq!(logs.entries.len(), 10);
-        assert_eq!(logs.next_idx, Some(10));
-        let logs = api::get_entries(&env, canister_id, logs.next_idx, None)?;
-        assert_eq!(logs.entries.len(), 1);
+        let logs = api::get_entries(&env, canister_id, Some(0), Some(3))?;
+        assert_eq!(logs.entries.len(), 3);
         Ok(())
     }
 

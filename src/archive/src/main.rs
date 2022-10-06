@@ -250,12 +250,6 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
             Some(idx) => idx as usize,
         };
 
-        let next_idx = if start_idx + limit < length {
-            Some((start_idx + limit) as u64)
-        } else {
-            None
-        };
-
         let mut entries = Vec::with_capacity(limit);
         for idx in start_idx..start_idx + limit {
             let entry = match log.get(idx) {
@@ -266,7 +260,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
                 candid::decode_one(&entry).expect("failed to decode log entry"),
             ))
         }
-        Entries { entries, next_idx }
+        Entries { entries }
     })
 }
 

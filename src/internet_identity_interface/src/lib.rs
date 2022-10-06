@@ -233,8 +233,6 @@ pub enum Private {
 pub struct Entries {
     // make this a vec of options to keep Entry extensible
     pub entries: Vec<Option<Entry>>,
-    // index pointing to the next entry not included in this response, if any
-    pub next_idx: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
