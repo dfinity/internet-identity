@@ -310,30 +310,13 @@ fn limit_or_default(limit: Option<u16>) -> usize {
 }
 
 #[init]
-fn init(arg: ArchiveInit) {
+#[post_upgrade]
+fn initialize(arg: ArchiveInit) {
     write_config(ArchiveConfig {
         ii_canister: arg.ii_canister,
         max_entries_per_call: arg.max_entries_per_call,
         last_upgrade_timestamp: time(),
     });
-}
-
-#[post_upgrade]
-fn post_upgrade(maybe_arg: Option<ArchiveInit>) {
-    let config = match maybe_arg {
-        Some(arg) => ArchiveConfig {
-            ii_canister: arg.ii_canister,
-            max_entries_per_call: arg.max_entries_per_call,
-            last_upgrade_timestamp: time(),
-        },
-        None => CONFIG.with(|cell| {
-            let config_cell = cell.borrow();
-            let mut archive_config = config_cell.get().get().clone();
-            archive_config.last_upgrade_timestamp = time();
-            archive_config
-        }),
-    };
-    write_config(config);
 }
 
 fn write_config(config: ArchiveConfig) {
