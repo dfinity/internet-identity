@@ -18,12 +18,12 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies] [CANISTER...]
+  $0 [--only-dependencies] [--internet-identity] [--archive]
 
 Options:
   --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
-  --internet_identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet_identity --archive
-  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet_identity --archive
+  --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
 EOF
 }
 
@@ -53,7 +53,7 @@ do
             ONLY_DEPS=1
             shift
             ;;
-        --internet_identity)
+        --internet-identity)
             CANISTERS+=("internet_identity")
             shift
             ;;
@@ -73,7 +73,7 @@ done
 
 # build everything by default
 if [ ${#CANISTERS[@]} -eq 0 ]; then
-    CANISTERS=("internet_identity" "archive")
+    CANISTERS=("internet_identity")
 fi
 
 # Checking for dependencies

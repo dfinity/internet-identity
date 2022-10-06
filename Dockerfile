@@ -75,7 +75,7 @@ RUN touch src/canister_tests/src/lib.rs
 RUN touch src/metrics_encoder/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build --internet_identity
+RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm
 
 FROM deps as build_archive

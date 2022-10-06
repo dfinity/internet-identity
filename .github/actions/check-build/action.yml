@@ -12,7 +12,7 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
-    - run: ./scripts/build --internet_identity
+    - run: ./scripts/build
       shell: bash
 
     # check the hash

@@ -4,7 +4,7 @@ This is a test suite for the Internet Identity canister. To run the tests:
 
 ``` bash
 # Make sure II is built with the "test" flavor
-II_DUMMY_CAPTHA=1 ./scripts/build --internet_identity
+II_DUMMY_CAPTHA=1 ./scripts/build
 
 # Make sure you have a copy of the latest release of II
 curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
