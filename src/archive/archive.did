@@ -54,7 +54,7 @@ type DeviceDataWithoutAlias = record {
 };
 
 type DeviceDataUpdate = record {
-    alias: opt Hidden;
+    alias: opt Private;
     credential_id: opt CredentialId;
     purpose: opt Purpose;
     key_type: opt KeyType;
