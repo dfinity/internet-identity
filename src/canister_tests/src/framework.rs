@@ -1,7 +1,7 @@
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::{parser::value::IDLValue, IDLArgs, Principal};
-use ic_crypto_internal_basic_sig_iccsa::types::SignatureBytes;
-use ic_crypto_internal_basic_sig_iccsa::{public_key_bytes_from_der, verify};
+use ic_crypto_iccsa::types::SignatureBytes;
+use ic_crypto_iccsa::{public_key_bytes_from_der, verify};
 use ic_error_types::ErrorCode;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine, UserError, WasmResult};
 use ic_types::crypto::Signable;
