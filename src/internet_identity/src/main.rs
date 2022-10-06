@@ -1,27 +1,29 @@
 use crate::assets::init_assets;
+use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
+use crate::state::{AssetHashes, ChallengeInfo, DeviceDataInternal, TentativeDeviceRegistration};
 use crate::AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
-use crate::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 use assets::ContentType;
-use candid::{CandidType, Deserialize, Principal};
+use candid::Principal;
 use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
-use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
+use ic_certified_map::{AsHashTree, Hash, HashTree};
 use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
-use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::ops::Deref;
 use storage::{Salt, Storage};
 
 use internet_identity_interface::*;
 
 mod assets;
+mod hash;
 mod http;
+mod state;
+mod storage;
 
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
@@ -52,196 +54,29 @@ const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
-/// This is an internal version of `DeviceData` primarily useful to provide a
-/// backwards compatible level between older device data stored in stable memory
-/// (that might not contain purpose or key_type) and new ones added.
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct DeviceDataInternal {
-    pubkey: DeviceKey,
-    alias: String,
-    credential_id: Option<CredentialId>,
-    purpose: Option<Purpose>,
-    key_type: Option<KeyType>,
-    protection: Option<DeviceProtection>,
-}
-
-impl From<DeviceData> for DeviceDataInternal {
-    fn from(device_data: DeviceData) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            alias: device_data.alias,
-            credential_id: device_data.credential_id,
-            purpose: Some(device_data.purpose),
-            key_type: Some(device_data.key_type),
-            protection: Some(device_data.protection),
-        }
-    }
-}
-
-impl From<DeviceDataInternal> for DeviceData {
-    fn from(device_data_internal: DeviceDataInternal) -> Self {
-        Self {
-            pubkey: device_data_internal.pubkey,
-            alias: device_data_internal.alias,
-            credential_id: device_data_internal.credential_id,
-            purpose: device_data_internal
-                .purpose
-                .unwrap_or(Purpose::Authentication),
-            key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
-            protection: device_data_internal
-                .protection
-                .unwrap_or(DeviceProtection::Unprotected),
-        }
-    }
-}
-
-mod hash;
-mod storage;
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct InternetIdentityStats {
-    assigned_user_number_range: (UserNumber, UserNumber),
-    users_registered: u64,
-}
-
-type AssetHashes = RbTree<&'static str, Hash>;
-
-struct TentativeDeviceRegistration {
-    expiration: Timestamp,
-    state: RegistrationState,
-}
-
-/// Registration state of new devices added using the two step device add flow
-enum RegistrationState {
-    DeviceRegistrationModeActive,
-    DeviceTentativelyAdded {
-        tentative_device: DeviceData,
-        verification_code: DeviceVerificationCode,
-        failed_attempts: FailedAttemptsCounter,
-    },
-}
-
-#[derive(Default)]
-struct UsageMetrics {
-    // number of prepare_delegation calls since last upgrade
-    delegation_counter: u64,
-    // number of anchor operations (register, add, remove, update) since last upgrade
-    anchor_operation_counter: u64,
-}
-
-struct State {
-    storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
-    sigs: RefCell<SignatureMap>,
-    asset_hashes: RefCell<AssetHashes>,
-    last_upgrade_timestamp: Cell<Timestamp>,
-    // note: we COULD persist this through upgrades, although this is currently NOT persisted
-    // through upgrades
-    inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
-    // tentative device registrations, not persisted across updates
-    // if a user number is present in this map then registration mode is active until expiration
-    tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
-    // additional usage metrics, NOT persisted across updates (but probably should be in the future)
-    usage_metrics: RefCell<UsageMetrics>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        const FIRST_USER_ID: UserNumber = 10_000;
-        Self {
-            storage: RefCell::new(Storage::new((
-                FIRST_USER_ID,
-                FIRST_USER_ID.saturating_add(storage::DEFAULT_RANGE_SIZE),
-            ))),
-            sigs: RefCell::new(SignatureMap::default()),
-            asset_hashes: RefCell::new(AssetHashes::default()),
-            last_upgrade_timestamp: Cell::new(0),
-            inflight_challenges: RefCell::new(HashMap::new()),
-            tentative_device_registrations: RefCell::new(HashMap::new()),
-            usage_metrics: RefCell::new(UsageMetrics::default()),
-        }
-    }
-}
-
-// The challenges we store and check against
-struct ChallengeInfo {
-    created: Timestamp,
-    chars: String,
-}
-
-type ChallengeKey = String;
-
-// The user's attempt
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct ChallengeAttempt {
-    chars: String,
-    key: ChallengeKey,
-}
-
-// What we send the user
-#[derive(Clone, Debug, CandidType, Deserialize)]
-struct Challenge {
-    png_base64: String,
-    challenge_key: ChallengeKey,
-}
-
-thread_local! {
-    static STATE: State = State::default();
-    static ASSETS: RefCell<HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>> = RefCell::new(HashMap::default());
-}
-
 #[update]
 async fn init_salt() {
-    STATE.with(|s| {
-        if s.storage.borrow().salt().is_some() {
-            trap("Salt already set");
-        }
-    });
-
-    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
-    };
-    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
-        trap(&format!(
-            "expected raw randomness to be of length 32, got {}",
-            res.len()
-        ));
-    });
-
-    STATE.with(|s| {
-        let mut store = s.storage.borrow_mut();
-        store.update_salt(salt); // update_salt() traps if salt has already been set
-    });
+    state::init_salt().await;
 }
 
 /// Enables device registration mode for the given user and returns the expiration timestamp (when it will be disabled again).
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 #[update]
 fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        prune_expired_tentative_device_registrations(state);
-        if state.tentative_device_registrations.borrow().len() >= MAX_USERS_IN_REGISTRATION_MODE {
+    state::tentative_device_registrations_mut(|registrations| {
+        prune_expired_tentative_device_registrations(registrations);
+        if registrations.len() >= MAX_USERS_IN_REGISTRATION_MODE {
             trap("too many users in device registration mode");
         }
 
-        let mut device_registration_state = state.tentative_device_registrations.borrow_mut();
-        match device_registration_state.get(&user_number) {
+        match registrations.get(&user_number) {
             Some(TentativeDeviceRegistration { expiration, .. }) => *expiration, // already enabled, just return the existing expiration
             None => {
                 let expiration = time() + REGISTRATION_MODE_DURATION;
-                device_registration_state.insert(
+                registrations.insert(
                     user_number,
                     TentativeDeviceRegistration {
                         expiration,
@@ -256,26 +91,13 @@ fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
 
 #[update]
 fn exit_device_registration_mode(user_number: UserNumber) {
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        prune_expired_tentative_device_registrations(state);
-
-        state
-            .tentative_device_registrations
-            .borrow_mut()
-            .remove(&user_number);
-    })
+    state::tentative_device_registrations_mut(|registrations| {
+        prune_expired_tentative_device_registrations(registrations);
+        registrations.remove(&user_number)
+    });
 }
 
 #[update]
@@ -286,13 +108,10 @@ async fn add_tentative_device(
     let verification_code = new_verification_code().await;
     let now = time();
 
-    STATE.with(|state| {
-        prune_expired_tentative_device_registrations(state);
+    state::tentative_device_registrations_mut(|registrations| {
+        prune_expired_tentative_device_registrations(registrations);
 
-        let mut tentative_registrations = state.tentative_device_registrations.borrow_mut();
-        let registration = tentative_registrations.get_mut(&user_number);
-
-        match registration {
+        match registrations.get_mut(&user_number) {
             None => AddTentativeDeviceResponse::DeviceRegistrationModeOff,
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
                 AddTentativeDeviceResponse::DeviceRegistrationModeOff
@@ -337,19 +156,13 @@ fn get_verified_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
-    STATE.with(|s| {
-        let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        prune_expired_tentative_device_registrations(s);
+    state::tentative_device_registrations_mut(|registrations| {
+        prune_expired_tentative_device_registrations(registrations);
 
-        let mut device_registration_state = s.tentative_device_registrations.borrow_mut();
-        let mut tentative_registration = device_registration_state
+        let mut tentative_registration = registrations
             .remove(&user_number)
             .ok_or(VerifyTentativeDeviceResponse::DeviceRegistrationModeOff)?;
 
@@ -372,7 +185,7 @@ fn get_verified_device(
                         verification_code,
                     };
                     // reinsert because retries are allowed
-                    device_registration_state.insert(user_number, tentative_registration);
+                    registrations.insert(user_number, tentative_registration);
                 }
                 return Err(WrongCode {
                     retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
@@ -400,14 +213,14 @@ async fn new_verification_code() -> DeviceVerificationCode {
 }
 
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
-fn prune_expired_tentative_device_registrations(state: &State) {
+fn prune_expired_tentative_device_registrations(
+    registrations: &mut HashMap<UserNumber, TentativeDeviceRegistration>,
+) {
     let now = time();
-    state
-        .tentative_device_registrations
-        .borrow_mut()
-        .retain(|_, value| match &value {
-            TentativeDeviceRegistration { expiration, .. } => expiration > &now,
-        });
+
+    registrations.retain(|_, value| match &value {
+        TentativeDeviceRegistration { expiration, .. } => expiration > &now,
+    })
 }
 
 #[update]
@@ -419,75 +232,56 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
     check_device(&device_data, &vec![]);
 
     if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
-        ic_cdk::trap(&format!(
+        trap(&format!(
             "{} could not be authenticated against {:?}",
             caller(),
             device_data.pubkey
         ));
     }
 
-    ensure_salt_set().await;
+    state::ensure_salt_set().await;
+    prune_expired_signatures();
 
-    STATE.with(|s| {
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
-
-        let mut store = s.storage.borrow_mut();
-        match store.allocate_user_number() {
-            Some(user_number) => {
-                write_anchor_data(
-                    store.deref(),
-                    user_number,
-                    vec![DeviceDataInternal::from(device_data)],
-                    s.usage_metrics.borrow_mut(),
-                );
-                RegisterResponse::Registered { user_number }
-            }
-            None => RegisterResponse::CanisterFull,
+    let allocation = state::storage_mut(|storage| storage.allocate_user_number());
+    match allocation {
+        Some(user_number) => {
+            write_anchor_data(user_number, vec![DeviceDataInternal::from(device_data)]);
+            RegisterResponse::Registered { user_number }
         }
-    })
+        None => RegisterResponse::CanisterFull,
+    }
 }
 
 #[update]
 async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
-    ensure_salt_set().await;
+    let mut entries = state::anchor_devices(user_number);
+    // must be called before the first await because it requires caller()
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    state::ensure_salt_set().await;
 
-    STATE.with(|s| {
-        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
+    check_device(&device_data, &entries);
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-        check_device(&device_data, &entries);
+    if entries
+        .iter()
+        .find(|e| e.pubkey == device_data.pubkey)
+        .is_some()
+    {
+        trap("Device already added.");
+    }
 
-        if entries
-            .iter()
-            .find(|e| e.pubkey == device_data.pubkey)
-            .is_some()
-        {
-            trap("Device already added.");
-        }
+    if entries.len() >= MAX_ENTRIES_PER_USER {
+        trap(&format!(
+            "at most {} authentication information entries are allowed per user",
+            MAX_ENTRIES_PER_USER,
+        ));
+    }
 
-        if entries.len() >= MAX_ENTRIES_PER_USER {
-            trap(&format!(
-                "at most {} authentication information entries are allowed per user",
-                MAX_ENTRIES_PER_USER,
-            ));
-        }
+    entries.push(DeviceDataInternal::from(device_data));
+    write_anchor_data(user_number, entries);
 
-        entries.push(DeviceDataInternal::from(device_data));
-        write_anchor_data(
-            s.storage.borrow().deref(),
-            user_number,
-            entries,
-            s.usage_metrics.borrow_mut(),
-        );
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
-    })
+    prune_expired_signatures();
 }
 
 /// Replace or remove an existing device.
@@ -534,81 +328,54 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
     if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
+    let mut entries = state::anchor_devices(user_number);
 
-    STATE.with(|s| {
-        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    check_device(&device_data, &entries);
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-        check_device(&device_data, &entries);
+    mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
-        mutate_device_or_trap(&mut entries, device_key, Some(device_data));
+    write_anchor_data(user_number, entries);
 
-        write_anchor_data(
-            s.storage.borrow().deref(),
-            user_number,
-            entries,
-            s.usage_metrics.borrow_mut(),
-        );
-
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
-    })
+    prune_expired_signatures();
 }
 
 #[update]
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
-    ensure_salt_set().await;
-    STATE.with(|s| {
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+    let mut entries = state::anchor_devices(user_number);
+    // must be called before the first await because it requires caller()
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        let mut entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
+    state::ensure_salt_set().await;
+    prune_expired_signatures();
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-
-        mutate_device_or_trap(&mut entries, device_key, None);
-        write_anchor_data(
-            s.storage.borrow().deref(),
-            user_number,
-            entries,
-            s.usage_metrics.borrow_mut(),
-        );
-    })
+    mutate_device_or_trap(&mut entries, device_key, None);
+    write_anchor_data(user_number, entries);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
-fn write_anchor_data(
-    storage: &Storage<Vec<DeviceDataInternal>>,
-    user_number: UserNumber,
-    entries: Vec<DeviceDataInternal>,
-    mut usage_metrics: RefMut<UsageMetrics>,
-) {
-    storage.write(user_number, entries).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to write device data of user {}: {}",
-            user_number, err
-        ))
+fn write_anchor_data(user_number: UserNumber, entries: Vec<DeviceDataInternal>) {
+    state::storage(|storage| {
+        storage.write(user_number, entries).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write device data of user {}: {}",
+                user_number, err
+            ))
+        });
     });
-    usage_metrics.anchor_operation_counter += 1;
+
+    state::usage_metrics_mut(|metrics| {
+        metrics.anchor_operation_counter += 1;
+    });
 }
 
 #[update]
 async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
 
-    let resp = STATE.with(|s| {
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut s.sigs.borrow_mut());
+    prune_expired_signatures();
 
-        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
-
+    state::inflight_challenges_mut(|inflight_challenges| {
         let now = time() as u64;
 
         // Prune old challenges. This drops all challenges that are older than
@@ -652,9 +419,7 @@ async fn create_challenge() -> Challenge {
             "Could not find a new key after {} tries",
             MAX_TRIES
         ));
-    });
-
-    resp
+    })
 }
 
 // Generate an n-char long string of random characters. The characters are sampled from the rang
@@ -728,8 +493,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
 // Check whether the CAPTCHA challenge was solved
 fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
-    STATE.with(|s| {
-        let mut inflight_challenges = s.inflight_challenges.borrow_mut();
+    state::inflight_challenges_mut(|inflight_challenges| {
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
                 if res.chars != challenge.chars {
@@ -746,9 +510,8 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 /// Note: Will be changed in the future to be more consistent with get_anchor_info.
 #[query]
 fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
-    STATE.with(|s| {
-        s.storage
-            .borrow()
+    state::storage(|storage| {
+        storage
             .read(user_number)
             .unwrap_or_default()
             .into_iter()
@@ -759,26 +522,14 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        let devices = entries.into_iter().map(DeviceData::from).collect();
-        let now = time();
-        match state
-            .tentative_device_registrations
-            .borrow()
-            .get(&user_number)
-        {
+    let devices = entries.into_iter().map(DeviceData::from).collect();
+    let now = time();
+
+    state::tentative_device_registrations(|tentative_device_registrations| {
+        match tentative_device_registrations.get(&user_number) {
             Some(TentativeDeviceRegistration {
                 expiration,
                 state:
@@ -813,24 +564,12 @@ fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
 fn get_principal(user_number: UserNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-
-        let seed = calculate_seed(user_number, &frontend);
-        let public_key = der_encode_canister_sig_key(seed.to_vec());
-        Principal::self_authenticating(&public_key)
-    })
+    let seed = calculate_seed(user_number, &frontend);
+    let public_key = der_encode_canister_sig_key(seed.to_vec());
+    Principal::self_authenticating(&public_key)
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other
@@ -848,39 +587,33 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    ensure_salt_set().await;
+    let entries = state::anchor_devices(user_number);
+    // must be called before the first await because it requires caller()
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-    STATE.with(|s| {
-        let entries = s.storage.borrow().read(user_number).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to read device data of user {}: {}",
-                user_number, err
-            ))
-        });
+    state::ensure_salt_set().await;
+    prune_expired_signatures();
+    check_frontend_length(&frontend);
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let delta = u64::min(
+        max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+        MAX_EXPIRATION_PERIOD_NS,
+    );
+    let expiration = (time() as u64).saturating_add(delta);
+    let seed = calculate_seed(user_number, &frontend);
 
-        check_frontend_length(&frontend);
+    state::signature_map_mut(|sigs| {
+        add_signature(sigs, session_key, seed, expiration);
+    });
+    update_root_hash();
 
-        let delta = u64::min(
-            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
-            MAX_EXPIRATION_PERIOD_NS,
-        );
-        let expiration = (time() as u64).saturating_add(delta);
-
-        let seed = calculate_seed(user_number, &frontend);
-        let mut sigs = s.sigs.borrow_mut();
-        add_signature(&mut sigs, session_key, seed, expiration);
-        update_root_hash(&s.asset_hashes.borrow(), &sigs);
-        prune_expired_signatures(&s.asset_hashes.borrow(), &mut sigs);
-
-        s.usage_metrics.borrow_mut().delegation_counter += 1;
-
-        (
-            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-            expiration,
-        )
-    })
+    state::usage_metrics_mut(|metrics| {
+        metrics.delegation_counter += 1;
+    });
+    (
+        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration,
+    )
 }
 
 #[query]
@@ -892,23 +625,13 @@ fn get_delegation(
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
 
-    STATE.with(|state| {
-        let entries = state
-            .storage
-            .borrow()
-            .read(user_number)
-            .unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to read device data of user {}: {}",
-                    user_number, err
-                ))
-            });
+    let entries = state::anchor_devices(user_number);
+    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
-        trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-
+    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
         match get_signature(
-            &state.asset_hashes.borrow(),
-            &state.sigs.borrow(),
+            asset_hashes,
+            sigs,
             session_key.clone(),
             calculate_seed(user_number, &frontend),
             expiration,
@@ -933,69 +656,37 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
 #[query]
 fn stats() -> InternetIdentityStats {
-    STATE.with(|state| {
-        let storage = state.storage.borrow();
-        InternetIdentityStats {
-            assigned_user_number_range: storage.assigned_user_number_range(),
-            users_registered: storage.user_count() as u64,
-        }
+    state::storage(|storage| InternetIdentityStats {
+        assigned_user_number_range: storage.assigned_user_number_range(),
+        users_registered: storage.user_count() as u64,
     })
 }
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    STATE.with(|state| {
+    state::storage_mut(|storage| {
         if let Some(arg) = maybe_arg {
-            state
-                .storage
-                .replace(Storage::new(arg.assigned_user_number_range));
+            *storage = Storage::new(arg.assigned_user_number_range);
         }
-        state.storage.borrow().flush();
-        update_root_hash(&state.asset_hashes.borrow(), &state.sigs.borrow());
+        storage.flush();
     });
+
+    update_root_hash();
 }
 
 #[post_upgrade]
 fn retrieve_data() {
     init_assets();
-    STATE.with(|s| {
-        s.last_upgrade_timestamp.set(time() as u64);
-        match Storage::from_stable_memory() {
-            Some(mut storage) => {
-                let (lo, hi) = storage.assigned_user_number_range();
-                let max_entries = storage.max_entries() as u64;
-                if (hi - lo) != max_entries {
-                    // This code might be executed for 2 reasons:
-                    //
-                    // 1. We used to specify a nonsensical limit of 8B entries
-                    //    by default.  We couldn't store more than 2M entries
-                    //    in a single canister at that point, so we needed to
-                    //    lower the upper limit on upgrade.
-                    //
-                    // 2. After stable memory limits were increased, we could
-                    //    affort storing more entries by using the 64 bit
-                    //    stable memory API.  So we needed to increase the
-                    //    upper limit on upgrade.
-                    storage.set_user_number_range((lo, lo.saturating_add(max_entries)));
-                }
-                s.storage.replace(storage);
-            }
-            None => {
-                s.storage.borrow().flush();
-            }
-        }
+    state::initialize_from_stable_memory();
 
-        // We drop all the signatures on upgrade, users will
-        // re-request them if needed.
-        update_root_hash(&s.asset_hashes.borrow(), &s.sigs.borrow());
-    });
+    // We drop all the signatures on upgrade, users will
+    // re-request them if needed.
+    update_root_hash();
 }
 
 fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = STATE
-        .with(|s| s.storage.borrow().salt().cloned())
-        .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"));
+    let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
@@ -1054,15 +745,16 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
-fn update_root_hash(a: &AssetHashes, m: &SignatureMap) {
+fn update_root_hash() {
     use ic_certified_map::{fork_hash, labeled_hash};
-
-    let prefixed_root_hash = fork_hash(
-        // NB: Labels added in lexicographic order
-        &labeled_hash(LABEL_ASSETS, &a.root_hash()),
-        &labeled_hash(LABEL_SIG, &m.root_hash()),
-    );
-    set_certified_data(&prefixed_root_hash[..]);
+    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
+        let prefixed_root_hash = fork_hash(
+            // NB: Labels added in lexicographic order
+            &labeled_hash(LABEL_ASSETS, &asset_hashes.root_hash()),
+            &labeled_hash(LABEL_SIG, &sigs.root_hash()),
+        );
+        set_certified_data(&prefixed_root_hash[..]);
+    })
 }
 
 fn get_signature(
@@ -1132,12 +824,12 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
 /// This function is supposed to piggy back on update calls to
 /// amortize the cost of tree pruning.  Each operation on the signature map
 /// will prune at most MAX_SIGS_TO_PRUNE other signatures.
-fn prune_expired_signatures(asset_hashes: &AssetHashes, sigs: &mut SignatureMap) {
+fn prune_expired_signatures() {
     const MAX_SIGS_TO_PRUNE: usize = 10;
-    let num_pruned = sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE);
-
+    let num_pruned =
+        state::signature_map_mut(|sigs| sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE));
     if num_pruned > 0 {
-        update_root_hash(asset_hashes, sigs);
+        update_root_hash();
     }
 }
 
@@ -1149,7 +841,7 @@ fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey
             return;
         }
     }
-    ic_cdk::trap(&format!("{} could not be authenticated.", caller()))
+    trap(&format!("{} could not be authenticated.", caller()))
 }
 
 /// This checks some device invariants, in particular:
@@ -1228,20 +920,6 @@ fn check_frontend_length(frontend: &FrontendHostname) {
             n, FRONTEND_HOSTNAME_LIMIT,
         ));
     }
-}
-
-// Checks if salt is empty and calls `init_salt` to set it.
-async fn ensure_salt_set() {
-    let salt = STATE.with(|s| s.storage.borrow().salt().cloned());
-    if salt.is_none() {
-        init_salt().await;
-    }
-
-    STATE.with(|s| {
-        if s.storage.borrow().salt().is_none() {
-            trap("Salt is not set. Try calling init_salt() to set it");
-        }
-    });
 }
 
 fn main() {}
