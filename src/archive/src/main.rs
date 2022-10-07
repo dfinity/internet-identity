@@ -302,8 +302,10 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
         };
 
         with_log(|log| {
+            // Take one too many from the iterator to extract the cursor. This avoids having to
+            // iterate twice or use next explicitly.
             let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = iterator
-                .take(limit + 1) // take one too many to extract the cursor
+                .take(limit + 1) //
                 .map(|(anchor_key, _)| {
                     let entry = log
                         .get(anchor_key.log_index as usize)
