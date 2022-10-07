@@ -490,9 +490,9 @@ pub fn log_entry_2() -> types::Entry {
     }
 }
 
-pub fn log_entry(idx: u64, anchor: types::Anchor) -> types::Entry {
+pub fn log_entry(idx: u64, timestamp: u64, anchor: types::Anchor) -> types::Entry {
     types::Entry {
-        timestamp: idx,
+        timestamp,
         anchor,
         caller: PrincipalId::new_user_test_id(idx).0,
         operation: types::OperationType::UpdateDevice {

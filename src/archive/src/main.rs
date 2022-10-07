@@ -181,30 +181,33 @@ impl AnchorIndexKey {
     fn to_anchor_offset(&self) -> Vec<u8> {
         let mut buf =
             Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<u64>());
-        buf.extend(&self.timestamp.to_le_bytes());
-        buf.extend(&self.log_index.to_le_bytes());
+        buf.extend(&self.timestamp.to_be_bytes());
+        buf.extend(&self.log_index.to_be_bytes());
         buf
     }
 }
 
+/// Storable implementation for the index key.
+/// Note: byte ordering is very important as the keys are sorted on a byte level (lower to higher index)
+/// --> use big endian to ensure that the most significant bytes are compared first
 impl Storable for AnchorIndexKey {
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = Vec::with_capacity(std::mem::size_of::<AnchorIndexKey>());
-        buf.extend(&self.anchor.to_le_bytes());
-        buf.extend(&self.timestamp.to_le_bytes());
-        buf.extend(&self.log_index.to_le_bytes());
+        buf.extend(&self.anchor.to_be_bytes());
+        buf.extend(&self.timestamp.to_be_bytes());
+        buf.extend(&self.log_index.to_be_bytes());
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         AnchorIndexKey {
-            anchor: u64::from_le_bytes(
+            anchor: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[0..8]).expect("failed to read anchor"),
             ),
-            timestamp: u64::from_le_bytes(
+            timestamp: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[8..16]).expect("failed to read timestamp"),
             ),
-            log_index: u64::from_le_bytes(
+            log_index: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[16..]).expect("failed to read log_index"),
             ),
         }
@@ -279,7 +282,10 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
         // - (anchor, 0, 0): given no cursor
         // - (anchor, timestamp, 0): given a Timestamp cursor
         // - (anchor, timestamp, idx): given a NextToken cursor
-        let prefix = anchor.to_le_bytes().to_vec();
+        //
+        // Note that the byte order is very important here: Use big endian so that the most
+        // significant bytes are compared first.
+        let prefix = anchor.to_be_bytes().to_vec();
         let iterator = match cursor {
             None => index.range(prefix, None),
             Some(Cursor::NextToken { next_token }) => {
@@ -291,7 +297,7 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
                 index.range(prefix, Some(index_key.to_anchor_offset()))
             }
             Some(Cursor::Timestamp { timestamp }) => {
-                index.range(prefix, Some(timestamp.to_le_bytes().to_vec()))
+                index.range(prefix, Some(timestamp.to_be_bytes().to_vec()))
             }
         };
 

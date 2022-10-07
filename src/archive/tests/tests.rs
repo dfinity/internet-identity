@@ -116,6 +116,8 @@ mod write_tests {
 #[cfg(test)]
 mod read_tests {
     use super::*;
+    use canister_tests::framework::ARCHIVE_WASM;
+    use internet_identity_interface::ArchiveInit;
 
     /// Verifies that a previously written entry can be read again.
     #[test]
@@ -202,7 +204,7 @@ mod read_tests {
                 principal_1(),
                 n,
                 n,
-                candid::encode_one(log_entry(n, n)).expect("failed to encode entry"),
+                candid::encode_one(log_entry(n, n, n)).expect("failed to encode entry"),
             )?;
         }
 
@@ -225,7 +227,7 @@ mod read_tests {
                 principal_1(),
                 n % 2,
                 n,
-                candid::encode_one(log_entry(n, n % 2)).expect("failed to encode entry"),
+                candid::encode_one(log_entry(n, n, n % 2)).expect("failed to encode entry"),
             )?;
         }
 
@@ -267,7 +269,7 @@ mod read_tests {
                 principal_1(),
                 n % 2,
                 n,
-                candid::encode_one(log_entry(n, n % 2)).expect("failed to encode entry"),
+                candid::encode_one(log_entry(n, n, n % 2)).expect("failed to encode entry"),
             )?;
         }
 
@@ -313,7 +315,8 @@ mod read_tests {
             principal_1(),
             USER_NUMBER_1,
             TIMESTAMP_3,
-            candid::encode_one(log_entry(3, USER_NUMBER_1)).expect("failed to encode entry"),
+            candid::encode_one(log_entry(3, TIMESTAMP_3, USER_NUMBER_1))
+                .expect("failed to encode entry"),
         )?;
 
         let logs = api::get_anchor_entries(
@@ -332,8 +335,96 @@ mod read_tests {
         );
         assert_eq!(
             logs.entries.get(1).unwrap().as_ref().unwrap(),
-            &log_entry(3, USER_NUMBER_1)
+            &log_entry(3, TIMESTAMP_3, USER_NUMBER_1)
         );
+        Ok(())
+    }
+
+    /// Verifies that entries retrieved by anchor are correctly ordered by timestamp.
+    #[test]
+    fn should_order_by_timestamp() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id =
+            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            1u64,
+            candid::encode_one(log_entry(0, 1, USER_NUMBER_1)).expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            1u64 << 8,
+            candid::encode_one(log_entry(1, 1u64 << 8, USER_NUMBER_1))
+                .expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            1u64 << 16,
+            candid::encode_one(log_entry(2, 1u64 << 16, USER_NUMBER_1))
+                .expect("failed to encode entry"),
+        )?;
+
+        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        assert_eq!(logs.entries.len(), 3);
+        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap().timestamp, 1);
+        assert_eq!(
+            logs.entries.get(1).unwrap().as_ref().unwrap().timestamp,
+            1u64 << 8
+        );
+        Ok(())
+    }
+
+    /// Verifies that entries retrieved by anchor are correctly ordered by index.
+    #[test]
+    fn should_order_by_index() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        // use high max_entries_per_call so that we get all the entries in one go
+        let config = candid::encode_one(ArchiveInit {
+            ii_canister: principal_1().0,
+            max_entries_per_call: 1000,
+        })
+        .unwrap();
+        let canister_id = env
+            .install_canister(ARCHIVE_WASM.clone(), config, None)
+            .unwrap();
+
+        // 257 entries because we need the index to not fit in a single byte
+        for i in 0..257 {
+            api::add_entry(
+                &env,
+                canister_id,
+                principal_1(),
+                USER_NUMBER_1,
+                TIMESTAMP_1,
+                candid::encode_one(log_entry(i, TIMESTAMP_1, USER_NUMBER_1))
+                    .expect("failed to encode entry"),
+            )?;
+        }
+
+        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        assert_eq!(logs.entries.len(), 257);
+
+        for i in 0..257 {
+            assert_eq!(
+                logs.entries
+                    .get(i)
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .sequence_number,
+                i as u64
+            );
+        }
         Ok(())
     }
 }
