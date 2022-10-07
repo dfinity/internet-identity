@@ -21,5 +21,4 @@ candid = "0.7"
 ic-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
 ic-certification = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
 ic-crypto-iccsa = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }

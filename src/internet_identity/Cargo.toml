@@ -34,9 +34,7 @@ ic-certified-map = "0.3"
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.3"
-ic-error-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
-ic-types = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
 regex = "1.5.6"
 
 [features]
