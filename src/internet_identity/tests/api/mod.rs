@@ -2,8 +2,7 @@
 use candid::Principal;
 use canister_tests::framework;
 use framework::CallError;
-use ic_state_machine_tests::StateMachine;
-use ic_types::{CanisterId, PrincipalId};
+use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 
 /// A fake "health check" method that just checks the canister is alive a well.
