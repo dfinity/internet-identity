@@ -77,7 +77,7 @@ export const addTentativeDevice = async (
     connection.addTentativeDevice(...tentativeDeviceInfo)
   );
 
-  if (hasOwnProperty(result, "added_tentatively")) {
+  if ("added_tentatively" in result) {
     await showVerificationCode(
       tentativeDeviceInfo[0],
       connection,

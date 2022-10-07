@@ -114,8 +114,7 @@ export const recoveryPhraseWarnings: {
   (userNumber: bigint, inputRaw: string): Warning | null => {
     const input = parseRecoveryPhrase(inputRaw);
     const leadingUserNumber =
-      (input.leadingUserNumber !== null && BigInt(input.leadingUserNumber)) ||
-      null;
+      input.leadingUserNumber !== null ? BigInt(input.leadingUserNumber) : null;
 
     if (leadingUserNumber !== null && leadingUserNumber !== userNumber) {
       return { type: "bad_anchor", anchor: leadingUserNumber };
