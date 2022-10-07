@@ -628,6 +628,10 @@ a:hover,
   margin: var(--rs-logo-stack) 0;
 }
 
+.t-action:hover {
+  color: var(--vc-brand-blue);
+}
+
 /**
  *  Forms and Buttons
  */
@@ -988,6 +992,51 @@ a:hover,
 .c-tooltip__message--right {
   right: 0;
   left: auto;
+}
+
+/* chasm: alternative to tooltips, where the card opens to reveal details */
+
+.c-chasm {
+  margin-left: calc(-1 * 31.25px);
+  margin-right: calc(-1 * 31.25px);
+}
+
+.c-chasm--closed {
+  max-height: 0;
+  visibility: hidden;
+  transition: max-height 0.15s ease-out;
+}
+
+.c-chasm--open {
+  max-height: 500px;
+  visibility: visible;
+  transition: max-height 0.15s ease-in;
+}
+
+.c-chasm__content {
+  background-color: white;
+  padding: 2rem;
+}
+
+.c-chasm__arrow {
+  margin: auto;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 15px solid white;
+  z-index: 10;
+}
+
+.c-chasm__button {
+  transition: transform 0.15s linear;
+}
+.c-chasm__button svg {
+  transform: translate(-50%, -50%);
+}
+
+.c-chasm__button--flipped {
+  transform: rotate(180deg);
 }
 
 .c-action-list {

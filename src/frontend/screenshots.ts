@@ -44,6 +44,11 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
       await visit(browser, `http://localhost:8080/${pageName}`);
     }
 
+    // When authenticating with alternative origins, toggle the chasm
+    if (pageName === "authenticateAlternative") {
+      await browser.$("#alternative-origin-chasm-toggle").click();
+    }
+
     await browser.execute('document.body.style.caretColor = "transparent"');
     await browser.saveScreenshot(`${screenshotsDir}/${pageName}.png`);
   }

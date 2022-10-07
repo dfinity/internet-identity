@@ -124,6 +124,13 @@ const iiPages: Record<string, () => void> = {
       dummyConnection,
       "https://nowhere.com",
       console.log,
+      BigInt(10000)
+    ),
+  authenticateAlternative: () =>
+    displayPage(
+      dummyConnection,
+      "https://nowhere.com",
+      console.log,
       BigInt(10000),
       "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app"
     ),
