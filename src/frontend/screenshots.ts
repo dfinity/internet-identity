@@ -47,6 +47,10 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
     // When authenticating with alternative origins, toggle the chasm
     if (pageName === "authenticateAlternative") {
       await browser.$("#alternative-origin-chasm-toggle").click();
+      // Ensure the button is not hovered anymore for screenshot stability
+      await browser
+        .$("#alternative-origin-chasm-toggle")
+        .moveTo({ xOffset: -10, yOffset: -10 });
     }
 
     await browser.execute('document.body.style.caretColor = "transparent"');
