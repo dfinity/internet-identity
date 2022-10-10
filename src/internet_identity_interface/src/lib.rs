@@ -173,3 +173,9 @@ pub struct HttpResponse {
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: (UserNumber, UserNumber),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct InternetIdentityStats {
+    pub assigned_user_number_range: (UserNumber, UserNumber),
+    pub users_registered: u64,
+}
