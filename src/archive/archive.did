@@ -21,7 +21,7 @@ type DeviceProtection = variant {
     unprotected;
 };
 
-type OperationType = variant {
+type Operation = variant {
     register_anchor: record {
         device: DeviceDataWithoutAlias;
     };
@@ -39,7 +39,7 @@ type OperationType = variant {
 
 type Entry = record {
     anchor: Anchor;
-    operation: OperationType;
+    operation: Operation;
     timestamp: Timestamp;
     caller: principal;
     sequence_number: nat64;

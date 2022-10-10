@@ -178,7 +178,7 @@ pub struct InternetIdentityInit {
 // Archive specific types
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub enum OperationType {
+pub enum Operation {
     #[serde(rename = "register_anchor")]
     RegisterAnchor { device: DeviceDataWithoutAlias },
     #[serde(rename = "add_device")]
@@ -196,7 +196,7 @@ pub enum OperationType {
 pub struct Entry {
     // store anchor in LogEntry, such that anchor operations can be attributed to an anchor without consulting the index.
     pub anchor: Anchor,
-    pub operation: OperationType,
+    pub operation: Operation,
     pub timestamp: Timestamp,
     pub caller: Principal,
     // global sequence number to detect lost messages (if any)

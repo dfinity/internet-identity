@@ -459,7 +459,7 @@ pub fn log_entry_1() -> types::Entry {
         timestamp: TIMESTAMP_1,
         anchor: USER_NUMBER_1,
         caller: principal_1().0,
-        operation: types::OperationType::RegisterAnchor {
+        operation: types::Operation::RegisterAnchor {
             device: types::DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
@@ -477,7 +477,7 @@ pub fn log_entry_2() -> types::Entry {
         timestamp: TIMESTAMP_2,
         anchor: USER_NUMBER_2,
         caller: principal_1().0,
-        operation: types::OperationType::AddDevice {
+        operation: types::Operation::AddDevice {
             device: types::DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
@@ -495,7 +495,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: types::Anchor) -> types::Entr
         timestamp,
         anchor,
         caller: PrincipalId::new_user_test_id(idx).0,
-        operation: types::OperationType::UpdateDevice {
+        operation: types::Operation::UpdateDevice {
             device: ByteBuf::from(PUBKEY_1),
             new_values: types::DeviceDataUpdate {
                 alias: None,
