@@ -534,6 +534,7 @@ a:hover,
 @media (max-width: 512px) {
   .c-card--highlight {
     border: none;
+    border-radius: 0;
   }
 }
 
@@ -1043,8 +1044,11 @@ a:hover,
     padding: 0;
   }
   .l-container {
-    max-width: 100%;
+    margin: 0;
+    width: 100%;
     padding: calc(var(--rs-card-bezel) * 0.8) calc(var(--rs-card-bezel-x) * 0.8);
+
+    max-width: none;
   }
 }
 
