@@ -97,7 +97,7 @@ const pageContent = (
           <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
             <div class="c-chasm__arrow"></div>
             <div class="t-weak c-chasm__content"><span class="t-strong">${hostName}</span>
-            is authenticating via<br/><span class="t-strong">${derivationOrigin}</span><br/>and you will be identified to both apps with the same pseudonym.
+            is an alternative domain of <br/><span class="t-strong">${derivationOrigin}</span><br/>and you will be authenticated to both with the same identity.
             </div>
           </div>
         </p>`
