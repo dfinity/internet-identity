@@ -52,6 +52,9 @@ use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
 
+#[cfg(test)]
+mod anchor_index_key_tests;
+
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
 /// and the managed memory for the archived data & indices.
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
@@ -168,17 +171,19 @@ impl Storable for ConfigState {
 
 /// Index key for the anchor index.
 /// Changing the (serialized) size of this value requires a stable memory migration.
-#[derive(Debug)]
+#[derive(Eq, PartialEq, Debug)]
 struct AnchorIndexKey {
     anchor: Anchor,
     timestamp: Timestamp,
     log_index: u64,
 }
 
+type AnchorOffset = Vec<u8>;
+
 impl AnchorIndexKey {
     /// Returns bytes corresponding only to the timestamp and log_index component of the anchor index key.
     /// This is useful as an offset when doing a range scan with the anchor component.
-    fn to_anchor_offset(&self) -> Vec<u8> {
+    fn to_anchor_offset(&self) -> AnchorOffset {
         let mut buf =
             Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<u64>());
         buf.extend(&self.timestamp.to_be_bytes());
@@ -315,7 +320,7 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
             // Take one too many from the iterator to extract the cursor. This avoids having to
             // iterate twice or use next explicitly.
             let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = iterator
-                .take(limit + 1) //
+                .take(limit + 1)
                 .map(|(anchor_key, _)| {
                     let entry = log
                         .get(anchor_key.log_index as usize)

@@ -70,6 +70,7 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "canister_tests",
+ "hex",
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
