@@ -273,18 +273,28 @@ fn get_anchor_entries(anchor: Anchor, cursor: Option<Cursor>, limit: Option<u16>
 
     with_anchor_index_mut(|index| {
         // Here we take advantage of the range scan and how the index keys are structured.
-        // The index key is a concatenation of (anchor, timestamp, idx). A range scan with
-        // (prefix, offset) allows to iterate over the index while only returning entries that have
-        // the same prefix starting with keys also matching offset and increasing from there.
+        // The index key is a concatenation of (anchor, timestamp, idx), ordered lexicographically.
+        // Note that the byte order is very important here: big endian is used so that the most
+        // significant bytes are compared first.
+        //
+        // Example:
+        // Anchor 10042 at time 123456, at index 1: 100421234561
+        //                       anchor (bytes 0-7) |   |
+        //                       timestamp (bytes 8-15) |     |
+        //                                index (bytes 16-23) ||
+        //
+        // When scanning through index entries, the log index can be recovered by deserializing the
+        // key using the structure above.
+        //
+        // A range scan with (prefix, offset) allows to iterate over the index while only returning
+        // entries that have the same prefix starting with keys also matching offset and increasing
+        // from there.
         //
         // Setting the prefix to anchor limits the returned keys to only those corresponding to the
         // anchor. And depending on the parameters supplied we start iterating at index key
         // - (anchor, 0, 0): given no cursor
         // - (anchor, timestamp, 0): given a Timestamp cursor
         // - (anchor, timestamp, idx): given a NextToken cursor
-        //
-        // Note that the byte order is very important here: Use big endian so that the most
-        // significant bytes are compared first.
         let prefix = anchor.to_be_bytes().to_vec();
         let iterator = match cursor {
             None => index.range(prefix, None),
