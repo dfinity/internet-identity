@@ -226,7 +226,8 @@ pub struct DeviceDataUpdate {
 // Placeholder for information that has been hidden for privacy reasons.
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Private {
-    HiddenForPrivacyReasons,
+    #[serde(rename = "redacted")]
+    Redacted,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

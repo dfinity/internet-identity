@@ -63,7 +63,7 @@ type DeviceDataUpdate = record {
 
 // Placeholder for information that has been hidden for privacy reasons.
 type Private = variant {
-    hidden_for_privacy_reasons;
+    redacted;
 };
 
 type Cursor = variant {
