@@ -324,6 +324,10 @@ body {
   font-size: 0.8em;
 }
 
+.t-centered {
+  text-align: center;
+}
+
 .t-title {
   font-weight: bold;
   font-size: 1.8rem;

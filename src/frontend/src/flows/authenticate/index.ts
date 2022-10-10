@@ -82,7 +82,7 @@ const pageContent = (
       <!-- The title is hidden but used for accessibility -->
       <h1 class="is-hidden">Internet Identity</h1>
       <div class="c-logo">${icLogo}</div>
-      <div class="l-stack" style="text-align: center;">
+      <div class="l-stack t-centered">
         <p class="t-lead">
           Connect to<br />
           <span class="t-strong">${hostName}</span>
