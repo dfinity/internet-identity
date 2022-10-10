@@ -26,15 +26,15 @@ rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/nmattia/captcha", rev = "fb3fe931c20b8577bf02070ae6b8c0ca2f442427", default-features = false }
 
 # All IC deps
-candid = "0.7"
-ic-cdk = "0.5"
-ic-cdk-macros = "0.5"
+candid = "0.8"
+ic-cdk = "0.6"
+ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
 
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.3"
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "a7b1978db8b84fcec164f747ceff438d3a51e5f3" }
 regex = "1.5.6"
 
 [features]
