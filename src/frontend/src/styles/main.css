@@ -1046,7 +1046,7 @@ a:hover,
   .l-container {
     margin: 0;
     width: 100%;
-    padding: calc(var(--rs-card-bezel) * 0.8) calc(var(--rs-card-bezel-x) * 0.8);
+    padding: 10%;
 
     max-width: none;
   }
