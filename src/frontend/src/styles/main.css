@@ -34,7 +34,7 @@
                \---/------------------------------------                           |
                 \ /              VII) Utilities (Trumps)                           V
                  V                                                   Explicit CSS (High specificity)
-                 
+
   I)   Settings:             Global variables, config switches.
   II)  Theme Settings:       DarkMode, LightMode, Product Specific stuff
   III) Generic:              Ground-zero styles (Normalize.css, resets, box-sizing).
@@ -50,11 +50,11 @@
 /* I) Settings: Global variables, config switches. */
 
 :root {
-  /* 
-   * value tokens 
+  /*
+   * value tokens
    *
    * raw basic values that should not be used within your components.
-   * they control the design system on a higher level and should be used only 
+   * they control the design system on a higher level and should be used only
    * in the root element.
    *
    */
@@ -100,7 +100,7 @@
 
   /*
    * reference tokens
-   * 
+   *
    * pointers to value tokens or other reference tokens. They control the actual
    * design rules.
    *
@@ -299,7 +299,7 @@ body {
 
 /**
  * V) Objects: Cosmetic-free design patterns
- * 
+ *
  * We generally use the BEM methodology.
  * http://getbem.com/
  *
@@ -308,11 +308,11 @@ body {
  * - `.l-` layout
  * - `.t-` typography
  *
- * We avoid element, id and attribute selectors when it is sane to do so¹. 
- * Use classes when possible. 
+ * We avoid element, id and attribute selectors when it is sane to do so¹.
+ * Use classes when possible.
  *
  * ¹ For example when needing to style the paths of an SVG it might be difficult
- * to do because the SVG are made by people with little to no XML know-how. 
+ * to do because the SVG are made by people with little to no XML know-how.
  */
 
 .t-strong {
@@ -503,7 +503,7 @@ a:hover,
 }
 
 /**
- * Title with counter and Actions 
+ * Title with counter and Actions
  */
 
 /**
@@ -569,8 +569,8 @@ a:hover,
 }
 
 .c-card__title {
-  /* 
-    approximation: to make sure the title 
+  /*
+    approximation: to make sure the title
     does not collide with the icon on the left
   */
   padding-right: 10%;
@@ -608,7 +608,7 @@ a:hover,
 }
 
 /**
- *  logo component 
+ *  logo component
  */
 .c-logo {
   display: block;
@@ -628,7 +628,7 @@ a:hover,
 }
 
 /**
- *  Forms and Buttons 
+ *  Forms and Buttons
  */
 
 .c-button {
@@ -940,12 +940,12 @@ a:hover,
   list-style-type: decimal;
 }
 
-/** 
+/**
  *  Tooltip component
  *  This is a CSS only tooltip that shows on hover
  *  The element that triggers the tooltip must have a .c-tooltip class
  *  and the element that appears on hover must have a .c-tooltip__content class.
- *  
+ *
  *  In some cases tooltips are only shown when the element is disabled.
  *  in those cases you can use the `.c-tooltip--onDisabled` modifier
  */
