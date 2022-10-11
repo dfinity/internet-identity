@@ -1,5 +1,5 @@
-use canister_tests::framework;
-use canister_tests::framework::CallError;
+use crate::framework;
+use crate::framework::CallError;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 

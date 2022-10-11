@@ -1,9 +1,10 @@
-/** The functions here are derived (manually) from Internet Identity's Candid file */
+use crate::framework;
+use crate::framework::CallError;
 use candid::Principal;
-use canister_tests::framework;
-use framework::CallError;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
+
+/** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
