@@ -1,5 +1,7 @@
 use candid::Principal;
+use canister_tests::api::internet_identity as api;
 use canister_tests::certificate_validation::validate_certification;
+use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_state_machine_tests::{ErrorCode::CanisterCalledTrap, PrincipalId, StateMachine};
 use internet_identity_interface::*;
@@ -8,20 +10,6 @@ use serde_bytes::ByteBuf;
 use std::ops::Add;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-/**
- * There are various modules related to testing the II canister:
- *  * `api`: Rust-bindings for the II canister
- *  * `flows`: Reusable flows consisting of multiple II interactions
- *
- * Most changes should happen in the `tests` module. The split was done this way so that `tests` is a simple
- * as possible to make tests easy to read and write.
- *
- * The submodules modules are split into folders because the tests folder has special rules regarding top level files:
- * See https://doc.rust-lang.org/book/ch11-03-test-organization.html#submodules-in-integration-tests
- */
-mod api;
-mod flows;
 
 #[test]
 fn ii_canister_can_be_installed() {

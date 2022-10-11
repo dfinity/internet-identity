@@ -1,22 +1,18 @@
-use canister_tests::framework;
-use canister_tests::framework::{
-    assert_metric, expect_user_error_with_message, log_entry, log_entry_1, log_entry_2,
-    principal_1, principal_2, CallError, TIMESTAMP_1, TIMESTAMP_2, TIMESTAMP_3, USER_NUMBER_1,
-    USER_NUMBER_2, USER_NUMBER_3,
-};
+use canister_tests::api::archive as api;
+use canister_tests::framework::*;
 use ic_state_machine_tests::ErrorCode::CanisterCalledTrap;
 use ic_state_machine_tests::{CanisterId, StateMachine};
+use internet_identity_interface::ArchiveInit;
 use internet_identity_interface::{Cursor, HttpRequest};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, SystemTime};
-mod api;
 
 /// Verifies that the canister can be installed successfully.
 #[test]
 fn should_install() -> Result<(), CallError> {
     let env = StateMachine::new();
-    let canister_id = framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+    let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 0);
     Ok(())
@@ -26,7 +22,7 @@ fn should_install() -> Result<(), CallError> {
 #[test]
 fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     let env = StateMachine::new();
-    let canister_id = framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+    let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
     let entry = log_entry_1();
     api::add_entry(
@@ -38,7 +34,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
         candid::encode_one(entry.clone()).expect("failed to encode entry"),
     )?;
 
-    framework::upgrade_archive_canister(&env, canister_id, framework::ARCHIVE_WASM.clone());
+    upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM.clone());
 
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 1);
@@ -58,8 +54,7 @@ mod write_tests {
     #[test]
     fn should_write_entry() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
@@ -93,8 +88,7 @@ mod write_tests {
         let env = StateMachine::new();
 
         // Configures principal_1 as the allowed principal for writing.
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         let result = api::add_entry(
             &env,
@@ -116,15 +110,12 @@ mod write_tests {
 #[cfg(test)]
 mod read_tests {
     use super::*;
-    use canister_tests::framework::ARCHIVE_WASM;
-    use internet_identity_interface::ArchiveInit;
 
     /// Verifies that a previously written entry can be read again.
     #[test]
     fn should_read_previously_written_entry() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
@@ -147,8 +138,7 @@ mod read_tests {
     #[test]
     fn should_return_logs_per_user() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
@@ -194,8 +184,7 @@ mod read_tests {
     #[test]
     fn should_return_only_limit_many_entries() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..=10 {
             api::add_entry(
@@ -217,8 +206,7 @@ mod read_tests {
     #[test]
     fn should_return_user_cursor() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..24 {
             api::add_entry(
@@ -259,8 +247,7 @@ mod read_tests {
     #[test]
     fn should_only_return_entries_belonging_to_anchor() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..22 {
             api::add_entry(
@@ -290,8 +277,7 @@ mod read_tests {
     #[test]
     fn should_filter_by_timestamp() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
@@ -344,8 +330,7 @@ mod read_tests {
     #[test]
     fn should_order_by_timestamp() -> Result<(), CallError> {
         let env = StateMachine::new();
-        let canister_id =
-            framework::install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
@@ -433,9 +418,6 @@ mod read_tests {
 #[cfg(test)]
 mod metrics_tests {
     use super::*;
-    use canister_tests::framework::{
-        install_archive_canister, log_entry_1, upgrade_archive_canister,
-    };
 
     /// Verifies that all metrics are present and have the correct timestamp.
     #[test]
@@ -454,11 +436,11 @@ mod metrics_tests {
         ];
         let env = StateMachine::new();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
-        let canister_id = install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         let metrics_body = get_metrics(&env, canister_id);
         for metric in metrics {
-            let (_, metric_timestamp) = framework::parse_metric(&metrics_body, metric);
+            let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
             assert_eq!(
                 metric_timestamp,
                 env.time(),
@@ -473,7 +455,7 @@ mod metrics_tests {
     fn should_update_upgrade_timestamp() -> Result<(), CallError> {
         let env = StateMachine::new();
         env.advance_time(Duration::from_secs(300));
-        let canister_id = install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_last_upgrade_timestamp",
@@ -485,7 +467,7 @@ mod metrics_tests {
         println!("{}", get_metrics(&env, canister_id));
 
         env.advance_time(Duration::from_secs(300));
-        upgrade_archive_canister(&env, canister_id, framework::ARCHIVE_WASM.clone());
+        upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM.clone());
 
         println!("{}", get_metrics(&env, canister_id));
         assert_metric(
@@ -508,7 +490,7 @@ mod metrics_tests {
         ];
 
         let env = StateMachine::new();
-        let canister_id = install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
         for metric in metrics.clone() {
             assert_metric(&get_metrics(&env, canister_id), metric, 0);
         }
@@ -535,7 +517,7 @@ mod metrics_tests {
         const DATA_OVERHEAD: u64 = 32;
 
         let env = StateMachine::new();
-        let canister_id = install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         assert_metric(
             &get_metrics(&env, canister_id),
@@ -590,7 +572,7 @@ mod metrics_tests {
     fn should_show_memory_metrics() -> Result<(), CallError> {
         const WASM_PAGE_SIZE: usize = 65536;
         let env = StateMachine::new();
-        let canister_id = install_archive_canister(&env, framework::ARCHIVE_WASM.clone());
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         assert_metric(
             &get_metrics(&env, canister_id),
