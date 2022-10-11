@@ -267,7 +267,7 @@ export const caretDownIcon = html`
   >
     <g fill="none" stroke="currentColor" stroke-width="1">
       <circle cx="10" cy="10" r="9" />
-      <path d="M6 8 L10 12.5 L14 8" />
+      <path d="M6 8.5 L10 12.5 L14 8.5" />
     </g>
   </svg>
 `;
