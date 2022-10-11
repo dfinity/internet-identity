@@ -535,6 +535,7 @@ jobs:
         with:
           name: internet_identity_production.wasm
           path: .
+      # Install recent bash (default bash 3 is lacking important features)
       - run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew update
