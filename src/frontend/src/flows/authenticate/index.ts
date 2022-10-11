@@ -1,5 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
-import { icLogo, attentionIcon } from "../../components/icons";
+import { icLogo, caretDownIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import { getUserNumber, setUserNumber } from "../../utils/userNumber";
 import { withLoader } from "../../components/loader";
@@ -50,24 +50,58 @@ const pageContent = (
   const onRecoverClick = () =>
     useRecovery(connection, anchorInput.readUserNumber());
 
+  /* the chasm that opens to reveal details about alternative origin */
+  const chasmRef: Ref<HTMLDivElement> = createRef();
+
+  /* the (purely visual) arrow on the chasm */
+  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
+
+  /* Toggle the chasm open/closed */
+  const chasmToggle = () =>
+    withRef(chasmRef, (chasm) => {
+      const classes = chasm.classList;
+
+      if (classes.contains("c-chasm--closed")) {
+        classes.remove("c-chasm--closed");
+        classes.add("c-chasm--open");
+
+        withRef(chasmToggleRef, (arrow) =>
+          arrow.classList.add("c-chasm__button--flipped")
+        );
+      } else if (classes.contains("c-chasm--open")) {
+        classes.remove("c-chasm--open");
+        classes.add("c-chasm--closed");
+
+        withRef(chasmToggleRef, (arrow) =>
+          arrow.classList.remove("c-chasm__button--flipped")
+        );
+      }
+    });
+
   const template = html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
       <h1 class="is-hidden">Internet Identity</h1>
       <div class="c-logo">${icLogo}</div>
-      <div class="l-stack">
-        <p class="t-lead" style="text-align: center;">
+      <div class="l-stack t-centered">
+        <p class="t-lead">
           Connect to<br />
           <span class="t-strong">${hostName}</span>
-          ${derivationOrigin !== undefined && derivationOrigin !== hostName
-            ? html` <span class="c-tooltip t-link__icon"
-                >${attentionIcon}<i
-                  class="c-tooltip__message c-card c-card--narrow"
-                  >An alternative origin of ${derivationOrigin}</i
-                ></span
-              >`
-            : ""}
           <br />
         </p>
+        ${derivationOrigin !== undefined
+          ? html`
+        <p class="t-paragraph t-weak">
+          <span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >shared identity <span ${ref(
+              chasmToggleRef
+            )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
+          <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
+            <div class="c-chasm__arrow"></div>
+            <div class="t-weak c-chasm__content"><span class="t-strong">${hostName}</span>
+            is an alternative domain of <br/><span class="t-strong">${derivationOrigin}</span><br/>and you will be authenticated to both with the same identity.
+            </div>
+          </div>
+        </p>`
+          : ""}
       </div>
 
       ${anchorInput.template}
