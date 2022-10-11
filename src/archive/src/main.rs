@@ -61,6 +61,7 @@ type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type StableLog = Log<VirtualMemory<Memory>, VirtualMemory<Memory>>;
 type ConfigCell = StableCell<ConfigState, Memory>;
 /// Type of the index to efficiently retrieve entries by anchor.
+type LogIndex = u64;
 type AnchorIndex = StableBTreeMap<VirtualMemory<Memory>, AnchorIndexKey, ()>;
 
 const GIB: u64 = 1 << 30;
@@ -175,17 +176,15 @@ impl Storable for ConfigState {
 struct AnchorIndexKey {
     anchor: Anchor,
     timestamp: Timestamp,
-    log_index: u64,
+    log_index: LogIndex,
 }
-
-type AnchorOffset = Vec<u8>;
 
 impl AnchorIndexKey {
     /// Returns bytes corresponding only to the timestamp and log_index component of the anchor index key.
     /// This is useful as an offset when doing a range scan with the anchor component.
-    fn to_anchor_offset(&self) -> AnchorOffset {
+    fn to_anchor_offset(&self) -> Vec<u8> {
         let mut buf =
-            Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<u64>());
+            Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<LogIndex>());
         buf.extend(&self.timestamp.to_be_bytes());
         buf.extend(&self.log_index.to_be_bytes());
         buf
