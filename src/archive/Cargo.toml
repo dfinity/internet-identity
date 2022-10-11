@@ -11,9 +11,9 @@ edition = "2021"
 internet_identity_interface = { path = "../internet_identity_interface" }
 metrics_encoder = { path = "../metrics_encoder" }
 # ic dependencies
-candid = "0.7"
-ic-cdk = "0.5"
-ic-cdk-macros = "0.5"
+candid = "0.8"
+ic-cdk = "0.6"
+ic-cdk-macros = "0.6"
 ic-stable-structures = "0.1"
 # other
 serde = "1"
@@ -22,5 +22,5 @@ serde_bytes = "0.11"
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "016e7d68bff38d921b9dd168fc11ac1f0a98995e" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "a7b1978db8b84fcec164f747ceff438d3a51e5f3" }
 regex = "1.5.6"

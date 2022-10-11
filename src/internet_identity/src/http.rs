@@ -1,9 +1,8 @@
-use crate::{assets, AssetHashes, ContentType, ASSETS, LABEL_ASSETS, LABEL_SIG, STATE};
+use crate::{assets, state, ContentType, LABEL_ASSETS, LABEL_SIG};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::HashTree;
-use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::{HeaderField, HttpRequest, HttpResponse};
 use metrics_encoder::MetricsEncoder;
 use serde::Serialize;
@@ -55,17 +54,11 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             }
         }
         probably_an_asset => {
-            let certificate_header = STATE.with(|s| {
-                make_asset_certificate_header(
-                    &s.asset_hashes.borrow(),
-                    &s.sigs.borrow(),
-                    probably_an_asset,
-                )
-            });
+            let certificate_header = make_asset_certificate_header(probably_an_asset);
             let mut headers = security_headers();
             headers.push(certificate_header);
 
-            ASSETS.with(|a| match a.borrow().get(probably_an_asset) {
+            state::assets(|a| match a.get(probably_an_asset) {
                 Some((asset_headers, value)) => {
                     headers.append(&mut asset_headers.clone());
 
@@ -91,13 +84,13 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
-    STATE.with(|s| {
+    state::storage(|storage| {
         w.encode_gauge(
             "internet_identity_user_count",
-            s.storage.borrow().user_count() as f64,
+            storage.user_count() as f64,
             "Number of users registered in this canister.",
         )?;
-        let (lo, hi) = s.storage.borrow().assigned_user_number_range();
+        let (lo, hi) = storage.assigned_user_number_range();
         w.encode_gauge(
             "internet_identity_min_user_number",
             lo as f64,
@@ -107,44 +100,52 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_max_user_number",
             (hi - 1) as f64,
             "The highest Identity Anchor that can be served by this canister.",
-        )?;
+        )
+    })?;
+    state::signature_map(|sigs| {
         w.encode_gauge(
             "internet_identity_signature_count",
-            s.sigs.borrow().len() as f64,
+            sigs.len() as f64,
             "Number of active signatures issued by this canister.",
-        )?;
-        w.encode_gauge(
-            "internet_identity_stable_memory_pages",
-            stable64_size() as f64,
-            "Number of stable memory pages used by this canister.",
-        )?;
-        w.encode_gauge(
-            "internet_identity_last_upgrade_timestamp",
-            s.last_upgrade_timestamp.get() as f64,
-            "The most recent IC time (in nanos) when this canister was successfully upgraded.",
-        )?;
+        )
+    })?;
+    w.encode_gauge(
+        "internet_identity_stable_memory_pages",
+        stable64_size() as f64,
+        "Number of stable memory pages used by this canister.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_last_upgrade_timestamp",
+        state::last_upgrade_timestamp() as f64,
+        "The most recent IC time (in nanos) when this canister was successfully upgraded.",
+    )?;
+    state::inflight_challenges(|inflight_challenges| {
         w.encode_gauge(
             "internet_identity_inflight_challenges",
-            s.inflight_challenges.borrow().len() as f64,
+            inflight_challenges.len() as f64,
             "The number of inflight CAPTCHA challenges",
-        )?;
+        )
+    })?;
+    state::tentative_device_registrations(|tentative_device_registrations| {
         w.encode_gauge(
             "internet_identity_users_in_registration_mode",
-            s.tentative_device_registrations.borrow().len() as f64,
+            tentative_device_registrations.len() as f64,
             "The number of users in registration mode",
-        )?;
+        )
+    })?;
+    state::usage_metrics(|usage_metrics| {
         w.encode_gauge(
             "internet_identity_delegation_counter",
-            s.usage_metrics.borrow().delegation_counter as f64,
+            usage_metrics.delegation_counter as f64,
             "The number of delegations created since last upgrade",
         )?;
         w.encode_gauge(
             "internet_identity_anchor_operations_counter",
-            s.usage_metrics.borrow().anchor_operation_counter as f64,
+            usage_metrics.anchor_operation_counter as f64,
             "The number of anchor operations since last upgrade",
-        )?;
-        Ok(())
-    })
+        )
+    })?;
+    Ok(())
 }
 
 /// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
@@ -252,29 +253,27 @@ fn security_headers() -> Vec<HeaderField> {
     ]
 }
 
-fn make_asset_certificate_header(
-    asset_hashes: &AssetHashes,
-    sigs: &SignatureMap,
-    asset_name: &str,
-) -> (String, String) {
+fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
-    let witness = asset_hashes.witness(asset_name.as_bytes());
-    let tree = ic_certified_map::fork(
-        ic_certified_map::labeled(LABEL_ASSETS, witness),
-        HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
-    );
-    let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
-    serializer.self_describe().unwrap();
-    tree.serialize(&mut serializer)
-        .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {}", e)));
-    (
-        "IC-Certificate".to_string(),
-        format!(
-            "certificate=:{}:, tree=:{}:",
-            base64::encode(&certificate),
-            base64::encode(&serializer.into_inner())
-        ),
-    )
+    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
+        let witness = asset_hashes.witness(asset_name.as_bytes());
+        let tree = ic_certified_map::fork(
+            ic_certified_map::labeled(LABEL_ASSETS, witness),
+            HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+        );
+        let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
+        serializer.self_describe().unwrap();
+        tree.serialize(&mut serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {}", e)));
+        (
+            "IC-Certificate".to_string(),
+            format!(
+                "certificate=:{}:, tree=:{}:",
+                base64::encode(&certificate),
+                base64::encode(&serializer.into_inner())
+            ),
+        )
+    })
 }

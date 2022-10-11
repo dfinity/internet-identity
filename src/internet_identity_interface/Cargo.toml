@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 serde_bytes = "0.11"
-candid = "0.7"
+candid = "0.8"
 serde = "1"

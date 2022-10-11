@@ -1,4 +1,5 @@
 import { features } from "../features";
+import { wrapError } from "./utils";
 
 export const checkRequiredFeatures = async (
   url: URL
@@ -18,6 +19,8 @@ export const checkRequiredFeatures = async (
       ? true
       : "UserVerifyingPlatformAuthenticator is not available";
   } catch (error) {
-    return `An error occured when checking for compatibility: ${error.message}`;
+    return `An error occured when checking for compatibility: ${wrapError(
+      error
+    )}`;
   }
 };

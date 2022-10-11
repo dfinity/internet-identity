@@ -1,5 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
+import { wrapError } from "../utils/utils";
 import { WebAuthnCredential } from "../../test-setup";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fsasync from "fs/promises";
@@ -91,7 +92,7 @@ export async function runInBrowser(
     try {
       await browser.deleteSession();
     } catch (e) {
-      console.error("error occurred during session cleanup: " + e.message);
+      console.error("error occurred during session cleanup: " + wrapError(e));
     }
   }
 }

@@ -34,7 +34,7 @@
                \---/------------------------------------                           |
                 \ /              VII) Utilities (Trumps)                           V
                  V                                                   Explicit CSS (High specificity)
-                 
+
   I)   Settings:             Global variables, config switches.
   II)  Theme Settings:       DarkMode, LightMode, Product Specific stuff
   III) Generic:              Ground-zero styles (Normalize.css, resets, box-sizing).
@@ -50,11 +50,11 @@
 /* I) Settings: Global variables, config switches. */
 
 :root {
-  /* 
-   * value tokens 
+  /*
+   * value tokens
    *
    * raw basic values that should not be used within your components.
-   * they control the design system on a higher level and should be used only 
+   * they control the design system on a higher level and should be used only
    * in the root element.
    *
    */
@@ -100,7 +100,7 @@
 
   /*
    * reference tokens
-   * 
+   *
    * pointers to value tokens or other reference tokens. They control the actual
    * design rules.
    *
@@ -299,7 +299,7 @@ body {
 
 /**
  * V) Objects: Cosmetic-free design patterns
- * 
+ *
  * We generally use the BEM methodology.
  * http://getbem.com/
  *
@@ -308,11 +308,11 @@ body {
  * - `.l-` layout
  * - `.t-` typography
  *
- * We avoid element, id and attribute selectors when it is sane to do so¹. 
- * Use classes when possible. 
+ * We avoid element, id and attribute selectors when it is sane to do so¹.
+ * Use classes when possible.
  *
  * ¹ For example when needing to style the paths of an SVG it might be difficult
- * to do because the SVG are made by people with little to no XML know-how. 
+ * to do because the SVG are made by people with little to no XML know-how.
  */
 
 .t-strong {
@@ -322,6 +322,10 @@ body {
 .t-weak {
   font-weight: normal;
   font-size: 0.8em;
+}
+
+.t-centered {
+  text-align: center;
 }
 
 .t-title {
@@ -503,7 +507,7 @@ a:hover,
 }
 
 /**
- * Title with counter and Actions 
+ * Title with counter and Actions
  */
 
 /**
@@ -534,6 +538,7 @@ a:hover,
 @media (max-width: 512px) {
   .c-card--highlight {
     border: none;
+    border-radius: 0;
   }
 }
 
@@ -569,8 +574,8 @@ a:hover,
 }
 
 .c-card__title {
-  /* 
-    approximation: to make sure the title 
+  /*
+    approximation: to make sure the title
     does not collide with the icon on the left
   */
   padding-right: 10%;
@@ -608,7 +613,7 @@ a:hover,
 }
 
 /**
- *  logo component 
+ *  logo component
  */
 .c-logo {
   display: block;
@@ -627,8 +632,12 @@ a:hover,
   margin: var(--rs-logo-stack) 0;
 }
 
+.t-action:hover {
+  color: var(--vc-brand-blue);
+}
+
 /**
- *  Forms and Buttons 
+ *  Forms and Buttons
  */
 
 .c-button {
@@ -940,12 +949,12 @@ a:hover,
   list-style-type: decimal;
 }
 
-/** 
+/**
  *  Tooltip component
  *  This is a CSS only tooltip that shows on hover
  *  The element that triggers the tooltip must have a .c-tooltip class
  *  and the element that appears on hover must have a .c-tooltip__content class.
- *  
+ *
  *  In some cases tooltips are only shown when the element is disabled.
  *  in those cases you can use the `.c-tooltip--onDisabled` modifier
  */
@@ -987,6 +996,51 @@ a:hover,
 .c-tooltip__message--right {
   right: 0;
   left: auto;
+}
+
+/* chasm: alternative to tooltips, where the card opens to reveal details */
+
+.c-chasm {
+  margin-left: calc(-1 * 31.25px);
+  margin-right: calc(-1 * 31.25px);
+}
+
+.c-chasm--closed {
+  max-height: 0;
+  visibility: hidden;
+  transition: max-height 0.15s ease-out;
+}
+
+.c-chasm--open {
+  max-height: 500px;
+  visibility: visible;
+  transition: max-height 0.15s ease-in;
+}
+
+.c-chasm__content {
+  background-color: white;
+  padding: 2rem;
+}
+
+.c-chasm__arrow {
+  margin: auto;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 15px solid white;
+  z-index: 10;
+}
+
+.c-chasm__button {
+  transition: transform 0.15s linear;
+}
+.c-chasm__button svg {
+  transform: translate(-50%, -50%);
+}
+
+.c-chasm__button--flipped {
+  transform: rotate(180deg);
 }
 
 .c-action-list {
@@ -1043,8 +1097,11 @@ a:hover,
     padding: 0;
   }
   .l-container {
-    max-width: 100%;
-    padding: calc(var(--rs-card-bezel) * 0.8) calc(var(--rs-card-bezel-x) * 0.8);
+    margin: 0;
+    width: 100%;
+    padding: 10%;
+
+    max-width: none;
   }
 }
 

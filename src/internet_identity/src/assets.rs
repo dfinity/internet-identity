@@ -2,7 +2,7 @@
 //
 // This file describes which assets are used and how (content, content type and content encoding).
 
-use crate::{ASSETS, STATE};
+use crate::state;
 use ic_cdk::api;
 use lazy_static::lazy_static;
 use sha2::Digest;
@@ -51,26 +51,21 @@ lazy_static! {
 
 // used both in init and post_upgrade
 pub fn init_assets() {
-    STATE.with(|s| {
-        let mut asset_hashes = s.asset_hashes.borrow_mut();
-
-        ASSETS.with(|a| {
-            let mut assets = a.borrow_mut();
-            for (path, content, content_encoding, content_type) in get_assets() {
-                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                let mut headers = match content_encoding {
-                    ContentEncoding::Identity => vec![],
-                    ContentEncoding::GZip => {
-                        vec![("Content-Encoding".to_string(), "gzip".to_string())]
-                    }
-                };
-                headers.push((
-                    "Content-Type".to_string(),
-                    content_type.to_mime_type_string(),
-                ));
-                assets.insert(path, (headers, content));
-            }
-        });
+    state::assets_and_hashes_mut(|assets, asset_hashes| {
+        for (path, content, content_encoding, content_type) in get_assets() {
+            asset_hashes.insert(path, sha2::Sha256::digest(content).into());
+            let mut headers = match content_encoding {
+                ContentEncoding::Identity => vec![],
+                ContentEncoding::GZip => {
+                    vec![("Content-Encoding".to_string(), "gzip".to_string())]
+                }
+            };
+            headers.push((
+                "Content-Type".to_string(),
+                content_type.to_mime_type_string(),
+            ));
+            assets.insert(path, (headers, content));
+        }
     });
 }
 

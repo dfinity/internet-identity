@@ -1,4 +1,5 @@
 import { Principal } from "@dfinity/principal";
+import { wrapError } from "../../utils/utils";
 
 const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
 const MAX_ALTERNATIVE_ORIGINS = 10;
@@ -102,7 +103,9 @@ export const validateDerivationOrigin = async (
   } catch (e) {
     return {
       result: "invalid",
-      message: `An error occurred while validating the derivationOrigin "${derivationOrigin}": ${e.message}`,
+      message: `An error occurred while validating the derivationOrigin "${derivationOrigin}": ${wrapError(
+        e
+      )}`,
     };
   }
 

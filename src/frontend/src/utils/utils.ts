@@ -103,3 +103,18 @@ export function iOSOrSafari(): boolean {
 export function unreachable(_: never): never {
   throw new Error("The impossible happened");
 }
+
+/* Wrap an unknown value as an error and try to extract a string from it */
+export function wrapError(err: unknown): string {
+  const unknownError = "unknown error";
+
+  if (err instanceof Error) {
+    return err.message;
+  }
+
+  if (typeof err === "string") {
+    return err;
+  }
+
+  return unknownError;
+}

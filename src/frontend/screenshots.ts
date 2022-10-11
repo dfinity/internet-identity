@@ -44,6 +44,15 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
       await visit(browser, `http://localhost:8080/${pageName}`);
     }
 
+    // When authenticating with alternative origins, toggle the chasm
+    if (pageName === "authenticateAlternative") {
+      await browser.$("#alternative-origin-chasm-toggle").click();
+      // Ensure the button is not hovered anymore for screenshot stability
+      await browser
+        .$("#alternative-origin-chasm-toggle")
+        .moveTo({ xOffset: -10, yOffset: -10 });
+    }
+
     await browser.execute('document.body.style.caretColor = "transparent"');
     await browser.saveScreenshot(`${screenshotsDir}/${pageName}.png`);
   }
@@ -114,7 +123,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
  */
 function readScreenshotsConfig(): {
   mobileEmulation?: {
-    deviceMetrics: { width: number; height: number };
+    deviceName: string;
   };
 } {
   const screenshotsType = process.env["SCREENSHOTS_TYPE"];
@@ -122,7 +131,7 @@ function readScreenshotsConfig(): {
     case "mobile":
       return {
         mobileEmulation: {
-          deviceMetrics: { width: 360, height: 667 },
+          deviceName: "iPhone SE",
         },
       };
       break;
