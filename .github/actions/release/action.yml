@@ -13,6 +13,6 @@ outputs:
   notes-file:
     description: The notes file
 runs:
-    using: 'node12'
+    using: 'node16'
     main: 'main.js'
     post: 'main.js'
