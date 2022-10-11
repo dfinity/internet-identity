@@ -11,24 +11,26 @@ cd "$SCRIPTS_DIR/.."
 #########
 
 function title() {
-    echo "Build Internet Identity"
+    echo "Builds Internet Identity and Archive Canisters"
 }
 
 function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies]
+  $0 [--only-dependencies] [--internet-identity] [--archive]
 
 Options:
-  --only-dependencies   only build rust dependencies (no js build, no wasm optimization)
+  --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
+  --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
 EOF
 }
 
 function help() {
     cat << EOF
 
-Builds the Internet Identity canister.
+Builds the Internet Identity and the Archive canister.
 
 NOTE: This requires a working rust toolchain as well as ic-cdk-optimizer.
 EOF
@@ -36,6 +38,7 @@ EOF
 }
 
 ONLY_DEPS=
+CANISTERS=()
 
 while [[ $# -gt 0  ]]
 do
@@ -50,6 +53,14 @@ do
             ONLY_DEPS=1
             shift
             ;;
+        --internet-identity)
+            CANISTERS+=("internet_identity")
+            shift
+            ;;
+        --archive)
+            CANISTERS+=("archive")
+            shift
+            ;;
         *)
             echo "ERROR: unknown argument $1"
             usage
@@ -60,6 +71,11 @@ do
     esac
 done
 
+# build everything by default
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity")
+fi
+
 # Checking for dependencies
 if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
 then
@@ -69,47 +85,74 @@ then
     exit 1
 fi
 
-if [ "$ONLY_DEPS" != "1" ]
-then
-    # Compile frontend assets to dist
-    echo Compiling frontend assets
-    npm run build
-fi
+# Builds a single canister
+# build_canister CANISTER EXTRA_BUILD_ARGS...
+# CANISTER: possible values: [internet_identity, archive]
+# EXTRA_BUILD_ARGS: extra arguments supplied to cargo when building the canister
+function build_canister() {
+    local canister=$1
+    shift
+    local extra_build_args=("$@")
 
-II_DIR="$PWD/src/internet_identity"
-TARGET="wasm32-unknown-unknown"
+    echo "Building $canister"
+    echo
 
-# standardize source references
-CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
-RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
+    SRC_DIR="$PWD/src/$canister"
+    TARGET="wasm32-unknown-unknown"
+    # standardize source references
+    CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
+    RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
 
-cargo_build_args=(
-    --manifest-path "$II_DIR/Cargo.toml"
-    --target "$TARGET"
-    --release
-    -j1
-    )
+    cargo_build_args=(
+        --manifest-path "$SRC_DIR/Cargo.toml"
+        --target "$TARGET"
+        --release
+        -j1
+        )
+    cargo_build_args+=("${extra_build_args[@]}")
 
-# This enables the "dummy_captcha" feature which makes sure the captcha string
-# is always "a".
-# WARNING: this MUST be opt-in, because we DO NOT want this in production,
-# EVAR.
-if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
-then
-    echo "USING DUMMY CAPTCHA"
-    cargo_build_args+=( --features dummy_captcha )
-fi
+    echo Running cargo build "${cargo_build_args[@]}"
+    echo RUSTFLAGS: "$RUSTFLAGS"
 
-echo Running cargo build "${cargo_build_args[@]}"
-echo RUSTFLAGS: "$RUSTFLAGS"
+    RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
 
-RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
+    if [ "$ONLY_DEPS" != "1" ]
+    then
+        CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$SRC_DIR/../../target/}"
 
-if [ "$ONLY_DEPS" != "1" ]
-then
-    CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$II_DIR/../../target/}"
+        ic-cdk-optimizer \
+            "$CARGO_TARGET_DIR/$TARGET/release/$canister.wasm" \
+            -o "./$canister.wasm"
+    fi
+}
 
-    ic-cdk-optimizer \
-        "$CARGO_TARGET_DIR/$TARGET/release/internet_identity.wasm" \
-        -o "./internet_identity.wasm"
-fi
+function build_internet_identity() {
+  if [ "$ONLY_DEPS" != "1" ]
+  then
+      # Compile frontend assets to dist
+      echo Compiling internet_identity frontend assets
+      npm run build
+  fi
+
+  # This enables the "dummy_captcha" feature which makes sure the captcha string
+  # is always "a".
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production,
+  # EVAR.
+  extra_build_args=()
+  if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
+  then
+      echo "USING DUMMY CAPTCHA"
+      extra_build_args+=( --features dummy_captcha )
+  fi
+  build_canister "internet_identity" "${extra_build_args[@]}"
+}
+
+for canister in "${CANISTERS[@]}"
+do
+  if [ "$canister" == "internet_identity" ]
+  then
+    build_internet_identity
+  else
+    build_canister "$canister"
+  fi
+done

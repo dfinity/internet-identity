@@ -44,6 +44,7 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
+COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
 COPY src/metrics_encoder/Cargo.toml src/metrics_encoder/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
@@ -51,6 +52,8 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \
     && touch src/internet_identity_interface/src/lib.rs \
+    && mkdir -p src/archive/src \
+    && touch src/archive/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
     && mkdir -p src/metrics_encoder/src \
@@ -58,7 +61,7 @@ RUN mkdir -p src/internet_identity/src \
     && ./scripts/build --only-dependencies \
     && rm -rf src
 
-FROM deps as build
+FROM deps as build_internet_identity
 
 COPY . .
 
@@ -75,5 +78,19 @@ RUN npm ci
 RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm
 
-FROM scratch AS scratch
-COPY --from=build /internet_identity.wasm /
+FROM deps as build_archive
+
+COPY . .
+
+RUN touch src/internet_identity_interface/src/lib.rs
+RUN touch src/archive/src/lib.rs
+RUN touch src/canister_tests/src/lib.rs
+
+RUN ./scripts/build --archive
+RUN sha256sum /archive.wasm
+
+FROM scratch AS scratch_internet_identity
+COPY --from=build_internet_identity /internet_identity.wasm /
+
+FROM scratch AS scratch_archive
+COPY --from=build_archive /archive.wasm /

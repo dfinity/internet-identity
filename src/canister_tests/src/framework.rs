@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime};
 /* The first few lines deal with actually getting the Wasm module(s) to test */
 
 lazy_static! {
-    /** The Wasm module for the current build, i.e. the one we're testing */
+    /** The Wasm module for the current II build, i.e. the one we're testing */
     pub static ref II_WASM: Vec<u8> = {
         let def_path = path::PathBuf::from("..").join("..").join("internet_identity.wasm");
         let err = format!("
@@ -33,7 +33,21 @@ lazy_static! {
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };
 
-    /** The Wasm module for the _previous_ build, or latest release, which is used when testing
+    /** The Wasm module for the current archive build, i.e. the one we're testing */
+    pub static ref ARCHIVE_WASM: Vec<u8> = {
+        let def_path = path::PathBuf::from("..").join("..").join("archive.wasm");
+        let err = format!("
+        Could not find Archive Wasm module for current build.
+
+        I will look for it at {:?}, and you can specify another path with the environment variable ARCHIVE_WASM (note that I run from {:?}).
+
+        In order to build the Wasm module, please run the following command:
+            ./scripts/build --archive
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        get_wasm_path("ARCHIVE_WASM".to_string(), &def_path).expect(&err)
+    };
+
+    /** The Wasm module for the _previous_ II build, or latest release, which is used when testing
      * upgrades and downgrades */
     pub static ref II_WASM_PREVIOUS: Vec<u8> = {
         let def_path = path::PathBuf::from("..").join("..").join("internet_identity_previous.wasm");
@@ -413,4 +427,85 @@ pub fn verify_delegation(
         &env.root_key(),
     )
     .expect("signature invalid");
+}
+
+pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
+    env.install_canister(wasm, encode_config(principal_1().0), None)
+        .unwrap()
+}
+
+pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
+    env.upgrade_canister(canister_id, wasm, encode_config(principal_1().0))
+        .unwrap()
+}
+
+fn encode_config(authorized_principal: Principal) -> Vec<u8> {
+    let config = types::ArchiveInit {
+        ii_canister: authorized_principal,
+        max_entries_per_call: 10,
+    };
+    candid::encode_one(config).expect("error encoding II installation arg as candid")
+}
+
+pub const USER_NUMBER_1: types::UserNumber = 100001;
+pub const USER_NUMBER_2: types::UserNumber = 100002;
+pub const USER_NUMBER_3: types::UserNumber = 100003;
+
+pub const TIMESTAMP_1: types::UserNumber = 999991;
+pub const TIMESTAMP_2: types::UserNumber = 999992;
+pub const TIMESTAMP_3: types::UserNumber = 999993;
+
+pub fn log_entry_1() -> types::Entry {
+    types::Entry {
+        timestamp: TIMESTAMP_1,
+        anchor: USER_NUMBER_1,
+        caller: principal_1().0,
+        operation: types::Operation::RegisterAnchor {
+            device: types::DeviceDataWithoutAlias {
+                pubkey: ByteBuf::from(PUBKEY_1),
+                credential_id: None,
+                purpose: types::Purpose::Authentication,
+                key_type: types::KeyType::Unknown,
+                protection: types::DeviceProtection::Unprotected,
+            },
+        },
+        sequence_number: 0,
+    }
+}
+
+pub fn log_entry_2() -> types::Entry {
+    types::Entry {
+        timestamp: TIMESTAMP_2,
+        anchor: USER_NUMBER_2,
+        caller: principal_1().0,
+        operation: types::Operation::AddDevice {
+            device: types::DeviceDataWithoutAlias {
+                pubkey: ByteBuf::from(PUBKEY_1),
+                credential_id: None,
+                purpose: types::Purpose::Authentication,
+                key_type: types::KeyType::Unknown,
+                protection: types::DeviceProtection::Unprotected,
+            },
+        },
+        sequence_number: 1,
+    }
+}
+
+pub fn log_entry(idx: u64, timestamp: u64, anchor: types::Anchor) -> types::Entry {
+    types::Entry {
+        timestamp,
+        anchor,
+        caller: PrincipalId::new_user_test_id(idx).0,
+        operation: types::Operation::UpdateDevice {
+            device: ByteBuf::from(PUBKEY_1),
+            new_values: types::DeviceDataUpdate {
+                alias: None,
+                credential_id: None,
+                purpose: Some(types::Purpose::Authentication),
+                key_type: None,
+                protection: Some(types::DeviceProtection::Unprotected),
+            },
+        },
+        sequence_number: idx,
+    }
 }

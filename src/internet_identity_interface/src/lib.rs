@@ -3,6 +3,7 @@ use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
 
 pub type UserNumber = u64;
+pub type Anchor = UserNumber;
 pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
 pub type DeviceKey = PublicKey;
@@ -178,4 +179,90 @@ pub struct InternetIdentityInit {
 pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
+}
+
+// Archive specific types
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub enum Operation {
+    #[serde(rename = "register_anchor")]
+    RegisterAnchor { device: DeviceDataWithoutAlias },
+    #[serde(rename = "add_device")]
+    AddDevice { device: DeviceDataWithoutAlias },
+    #[serde(rename = "update_device")]
+    UpdateDevice {
+        device: PublicKey,
+        new_values: DeviceDataUpdate,
+    },
+    #[serde(rename = "remove_device")]
+    RemoveDevice { device: PublicKey },
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct Entry {
+    // store anchor in LogEntry, such that anchor operations can be attributed to an anchor without consulting the index.
+    pub anchor: Anchor,
+    pub operation: Operation,
+    pub timestamp: Timestamp,
+    pub caller: Principal,
+    // global sequence number to detect lost messages (if any)
+    pub sequence_number: u64,
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct DeviceDataWithoutAlias {
+    pub pubkey: DeviceKey,
+    pub credential_id: Option<CredentialId>,
+    pub purpose: Purpose,
+    pub key_type: KeyType,
+    pub protection: DeviceProtection,
+}
+
+// If present, the attribute has been changed to the value given.
+// Does not include the pubkey because it cannot be changed.
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct DeviceDataUpdate {
+    pub alias: Option<Private>,
+    pub credential_id: Option<CredentialId>,
+    pub purpose: Option<Purpose>,
+    pub key_type: Option<KeyType>,
+    pub protection: Option<DeviceProtection>,
+}
+
+// Placeholder for information that has been hidden for privacy reasons.
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub enum Private {
+    #[serde(rename = "redacted")]
+    Redacted,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct Entries {
+    // make this a vec of options to keep Entry extensible
+    pub entries: Vec<Option<Entry>>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct AnchorEntries {
+    // make this a vec of options to keep Entry extensible
+    pub entries: Vec<Option<Entry>>,
+    // cursor pointing to the next entry not included in this response, if any
+    pub cursor: Option<Cursor>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub enum Cursor {
+    // timestamp of the next entry not included in this response, if any
+    #[serde(rename = "timestamp")]
+    Timestamp { timestamp: Timestamp },
+    // index of the next entry not included in this response, if any
+    #[serde(rename = "next_token")]
+    NextToken { next_token: ByteBuf },
+}
+
+/// Init arguments of the archive canister.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct ArchiveInit {
+    pub ii_canister: Principal,
+    pub max_entries_per_call: u16,
 }

@@ -35,7 +35,7 @@ jobs:
           outputs: type=cacheonly
           target: deps
 
-  docker-build:
+  docker-build-ii:
     runs-on: ubuntu-latest
     needs: docker-build-base
     strategy:
@@ -83,6 +83,7 @@ jobs:
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
+          target: scratch_internet_identity
 
       - run: sha256sum out/internet_identity.wasm
       - run: mv out/internet_identity.wasm ${{ matrix.name }}
@@ -95,9 +96,39 @@ jobs:
           # downloaded file
           path: ${{ matrix.name }}
 
+  docker-build-archive:
+    runs-on: ubuntu-latest
+    needs: docker-build-base
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build Archive Canister
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile
+          cache-from: type=gha,scope=cached-stage
+          # Exports the artefacts from the final stage
+          outputs: ./out
+          target: scratch_archive
+
+      - run: mv out/archive.wasm archive.wasm
+      - run: sha256sum archive.wasm
+      - name: 'Upload archive.wasm'
+        uses: actions/upload-artifact@v2
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: archive.wasm
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: archive.wasm
+
   wasm-size:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: docker-build-ii
     steps:
       - uses: actions/checkout@v2
       - name: 'Download wasm'
@@ -154,7 +185,7 @@ jobs:
   # (note: this runs _all_ cargo tests)
   canister-tests:
     runs-on: ${{ matrix.os }}
-    needs: docker-build
+    needs: [docker-build-ii, docker-build-archive]
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
@@ -185,10 +216,16 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src/**/Cargo.toml', 'rust-toolchain.toml') }}-3
 
-      - name: 'Download wasm'
+      - name: 'Download II wasm'
         uses: actions/download-artifact@v2
         with:
           name: internet_identity_test.wasm
+          path: .
+
+      - name: 'Download archive wasm'
+        uses: actions/download-artifact@v2
+        with:
+          name: archive.wasm
           path: .
 
         # For each file involved in the build, set the mtime back to the commit date of the last edit. This means we get
@@ -237,7 +274,7 @@ jobs:
 
   selenium:
     runs-on: ubuntu-latest
-    needs: [docker-build, test-app-build]
+    needs: [docker-build-ii, test-app-build]
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
@@ -321,7 +358,7 @@ jobs:
 
   using-dev-build:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: docker-build-ii
     steps:
       - uses: actions/checkout@v2
 
@@ -401,7 +438,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build
+    needs: docker-build-ii
     steps:
       - uses: actions/checkout@v2
 
@@ -436,7 +473,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build
+    needs: docker-build-ii
 
     steps:
       - uses: actions/checkout@v2
@@ -487,7 +524,7 @@ jobs:
   clean-build:
     runs-on: ${{ matrix.os }}
     if: ${{ github.ref == 'refs/heads/main' }}
-    needs: docker-build
+    needs: docker-build-ii
     strategy:
       matrix:
         os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-11, macos-12 ]
