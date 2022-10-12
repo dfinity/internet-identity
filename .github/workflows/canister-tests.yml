@@ -535,6 +535,15 @@ jobs:
         with:
           name: internet_identity_production.wasm
           path: .
+      # Install recent bash (default bash 3 is lacking important features)
+      - run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          brew update
+          brew install bash
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo bash --version
+          bash --version
+        if: ${{ startsWith(matrix.os, 'mac') }}
       - run: |
           sha256=$(shasum -a 256 ./internet_identity_production.wasm | cut -d ' ' -f1)
           echo "::set-output name=sha256::$sha256"
