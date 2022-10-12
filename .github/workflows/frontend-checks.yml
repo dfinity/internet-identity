@@ -7,7 +7,7 @@ jobs:
   frontend-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
       - run: npm ci
       - name: Run ESLint
@@ -24,7 +24,7 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
       - run: rm -v -f screenshots/${{ matrix.device }}*.png
       - run: npm ci
@@ -46,7 +46,7 @@ jobs:
           shasum -a 256 screenshots/${{ matrix.device }}/*.png | sort -k2 # sort by 2nd column (filename)
 
       - name: Upload screenshots
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: e2e-screenshots-${{ matrix.device }}
           path: screenshots/${{ matrix.device }}/*.png
@@ -62,7 +62,7 @@ jobs:
     needs: screenshots
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           # set a PAT so that add-and-commit can trigger CI runs
           token: ${{ secrets.GIX_BOT_PAT }}
@@ -71,13 +71,13 @@ jobs:
       - run: rm -v -f screenshots/*.png
 
       # Download the desktop screenshots artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: e2e-screenshots-desktop
           path: screenshots/desktop
 
       # Download the mobile screenshots artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: e2e-screenshots-mobile
           path: screenshots/mobile

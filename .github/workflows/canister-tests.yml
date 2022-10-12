@@ -17,16 +17,16 @@ jobs:
   docker-build-base:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # We use buildx and its GitHub Actions caching support `type=gha`. For
       # more information, see
       # https://github.com/docker/build-push-action/issues/539
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Build base Docker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           file: Dockerfile
@@ -66,13 +66,13 @@ jobs:
             II_DUMMY_AUTH: 1
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Build ${{ matrix.name }}
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           file: Dockerfile
@@ -88,7 +88,7 @@ jobs:
       - run: sha256sum out/internet_identity.wasm
       - run: mv out/internet_identity.wasm ${{ matrix.name }}
       - name: 'Upload ${{ matrix.name }}'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
@@ -100,13 +100,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Build Archive Canister
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           file: Dockerfile
@@ -118,7 +118,7 @@ jobs:
       - run: mv out/archive.wasm archive.wasm
       - run: sha256sum archive.wasm
       - name: 'Upload archive.wasm'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           # name is the name used to display and retrieve the artifact
           name: archive.wasm
@@ -130,9 +130,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-ii
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
           path: .
@@ -155,8 +155,8 @@ jobs:
   test-app-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
@@ -169,7 +169,7 @@ jobs:
         working-directory: demos/test-app
         run: ./build.sh
       - name: 'Upload test app'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           # name is the name used to display and retrieve the artifact
           name: test_app.wasm
@@ -190,7 +190,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           # Pull a deep copy so that we can set meaningful timestamps across builds, based on the commit history
           fetch-depth: '0'
@@ -205,7 +205,7 @@ jobs:
         # due to the mtime changing on the checkout. Can be worked around by storing
         # the original mtime in the cache and by hashing all of src/canister_tests
         # (and then restoring the mtime).
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           # note on paths: we include the whole ~/.cargo/. (as opposed to just .cargo/git, etc.) because cargo stores crate
           # data as .crates(2?).{json,toml} without which the whole cache is invalidated. We may accumulate unnecessary
@@ -217,13 +217,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src/**/Cargo.toml', 'rust-toolchain.toml') }}-3
 
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_test.wasm
           path: .
 
       - name: 'Download archive wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: archive.wasm
           path: .
@@ -282,7 +282,7 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-dfx
@@ -301,13 +301,13 @@ jobs:
         run: dfx start --background
 
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_test.wasm
           path: .
 
       - name: 'Download test app wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: test_app.wasm
           path: demos/test-app
@@ -343,14 +343,14 @@ jobs:
 
       - name: Archive test logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: e2e-test-log-${{ matrix.device }}
           path: ./*.log
 
       - name: Archive test failures
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: e2e-test-failures-${{ matrix.device }}
           path: test-failures/*
@@ -360,7 +360,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-ii
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - run: |
           sudo apt-get update
@@ -381,7 +381,7 @@ jobs:
           dfx start --background
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_dev.wasm
           path: .
@@ -440,13 +440,13 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/release-')
     needs: docker-build-ii
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: 'Install dfx'
         run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
           path: .
@@ -476,22 +476,22 @@ jobs:
     needs: docker-build-ii
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_test.wasm
           path: .
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_dev.wasm
           path: .
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
           path: .
@@ -529,9 +529,9 @@ jobs:
       matrix:
         os: [ ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-11, macos-12 ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: 'Download wasm'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
           path: .
