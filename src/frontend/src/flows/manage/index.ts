@@ -1,6 +1,7 @@
-import { render, html } from "lit-html";
+import { TemplateResult, render, html } from "lit-html";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
+import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
@@ -42,7 +43,12 @@ const numAuthenticators = (devices: DeviceData[]) =>
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
+const pageContent = (
+  userNumber: bigint,
+  devices: DeviceData[],
+  onAddDevice: (next: "canceled" | "local" | "remote") => void,
+  onAddRecovery: () => void
+): TemplateResult => html`
   <section class="l-container c-card c-card--highlight">
     <hgroup>
       <h1 class="t-title t-title--main">Anchor Management</h1>
@@ -50,12 +56,29 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
         You can view and manage this Identity Anchor and its added devices here.
       </p>
     </hgroup>
-    ${!hasRecoveryDevice(devices) ? recoveryNag() : undefined}
-    <aside class="l-stack">
-      <h2 class="t-title">Identity Anchor</h2>
-      <output class="c-input c-input--vip c-input--readonly t-vip" aria-label="User Number" data-usernumber>${userNumber}</output>
-    </aside>
+    ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
+    ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
+    ${recoverySection(devices, onAddRecovery)} ${logoutSection()} ${navbar}
+  </section>
+  ${footer}
+`;
 
+const anchorSection = (userNumber: bigint): TemplateResult => html`
+  <aside class="l-stack">
+    <h2 class="t-title">Identity Anchor</h2>
+    <output
+      class="c-input c-input--vip c-input--readonly t-vip"
+      aria-label="User Number"
+      data-usernumber
+      >${userNumber}</output
+    >
+  </aside>
+`;
+
+const devicesSection = (
+  devices: DeviceData[],
+  onAddDevice: (next: "canceled" | "local" | "remote") => void
+): TemplateResult => html`
     <aside class="l-stack">
       <div class="t-title t-title--complications">
         <h2 class="t-title">Added devices</h2>
@@ -69,6 +92,7 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
         <button
           ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
           class="t-title__complication t-title__complication--end c-tooltip c-tooltip--onDisabled"
+          @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
           id="addAdditionalDevice"
         >
           <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
@@ -81,36 +105,37 @@ const pageContent = (userNumber: bigint, devices: DeviceData[]) => html`
           </span>
         </button>
       </div>
-
       <div id="deviceList" class="c-action-list"></div>
     </aside>
-
-    <aside class="l-stack">
-      ${
-        !hasRecoveryDevice(devices)
-          ? undefined
-          : html`
-              <div class="t-title t-title--complications">
-                <h2>Recovery mechanisms</h2>
-                <button
-                  class="t-title__complication t-title__complication--end"
-                  id="addRecovery"
-                >
-                  <i class="t-link__icon" aria-hidden>+</i>
-                  <span class="t-link t-link--discreet"
-                    >Add recovery mechanism</span
-                  >
-                </button>
-              </div>
-              <div id="recoveryList" class="c-action-list"></div>
-            `
-      }
-    </aside>
-    
-    ${logoutSection()} ${navbar}
-  </section>
-  ${footer}
 `;
+
+const recoverySection = (
+  devices: DeviceData[],
+  onAddRecovery: () => void
+): TemplateResult => {
+  return html`
+    <aside class="l-stack">
+      ${!hasRecoveryDevice(devices)
+        ? undefined
+        : html`
+            <div class="t-title t-title--complications">
+              <h2>Recovery mechanisms</h2>
+              <button
+                @click="${onAddRecovery}"
+                class="t-title__complication t-title__complication--end"
+                id="addRecovery"
+              >
+                <i class="t-link__icon" aria-hidden>+</i>
+                <span class="t-link t-link--discreet"
+                  >Add recovery mechanism</span
+                >
+              </button>
+            </div>
+            <div id="recoveryList" class="c-action-list"></div>
+          `}
+    </aside>
+  `;
+};
 
 const deviceListItem = (device: DeviceData) => html`
   <div class="c-action-list__label">${device.alias}</div>
@@ -124,11 +149,17 @@ const deviceListItem = (device: DeviceData) => html`
   </button>
 `;
 
-const recoveryNag = () =>
+const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({
     title: "Recovery Mechanism",
     message: "Add a recovery mechanism to help protect this Identity Anchor.",
-    slot: html`<button id="addRecovery" class="c-button">Add Recovery</button>`,
+    slot: html`<button
+      @click="${onAddRecovery}"
+      id="addRecovery"
+      class="c-button"
+    >
+      Add Recovery
+    </button>`,
   });
 
 // Get the list of devices from canister and actually display the page
@@ -159,51 +190,34 @@ export const displayManage = (
   devices: DeviceData[]
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber, devices), container);
-  init(userNumber, connection, devices);
-};
-
-// Initializes the management page.
-const init = (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  devices: DeviceData[]
-) => {
-  // TODO - Check alias for current identity, and populate #nameSpan
-
-  // Add the buttons for adding devices and recovery mechanism
-
-  // Add device
-  const addAdditionalDeviceButton = document.querySelector(
-    "#addAdditionalDevice"
-  ) as HTMLButtonElement;
-  addAdditionalDeviceButton.onclick = async () => {
-    const nextAction = await chooseDeviceAddFlow();
-    if (nextAction === null) {
-      // user clicked 'cancel'
-      await renderManage(userNumber, connection);
-      return;
-    }
-    switch (nextAction) {
-      case "local": {
-        await addLocalDevice(userNumber, connection, devices);
-        return;
+  const template = pageContent(
+    userNumber,
+    devices,
+    async (nextAction) => {
+      switch (nextAction) {
+        case "canceled": {
+          await renderManage(userNumber, connection);
+          break;
+        }
+        case "local": {
+          await addLocalDevice(userNumber, connection, devices);
+          return;
+        }
+        case "remote": {
+          await pollForTentativeDevice(userNumber, connection);
+          return;
+        }
+        default:
+          unreachable(nextAction);
+          break;
       }
-      case "remote": {
-        await pollForTentativeDevice(userNumber, connection);
-        return;
-      }
+    },
+    async () => {
+      await setupRecovery(userNumber, connection);
+      renderManage(userNumber, connection);
     }
-  };
-
-  // Add recovery
-  const setupRecoveryButton = document.querySelector(
-    "#addRecovery"
-  ) as HTMLButtonElement;
-  setupRecoveryButton.onclick = async () => {
-    await setupRecovery(userNumber, connection);
-    renderManage(userNumber, connection);
-  };
+  );
+  render(template, container);
   renderDevices(userNumber, connection, devices);
 };
 
