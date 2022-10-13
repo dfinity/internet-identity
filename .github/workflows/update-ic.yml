@@ -10,7 +10,7 @@ jobs:
   ic-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
         # First, iterate over all Cargo.toml files and check against IC GitHub for new commits.
       - name: Check new ic version
