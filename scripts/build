@@ -71,7 +71,7 @@ do
     esac
 done
 
-# build everything by default
+# build II by default
 if [ ${#CANISTERS[@]} -eq 0 ]; then
     CANISTERS=("internet_identity")
 fi

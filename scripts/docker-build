@@ -108,13 +108,13 @@ do
             echo "ERROR: unknown argument $1"
             usage
             echo
-            echo "Use 'docker-build --help' for more information"
+            echo "Use '$0 --help' for more information"
             exit 1
             ;;
     esac
 done
 
-# build everything by default
+# build II by default
 if [ ${#CANISTER[@]} -eq 0 ]; then
     CANISTER=("internet_identity")
 fi
