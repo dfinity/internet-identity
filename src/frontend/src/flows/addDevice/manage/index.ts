@@ -51,13 +51,15 @@ export type DeviceAddFlow = "local" | "remote";
  * - adding a local authenticator (e.g. a Yubikey attached to the computer) -> if chosen flow is continued with {@link addLocalDevice}
  * - adding a new remote device (e.g. a different computer with platform biometrics) -> if chosen flow is continued with {@link pollForTentativeDevice}
  */
-export const chooseDeviceAddFlow = async (): Promise<DeviceAddFlow | null> => {
+export const chooseDeviceAddFlow = async (): Promise<
+  DeviceAddFlow | "canceled"
+> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init();
 };
 
-const init = (): Promise<DeviceAddFlow | null> =>
+const init = (): Promise<DeviceAddFlow | "canceled"> =>
   new Promise((resolve) => {
     const localDeviceFlow = document.getElementById(
       "local"
@@ -70,5 +72,5 @@ const init = (): Promise<DeviceAddFlow | null> =>
     ) as HTMLButtonElement;
     localDeviceFlow.onclick = () => resolve("local");
     remoteDeviceFlow.onclick = () => resolve("remote");
-    cancel.onclick = () => resolve(null);
+    cancel.onclick = () => resolve("canceled");
   });
