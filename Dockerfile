@@ -85,6 +85,7 @@ COPY . .
 RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/archive/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
+RUN touch src/metrics_encoder/src/lib.rs
 
 RUN ./scripts/build --archive
 RUN sha256sum /archive.wasm

@@ -17,7 +17,11 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0
+  $0 [--internet-identity] [--archive]
+
+Options:
+  --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
 
 Environment:
   II_FETCH_ROOT_KEY     When set to "1", enable the "II_FETCH_ROOT_KEY" feature.
@@ -51,9 +55,13 @@ function check_feature() {
     fi
 }
 
+# Builds a single canister using docker
+# build_canister CANISTER
+# CANISTER: possible values: [internet_identity, archive]
 function build() {
-    image_name="internet-identity"
-    docker_build_args=( --target scratch_internet_identity )
+    image_name="ii-docker-build"
+    canister="$1"
+    docker_build_args=( --target "scratch_$canister" )
 
     check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
     check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
@@ -70,7 +78,7 @@ function build() {
     set +x
 
     echo "Copying build output from $tmp_outdir to $PWD"
-    cp "$tmp_outdir/internet_identity.wasm" .
+    cp "$tmp_outdir/$canister.wasm" .
 
     echo "Removing $tmp_outdir"
     rm -rf "$tmp_outdir"
@@ -78,23 +86,40 @@ function build() {
 
 # ARGUMENT PARSING
 
+CANISTERS=()
 while [[ $# -gt 0 ]]
 do
     case $1 in
-        --help)
+        -h|--help)
             title
             usage
             help
             exit 0
             ;;
+        --internet-identity)
+            CANISTERS+=("internet_identity")
+            shift
+            ;;
+        --archive)
+            CANISTERS+=("archive")
+            shift
+            ;;
         *)
             echo "ERROR: unknown argument $1"
             usage
             echo
-            echo "Use 'release --help' for more information."
+            echo "Use '$0 --help' for more information"
             exit 1
             ;;
     esac
 done
 
-build
+# build II by default
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity")
+fi
+
+for canister in "${CANISTERS[@]}"
+do
+    build "$canister"
+done
