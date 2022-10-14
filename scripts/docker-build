@@ -86,7 +86,7 @@ function build() {
 
 # ARGUMENT PARSING
 
-CANISTER=()
+CANISTERS=()
 while [[ $# -gt 0 ]]
 do
     case $1 in
@@ -97,11 +97,11 @@ do
             exit 0
             ;;
         --internet-identity)
-            CANISTER+=("internet_identity")
+            CANISTERS+=("internet_identity")
             shift
             ;;
         --archive)
-            CANISTER+=("archive")
+            CANISTERS+=("archive")
             shift
             ;;
         *)
@@ -115,11 +115,11 @@ do
 done
 
 # build II by default
-if [ ${#CANISTER[@]} -eq 0 ]; then
-    CANISTER=("internet_identity")
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity")
 fi
 
-for canister in "${CANISTER[@]}"
+for canister in "${CANISTERS[@]}"
 do
     build "$canister"
 done
