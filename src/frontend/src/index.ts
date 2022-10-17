@@ -11,6 +11,7 @@ import { showWarningIfNecessary } from "./banner";
 import { authorizeAuthentication } from "./flows/authenticate";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
+import { blockMigration } from "./utils/migrating";
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -73,6 +74,7 @@ const init = async () => {
     }
     // Open the management page
     case "manage": {
+      await blockMigration();
       // Go through the login flow, potentially creating an anchor.
       const { userNumber, connection: authenticatedConnection } = await login(
         connection

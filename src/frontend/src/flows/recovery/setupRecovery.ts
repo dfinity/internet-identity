@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { blockMigration } from "../../utils/migrating";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
@@ -16,6 +17,7 @@ export const setupRecovery = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
+  await blockMigration();
   const devices = await connection.lookupAll(userNumber);
   const recoveryMechanism = await chooseRecoveryMechanism(devices);
   if (recoveryMechanism === null) {

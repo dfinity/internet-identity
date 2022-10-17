@@ -2,6 +2,7 @@ import { LoginFlowResult } from "../flows/login/flowResult";
 import { register } from "../flows/register";
 import { registerDisabled } from "../flows/registerDisabled";
 import { Connection } from "../utils/iiConnection";
+import { blockMigration } from "../utils/migrating";
 
 /** Check that the current origin is not the explicit canister id or a raw url.
  *  Explanation why we need to do this:
@@ -16,5 +17,6 @@ function isRegistrationAllowed() {
 export const registerIfAllowed = async (
   connection: Connection
 ): Promise<LoginFlowResult | null> => {
+  await blockMigration();
   return isRegistrationAllowed() ? register(connection) : registerDisabled();
 };
