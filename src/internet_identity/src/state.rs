@@ -106,8 +106,14 @@ pub struct Challenge {
     pub challenge_key: ChallengeKey,
 }
 
+#[derive(Clone, Debug, Default, CandidType, Deserialize)]
+pub struct ArchiveInfo {
+    pub expected_module_hash: Option<[u8; 32]>,
+    pub state: ArchiveState,
+}
+
 /// State of the archive canister.
-#[derive(Eq, PartialEq, Clone, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
 pub enum ArchiveState {
     NotCreated,
     CreationInProgress,
@@ -121,7 +127,7 @@ impl Default for ArchiveState {
 }
 
 /// Management metadata about the archive.
-#[derive(Eq, PartialEq, Clone, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
 pub struct ArchiveData {
     // Sequence number of anchor operations. Using this sequence number missing entries / reliability
     // can be assessed without having explicit error handling on the II side.
@@ -133,7 +139,7 @@ pub struct ArchiveData {
 #[derive(Clone, Default, CandidType, Deserialize)]
 pub struct PersistentStateV1 {
     // Information related to the archive
-    pub archive_info: ArchiveState,
+    pub archive_info: ArchiveInfo,
 }
 
 struct State {
@@ -289,15 +295,25 @@ pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
 }
 
 pub fn archive_ready() -> bool {
-    STATE.with(|s| match s.persistent_state.borrow().archive_info {
+    STATE.with(|s| match s.persistent_state.borrow().archive_info.state {
         ArchiveState::Created(_) => true,
         _ => false,
     })
 }
 
+pub fn expected_archive_hash() -> Option<[u8; 32]> {
+    STATE.with(|s| {
+        s.persistent_state
+            .borrow()
+            .archive_info
+            .expected_module_hash
+            .clone()
+    })
+}
+
 pub fn archive_data() -> ArchiveData {
     STATE.with(|s| {
-        if let ArchiveState::Created(ref data) = s.persistent_state.borrow().archive_info {
+        if let ArchiveState::Created(ref data) = s.persistent_state.borrow().archive_info.state {
             data.clone()
         } else {
             trap("no archive deployed")
@@ -307,7 +323,9 @@ pub fn archive_data() -> ArchiveData {
 
 pub fn increment_archive_seq_nr() {
     STATE.with(|s| {
-        if let ArchiveState::Created(ref mut data) = s.persistent_state.borrow_mut().archive_info {
+        if let ArchiveState::Created(ref mut data) =
+            s.persistent_state.borrow_mut().archive_info.state
+        {
             data.sequence_number += 1;
         } else {
             trap("no archive deployed")

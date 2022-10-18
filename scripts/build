@@ -144,11 +144,6 @@ function build_internet_identity() {
       echo "USING DUMMY CAPTCHA"
       extra_build_args+=( --features dummy_captcha )
   fi
-  if [ "${II_ARCHIVE:-}" == "1" ]
-  then
-      echo "USING ARCHIVE"
-      extra_build_args+=( --features archive )
-  fi
   build_canister "internet_identity" "${extra_build_args[@]}"
 }
 

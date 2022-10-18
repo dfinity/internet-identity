@@ -249,4 +249,20 @@ pub fn stats(
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.
-pub mod compat {}
+pub mod compat {
+    use super::*;
+    use candid::{CandidType, Deserialize};
+
+    #[derive(Clone, Debug, CandidType, Deserialize)]
+    pub struct InternetIdentityStats {
+        pub assigned_user_number_range: (types::UserNumber, types::UserNumber),
+        pub users_registered: u64,
+    }
+
+    pub fn stats(
+        env: &StateMachine,
+        canister_id: CanisterId,
+    ) -> Result<InternetIdentityStats, CallError> {
+        framework::query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
+    }
+}

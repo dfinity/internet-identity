@@ -699,47 +699,56 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
 #[query]
 fn stats() -> InternetIdentityStats {
-    let archive = state::persistent_state(|persistent_state| {
-        if let ArchiveState::Created(ref data) = persistent_state.archive_info {
-            Some(data.archive_canister)
+    let archive_info = state::persistent_state(|persistent_state| {
+        if let ArchiveState::Created(ref data) = persistent_state.archive_info.state {
+            ArchiveInfo {
+                archive_canister: Some(data.archive_canister),
+                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
+            }
         } else {
-            None
+            ArchiveInfo {
+                archive_canister: None,
+                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
+            }
         }
     });
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_user_number_range(),
         users_registered: storage.user_count() as u64,
-        archive,
+        archive_info,
     })
 }
 
-#[cfg(not(feature = "archive"))]
-#[update]
-async fn deploy_archive(_wasm: ByteBuf) -> DeployArchiveResult {
-    DeployArchiveResult::CreationFailed("archive feature disabled".to_string())
-}
-
-#[cfg(feature = "archive")]
 #[update]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
+    if state::expected_archive_hash().is_none() {
+        return DeployArchiveResult::CreationFailed("archive deployment disabled".to_string());
+    }
     archive::deploy_archive(wasm).await
 }
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::storage_mut(|storage| {
-        if let Some(arg) = maybe_arg {
-            *storage = Storage::new(arg.assigned_user_number_range);
-        }
-        storage.flush();
-    });
 
+    if let Some(arg) = maybe_arg {
+        if let Some(range) = arg.assigned_user_number_range {
+            state::storage_mut(|storage| *storage = Storage::new(range));
+        }
+        if let Some(archive_hash) = arg.archive_module_hash {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
+            })
+        }
+    }
+
+    // make sure the fully initialized storage configuration is written to stable memory
+    state::storage(|storage| storage.flush());
     update_root_hash();
 }
 
 #[post_upgrade]
-fn retrieve_data() {
+fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     state::initialize_from_stable_memory();
 
@@ -748,6 +757,23 @@ fn retrieve_data() {
     update_root_hash();
     // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
     state::load_persistent_state();
+
+    if let Some(arg) = maybe_arg {
+        if let Some(range) = arg.assigned_user_number_range {
+            let current_range = state::storage(|storage| storage.assigned_user_number_range());
+            if range != current_range {
+                trap(&format!(
+                    "User number range cannot be changed. Current value: {:?}",
+                    current_range
+                ));
+            }
+        }
+        if let Some(archive_hash) = arg.archive_module_hash {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
+            })
+        }
+    }
 }
 
 #[pre_upgrade]

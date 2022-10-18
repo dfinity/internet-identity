@@ -41,6 +41,3 @@ regex = "1.5.6"
 # the dummy_captcha feature which ensures the captcha string is always "a"
 # (needed for tests)
 dummy_captcha = []
-# the archive feature which allows deploying an archive canister for anchor operations
-# (needed for tests)
-archive = []

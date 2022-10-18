@@ -111,7 +111,6 @@ frontend. -->
 | `II_FETCH_ROOT_KEY` | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |
 | `II_DUMMY_CAPTCHA` | When enabled, the CAPTCHA challenge (sent by the canister code to the frontend code) is always the known string `"a"`. This is useful for automated testing. |
 | `II_DUMMY_AUTH` | When enabled, the frontend code will use a known, stable private key for registering anchors and authenticating. This means that all anchors will have the same public key(s). In particular this bypasses the WebAuthn flows (TouchID, Windows Hello, etc), which simplifies automated testing. |
-| `II_ARCHIVE` | Enables support for the archive canister. When enabled, the archive canister can be deployed using the `deploy_archive` canister call of II. After successful deployment, II will record all anchor operations (register anchor and add, update, remove device). |
 
 ### Flavors
 
@@ -120,7 +119,7 @@ We offer some pre-built Wasm modules that contain flavors, i.e. sets of features
 | Flavor | Description | |
 | --- | --- | :---: |
 | Production | This is the production build deployed to https://identity.ic0.app. Includes none of the build features. | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm) |
-| Test | This flavor is used by Internet Identity's test suite. It fully supports authentication but uses a known CAPTCHA value for test automation. Includes the following features: <br><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li><li><code>II_ARCHIVE</code></li></ul> | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm) |
+| Test | This flavor is used by Internet Identity's test suite. It fully supports authentication but uses a known CAPTCHA value for test automation. Includes the following features: <br><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li></ul>| [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm) |
 | Development | This flavor contains a version of Internet Identity that effectively performs no checks. It can be useful for external developers who want to integrate Internet Identity in their project and care about the general Internet Identity authentication flow, without wanting to deal with authentication and, in particular, WebAuthentication. Includes the following features: <br><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li><li><code>II_DUMMY_AUTH</code></li></ul><br>See the [`using-dev-build`](demos/using-dev-build/README.md) project for an example on how to use this flavor.| [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm) |
 
 ## Getting Help

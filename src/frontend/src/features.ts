@@ -5,7 +5,6 @@ export const features = {
   FETCH_ROOT_KEY: process.env.II_FETCH_ROOT_KEY === "1",
   DUMMY_AUTH: process.env.II_DUMMY_AUTH === "1",
   DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA === "1",
-  ARCHIVE: process.env.II_ARCHIVE === "1",
 };
 
 export const anyFeatures = (): boolean => {

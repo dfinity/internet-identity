@@ -19,24 +19,79 @@ fn ii_canister_can_be_installed() {
     api::health_check(&env, canister_id);
 }
 
-#[test]
-fn ii_upgrade_works() {
-    let env = StateMachine::new();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-    api::health_check(&env, canister_id);
-}
+/// Tests for making sure that the current version can be upgrade to from the last release. This tests stable memory compatibility and pre / post install hooks.
+#[cfg(test)]
+mod upgrade_tests {
+    use super::*;
 
-#[test]
-fn ii_upgrade_retains_anchors() {
-    let env = StateMachine::new();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    let user_number = flows::register_anchor(&env, canister_id);
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    /// Basic upgrade test.
+    #[test]
+    fn ii_upgrade_works() {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        api::health_check(&env, canister_id);
+    }
 
-    let retrieved_device_data = api::lookup(&env, canister_id, user_number).expect("lookup failed");
+    /// Test to verify that anchors are kept across upgrades.
+    #[test]
+    fn ii_upgrade_retains_anchors() {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    assert_eq!(retrieved_device_data, vec![device_data_1()]);
+        let retrieved_device_data =
+            api::lookup(&env, canister_id, user_number).expect("lookup failed");
+
+        assert_eq!(retrieved_device_data, vec![device_data_1()]);
+    }
+
+    /// Test to verify that anchors number range cannot be changed on upgrade.
+    #[test]
+    fn ii_upgrade_should_not_allow_change_of_user_ranges() {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+
+        let result = upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((2000, 4000)),
+                archive_module_hash: None,
+            }),
+        );
+
+        expect_user_error_with_message(
+            result.map_err(|err| CallError::UserError(err)),
+            CanisterCalledTrap,
+            Regex::new("User number range cannot be changed. Current value: \\(\\d+, \\d+\\)")
+                .unwrap(),
+        );
+    }
+
+    /// Test to verify that the same anchor range is allowed on upgrade.
+    #[test]
+    fn ii_upgrade_should_allow_same_user_range() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+
+        let stats = api::compat::stats(&env, canister_id)?;
+
+        let result = upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some(stats.assigned_user_number_range),
+                archive_module_hash: None,
+            }),
+        );
+
+        assert!(result.is_ok());
+        Ok(())
+    }
 }
 
 /// Tests for making sure that any release can be rolled back. This tests stable memory compatibility and pre / post install hooks.
@@ -175,7 +230,8 @@ mod registration_tests {
             &env,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: (127, 129),
+                assigned_user_number_range: Some((127, 129)),
+                archive_module_hash: None,
             }),
         );
 
@@ -589,7 +645,8 @@ mod stable_memory_tests {
         assert_eq!(devices.len(), 4);
 
         let stats = api::stats(&env, canister_id)?;
-        assert!(stats.archive.is_none());
+        assert!(stats.archive_info.archive_canister.is_none());
+        assert!(stats.archive_info.expected_wasm_hash.is_none());
         Ok(())
     }
 
@@ -611,8 +668,14 @@ mod stable_memory_tests {
 
         let stats = api::stats(&env, canister_id)?;
         assert_eq!(
-            stats.archive.unwrap(),
+            stats.archive_info.archive_canister.unwrap(),
             Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap()
+        );
+
+        assert_eq!(
+            stats.archive_info.expected_wasm_hash.unwrap().to_vec(),
+            hex::decode("93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476")
+                .unwrap()
         );
         Ok(())
     }
@@ -1823,7 +1886,8 @@ mod http_tests {
             &env,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: (127, 129),
+                assigned_user_number_range: Some((127, 129)),
+                archive_module_hash: None,
             }),
         );
 

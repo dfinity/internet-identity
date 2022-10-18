@@ -1,7 +1,8 @@
 use crate::api;
 use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
-use candid::{parser::value::IDLValue, IDLArgs, Principal};
+use candid::Principal;
 use flate2::read::GzDecoder;
+use flate2::{Compression, GzBuilder};
 use ic_crypto_iccsa::types::SignatureBytes;
 use ic_crypto_iccsa::{public_key_bytes_from_der, verify};
 use ic_state_machine_tests::{
@@ -14,9 +15,11 @@ use internet_identity_interface as types;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use sha2::Digest;
+use sha2::Sha256;
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path;
 use std::time::{Duration, SystemTime};
 
@@ -120,11 +123,47 @@ pub fn install_ii_canister_with_arg(
     env.install_canister(wasm, byts, None).unwrap()
 }
 
+pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<types::InternetIdentityInit> {
+    let mut hasher = Sha256::new();
+    hasher.update(&wasm);
+    let wasm_hash: [u8; 32] = hasher.finalize().into();
+    Some(types::InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_module_hash: Some(wasm_hash),
+    })
+}
+
 pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
-    let nulls = vec![IDLValue::Null; 1];
-    let args = IDLArgs::new(&nulls);
-    let byts = args.to_bytes().unwrap();
-    env.upgrade_canister(canister_id, wasm, byts).unwrap()
+    upgrade_ii_canister_with_arg(env, canister_id, wasm, None).unwrap()
+}
+
+pub fn upgrade_ii_canister_with_arg(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    wasm: Vec<u8>,
+    arg: Option<types::InternetIdentityInit>,
+) -> Result<(), UserError> {
+    let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
+    env.upgrade_canister(canister_id, wasm, byts)
+}
+
+/// Utility function to create compressed stable memory backups for use in backup tests.
+pub fn save_compressed_stable_memory(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    path: &str,
+    decompressed_name: &str,
+) {
+    let file = File::create(path).expect("Failed to create stable memory file");
+    let mut encoder = GzBuilder::new()
+        .filename(decompressed_name)
+        .write(file, Compression::best());
+    encoder
+        .write(env.stable_memory(canister_id).as_slice())
+        .unwrap();
+    encoder.flush().unwrap();
+    let mut file = encoder.finish().unwrap();
+    file.flush().unwrap();
 }
 
 pub fn restore_compressed_stable_memory(env: &StateMachine, canister_id: CanisterId, path: &str) {

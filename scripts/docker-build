@@ -27,7 +27,6 @@ Environment:
   II_FETCH_ROOT_KEY     When set to "1", enable the "II_FETCH_ROOT_KEY" feature.
   II_DUMMY_CAPTCHA      When set to "1", enable the "II_DUMMY_CAPTCHA" feature.
   II_DUMMY_AUTH         When set to "1", enable the "II_DUMMY_AUTH" feature.
-  II_ARCHIVE            When set to "1", enable the "II_ARCHIVE" feature.
 EOF
 }
 
@@ -67,7 +66,6 @@ function build() {
     check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
     check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
     check_feature "dummyauth" "II_DUMMY_AUTH"
-    check_feature "archive" "II_ARCHIVE"
 
     docker_build_args+=(--tag "$image_name" .)
 

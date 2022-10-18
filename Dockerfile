@@ -68,7 +68,6 @@ COPY . .
 ARG II_FETCH_ROOT_KEY=
 ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
-ARG II_ARCHIVE=
 
 RUN touch src/internet_identity/src/lib.rs
 RUN touch src/internet_identity_interface/src/lib.rs

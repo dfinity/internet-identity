@@ -148,7 +148,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )
     })?;
     state::persistent_state(|persistent_state| {
-        if let ArchiveState::Created(ref data) = persistent_state.archive_info {
+        if let ArchiveState::Created(ref data) = persistent_state.archive_info.state {
             w.encode_gauge(
                 "internet_identity_archive_sequence_number",
                 data.sequence_number as f64,

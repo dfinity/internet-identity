@@ -172,14 +172,15 @@ pub struct HttpResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
-    pub assigned_user_number_range: (UserNumber, UserNumber),
+    pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
+    pub archive_module_hash: Option<[u8; 32]>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
-    pub archive: Option<Principal>,
+    pub archive_info: ArchiveInfo,
 }
 
 // Archive specific types
@@ -271,6 +272,13 @@ pub enum Cursor {
     // index of the next entry not included in this response, if any
     #[serde(rename = "next_token")]
     NextToken { next_token: ByteBuf },
+}
+
+/// Information about the archive.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct ArchiveInfo {
+    pub archive_canister: Option<Principal>,
+    pub expected_wasm_hash: Option<[u8; 32]>,
 }
 
 /// Init arguments of the archive canister.

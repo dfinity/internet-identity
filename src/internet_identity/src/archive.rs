@@ -13,26 +13,17 @@ use internet_identity_interface::{
     DeployArchiveResult::{CreationFailed, UpgradeFailed},
     DeviceDataUpdate, Entry, Operation, Private, UserNumber,
 };
-use lazy_static::lazy_static;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
 use CanisterInstallMode::Upgrade;
 
-lazy_static! {
-    static ref ARCHIVE_HASH: [u8; 32] =
-        hex::decode("d307df9b692b18f4e0fedc69106e9c5668bde7d461f94e938d366516bea96fb6")
-            .unwrap()
-            .try_into()
-            .unwrap();
-}
-
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     let archive_state = state::persistent_state_mut(|persistent_state| {
-        let archive_state = persistent_state.archive_info.clone();
+        let archive_state = persistent_state.archive_info.state.clone();
         if archive_state == ArchiveState::NotCreated {
             // lock archive creation because of async operation
-            persistent_state.archive_info = ArchiveState::CreationInProgress;
+            persistent_state.archive_info.state = ArchiveState::CreationInProgress;
         }
         archive_state
     });
@@ -54,7 +45,7 @@ async fn create_and_install_archive(wasm: Vec<u8>) -> DeployArchiveResult {
         Err(e) => {
             state::persistent_state_mut(|persistent_state| {
                 // unlock archive creation again
-                persistent_state.archive_info = ArchiveState::NotCreated
+                persistent_state.archive_info.state = ArchiveState::NotCreated
             });
             return CreationFailed(format!("failed to create archive: {:?}", e));
         }
@@ -62,7 +53,7 @@ async fn create_and_install_archive(wasm: Vec<u8>) -> DeployArchiveResult {
             let archive_canister_id = data.archive_canister;
             state::persistent_state_mut(|persistent_state| {
                 // safe archive info permanently
-                persistent_state.archive_info = ArchiveState::Created(data)
+                persistent_state.archive_info.state = ArchiveState::Created(data)
             });
             match install_archive(archive_canister_id, wasm).await {
                 Ok(()) => DeployArchiveResult::Success(archive_canister_id),
@@ -81,7 +72,7 @@ async fn create_archive() -> CallResult<ArchiveData> {
 }
 
 async fn install_archive(archive_canister: Principal, wasm_module: Vec<u8>) -> Result<(), String> {
-    verify_wasm_hash(&wasm_module)?;
+    let expected_hash = verify_wasm_hash(&wasm_module)?;
 
     let (archive_status,) = canister_status(CanisterIdRecord {
         canister_id: archive_canister,
@@ -92,7 +83,7 @@ async fn install_archive(archive_canister: Principal, wasm_module: Vec<u8>) -> R
     let module_hash = archive_status.module_hash;
     if module_hash
         .clone()
-        .map(|hash| hash == ARCHIVE_HASH.clone())
+        .map(|hash| hash == expected_hash.to_vec())
         .unwrap_or(false)
     {
         // Don't do anything further if the archive canister has the given module already installed
@@ -144,15 +135,17 @@ pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Opera
     state::increment_archive_seq_nr();
 }
 
-fn verify_wasm_hash(wasm_module: &Vec<u8>) -> Result<(), String> {
+fn verify_wasm_hash(wasm_module: &Vec<u8>) -> Result<[u8; 32], String> {
+    let expected_hash = state::expected_archive_hash().expect("bug: no wasm hash to check against");
+
     let mut hasher = Sha256::new();
     hasher.update(&wasm_module);
     let wasm_hash: [u8; 32] = hasher.finalize().into();
 
-    if wasm_hash != ARCHIVE_HASH.clone() {
+    if wasm_hash != expected_hash {
         return Err("invalid wasm module".to_string());
     }
-    Ok(())
+    Ok(expected_hash)
 }
 
 pub fn device_diff(old: &DeviceDataInternal, new: &DeviceDataInternal) -> DeviceDataUpdate {

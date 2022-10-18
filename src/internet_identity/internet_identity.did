@@ -122,11 +122,22 @@ type GetDelegationResponse = variant {
 type InternetIdentityStats = record {
   users_registered: nat64;
   assigned_user_number_range: record { nat64; nat64; };
-  archive: opt principal;
+  archive_info: ArchiveInfo;
+};
+
+// Information about the archive.
+type ArchiveInfo = record {
+    // Canister id of the archive or empty if no archive has been deployed yet.
+    archive_canister : opt principal;
+    // Expected hash of the archive wasm module. II will accept wasm modules hashing to this hash in the canister call
+    // deploy_archive. The actual installed archive wasm hash might be different if the archive has not yet been upgraded.
+    // When empty, deployment of the archive is disabled and II will not accept any wasm module.
+    expected_wasm_hash: opt blob;
 };
 
 type InternetIdentityInit = record {
-  assigned_user_number_range : record { nat64; nat64; };
+  assigned_user_number_range : opt record { nat64; nat64; };
+  archive_module_hash : opt blob;
 };
 
 type ChallengeKey = text;

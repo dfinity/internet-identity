@@ -50,7 +50,6 @@ jobs:
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_CAPTCHA: 0
             II_DUMMY_AUTH: 0
-            II_ARCHIVE: 0
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # selenium.
@@ -58,7 +57,6 @@ jobs:
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 0
-            II_ARCHIVE: 1
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
@@ -66,7 +64,6 @@ jobs:
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 1
-            II_ARCHIVE: 0
 
     steps:
       - uses: actions/checkout@v3
@@ -83,7 +80,6 @@ jobs:
             II_FETCH_ROOT_KEY=${{ matrix.II_FETCH_ROOT_KEY }}
             II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
-            II_ARCHIVE=${{ matrix.II_ARCHIVE }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
