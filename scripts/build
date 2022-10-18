@@ -109,7 +109,8 @@ function build_canister() {
         --release
         -j1
         )
-    cargo_build_args+=("${extra_build_args[@]}")
+    # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
+    cargo_build_args+=(${extra_build_args[@]+"${extra_build_args[@]}"})
 
     echo Running cargo build "${cargo_build_args[@]}"
     echo RUSTFLAGS: "$RUSTFLAGS"
@@ -144,7 +145,8 @@ function build_internet_identity() {
       echo "USING DUMMY CAPTCHA"
       extra_build_args+=( --features dummy_captcha )
   fi
-  build_canister "internet_identity" "${extra_build_args[@]}"
+  # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
+  build_canister "internet_identity" ${extra_build_args[@]+"${extra_build_args[@]}"}
 }
 
 for canister in "${CANISTERS[@]}"
