@@ -56,6 +56,7 @@ const LABEL_SIG: &[u8] = b"sig";
 
 #[update]
 async fn init_salt() {
+    trap("functionality disabled: II is currently under maintenance");
     state::init_salt().await;
 }
 
@@ -63,6 +64,7 @@ async fn init_salt() {
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 #[update]
 fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
+    trap("functionality disabled: II is currently under maintenance");
     let entries = state::anchor_devices(user_number);
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -91,6 +93,7 @@ fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
 
 #[update]
 fn exit_device_registration_mode(user_number: UserNumber) {
+    trap("functionality disabled: II is currently under maintenance");
     let entries = state::anchor_devices(user_number);
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -105,6 +108,7 @@ async fn add_tentative_device(
     user_number: UserNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
+    trap("functionality disabled: II is currently under maintenance");
     let verification_code = new_verification_code().await;
     let now = time();
 
@@ -140,6 +144,7 @@ async fn verify_tentative_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
+    trap("functionality disabled: II is currently under maintenance");
     match get_verified_device(user_number, user_verification_code) {
         Ok(device) => {
             add(user_number, device).await;
@@ -156,6 +161,7 @@ fn get_verified_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
+    trap("functionality disabled: II is currently under maintenance");
     let entries = state::anchor_devices(user_number);
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
@@ -225,6 +231,7 @@ fn prune_expired_tentative_device_registrations(
 
 #[update]
 async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    trap("functionality disabled: II is currently under maintenance");
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
@@ -254,6 +261,7 @@ async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -
 
 #[update]
 async fn add(user_number: UserNumber, device_data: DeviceData) {
+    trap("functionality disabled: II is currently under maintenance");
     const MAX_ENTRIES_PER_USER: usize = 10;
 
     let mut entries = state::anchor_devices(user_number);
@@ -325,6 +333,7 @@ fn mutate_device_or_trap(
 
 #[update]
 async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+    trap("functionality disabled: II is currently under maintenance");
     if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
@@ -342,6 +351,7 @@ async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: Dev
 
 #[update]
 async fn remove(user_number: UserNumber, device_key: DeviceKey) {
+    trap("functionality disabled: II is currently under maintenance");
     let mut entries = state::anchor_devices(user_number);
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
@@ -371,6 +381,7 @@ fn write_anchor_data(user_number: UserNumber, entries: Vec<DeviceDataInternal>) 
 
 #[update]
 async fn create_challenge() -> Challenge {
+    trap("functionality disabled: II is currently under maintenance");
     let mut rng = make_rng().await;
 
     prune_expired_signatures();
@@ -522,6 +533,7 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
+    trap("functionality disabled: II is currently under maintenance");
     let entries = state::anchor_devices(user_number);
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
