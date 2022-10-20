@@ -4,15 +4,6 @@ import { anyFeatures } from "./features";
 // Show a warning banner if the build is not "official". This happens if either the build
 // is a flavored build, or if the origin is not 'identity.ic0.app'.
 export const showWarningIfNecessary = (): void => {
-  showWarning(html`Internet Identity is moving to a new subnet and will be
-    partially unavailable on October 26th!
-    <a
-      class="features-warning-btn"
-      target="_blank"
-      rel="noopener noreferrer"
-      href="https://forum.dfinity.org/t/internet-identity-subnet-migration-on-october-26/15989"
-      >more</a
-    >`);
   const officialUrl = "https://identity.ic0.app";
   if (anyFeatures()) {
     showWarning(html`Test only. Do not use your regular anchor!
