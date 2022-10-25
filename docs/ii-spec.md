@@ -84,11 +84,15 @@ A user account is identified by a unique *Identity Anchor*, a smallish natural n
 
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet Computer.
 
-A user has a separate *user identity* for each client application frontend (i.e., per hostname). This identity is a [*self-authenticating id*](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the form
+A user has a separate *user identity* for each client application frontend (i.e., per hostname). This identity is a [*self-authenticating id*](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the [DER encoded canister signature public key](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures) which has the form
 
-    user_id = SHA-224(|ii_canister_id| · ii_canister_id · seed) · 0x02` (29 bytes)
+    user_id = SHA-224(DER encoded public key) · 0x02` (29 bytes)
 
-that is derived from a [canister signature](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) public "key" based on the `ii_canister_id` and a seed of the form
+and the `BIT STRING` field of the DER encoded public key has the form  
+  
+    bit_string = |ii_canister_id| · ii_canister_id · seed
+
+where the `seed` is derived as follows 
 
     seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 
