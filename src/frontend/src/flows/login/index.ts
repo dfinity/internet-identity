@@ -145,8 +145,8 @@ const pageContent = (
   `;
 
   const signup = html`
-    <div class="l-stack">
-      <p class="t-paragraph t-centered">
+    <div class="${!props.returning && "l-stack"}">
+      <p class="t-paragraph t-centered ${props.returning && "t-weak"}">
         An Identity Anchor is a unique ID that is used to authenticate yourself.
         You will be able to use it to log in to all kinds of apps.
       </p>
