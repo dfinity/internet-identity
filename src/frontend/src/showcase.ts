@@ -19,8 +19,7 @@ import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { showWarning } from "./banner";
 import { displayUserNumber } from "./flows/displayUserNumber";
-import { loginKnownAnchor } from "./flows/login/knownAnchor";
-import { loginUnknownAnchor } from "./flows/login/unknownAnchor";
+import { loginPage } from "./flows/login";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
@@ -114,8 +113,8 @@ const iiPages: Record<string, () => void> = {
   faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
-  loginKnownAnchor: () => loginKnownAnchor(userNumber, dummyConnection),
-  loginUnknownAnchor: () => loginUnknownAnchor(dummyConnection),
+  login: () => loginPage(dummyConnection),
+  loginReturn: () => loginPage(dummyConnection, BigInt(10002)),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
@@ -198,7 +197,7 @@ const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
   banner: () => {
-    loginUnknownAnchor(dummyConnection);
+    loginPage(dummyConnection);
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
