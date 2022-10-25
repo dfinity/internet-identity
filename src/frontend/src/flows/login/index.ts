@@ -15,13 +15,14 @@ import { unknownToString } from "../../utils/utils";
 import { useRecovery } from "../recovery/useRecovery";
 import { withLoader } from "../../components/loader";
 
-type PageOps =
-    {
+/** Data and callbacks used on the login page */
+type PageProps = {
   submit: (res: bigint) => void;
   addDevice: (userNumber: bigint | undefined) => void;
   recover: () => void;
   register: () => void;
-}
+  userNumber?: bigint;
+};
 
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
@@ -33,7 +34,24 @@ export const login = async (
 }> => {
   try {
     const userNumber = getUserNumber();
-    const x = await loginPage(connection, userNumber);
+    const x = await new Promise<LoginFlowResult>((resolve, reject) => {
+      loginPage({
+        submit: (userNumber) => doLogin(userNumber, connection).then(resolve),
+        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+        recover: () => useRecovery(connection),
+        register: () =>
+          registerIfAllowed(connection)
+            .then((res) => {
+              if (res === null) {
+                window.location.reload();
+              } else {
+                resolve(res);
+              }
+            })
+            .catch(reject),
+        userNumber,
+      });
+    });
 
     switch (x.tag) {
       case "ok": {
@@ -57,32 +75,15 @@ export const login = async (
   }
 };
 
-export const loginPage = async (
-  connection: Connection,
-  userNumber?: bigint
-): Promise<LoginFlowResult> =>
-  new Promise((resolve, reject) => {
-    const container = document.getElementById("pageContent") as HTMLElement;
-    const content = pageContent({
-      submit: (userNumber) => resolve(doLogin(userNumber, connection)),
-      addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
-      recover: () => useRecovery(connection),
-      register: () => 
-            registerIfAllowed(connection)
-              .then((res) => {
-                if (res === null) {
-                  window.location.reload();
-                } else {
-                  resolve(res);
-                }
-              })
-              .catch(reject),
-      userNumber,
-    });
-    render(content.template, container);
-  });
+export const loginPage = (props: PageProps): void => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  const content = pageContent(props);
+  render(content.template, container);
+};
 
-const pageContent = (props: PageOps & { userNumber?: bigint; }): {
+const pageContent = (
+  props: PageProps
+): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
 } => {

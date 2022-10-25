@@ -108,13 +108,30 @@ const dummyChallenge: Challenge = {
 const dummyIdentity: IdentifiableIdentity =
   undefined as unknown as IdentifiableIdentity;
 
+const login = (userNumber?: bigint): void =>
+  loginPage({
+    submit: (userNumber) => {
+      console.log("Submitted:", userNumber);
+    },
+    addDevice: (userNumber) => {
+      console.log("Add device:", userNumber);
+    },
+    recover: () => {
+      console.log("Recover");
+    },
+    register: () => {
+      console.log("Register");
+    },
+    userNumber,
+  });
+
 const iiPages: Record<string, () => void> = {
   displayUserNumber: () => displayUserNumber(userNumber),
   faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
-  login: () => loginPage(dummyConnection),
-  loginReturn: () => loginPage(dummyConnection, BigInt(10002)),
+  login: login,
+  loginReturn: () => login(BigInt(10002)),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
@@ -197,7 +214,7 @@ const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
   banner: () => {
-    loginPage(dummyConnection);
+    login();
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
