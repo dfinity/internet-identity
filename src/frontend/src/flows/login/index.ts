@@ -21,8 +21,13 @@ type PageProps = {
   addDevice: (userNumber: bigint | undefined) => void;
   recover: () => void;
   register: () => void;
-  userNumber?: bigint;
-};
+} & Returning;
+
+/** Type representing either a returning user (with saved anchor and function to clear
+ * said anchor) or a first time user */
+export type Returning =
+  | { returning: true; clearCache: () => void; userNumber: bigint }
+  | { returning: false };
 
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
@@ -34,6 +39,10 @@ export const login = async (
 }> => {
   try {
     const userNumber = getUserNumber();
+    const returning: Returning =
+      userNumber !== undefined
+        ? { returning: true, clearCache: () => {}, userNumber }
+        : { returning: false };
     const x = await new Promise<LoginFlowResult>((resolve, reject) => {
       loginPage({
         submit: (userNumber) => doLogin(userNumber, connection).then(resolve),
@@ -49,7 +58,7 @@ export const login = async (
               }
             })
             .catch(reject),
-        userNumber,
+        ...returning,
       });
     });
 
@@ -90,7 +99,7 @@ const pageContent = (
   const anchorInput = mkAnchorInput({
     inputId: "registerUserNumber",
     onSubmit: props.submit,
-    userNumber: props.userNumber,
+    userNumber: props.returning ? props.userNumber : undefined,
   });
 
   const clearAnchor = () => {
@@ -120,27 +129,45 @@ const pageContent = (
       <hgroup>
       <div class="l-stack">
         ${anchorInput.template}
-        <button @click="${anchorInput.submit}" type="button" id="loginButton" class="c-button">
+        <button @click="${
+          anchorInput.submit
+        }" type="button" id="loginButton" class="c-button">
           Authenticate
         </button>
-        <div style="text-align: right;">
+        <div style="t-centered">
           <span class="t-paragraph t-weak">
-            Lost access? <a @click=${props.recover} id="recoverButton" href="#" class="t-link">Recover Anchor </a><br/>
-            New device? <a @click=${addDeviceClick} id="addNewDeviceButton" href="#" class="t-link">Enroll it now </a><br/>
-            Fresh start? <a @click=${clearAnchor} href="#" class="t-link">Clear anchor</a><br/>
+            Lost access? <button @click=${
+              props.recover
+            } id="recoverButton" class="t-link">Recover Anchor </button> or <button @click=${addDeviceClick} id="addNewDeviceButton" class="t-link">Enroll Device</button><br/>
           </span>
         </div>
       </div>
     </article>
-      <div class="l-divider" aria-label="Other Options">
-      </div>
-      <p class="t-paragraph t-weak">
-An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
-      </p>
 
-    <button type="button" @click=${props.register} id="registerButton" class="c-button c-button--secondary">
+    <div class="l-divider" aria-label="Other Options">
+    </div>
+    <p class="t-paragraph t-weak">
+    New here? An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
+    </p>
+    <button type="button" @click=${
+      props.register
+    } id="registerButton" class="c-button c-button--secondary">
       Create an Anchor
     </button>
+
+    ${
+      props.returning
+        ? html`
+            <div class="l-divider" aria-label="Other Options"></div>
+            <p class="t-paragraph t-weak">
+              Need a fresh start?
+              <button @click=${props.clearCache} class="t-link">
+                Clear anchor cache</button
+              ><br />
+            </p>
+          `
+        : ""
+    }
     ${navbar}
   </section>
   ${footer}`;

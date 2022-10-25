@@ -19,7 +19,7 @@ import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { showWarning } from "./banner";
 import { displayUserNumber } from "./flows/displayUserNumber";
-import { loginPage } from "./flows/login";
+import { loginPage, Returning } from "./flows/login";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
@@ -108,7 +108,15 @@ const dummyChallenge: Challenge = {
 const dummyIdentity: IdentifiableIdentity =
   undefined as unknown as IdentifiableIdentity;
 
-const login = (userNumber?: bigint): void =>
+const login = (userNumber?: bigint): void => {
+  const returning: Returning =
+    userNumber !== undefined
+      ? {
+          returning: true,
+          clearCache: () => console.log("clear cache"),
+          userNumber: userNumber,
+        }
+      : { returning: false };
   loginPage({
     submit: (userNumber) => {
       console.log("Submitted:", userNumber);
@@ -122,8 +130,9 @@ const login = (userNumber?: bigint): void =>
     register: () => {
       console.log("Register");
     },
-    userNumber,
+    ...returning,
   });
+};
 
 const iiPages: Record<string, () => void> = {
   displayUserNumber: () => displayUserNumber(userNumber),
