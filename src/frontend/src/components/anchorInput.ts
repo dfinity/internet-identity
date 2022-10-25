@@ -172,10 +172,12 @@ const mount = (callback: (elem: Element) => void): DirectiveResult =>
       // Note: it would be much easier to use the "DOMNodeInsertedIntoDocument"
       // event on the element itself, but the API is deprecated and Firefox
       // does not support it.
-
       const observer = new MutationObserver(() => {
         try {
-          callback(e);
+          // check that the element is indeed in the DOM and call callback
+          if (e.isConnected) {
+            callback(e);
+          }
         } finally {
           observer.disconnect();
         }
