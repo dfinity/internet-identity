@@ -15,6 +15,14 @@ import { unknownToString } from "../../utils/utils";
 import { useRecovery } from "../recovery/useRecovery";
 import { withLoader } from "../../components/loader";
 
+type PageOps =
+    {
+  submit: (res: bigint) => void;
+  addDevice: (userNumber: bigint | undefined) => void;
+  recover: () => void;
+  register: () => void;
+}
+
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
 export const login = async (
@@ -56,37 +64,50 @@ export const loginPage = async (
   new Promise((resolve, reject) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     const content = pageContent({
-      onContinue: (userNumber) => resolve(doLogin(userNumber, connection)),
+      submit: (userNumber) => resolve(doLogin(userNumber, connection)),
+      addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+      recover: () => useRecovery(connection),
+      register: () => 
+            registerIfAllowed(connection)
+              .then((res) => {
+                if (res === null) {
+                  window.location.reload();
+                } else {
+                  resolve(res);
+                }
+              })
+              .catch(reject),
       userNumber,
     });
     render(content.template, container);
-    initLinkDevice(connection);
-    initRegister(connection, resolve, reject);
-    initRecovery(connection);
   });
 
-const pageContent = (props: {
-  onContinue: (res: bigint) => void;
-  userNumber?: bigint;
-}): {
+const pageContent = (props: PageOps & { userNumber?: bigint; }): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
 } => {
   const anchorInput = mkAnchorInput({
     inputId: "registerUserNumber",
-    onSubmit: props.onContinue,
+    onSubmit: props.submit,
     userNumber: props.userNumber,
   });
 
   const clearAnchor = () => {
     const message = `This will forget your anchor but your credentials will still stored. To clear your credentials delete browser history.`;
-
     const confirmed = confirm(message);
-
     if (confirmed) {
       window.localStorage.clear();
       window.location.reload();
     }
+  };
+
+  const addDeviceClick = () => {
+    const userNumberInput = anchorInput.userNumberInput.value;
+    const userNumber =
+      userNumberInput === undefined
+        ? undefined
+        : parseUserNumber(userNumberInput.value) ?? undefined;
+    props.addDevice(userNumber);
   };
 
   const template = html`
@@ -103,8 +124,8 @@ const pageContent = (props: {
         </button>
         <div style="text-align: right;">
           <span class="t-paragraph t-weak">
-            Lost access? <a id="recoverButton" href="#" class="t-link">Recover Anchor </a><br/>
-            New device? <a id="addNewDeviceButton" href="#" class="t-link">Enroll it now </a><br/>
+            Lost access? <a @click=${props.recover} id="recoverButton" href="#" class="t-link">Recover Anchor </a><br/>
+            New device? <a @click=${addDeviceClick} id="addNewDeviceButton" href="#" class="t-link">Enroll it now </a><br/>
             Fresh start? <a @click=${clearAnchor} href="#" class="t-link">Clear anchor</a><br/>
           </span>
         </div>
@@ -116,7 +137,7 @@ const pageContent = (props: {
 An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
       </p>
 
-    <button type="button" id="registerButton" class="c-button c-button--secondary">
+    <button type="button" @click=${props.register} id="registerButton" class="c-button c-button--secondary">
       Create an Anchor
     </button>
     ${navbar}
@@ -124,34 +145,6 @@ An Identity Anchor is a unique ID that is used to authenticate yourself. You wil
   ${footer}`;
 
   return { ...anchorInput, template };
-};
-
-const initRegister = (
-  connection: Connection,
-  resolve: (res: LoginFlowResult) => void,
-  reject: (err: Error) => void
-) => {
-  const registerButton = document.getElementById(
-    "registerButton"
-  ) as HTMLButtonElement;
-  registerButton.onclick = () => {
-    registerIfAllowed(connection)
-      .then((res) => {
-        if (res === null) {
-          window.location.reload();
-        } else {
-          resolve(res);
-        }
-      })
-      .catch(reject);
-  };
-};
-
-const initRecovery = (connection: Connection) => {
-  const recoverButton = document.getElementById(
-    "recoverButton"
-  ) as HTMLAnchorElement;
-  recoverButton.onclick = () => useRecovery(connection);
 };
 
 const doLogin = async (
@@ -163,19 +156,4 @@ const doLogin = async (
     setUserNumber(userNumber);
   }
   return apiResultToLoginFlowResult(result);
-};
-
-const initLinkDevice = (connection: Connection) => {
-  const addNewDeviceButton = document.getElementById(
-    "addNewDeviceButton"
-  ) as HTMLButtonElement;
-
-  addNewDeviceButton.onclick = async () => {
-    const userNumberInput = document.getElementById(
-      "registerUserNumber"
-    ) as HTMLInputElement;
-
-    const userNumber = parseUserNumber(userNumberInput.value) ?? undefined;
-    await addRemoteDevice(connection, userNumber);
-  };
 };
