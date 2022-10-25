@@ -39,9 +39,18 @@ export const login = async (
 }> => {
   try {
     const userNumber = getUserNumber();
+    const clearCache = () => {
+      const message = `This will forget your anchor but your credentials will still stored. To clear your credentials delete browser history.`;
+      const confirmed = confirm(message);
+      if (confirmed) {
+        window.localStorage.clear();
+        window.location.reload();
+      }
+    };
+
     const returning: Returning =
       userNumber !== undefined
-        ? { returning: true, clearCache: () => {}, userNumber }
+        ? { returning: true, clearCache, userNumber }
         : { returning: false };
     const x = await new Promise<LoginFlowResult>((resolve, reject) => {
       loginPage({
@@ -101,15 +110,6 @@ const pageContent = (
     onSubmit: props.submit,
     userNumber: props.returning ? props.userNumber : undefined,
   });
-
-  const clearAnchor = () => {
-    const message = `This will forget your anchor but your credentials will still stored. To clear your credentials delete browser history.`;
-    const confirmed = confirm(message);
-    if (confirmed) {
-      window.localStorage.clear();
-      window.location.reload();
-    }
-  };
 
   const addDeviceClick = () => {
     const userNumberInput = anchorInput.userNumberInput.value;
