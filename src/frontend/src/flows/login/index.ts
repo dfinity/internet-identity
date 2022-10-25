@@ -120,18 +120,12 @@ const pageContent = (
     props.addDevice(userNumber);
   };
 
-  const template = html`
-  <section class="l-container c-card c-card--highlight" aria-label="Authentication">
-    <div class="c-logo">${icLogo}</div>
-    <article class="l-stack">
-      <hgroup class="t-centered">
-        <h1 id="loginWelcome" class="t-title t-title--main">Welcome!</h1>
-      <hgroup>
+  const signin = html`
       <div class="l-stack">
         ${anchorInput.template}
         <button @click="${
           anchorInput.submit
-        }" type="button" id="loginButton" class="c-button">
+        }" type="button" id="loginButton" class="c-button ${props.returning ? "" : "c-button--secondary"}">
           Authenticate
         </button>
         <div style="t-centered">
@@ -142,18 +136,40 @@ const pageContent = (
           </span>
         </div>
       </div>
-    </article>
+  `;
 
-    <div class="l-divider" aria-label="Other Options">
-    </div>
+  const signup = html`
+  <div class="l-stack">
     <p class="t-paragraph t-weak">
-    New here? An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
+    An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
     </p>
     <button type="button" @click=${
       props.register
-    } id="registerButton" class="c-button c-button--secondary">
+    } id="registerButton" class="c-button ${props.returning ? "c-button--secondary" : ""}">
       Create an Anchor
     </button>
+    </div>
+  `;
+
+  const dividerReturning = html` <div class="l-divider" aria-label="Other Options"> </div> `;
+
+  const divider = html` <div class="l-divider l-divider--text" aria-label="Other Options">Returning? </div> `;
+
+  const template = html`
+  <section class="l-container c-card c-card--highlight" aria-label="Authentication">
+    <div class="c-logo">${icLogo}</div>
+    <article class="l-stack">
+      <hgroup class="t-centered">
+        <h1 id="loginWelcome" class="t-title t-title--main">Your Key to the Internet Computer.</h1>
+      <hgroup>
+
+      ${ props.returning ? signin : signup}
+
+      ${ props.returning ? divider : divider }
+
+      ${ props.returning ? signup : signin}
+
+    </article>
 
     ${
       props.returning
