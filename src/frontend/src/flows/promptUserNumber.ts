@@ -1,13 +1,12 @@
 import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
-import { withRef } from "../utils/utils";
 import { mkAnchorInput } from "../components/anchorInput";
 
 const pageContent = (
   title: string,
   userNumber: bigint | null,
   callbacks: { onContinue: (ret: bigint) => void; onCancel: () => void }
-): { template: TemplateResult; userNumberInput: Ref<HTMLInputElement> } => {
+): { template: TemplateResult } => {
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
   const anchorInput = mkAnchorInput({
     inputId: "userNumberInput",
@@ -44,7 +43,7 @@ const pageContent = (
     </div>
   `;
 
-  return { ...anchorInput, template };
+  return { template };
 };
 
 export const promptUserNumber = async (
@@ -58,8 +57,4 @@ export const promptUserNumber = async (
       onCancel: () => resolve(null),
     });
     render(content.template, container);
-    const { userNumberInput } = content;
-
-    // always select the input
-    withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
   });
