@@ -77,5 +77,3 @@ function readLocalStorage(): LocalStorage {
 
   return ls;
 }
-
-function populateLocalStorage(content: any) {}
