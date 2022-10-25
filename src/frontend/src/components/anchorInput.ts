@@ -91,7 +91,7 @@ export const mkAnchorInput = (props: {
     }
   };
 
-  const template = html` <div class="l-stack c-input--anchor">
+  const template = html` <div class="c-input--anchor">
     <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}

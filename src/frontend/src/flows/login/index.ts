@@ -121,58 +121,75 @@ const pageContent = (
   };
 
   const signin = html`
-      <div class="l-stack">
-        ${anchorInput.template}
-        <button @click="${
-          anchorInput.submit
-        }" type="button" id="loginButton" class="c-button ${props.returning ? "" : "c-button--secondary"}">
-          Authenticate
+    <div>
+      ${anchorInput.template}
+      <button
+        @click="${anchorInput.submit}"
+        type="button"
+        id="loginButton"
+        class="c-button ${props.returning ? "" : "c-button--secondary"}"
+      >
+        Authenticate
+      </button>
+      <p class="t-paragraph t-weak t-centered">
+        Lost access?
+        <button @click=${props.recover} id="recoverButton" class="t-link">
+          Recover Anchor
         </button>
-        <div style="t-centered">
-          <span class="t-paragraph t-weak">
-            Lost access? <button @click=${
-              props.recover
-            } id="recoverButton" class="t-link">Recover Anchor </button> or <button @click=${addDeviceClick} id="addNewDeviceButton" class="t-link">Enroll Device</button><br/>
-          </span>
-        </div>
-      </div>
-  `;
-
-  const signup = html`
-  <div class="l-stack">
-    <p class="t-paragraph t-weak">
-    An Identity Anchor is a unique ID that is used to authenticate yourself. You will be able to use it to log in to all kinds of apps.
-    </p>
-    <button type="button" @click=${
-      props.register
-    } id="registerButton" class="c-button ${props.returning ? "c-button--secondary" : ""}">
-      Create an Anchor
-    </button>
+        or
+        <button @click=${addDeviceClick} id="addNewDeviceButton" class="t-link">
+          Enroll Device</button
+        ><br />
+      </p>
     </div>
   `;
 
-  const dividerReturning = html` <div class="l-divider" aria-label="Other Options"> </div> `;
+  const signup = html`
+    <div class="l-stack">
+      <p class="t-paragraph t-centered">
+        An Identity Anchor is a unique ID that is used to authenticate yourself.
+        You will be able to use it to log in to all kinds of apps.
+      </p>
+      <div class="l-stack">
+        <button
+          type="button"
+          @click=${props.register}
+          id="registerButton"
+          class="c-button ${props.returning ? "c-button--secondary" : ""}"
+        >
+          Create an Anchor
+        </button>
+      </div>
+    </div>
+  `;
 
-  const divider = html` <div class="l-divider l-divider--text" aria-label="Other Options">Returning? </div> `;
+  const dividerReturning = html`
+    <div class="l-divider" aria-label="Other Options"></div>
+  `;
 
-  const template = html`
-  <section class="l-container c-card c-card--highlight" aria-label="Authentication">
-    <div class="c-logo">${icLogo}</div>
-    <article class="l-stack">
-      <hgroup class="t-centered">
-        <h1 id="loginWelcome" class="t-title t-title--main">Your Key to the Internet Computer.</h1>
-      <hgroup>
+  const divider = html`<div
+    class="l-divider l-divider--text"
+    aria-label="Other Options"
+  >
+    Returning?
+  </div>`;
 
-      ${ props.returning ? signin : signup}
+  const template = html` <section
+      class="l-container c-card c-card--highlight"
+      aria-label="Authentication"
+    >
+      <div class="c-logo">${icLogo}</div>
+      <article class="l-stack">
+        <h1 id="loginWelcome" class="t-title t-title--main t-centered">
+          Your Key to the Internet Computer.
+        </h1>
 
-      ${ props.returning ? divider : divider }
+        ${props.returning ? signin : signup}
+        ${props.returning ? divider : divider}
+        ${props.returning ? signup : signin}
+      </article>
 
-      ${ props.returning ? signup : signin}
-
-    </article>
-
-    ${
-      props.returning
+      ${props.returning
         ? html`
             <div class="l-divider" aria-label="Other Options"></div>
             <p class="t-paragraph t-weak">
@@ -182,11 +199,10 @@ const pageContent = (
               ><br />
             </p>
           `
-        : ""
-    }
-    ${navbar}
-  </section>
-  ${footer}`;
+        : ""}
+      ${navbar}
+    </section>
+    ${footer}`;
 
   return { ...anchorInput, template };
 };
