@@ -23,7 +23,6 @@ import { unreachable, withRef } from "../../utils/utils";
 
 type PageElements = {
   authorizeButton: Ref<HTMLButtonElement>;
-  userNumberInput: Ref<HTMLInputElement>;
   registerButton: Ref<HTMLLinkElement>;
 };
 
@@ -148,7 +147,6 @@ const pageContent = (
   return {
     template,
     authorizeButton,
-    userNumberInput: anchorInput.userNumberInput,
     registerButton,
   };
 };
@@ -226,7 +224,7 @@ const init = (
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
   return new Promise((resolve) => {
-    const { authorizeButton, userNumberInput, registerButton } = displayPage(
+    const { authorizeButton, registerButton } = displayPage(
       connection,
       authContext.requestOrigin,
       async (userNumber) => {
@@ -244,8 +242,6 @@ const init = (
     // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
     if (userNumber !== undefined && userNumber === getUserNumber()) {
       withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
-    } else {
-      withRef(userNumberInput, (userNumberInput) => userNumberInput.select());
     }
 
     // Resolve either on successful authentication or after registration

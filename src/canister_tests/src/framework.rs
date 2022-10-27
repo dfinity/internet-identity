@@ -378,12 +378,12 @@ connect-src 'self' https://ic0.app https://\\*\\.ic0.app;\
 img-src 'self' data:;\
 script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
 base-uri 'none';\
-frame-ancestors 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
 style-src-elem 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
 font-src https://fonts\\.gstatic\\.com;\
-upgrade-insecure-requests;$"
+upgrade-insecure-requests;\
+frame-ancestors 'none';$"
     )
     .unwrap()
     .is_match(csp));
