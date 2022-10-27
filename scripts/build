@@ -137,13 +137,20 @@ function build_internet_identity() {
 
   # This enables the "dummy_captcha" feature which makes sure the captcha string
   # is always "a".
-  # WARNING: this MUST be opt-in, because we DO NOT want this in production,
-  # EVAR.
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
   extra_build_args=()
   if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
   then
       echo "USING DUMMY CAPTCHA"
       extra_build_args+=( --features dummy_captcha )
+  fi
+  # This enables the "insecure_requests" feature which disables the content security policy directive
+  # 'upgrade-insecure-requests'.
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
+  if [ "${II_INSECURE_REQUESTS:-}" == "1" ]
+  then
+      echo "ALLOWING INSECURE REQUESTS"
+      extra_build_args+=( --features insecure_requests )
   fi
   # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
   build_canister "internet_identity" ${extra_build_args[@]+"${extra_build_args[@]}"}
