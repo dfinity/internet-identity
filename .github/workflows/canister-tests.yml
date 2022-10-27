@@ -203,13 +203,13 @@ jobs:
       - name: Retrieve commit information
         id: git_info
         run: |
-          # Last time dependencies or toolchain were updated; used for ~/cargo and dependencies
+          # Last time dependencies or toolchain were updated; used for ~/.cargo and dependencies
           commit_deps=$(git log -1 --pretty=format:%H -- Cargo.* src/*/Cargo.toml rust-toolchain.toml)
           echo "::set-output name=commit_deps::$commit_deps"
           echo "deps: $commit_deps"
 
           # Last time the canister code was modified
-          commit_canister=$(git log -1 --pretty=format:%H -- src/[^frontend]*)
+          commit_canister=$(git log -1 --pretty=format:%H -- 'src/**' ':^src/frontend')
           echo "::set-output name=commit_canister::$commit_canister"
           echo "canister: $commit_canister"
 
@@ -236,6 +236,9 @@ jobs:
 
       # Caching ~/.cargo
 
+      # At every step (cargo cache, deps, etc) we store the cache content to a temporary
+      # directory so that the cache is kept as it was right after the layer build until
+      # the actions/cache post step is run (which only then uploads the cache)
       - uses: actions/cache@v3
         id: cache-dot-cargo
         with:
@@ -271,6 +274,8 @@ jobs:
           rsync -av "/tmp/target-deps/" "$PWD/target/"
           mtime=$(date +%Y%m%d%H%M.%S)
           find ./target -exec touch -t "$mtime" {} +
+          # Here we touch the cache itself so that when diffing (with --compare-dest)
+          # rsync knows what is _newer_ than what we've restored here
           find "/tmp/target-deps/" -exec touch -t "$mtime" {} +
 
       - name: Dependencies (build)
@@ -302,6 +307,8 @@ jobs:
 
       - name: Canister code (save to cache)
         if: steps.cache-canister.outputs.cache-hit != 'true'
+        # Here we only store what's been built since the dependency cache restore. Saving the whole
+        # ./target again would take another ~800MB (compressed) whereas the diff only takes ~20MB.
         run: rsync -av --compare-dest="/tmp/target-deps/" "$PWD/target/" "/tmp/target-canister/"
 
       # Build the tests
