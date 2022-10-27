@@ -205,6 +205,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
+        // use buffered writer to minimize expensive stable memory operations
         let mut writer = BufferedWriter::new(
             self.header.entry_size as usize,
             Writer::new(&mut self.memory, stable_offset),
@@ -224,6 +225,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
             RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
 
         // the reader will check stable memory bounds
+        // use buffered reader to minimize expensive stable memory operations
         let mut reader = BufferedReader::new(
             self.header.entry_size as usize,
             Reader::new(&self.memory, stable_offset),
