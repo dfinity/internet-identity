@@ -220,7 +220,7 @@ fn security_headers() -> Vec<HeaderField> {
 /// We deliver the CSP by header _and_ meta tag because the headers are not yet certified.
 fn content_security_policy_header() -> String {
     let meta_policy = content_security_policy_meta();
-    format!("{meta_policy} frame-ancestors 'none';").to_string()
+    format!("{meta_policy}frame-ancestors 'none';").to_string()
 }
 
 /// Stripped down content security policy for the HTML `meta` tag, where not all directives are supported.
@@ -265,7 +265,7 @@ pub fn content_security_policy_meta() -> String {
          font-src https://fonts.gstatic.com;"
     );
     #[cfg(not(feature = "insecure_requests"))]
-    let csp = format!("{csp} upgrade-insecure-requests;");
+    let csp = format!("{csp}upgrade-insecure-requests;");
     csp
 }
 
