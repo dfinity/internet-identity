@@ -35,7 +35,7 @@ lazy_static! {
         format!("sha256-{hash}")
     };
 
-    // The full content of the index.html, after the canister, the script tag and the CSP have been
+    // The full content of the index.html, after the canister ID, the script tag and the CSP have been
     // injected
     static ref INDEX_HTML_STR: String = {
         let index_html = include_str!("../../../dist/index.html");
