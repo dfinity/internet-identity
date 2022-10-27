@@ -1,17 +1,67 @@
+//! This module implements all the stable memory interactions of Internet Identity.
+//! It uses the [Reader] and [Writer] implementations of the `stable_structures` crate.
+//!
+//! ## Stable Memory Layout
+//! ```text
+//! ------------------------------------------- <- Address 0
+//! Magic "IIC"                 ↕ 3 bytes
+//! -------------------------------------------
+//! Layout version              ↕ 1 byte
+//! -------------------------------------------
+//! Number of anchors           ↕ 4 bytes
+//! -------------------------------------------
+//! anchor_range_lower (A_0)    ↕ 8 bytes
+//! -------------------------------------------
+//! anchor_range_upper (A_MAX)  ↕ 8 bytes
+//! -------------------------------------------
+//! max_entry_size (SIZE_MAX)   ↕ 2 bytes
+//! -------------------------------------------
+//! Salt                        ↕ 32 bytes
+//! ------------------------------------------- <- Address 58 (header size)
+//! Reserved space              ↕ 454 bytes
+//! ------------------------------------------- <- Address 512 = A_0_offset = RESERVED_HEADER_BYTES
+//! A_0_size                    ↕ 2 bytes
+//! -------------------------------------------
+//! Candid encoded entry        ↕ A_0_size bytes
+//! -------------------------------------------
+//! Unused space A_0            ↕ (SIZE_MAX - A_0_size - 2) bytes
+//! ------------------------------------------- <- A_1_offset = A_0_offset + (A_1 - A_0) * SIZE_MAX  ┬
+//! A_1_size                    ↕ 2 bytes                                                            │
+//! -------------------------------------------                                                      │
+//! Candid encoded entry        ↕ A_1_size bytes                                          anchor A_1 │
+//! -------------------------------------------                                                      │
+//! Unused space A_1            ↕ (SIZE_MAX - A_1_size - 2) bytes                                    │
+//! -------------------------------------------                                                      ┴
+//! ...
+//! ------------------------------------------- <- A_MAX_offset = A_0_offset + (A_MAX - A_0) * SIZE_MAX
+//! A_MAX_size                  ↕ 2 bytes
+//! -------------------------------------------
+//! Candid encoded entry        ↕ A_MAX_size bytes
+//! -------------------------------------------
+//! Unused space A_MAX          ↕ (SIZE_MAX - A_MAX_size - 2) bytes
+//! -------------------------------------------
+//! Unallocated space           ↕ STABLE_MEMORY_RESERVE bytes
+//! -------------------------------------------
+//! ```
+
 use candid;
-use ic_cdk::api::{
-    stable::{stable64_grow, stable64_read, stable64_size, stable64_write},
-    trap,
-};
+use ic_cdk::api::trap;
+use ic_stable_structures::reader::{BufferedReader, Reader};
+use ic_stable_structures::writer::{BufferedWriter, Writer};
+use ic_stable_structures::Memory;
 use internet_identity_interface::UserNumber;
 use std::convert::TryInto;
 use std::fmt;
+use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-const HEADER_SIZE: u64 = 512;
+#[cfg(test)]
+mod tests;
+
+/// Reserved space for the header before the anchor records start.
+const RESERVED_HEADER_BYTES: u64 = 512;
 const DEFAULT_ENTRY_SIZE: u16 = 2048;
 const EMPTY_SALT: [u8; 32] = [0; 32];
-const WASM_PAGE_SIZE: u64 = 65536;
 const GB: u64 = 1 << 30;
 const STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
@@ -19,13 +69,15 @@ const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
 
 /// The maximum number of users this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
-    (STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
+    (STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
+        / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
 /// Data type responsible for managing user data in stable memory.
-pub struct Storage<T> {
+pub struct Storage<T, M> {
     header: Header,
+    memory: M,
     _marker: PhantomData<T>,
 }
 
@@ -40,10 +92,10 @@ struct Header {
     salt: [u8; 32],
 }
 
-impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
+impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, M> {
     /// Creates a new empty storage that manages the data of users in
     /// the specified range.
-    pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber)) -> Self {
+    pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber), memory: M) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
                 "improper Identity Anchor range: [{}, {})",
@@ -68,6 +120,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
             },
+            memory,
             _marker: PhantomData,
         }
     }
@@ -88,14 +141,14 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
         self.flush();
     }
 
-    /// Initializes storage by reading stable memory.
+    /// Initializes storage by reading the given memory.
     ///
-    /// Returns None if the stable memory is empty.
+    /// Returns None if the memory is empty.
     ///
-    /// Panics if the stable memory is not empty but cannot be
+    /// Panics if the memory is not empty but cannot be
     /// decoded.
-    pub fn from_stable_memory() -> Option<Self> {
-        if stable64_size() < 1 {
+    pub fn from_memory(memory: M) -> Option<Self> {
+        if memory.size() < 1 {
             return None;
         }
 
@@ -106,7 +159,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 &mut header as *mut _ as *mut u8,
                 std::mem::size_of::<Header>(),
             );
-            stable64_read(0, slice);
+            memory.read(0, slice);
         }
 
         if &header.magic != b"IIC" {
@@ -121,6 +174,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
 
         Some(Self {
             header,
+            memory,
             _marker: PhantomData,
         })
     }
@@ -140,46 +194,48 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     }
 
     /// Writes the data of the specified user to stable memory.
-    pub fn write(&self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
+    pub fn write(&mut self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
-        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
+        let stable_offset =
+            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
         let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
 
         if buf.len() > self.value_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
-        let current_size = stable64_size();
-        let pages =
-            (stable_offset + self.header.entry_size as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
-        if pages > current_size {
-            let pages_to_grow = pages - current_size;
-            let result = stable64_grow(pages - current_size);
-            if result.is_err() {
-                trap(&format!(
-                    "failed to grow stable memory by {} pages",
-                    pages_to_grow
-                ))
-            }
-        }
-        stable64_write(stable_offset, &(buf.len() as u16).to_le_bytes());
-        stable64_write(stable_offset + std::mem::size_of::<u16>() as u64, &buf);
+        // use buffered writer to minimize expensive stable memory operations
+        let mut writer = BufferedWriter::new(
+            self.header.entry_size as usize,
+            Writer::new(&mut self.memory, stable_offset),
+        );
+        writer
+            .write(&(buf.len() as u16).to_le_bytes())
+            .expect("memory write failed");
+        writer.write(&buf).expect("memory write failed");
+        writer.flush().expect("memory write failed");
         Ok(())
     }
 
     /// Reads the data of the specified user from stable memory.
     pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
+        let stable_offset =
+            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
 
-        let stable_offset = HEADER_SIZE + record_number as u64 * self.header.entry_size as u64;
-        if stable_offset + self.header.entry_size as u64 > stable64_size() * WASM_PAGE_SIZE {
-            trap("a record for a valid Identity Anchor is out of stable memory bounds");
-        }
+        // the reader will check stable memory bounds
+        // use buffered reader to minimize expensive stable memory operations
+        let mut reader = BufferedReader::new(
+            self.header.entry_size as usize,
+            Reader::new(&self.memory, stable_offset),
+        );
 
-        let mut buf = vec![0; self.header.entry_size as usize];
-        stable64_read(stable_offset, &mut buf);
-        let len = u16::from_le_bytes(buf[0..2].try_into().unwrap()) as usize;
+        let mut len_buf = vec![0; 2];
+        reader
+            .read(&mut len_buf.as_mut_slice())
+            .expect("failed to read memory");
+        let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
         if len > self.value_size_limit() {
@@ -190,18 +246,21 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
             ))
         }
 
-        let data: T =
-            candid::decode_one(&buf[2..2 + len]).map_err(StorageError::DeserializationError)?;
+        let mut data_buf = vec![0; len];
+        reader
+            .read(&mut data_buf.as_mut_slice())
+            .expect("failed to read memory");
+        let data: T = candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
 
         Ok(data)
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
     pub fn flush(&self) {
-        if stable64_size() < 1 {
-            let result = stable64_grow(1);
-            if result.is_err() {
-                trap("failed to grow stable memory by 1 page");
+        if self.memory.size() < 1 {
+            let result = self.memory.grow(1);
+            if result == -1 {
+                trap("failed to grow stable memory to 1 page");
             }
         }
         unsafe {
@@ -209,7 +268,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
                 &self.header as *const _ as *const u8,
                 std::mem::size_of::<Header>(),
             );
-            stable64_write(0, &slice);
+            self.memory.write(0, &slice);
         }
     }
 
@@ -219,7 +278,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - HEADER_SIZE as u64 - STABLE_MEMORY_RESERVE)
+        ((STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
             / self.header.entry_size as u64) as usize
     }
 
@@ -267,6 +326,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned> Storage<T> {
     }
 }
 
+#[derive(Debug)]
 pub enum StorageError {
     UserNumberOutOfRange {
         user_number: UserNumber,

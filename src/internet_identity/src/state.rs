@@ -4,6 +4,7 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use ic_certified_map::{Hash, RbTree};
+use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::*;
 use std::cell::{Cell, RefCell};
@@ -20,7 +21,7 @@ thread_local! {
 /// This is an internal version of `DeviceData` primarily useful to provide a
 /// backwards compatible level between older device data stored in stable memory
 /// (that might not contain purpose or key_type) and new ones added.
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DeviceDataInternal {
     pub pubkey: DeviceKey,
     pub alias: String,
@@ -106,7 +107,7 @@ pub struct Challenge {
 }
 
 struct State {
-    storage: RefCell<Storage<Vec<DeviceDataInternal>>>,
+    storage: RefCell<Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -124,10 +125,13 @@ impl Default for State {
     fn default() -> Self {
         const FIRST_USER_ID: UserNumber = 10_000;
         Self {
-            storage: RefCell::new(Storage::new((
-                FIRST_USER_ID,
-                FIRST_USER_ID.saturating_add(DEFAULT_RANGE_SIZE),
-            ))),
+            storage: RefCell::new(Storage::new(
+                (
+                    FIRST_USER_ID,
+                    FIRST_USER_ID.saturating_add(DEFAULT_RANGE_SIZE),
+                ),
+                DefaultMemoryImpl::default(),
+            )),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
@@ -185,7 +189,7 @@ pub fn salt() -> [u8; 32] {
 pub fn initialize_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time() as u64);
-        match Storage::from_stable_memory() {
+        match Storage::from_memory(DefaultMemoryImpl::default()) {
             Some(mut storage) => {
                 let (lo, hi) = storage.assigned_user_number_range();
                 let max_entries = storage.max_entries() as u64;
@@ -259,11 +263,13 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut *s.sigs.borrow_mut()))
 }
 
-pub fn storage<R>(f: impl FnOnce(&Storage<Vec<DeviceDataInternal>>) -> R) -> R {
+pub fn storage<R>(f: impl FnOnce(&Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&*s.storage.borrow()))
 }
 
-pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<Vec<DeviceDataInternal>>) -> R) -> R {
+pub fn storage_mut<R>(
+    f: impl FnOnce(&mut Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R,
+) -> R {
     STATE.with(|s| f(&mut *s.storage.borrow_mut()))
 }
 
