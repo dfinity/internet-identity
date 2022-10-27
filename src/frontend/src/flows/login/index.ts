@@ -132,14 +132,14 @@ const pageContent = (
         Authenticate
       </button>
       <p class="t-paragraph t-weak t-centered">
+        Using this device for the first time?
+        <button @click=${addDeviceClick} id="addNewDeviceButton" class="t-link">
+          Add this device</button
+        ><br />
         Lost access?
         <button @click=${props.recover} id="recoverButton" class="t-link">
           Recover Anchor
         </button>
-        or
-        <button @click=${addDeviceClick} id="addNewDeviceButton" class="t-link">
-          Enroll Device</button
-        ><br />
       </p>
     </div>
   `;
@@ -147,8 +147,7 @@ const pageContent = (
   const signup = html`
     <div class="${!props.returning && "l-stack"}">
       <p class="t-paragraph t-centered ${props.returning && "t-weak"}">
-        An Identity Anchor is a unique ID that is used to authenticate yourself.
-        You will be able to use it to log in to all kinds of apps.
+        Claim an Identity Anchor to interact with apps on the Internet Computer.
       </p>
       <div class="l-stack">
         <button
@@ -157,14 +156,14 @@ const pageContent = (
           id="registerButton"
           class="c-button ${props.returning ? "c-button--secondary" : ""}"
         >
-          Create an Anchor
+          Claim an Anchor
         </button>
       </div>
     </div>
   `;
 
   const dividerReturning = html`
-    <div class="l-divider" aria-label="Other Options"></div>
+    <div class="l-divider l-divider--text" aria-label="Other Options">New?</div>
   `;
 
   const divider = html`<div
@@ -181,7 +180,7 @@ const pageContent = (
       <div class="c-logo">${icLogo}</div>
       <article class="l-stack">
         <h1 id="loginWelcome" class="t-title t-title--main t-centered">
-          Your Key to the Internet Computer.
+          Unlock the Full Power<br />of the Internet Computer
         </h1>
 
         ${props.returning ? signin : signup}
@@ -192,11 +191,10 @@ const pageContent = (
       ${props.returning
         ? html`
             <div class="l-divider" aria-label="Other Options"></div>
-            <p class="t-paragraph t-weak">
-              Need a fresh start?
+            <p class="t-paragraph t-weak t-centered">
               <button @click=${props.clearCache} class="t-link">
-                Clear anchor cache</button
-              ><br />
+                Clear identity anchor from browser
+              </button>
             </p>
           `
         : ""}
