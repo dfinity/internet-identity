@@ -152,51 +152,12 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
 fn security_headers() -> Vec<HeaderField> {
-    let hash = assets::INDEX_HTML_SETUP_JS_SRI_HASH.to_string();
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-        // Content Security Policy
-        //
-        // The sha256 hash matches the inline script in index.html. This inline script is a workaround
-        // for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
-        // This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
-        //
-        // script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
-        // validation of bls signatures.
-        // There is currently no other way to allow execution of WebAssembly modules with CSP.
-        // See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
-        //
-        // script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
-        // by modern browsers.
-        //
-        // connect-src https://*.ic0.app is required in order for II to be able to fetch the
-        // /.well-known/ii-alternative-origins path of authenticating canisters setting a derivationOrigin.
-        //
-        // style-src 'unsafe-inline' is currently required due to the way styles are handled by the
-        // application. Adding hashes would require a big restructuring of the application and build
-        // infrastructure.
-        //
-        // NOTE about `script-src`: we cannot use a normal script tag like this
-        //   <script src="index.js" integrity="sha256-..." defer></script>
-        // because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
-        // Instead, we add it to the CSP policy
         (
             "Content-Security-Policy".to_string(),
-            format!(
-                "default-src 'none';\
-             connect-src 'self' https://ic0.app https://*.ic0.app;\
-             img-src 'self' data:;\
-             script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
-             base-uri 'none';\
-             frame-ancestors 'none';\
-             form-action 'none';\
-             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-             style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-             font-src https://fonts.gstatic.com;\
-             upgrade-insecure-requests;"
-            )
-            .to_string(),
+            content_security_policy_header(),
         ),
         (
             "Strict-Transport-Security".to_string(),
@@ -251,6 +212,61 @@ fn security_headers() -> Vec<HeaderField> {
                 .to_string(),
         ),
     ]
+}
+
+/// Full content security policy delivered via HTTP response header.
+///
+/// This policy also includes the `frame-ancestors` directive in addition to the policies included in the HTML `meta` tag.
+/// We deliver the CSP by header _and_ meta tag because the headers are not yet certified.
+fn content_security_policy_header() -> String {
+    let meta_policy = content_security_policy_meta();
+    format!("{meta_policy} frame-ancestors 'none';").to_string()
+}
+
+/// Stripped down content security policy for the HTML `meta` tag, where not all directives are supported.
+///
+/// The sha256 hash matches the inline script in index.html. This inline script is a workaround
+/// for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
+/// This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+///
+/// script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
+/// validation of bls signatures.
+/// There is currently no other way to allow execution of WebAssembly modules with CSP.
+/// See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
+///
+/// script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
+/// by modern browsers.
+///
+/// connect-src https://*.ic0.app is required in order for II to be able to fetch the
+/// /.well-known/ii-alternative-origins path of authenticating canisters setting a derivationOrigin.
+///
+/// style-src 'unsafe-inline' is currently required due to the way styles are handled by the
+/// application. Adding hashes would require a big restructuring of the application and build
+/// infrastructure.
+///
+/// NOTE about `script-src`: we cannot use a normal script tag like this
+///   <script src="index.js" integrity="sha256-..." defer></script>
+/// because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
+/// Instead, we add the hash of the inline script to the CSP policy.
+///
+/// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
+/// with Safari.
+pub fn content_security_policy_meta() -> String {
+    let hash = assets::INDEX_HTML_SETUP_JS_SRI_HASH.to_string();
+    let csp = format!(
+        "default-src 'none';\
+         connect-src 'self' https://ic0.app https://*.ic0.app;\
+         img-src 'self' data:;\
+         script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+         base-uri 'none';\
+         form-action 'none';\
+         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+         style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+         font-src https://fonts.gstatic.com;"
+    );
+    #[cfg(not(feature = "insecure_requests"))]
+    let csp = format!("{csp} upgrade-insecure-requests;");
+    csp
 }
 
 fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
