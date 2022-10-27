@@ -1901,7 +1901,7 @@ mod http_tests {
         // empty II has some metadata in stable memory which requires at least one page
         assert_eq!(stable_memory_pages, 1);
 
-        // a wasm page is 64kb and a single user takes up  2kb -> 33rd anchor record starts on the second wasm page
+        // a wasm page is 64kb and a single user takes up 2kb -> 33rd anchor record starts on the second wasm page
         for _ in 0..33 {
             flows::register_anchor(&env, canister_id);
         }

@@ -78,7 +78,7 @@ fn should_serialize_first_record() {
 
 #[test]
 fn should_serialize_subsequent_record_to_expected_memory_location() {
-    const EXPECTED_RECORD_OFFSET: u64 = 204_800;
+    const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
     let mut storage =
         Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
@@ -128,9 +128,9 @@ fn should_deserialize_first_record() {
 
 #[test]
 fn should_deserialize_subsequent_record_at_expected_memory_location() {
-    const EXPECTED_RECORD_OFFSET: u64 = 204_800;
+    const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
-    memory.grow(4);
+    memory.grow(4); // grow memory to accommodate a write to EXPECTED_RECORD_OFFSET
     let mut storage =
         Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
     for _ in 0..100 {
