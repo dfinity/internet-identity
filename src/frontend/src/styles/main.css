@@ -949,6 +949,160 @@ a:hover,
   list-style-type: decimal;
 }
 
+.c-list__item--vip {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.c-list__parcel--select:hover {
+  transition: background-color 400ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors {
+  --border-radius: 8px;
+  width: 40rem;
+}
+
+.c-list__item--icon {
+  position: relative;
+}
+
+.c-list__item--icon .c-list__parcel:last-of-type {
+  padding-right: calc(1.5em + 0.8em * 2);
+}
+
+.c-list--anchors .c-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  border: var(--vs-line) var(--rc-line) solid;
+  position: relative;
+}
+
+.c-list--anchors .c-list__item:focus-within,
+.c-list--anchors .c-list__item:focus,
+.c-list--anchors .c-list__item--focus {
+  z-index: var(--vz-foreground);
+}
+
+.c-list--anchors .c-list__item::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  will-change: filter;
+  background-image: linear-gradient(270deg, var(--rg-brand));
+  filter: blur(20px);
+  opacity: 0;
+  transform: scaleX(0.1) scaleY(0.7);
+  transition: 300ms opacity linear, 600ms transform cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors .c-list__item:focus-within::before,
+.c-list--anchors .c-list__item--focus::before {
+  opacity: 1;
+  transform: scaleX(1) scaleY(0.8);
+}
+
+.c-list--anchors .c-list__item--noFocusStyle::before {
+  display: none;
+}
+
+.c-list--anchors .c-list__item:first-of-type {
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:first-of-type .c-list__parcel:first-of-type {
+  border-top-left-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:first-of-type .c-list__parcel:last-of-type {
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors
+  .c-list__item:first-of-type
+  .c-list__parcel--fullwidth:first-of-type {
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type {
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type .c-list__parcel:first-of-type {
+  border-bottom-left-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type .c-list__parcel:last-of-type {
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors
+  .c-list__item:last-of-type
+  .c-list__parcel--fullwidth:last-of-type {
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item + .c-list__item {
+  margin-top: calc(-1 * var(--vs-line));
+}
+
+.c-list__parcel {
+  position: relative;
+  padding: var(--vs-bezel) 0.8em;
+  border: var(--vs-line) solid var(--rc-line);
+  flex-grow: 1;
+  margin: calc(-1 * var(--vs-line));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--rc-input);
+}
+
+.c-list__parcel--detail {
+  overflow: hidden;
+  white-space: inherit;
+  padding: var(--vs-bezel) 0.8em;
+}
+
+.c-list__parcel--fullwidth {
+  flex: 1 0 100%;
+  width: 100%;
+}
+
+.c-list__icon {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--vs-bezel) * 1.5);
+  transform: translateY(-50%);
+  width: 1.5em;
+  height: 1.5em;
+  --stroke-width: 2;
+}
+
+/* This is a workaround for animating the arrow icon on all major browsers
+ * (Safari, Chrome, Firefox). SVG path update doesn't work on Safari, and
+ * svg transform is glitchy on Firefox. So instead we hide part of the
+ * arrow and "unhide" it on hover, which looks like the arrow is growing.
+ */
+.c-list__icon--masked {
+  clip-path: inset(0 0 0 35%);
+  transition: clip-path 300ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors .c-list__item:hover .c-list__icon--masked {
+  clip-path: inset(0 0 0 0%);
+}
+
+.c-list__icon svg {
+  display: block;
+  width: 100%;
+}
+
 /**
  *  Tooltip component
  *  This is a CSS only tooltip that shows on hover
