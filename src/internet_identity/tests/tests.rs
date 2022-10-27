@@ -2000,18 +2000,20 @@ mod http_tests {
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (signature_count, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        let (stable_memory_pages, _) =
+            parse_metric(&metrics, "internet_identity_stable_memory_pages");
         // empty II has some metadata in stable memory which requires at least one page
-        assert_eq!(signature_count, 1);
+        assert_eq!(stable_memory_pages, 1);
 
-        // a wasm page is 64kb and a single user takes up 2kb -> 32 users require a complete wasm page
-        for _ in 0..32 {
+        // a wasm page is 64kb and a single user takes up 2kb -> 33rd anchor record starts on the second wasm page
+        for _ in 0..33 {
             flows::register_anchor(&env, canister_id);
         }
 
         let metrics = flows::get_metrics(&env, canister_id);
-        let (signature_count, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-        assert_eq!(signature_count, 2);
+        let (stable_memory_pages, _) =
+            parse_metric(&metrics, "internet_identity_stable_memory_pages");
+        assert_eq!(stable_memory_pages, 2);
         Ok(())
     }
 

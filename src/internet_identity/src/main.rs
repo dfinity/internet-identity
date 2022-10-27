@@ -11,6 +11,7 @@ use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree};
+use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
@@ -398,7 +399,7 @@ async fn remove(user_number: UserNumber, device_key: DeviceKey) {
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
 fn write_anchor_data(user_number: UserNumber, entries: Vec<DeviceDataInternal>) {
-    state::storage(|storage| {
+    state::storage_mut(|storage| {
         storage.write(user_number, entries).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to write device data of user {}: {}",
@@ -733,7 +734,9 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
-            state::storage_mut(|storage| *storage = Storage::new(range));
+            state::storage_mut(|storage| {
+                *storage = Storage::new(range, DefaultMemoryImpl::default())
+            });
         }
         if let Some(archive_hash) = arg.archive_module_hash {
             state::persistent_state_mut(|persistent_state| {
