@@ -2,7 +2,7 @@
 //
 // This file describes which assets are used and how (content, content type and content encoding).
 
-use crate::state;
+use crate::{http, state};
 use ic_cdk::api;
 use lazy_static::lazy_static;
 use sha2::Digest;
@@ -35,7 +35,7 @@ lazy_static! {
         format!("sha256-{hash}")
     };
 
-    // The full content of the index.html, after the canister ID (and script tag) have been
+    // The full content of the index.html, after the canister ID, the script tag and the CSP have been
     // injected
     static ref INDEX_HTML_STR: String = {
         let index_html = include_str!("../../../dist/index.html");
@@ -44,6 +44,10 @@ lazy_static! {
         let index_html = index_html.replace(
             r#"<script id="setupJs"></script>"#,
             &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#).to_string()
+        );
+        let index_html = index_html.replace(
+            "CSP_POLICY_PLACEHOLDER",
+            &http::content_security_policy_meta()
         );
         index_html
     };

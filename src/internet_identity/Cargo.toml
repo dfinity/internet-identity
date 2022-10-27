@@ -41,3 +41,6 @@ regex = "1.5.6"
 # the dummy_captcha feature which ensures the captcha string is always "a"
 # (needed for tests)
 dummy_captcha = []
+# the insecure requests disables removes the 'upgrade-insecure-requests' directive from the CSP in oder to allow local
+# development with Safari.
+insecure_requests = []
