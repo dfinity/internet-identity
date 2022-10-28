@@ -11,7 +11,6 @@ use ic_cdk::api::call::call;
 use ic_cdk::api::{caller, data_certificate, id, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::{AsHashTree, Hash, HashTree};
-use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::Serialize;
@@ -735,7 +734,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
             state::storage_mut(|storage| {
-                *storage = Storage::new(range, DefaultMemoryImpl::default())
+                storage.set_user_number_range(range);
             });
         }
         if let Some(archive_hash) = arg.archive_module_hash {
@@ -746,7 +745,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     }
 
     // make sure the fully initialized storage configuration is written to stable memory
-    state::storage(|storage| storage.flush());
+    state::storage_mut(|storage| storage.flush());
     update_root_hash();
 }
 

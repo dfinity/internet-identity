@@ -107,7 +107,7 @@ pub struct Challenge {
     pub challenge_key: ChallengeKey,
 }
 
-#[derive(Clone, Debug, Default, CandidType, Deserialize)]
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ArchiveInfo {
     pub expected_module_hash: Option<[u8; 32]>,
     pub state: ArchiveState,
@@ -137,7 +137,7 @@ pub struct ArchiveData {
     pub archive_canister: Principal,
 }
 
-#[derive(Clone, Default, CandidType, Deserialize)]
+#[derive(Clone, Default, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct PersistentStateV1 {
     // Information related to the archive
     pub archive_info: ArchiveInfo,
@@ -253,7 +253,7 @@ pub fn initialize_from_stable_memory() {
                 s.storage.replace(storage);
             }
             None => {
-                s.storage.borrow().flush();
+                s.storage.borrow_mut().flush();
             }
         }
     });
