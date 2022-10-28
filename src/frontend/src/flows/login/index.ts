@@ -106,7 +106,6 @@ const pageContent = (
   userNumberInput: Ref<HTMLInputElement>;
 } => {
   const anchorInput = mkAnchorInput({
-    inputId: "registerUserNumber",
     onSubmit: props.submit,
     userNumber: props.returning ? props.userNumber : undefined,
     focus: props.returning,

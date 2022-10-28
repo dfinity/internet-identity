@@ -6,12 +6,10 @@ import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({
-  inputId,
   userNumber,
   onSubmit,
   focus = true,
 }: {
-  inputId: string;
   userNumber?: bigint;
   onSubmit?: (userNumber: bigint) => void;
   focus?: boolean;
@@ -103,7 +101,7 @@ export const mkAnchorInput = ({
         ${ref(userNumberInput)}
         ${focus ? mount(selectInput) : ""}
         type="text"
-        id="${inputId}"
+        data-role="anchor-input"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
         value="${ifDefined(userNumber?.toString())}"
