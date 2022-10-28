@@ -152,7 +152,7 @@ export const styleguide = html`
         <section class="demo" aria-label="Paragraphs Demo">
           <hr class="l-divider" />
           <div class="l-divider l-divider--text" aria-label="Other Options">
-            <span class="l-divider__label" aria-hidden>Or</span>
+            <span class="l-divider__label" aria-hidden="true">Or</span>
           </div>
         </section>
         <p class="t-lead">
@@ -183,7 +183,7 @@ export const styleguide = html`
           </div>
 
           <div class="c-card c-card--warning">
-            <span class="c-card__icon" aria-hidden>${warningIcon}</span>
+            <span class="c-card__icon" aria-hidden="true">${warningIcon}</span>
             <div class="c-card__content">
               <h2 class="c-card__title t-title">Warning Card with Icon</h2>
               <p class="c-card__text t-paragraph">
