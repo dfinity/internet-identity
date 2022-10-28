@@ -5,10 +5,16 @@ import { DirectiveResult } from "lit-html/directive.js";
 import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
-export const mkAnchorInput = (props: {
+export const mkAnchorInput = ({
+  inputId,
+  userNumber,
+  onSubmit,
+  focus = true,
+}: {
   inputId: string;
   userNumber?: bigint;
   onSubmit?: (userNumber: bigint) => void;
+  focus?: boolean;
 }): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
@@ -44,7 +50,7 @@ export const mkAnchorInput = (props: {
     if (result === undefined) {
       return showHint("Please enter an Anchor");
     }
-    props.onSubmit?.(result);
+    onSubmit?.(result);
   };
 
   // How we react on unexpected (i.e. non-digit) input
@@ -84,23 +90,23 @@ export const mkAnchorInput = (props: {
     return result;
   };
 
-  // Select the input when the component is rendered (and value is empty)
+  // Select the input when the component is rendered
   const selectInput = (elem: Element): void => {
-    if (elem instanceof HTMLInputElement && elem.value === "") {
+    if (elem instanceof HTMLInputElement) {
       elem.select();
     }
   };
 
-  const template = html` <div class="l-stack c-input--anchor">
+  const template = html` <div class="c-input--anchor">
     <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}
-        ${mount(selectInput)}
+        ${focus ? mount(selectInput) : ""}
         type="text"
-        id="${props.inputId}"
+        id="${inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${props.userNumber}"
+        value="${userNumber}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
