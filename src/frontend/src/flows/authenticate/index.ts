@@ -19,7 +19,8 @@ import {
   validateDerivationOrigin,
   ValidationResult,
 } from "./validateDerivationOrigin";
-import { unreachable, withRef } from "../../utils/utils";
+import { unreachable } from "../../utils/utils";
+import { withRef } from "../../utils/lit-html";
 
 type PageElements = {
   authorizeButton: Ref<HTMLButtonElement>;
