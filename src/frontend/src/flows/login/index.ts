@@ -109,6 +109,7 @@ const pageContent = (
     inputId: "registerUserNumber",
     onSubmit: props.submit,
     userNumber: props.returning ? props.userNumber : undefined,
+    focus: props.returning,
   });
 
   const addDeviceClick = () => {
@@ -138,7 +139,7 @@ const pageContent = (
         ><br />
         Lost access?
         <button @click=${props.recover} id="recoverButton" class="t-link">
-          Recover Anchor
+          Recover anchor
         </button>
       </p>
     </div>
@@ -180,7 +181,7 @@ const pageContent = (
       <div class="c-logo">${icLogo}</div>
       <article class="l-stack">
         <h1 id="loginWelcome" class="t-title t-title--main t-centered">
-          Unlock the Full Power<br />of the Internet Computer
+          Unlock the <br />Full Power of Web3
         </h1>
 
         ${props.returning ? signin : signup}
