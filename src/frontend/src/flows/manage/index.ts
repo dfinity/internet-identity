@@ -100,7 +100,7 @@ const devicesSection = (
             Remove a device before you can add a new one.</span
           >
           <span class="t-link t-link--discreet">
-            <i class="t-link__icon" aria-hidden>+</i>
+            <i class="t-link__icon" aria-hidden=true>+</i>
             Add new device
           </span>
         </button>
@@ -125,7 +125,7 @@ const recoverySection = (
                 class="t-title__complication t-title__complication--end"
                 id="addRecovery"
               >
-                <i class="t-link__icon" aria-hidden>+</i>
+                <i class="t-link__icon" aria-hidden="true">+</i>
                 <span class="t-link t-link--discreet"
                   >Add recovery mechanism</span
                 >

@@ -89,8 +89,7 @@ const pageContent = (
         </p>
         ${derivationOrigin !== undefined
           ? html`
-        <p class="t-paragraph t-weak">
-          <span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >shared identity <span ${ref(
+        <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >shared identity <span ${ref(
               chasmToggleRef
             )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
           <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">

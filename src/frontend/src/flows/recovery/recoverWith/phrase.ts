@@ -26,8 +26,8 @@ const pageContent = (userNumber: bigint, message?: string) => html`
         background-color: unset;
       }
       50% {
-        background-color: #ED1E79;
-        border-color: #ED1E79;
+        background-color: #ed1e79;
+        border-color: #ed1e79;
       }
       100% {
         background-color: unset;
@@ -42,19 +42,28 @@ const pageContent = (userNumber: bigint, message?: string) => html`
   <article class="l-container c-card c-card--highlight">
     <hgroup>
       <h1 class="t-title t-title--main">Your seed phrase</h1>
-      <p class="t-lead">${
-        message !== undefined ? message : "Please provide your seed phrase"
-      }</p>
+      <p class="t-lead">
+        ${message !== undefined ? message : "Please provide your seed phrase"}
+      </p>
     </hgroup>
-    <textarea id="inputSeedPhrase" class="c-input" placeholder="${
-      userNumber + " above squirrel ..."
-    }"></textarea>
-    <details data-id="phrase-warnings" class="c-card c-card--highlight is-hidden">
-        <summary><span class="warnings-box-summary">Phrase may not be valid<span></summary>
-        <div id="warnings"></div>
+    <textarea
+      id="inputSeedPhrase"
+      class="c-input"
+      placeholder="${userNumber + " above squirrel ..."}"
+    ></textarea>
+    <details
+      data-id="phrase-warnings"
+      class="c-card c-card--highlight is-hidden"
+    >
+      <summary>
+        <span class="warnings-box-summary">Phrase may not be valid</span>
+      </summary>
+      <div id="warnings"></div>
     </details>
     <div class="c-button-group">
-      <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">Cancel</button>
+      <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">
+        Cancel
+      </button>
       <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
     </div>
   </article>
