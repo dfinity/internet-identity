@@ -5,12 +5,12 @@ class View {
 export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#registerUserNumber")
+      .$('[data-role="anchor-input"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
-    await this.browser.$("#registerUserNumber").setValue(userNumber);
+    await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
   }
 
   async login(): Promise<void> {
@@ -324,12 +324,14 @@ export class AuthenticateView extends View {
   }
 
   async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
-    expect(await this.browser.$("#userNumberInput").getValue()).toBe(anchor);
+    expect(await this.browser.$('[data-role="anchor-input"]').getValue()).toBe(
+      anchor
+    );
   }
 
   async expectAnchorInputField(): Promise<void> {
     await this.browser
-      .$("#userNumberInput")
+      .$('[data-role="anchor-input"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
@@ -342,7 +344,7 @@ export class AuthenticateView extends View {
   }
 
   async switchToAnchorInput(): Promise<void> {
-    await this.browser.$("#userNumberInput").click();
+    await this.browser.$('[data-role="anchor-input"]').click();
   }
 }
 
@@ -365,13 +367,13 @@ export class WelcomeBackView extends View {
 export class AddIdentityAnchorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#addDeviceUserNumber")
+      .$('[data-role="anchor-input"]')
       .waitForDisplayed({ timeout: 3_000 });
   }
 
   async continue(userNumber?: string): Promise<void> {
     if (userNumber !== undefined) {
-      await fillText(this.browser, "addDeviceUserNumber", userNumber);
+      await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
     }
     await this.browser.$("#addDeviceUserNumberContinue").click();
   }
@@ -518,7 +520,7 @@ export class RecoverView extends View {
   }
 
   async enterIdentityAnchor(identityAnchor: string): Promise<void> {
-    await this.browser.$("#userNumberInput").setValue(identityAnchor);
+    await this.browser.$('[data-role="anchor-input"]').setValue(identityAnchor);
   }
 
   async continue(): Promise<void> {

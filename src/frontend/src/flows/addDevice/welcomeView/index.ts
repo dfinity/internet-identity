@@ -5,7 +5,6 @@ import { Connection } from "../../../utils/iiConnection";
 
 const pageContent = (connection: Connection, userNumber?: bigint) => {
   const anchorInput = mkAnchorInput({
-    inputId: "addDeviceUserNumber",
     userNumber,
     onSubmit: (userNumber) => registerTentativeDevice(userNumber, connection),
   });

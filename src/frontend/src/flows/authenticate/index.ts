@@ -42,7 +42,6 @@ const pageContent = (
   const authorizeButton: Ref<HTMLButtonElement> = createRef();
   const registerButton: Ref<HTMLLinkElement> = createRef();
   const anchorInput = mkAnchorInput({
-    inputId: "userNumberInput",
     userNumber,
     onSubmit: onContinue,
   });
