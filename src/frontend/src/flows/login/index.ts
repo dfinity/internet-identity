@@ -40,7 +40,7 @@ export const login = async (
   try {
     const userNumber = getUserNumber();
     const clearCache = () => {
-      const message = `This will forget your anchor but your credentials will still stored. To clear your credentials delete browser history.`;
+      const message = `This will forget your anchor number but your credentials will still be stored. To clear your credentials please check your device's documentation on how to clear WebAuthn credentials.`;
       const confirmed = confirm(message);
       if (confirmed) {
         window.localStorage.clear();
