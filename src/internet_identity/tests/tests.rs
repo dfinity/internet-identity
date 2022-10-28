@@ -674,7 +674,7 @@ mod stable_memory_tests {
 
         assert_eq!(
             stats.archive_info.expected_wasm_hash.unwrap().to_vec(),
-            hex::decode("93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476")
+            hex::decode("12e2c2bd05dfcd86e3004ecd5f00533e6120e7bcf82bac0753af0a7fe14bfea1")
                 .unwrap()
         );
         Ok(())

@@ -176,7 +176,7 @@ fn should_save_and_restore_persistent_state() {
 
     let persistent_state = sample_persistent_state();
 
-    storage.write_persistent_state(&persistent_state).unwrap();
+    storage.write_persistent_state(&persistent_state);
     assert_eq!(storage.read_persistent_state().unwrap(), persistent_state);
 }
 
@@ -187,9 +187,7 @@ fn should_save_persistent_state_at_expected_memory_address() {
         Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
-    storage
-        .write_persistent_state(&sample_persistent_state())
-        .unwrap();
+    storage.write_persistent_state(&sample_persistent_state());
 
     let mut buf = vec![0u8; 4];
     memory.read(RESERVED_HEADER_BYTES, &mut buf);
@@ -209,9 +207,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
         storage.allocate_user_number().unwrap();
     }
 
-    storage
-        .write_persistent_state(&sample_persistent_state())
-        .unwrap();
+    storage.write_persistent_state(&sample_persistent_state());
 
     let mut buf = vec![0u8; 4];
     memory.read(EXPECTED_ADDRESS, &mut buf);
@@ -228,9 +224,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
     storage.flush();
 
     storage.allocate_user_number().unwrap();
-    storage
-        .write_persistent_state(&sample_persistent_state())
-        .unwrap();
+    storage.write_persistent_state(&sample_persistent_state());
 
     let mut buf = vec![0u8; 4];
     memory.read(EXPECTED_ADDRESS, &mut buf);
@@ -252,7 +246,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 #[test]
 fn should_read_previously_stored_persistent_state() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
-    const PERSISTENT_STATE_BYTES: &'static str = "494950537a000000000000004449444c066c01cbc282b705016c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b7fb5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b00101";
+    const PERSISTENT_STATE_BYTES: &'static str = "494950537a000000000000004449444c066c01cbc282b705016c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b00101";
 
     let memory = VectorMemory::default();
     // allocate space for the writes
