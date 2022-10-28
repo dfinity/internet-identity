@@ -1,5 +1,3 @@
-import { Ref } from "lit-html/directives/ref.js";
-
 // A `hasOwnProperty` that produces evidence for the typechecker
 export function hasOwnProperty<
   X extends Record<string, unknown>,
