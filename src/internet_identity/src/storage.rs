@@ -54,14 +54,14 @@
 //!
 //! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
-//! were used).
+//! were used instead).
 
 use crate::state::PersistentStateV1;
 use candid;
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::{GrowFailed, Memory};
+use ic_stable_structures::Memory;
 use internet_identity_interface::UserNumber;
 use std::convert::TryInto;
 use std::fmt;
@@ -347,36 +347,20 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
 
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
     /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next user registration.
-    pub fn write_persistent_state(
-        &mut self,
-        state: &PersistentStateV1,
-    ) -> Result<(), PersistentStateError> {
-        const WASM_PAGE_SIZE: u64 = 65536;
+    pub fn write_persistent_state(&mut self, state: &PersistentStateV1) {
         let address = self.unused_memory_start();
-        let encoded_state =
-            candid::encode_one(state).map_err(|err| PersistentStateError::CandidError(err))?;
 
-        // This block is an additional sanity check to make sure that the calculated address is in
-        // the expected range so that no user data gets overridden.
-        {
-            // plus 1 because memory could lie right on the boundary of one wasm page to the next
-            let max_wasm_pages_affected = div_ceil(encoded_state.len() as u64, WASM_PAGE_SIZE) + 1;
-            let address_page = div_ceil(address, WASM_PAGE_SIZE);
-            // compare with >= to allow for growth when actually writing the data
-            assert!(address_page + max_wasm_pages_affected >= self.memory.size());
-        }
+        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
+        let encoded_state = candid::encode_one(state).unwrap();
 
+        // In practice, for all reasonably sized persistent states (<800MB) the writes are
+        // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
         let mut writer = Writer::new(&mut self.memory, address);
-        writer
-            .write(&PERSISTENT_STATE_MAGIC)
-            .map_err(|err| PersistentStateError::WriteError(err))?;
+        writer.write(&PERSISTENT_STATE_MAGIC).unwrap();
         writer
             .write(&(encoded_state.len() as u64).to_le_bytes())
-            .map_err(|err| PersistentStateError::WriteError(err))?;
-        writer
-            .write(&encoded_state)
-            .map_err(|err| PersistentStateError::WriteError(err))?;
-        Ok(())
+            .unwrap();
+        writer.write(&encoded_state).unwrap();
     }
 
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
@@ -410,17 +394,11 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     }
 }
 
-/// Manual implementation because https://doc.rust-lang.org/std/primitive.u64.html#method.div_ceil is not stable yet.
-fn div_ceil(a: u64, b: u64) -> u64 {
-    (a + b - 1) / b
-}
-
 #[derive(Debug)]
 pub enum PersistentStateError {
     CandidError(candid::error::Error),
     NotFound,
     ReadError(OutOfBounds),
-    WriteError(GrowFailed),
 }
 
 #[derive(Debug)]

@@ -721,9 +721,6 @@ fn stats() -> InternetIdentityStats {
 
 #[update]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
-    if state::expected_archive_hash().is_none() {
-        return DeployArchiveResult::CreationFailed("archive deployment disabled".to_string());
-    }
     archive::deploy_archive(wasm).await
 }
 

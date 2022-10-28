@@ -117,7 +117,7 @@ pub struct ArchiveInfo {
 #[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
 pub enum ArchiveState {
     NotCreated,
-    CreationInProgress,
+    CreationInProgress(Timestamp), // timestamp when creation was initiated
     Created(ArchiveData),
 }
 
@@ -263,8 +263,7 @@ pub fn save_persistent_state() {
     STATE.with(|s| {
         s.storage
             .borrow_mut()
-            .write_persistent_state(&s.persistent_state.borrow())
-            .expect("failed to save persistent state");
+            .write_persistent_state(&s.persistent_state.borrow());
     })
 }
 

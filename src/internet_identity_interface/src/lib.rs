@@ -294,8 +294,6 @@ pub enum DeployArchiveResult {
     Success(Principal),
     #[serde(rename = "creation_in_progress")]
     CreationInProgress,
-    #[serde(rename = "creation_failed")]
-    CreationFailed(String),
-    #[serde(rename = "upgrade_failed")]
-    UpgradeFailed(String),
+    #[serde(rename = "failed")]
+    Failed(String),
 }

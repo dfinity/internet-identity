@@ -163,10 +163,8 @@ type DeployArchiveResult = variant {
   success: principal;
   // Initial archive creation is already in progress.
   creation_in_progress;
-  // Archive does not exist and creation of a new one failed.
-  creation_failed: text;
-  // Archive exists and upgrade to the supplied wasm module failed.
-  upgrade_failed: text;
+  // Archive deployment failed. An error description is returned.
+  failed: text;
 };
 
 service : (opt InternetIdentityInit) -> {

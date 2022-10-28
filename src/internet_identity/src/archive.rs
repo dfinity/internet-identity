@@ -9,57 +9,79 @@ use ic_cdk::api::management_canister::main::{
 use ic_cdk::api::time;
 use ic_cdk::{id, notify};
 use internet_identity_interface::{
-    ArchiveInit, DeployArchiveResult,
-    DeployArchiveResult::{CreationFailed, UpgradeFailed},
-    DeviceDataUpdate, Entry, Operation, Private, UserNumber,
+    ArchiveInit, DeployArchiveResult, DeviceDataUpdate, Entry, Operation, Private, UserNumber,
 };
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use std::time::Duration;
+use ArchiveState::{Created, CreationInProgress, NotCreated};
 use CanisterInstallMode::Upgrade;
+use DeployArchiveResult::{Failed, Success};
 
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
+    if state::expected_archive_hash().is_none() {
+        return Failed("archive deployment disabled".to_string());
+    }
+    let wasm = wasm.into_vec();
+    let hash_check = verify_wasm_hash(&wasm);
+    if hash_check.is_err() {
+        return Failed(hash_check.err().unwrap());
+    }
+
     let archive_state = state::persistent_state_mut(|persistent_state| {
         let archive_state = persistent_state.archive_info.state.clone();
-        if archive_state == ArchiveState::NotCreated {
-            // lock archive creation because of async operation
-            persistent_state.archive_info.state = ArchiveState::CreationInProgress;
+        match archive_state {
+            NotCreated => {
+                // lock archive creation because of async operation
+                persistent_state.archive_info.state = CreationInProgress(time());
+                archive_state
+            }
+            CreationInProgress(timestamp) => {
+                let now = time();
+                let lock_age = Duration::from_nanos(now - timestamp);
+                if lock_age > Duration::from_secs(24 * 60 * 60) {
+                    // The archive has been in creation for more than 1 day. The creation process
+                    // has likely failed and another attempt should be made --> update the lock with
+                    // current timestamp and proceed as if the state had been NotCreated.
+                    persistent_state.archive_info.state = CreationInProgress(now);
+                    return NotCreated;
+                }
+                archive_state
+            }
+            Created(_) => archive_state,
         }
-        archive_state
     });
 
     match archive_state {
-        ArchiveState::NotCreated => create_and_install_archive(wasm.into_vec()).await,
-        ArchiveState::CreationInProgress => DeployArchiveResult::CreationInProgress,
-        ArchiveState::Created(data) => {
-            match install_archive(data.archive_canister, wasm.into_vec()).await {
-                Ok(()) => DeployArchiveResult::Success(data.archive_canister),
-                Err(err) => UpgradeFailed(err),
+        NotCreated => {
+            let creation_result = create_archive().await;
+            match creation_result {
+                Err(e) => {
+                    state::persistent_state_mut(|persistent_state| {
+                        // unlock archive creation again
+                        persistent_state.archive_info.state = NotCreated
+                    });
+                    return Failed(format!("failed to create archive: {:?}", e));
+                }
+                Ok(data) => {
+                    let archive_canister_id = data.archive_canister;
+                    state::persistent_state_mut(|persistent_state| {
+                        // save archive info permanently
+                        persistent_state.archive_info.state = Created(data)
+                    });
+                    match install_archive(archive_canister_id, wasm).await {
+                        Ok(()) => Success(archive_canister_id),
+                        Err(err) => Failed(err),
+                    }
+                }
             }
         }
-    }
-}
-
-async fn create_and_install_archive(wasm: Vec<u8>) -> DeployArchiveResult {
-    match create_archive().await {
-        Err(e) => {
-            state::persistent_state_mut(|persistent_state| {
-                // unlock archive creation again
-                persistent_state.archive_info.state = ArchiveState::NotCreated
-            });
-            return CreationFailed(format!("failed to create archive: {:?}", e));
-        }
-        Ok(data) => {
-            let archive_canister_id = data.archive_canister;
-            state::persistent_state_mut(|persistent_state| {
-                // safe archive info permanently
-                persistent_state.archive_info.state = ArchiveState::Created(data)
-            });
-            match install_archive(archive_canister_id, wasm).await {
-                Ok(()) => DeployArchiveResult::Success(archive_canister_id),
-                Err(err) => UpgradeFailed(err),
-            }
-        }
+        Created(data) => match install_archive(data.archive_canister, wasm).await {
+            Ok(()) => Success(data.archive_canister),
+            Err(err) => Failed(err),
+        },
+        CreationInProgress(_) => DeployArchiveResult::CreationInProgress,
     }
 }
 
@@ -72,8 +94,6 @@ async fn create_archive() -> CallResult<ArchiveData> {
 }
 
 async fn install_archive(archive_canister: Principal, wasm_module: Vec<u8>) -> Result<(), String> {
-    let expected_hash = verify_wasm_hash(&wasm_module)?;
-
     let (archive_status,) = canister_status(CanisterIdRecord {
         canister_id: archive_canister,
     })
@@ -81,17 +101,10 @@ async fn install_archive(archive_canister: Principal, wasm_module: Vec<u8>) -> R
     .map_err(|err| format!("failed to retrieve archive status: {:?}", err))?;
 
     let module_hash = archive_status.module_hash;
-    if module_hash
-        .clone()
-        .map(|hash| hash == expected_hash.to_vec())
-        .unwrap_or(false)
-    {
-        // Don't do anything further if the archive canister has the given module already installed
-        return Ok(());
-    }
-
+    let expected_hash = state::expected_archive_hash().expect("bug: now wasm hash available");
     let mode = match module_hash {
         None => Install,
+        Some(hash) if hash == expected_hash => return Ok(()),
         Some(_) => Upgrade,
     };
 

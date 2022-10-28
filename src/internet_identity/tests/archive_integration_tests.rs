@@ -44,7 +44,7 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
     match result {
-        DeployArchiveResult::UpgradeFailed(msg) => {
+        DeployArchiveResult::Failed(msg) => {
             assert_eq!(msg, "invalid wasm module".to_string())
         }
         unexpected => panic!("unexpected result: {:?}", unexpected),
@@ -62,7 +62,7 @@ fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
     match result {
-        DeployArchiveResult::CreationFailed(msg) => {
+        DeployArchiveResult::Failed(msg) => {
             assert_eq!(msg, "archive deployment disabled".to_string())
         }
         unexpected => panic!("unexpected result: {:?}", unexpected),
