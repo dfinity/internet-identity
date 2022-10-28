@@ -90,7 +90,7 @@ export const mkAnchorInput = ({
     return result;
   };
 
-  // Select the input when the component is rendered (and value is empty)
+  // Select the input when the component is rendered
   const selectInput = (elem: Element): void => {
     if (elem instanceof HTMLInputElement) {
       elem.select();
