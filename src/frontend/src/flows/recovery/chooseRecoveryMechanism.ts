@@ -18,7 +18,7 @@ const pageContent = (devices: DeviceData[]) => html`
         class="c-button c-button--secondary"
         id="seedPhrase"
       >
-        <span aria-hidden>${seedPhraseIcon}</span>
+        <span aria-hidden="true">${seedPhraseIcon}</span>
         <div class="t-strong">Seed Phrase</div>
         <div class="t-weak">Use your own storage</div>
       </button>
@@ -27,7 +27,7 @@ const pageContent = (devices: DeviceData[]) => html`
         class="c-button c-button--secondary"
         id="securityKey"
       >
-        <span aria-hidden>${securityKeyIcon}</span>
+        <span aria-hidden="true">${securityKeyIcon}</span>
         <div class="t-strong">Security Key</div>
         <div class="t-weak">Use an extra security key</div>
       </button>

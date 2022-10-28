@@ -1,6 +1,7 @@
 import { html, TemplateResult } from "lit-html";
 import { withRef } from "../utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import { DirectiveResult } from "lit-html/directive.js";
 import { parseUserNumber } from "../utils/userNumber";
 
@@ -106,7 +107,7 @@ export const mkAnchorInput = ({
         id="${inputId}"
         class="c-input c-input--vip"
         placeholder="Enter anchor"
-        value="${userNumber}"
+        value="${ifDefined(userNumber?.toString())}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
