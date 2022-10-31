@@ -38,7 +38,7 @@ export const icLogo = html`
       id="icLogo"
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
-      viewBox="0 0 233 110"
+      viewBox="0 0 233 111"
     >
       <defs>
         <linearGradient
