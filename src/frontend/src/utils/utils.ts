@@ -154,3 +154,12 @@ export class Chan<A> {
     }
   }
 }
+
+/** Return a random string of size 10
+ *
+ * NOTE: this is not a very robust random, so do not use this for
+ * anything requiring anything resembling true randomness.
+ * */
+export function randomString(): string {
+  return (Math.random() + 1).toString(36).substring(2);
+}
