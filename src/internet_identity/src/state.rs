@@ -2,6 +2,7 @@ use crate::state::ArchiveState::NotCreated;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{PersistentStateError, Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
+use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use ic_certified_map::{Hash, RbTree};
@@ -10,6 +11,7 @@ use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
 pub type AssetHashes = RbTree<&'static str, Hash>;
@@ -145,6 +147,15 @@ pub struct PersistentStateV1 {
     pub canister_creation_cycles_cost: u64,
 }
 
+/// Cached archive status information
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+pub struct ArchiveStatusCache {
+    // Timestamp when the status was last obtained
+    pub timestamp: Timestamp,
+    // Status of the archive canister
+    pub status: CanisterStatusResponse,
+}
+
 struct State {
     storage: RefCell<Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
@@ -163,6 +174,8 @@ struct State {
     // This must remain small as it is serialized and deserialized on pre- and post-upgrade.
     // Be careful when making changes here, as II needs to be able to update and roll back.
     persistent_state: RefCell<PersistentStateV1>,
+    // Cache of the archive status (to make unwanted calls to deploy_archive cheap to dismiss).
+    archive_status_cache: RefCell<Option<ArchiveStatusCache>>,
 }
 
 impl Default for State {
@@ -183,6 +196,7 @@ impl Default for State {
             tentative_device_registrations: RefCell::new(HashMap::new()),
             usage_metrics: RefCell::new(UsageMetrics::default()),
             persistent_state: RefCell::new(PersistentStateV1::default()),
+            archive_status_cache: RefCell::new(None),
         }
     }
 }
@@ -299,6 +313,10 @@ pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
     })
 }
 
+pub fn archive_state() -> ArchiveState {
+    STATE.with(|s| s.persistent_state.borrow().archive_info.state.clone())
+}
+
 pub fn archive_ready() -> bool {
     STATE.with(|s| match s.persistent_state.borrow().archive_info.state {
         ArchiveState::Created(_) => true,
@@ -410,4 +428,23 @@ pub fn persistent_state<R>(f: impl FnOnce(&PersistentStateV1) -> R) -> R {
 
 pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentStateV1) -> R) -> R {
     STATE.with(|s| f(&mut *s.persistent_state.borrow_mut()))
+}
+
+pub fn cached_archive_status() -> Option<CanisterStatusResponse> {
+    STATE.with(|s| match *s.archive_status_cache.borrow() {
+        None => None,
+        Some(ref cached_status) => {
+            // cache is outdated
+            if time() - cached_status.timestamp > Duration::from_secs(60 * 60).as_nanos() as u64 {
+                return None;
+            }
+            Some(cached_status.status.clone())
+        }
+    })
+}
+
+pub fn cache_archive_status(archive_status: ArchiveStatusCache) {
+    STATE.with(|state| {
+        *state.archive_status_cache.borrow_mut() = Some(archive_status);
+    })
 }
