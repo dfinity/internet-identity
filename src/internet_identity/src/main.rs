@@ -712,10 +712,15 @@ fn stats() -> InternetIdentityStats {
             }
         }
     });
+
+    let canister_creation_cycles_cost =
+        state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_user_number_range(),
         users_registered: storage.user_count() as u64,
         archive_info,
+        canister_creation_cycles_cost,
     })
 }
 
@@ -775,6 +780,11 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(archive_hash) = arg.archive_module_hash {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.archive_info.expected_module_hash = Some(archive_hash);
+            })
+        }
+        if let Some(cost) = arg.canister_creation_cycles_cost {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.canister_creation_cycles_cost = cost;
             })
         }
     }

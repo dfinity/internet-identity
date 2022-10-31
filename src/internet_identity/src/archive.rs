@@ -21,9 +21,11 @@ use CanisterInstallMode::Upgrade;
 use DeployArchiveResult::{Failed, Success};
 
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
-    if state::expected_archive_hash().is_none() {
+    let expected_hash = if let Some(hash) = state::expected_archive_hash() {
+        hash
+    } else {
         return Failed("archive deployment disabled".to_string());
-    }
+    };
 
     let (archive_canister, install_mode) = match state::archive_state() {
         NotCreated => match create_archive().await {
@@ -47,11 +49,14 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
                 Ok(status) => status,
                 Err(message) => return Failed(message),
             };
-            // we already have an archive with the expected module and don't need to do anything
-            if status.module_hash == state::expected_archive_hash().map(|hash| hash.to_vec()) {
-                return Success(archive_data.archive_canister);
+            match status.module_hash {
+                None => (archive_data.archive_canister, Install),
+                Some(hash) if hash == expected_hash.to_vec() => {
+                    // we already have an archive with the expected module and don't need to do anything
+                    return Success(archive_data.archive_canister);
+                }
+                Some(_) => (archive_data.archive_canister, Upgrade),
             }
-            (archive_data.archive_canister, Upgrade)
         }
     };
 

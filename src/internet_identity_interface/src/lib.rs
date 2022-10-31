@@ -182,6 +182,7 @@ pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
     pub archive_info: ArchiveInfo,
+    pub canister_creation_cycles_cost: u64,
 }
 
 // Archive specific types

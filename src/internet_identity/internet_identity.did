@@ -123,6 +123,7 @@ type InternetIdentityStats = record {
   users_registered: nat64;
   assigned_user_number_range: record { nat64; nat64; };
   archive_info: ArchiveInfo;
+  canister_creation_cycles_cost: nat64;
 };
 
 // Information about the archive.
