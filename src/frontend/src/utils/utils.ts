@@ -1,20 +1,3 @@
-import { Ref } from "lit-html/directives/ref.js";
-
-// Read a "lit-html" ref, showing an error message (in the console) in case the
-// element is not available.
-export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
-  const value = ref.value;
-
-  if (value === undefined) {
-    console.error(
-      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
-    );
-    return;
-  } else {
-    return f(value);
-  }
-}
-
 // A `hasOwnProperty` that produces evidence for the typechecker
 export function hasOwnProperty<
   X extends Record<string, unknown>,
@@ -117,4 +100,66 @@ export function wrapError(err: unknown): string {
   }
 
   return unknownError;
+}
+
+/** A channel (Chan) between two execution environments.
+ * Values can be sent (`send()`) and received (`recv()`) asynchronously
+ * on the other end.
+ */
+export class Chan<A> {
+  /* The `recv` function will read values both from a blocking `snd` function
+   * and from a buffer. We always _first_ write to `snd` and _then_ write
+   * to `buffer` and _first_ read from the buffer and _then_ read from `snd`
+   * to maintain a correct ordering.
+   *
+   * `snd` is a set by `recv` as `resolve` from a promise that `recv` blocks
+   * on.
+   */
+
+  // Write to `recv`'s blocking promise
+  private snd?: (value: A) => void;
+
+  // Buffer where values are stored in between direct writes
+  // to the promise
+  private buffer: A[] = [];
+
+  send(a: A): void {
+    if (this.snd !== undefined) {
+      this.snd(a);
+      // After the promise was resolved, set as undefined so that
+      // future `send`s go to the buffer.
+      this.snd = undefined;
+    } else {
+      this.buffer.push(a);
+    }
+  }
+
+  async *recv(): AsyncIterable<A> {
+    // Forever loop, yielding entire buffers and then blocking
+    // on `snd` (which prevents hot looping)
+    while (true) {
+      // Yield the buffer first
+      while (true) {
+        const val = this.buffer.shift();
+        if (val === undefined) {
+          break;
+        }
+        yield val;
+      }
+
+      // then block and yield a value when received
+      yield await new Promise((resolve: (value: A) => void) => {
+        this.snd = resolve;
+      });
+    }
+  }
+}
+
+/** Return a random string of size 10
+ *
+ * NOTE: this is not a very robust random, so do not use this for
+ * anything requiring anything resembling true randomness.
+ * */
+export function randomString(): string {
+  return (Math.random() + 1).toString(36).substring(2);
 }
