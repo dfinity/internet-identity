@@ -276,6 +276,7 @@ display:revert; revert to element instead of attribute */
   /* general styles */
   font-family: "Montserrat", sans-serif;
   font-size: 62.5%; /* 10px */
+  font-size: max(62.5%, calc(0.6vh + 0.25rem));
 
   background: var(--rc-background);
   color: var(--rc-text);
