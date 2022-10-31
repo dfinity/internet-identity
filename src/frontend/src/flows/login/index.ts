@@ -109,6 +109,7 @@ const pageContent = (
     onSubmit: props.submit,
     userNumber: props.returning ? props.userNumber : undefined,
     focus: props.returning,
+    important: props.returning,
   });
 
   const addDeviceClick = () => {
