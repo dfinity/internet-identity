@@ -271,3 +271,21 @@ export const caretDownIcon = html`
     </g>
   </svg>
 `;
+
+export const arrowRight = html`
+  <svg
+    viewBox="0 0 23 21"
+    xmlns="http://www.w3.org/2000/svg"
+    class="icon icon--arrow-right"
+  >
+    <style>
+      .icon--arrow-right g {
+        stroke-width: var(--stroke-width, 1);
+      }
+    </style>
+    <g vector-effect="non-scaling-stroke" fill="none" stroke="currentColor">
+      <path d="M 15.5 5 L 21 10 L 15.5 15" />
+      <line x1="0" y1="10" x2="21" y2="10" />
+    </g>
+  </svg>
+`;
