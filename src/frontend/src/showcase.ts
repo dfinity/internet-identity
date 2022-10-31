@@ -2,7 +2,11 @@
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
 import "./styles/main.css";
-import { html, render } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { Chan } from "./utils/utils";
+import { withRef } from "./utils/lit-html";
+import { TemplateResult, html, render } from "lit-html";
 import {
   Challenge,
   DeviceData,
@@ -41,6 +45,7 @@ import {
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
@@ -229,6 +234,67 @@ const iiPages: Record<string, () => void> = {
   registerDisabled: () => registerDisabled(),
 };
 
+const showcase: TemplateResult = html`
+  <h1 class="t-title t-title--main">showcase</h1>
+  <div class="showcase-grid l-stack">
+    ${Object.entries(iiPages).map(([key, _]) => {
+      return html`<aside>
+        <a data-page-name="${key}" href="/${key}">
+          <iframe src="/${key}" title="${key}"></iframe>
+          <h2>${key}</h2>
+        </a>
+      </aside>`;
+    })}
+  </div>
+`;
+
+const components = (): TemplateResult => {
+  const showSelected: Ref<HTMLDivElement> = createRef();
+  const savedAnchors: Ref<HTMLInputElement> = createRef();
+  const updateSavedAnchors: Ref<HTMLButtonElement> = createRef();
+
+  const mk = (anchors: bigint[]): TemplateResult =>
+    mkAnchorPicker({
+      savedAnchors: anchors,
+      pick: (anchor: bigint) =>
+        withRef(showSelected, (div) => {
+          div.innerText = anchor.toString();
+        }),
+    }).template;
+
+  const chan = new Chan<TemplateResult>();
+
+  const update = () => {
+    const value = savedAnchors.value?.value;
+    if (value !== undefined) {
+      if (value === "") {
+        chan.send(mk([]));
+      } else {
+        const values = value.split(",").map((x) => {
+          return BigInt(x);
+        });
+
+        chan.send(mk(values));
+      }
+    }
+  };
+
+  chan.send(mk([BigInt(10055), BigInt(1669234)]));
+
+  return html`
+    <div class="c-card" style="margin: 40px;">
+        <input class="c-input" ${ref(
+          savedAnchors
+        )} placeholder="stored anchors: anchor1, anchor2, ..." ></input>
+        <button class="c-button" ${ref(
+          updateSavedAnchors
+        )} @click="${update}">update</button>
+        <div>${asyncReplace(chan.recv())}</div>
+    <div ${ref(
+      showSelected
+    )} class="c-input c-input--readonly">Please select anchor</div></div>`;
+};
+
 // The showcase
 const pageContent = html`
   <style>
@@ -275,18 +341,7 @@ const pageContent = html`
       font-size: 1.25rem;
     }
   </style>
-  <h1 class="t-title t-title--main">showcase</h1>
-  <div class="showcase-grid l-stack">
-    ${Object.entries(iiPages).map(([key, _]) => {
-      return html`<aside>
-        <a data-page-name="${key}" href="/${key}">
-          <iframe src="/${key}" title="${key}"></iframe>
-          <h2>${key}</h2>
-        </a>
-      </aside>`;
-    })}
-  </div>
-  ${styleguide}
+  ${showcase} ${components()} ${styleguide}
 `;
 
 const init = async () => {
