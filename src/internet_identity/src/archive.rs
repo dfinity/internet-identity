@@ -1,9 +1,9 @@
 use crate::state;
 use crate::state::{ArchiveData, ArchiveState, DeviceDataInternal};
 use candid::Principal;
-use ic_cdk::api::call::CallResult;
+use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::main::{
-    canister_status, create_canister, install_code, CanisterIdRecord, CanisterInstallMode,
+    canister_status, install_code, CanisterIdRecord, CanisterInstallMode,
     CanisterInstallMode::Install, CreateCanisterArgument, InstallCodeArgument,
 };
 use ic_cdk::api::time;
@@ -91,6 +91,26 @@ async fn create_archive() -> CallResult<ArchiveData> {
         sequence_number: 0,
         archive_canister: result.canister_id,
     })
+}
+
+/// Register a new canister and get its canister id.
+///
+/// See [IC method `create_canister`](https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-create_canister).
+///
+/// Note: Copied from [ic-cdk::create_canister] but modified to allow a configurable amount of cycles
+/// to be sent (canister creation is free on system subnets where II is running). We still make the
+/// cycles cost configurable so that II can be run and deploy an archive on an application subnets
+/// as well.
+pub async fn create_canister(arg: CreateCanisterArgument) -> CallResult<(CanisterIdRecord,)> {
+    let cycles_cost =
+        state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+    call_with_payment(
+        Principal::management_canister(),
+        "create_canister",
+        (arg,),
+        cycles_cost,
+    )
+    .await
 }
 
 async fn install_archive(archive_canister: Principal, wasm_module: Vec<u8>) -> Result<(), String> {

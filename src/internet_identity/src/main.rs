@@ -739,6 +739,11 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.archive_info.expected_module_hash = Some(archive_hash);
             })
         }
+        if let Some(cost) = arg.canister_creation_cycles_cost {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.canister_creation_cycles_cost = cost;
+            })
+        }
     }
 
     // make sure the fully initialized storage configuration is written to stable memory

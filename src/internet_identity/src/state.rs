@@ -141,6 +141,8 @@ pub struct ArchiveData {
 pub struct PersistentStateV1 {
     // Information related to the archive
     pub archive_info: ArchiveInfo,
+    // Amount of cycles that need to be attached when II creates a canister
+    pub canister_creation_cycles_cost: u64,
 }
 
 struct State {

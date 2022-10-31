@@ -60,6 +60,7 @@ mod upgrade_tests {
             Some(InternetIdentityInit {
                 assigned_user_number_range: Some((2000, 4000)),
                 archive_module_hash: None,
+                canister_creation_cycles_cost: None,
             }),
         );
 
@@ -86,6 +87,7 @@ mod upgrade_tests {
             Some(InternetIdentityInit {
                 assigned_user_number_range: Some(stats.assigned_user_number_range),
                 archive_module_hash: None,
+                canister_creation_cycles_cost: None,
             }),
         );
 
@@ -232,6 +234,7 @@ mod registration_tests {
             Some(InternetIdentityInit {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
+                canister_creation_cycles_cost: None,
             }),
         );
 
@@ -1888,6 +1891,7 @@ mod http_tests {
             Some(InternetIdentityInit {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
+                canister_creation_cycles_cost: None,
             }),
         );
 

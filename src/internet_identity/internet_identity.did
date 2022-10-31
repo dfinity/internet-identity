@@ -138,6 +138,7 @@ type ArchiveInfo = record {
 type InternetIdentityInit = record {
   assigned_user_number_range : opt record { nat64; nat64; };
   archive_module_hash : opt blob;
+  canister_creation_cycles_cost : opt nat64;
 };
 
 type ChallengeKey = text;

@@ -124,13 +124,17 @@ pub fn install_ii_canister_with_arg(
 }
 
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<types::InternetIdentityInit> {
-    let mut hasher = Sha256::new();
-    hasher.update(&wasm);
-    let wasm_hash: [u8; 32] = hasher.finalize().into();
     Some(types::InternetIdentityInit {
         assigned_user_number_range: None,
-        archive_module_hash: Some(wasm_hash),
+        archive_module_hash: Some(archive_wasm_hash(&wasm)),
+        canister_creation_cycles_cost: Some(0),
     })
+}
+
+pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(&wasm);
+    hasher.finalize().into()
 }
 
 pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {

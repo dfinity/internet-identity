@@ -246,7 +246,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 #[test]
 fn should_read_previously_stored_persistent_state() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
-    const PERSISTENT_STATE_BYTES: &'static str = "494950537a000000000000004449444c066c01cbc282b705016c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b00101";
+    const PERSISTENT_STATE_BYTES: &'static str = "4949505388000000000000004449444c066c02cbc282b70501f7f5cbfb07786c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b001018002e1df02000000";
 
     let memory = VectorMemory::default();
     // allocate space for the writes
@@ -288,6 +288,7 @@ fn sample_persistent_state() -> PersistentStateV1 {
                 archive_canister: Principal::from_text("2h5ob-7aaaa-aaaad-aacya-cai").unwrap(),
             }),
         },
+        canister_creation_cycles_cost: 12_346_000_000,
     };
     persistent_state
 }

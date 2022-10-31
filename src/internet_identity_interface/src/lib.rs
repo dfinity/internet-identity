@@ -174,6 +174,7 @@ pub struct HttpResponse {
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
     pub archive_module_hash: Option<[u8; 32]>,
+    pub canister_creation_cycles_cost: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

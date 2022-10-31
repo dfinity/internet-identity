@@ -6,12 +6,10 @@ use canister_tests::framework::*;
 use ic_state_machine_tests::StateMachine;
 use internet_identity_interface::{
     DeployArchiveResult, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
-    KeyType, Operation, Purpose,
+    InternetIdentityInit, KeyType, Operation, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::time::SystemTime;
-
-const TRILLION: u128 = 1_000_000_000_000;
 
 /// Test to verify that II can spawn an archive canister.
 #[test]
@@ -22,11 +20,30 @@ fn should_deploy_archive() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(ARCHIVE_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
     assert!(matches!(result, DeployArchiveResult::Success(_)));
+    Ok(())
+}
+
+/// Test to verify that II can spawn an archive canister when cycles are required.
+#[test]
+fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
+    let env = StateMachine::new();
+    let ii_canister = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            assigned_user_number_range: None,
+            archive_module_hash: Some(archive_wasm_hash(&ARCHIVE_WASM)),
+            canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
+        }),
+    );
+    env.add_cycles(ii_canister, 150_000_000_000);
+
+    let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+    assert!(matches!(result, DeployArchiveResult::Success(_)));
+    assert_eq!(env.cycle_balance(ii_canister), 50_000_000_000);
     Ok(())
 }
 
@@ -39,8 +56,6 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(ARCHIVE_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
     match result {
@@ -57,8 +72,6 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
 fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
     let env = StateMachine::new();
     let ii_canister = install_ii_canister(&env, II_WASM.clone());
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
     match result {
@@ -79,9 +92,6 @@ fn should_keep_archive_module_hash_across_upgrades() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(ARCHIVE_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
-
     upgrade_ii_canister(&env, ii_canister, II_WASM.clone());
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
@@ -98,8 +108,6 @@ fn should_upgrade_the_archive() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(EMPTY_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
     assert!(matches!(result, DeployArchiveResult::Success(_)));
@@ -134,8 +142,6 @@ fn should_keep_archive_across_upgrades() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(ARCHIVE_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let archive_canister = deploy_archive_via_ii(&env, ii_canister);
     assert!(env.canister_exists(archive_canister));
@@ -158,8 +164,6 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
         II_WASM.clone(),
         arg_with_wasm_hash(ARCHIVE_WASM.clone()),
     );
-    // the env requires cycles to spawn canisters
-    env.add_cycles(ii_canister, 2 * TRILLION);
 
     let archive_canister = deploy_archive_via_ii(&env, ii_canister);
     assert!(env.canister_exists(archive_canister));
