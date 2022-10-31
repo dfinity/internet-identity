@@ -121,7 +121,7 @@ const pageContent = (
   };
 
   const signin = html`
-    <div>
+    <div class="${props.returning && "l-stack"}">
       ${anchorInput.template}
       <button
         @click="${anchorInput.submit}"
