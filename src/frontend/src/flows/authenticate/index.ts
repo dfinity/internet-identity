@@ -22,32 +22,27 @@ import {
 import { unreachable } from "../../utils/utils";
 import { withRef } from "../../utils/lit-html";
 
-type PageElements = {
-  authorizeButton: Ref<HTMLButtonElement>;
-  registerButton: Ref<HTMLLinkElement>;
+type PageProps = {
+  origin: string;
+  onContinue: (arg: bigint) => void;
+  recoverAnchor: (userNumner?: bigint) => void;
+  register: () => void;
+  userNumber?: bigint;
+  derivationOrigin?: string;
 };
 
-const pageContent = (
-  connection: Connection,
-  hostName: string,
-  onContinue: (arg: bigint) => void,
-  userNumber?: bigint,
-  derivationOrigin?: string
-): PageElements & { template: TemplateResult } => {
-  const onManageClick = () => {
-    window.location.hash = "";
-    window.location.reload();
-  };
-
-  const authorizeButton: Ref<HTMLButtonElement> = createRef();
-  const registerButton: Ref<HTMLLinkElement> = createRef();
+const pageContent = ({
+  origin,
+  onContinue,
+  recoverAnchor,
+  register,
+  userNumber,
+  derivationOrigin,
+}: PageProps): { template: TemplateResult } => {
   const anchorInput = mkAnchorInput({
     userNumber,
     onSubmit: onContinue,
   });
-
-  const onRecoverClick = () =>
-    useRecovery(connection, anchorInput.readUserNumber());
 
   /* the chasm that opens to reveal details about alternative origin */
   const chasmRef: Ref<HTMLDivElement> = createRef();
@@ -84,7 +79,7 @@ const pageContent = (
       <div class="l-stack t-centered">
         <p class="t-lead">
           Connect to<br />
-          <span class="t-strong">${hostName}</span>
+          <span class="t-strong">${origin}</span>
           <br />
         </p>
         ${derivationOrigin !== undefined
@@ -94,7 +89,7 @@ const pageContent = (
             )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
           <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
             <div class="c-chasm__arrow"></div>
-            <div class="t-weak c-chasm__content"><span class="t-strong">${hostName}</span>
+            <div class="t-weak c-chasm__content"><span class="t-strong">${origin}</span>
             is an alternative domain of <br/><span class="t-strong">${derivationOrigin}</span><br/>and you will be authenticated to both with the same identity.
             </div>
           </div>
@@ -106,7 +101,6 @@ const pageContent = (
 
       <button
         @click="${anchorInput.submit}"
-        ${ref(authorizeButton)}
         id="authorizeButton"
         class="c-button"
       >
@@ -115,19 +109,22 @@ const pageContent = (
       <div class="l-stack">
         <ul class="c-list--flex">
           <li>
-            <a ${ref(registerButton)} id="registerButton" class="t-link"
+            <a @click=${register} id="registerButton" class="t-link"
               >Create Anchor</a
             >
           </li>
           <li>
-            <a @click="${onRecoverClick}" id="recoverButton" class="t-link"
+            <a
+              @click="${() => recoverAnchor(anchorInput.readUserNumber())}"
+              id="recoverButton"
+              class="t-link"
               >Lost Access?</a
             >
           </li>
+        </ul>
+        <ul class="c-list--flex">
           <li>
-            <a @click="${onManageClick}" class="t-link" id="manageButton"
-              >Manage Anchor</a
-            >
+            <a href="/" class="t-link" id="manageButton">Home</a>
           </li>
           <li>
             <a
@@ -145,8 +142,6 @@ const pageContent = (
 
   return {
     template,
-    authorizeButton,
-    registerButton,
   };
 };
 
@@ -208,25 +203,22 @@ export const authorizeAuthentication = async (
         // never resolve, do not call init
       });
     case "valid":
-      return new Promise((resolve) => {
-        init(connection, authContext, userNumber).then(resolve);
-      });
+      return authenticatePage(connection, authContext, userNumber);
     default:
       unreachable(validationResult);
       break;
   }
 };
 
-const init = (
+const authenticatePage = (
   connection: Connection,
   authContext: AuthContext,
   userNumber?: bigint
 ): Promise<AuthSuccess> => {
   return new Promise((resolve) => {
-    const { authorizeButton, registerButton } = displayPage(
-      connection,
-      authContext.requestOrigin,
-      async (userNumber) => {
+    displayPage({
+      origin: authContext.requestOrigin,
+      onContinue: async (userNumber) => {
         const authSuccess = await authenticateUser(
           connection,
           authContext,
@@ -234,54 +226,32 @@ const init = (
         );
         resolve(authSuccess);
       },
+      register: () =>
+        registerIfAllowed(connection)
+          .then((result) => {
+            if (result === null) {
+              // user canceled registration
+              return authenticatePage(connection, authContext, userNumber);
+            }
+            if (result.tag === "ok") {
+              return handleAuthSuccess(result, authContext);
+            }
+            // something went wrong, display error and try again
+            return displayError({
+              title: result.title,
+              message: result.message,
+              detail: result.detail !== "" ? result.detail : undefined,
+              primaryButton: "Try again",
+            }).then(() =>
+              authenticatePage(connection, authContext, userNumber)
+            );
+          })
+          .then(resolve),
+
+      recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
       userNumber,
-      authContext.authRequest.derivationOrigin
-    );
-
-    // only focus on the button if the anchor is set and was previously used successfully (i.e. is in local storage)
-    if (userNumber !== undefined && userNumber === getUserNumber()) {
-      withRef(authorizeButton, (authorizeButton) => authorizeButton.focus());
-    }
-
-    // Resolve either on successful authentication or after registration
-    withRef(registerButton, (registerButton) =>
-      initRegistration(
-        connection,
-        authContext,
-        registerButton,
-        userNumber
-      ).then(resolve)
-    );
-  });
-};
-
-const initRegistration = async (
-  connection: Connection,
-  authContext: AuthContext,
-  registerButton: HTMLLinkElement,
-  userNumber?: bigint
-): Promise<AuthSuccess> => {
-  return new Promise((resolve) => {
-    registerButton.onclick = () => {
-      registerIfAllowed(connection)
-        .then((result) => {
-          if (result === null) {
-            // user canceled registration
-            return init(connection, authContext, userNumber);
-          }
-          if (result.tag === "ok") {
-            return handleAuthSuccess(result, authContext);
-          }
-          // something went wrong, display error and try again
-          return displayError({
-            title: result.title,
-            message: result.message,
-            detail: result.detail !== "" ? result.detail : undefined,
-            primaryButton: "Try again",
-          }).then(() => init(connection, authContext, userNumber));
-        })
-        .then(resolve);
-    };
+      derivationOrigin: authContext.authRequest.derivationOrigin,
+    });
   });
 };
 
@@ -312,27 +282,13 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return init(connection, authContext, userNumber);
+  return authenticatePage(connection, authContext, userNumber);
 };
 
-export const displayPage = (
-  connection: Connection,
-  origin: string,
-  onContinue: (arg: bigint) => void,
-  userNumber?: bigint,
-  derivationOrigin?: string
-): PageElements => {
+export const displayPage = (props: PageProps): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const ret = pageContent(
-    connection,
-    origin,
-    onContinue,
-    userNumber,
-    derivationOrigin
-  );
+  const ret = pageContent(props);
   render(ret.template, container);
-
-  return ret;
 };
 
 async function handleAuthSuccess(
