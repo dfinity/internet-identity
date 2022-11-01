@@ -19,7 +19,8 @@ import {
   validateDerivationOrigin,
   ValidationResult,
 } from "./validateDerivationOrigin";
-import { unreachable, withRef } from "../../utils/utils";
+import { unreachable } from "../../utils/utils";
+import { withRef } from "../../utils/lit-html";
 
 type PageElements = {
   authorizeButton: Ref<HTMLButtonElement>;
@@ -41,7 +42,6 @@ const pageContent = (
   const authorizeButton: Ref<HTMLButtonElement> = createRef();
   const registerButton: Ref<HTMLLinkElement> = createRef();
   const anchorInput = mkAnchorInput({
-    inputId: "userNumberInput",
     userNumber,
     onSubmit: onContinue,
   });

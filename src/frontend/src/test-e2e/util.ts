@@ -1,6 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
-import { wrapError } from "../utils/utils";
+import { wrapError, randomString } from "../utils/utils";
 import { WebAuthnCredential } from "../../test-setup";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fsasync from "fs/promises";
@@ -67,7 +67,9 @@ export async function runInBrowser(
     // run test
     await test(browser, runConfig);
   } catch (e) {
-    const testName = expect.getState().currentTestName.replace(/\W/g, "_");
+    const testName =
+      expect.getState().currentTestName?.replace(/\W/g, "_") ??
+      `unknown-${randomString()}`;
     if (!fs.existsSync("test-failures")) {
       fs.mkdirSync("test-failures");
     }

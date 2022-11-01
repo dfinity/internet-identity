@@ -9,7 +9,6 @@ const pageContent = (
 ): { template: TemplateResult } => {
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
   const anchorInput = mkAnchorInput({
-    inputId: "userNumberInput",
     userNumber: userNumber ?? undefined,
     onSubmit: (userNumber: bigint) => {
       callbacks.onContinue(userNumber);
