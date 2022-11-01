@@ -18,5 +18,10 @@
       }
     ]
   },
-  "ignorePatterns": ["src/**/*.test.ts", "src/frontend/generated/*"]
+  "ignorePatterns": [
+    "src/**/*.test.ts",
+    "src/frontend/src/test-e2e/*.ts",
+    "src/frontend/generated/*",
+    "src/frontend/custom-sequencer.ts"
+  ]
 }
