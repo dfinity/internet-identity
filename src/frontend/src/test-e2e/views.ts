@@ -387,14 +387,6 @@ export class AboutView extends View {
   }
 }
 
-export class CompatabilityNoticeView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#compatibilityNotice")
-      .waitForDisplayed({ timeout: 3_000 });
-  }
-}
-
 export class DemoAppView extends View {
   async open(demoAppUrl: string, iiUrl: string): Promise<void> {
     await this.browser.url(demoAppUrl);
