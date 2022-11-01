@@ -9,10 +9,12 @@ export const mkAnchorInput = ({
   userNumber,
   onSubmit,
   focus = true,
+  important = true,
 }: {
   userNumber?: bigint;
   onSubmit?: (userNumber: bigint) => void;
   focus?: boolean;
+  important?: boolean;
 }): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
@@ -102,7 +104,8 @@ export const mkAnchorInput = ({
         ${focus ? mount(selectInput) : ""}
         type="text"
         data-role="anchor-input"
-        class="c-input c-input--vip"
+        class="c-input ${important &&
+        "c-input--vip"} c-input--rounded c-input--centered c-input--spacious"
         placeholder="Enter anchor"
         value="${ifDefined(userNumber?.toString())}"
         @input=${inputFilter(isDigits, onBadInput)}

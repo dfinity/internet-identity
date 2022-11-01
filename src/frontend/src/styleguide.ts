@@ -208,6 +208,21 @@ export const styleguide = html`
           <div class="c-input c-input--vip">Important inputs</div>
           <input
             type="text"
+            placeholder="Rounded Input"
+            class="c-input c-input--rounded"
+          />
+          <input
+            type="text"
+            placeholder="Spacious Input"
+            class="c-input c-input--rounded c-input--spacious"
+          />
+          <input
+            type="text"
+            placeholder="Centered Input"
+            class="c-input c-input--centered"
+          />
+          <input
+            type="text"
             placeholder="Errored Input"
             class="c-input has-error"
           />
