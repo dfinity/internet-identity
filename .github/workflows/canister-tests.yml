@@ -354,6 +354,11 @@ jobs:
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
+        # Specify some shards for jest (a jest instance will only run a subset of files
+        # based on the shard assigned to it)
+        # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
+        # version here (with underscore).
+        shard: [ '1_3', '2_3', '3_3' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -404,7 +409,7 @@ jobs:
 
       - run: npm ci
       - run: npm test
-      - run: npm run test:e2e-${{ matrix.device }}
+      - run: "SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
       - name: Collect docker logs
         working-directory: docker-test-env
         if: ${{ always() }}
@@ -421,14 +426,14 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: e2e-test-log-${{ matrix.device }}
+          name: e2e-test-log-${{ matrix.device }}-${{ matrix.shard }}
           path: ./*.log
 
       - name: Archive test failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: e2e-test-failures-${{ matrix.device }}
+          name: e2e-test-failures-${{ matrix.device }}-${{ matrix.shard }}
           path: test-failures/*
           if-no-files-found: ignore
 

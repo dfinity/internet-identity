@@ -13,6 +13,8 @@ export default {
   },
   setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
 
+  testSequencer: "./src/frontend/jest-custom-sequencer.ts",
+
   // These two transform options make sure that jest can process files that include ES modules
   // (in particular, files that have lit-html import)
   transform: { "\\.[jt]sx?$": "ts-jest" },
