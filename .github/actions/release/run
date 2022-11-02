@@ -55,8 +55,9 @@ do
 
     # Find out the Job ID
     # XXX: Unfortunately GitHub actions doesn't give us a way to find out the Job ID explicitely.
-    # Instead, we find the job name that includes "$filename" and assume that's the Job ID. This works
-    # because our build matrix takes in the filename as argument, which is added to the job name.
+    # Instead, we find the job name that includes "$filename" without the .wasm extension and assume that's the Job ID.
+    # This works because our jobs contain the filename without extension
+    # (either added manually or by build matrix which takes in the filename as argument and adds it to the job name).
     # https://github.community/t/get-action-job-id/17365/7
     if [ -z "${GITHUB_RUN_ID:-}" ]
     then
@@ -66,8 +67,8 @@ do
     else
         job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
-            --arg filename "$filename" \
-            '.jobs[] | select(.name | contains($filename)) | .id')
+            --arg search_string "${filename%.wasm}" \
+            '.jobs[] | select(.name | contains($search_string)) | .id')
                     >&2 echo "Found job id: $job_id"
 
         # Now get the URL that we'll link to for verification of the sha
