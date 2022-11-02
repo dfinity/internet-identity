@@ -194,6 +194,18 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
+      - name: Install protobuf compiler (linux)
+        if: ${{ matrix.os  == 'ubuntu-latest' }}
+        run: |
+          sudo apt update && sudo apt install -y protobuf-compiler
+          protoc --version
+
+      - name: Install protobuf compiler (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install protobuf
+          protoc --version
+
       - uses: actions/checkout@v3
         with:
           # Pull a deep copy so that we can set meaningful timestamps across builds, based on the commit history
