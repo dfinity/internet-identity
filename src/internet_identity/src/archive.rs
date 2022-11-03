@@ -27,17 +27,19 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
         return Failed("archive deployment disabled".to_string());
     };
 
-    let (archive_canister, install_mode) = match state::archive_state() {
-        NotCreated => match create_archive().await {
-            Ok(archive) => (archive, Install),
+    let wasm = wasm.into_vec();
+
+    let (archive_canister, install_mode, wasm_hash_verified) = match state::archive_state() {
+        NotCreated => match create_archive(&wasm).await {
+            Ok(archive) => (archive, Install, true),
             Err(result) => return result,
         },
         CreationInProgress(timestamp) => {
             if time() - timestamp > Duration::from_secs(24 * 60 * 60).as_nanos() as u64 {
                 // The archive has been in creation for more than a day and the creation process
                 // has likely failed thus another attempt should be made.
-                match create_archive().await {
-                    Ok(archive) => (archive, Install),
+                match create_archive(&wasm).await {
+                    Ok(archive) => (archive, Install, true),
                     Err(result) => return result,
                 }
             } else {
@@ -50,20 +52,22 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
                 Err(message) => return Failed(message),
             };
             match status.module_hash {
-                None => (archive_data.archive_canister, Install),
+                None => (archive_data.archive_canister, Install, false),
                 Some(hash) if hash == expected_hash.to_vec() => {
                     // we already have an archive with the expected module and don't need to do anything
                     return Success(archive_data.archive_canister);
                 }
-                Some(_) => (archive_data.archive_canister, Upgrade),
+                Some(_) => (archive_data.archive_canister, Upgrade, false),
             }
         }
     };
 
-    let wasm = wasm.into_vec();
-    let hash_check = verify_wasm_hash(&wasm);
-    if hash_check.is_err() {
-        return Failed(hash_check.err().unwrap());
+    // creating the archive verifies the wasm hash as well
+    if !wasm_hash_verified {
+        let hash_check = verify_wasm_hash(&wasm);
+        if hash_check.is_err() {
+            return Failed(hash_check.err().unwrap());
+        }
     }
 
     match install_archive(archive_canister, wasm, install_mode).await {
@@ -72,7 +76,12 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     }
 }
 
-async fn create_archive() -> Result<Principal, DeployArchiveResult> {
+async fn create_archive(wasm: &Vec<u8>) -> Result<Principal, DeployArchiveResult> {
+    let hash_check = verify_wasm_hash(wasm);
+    if hash_check.is_err() {
+        return Err(Failed(hash_check.err().unwrap()));
+    }
+
     // lock the archive
     state::persistent_state_mut(|persistent_state| {
         persistent_state.archive_info.state = CreationInProgress(time());

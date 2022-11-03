@@ -64,6 +64,9 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
         }
         unexpected => panic!("unexpected result: {:?}", unexpected),
     }
+
+    let stats = ii_api::stats(&env, ii_canister)?;
+    assert!(stats.archive_info.archive_canister.is_none());
     Ok(())
 }
 
@@ -80,6 +83,9 @@ fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
         }
         unexpected => panic!("unexpected result: {:?}", unexpected),
     }
+
+    let stats = ii_api::stats(&env, ii_canister)?;
+    assert!(stats.archive_info.archive_canister.is_none());
     Ok(())
 }
 
