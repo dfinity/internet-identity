@@ -27,8 +27,8 @@ jobs:
           latest_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
           echo latest release sha256 is "$latest_release_sha256"
-          echo "::set-output name=ref::$latest_release_ref"
-          echo "::set-output name=sha256::$latest_release_sha256"
+          echo "ref=$latest_release_ref" >> $GITHUB_OUTPUT
+          echo "sha256=$latest_release_sha256" >> $GITHUB_OUTPUT
         id: release
 
   # Then perform the build, using the release as checkout
