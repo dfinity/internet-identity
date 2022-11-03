@@ -589,6 +589,12 @@ jobs:
           name: internet_identity_production.wasm
           path: .
 
+      - name: 'Download wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: archive.wasm
+          path: .
+
       - name: Prepare release
         uses: ./.github/actions/release
         id: prepare-release
@@ -597,6 +603,7 @@ jobs:
             internet_identity_production.wasm
             internet_identity_dev.wasm
             internet_identity_test.wasm
+            archive.wasm
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
@@ -608,7 +615,8 @@ jobs:
             internet_identity_production.wasm \
             internet_identity_dev.wasm \
             internet_identity_test.wasm \
-            src/internet_identity/internet_identity.did
+            src/internet_identity/internet_identity.did \
+            archive.wasm
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
