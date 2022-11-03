@@ -45,10 +45,7 @@ lazy_static! {
             r#"<script id="setupJs"></script>"#,
             &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#).to_string()
         );
-        let index_html = index_html.replace(
-            "CSP_POLICY_PLACEHOLDER",
-            &http::content_security_policy_meta()
-        );
+        let index_html = index_html.replace("<meta replaceme-with-csp/>", &format!(r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,&http::content_security_policy_meta() ));
         index_html
     };
 }
