@@ -1,6 +1,6 @@
 use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState, ArchiveStatusCache};
-use crate::storage::DEFAULT_RANGE_SIZE;
-use crate::{PersistentStateError, Salt, Storage};
+use crate::storage::{PersistentStateError, DEFAULT_RANGE_SIZE_V1};
+use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use ic_cdk::api::time;
@@ -118,7 +118,7 @@ pub struct PersistentState {
 }
 
 struct State {
-    storage: RefCell<Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>>,
+    storage: RefCell<Storage<DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -146,7 +146,7 @@ impl Default for State {
             storage: RefCell::new(Storage::new(
                 (
                     FIRST_USER_ID,
-                    FIRST_USER_ID.saturating_add(DEFAULT_RANGE_SIZE),
+                    FIRST_USER_ID.saturating_add(DEFAULT_RANGE_SIZE_V1),
                 ),
                 DefaultMemoryImpl::default(),
             )),
@@ -344,13 +344,11 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut *s.sigs.borrow_mut()))
 }
 
-pub fn storage<R>(f: impl FnOnce(&Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R) -> R {
+pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&*s.storage.borrow()))
 }
 
-pub fn storage_mut<R>(
-    f: impl FnOnce(&mut Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R,
-) -> R {
+pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&mut *s.storage.borrow_mut()))
 }
 

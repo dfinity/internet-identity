@@ -128,6 +128,7 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<types::InternetIdentityInit> 
         assigned_user_number_range: None,
         archive_module_hash: Some(archive_wasm_hash(&wasm)),
         canister_creation_cycles_cost: Some(0),
+        memory_migration_batch_size: None,
     })
 }
 

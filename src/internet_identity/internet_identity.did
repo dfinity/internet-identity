@@ -120,10 +120,13 @@ type GetDelegationResponse = variant {
 };
 
 type InternetIdentityStats = record {
-  users_registered: nat64;
-  assigned_user_number_range: record { nat64; nat64; };
-  archive_info: ArchiveInfo;
-  canister_creation_cycles_cost: nat64;
+    users_registered: nat64;
+    assigned_user_number_range: record { nat64; nat64; };
+    archive_info: ArchiveInfo;
+    canister_creation_cycles_cost: nat64;
+
+    // this is opt so that we can remove the migration state after the migration without breaking any clients
+    anchor_migration_state: opt MigrationState;
 };
 
 // Information about the archive.
@@ -134,6 +137,17 @@ type ArchiveInfo = record {
     // deploy_archive. The actual installed archive wasm hash might be different if the archive has not yet been upgraded.
     // When empty, deployment of the archive is disabled and II will not accept any wasm module.
     expected_wasm_hash: opt blob;
+};
+
+type MigrationState = variant {
+    not_started;
+    in_progress: record {
+        // number of anchors that still need migration. Once it reaches 0, the migration is finished.
+        anchors_left: nat64;
+        batch_size: nat64;
+    };
+    paused;
+    finished;
 };
 
 // Init arguments of II which can be supplied on install and upgrade.
@@ -148,6 +162,9 @@ type InternetIdentityInit = record {
     // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
     // canister creation cost, the newly created canister will keep extra cycles.
     canister_creation_cycles_cost : opt nat64;
+    // Anchor migration batch size for the stable memory migration.
+    // If set to 0, migration is disabled (if the migration was already started, it will be paused in the current state).
+    memory_migration_batch_size: opt nat32;
 };
 
 type ChallengeKey = text;

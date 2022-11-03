@@ -20,14 +20,14 @@ fn should_match_actual_header_size() {
 #[test]
 fn should_report_max_number_of_entries_for_8gb() {
     let memory = VectorMemory::default();
-    let storage = Storage::<(), VectorMemory>::new((1, 2), memory);
+    let storage = Storage::<VectorMemory>::new((1, 2), memory);
     assert_eq!(storage.max_entries(), 3774873);
 }
 
 #[test]
 fn should_serialize_header() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::<(), VectorMemory>::new((1, 2), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((1, 2), memory.clone());
     storage.update_salt([5u8; 32]);
     storage.flush();
 
@@ -42,7 +42,7 @@ fn should_recover_header_from_memory() {
     memory.grow(1);
     memory.write(0, &hex::decode("494943010500000040e2010000000000f1fb09000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
 
-    let storage = Storage::<(), VectorMemory>::from_memory(memory).unwrap();
+    let storage = Storage::<VectorMemory>::from_memory(memory).unwrap();
     assert_eq!(storage.assigned_user_number_range(), (123456, 654321));
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.user_count(), 5);
@@ -54,7 +54,7 @@ fn should_update_header() {
     memory.grow(1);
     memory.write(0, &hex::decode("494943010500000040e2010000000000f1fb09000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
 
-    let mut storage = Storage::<(), VectorMemory>::from_memory(memory.clone()).unwrap();
+    let mut storage = Storage::<VectorMemory>::from_memory(memory.clone()).unwrap();
     storage.set_user_number_range((1234567, 5_000_000));
     storage.allocate_user_number();
     storage.flush();
@@ -67,8 +67,7 @@ fn should_update_header() {
 #[test]
 fn should_serialize_first_record() {
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     let user_number = storage.allocate_user_number().unwrap();
     assert_eq!(user_number, 123u64);
 
@@ -85,8 +84,7 @@ fn should_serialize_first_record() {
 fn should_serialize_subsequent_record_to_expected_memory_location() {
     const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     for _ in 0..100 {
         storage.allocate_user_number().unwrap();
     }
@@ -105,8 +103,7 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
 #[test]
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     storage.allocate_user_number().unwrap();
 
     let result = storage.write(222, sample_anchor_record().clone());
@@ -117,8 +114,7 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
 fn should_deserialize_first_record() {
     let memory = VectorMemory::default();
     memory.grow(1);
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     let user_number = storage.allocate_user_number().unwrap();
     assert_eq!(user_number, 123u64);
 
@@ -136,8 +132,7 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
     const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
     memory.grow(4); // grow memory to accommodate a write to EXPECTED_RECORD_OFFSET
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     for _ in 0..100 {
         storage.allocate_user_number().unwrap();
     }
@@ -159,8 +154,7 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
 #[test]
 fn should_not_read_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     storage.allocate_user_number().unwrap();
 
     let result = storage.read(222);
@@ -170,8 +164,7 @@ fn should_not_read_using_anchor_number_outside_allocated_range() {
 #[test]
 fn should_save_and_restore_persistent_state() {
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
     storage.flush();
     storage.allocate_user_number().unwrap();
 
@@ -184,8 +177,7 @@ fn should_save_and_restore_persistent_state() {
 #[test]
 fn should_save_persistent_state_at_expected_memory_address() {
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     storage.write_persistent_state(&sample_persistent_state());
@@ -200,8 +192,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 100 * 2048; // number of anchors is 100
 
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     for _ in 0..100 {
@@ -224,8 +215,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     memory.write(0, &hex::decode("49494301C0C62D001027000000000000a9c039000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3_000_000 * 2048; // number of anchors is 100
 
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::from_memory(memory.clone()).unwrap();
+    let mut storage = Storage::<VectorMemory>::from_memory(memory.clone()).unwrap();
     storage.write_persistent_state(&sample_persistent_state());
 
     let mut buf = vec![0u8; 4];
@@ -238,8 +228,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 2048; // only one anchor exists
 
     let memory = VectorMemory::default();
-    let mut storage =
-        Storage::<Vec<DeviceDataInternal>, VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     storage.allocate_user_number().unwrap();
@@ -278,7 +267,7 @@ fn should_read_previously_stored_persistent_state() {
         &hex::decode(PERSISTENT_STATE_BYTES).unwrap(),
     );
 
-    let storage = Storage::<Vec<DeviceDataInternal>, VectorMemory>::from_memory(memory).unwrap();
+    let storage = Storage::<VectorMemory>::from_memory(memory).unwrap();
 
     assert_eq!(
         storage.read_persistent_state().unwrap(),

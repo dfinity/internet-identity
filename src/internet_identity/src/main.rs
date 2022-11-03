@@ -1,3 +1,5 @@
+extern crate core;
+
 use crate::anchor_management::tentative_device_registration;
 use crate::assets::init_assets;
 use candid::Principal;
@@ -5,7 +7,7 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use serde_bytes::ByteBuf;
-use storage::{PersistentStateError, Salt, Storage};
+use storage::{Salt, Storage};
 
 use crate::archive::ArchiveState;
 use internet_identity_interface::*;
@@ -164,6 +166,7 @@ fn stats() -> InternetIdentityStats {
         users_registered: storage.user_count() as u64,
         archive_info,
         canister_creation_cycles_cost,
+        anchor_migration_state: Some(storage.migration_state()),
     })
 }
 
@@ -229,6 +232,9 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.canister_creation_cycles_cost = cost;
             })
+        }
+        if let Some(batch_size) = arg.memory_migration_batch_size {
+            state::storage_mut(|storage| storage.configure_migration(batch_size))
         }
     }
 }

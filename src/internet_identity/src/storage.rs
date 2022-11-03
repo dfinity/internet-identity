@@ -56,58 +56,198 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::PersistentState;
+use crate::state::{DeviceDataInternal, PersistentState};
 use candid;
+use candid::{CandidType, Deserialize};
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
-use internet_identity_interface::UserNumber;
+use internet_identity_interface::{
+    CredentialId, DeviceKey, DeviceProtection, KeyType, MigrationState, Purpose, UserNumber,
+};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
 #[cfg(test)]
 mod tests;
 
 /// Reserved space for the header before the anchor records start.
-const RESERVED_HEADER_BYTES: u64 = 512;
-const DEFAULT_ENTRY_SIZE: u16 = 2048;
+const WASM_PAGE_SIZE: u64 = 65_536;
+
+const RESERVED_HEADER_BYTES_V1: u64 = 512;
+const RESERVED_HEADER_BYTES_V3: u64 = 2 * WASM_PAGE_SIZE; // 1 page reserved for II config, 1 for memory manager
+
+const DEFAULT_ENTRY_SIZE_V1: u16 = 2048;
+const DEFAULT_ENTRY_SIZE_V3: u16 = 4096;
+
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
-const STABLE_MEMORY_SIZE: u64 = 8 * GB;
+
+/// In practice, II has 32 GB of stable memory available. But we want to keep the default
+/// user range until the stable memory migration is complete. Thus we keep this value for anchor
+/// range checking for the time being.
+const LEGACY_STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
-const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
+const STABLE_MEMORY_RESERVE: u64 = LEGACY_STABLE_MEMORY_SIZE / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// The maximum number of users this canister can store.
-pub const DEFAULT_RANGE_SIZE: u64 =
-    (STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
-        / DEFAULT_ENTRY_SIZE as u64;
+pub const DEFAULT_RANGE_SIZE_V1: u64 =
+    (LEGACY_STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES_V1 - STABLE_MEMORY_RESERVE)
+        / DEFAULT_ENTRY_SIZE_V1 as u64;
 
 pub type Salt = [u8; 32];
 
 /// Data type responsible for managing user data in stable memory.
-pub struct Storage<T, M> {
+pub struct Storage<M> {
     header: Header,
     memory: M,
-    _marker: PhantomData<T>,
 }
 
 #[repr(packed)]
 struct Header {
     magic: [u8; 3],
-    version: u8,
+    version: u8, // 1: legacy layout, 2: migration in progress, 3: post-migration layout
     num_users: u32,
     id_range_lo: u64,
     id_range_hi: u64,
     entry_size: u16,
     salt: [u8; 32],
+    entry_size_new: u16,       // post-migration entry size
+    new_layout_start: u32,     // all records < this value are still in the old layout
+    migration_batch_size: u32, // batch size for incremental anchor migration
 }
 
-impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, M> {
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+struct Anchor {
+    devices: Vec<Device>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+enum Device {
+    RecoveryPhrase(RecoveryPhrase),
+    WebAuthnDevice(WebAuthnDevice),
+}
+
+impl From<Device> for DeviceDataInternal {
+    fn from(device: Device) -> Self {
+        match device {
+            Device::RecoveryPhrase(recovery_phrase) => Self {
+                pubkey: recovery_phrase.pubkey,
+                alias: "Recovery phrase".to_string(),
+                credential_id: None,
+                purpose: Some(Purpose::Recovery),
+                key_type: Some(KeyType::SeedPhrase),
+                protection: Some(recovery_phrase.protection),
+            },
+            Device::WebAuthnDevice(webauthn_device) => Self {
+                pubkey: webauthn_device.pubkey,
+                alias: webauthn_device.alias,
+                credential_id: Some(webauthn_device.credential_id),
+                purpose: Some(webauthn_device.purpose),
+                key_type: Some(KeyType::from(webauthn_device.key_type)),
+                protection: Some(DeviceProtection::Unprotected),
+            },
+        }
+    }
+}
+
+impl From<DeviceDataInternal> for Device {
+    fn from(internal_device: DeviceDataInternal) -> Self {
+        match internal_device.key_type {
+            Some(KeyType::SeedPhrase) => Device::RecoveryPhrase(RecoveryPhrase {
+                pubkey: internal_device.pubkey,
+                protection: internal_device
+                    .protection
+                    .unwrap_or(DeviceProtection::Unprotected),
+            }),
+            None | Some(_) => Device::WebAuthnDevice(WebAuthnDevice {
+                pubkey: internal_device.pubkey,
+                alias: internal_device.alias,
+                credential_id: internal_device.credential_id.unwrap(),
+                purpose: internal_device.purpose.unwrap_or(Purpose::Authentication),
+                key_type: WebAuthnKeyType::from(
+                    internal_device.key_type.unwrap_or(KeyType::Unknown),
+                ),
+                domain: Domain::Ic0App,
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+struct RecoveryPhrase {
+    pubkey: DeviceKey,
+    protection: DeviceProtection,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+struct WebAuthnDevice {
+    pubkey: DeviceKey,
+    alias: String,
+    credential_id: CredentialId,
+    purpose: Purpose,
+    key_type: WebAuthnKeyType,
+    domain: Domain,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+enum Domain {
+    Ic0App,    // https://identity.ic0.app
+    NewDomain, // ??
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+enum WebAuthnKeyType {
+    Unknown,
+    Platform,
+    CrossPlatform,
+}
+
+impl From<KeyType> for WebAuthnKeyType {
+    fn from(key_type: KeyType) -> Self {
+        match key_type {
+            KeyType::Unknown => WebAuthnKeyType::Unknown,
+            KeyType::Platform => WebAuthnKeyType::Platform,
+            KeyType::CrossPlatform => WebAuthnKeyType::CrossPlatform,
+            KeyType::SeedPhrase => trap("seed phrase is not a WebAuthn key type"),
+        }
+    }
+}
+
+impl From<WebAuthnKeyType> for KeyType {
+    fn from(key_type: WebAuthnKeyType) -> Self {
+        match key_type {
+            WebAuthnKeyType::Unknown => KeyType::Unknown,
+            WebAuthnKeyType::Platform => KeyType::Platform,
+            WebAuthnKeyType::CrossPlatform => KeyType::CrossPlatform,
+        }
+    }
+}
+
+struct RecordMeta {
+    layout: Layout,
+    offset: u64,
+    entry_size: u16,
+}
+
+impl RecordMeta {
+    pub fn candid_size_limit(&self) -> usize {
+        // u16 is the length of candid before the actual candid starts
+        self.entry_size as usize - std::mem::size_of::<u16>()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Layout {
+    V1,
+    V3,
+}
+
+impl<M: Memory> Storage<M> {
     /// Creates a new empty storage that manages the data of users in
     /// the specified range.
     pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber), memory: M) -> Self {
@@ -118,25 +258,27 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
             ));
         }
 
-        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
+        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE_V1 {
             trap(&format!(
                 "id range [{}, {}) is too large for a single canister (max {} entries)",
-                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE,
+                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE_V1,
             ));
         }
 
         Self {
             header: Header {
                 magic: *b"IIC",
-                version: 1,
+                version: 3,
                 num_users: 0,
                 id_range_lo,
                 id_range_hi,
-                entry_size: DEFAULT_ENTRY_SIZE,
+                entry_size: DEFAULT_ENTRY_SIZE_V3,
                 salt: EMPTY_SALT,
+                entry_size_new: DEFAULT_ENTRY_SIZE_V3,
+                new_layout_start: 0,
+                migration_batch_size: 0,
             },
             memory,
-            _marker: PhantomData,
         }
     }
 
@@ -156,6 +298,19 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         self.flush();
     }
 
+    pub fn migration_state(&self) -> MigrationState {
+        match self.header.version {
+            1 => MigrationState::NotStarted,
+            2 if self.header.migration_batch_size == 0 => MigrationState::Paused,
+            2 => MigrationState::InProgress {
+                anchors_left: self.header.new_layout_start as u64,
+                batch_size: self.header.migration_batch_size as u64,
+            },
+            3 => MigrationState::Finished,
+            _ => trap("unsupported header version"),
+        }
+    }
+
     /// Initializes storage by reading the given memory.
     ///
     /// Returns None if the memory is empty.
@@ -166,7 +321,6 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         if memory.size() < 1 {
             return None;
         }
-
         let mut header: Header = unsafe { std::mem::zeroed() };
 
         unsafe {
@@ -183,15 +337,8 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
                 &header.magic,
             ));
         }
-        if header.version != 1 {
-            trap(&format!("unsupported header version: {}", header.version));
-        }
 
-        Some(Self {
-            header,
-            memory,
-            _marker: PhantomData,
-        })
+        Some(Self { header, memory })
     }
 
     /// Allocates a fresh Identity Anchor.
@@ -209,41 +356,100 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     }
 
     /// Writes the data of the specified user to stable memory.
-    pub fn write(&mut self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
+    /// Write only happen during update calls so we can use this call to piggy back on.
+    pub fn write(
+        &mut self,
+        user_number: UserNumber,
+        data: Vec<DeviceDataInternal>,
+    ) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
+        self.write_internal(record_number, data)?;
+        self.migrate_record_batch()
+    }
 
-        let stable_offset =
-            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
-        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
+    /// Internal version of write that operates on record numbers rather than anchors,
+    /// which is more suited for the stable memory migration.
+    fn write_internal(
+        &mut self,
+        record_number: u32,
+        data: Vec<DeviceDataInternal>,
+    ) -> Result<(), StorageError> {
+        let record_meta = self.record_meta(record_number);
 
-        if buf.len() > self.value_size_limit() {
-            return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
+        let data = match record_meta.layout {
+            Layout::V1 => candid::encode_one(data).map_err(StorageError::SerializationError)?,
+            Layout::V3 => {
+                let anchor = Anchor {
+                    devices: data
+                        .into_iter()
+                        .map(|internal_device| Device::from(internal_device))
+                        .collect(),
+                };
+                candid::encode_one(anchor).map_err(StorageError::SerializationError)?
+            }
+        };
+
+        self.write_entry_bytes(record_meta, data)
+    }
+
+    fn write_entry_bytes(
+        &mut self,
+        record_meta: RecordMeta,
+        data: Vec<u8>,
+    ) -> Result<(), StorageError> {
+        if data.len() > record_meta.candid_size_limit() {
+            return Err(StorageError::EntrySizeLimitExceeded(data.len()));
         }
 
         // use buffered writer to minimize expensive stable memory operations
         let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(&mut self.memory, stable_offset),
+            record_meta.entry_size as usize,
+            Writer::new(&mut self.memory, record_meta.offset),
         );
+
         writer
-            .write(&(buf.len() as u16).to_le_bytes())
+            .write(&(data.len() as u16).to_le_bytes())
             .expect("memory write failed");
-        writer.write(&buf).expect("memory write failed");
+        writer.write(&data).expect("memory write failed");
         writer.flush().expect("memory write failed");
         Ok(())
     }
 
     /// Reads the data of the specified user from stable memory.
-    pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
+    pub fn read(&self, user_number: UserNumber) -> Result<Vec<DeviceDataInternal>, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
-        let stable_offset =
-            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
+        self.read_internal(record_number)
+    }
 
+    /// Internal version of read that operates on record numbers rather than anchors,
+    /// which is more suited for the stable memory migration.
+    fn read_internal(&self, record_number: u32) -> Result<Vec<DeviceDataInternal>, StorageError> {
+        let record_meta = self.record_meta(record_number);
+        let candid_bytes = self.read_entry_bytes(&record_meta);
+
+        match record_meta.layout {
+            Layout::V1 => {
+                candid::decode_one(&candid_bytes).map_err(StorageError::DeserializationError)
+            }
+            Layout::V3 => {
+                let anchor: Anchor = candid::decode_one(&candid_bytes)
+                    .map_err(StorageError::DeserializationError)?;
+                let devices = anchor
+                    .devices
+                    .into_iter()
+                    .map(|device| DeviceDataInternal::from(device))
+                    .collect();
+                Ok(devices)
+            }
+        }
+    }
+
+    fn read_entry_bytes(&self, record_meta: &RecordMeta) -> Vec<u8> {
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
         let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(&self.memory, stable_offset),
+            record_meta.entry_size as usize,
+            Reader::new(&self.memory, record_meta.offset),
         );
 
         let mut len_buf = vec![0; 2];
@@ -253,11 +459,11 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
-        if len > self.value_size_limit() {
+        if len > record_meta.candid_size_limit() {
             trap(&format!(
-                "persisted value size {} exeeds maximum size {}",
+                "persisted value size {} exceeds maximum size {}",
                 len,
-                self.value_size_limit()
+                record_meta.candid_size_limit()
             ))
         }
 
@@ -265,9 +471,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         reader
             .read(&mut data_buf.as_mut_slice())
             .expect("failed to read memory");
-        let data: T = candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-
-        Ok(data)
+        data_buf
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -290,7 +494,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
+        ((LEGACY_STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES_V1 - STABLE_MEMORY_RESERVE)
             / self.header.entry_size as u64) as usize
     }
 
@@ -318,8 +522,22 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         self.flush();
     }
 
-    fn value_size_limit(&self) -> usize {
-        self.header.entry_size as usize - std::mem::size_of::<u16>()
+    fn record_meta(&self, record_number: u32) -> RecordMeta {
+        if record_number < self.header.new_layout_start {
+            RecordMeta {
+                layout: Layout::V1,
+                offset: RESERVED_HEADER_BYTES_V1
+                    + record_number as u64 * self.header.entry_size as u64,
+                entry_size: self.header.entry_size,
+            }
+        } else {
+            RecordMeta {
+                layout: Layout::V3,
+                offset: RESERVED_HEADER_BYTES_V3
+                    + record_number as u64 * self.header.entry_size_new as u64,
+                entry_size: self.header.entry_size_new,
+            }
+        }
     }
 
     fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
@@ -342,7 +560,17 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     /// reserve at the end of stable memory.
     fn unused_memory_start(&self) -> u64 {
         let record_number = self.header.num_users as u64;
-        RESERVED_HEADER_BYTES + record_number * self.header.entry_size as u64
+        match self.migration_state() {
+            MigrationState::NotStarted => {
+                RESERVED_HEADER_BYTES_V1 + record_number * self.header.entry_size as u64
+            }
+            MigrationState::InProgress { .. } | MigrationState::Paused => {
+                RESERVED_HEADER_BYTES_V3 + record_number * self.header.entry_size_new as u64
+            }
+            MigrationState::Finished => {
+                RESERVED_HEADER_BYTES_V3 + record_number * self.header.entry_size as u64
+            }
+        }
     }
 
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
@@ -391,6 +619,71 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
             .map_err(|err| PersistentStateError::ReadError(err))?;
 
         candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+    }
+
+    pub fn configure_migration(&mut self, batch_size: u32) {
+        let migration_state = self.migration_state();
+
+        if let MigrationState::Finished = migration_state {
+            // nothing to do, we're done
+            return;
+        }
+
+        if batch_size > 0 && migration_state == MigrationState::NotStarted {
+            // initialize header for migration
+            self.header.version = 2;
+            self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
+            // the next user will start using the new layout
+            self.header.new_layout_start = self.header.num_users + 1;
+        }
+
+        self.header.migration_batch_size = batch_size;
+        self.flush();
+    }
+
+    fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
+        match self.migration_state() {
+            MigrationState::NotStarted | MigrationState::Paused | MigrationState::Finished => {
+                return Ok(())
+            }
+            MigrationState::InProgress { .. } => {}
+        }
+
+        assert!(self.header.new_layout_start > 0);
+
+        for _ in 0..self.header.migration_batch_size {
+            let record = self.header.new_layout_start - 1;
+            self.migrate_record(record)?;
+
+            if self.header.new_layout_start == 0 {
+                self.finalize_migration();
+                return Ok(());
+            }
+        }
+
+        // write the modified migration state back to stable memory
+        self.flush();
+
+        Ok(())
+    }
+
+    fn migrate_record(&mut self, record: u32) -> Result<(), StorageError> {
+        let data = self.read_internal(record)?;
+
+        // modifying this pointer will make write switch to the new layout.
+        self.header.new_layout_start -= 1;
+
+        assert_eq!(record, { self.header.new_layout_start });
+
+        self.write_internal(record, data)
+    }
+
+    fn finalize_migration(&mut self) {
+        self.header.version = 3;
+        self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
+        self.header.migration_batch_size = 0;
+        self.header.new_layout_start = 0;
+        self.flush();
     }
 }
 
