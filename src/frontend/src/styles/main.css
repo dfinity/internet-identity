@@ -276,6 +276,7 @@ display:revert; revert to element instead of attribute */
   /* general styles */
   font-family: "Montserrat", sans-serif;
   font-size: 62.5%; /* 10px */
+  font-size: max(62.5%, calc(0.6vh + 0.25rem));
 
   background: var(--rc-background);
   color: var(--rc-text);
@@ -731,10 +732,23 @@ a:hover,
   outline-offset: 2px;
 }
 
-.c-input--vip {
-  font-size: 2.4rem;
-  text-align: center;
+.c-input--rounded {
   border-radius: 999999px;
+}
+
+.c-input--centered {
+  text-align: center;
+}
+
+.c-input--spacious {
+  padding: calc(2 * var(--rs-input-bezel)) calc(3 * var(--rs-input-bezel))
+    calc(1.8 * var(--rs-input-bezel));
+}
+
+.c-input--vip {
+  font-size: 1.4em;
+  padding: calc(1.2 * var(--rs-input-bezel)) calc(3 * var(--rs-input-bezel))
+    var(--rs-input-bezel);
 }
 
 .c-input--vip::placeholder {

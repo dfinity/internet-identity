@@ -150,20 +150,22 @@ const iiPages: Record<string, () => void> = {
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
   authenticate: () =>
-    displayPage(
-      dummyConnection,
-      "https://nowhere.com",
-      console.log,
-      BigInt(10000)
-    ),
+    displayPage({
+      origin: "https://nowhere.com",
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+      userNumber: BigInt(10000),
+    }),
   authenticateAlternative: () =>
-    displayPage(
-      dummyConnection,
-      "https://nowhere.com",
-      console.log,
-      BigInt(10000),
-      "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app"
-    ),
+    displayPage({
+      origin: "https://nowhere.com",
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+      userNumber: BigInt(10000),
+      derivationOrigin: "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app",
+    }),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
   recoverWithDevice: () =>

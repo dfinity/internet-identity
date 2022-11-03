@@ -109,6 +109,7 @@ const pageContent = (
     onSubmit: props.submit,
     userNumber: props.returning ? props.userNumber : undefined,
     focus: props.returning,
+    important: props.returning,
   });
 
   const addDeviceClick = () => {
@@ -121,7 +122,7 @@ const pageContent = (
   };
 
   const signin = html`
-    <div>
+    <div class="${props.returning && "l-stack"}">
       ${anchorInput.template}
       <button
         @click="${anchorInput.submit}"

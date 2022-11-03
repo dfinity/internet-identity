@@ -16,8 +16,8 @@
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend .eslintrc.json webpack.config.js jest.config.ts",
-    "format-check": "prettier --check src/frontend .eslintrc.json webpack.config.js jest.config.ts"
+    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json webpack.config.js jest.config.ts",
+    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json webpack.config.js jest.config.ts"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",
