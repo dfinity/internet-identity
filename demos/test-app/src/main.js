@@ -315,6 +315,9 @@ const init = async () => {
     console.log(
       "attestation object: " + buf2hex(credential.response.attestationObject)
     );
+    console.log(
+      "authenticator attachment: " + credential.authenticatorAttachment
+    );
   };
 
   webAuthnSignBtn.onclick = async () => {
