@@ -221,12 +221,12 @@ jobs:
         run: |
           # Last time dependencies or toolchain were updated; used for ~/.cargo and dependencies
           commit_deps=$(git log -1 --pretty=format:%H -- Cargo.* src/*/Cargo.toml rust-toolchain.toml)
-          echo "commit_deps=$commit_deps" >> $GITHUB_OUTPUT
+          echo "commit_deps=$commit_deps" >> "$GITHUB_OUTPUT"
           echo "deps: $commit_deps"
 
           # Last time the canister code was modified
           commit_canister=$(git log -1 --pretty=format:%H -- 'src/**' ':^src/frontend')
-          echo "commit_canister=$commit_canister" >> $GITHUB_OUTPUT
+          echo "commit_canister=$commit_canister" >> "$GITHUB_OUTPUT"
           echo "canister: $commit_canister"
 
           # This commit
@@ -638,7 +638,7 @@ jobs:
           path: .
       - run: |
           sha256=$(shasum -a 256 ./internet_identity_production.wasm | cut -d ' ' -f1)
-          echo "sha256=$sha256" >> $GITHUB_OUTPUT
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
         id: sha256
 
       - uses: ./.github/actions/check-build

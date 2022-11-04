@@ -6,7 +6,7 @@ runs:
     - name: Read .node-version
       shell: bash
       id: read-node-version
-      run: echo "version=$(cat .node-version)" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat .node-version)" >> "$GITHUB_OUTPUT"
 
     - uses: actions/setup-node@v3
       with:

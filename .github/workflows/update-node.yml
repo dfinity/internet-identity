@@ -31,9 +31,9 @@ jobs:
           then
             echo node needs an update
             echo "$latest_node_version" > ./.node-version
-            echo "updated=1" >> $GITHUB_OUTPUT
+            echo "updated=1" >> "$GITHUB_OUTPUT"
           else
-            echo "updated=0" >> $GITHUB_OUTPUT
+            echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
           cat ./.node-version

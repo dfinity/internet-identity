@@ -41,9 +41,9 @@ jobs:
           
           if $need_update; then
             echo IC dependencies need an update
-            echo "updated=1" >> $GITHUB_OUTPUT
+            echo "updated=1" >> "$GITHUB_OUTPUT"
           else
-            echo "updated=0" >> $GITHUB_OUTPUT
+            echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: ./.github/actions/bootstrap
