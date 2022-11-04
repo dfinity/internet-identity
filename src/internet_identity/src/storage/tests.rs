@@ -1,5 +1,6 @@
+use crate::state::DeviceDataInternal;
 use crate::storage::{Header, StorageError};
-use crate::{DeviceDataInternal, Storage};
+use crate::Storage;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::{DeviceProtection, KeyType, Purpose};
 use serde_bytes::ByteBuf;
