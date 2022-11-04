@@ -75,10 +75,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
     const result = (await navigator.credentials.get({
       publicKey: {
-        allowCredentials: this.credentialData.map((cd) => ({
-          type: "public-key",
-          id: cd.credentialId,
-        })),
         challenge: blob,
         userVerification: "discouraged",
       },

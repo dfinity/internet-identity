@@ -514,21 +514,13 @@ export class AuthenticatedConnection extends Connection {
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: DeviceData[] = [],
-  authenticatorAttachment?: AuthenticatorAttachment
+  _authenticatorAttachment?: AuthenticatorAttachment
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
-      userVerification: "preferred",
-      authenticatorAttachment,
+      userVerification: "discouraged",
+      residentKey: "required",
     },
-    excludeCredentials: exclude.flatMap((device) =>
-      device.credential_id.length === 0
-        ? []
-        : {
-            id: new Uint8Array(device.credential_id[0]),
-            type: "public-key",
-          }
-    ),
     challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
     pubKeyCredParams: [
       {

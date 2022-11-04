@@ -95,35 +95,41 @@ const init = (connection: Connection): Promise<LoginFlowResult | null> =>
       /* The Identity (i.e. key pair) used when creating the anchor.
        * If "II_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
        */
-      const createIdentity =
-        process.env.II_DUMMY_AUTH === "1"
-          ? () => Promise.resolve(new DummyIdentity())
-          : () =>
-              WebAuthnIdentity.create({
-                publicKey: creationOptions(),
-              });
-
       try {
-        // Kick-start both the captcha creation and the identity
-        Promise.all([
-          makeCaptcha(connection),
-          createIdentity() as Promise<IdentifiableIdentity>,
-        ])
-          .catch((error) => {
-            resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
-            // We can never get here, but TS doesn't understand that
-            return 0 as unknown as [Challenge, IdentifiableIdentity];
-          })
-          .then(([captcha, identity]) => {
-            confirmRegister(
-              connection,
-              Promise.resolve(captcha),
-              identity,
-              alias
-            ).then(resolve);
-          });
-      } catch (err) {
-        reject(err);
+        const createIdentity =
+          process.env.II_DUMMY_AUTH === "1"
+            ? () => Promise.resolve(new DummyIdentity())
+            : () =>
+                WebAuthnIdentity.create({
+                  publicKey: creationOptions(),
+                });
+
+        try {
+          // Kick-start both the captcha creation and the identity
+          Promise.all([
+            makeCaptcha(connection),
+            createIdentity() as Promise<IdentifiableIdentity>,
+          ])
+            .catch((error) => {
+              console.log(error);
+              resolve(apiResultToLoginFlowResult({ kind: "authFail", error }));
+              // We can never get here, but TS doesn't understand that
+              return 0 as unknown as [Challenge, IdentifiableIdentity];
+            })
+            .then(([captcha, identity]) => {
+              confirmRegister(
+                connection,
+                Promise.resolve(captcha),
+                identity,
+                alias
+              ).then(resolve);
+            });
+        } catch (err) {
+          console.log(err);
+          reject(err);
+        }
+      } catch (e) {
+        console.log(e);
       }
     };
 

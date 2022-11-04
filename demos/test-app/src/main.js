@@ -7,10 +7,12 @@ import {
 } from "@dfinity/identity";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
-import { IDL } from "@dfinity/candid";
 
 const signInBtn = document.getElementById("signinBtn");
 const signOutBtn = document.getElementById("signoutBtn");
+const webAuthnRegisterBtn = document.getElementById("webAuthnRegisterBtn");
+const webAuthnSignBtn = document.getElementById("webAuthnSignBtn");
+const userEl = document.getElementById("user");
 const whoamiBtn = document.getElementById("whoamiBtn");
 const updateAlternativeOriginsBtn = document.getElementById(
   "updateNewAlternativeOrigins"
@@ -260,7 +262,90 @@ const init = async () => {
     await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
     await updateAlternativeOriginsView();
   };
+
+  let challenge = new Uint8Array(100);
+  window.crypto.getRandomValues(challenge.slice(0, 100));
+  console.log("challenge: " + JSON.stringify(challenge));
+
+  let user_id = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    user_id.set([userEl.value * i], i);
+  }
+  console.log("user id: " + JSON.stringify(user_id));
+  let credential = null;
+
+  webAuthnRegisterBtn.onclick = async () => {
+    console.log("register");
+    const options = {
+      publicKey: {
+        authenticatorSelection: { requireResidentKey: true },
+        challenge: challenge,
+        rp: {
+          displayName: "Test Application",
+          name: "Test Application",
+          id: "localhost",
+        },
+        user: {
+          displayName: "Test User " + userEl.value,
+          name: "Test User " + userEl.value,
+          id: user_id,
+        },
+        pubKeyCredParams: [
+          {
+            type: "public-key",
+            // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
+            alg: -7,
+          },
+          {
+            type: "public-key",
+            // alg: PubKeyCoseAlgo.RSA_WITH_SHA256
+            alg: -257,
+          },
+        ],
+      },
+    };
+    console.log("options: " + JSON.stringify(options));
+    credential = await navigator.credentials.create(options);
+    const clientDataStr = arrayBufferToStr(credential.response.clientDataJSON);
+    console.log("credential: " + credential.id);
+    console.log("client data: " + clientDataStr);
+    console.log(
+      "attestation object: " + buf2hex(credential.response.attestationObject)
+    );
+  };
+
+  webAuthnSignBtn.onclick = async () => {
+    console.log("sign");
+    // this prompts an authentication selector from chrome, fails in FF
+    // const options = {
+    //   publicKey: {
+    //     challenge: challenge,
+    //     rpId: "localhost",
+    //   },
+    // };
+    const options = {
+      publicKey: {
+        challenge: challenge,
+        allowCredentials: [{ id: credential.rawId, type: "public-key" }],
+      },
+    };
+    let result = await navigator.credentials.get(options);
+    console.log("credential: " + result.id);
+
+    console.log(result);
+  };
 };
+
+function arrayBufferToStr(buf) {
+  return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+
+function buf2hex(buffer) {
+  // buffer is an ArrayBuffer
+  return [...new Uint8Array(buffer)]
+    .map((x) => x.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 init();
 
