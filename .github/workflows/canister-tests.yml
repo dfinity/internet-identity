@@ -224,8 +224,8 @@ jobs:
           echo "::set-output name=commit_deps::$commit_deps"
           echo "deps: $commit_deps"
 
-          # Last time the canister code was modified
-          commit_canister=$(git log -1 --pretty=format:%H -- 'src/**' ':^src/frontend')
+          # Last time dependencies or toolchain or the canister code was modified
+          commit_canister=$(git log -1 --pretty=format:%H -- 'Cargo.*' 'rust-toolchain.toml' 'src/**' ':^src/frontend')
           echo "::set-output name=commit_canister::$commit_canister"
           echo "canister: $commit_canister"
 
