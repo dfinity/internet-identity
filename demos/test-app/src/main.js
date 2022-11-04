@@ -265,17 +265,16 @@ const init = async () => {
 
   let challenge = new Uint8Array(100);
   window.crypto.getRandomValues(challenge.slice(0, 100));
-  console.log("challenge: " + JSON.stringify(challenge));
 
-  let user_id = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    user_id.set([userEl.value * i], i);
-  }
-  console.log("user id: " + JSON.stringify(user_id));
   let credential = null;
 
   webAuthnRegisterBtn.onclick = async () => {
     console.log("register");
+    let user_id = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      user_id.set([userEl.value * i], i);
+    }
+    console.log("user id: " + JSON.stringify(user_id));
     const options = {
       publicKey: {
         authenticatorSelection: {
