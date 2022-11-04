@@ -224,8 +224,8 @@ jobs:
           echo "commit_deps=$commit_deps" >> "$GITHUB_OUTPUT"
           echo "deps: $commit_deps"
 
-          # Last time the canister code was modified
-          commit_canister=$(git log -1 --pretty=format:%H -- 'src/**' ':^src/frontend')
+          # Last time dependencies or toolchain or the canister code was modified
+          commit_canister=$(git log -1 --pretty=format:%H -- 'Cargo.*' 'rust-toolchain.toml' 'src/**' ':^src/frontend')
           echo "commit_canister=$commit_canister" >> "$GITHUB_OUTPUT"
           echo "canister: $commit_canister"
 
