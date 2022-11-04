@@ -278,12 +278,15 @@ const init = async () => {
     console.log("register");
     const options = {
       publicKey: {
-        authenticatorSelection: { requireResidentKey: true }, // not supported on FF, allows only one per rp on chrome
+        authenticatorSelection: {
+          requireResidentKey: true, // not supported on FF
+          attestation: "indirect",
+        },
         challenge: challenge,
         rp: {
           displayName: "Test Application",
           name: "Test Application",
-          id: "localhost",
+          id: window.location.hostname,
         },
         user: {
           displayName: "Test User " + userEl.value,
