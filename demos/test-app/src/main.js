@@ -278,7 +278,7 @@ const init = async () => {
     console.log("register");
     const options = {
       publicKey: {
-        authenticatorSelection: { requireResidentKey: true },
+        authenticatorSelection: { requireResidentKey: true }, // not supported on FF, allows only one per rp on chrome
         challenge: challenge,
         rp: {
           displayName: "Test Application",
@@ -326,7 +326,7 @@ const init = async () => {
     const options = {
       publicKey: {
         challenge: challenge,
-        allowCredentials: [{ id: credential.rawId, type: "public-key" }],
+        //allowCredentials: [{ id: credential.rawId, type: "public-key" }],
       },
     };
     let result = await navigator.credentials.get(options);
