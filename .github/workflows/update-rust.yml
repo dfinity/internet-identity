@@ -27,9 +27,9 @@ jobs:
           then
             echo rust toolchain needs an update
             sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
-            echo "::set-output name=updated::1"
+            echo "updated=1" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=updated::0"
+            echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
           cat ./rust-toolchain.toml

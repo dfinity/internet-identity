@@ -13,7 +13,7 @@ ref="notes/file-size/$name"
 size="$(wc -c <"$filename" | xargs)"
 
 >&2 echo "Size: '$size'"
-echo "::set-output name=size::$size"
+echo "size=$size" >> "$GITHUB_OUTPUT"
 
 logged() {
     ( set -x && "$@" )

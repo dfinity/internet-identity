@@ -147,6 +147,6 @@ cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build
 >&2 echo "body complete:"
 cat "$body"
 
-echo "::set-output name=notes-file::$body"
+echo "notes-file=$body" >> "$GITHUB_OUTPUT"
 
 [ -n "${GITHUB_ENV:-}" ] && echo "RELEASE_ACTION_BODY_FILE=$body" >>"$GITHUB_ENV"
