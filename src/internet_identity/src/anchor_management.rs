@@ -80,15 +80,13 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
 
     delegation::prune_expired_signatures();
 
-    if state::archive_ready() {
-        archive_operation(
-            user_number,
-            caller,
-            Operation::AddDevice {
-                device: DeviceDataWithoutAlias::from(device_data),
-            },
-        )
-    }
+    archive_operation(
+        user_number,
+        caller,
+        Operation::AddDevice {
+            device: DeviceDataWithoutAlias::from(device_data),
+        },
+    );
 }
 
 /// Replace or remove an existing device.
@@ -152,9 +150,7 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
 
     delegation::prune_expired_signatures();
 
-    if state::archive_ready() {
-        archive_operation(user_number, caller(), operation)
-    }
+    archive_operation(user_number, caller(), operation);
 }
 
 pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
@@ -169,9 +165,7 @@ pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     let operation = mutate_device_or_trap(&mut entries, device_key, None);
     write_anchor_data(user_number, entries);
 
-    if state::archive_ready() {
-        archive_operation(user_number, caller, operation)
-    }
+    archive_operation(user_number, caller, operation);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.

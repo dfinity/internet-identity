@@ -56,7 +56,7 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::PersistentStateV1;
+use crate::state::PersistentState;
 use candid;
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
@@ -347,7 +347,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
 
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
     /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next user registration.
-    pub fn write_persistent_state(&mut self, state: &PersistentStateV1) {
+    pub fn write_persistent_state(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
         // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
@@ -365,7 +365,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
 
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
     /// This is only used to restore state in `post_upgrade`.
-    pub fn read_persistent_state(&self) -> Result<PersistentStateV1, PersistentStateError> {
+    pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
         let address = self.unused_memory_start();
         let mut reader = Reader::new(&self.memory, address);
 

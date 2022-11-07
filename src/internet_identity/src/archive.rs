@@ -1,6 +1,6 @@
 use crate::state;
-use crate::state::{ArchiveData, ArchiveState, ArchiveStatusCache, DeviceDataInternal};
-use candid::Principal;
+use crate::state::DeviceDataInternal;
+use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::main::{
     canister_status, install_code, CanisterIdRecord, CanisterInstallMode,
@@ -10,7 +10,8 @@ use ic_cdk::api::management_canister::main::{
 use ic_cdk::api::time;
 use ic_cdk::{id, notify};
 use internet_identity_interface::{
-    ArchiveInit, DeployArchiveResult, DeviceDataUpdate, Entry, Operation, Private, UserNumber,
+    ArchiveInit, DeployArchiveResult, DeviceDataUpdate, Entry, Operation, Private, Timestamp,
+    UserNumber,
 };
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -19,6 +20,45 @@ use std::time::Duration;
 use ArchiveState::{Created, CreationInProgress, NotCreated};
 use CanisterInstallMode::Upgrade;
 use DeployArchiveResult::{Failed, Success};
+
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ArchiveInfo {
+    pub expected_module_hash: Option<[u8; 32]>,
+    pub state: ArchiveState,
+}
+
+/// State of the archive canister.
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+pub enum ArchiveState {
+    NotCreated,
+    CreationInProgress(Timestamp), // timestamp when creation was initiated
+    Created(ArchiveData),
+}
+
+impl Default for ArchiveState {
+    fn default() -> Self {
+        NotCreated
+    }
+}
+
+/// Management metadata about the archive.
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+pub struct ArchiveData {
+    // Sequence number of anchor operations. Using this sequence number missing entries / reliability
+    // can be assessed without having explicit error handling on the II side.
+    pub sequence_number: u64,
+    // Canister id of the archive canister
+    pub archive_canister: Principal,
+}
+
+/// Cached archive status information
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+pub struct ArchiveStatusCache {
+    // Timestamp when the status was last obtained
+    pub timestamp: Timestamp,
+    // Status of the archive canister
+    pub status: CanisterStatusResponse,
+}
 
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     let expected_hash = if let Some(hash) = state::expected_archive_hash() {
@@ -194,7 +234,10 @@ fn verify_wasm_hash(wasm_module: &Vec<u8>) -> Result<[u8; 32], String> {
 }
 
 pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Operation) {
-    let archive_data = state::archive_data(); // traps if archive is not available
+    let archive_data = match state::archive_data() {
+        Some(data) => data,
+        None => return,
+    };
     let timestamp = time();
     let entry = Entry {
         anchor,

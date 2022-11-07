@@ -1,6 +1,7 @@
-use crate::state::{ArchiveData, ArchiveInfo, ArchiveState, DeviceDataInternal, PersistentStateV1};
+use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState};
+use crate::state::{DeviceDataInternal, PersistentState};
 use crate::storage::{Header, PersistentStateError, StorageError};
-use crate::Storage;
+use crate::{archive, Storage};
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::{DeviceProtection, KeyType, Purpose};
@@ -279,8 +280,8 @@ fn sample_anchor_record() -> Vec<DeviceDataInternal> {
     device_vec
 }
 
-fn sample_persistent_state() -> PersistentStateV1 {
-    let persistent_state = PersistentStateV1 {
+fn sample_persistent_state() -> PersistentState {
+    let persistent_state = PersistentState {
         archive_info: ArchiveInfo {
             expected_module_hash: Some([99u8; 32]),
             state: ArchiveState::Created(ArchiveData {

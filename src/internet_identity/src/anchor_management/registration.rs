@@ -181,15 +181,13 @@ pub async fn register(
                 user_number,
                 vec![DeviceDataInternal::from(device_data.clone())],
             );
-            if state::archive_ready() {
-                archive_operation(
-                    user_number,
-                    caller,
-                    Operation::RegisterAnchor {
-                        device: DeviceDataWithoutAlias::from(device_data),
-                    },
-                )
-            }
+            archive_operation(
+                user_number,
+                caller,
+                Operation::RegisterAnchor {
+                    device: DeviceDataWithoutAlias::from(device_data),
+                },
+            );
             RegisterResponse::Registered { user_number }
         }
         None => RegisterResponse::CanisterFull,

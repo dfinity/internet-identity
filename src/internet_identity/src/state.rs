@@ -1,4 +1,4 @@
-use crate::state::ArchiveState::NotCreated;
+use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState, ArchiveStatusCache};
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{PersistentStateError, Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
@@ -109,51 +109,12 @@ pub struct Challenge {
     pub challenge_key: ChallengeKey,
 }
 
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
-pub struct ArchiveInfo {
-    pub expected_module_hash: Option<[u8; 32]>,
-    pub state: ArchiveState,
-}
-
-/// State of the archive canister.
-#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
-pub enum ArchiveState {
-    NotCreated,
-    CreationInProgress(Timestamp), // timestamp when creation was initiated
-    Created(ArchiveData),
-}
-
-impl Default for ArchiveState {
-    fn default() -> Self {
-        NotCreated
-    }
-}
-
-/// Management metadata about the archive.
-#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
-pub struct ArchiveData {
-    // Sequence number of anchor operations. Using this sequence number missing entries / reliability
-    // can be assessed without having explicit error handling on the II side.
-    pub sequence_number: u64,
-    // Canister id of the archive canister
-    pub archive_canister: Principal,
-}
-
 #[derive(Clone, Default, CandidType, Deserialize, Eq, PartialEq, Debug)]
-pub struct PersistentStateV1 {
+pub struct PersistentState {
     // Information related to the archive
     pub archive_info: ArchiveInfo,
     // Amount of cycles that need to be attached when II creates a canister
     pub canister_creation_cycles_cost: u64,
-}
-
-/// Cached archive status information
-#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
-pub struct ArchiveStatusCache {
-    // Timestamp when the status was last obtained
-    pub timestamp: Timestamp,
-    // Status of the archive canister
-    pub status: CanisterStatusResponse,
 }
 
 struct State {
@@ -173,7 +134,7 @@ struct State {
     // pre- and post-upgrade hooks.
     // This must remain small as it is serialized and deserialized on pre- and post-upgrade.
     // Be careful when making changes here, as II needs to be able to update and roll back.
-    persistent_state: RefCell<PersistentStateV1>,
+    persistent_state: RefCell<PersistentState>,
     // Cache of the archive status (to make unwanted calls to deploy_archive cheap to dismiss).
     archive_status_cache: RefCell<Option<ArchiveStatusCache>>,
 }
@@ -195,7 +156,7 @@ impl Default for State {
             inflight_challenges: RefCell::new(HashMap::new()),
             tentative_device_registrations: RefCell::new(HashMap::new()),
             usage_metrics: RefCell::new(UsageMetrics::default()),
-            persistent_state: RefCell::new(PersistentStateV1::default()),
+            persistent_state: RefCell::new(PersistentState::default()),
             archive_status_cache: RefCell::new(None),
         }
     }
@@ -290,7 +251,7 @@ pub fn load_persistent_state() {
             Err(PersistentStateError::NotFound) => {
                 // This is allowed for the first release of this feature only!
                 // After this feature has been deployed, we will panic on this error.
-                *s.persistent_state.borrow_mut() = PersistentStateV1::default()
+                *s.persistent_state.borrow_mut() = PersistentState::default()
             }
             Err(err) => trap(&format!(
                 "failed to recover persistent state! Err: {:?}",
@@ -317,13 +278,6 @@ pub fn archive_state() -> ArchiveState {
     STATE.with(|s| s.persistent_state.borrow().archive_info.state.clone())
 }
 
-pub fn archive_ready() -> bool {
-    STATE.with(|s| match s.persistent_state.borrow().archive_info.state {
-        ArchiveState::Created(_) => true,
-        _ => false,
-    })
-}
-
 pub fn expected_archive_hash() -> Option<[u8; 32]> {
     STATE.with(|s| {
         s.persistent_state
@@ -334,12 +288,12 @@ pub fn expected_archive_hash() -> Option<[u8; 32]> {
     })
 }
 
-pub fn archive_data() -> ArchiveData {
+pub fn archive_data() -> Option<ArchiveData> {
     STATE.with(|s| {
         if let ArchiveState::Created(ref data) = s.persistent_state.borrow().archive_info.state {
-            data.clone()
+            Some(data.clone())
         } else {
-            trap("no archive deployed")
+            None
         }
     })
 }
@@ -422,11 +376,11 @@ pub fn last_upgrade_timestamp() -> Timestamp {
     STATE.with(|s| s.last_upgrade_timestamp.get())
 }
 
-pub fn persistent_state<R>(f: impl FnOnce(&PersistentStateV1) -> R) -> R {
+pub fn persistent_state<R>(f: impl FnOnce(&PersistentState) -> R) -> R {
     STATE.with(|s| f(&*s.persistent_state.borrow()))
 }
 
-pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentStateV1) -> R) -> R {
+pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentState) -> R) -> R {
     STATE.with(|s| f(&mut *s.persistent_state.borrow_mut()))
 }
 

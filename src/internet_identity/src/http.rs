@@ -1,5 +1,5 @@
+use crate::archive::ArchiveState;
 use crate::assets::ContentType;
-use crate::state::ArchiveState;
 use crate::{assets, state, LABEL_ASSETS, LABEL_SIG};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
