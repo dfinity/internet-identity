@@ -136,10 +136,18 @@ type ArchiveInfo = record {
     expected_wasm_hash: opt blob;
 };
 
+// Init arguments of II which can be supplied on install and upgrade.
+// Setting a value to null keeps the previous value.
 type InternetIdentityInit = record {
-  assigned_user_number_range : opt record { nat64; nat64; };
-  archive_module_hash : opt blob;
-  canister_creation_cycles_cost : opt nat64;
+    // Set lowest and highest anchor
+    assigned_user_number_range : opt record { nat64; nat64; };
+    // Set the module hash of the archive canister
+    archive_module_hash : opt blob;
+    // Set the amounts of cycles sent with the create canister message.
+    // This is configurable because in the staging environment cycles are required.
+    // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
+    // canister creation cost, the newly created canister will keep extra cycles.
+    canister_creation_cycles_cost : opt nat64;
 };
 
 type ChallengeKey = text;
