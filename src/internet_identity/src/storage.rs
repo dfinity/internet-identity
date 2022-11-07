@@ -271,20 +271,17 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
-    pub fn flush(&self) {
-        if self.memory.size() < 1 {
-            let result = self.memory.grow(1);
-            if result == -1 {
-                trap("failed to grow stable memory to 1 page");
-            }
-        }
-        unsafe {
-            let slice = std::slice::from_raw_parts(
+    pub fn flush(&mut self) {
+        let slice = unsafe {
+            std::slice::from_raw_parts(
                 &self.header as *const _ as *const u8,
                 std::mem::size_of::<Header>(),
-            );
-            self.memory.write(0, &slice);
-        }
+            )
+        };
+        let mut writer = Writer::new(&mut self.memory, 0);
+
+        // this should never fail as this write only requires a memory of size 1
+        writer.write(slice).expect("bug: failed to grow memory");
     }
 
     pub fn user_count(&self) -> usize {
