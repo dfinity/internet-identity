@@ -172,13 +172,17 @@ pub struct HttpResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
-    pub assigned_user_number_range: (UserNumber, UserNumber),
+    pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
+    pub archive_module_hash: Option<[u8; 32]>,
+    pub canister_creation_cycles_cost: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
+    pub archive_info: ArchiveInfo,
+    pub canister_creation_cycles_cost: u64,
 }
 
 // Archive specific types
@@ -216,6 +220,18 @@ pub struct DeviceDataWithoutAlias {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+}
+
+impl From<DeviceData> for DeviceDataWithoutAlias {
+    fn from(device_data: DeviceData) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            credential_id: device_data.credential_id,
+            purpose: device_data.purpose,
+            key_type: device_data.key_type,
+            protection: device_data.protection,
+        }
+    }
 }
 
 // If present, the attribute has been changed to the value given.
@@ -260,9 +276,26 @@ pub enum Cursor {
     NextToken { next_token: ByteBuf },
 }
 
+/// Information about the archive.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct ArchiveInfo {
+    pub archive_canister: Option<Principal>,
+    pub expected_wasm_hash: Option<[u8; 32]>,
+}
+
 /// Init arguments of the archive canister.
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct ArchiveInit {
     pub ii_canister: Principal,
     pub max_entries_per_call: u16,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub enum DeployArchiveResult {
+    #[serde(rename = "success")]
+    Success(Principal),
+    #[serde(rename = "creation_in_progress")]
+    CreationInProgress,
+    #[serde(rename = "failed")]
+    Failed(String),
 }

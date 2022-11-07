@@ -1,4 +1,5 @@
 use crate::anchor_management::{check_device, write_anchor_data};
+use crate::archive::archive_operation;
 use crate::state::{ChallengeInfo, DeviceDataInternal};
 use crate::storage::Salt;
 use crate::{delegation, secs_to_nanos, state};
@@ -162,11 +163,11 @@ pub async fn register(
 
     check_device(&device_data, &vec![]);
 
-    if caller() != Principal::self_authenticating(device_data.pubkey.clone()) {
+    let caller = caller();
+    if caller != Principal::self_authenticating(device_data.pubkey.clone()) {
         trap(&format!(
             "{} could not be authenticated against {:?}",
-            caller(),
-            device_data.pubkey
+            caller, device_data.pubkey
         ));
     }
 
@@ -176,7 +177,17 @@ pub async fn register(
     let allocation = state::storage_mut(|storage| storage.allocate_user_number());
     match allocation {
         Some(user_number) => {
-            write_anchor_data(user_number, vec![DeviceDataInternal::from(device_data)]);
+            write_anchor_data(
+                user_number,
+                vec![DeviceDataInternal::from(device_data.clone())],
+            );
+            archive_operation(
+                user_number,
+                caller,
+                Operation::RegisterAnchor {
+                    device: DeviceDataWithoutAlias::from(device_data),
+                },
+            );
             RegisterResponse::Registered { user_number }
         }
         None => RegisterResponse::CanisterFull,

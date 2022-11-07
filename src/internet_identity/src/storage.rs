@@ -43,10 +43,23 @@
 //! Unallocated space           ↕ STABLE_MEMORY_RESERVE bytes
 //! -------------------------------------------
 //! ```
+//!
+//! ## Persistent State
+//!
+//! In order to keep state across upgrades that is not related to specific anchors (such as archive
+//! information) Internet Identity will serialize the [PersistentState] into the first unused memory
+//! location (after the anchor record of the highest allocated anchor number). The [PersistentState]
+//! will be read in `post_upgrade` after which the data can be safely overwritten by the next anchor
+//! to be registered.
+//!
+//! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
+//! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
+//! were used instead).
 
+use crate::state::PersistentState;
 use candid;
 use ic_cdk::api::trap;
-use ic_stable_structures::reader::{BufferedReader, Reader};
+use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
 use internet_identity_interface::UserNumber;
@@ -66,6 +79,8 @@ const GB: u64 = 1 << 30;
 const STABLE_MEMORY_SIZE: u64 = 8 * GB;
 /// We reserve last ~10% of the stable memory for later new features.
 const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
+
+const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// The maximum number of users this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
@@ -321,6 +336,69 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         }
         Ok(record_number)
     }
+
+    /// Returns the address of the first byte not yet allocated to a user.
+    /// This address exists even if the max user number has been reached, because there is a memory
+    /// reserve at the end of stable memory.
+    fn unused_memory_start(&self) -> u64 {
+        let record_number = self.header.num_users as u64;
+        RESERVED_HEADER_BYTES + record_number * self.header.entry_size as u64
+    }
+
+    /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
+    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next user registration.
+    pub fn write_persistent_state(&mut self, state: &PersistentState) {
+        let address = self.unused_memory_start();
+
+        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
+        let encoded_state = candid::encode_one(state).unwrap();
+
+        // In practice, for all reasonably sized persistent states (<800MB) the writes are
+        // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
+        let mut writer = Writer::new(&mut self.memory, address);
+        writer.write(&PERSISTENT_STATE_MAGIC).unwrap();
+        writer
+            .write(&(encoded_state.len() as u64).to_le_bytes())
+            .unwrap();
+        writer.write(&encoded_state).unwrap();
+    }
+
+    /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
+    /// This is only used to restore state in `post_upgrade`.
+    pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
+        let address = self.unused_memory_start();
+        let mut reader = Reader::new(&self.memory, address);
+
+        let mut magic_buf: [u8; 4] = [0; 4];
+        reader
+            .read(&mut magic_buf)
+            .map_err(|err| PersistentStateError::ReadError(err))?;
+
+        if magic_buf != PERSISTENT_STATE_MAGIC {
+            return Err(PersistentStateError::NotFound);
+        }
+
+        let mut size_buf: [u8; 8] = [0; 8];
+        reader
+            .read(&mut size_buf)
+            .map_err(|err| PersistentStateError::ReadError(err))?;
+
+        let size = u64::from_le_bytes(size_buf);
+        let mut data_buf = Vec::new();
+        data_buf.resize(size as usize, 0);
+        reader
+            .read(data_buf.as_mut_slice())
+            .map_err(|err| PersistentStateError::ReadError(err))?;
+
+        candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+    }
+}
+
+#[derive(Debug)]
+pub enum PersistentStateError {
+    CandidError(candid::error::Error),
+    NotFound,
+    ReadError(OutOfBounds),
 }
 
 #[derive(Debug)]

@@ -1,3 +1,4 @@
+use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::{DeviceDataInternal, TentativeDeviceRegistration};
 use crate::{delegation, state, trap_if_not_authenticated};
@@ -54,6 +55,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
     let mut entries = state::anchor_devices(user_number);
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
 
     check_device(&device_data, &entries);
@@ -73,10 +75,18 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
         ));
     }
 
-    entries.push(DeviceDataInternal::from(device_data));
+    entries.push(DeviceDataInternal::from(device_data.clone()));
     write_anchor_data(user_number, entries);
 
     delegation::prune_expired_signatures();
+
+    archive_operation(
+        user_number,
+        caller,
+        Operation::AddDevice {
+            device: DeviceDataWithoutAlias::from(device_data),
+        },
+    );
 }
 
 /// Replace or remove an existing device.
@@ -86,7 +96,7 @@ fn mutate_device_or_trap(
     entries: &mut Vec<DeviceDataInternal>,
     device_key: DeviceKey,
     new_value: Option<DeviceData>,
-) {
+) -> Operation {
     let index = match entries.iter().position(|e| e.pubkey == device_key) {
         None => trap("Could not find device to mutate, check device key"),
         Some(index) => index,
@@ -108,12 +118,19 @@ fn mutate_device_or_trap(
 
     match new_value {
         Some(device_data) => {
-            *device = device_data.into();
+            let internal_device = device_data.into();
+            let diff = device_diff(device, &internal_device);
+            *device = internal_device;
+            Operation::UpdateDevice {
+                device: device_key,
+                new_values: diff,
+            }
         }
         None => {
             // NOTE: we void the more efficient remove_swap to ensure device ordering
             // is not changed
             entries.remove(index);
+            Operation::RemoveDevice { device: device_key }
         }
     }
 }
@@ -127,11 +144,13 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
     check_device(&device_data, &entries);
 
-    mutate_device_or_trap(&mut entries, device_key, Some(device_data));
+    let operation = mutate_device_or_trap(&mut entries, device_key, Some(device_data));
 
     write_anchor_data(user_number, entries);
 
     delegation::prune_expired_signatures();
+
+    archive_operation(user_number, caller(), operation);
 }
 
 pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
@@ -139,11 +158,14 @@ pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
 
+    let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
     delegation::prune_expired_signatures();
 
-    mutate_device_or_trap(&mut entries, device_key, None);
+    let operation = mutate_device_or_trap(&mut entries, device_key, None);
     write_anchor_data(user_number, entries);
+
+    archive_operation(user_number, caller, operation);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.

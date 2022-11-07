@@ -1,4 +1,6 @@
-use crate::{assets, state, ContentType, LABEL_ASSETS, LABEL_SIG};
+use crate::archive::ArchiveState;
+use crate::assets::ContentType;
+use crate::{assets, state, LABEL_ASSETS, LABEL_SIG};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
@@ -144,6 +146,17 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             usage_metrics.anchor_operation_counter as f64,
             "The number of anchor operations since last upgrade",
         )
+    })?;
+    state::persistent_state(|persistent_state| {
+        if let ArchiveState::Created(ref data) = persistent_state.archive_info.state {
+            w.encode_gauge(
+                "internet_identity_archive_sequence_number",
+                data.sequence_number as f64,
+                "The number of entries written to the archive.",
+            )
+        } else {
+            Ok(())
+        }
     })?;
     Ok(())
 }

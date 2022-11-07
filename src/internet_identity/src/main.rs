@@ -1,16 +1,17 @@
+use crate::anchor_management::tentative_device_registration;
 use crate::assets::init_assets;
-use anchor_management::tentative_device_registration;
-use assets::ContentType;
 use candid::Principal;
 use ic_cdk::api::{caller, set_certified_data, trap};
-use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
-use ic_stable_structures::DefaultMemoryImpl;
-use storage::{Salt, Storage};
+use serde_bytes::ByteBuf;
+use storage::{PersistentStateError, Salt, Storage};
 
+use crate::archive::ArchiveState;
 use internet_identity_interface::*;
 
 mod anchor_management;
+mod archive;
 mod assets;
 mod delegation;
 mod hash;
@@ -141,33 +142,100 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
 #[query]
 fn stats() -> InternetIdentityStats {
+    let archive_info = state::persistent_state(|persistent_state| {
+        if let ArchiveState::Created(ref data) = persistent_state.archive_info.state {
+            ArchiveInfo {
+                archive_canister: Some(data.archive_canister),
+                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
+            }
+        } else {
+            ArchiveInfo {
+                archive_canister: None,
+                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
+            }
+        }
+    });
+
+    let canister_creation_cycles_cost =
+        state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_user_number_range(),
         users_registered: storage.user_count() as u64,
+        archive_info,
+        canister_creation_cycles_cost,
     })
+}
+
+#[update]
+async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
+    archive::deploy_archive(wasm).await
 }
 
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::storage_mut(|storage| {
-        if let Some(arg) = maybe_arg {
-            *storage = Storage::new(arg.assigned_user_number_range, DefaultMemoryImpl::default());
-        }
-        storage.flush();
-    });
 
+    if let Some(arg) = maybe_arg {
+        if let Some(range) = arg.assigned_user_number_range {
+            state::storage_mut(|storage| {
+                storage.set_user_number_range(range);
+            });
+        }
+        if let Some(archive_hash) = arg.archive_module_hash {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
+            })
+        }
+        if let Some(cost) = arg.canister_creation_cycles_cost {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.canister_creation_cycles_cost = cost;
+            })
+        }
+    }
+
+    // make sure the fully initialized storage configuration is written to stable memory
+    state::storage_mut(|storage| storage.flush());
     update_root_hash();
 }
 
 #[post_upgrade]
-fn retrieve_data() {
+fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     state::initialize_from_stable_memory();
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
     update_root_hash();
+    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
+    state::load_persistent_state();
+
+    if let Some(arg) = maybe_arg {
+        if let Some(range) = arg.assigned_user_number_range {
+            let current_range = state::storage(|storage| storage.assigned_user_number_range());
+            if range != current_range {
+                trap(&format!(
+                    "User number range cannot be changed. Current value: {:?}",
+                    current_range
+                ));
+            }
+        }
+        if let Some(archive_hash) = arg.archive_module_hash {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
+            })
+        }
+        if let Some(cost) = arg.canister_creation_cycles_cost {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.canister_creation_cycles_cost = cost;
+            })
+        }
+    }
+}
+
+#[pre_upgrade]
+fn save_persistent_state() {
+    state::save_persistent_state();
 }
 
 fn update_root_hash() {
