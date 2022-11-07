@@ -215,6 +215,24 @@ fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
     assert_eq!(buf, PERSISTENT_STATE_MAGIC);
 }
 
+/// This tests verifies that address calculation is correct for 64bit addresses.
+/// Note: this test takes about 8GB of memory.
+#[test]
+fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
+    let memory = VectorMemory::default();
+    memory.grow(1);
+    memory.write(0, &hex::decode("49494301C0C62D001027000000000000a9c039000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3_000_000 * 2048; // number of anchors is 100
+
+    let mut storage =
+        Storage::<Vec<DeviceDataInternal>, VectorMemory>::from_memory(memory.clone()).unwrap();
+    storage.write_persistent_state(&sample_persistent_state());
+
+    let mut buf = vec![0u8; 4];
+    memory.read(EXPECTED_ADDRESS, &mut buf);
+    assert_eq!(buf, PERSISTENT_STATE_MAGIC);
+}
+
 #[test]
 fn should_overwrite_persistent_state_with_next_anchor() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 2048; // only one anchor exists
