@@ -230,7 +230,7 @@ pub fn initialize_from_stable_memory() {
                 s.storage.replace(storage);
             }
             None => {
-                s.storage.borrow_mut().flush();
+                s.storage.borrow().flush();
             }
         }
     });

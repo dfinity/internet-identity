@@ -270,6 +270,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         Ok(data)
     }
 
+    /// Make sure all the required metadata is recorded to stable memory.
     pub fn flush(&self) {
         if self.memory.size() < 1 {
             let result = self.memory.grow(1);
