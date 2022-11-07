@@ -60,26 +60,63 @@ pub struct ArchiveStatusCache {
     pub status: CanisterStatusResponse,
 }
 
+/// Wrapper for wasm to carry verification state.
+struct VerifiableWasm {
+    wasm: Vec<u8>,
+    verified: bool,
+}
+
+impl VerifiableWasm {
+    pub fn from_unverified_wasm(wasm: ByteBuf) -> Self {
+        VerifiableWasm {
+            wasm: wasm.into_vec(),
+            verified: false,
+        }
+    }
+
+    pub fn verify_wasm_hash(&mut self) -> Result<(), DeployArchiveResult> {
+        let expected_hash =
+            state::expected_archive_hash().expect("bug: no wasm hash to check against");
+
+        let mut hasher = Sha256::new();
+        hasher.update(&self.wasm);
+        let wasm_hash: [u8; 32] = hasher.finalize().into();
+
+        if wasm_hash != expected_hash {
+            return Err(Failed("invalid wasm module".to_string()));
+        }
+
+        self.verified = true;
+        Ok(())
+    }
+
+    pub fn get_verified_wasm(mut self) -> Result<Vec<u8>, DeployArchiveResult> {
+        if !self.verified {
+            self.verify_wasm_hash()?;
+        };
+        Ok(self.wasm)
+    }
+}
+
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
+    let mut wasm = VerifiableWasm::from_unverified_wasm(wasm);
     let expected_hash = if let Some(hash) = state::expected_archive_hash() {
         hash
     } else {
         return Failed("archive deployment disabled".to_string());
     };
 
-    let wasm = wasm.into_vec();
-
-    let (archive_canister, install_mode, wasm_hash_verified) = match state::archive_state() {
-        NotCreated => match create_archive(&wasm).await {
-            Ok(archive) => (archive, Install, true),
+    let (archive_canister, install_mode) = match state::archive_state() {
+        NotCreated => match create_archive(&mut wasm).await {
+            Ok(archive) => (archive, Install),
             Err(result) => return result,
         },
         CreationInProgress(timestamp) => {
             if time() - timestamp > Duration::from_secs(24 * 60 * 60).as_nanos() as u64 {
                 // The archive has been in creation for more than a day and the creation process
                 // has likely failed thus another attempt should be made.
-                match create_archive(&wasm).await {
-                    Ok(archive) => (archive, Install, true),
+                match create_archive(&mut wasm).await {
+                    Ok(archive) => (archive, Install),
                     Err(result) => return result,
                 }
             } else {
@@ -92,35 +129,24 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
                 Err(message) => return Failed(message),
             };
             match status.module_hash {
-                None => (archive_data.archive_canister, Install, false),
+                None => (archive_data.archive_canister, Install),
                 Some(hash) if hash == expected_hash.to_vec() => {
                     // we already have an archive with the expected module and don't need to do anything
                     return Success(archive_data.archive_canister);
                 }
-                Some(_) => (archive_data.archive_canister, Upgrade, false),
+                Some(_) => (archive_data.archive_canister, Upgrade),
             }
         }
     };
 
-    // creating the archive verifies the wasm hash as well
-    if !wasm_hash_verified {
-        let hash_check = verify_wasm_hash(&wasm);
-        if hash_check.is_err() {
-            return Failed(hash_check.err().unwrap());
-        }
-    }
-
     match install_archive(archive_canister, wasm, install_mode).await {
         Ok(()) => Success(archive_canister),
-        Err(message) => Failed(message),
+        Err(err) => err,
     }
 }
 
-async fn create_archive(wasm: &Vec<u8>) -> Result<Principal, DeployArchiveResult> {
-    let hash_check = verify_wasm_hash(wasm);
-    if hash_check.is_err() {
-        return Err(Failed(hash_check.err().unwrap()));
-    }
+async fn create_archive(wasm: &mut VerifiableWasm) -> Result<Principal, DeployArchiveResult> {
+    wasm.verify_wasm_hash()?;
 
     // lock the archive
     state::persistent_state_mut(|persistent_state| {
@@ -175,28 +201,32 @@ async fn create_canister(arg: CreateCanisterArgument) -> CallResult<(CanisterIdR
 
 async fn install_archive(
     archive_canister: Principal,
-    wasm_module: Vec<u8>,
+    wasm: VerifiableWasm,
     install_mode: CanisterInstallMode,
-) -> Result<(), String> {
+) -> Result<(), DeployArchiveResult> {
     let settings = ArchiveInit {
         ii_canister: id(),
         max_entries_per_call: 1000,
     };
-    let encoded_arg = candid::encode_one(settings)
-        .map_err(|err| format!("failed to encode archive install argument: {:?}", err))?;
+    let encoded_arg = candid::encode_one(settings).map_err(|err| {
+        Failed(format!(
+            "failed to encode archive install argument: {:?}",
+            err
+        ))
+    })?;
 
     install_code(InstallCodeArgument {
         mode: install_mode,
         canister_id: archive_canister,
-        wasm_module,
+        wasm_module: wasm.get_verified_wasm()?,
         arg: encoded_arg,
     })
     .await
     .map_err(|(code, message)| {
-        format!(
+        Failed(format!(
             "failed to install archive canister! error code: {:?}, message: {}",
             code, message
-        )
+        ))
     })
 }
 
@@ -218,19 +248,6 @@ async fn archive_status(archive_canister: Principal) -> Result<CanisterStatusRes
         }
         Some(status) => Ok(status),
     }
-}
-
-fn verify_wasm_hash(wasm_module: &Vec<u8>) -> Result<[u8; 32], String> {
-    let expected_hash = state::expected_archive_hash().expect("bug: no wasm hash to check against");
-
-    let mut hasher = Sha256::new();
-    hasher.update(&wasm_module);
-    let wasm_hash: [u8; 32] = hasher.finalize().into();
-
-    if wasm_hash != expected_hash {
-        return Err("invalid wasm module".to_string());
-    }
-    Ok(expected_hash)
 }
 
 pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Operation) {
