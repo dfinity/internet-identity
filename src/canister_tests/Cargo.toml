@@ -18,8 +18,8 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.8"
-ic-types = { git = "https://github.com/dfinity/ic", rev = "a7ab3234957da623516167535a8a9ea6cba7ee96" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "b5fa78c590188b96f9635f4e82ed1e958884e19c" }
 ic-sdk-types = { package="ic-types", version="0.6" }
-ic-certification = { git = "https://github.com/dfinity/ic", rev = "a7ab3234957da623516167535a8a9ea6cba7ee96" }
-ic-crypto-iccsa = { git = "https://github.com/dfinity/ic", rev = "a7ab3234957da623516167535a8a9ea6cba7ee96" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "a7ab3234957da623516167535a8a9ea6cba7ee96" }
+ic-certification = { git = "https://github.com/dfinity/ic", rev = "b5fa78c590188b96f9635f4e82ed1e958884e19c" }
+ic-crypto-iccsa = { git = "https://github.com/dfinity/ic", rev = "b5fa78c590188b96f9635f4e82ed1e958884e19c" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "b5fa78c590188b96f9635f4e82ed1e958884e19c" }
