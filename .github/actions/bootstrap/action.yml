@@ -15,13 +15,13 @@ runs:
                 echo "system is darwin ($uname_sys)"
                 ver=$(uname -r | sed 's/\./_/g')
                 echo "darwin version is '$ver'"
-                echo "::set-output name=platform-id::darwin-$ver"
+                echo "platform-id=darwin-$ver" >> "$GITHUB_OUTPUT"
                 ;;
             Linux)
                 echo "system is linux ($uname_sys)"
                 glibc_version=$(ldd --version | head -n 1 | grep -oP 'ldd (.*) \K[[:digit:]]+\.[[:digit:]]+' | sed 's/\./_/g')
                 echo "glibc version is '$glibc_version'"
-                echo "::set-output name=platform-id::ubuntu-glibc-$glibc_version"
+                echo "platform-id=ubuntu-glibc-$glibc_version" >> "$GITHUB_OUTPUT"
                 ;;
             *)
                 echo uknown system "$uname_sys"
