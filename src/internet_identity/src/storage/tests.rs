@@ -1,7 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState};
 use crate::state::{DeviceDataInternal, PersistentState};
 use crate::storage::{Header, PersistentStateError, StorageError};
-use crate::{archive, Storage};
+use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::{DeviceProtection, KeyType, Purpose};
