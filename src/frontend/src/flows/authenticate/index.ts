@@ -286,7 +286,7 @@ export const authenticationFlow = async (
       switch (status) {
         case "waiting":
           render(
-            html`<h1>waiting for authentication data from dapp...</h1>`,
+            html`<h1>waiting for authentication data from service...</h1>`,
             container
           );
           break;
@@ -304,7 +304,7 @@ export const authenticationFlow = async (
     case "orphan":
       await displayError({
         title: "Invalid Data",
-        message: `It looks like you were sent here for authentication, but no dapp requested authentication.`,
+        message: `It looks like you were sent here for authentication, but no service requested authentication.`,
         primaryButton: "Home",
       });
 
@@ -314,7 +314,7 @@ export const authenticationFlow = async (
     case "failure":
       render(
         html`<h1>
-          Something went wrong during authentication. Authenticating dapp was
+          Something went wrong during authentication. Authenticating service was
           notified and you may close this page.
         </h1>`,
         container
