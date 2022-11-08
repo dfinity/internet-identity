@@ -538,10 +538,16 @@ jobs:
       - name: 'Install dfx'
         run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
 
-      - name: 'Download wasm'
+      - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
+          path: .
+
+      - name: 'Download archive wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: archive.wasm
           path: .
 
       - name: 'Install key'
@@ -553,13 +559,21 @@ jobs:
           dfx identity import --disable-encryption --force default "$key_pem"
           rm "$key_pem"
 
-      - name: "Deploy"
+      - name: "Deploy II"
         run: |
           mv internet_identity_production.wasm internet_identity.wasm
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          archiveShaWithBackslashes=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument '(null)' \
+            --argument "(opt record {archive_module_hash = opt blob \"$archiveShaWithBackSlashes\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             internet_identity
+
+      - name: "Deploy archive"
+        run: |
+          echo -n '(blob "' > call_arg
+          hexdump -ve '1/1 "%.2x"' archive.wasm | sed 's/../\\&/g' >> call_arg
+          echo -n '")' >> call_arg
+          dfx canister --network ic call internet_identity deploy_archive --argument-file call_arg
 
 
   # This ... releases
