@@ -1,21 +1,27 @@
-const path = require("path");
-const webpack = require("webpack");
-const CopyPlugin = require("copy-webpack-plugin");
-const CompressionPlugin = require("compression-webpack-plugin");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+import path from "path";
+import * as fs from "fs";
+import webpack from "webpack";
+import CopyPlugin from "copy-webpack-plugin";
+import CompressionPlugin from "compression-webpack-plugin";
+import HtmlWebpackPlugin from "html-webpack-plugin";
+import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
+import { fileURLToPath } from "url";
+import { config } from "dotenv";
 
-require("dotenv").config();
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+config();
 
 /** Read the II canister ID from dfx's local state */
-function readCanisterId() {
+async function readCanisterId() {
   const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
   let canisterId;
 
   try {
-    canisterId = require(canisterIdsJson).internet_identity.local;
+    canisterId = JSON.parse(fs.readFileSync(canisterIdsJson)).internet_identity
+      .local;
   } catch (e) {
     throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
   }
@@ -61,7 +67,7 @@ const defaults = {
   resolve: {
     extensions: [".js", ".ts"],
     fallback: {
-      stream: require.resolve("stream-browserify/"),
+      stream: "stream-browserify",
     },
   },
   module: {
@@ -83,8 +89,8 @@ const defaults = {
   plugins: [
     ...(isProduction ? [new MiniCssExtractPlugin()] : []),
     new webpack.ProvidePlugin({
-      Buffer: [require.resolve("buffer/"), "Buffer"],
-      process: require.resolve("process/browser"),
+      Buffer: ["buffer", "Buffer"],
+      process: "process/browser",
     }),
     new webpack.EnvironmentPlugin({
       II_FETCH_ROOT_KEY: "0",
@@ -118,7 +124,7 @@ const defaults = {
   ],
 };
 
-module.exports = [
+export default [
   {
     ...defaults,
     name: "app",
