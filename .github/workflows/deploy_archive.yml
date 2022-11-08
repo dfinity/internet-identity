@@ -9,7 +9,7 @@ inputs:
     required: true
 
 jobs:
-  cargo-fmt:
+  deploy-archive:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
