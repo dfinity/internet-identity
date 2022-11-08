@@ -569,7 +569,7 @@ jobs:
             internet_identity
 
       - name: "Deploy archive"
-        run: scripts/deploy-archive --wasm archive.wasm --canister-id $(jq -r .internet_identity.ic canister_ids.json) --network ic
+        run: scripts/deploy-archive --wasm archive.wasm --canister-id internet_identity --network ic
 
 
   # This ... releases
