@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
+import { LoginFlowCanceled, cancel } from "./login/flowResult";
 
 const pageContent = (onCancel: () => void) => html`
   <div class="l-container c-card c-card--highlight">
@@ -45,12 +46,12 @@ const pageContent = (onCancel: () => void) => html`
   </div>
 `;
 
-export const registerDisabled = (): Promise<null> => {
+export const registerDisabled = (): Promise<LoginFlowCanceled> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(
       pageContent(() => {
-        resolve(null);
+        resolve(cancel);
       }),
       container
     );

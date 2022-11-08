@@ -5,6 +5,7 @@ import { setUserNumber } from "../utils/userNumber";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
+  cancel,
 } from "./login/flowResult";
 import { Challenge } from "../../generated/internet_identity_types";
 import { withLoader } from "../components/loader";
@@ -50,7 +51,7 @@ export const confirmRegister = (
   captcha: Promise<Challenge>,
   identity: IdentifiableIdentity,
   alias: string
-): Promise<LoginFlowResult | null> => {
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init(connection, identity, alias, captcha);
@@ -166,7 +167,7 @@ const init = (
   identity: IdentifiableIdentity,
   alias: string,
   captcha: Promise<Challenge>
-): Promise<LoginFlowResult | null> => {
+): Promise<LoginFlowResult> => {
   requestCaptcha(connection, captcha);
 
   // since the index expects to regain control we unfortunately have to wrap
@@ -184,7 +185,7 @@ const init = (
     ) as HTMLButtonElement;
 
     cancelButton.onclick = () => {
-      resolve(null);
+      resolve(cancel);
     };
 
     confirmRegisterButton.onclick = (e) => {

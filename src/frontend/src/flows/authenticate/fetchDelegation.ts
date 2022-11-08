@@ -8,15 +8,14 @@ import {
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the application information contained in
  * authContext.
- * @param loginResult User number and authenticated II connection resulting from successful authentication.
+ * @param userNumber User number resulting from successful authentication.
+ * @param connection authenticated II connection resulting from successful authentication.
  * @param authContext Information about the authentication request received from the application via window post message.
  * @return Tuple of PublicKey and matching delegation.
  */
 export const fetchDelegation = async (
-  loginResult: {
-    userNumber: bigint;
-    connection: AuthenticatedConnection;
-  },
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
   authContext: AuthContext
 ): Promise<[PublicKey, Delegation]> => {
   const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
@@ -27,15 +26,15 @@ export const fetchDelegation = async (
       ? authContext.authRequest.derivationOrigin
       : authContext.requestOrigin;
 
-  const [userKey, timestamp] = await loginResult.connection.prepareDelegation(
+  const [userKey, timestamp] = await connection.prepareDelegation(
     derivationOrigin,
     sessionKey,
     authContext.authRequest.maxTimeToLive
   );
 
   const signed_delegation = await retryGetDelegation(
-    loginResult.connection,
-    loginResult.userNumber,
+    connection,
+    userNumber,
     derivationOrigin,
     sessionKey,
     timestamp
