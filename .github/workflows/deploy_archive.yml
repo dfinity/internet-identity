@@ -13,8 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: 'Install dfx'
-        run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+      - uses: ./.github/actions/setup-dfx
 
       - name: 'Download archive'
         run: curl -sSL ${{ archive-wasm-url }} -o archive.wasm
