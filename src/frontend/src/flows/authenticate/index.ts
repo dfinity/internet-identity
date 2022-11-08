@@ -31,19 +31,12 @@ type PageProps = {
   derivationOrigin?: string;
 };
 
-const pageContent = ({
-  origin,
-  onContinue,
-  recoverAnchor,
-  register,
-  userNumber,
-  derivationOrigin,
-}: PageProps): { template: TemplateResult } => {
-  const anchorInput = mkAnchorInput({
-    userNumber,
-    onSubmit: onContinue,
-  });
+type ChasmOpts = {
+  info: string;
+  message: TemplateResult;
+};
 
+const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   /* the chasm that opens to reveal details about alternative origin */
   const chasmRef: Ref<HTMLDivElement> = createRef();
 
@@ -72,7 +65,67 @@ const pageContent = ({
       }
     });
 
-  const template = html` <div class="l-container c-card c-card--highlight">
+  return html`
+    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
+    chasmToggleRef
+  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
+      <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
+        <div class="c-chasm__arrow"></div>
+        <div class="t-weak c-chasm__content">
+            ${message}
+        </div>
+      </div>
+    </p>
+`;
+};
+
+const mkLinks = ({
+  recoverAnchor,
+  register,
+}: {
+  recoverAnchor: () => void;
+  register: () => void;
+}) => html`
+  <div class="l-stack">
+    <ul class="c-list--flex">
+      <li>
+        <a @click=${register} id="registerButton" class="t-link"
+          >Create Anchor</a
+        >
+      </li>
+      <li>
+        <a @click="${recoverAnchor}" id="recoverButton" class="t-link"
+          >Lost Access?</a
+        >
+      </li>
+    </ul>
+    <ul class="c-list--flex">
+      <li>
+        <a href="/" class="t-link" id="manageButton">Home</a>
+      </li>
+      <li>
+        <a class="t-link" href="/faq" target="_blank" rel="noopener noreferrer"
+          >FAQ</a
+        >
+      </li>
+    </ul>
+  </div>
+`;
+
+const pageContent = ({
+  origin,
+  onContinue,
+  recoverAnchor,
+  register,
+  userNumber,
+  derivationOrigin,
+}: PageProps): TemplateResult => {
+  const anchorInput = mkAnchorInput({
+    userNumber,
+    onSubmit: onContinue,
+  });
+
+  return html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
       <h1 class="is-hidden">Internet Identity</h1>
       <div class="c-logo">${icLogo}</div>
@@ -83,17 +136,14 @@ const pageContent = ({
           <br />
         </p>
         ${derivationOrigin !== undefined
-          ? html`
-        <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >shared identity <span ${ref(
-              chasmToggleRef
-            )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
-          <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
-            <div class="c-chasm__arrow"></div>
-            <div class="t-weak c-chasm__content"><span class="t-strong">${origin}</span>
-            is an alternative domain of <br/><span class="t-strong">${derivationOrigin}</span><br/>and you will be authenticated to both with the same identity.
-            </div>
-          </div>
-        </p>`
+          ? mkChasm({
+              info: "shared identity",
+              message: html`<span class="t-strong">${origin}</span> is an
+                alternative domain of <br /><span class="t-strong"
+                  >${derivationOrigin}</span
+                ><br />and you will be authenticated to both with the same
+                identity. `,
+            })
           : ""}
       </div>
 
@@ -106,43 +156,12 @@ const pageContent = ({
       >
         Authorize
       </button>
-      <div class="l-stack">
-        <ul class="c-list--flex">
-          <li>
-            <a @click=${register} id="registerButton" class="t-link"
-              >Create Anchor</a
-            >
-          </li>
-          <li>
-            <a
-              @click="${() => recoverAnchor(anchorInput.readUserNumber())}"
-              id="recoverButton"
-              class="t-link"
-              >Lost Access?</a
-            >
-          </li>
-        </ul>
-        <ul class="c-list--flex">
-          <li>
-            <a href="/" class="t-link" id="manageButton">Home</a>
-          </li>
-          <li>
-            <a
-              class="t-link"
-              href="/faq"
-              target="_blank"
-              rel="noopener noreferrer"
-              >FAQ</a
-            >
-          </li>
-        </ul>
-      </div>
+      ${mkLinks({
+        register,
+        recoverAnchor: () => recoverAnchor(anchorInput.readUserNumber()),
+      })}
     </div>
     ${footer}`;
-
-  return {
-    template,
-  };
 };
 
 export interface AuthSuccess {
@@ -287,8 +306,7 @@ const authenticateUser = async (
 
 export const displayPage = (props: PageProps): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const ret = pageContent(props);
-  render(ret.template, container);
+  render(pageContent(props), container);
 };
 
 async function handleAuthSuccess(
