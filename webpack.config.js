@@ -14,7 +14,7 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 config();
 
 /** Read the II canister ID from dfx's local state */
-async function readCanisterId() {
+function readCanisterId() {
   const canisterIdsJson = "./.dfx/local/canister_ids.json";
 
   let canisterId;
