@@ -206,11 +206,11 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
 
 :::caution
-This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternat ive-origins` and never set origins you do not control as `derivationOrigin`!
+This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
 :::
 
 :::note
-`https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` princip als or vice versa.
+`https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 :::
 
 In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
