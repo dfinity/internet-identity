@@ -1,6 +1,7 @@
 {
   "name": "@dfinity/internet-identity",
   "version": "0.1.0",
+  "type": "module",
   "description": "",
   "keywords": [],
   "scripts": {
@@ -10,7 +11,7 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build": "NODE_ENV=production webpack --config-name app",
     "showcase": "II_FETCH_ROOT_KEY=1 webpack serve --config-name showcase",
-    "screenshots": "ts-node ./src/frontend/screenshots.ts",
+    "screenshots": "node --loader ts-node/esm ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
     "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
