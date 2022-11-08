@@ -2,9 +2,10 @@ import { html, render, TemplateResult } from "lit-html";
 import { icLogo, caretDownIcon } from "../../components/icons";
 import { footer } from "../../components/footer";
 import { getUserNumber, setUserNumber } from "../../utils/userNumber";
+import { unreachable } from "../../utils/utils";
 import { withLoader } from "../../components/loader";
 import { mkAnchorInput } from "../../components/anchorInput";
-import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
@@ -12,14 +13,14 @@ import {
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
-import waitForAuthRequest, { AuthContext } from "./postMessageInterface";
+import { recoveryWizard } from "../recovery/recoveryWizard";
+import {
+  AuthContext,
+  AuthSuccess,
+  authenticationProtocol,
+} from "./postMessageInterface";
 import { fetchDelegation } from "./fetchDelegation";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import {
-  validateDerivationOrigin,
-  ValidationResult,
-} from "./validateDerivationOrigin";
-import { unreachable } from "../../utils/utils";
 import { withRef } from "../../utils/lit-html";
 
 type PageProps = {
@@ -164,81 +165,15 @@ const pageContent = ({
     ${footer}`;
 };
 
-export interface AuthSuccess {
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-  sendDelegationMessage: () => void;
-}
-
-/**
- * Shows the authorize application view and returns information about the authenticated user and a callback, which sends
- * the delegation to the application window. After having received the delegation the application will close the
- * Internet Identity window.
- */
-export const authorizeAuthentication = async (
-  connection: Connection
-): Promise<AuthSuccess> => {
-  const [authContext, validationResult]: [AuthContext, ValidationResult] =
-    await withLoader(async () => {
-      const authContext = await waitForAuthRequest();
-
-      if (authContext === null) {
-        // The user has manually navigated to "/#authorize".
-        window.location.hash = "";
-        window.location.reload();
-        return new Promise((_resolve) => {
-          // never resolve, window is being reloaded
-        });
-      }
-
-      const validationResult = await validateDerivationOrigin(
-        authContext.requestOrigin,
-        authContext.authRequest.derivationOrigin
-      );
-      return [authContext, validationResult];
-    });
-
-  const userNumber = getUserNumber();
-  switch (validationResult.result) {
-    case "invalid":
-      await displayError({
-        title: "Invalid Derivation Origin",
-        message: `"${authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${authContext.requestOrigin}"`,
-        detail: validationResult.message,
-        primaryButton: "Close",
-      });
-
-      // notify the client application
-      // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
-      authContext.postMessageCallback({
-        kind: "authorize-client-failure",
-        text: `Invalid derivation origin: ${validationResult.message}`,
-      });
-
-      // we cannot recover from this, retrying or reloading won't help
-      // close the window as it returns the user to the offending application that opened II for authentication
-      window.close();
-      return new Promise((_resolve) => {
-        // never resolve, do not call init
-      });
-    case "valid":
-      return authenticatePage(connection, authContext, userNumber);
-    default:
-      unreachable(validationResult);
-      break;
-  }
-};
-
-const authenticatePage = (
+export const authenticatePage = (
   connection: Connection,
-  authContext: AuthContext,
-  userNumber?: bigint
+  authContext: AuthContext
 ): Promise<AuthSuccess> => {
   return new Promise((resolve) => {
     displayPage({
       origin: authContext.requestOrigin,
       onContinue: async (userNumber) => {
-        const authSuccess = await authenticateUser(
+        const authSuccess = await authenticate(
           connection,
           authContext,
           userNumber
@@ -250,7 +185,7 @@ const authenticatePage = (
           .then((result) => {
             if (result === null) {
               // user canceled registration
-              return authenticatePage(connection, authContext, userNumber);
+              return authenticatePage(connection, authContext);
             }
             if (result.tag === "ok") {
               return handleAuthSuccess(result, authContext);
@@ -261,20 +196,18 @@ const authenticatePage = (
               message: result.message,
               detail: result.detail !== "" ? result.detail : undefined,
               primaryButton: "Try again",
-            }).then(() =>
-              authenticatePage(connection, authContext, userNumber)
-            );
+            }).then(() => authenticatePage(connection, authContext));
           })
           .then(resolve),
 
       recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-      userNumber,
+      userNumber: getUserNumber(),
       derivationOrigin: authContext.authRequest.derivationOrigin,
     });
   });
 };
 
-const authenticateUser = async (
+const authenticate = async (
   connection: Connection,
   authContext: AuthContext,
   userNumber: bigint
@@ -301,7 +234,7 @@ const authenticateUser = async (
       primaryButton: "Try again",
     });
   }
-  return authenticatePage(connection, authContext, userNumber);
+  return authenticatePage(connection, authContext);
 };
 
 export const displayPage = (props: PageProps): void => {
@@ -312,7 +245,7 @@ export const displayPage = (props: PageProps): void => {
 async function handleAuthSuccess(
   loginResult: LoginFlowSuccess,
   authContext: AuthContext
-) {
+): Promise<AuthSuccess> {
   // successful login, store user number for next time
   setUserNumber(loginResult.userNumber);
   const [userKey, parsed_signed_delegation] = await fetchDelegation(
@@ -322,11 +255,79 @@ async function handleAuthSuccess(
   return {
     userNumber: loginResult.userNumber,
     connection: loginResult.connection,
-    sendDelegationMessage: () =>
-      authContext.postMessageCallback({
-        kind: "authorize-client-success",
-        delegations: [parsed_signed_delegation],
-        userPublicKey: Uint8Array.from(userKey),
-      }),
+    parsedSignedDelegation: parsed_signed_delegation,
+    userKey,
   };
 }
+
+/** Run the authentication flow, including postMessage protocol, offering to authenticate
+ * using an existing anchor or creating a new anchor, etc.
+ */
+export const authenticationFlow = async (
+  connection: Connection
+): Promise<void> => {
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(html`<h1>starting authentication</h1>`, container);
+  const result = await authenticationProtocol({
+    authenticate: async (authContext) => {
+      const authSuccess = await authenticatePage(connection, authContext);
+      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      return authSuccess;
+    },
+    onInvalidOrigin: (result) =>
+      displayError({
+        title: "Invalid Derivation Origin",
+        message: `"${result.authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${result.authContext.requestOrigin}"`,
+        detail: result.message,
+        primaryButton: "Continue",
+      }),
+
+    onProgress: (status) => {
+      switch (status) {
+        case "waiting":
+          render(
+            html`<h1>waiting for authentication data from service...</h1>`,
+            container
+          );
+          break;
+        case "validating":
+          render(html`<h1>validating authentication data...</h1>`, container);
+          break;
+        default:
+          unreachable(status);
+          break;
+      }
+    },
+  });
+
+  switch (result) {
+    case "orphan":
+      await displayError({
+        title: "Invalid Data",
+        message: `It looks like you were sent here for authentication, but no service requested authentication.`,
+        primaryButton: "Home",
+      });
+
+      location.hash = "";
+      window.location.reload();
+      break;
+    case "failure":
+      render(
+        html`<h1>
+          Something went wrong during authentication. Authenticating service was
+          notified and you may close this page.
+        </h1>`,
+        container
+      );
+      break;
+    case "success":
+      render(
+        html`<h1>Authentication sucessful. You may close this page.</h1>`,
+        container
+      );
+      break;
+    default:
+      unreachable(result);
+      break;
+  }
+};
