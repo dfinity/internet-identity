@@ -1,0 +1,23 @@
+name: Deploy Archive
+
+on:
+  workflow_dispatch:
+
+inputs:
+  archive-wasm-url:
+    description: 'Archive wasm URL to deploy'
+    required: true
+
+jobs:
+  cargo-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: 'Install dfx'
+        run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+      - name: 'Download archive'
+        run: curl -sSL ${{ archive-wasm-url }} -o archive.wasm
+
+      - name: Deploy Archive
+        run: scripts/deploy-archive --wasm archive.wasm --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai --network ic

@@ -569,11 +569,7 @@ jobs:
             internet_identity
 
       - name: "Deploy archive"
-        run: |
-          echo -n '(blob "' > call_arg
-          hexdump -ve '1/1 "%.2x"' archive.wasm | sed 's/../\\&/g' >> call_arg
-          echo -n '")' >> call_arg
-          dfx canister --network ic call internet_identity deploy_archive --argument-file call_arg
+        run: scripts/deploy-archive --wasm archive.wasm --canister-id $(jq -r .internet_identity.ic canister_ids.json) --network ic
 
 
   # This ... releases
