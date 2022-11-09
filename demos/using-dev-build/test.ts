@@ -57,19 +57,16 @@ function parseCanisterIDs(): CanisterIDs {
   }
 }
 
-function parseReplicaHost(): string {
-  const DFX_JSON_PATH = `${__dirname}/dfx.json`;
-  try {
-    const dfx_json = JSON.parse(fs.readFileSync(DFX_JSON_PATH, "utf8"));
-    let replicaHost = dfx_json.networks.local.bind;
-    if (!replicaHost.startsWith("http://")) {
-      replicaHost = `http://${replicaHost}`;
-    }
-    return replicaHost;
-  } catch (e) {
-    console.log(`Could not read replica host from ${DFX_JSON_PATH}`);
-    throw e;
-  }
+async function getReplicaHost(): Promise<string> {
+  let proc = spawn("dfx", ["info", "webserver-port"]);
+  let result = "";
+  proc.stdout.on("data", (data) => (result += data.toString()));
+  return new Promise((resolve) =>
+    proc.stdout.on("close", (code) => {
+      console.log("process exited with exit code " + code);
+      resolve(`http://localhost:${result}`);
+    })
+  );
 }
 
 /*
@@ -92,14 +89,14 @@ function spawnProxy(
   ]);
 }
 
-function main() {
+async function main() {
   // Read values and spawn proxy
   const canisterIds = parseCanisterIDs();
   console.log(
     `Using canister IDs: internet_identity: ${canisterIds.internetIdentity}, webapp: ${canisterIds.webapp}`
   );
 
-  const replicaHost = parseReplicaHost();
+  const replicaHost = await getReplicaHost();
   console.log(`Using replica host: ${replicaHost}`);
 
   const proxy = spawnProxy(canisterIds, replicaHost);
