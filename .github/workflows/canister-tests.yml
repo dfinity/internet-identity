@@ -535,8 +535,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: 'Install dfx'
-        run: DFX_VERSION=0.10.1 sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+      - uses: ./.github/actions/setup-dfx
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
