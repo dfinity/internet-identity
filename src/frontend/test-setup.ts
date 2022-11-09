@@ -1,5 +1,5 @@
 import crypto from "@trust/webcrypto";
-import textEncoding = require("text-encoding");
+import textEncoding from "text-encoding";
 
 export type WebAuthnCredential = {
   credentialId: string;

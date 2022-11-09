@@ -2,11 +2,22 @@
 // applications that want to authenticate the user using Internet Identity
 import { Principal } from "@dfinity/principal";
 
-export interface AuthRequest {
-  kind: "authorize-client";
-  sessionPublicKey: Uint8Array;
-  maxTimeToLive?: bigint;
-  derivationOrigin?: string;
+import { validateDerivationOrigin } from "./validateDerivationOrigin";
+
+import { PublicKey } from "../../../generated/internet_identity_types";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
+
+export interface AuthSuccess {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  parsedSignedDelegation: Delegation;
+  userKey: PublicKey;
+}
+
+export interface AuthResponseSuccess {
+  kind: "authorize-client-success";
+  delegations: Delegation[];
+  userPublicKey: Uint8Array;
 }
 
 export interface Delegation {
@@ -16,17 +27,6 @@ export interface Delegation {
     targets?: Principal[];
   };
   signature: Uint8Array;
-}
-
-export interface AuthResponseSuccess {
-  kind: "authorize-client-success";
-  delegations: Delegation[];
-  userPublicKey: Uint8Array;
-}
-
-export interface AuthResponseFailure {
-  kind: "authorize-client-failure";
-  text: string;
 }
 
 /**
@@ -42,35 +42,94 @@ export interface AuthContext {
    * Origin of the message.
    */
   requestOrigin: string;
-  /**
-   * Callback to send a result back to the sender.
-   */
-  postMessageCallback: (
-    message: AuthResponseSuccess | AuthResponseFailure
-  ) => void;
 }
 
-// A message to signal that the II is ready to receive authorization requests.
-export const READY_MESSAGE = {
-  kind: "authorize-ready",
-};
+export interface AuthRequest {
+  kind: "authorize-client";
+  sessionPublicKey: Uint8Array;
+  maxTimeToLive?: bigint;
+  derivationOrigin?: string;
+}
 
 /**
- * Set up an event listener for window post messages and wait for the authorize
- * authentication request from the client application.
+ * The postMessage-based authentication protocol.
  */
-export default async function waitForAuthRequest(): Promise<AuthContext | null> {
+export async function authenticationProtocol({
+  authenticate,
+  onInvalidOrigin,
+  onProgress,
+}: {
+  /** The callback used to get auth data (i.e. select or create anchor) */
+  authenticate: (authContext: AuthContext) => Promise<AuthSuccess>;
+  /** Callback used to show an "invalid origin" error. At this point the authentication protocol is not over so we use a callback to regain control afterwards. */
+  onInvalidOrigin: (opts: {
+    authContext: AuthContext;
+    message: string;
+  }) => Promise<void>;
+  /* Progress update messages to let the user know what's happening. */
+  onProgress: (state: "waiting" | "validating") => void;
+}): Promise<"orphan" | "success" | "failure"> {
   if (window.opener === null) {
     // If there's no `window.opener` a user has manually navigated to "/#authorize".
     // Signal that there will never be an authentication request incoming.
-    return Promise.resolve(null);
+    return "orphan";
   }
 
-  const result = new Promise<AuthContext>((resolve) => {
-    // Set up an event listener for receiving messages from the client.
-    window.addEventListener("message", async (event) => {
+  // Send a message to indicate we're ready.
+  // NOTE: Because `window.opener.origin` cannot be accessed, this message
+  // is sent with "*" as the target origin. This is safe as no sensitive
+  // information is being communicated here.
+  window.opener.postMessage({ kind: "authorize-ready" }, "*");
+
+  onProgress("waiting");
+
+  const authContext = await waitForAuthRequest();
+
+  onProgress("validating");
+
+  const validationResult = await validateDerivationOrigin(
+    authContext.requestOrigin,
+    authContext.authRequest.derivationOrigin
+  );
+
+  if (validationResult.result === "invalid") {
+    await onInvalidOrigin({ message: validationResult.message, authContext });
+    // notify the client application
+    // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
+    window.opener.postMessage(
+      {
+        kind: "authorize-client-failure",
+        text: `Invalid derivation origin: ${validationResult.message}`,
+      },
+      authContext.requestOrigin
+    );
+
+    return "failure";
+  }
+
+  const authSuccess = await authenticate(authContext);
+
+  window.opener.postMessage(
+    {
+      kind: "authorize-client-success",
+      delegations: [authSuccess.parsedSignedDelegation],
+      userPublicKey: Uint8Array.from(authSuccess.userKey),
+    },
+    authContext.requestOrigin
+  );
+
+  return "success";
+}
+
+/**
+ * Wait for client to request authentication.
+ */
+const waitForAuthRequest = (): Promise<AuthContext> =>
+  new Promise<AuthContext>((resolve) => {
+    const eventHandler = async (event: MessageEvent) => {
       const message = event.data;
       if (message.kind === "authorize-client") {
+        window.removeEventListener("message", eventHandler);
         console.log(
           `Handling authorize-client request ${JSON.stringify(message, (_, v) =>
             typeof v === "bigint" ? v.toString() : v
@@ -79,21 +138,14 @@ export default async function waitForAuthRequest(): Promise<AuthContext | null> 
         resolve({
           authRequest: message,
           requestOrigin: event.origin,
-          postMessageCallback: (responseMessage) =>
-            (event.source as Window).postMessage(responseMessage, event.origin),
         });
       } else {
         console.warn(
           `Message of unknown kind received: ${JSON.stringify(message)}`
         );
       }
-    });
-  });
+    };
 
-  // Send a message to indicate we're ready.
-  // NOTE: Because `window.opener.origin` cannot be accessed, this message
-  // is sent with "*" as the target origin. This is safe as no sensitive
-  // information is being communicated here.
-  window.opener.postMessage(READY_MESSAGE, "*");
-  return result;
-}
+    // Set up an event listener for receiving messages from the client.
+    window.addEventListener("message", eventHandler);
+  });
