@@ -5,10 +5,10 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
+import { authenticationFlow } from "./flows/authenticate";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
-import { authorizeAuthentication } from "./flows/authenticate";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
 
@@ -63,13 +63,8 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      // show the application 'authorize authentication' screen. The user can authenticate, create a new anchor or jump to other pages to recover and manage.
-      const authSuccess = await authorizeAuthentication(connection);
-      // show the recovery wizard before sending the window post message, otherwise the II window will be closed
-      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
-      // send the delegation back to the dapp window (which will then close the II window)
-      authSuccess.sendDelegationMessage();
-      return;
+      await authenticationFlow(connection);
+      break;
     }
     // Open the management page
     case "manage": {

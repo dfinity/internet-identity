@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2019", "DOM"],
-    "module": "commonjs",
+    "module": "es2020",
     "strict": true,
     "target": "es2018",
     "skipLibCheck": true,

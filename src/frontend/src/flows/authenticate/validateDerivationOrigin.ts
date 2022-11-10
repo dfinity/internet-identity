@@ -3,7 +3,7 @@ import { wrapError } from "../../utils/utils";
 
 const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
 const MAX_ALTERNATIVE_ORIGINS = 10;
-export type ValidationResult =
+type ValidationResult =
   | { result: "valid" }
   | { result: "invalid"; message: string };
 
