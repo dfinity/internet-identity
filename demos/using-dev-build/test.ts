@@ -7,7 +7,7 @@
  */
 
 import * as fs from "fs";
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, spawn, execSync } from "child_process";
 
 // Port and URL for II and the sign in app, then exported to the tests
 const II_DAPP_PORT = 8086;
@@ -57,16 +57,9 @@ function parseCanisterIDs(): CanisterIDs {
   }
 }
 
-async function getReplicaHost(): Promise<string> {
-  let proc = spawn("dfx", ["info", "webserver-port"]);
-  let result = "";
-  proc.stdout.on("data", (data) => (result += data.toString()));
-  return new Promise((resolve) =>
-    proc.stdout.on("close", (code) => {
-      console.log("process exited with exit code " + code);
-      resolve(`http://localhost:${result}`);
-    })
-  );
+function getReplicaHost(): string {
+  let port = execSync("dfx info webserver-port");
+  return `http://localhost:${port}`;
 }
 
 /*
@@ -89,14 +82,14 @@ function spawnProxy(
   ]);
 }
 
-async function main() {
+function main() {
   // Read values and spawn proxy
   const canisterIds = parseCanisterIDs();
   console.log(
     `Using canister IDs: internet_identity: ${canisterIds.internetIdentity}, webapp: ${canisterIds.webapp}`
   );
 
-  const replicaHost = await getReplicaHost();
+  const replicaHost = getReplicaHost();
   console.log(`Using replica host: ${replicaHost}`);
 
   const proxy = spawnProxy(canisterIds, replicaHost);
