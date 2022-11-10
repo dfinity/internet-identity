@@ -45,7 +45,7 @@ module.exports = {
       const canisterIdsJson = "./.dfx/local/canister_ids.json";
       let canisterId;
       try {
-        canisterId = require(canisterIdsJson).selenium_test_app.local;
+        canisterId = require(canisterIdsJson).test_app.local;
       } catch (e) {
         throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
       }
@@ -76,7 +76,7 @@ module.exports = {
       );
       return middlewares;
     },
-    port: 8080,
+    port: 8081,
     proxy: {
       // Make sure /api calls land on the replica (and not on webpack)
       "/api": "http://localhost:8000",
