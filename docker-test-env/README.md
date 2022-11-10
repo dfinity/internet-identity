@@ -16,8 +16,8 @@ When selenium tests are run, the tests are executed on the host machine natively
 To run selenium tests, do the following:
 1. Run `dfx start` from the repository root.
    1. The `--background` flag can be added to run in the background.
-2. Run `II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 dfx deploy --argument '(null)'`.
-3. Switch to the `demos/test-app` directory and run `dfx deploy`.
+2. Run `II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 dfx deploy --no-wallet`.
+3. Switch to the `demos/test-app` directory and run `dfx deploy --no-wallet`.
 4. Run `npm run start` from the repository root.
 5. Run `scripts/start-selenium-env` from the repository root.
    1. The docker compose setup can be shut down by running `docker compose down` in the `docker-test-env` directory.
