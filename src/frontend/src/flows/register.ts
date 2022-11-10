@@ -11,6 +11,7 @@ import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
+  cancel,
 } from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
@@ -62,7 +63,7 @@ const constructingContent = html`
 
 export const register = async (
   connection: Connection
-): Promise<LoginFlowResult | null> => {
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init(connection);
@@ -73,14 +74,14 @@ export const renderConstructing = (): void => {
   render(constructingContent, container);
 };
 
-const init = (connection: Connection): Promise<LoginFlowResult | null> =>
+const init = (connection: Connection): Promise<LoginFlowResult> =>
   new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
       "registerCancel"
     ) as HTMLButtonElement;
 
-    registerCancel.onclick = () => resolve(null);
+    registerCancel.onclick = () => resolve(cancel);
     form.onsubmit = async (e) => {
       e.preventDefault();
       e.stopPropagation();

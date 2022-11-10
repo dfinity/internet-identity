@@ -3,7 +3,7 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import {
   apiResultToLoginFlowResult,
   LoginFlowCanceled,
-  canceled,
+  cancel,
   LoginFlowSuccess,
 } from "../../login/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
@@ -143,7 +143,7 @@ const init = (
       "inputSeedPhraseCancel"
     ) as HTMLButtonElement;
     inputSeedPhraseCancel.onclick = () => {
-      resolve(canceled());
+      resolve(cancel);
     };
     inputSeedPhraseContinue.onclick = async () => {
       const inputValue = inputSeedPhraseInput.value.trim();

@@ -1,7 +1,7 @@
-import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { Ref } from "lit-html/directives/ref.js";
 import { addRemoteDevice } from "../addDevice/welcomeView";
-import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
+import { LoginFlowSuccess, LoginFlowError, LoginData } from "./flowResult";
 import { displayError } from "../../components/displayError";
 import { footer } from "../../components/footer";
 import { getUserNumber } from "../../utils/userNumber";
@@ -11,9 +11,9 @@ import { mkAnchorInput } from "../../components/anchorInput";
 import { navbar } from "../../components/navbar";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import { unknownToString } from "../../utils/utils";
+import { authenticate } from "../authenticate";
+import { unknownToString, unreachable } from "../../utils/utils";
 import { useRecovery } from "../recovery/useRecovery";
-import { withLoader } from "../../components/loader";
 
 /** Data and callbacks used on the login page */
 type PageProps = {
@@ -31,12 +31,7 @@ export type Returning =
 
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
-export const login = async (
-  connection: Connection
-): Promise<{
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-}> => {
+export const login = async (connection: Connection): Promise<LoginData> => {
   try {
     const userNumber = getUserNumber();
     const clearCache = () => {
@@ -52,24 +47,32 @@ export const login = async (
       userNumber !== undefined
         ? { returning: true, clearCache, userNumber }
         : { returning: false };
-    const x = await new Promise<LoginFlowResult>((resolve, reject) => {
-      loginPage({
-        submit: (userNumber) => doLogin(userNumber, connection).then(resolve),
-        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
-        recover: () => useRecovery(connection),
-        register: () =>
-          registerIfAllowed(connection)
-            .then((res) => {
-              if (res === null) {
-                window.location.reload();
-              } else {
-                resolve(res);
-              }
-            })
-            .catch(reject),
-        ...returning,
-      });
-    });
+    const x = await new Promise<LoginFlowSuccess | LoginFlowError>(
+      (resolve, reject) => {
+        loginPage({
+          submit: async (userNumber) => {
+            const loginData = await authenticate(connection, userNumber);
+            if (loginData.tag === "ok") {
+              setUserNumber(loginData.userNumber);
+            }
+            resolve(loginData);
+          },
+          addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+          recover: () => useRecovery(connection),
+          register: () =>
+            registerIfAllowed(connection)
+              .then((res) => {
+                if (res.tag === "canceled") {
+                  window.location.reload();
+                } else {
+                  resolve(res);
+                }
+              })
+              .catch(reject),
+          ...returning,
+        });
+      }
+    );
 
     switch (x.tag) {
       case "ok": {
@@ -79,6 +82,9 @@ export const login = async (
         await displayError({ ...x, primaryButton: "Try again" });
         return login(connection);
       }
+      default:
+        unreachable(x);
+        break;
     }
   } catch (err: unknown) {
     await displayError({
@@ -204,15 +210,4 @@ const pageContent = (
     ${footer}`;
 
   return { ...anchorInput, template };
-};
-
-const doLogin = async (
-  userNumber: bigint,
-  connection: Connection
-): Promise<LoginFlowResult> => {
-  const result = await withLoader(() => connection.login(userNumber));
-  if (result.kind === "loginSuccess") {
-    setUserNumber(userNumber);
-  }
-  return apiResultToLoginFlowResult(result);
 };
