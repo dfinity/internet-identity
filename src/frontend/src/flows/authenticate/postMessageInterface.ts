@@ -1,24 +1,9 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
 import { Principal } from "@dfinity/principal";
-
+import { fetchDelegation } from "./fetchDelegation";
+import { LoginData } from "../login/flowResult";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
-
-import { PublicKey } from "../../../generated/internet_identity_types";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
-
-export interface AuthSuccess {
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-  parsedSignedDelegation: Delegation;
-  userKey: PublicKey;
-}
-
-export interface AuthResponseSuccess {
-  kind: "authorize-client-success";
-  delegations: Delegation[];
-  userPublicKey: Uint8Array;
-}
 
 export interface Delegation {
   delegation: {
@@ -60,14 +45,14 @@ export async function authenticationProtocol({
   onProgress,
 }: {
   /** The callback used to get auth data (i.e. select or create anchor) */
-  authenticate: (authContext: AuthContext) => Promise<AuthSuccess>;
+  authenticate: (authContext: AuthContext) => Promise<LoginData>;
   /** Callback used to show an "invalid origin" error. At this point the authentication protocol is not over so we use a callback to regain control afterwards. */
   onInvalidOrigin: (opts: {
     authContext: AuthContext;
     message: string;
   }) => Promise<void>;
   /* Progress update messages to let the user know what's happening. */
-  onProgress: (state: "waiting" | "validating") => void;
+  onProgress: (state: "waiting" | "validating" | "fetching delegation") => void;
 }): Promise<"orphan" | "success" | "failure"> {
   if (window.opener === null) {
     // If there's no `window.opener` a user has manually navigated to "/#authorize".
@@ -106,14 +91,21 @@ export async function authenticationProtocol({
 
     return "failure";
   }
-
   const authSuccess = await authenticate(authContext);
+
+  onProgress("fetching delegation");
+
+  const [userKey, parsed_signed_delegation] = await fetchDelegation(
+    authSuccess.userNumber,
+    authSuccess.connection,
+    authContext
+  );
 
   window.opener.postMessage(
     {
       kind: "authorize-client-success",
-      delegations: [authSuccess.parsedSignedDelegation],
-      userPublicKey: Uint8Array.from(authSuccess.userKey),
+      delegations: [parsed_signed_delegation],
+      userPublicKey: Uint8Array.from(userKey),
     },
     authContext.requestOrigin
   );
