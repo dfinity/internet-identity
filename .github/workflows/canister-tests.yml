@@ -517,10 +517,16 @@ jobs:
 
       - uses: ./.github/actions/setup-dfx
 
-      - name: 'Download wasm'
+      - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
+          path: .
+
+      - name: 'Download archive wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: archive.wasm
           path: .
 
       - name: 'Install key'
@@ -532,13 +538,17 @@ jobs:
           dfx identity import --disable-encryption --force default "$key_pem"
           rm "$key_pem"
 
-      - name: "Deploy"
+      - name: "Deploy II"
         run: |
           mv internet_identity_production.wasm internet_identity.wasm
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument '(null)' \
+            --argument "(opt record {archive_module_hash = opt blob \"$sha\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             internet_identity
+
+      - name: "Deploy archive"
+        run: scripts/deploy-archive --wasm archive.wasm --canister-id internet_identity --network ic
 
 
   # This ... releases
