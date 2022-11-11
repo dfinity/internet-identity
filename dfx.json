@@ -4,18 +4,13 @@
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm",
-      "build": "scripts/build"
+      "build": "scripts/build",
+      "shrink" : false
     }
   },
   "defaults": {
     "build": {
       "packtool": ""
-    }
-  },
-  "networks": {
-    "local": {
-      "bind": "0.0.0.0:8000",
-      "type": "ephemeral"
     }
   },
   "version": 1

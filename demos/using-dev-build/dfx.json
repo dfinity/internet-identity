@@ -1,17 +1,15 @@
 {
-  "__0": "The format of dfx.json is not documented. We use '__X' fields (unknown fields are ignored by dfx) to record our discoveries and other observations.",
+  "__0": "dfx.json reference: https://internetcomputer.org/docs/current/references/dfx-json-reference/",
+  "__1": "We use '__X' fields (unknown fields are ignored by dfx) to leave comments.",
   "canisters": {
     "internet_identity": {
       "__0": "The development build of Internet Identity. For more information, see https://github.com/dfinity/internet-identity#build-features-and-flavors",
-
       "type": "custom",
-      "candid": "internet_identity.did",
-      "wasm": "internet_identity.wasm",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
 
-      "__1": "There is no standard way to pull remote canisters, so instead we have a dummy build script that",
-      "__2": "simply downloads the Internet Identity canister and Candid description.",
-      "__3": "See also: https://github.com/dfinity/sdk/issues/2085",
-      "build": "./scripts/download-did-and-wasm"
+      "__1": "Currently, dfx tries to shrink already optimized wasm modules. This is why we disable it here.",
+      "shrink": false
     },
 
     "whoami": {
@@ -37,12 +35,6 @@
   "defaults": {
     "build": {
       "packtool": ""
-    }
-  },
-  "networks": {
-    "local": {
-      "bind": "0.0.0.0:8000",
-      "type": "ephemeral"
     }
   },
   "version": 1

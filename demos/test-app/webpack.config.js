@@ -37,7 +37,7 @@ module.exports = {
       } catch (e) {
         throw Error(`Could get host from ${dfxJson}: ${e}`);
       }
-      // If the replicaHost lacks protocol (e.g. 'localhost:8000') the
+      // If the replicaHost lacks protocol (e.g. 'localhost:4943') the
       // requests are not forwarded properly
       if (!replicaHost.startsWith("http://")) {
         replicaHost = `http://${replicaHost}`;
@@ -79,7 +79,7 @@ module.exports = {
     port: 8081,
     proxy: {
       // Make sure /api calls land on the replica (and not on webpack)
-      "/api": "http://localhost:8000",
+      "/api": "http://localhost:4943",
     },
     allowedHosts: [".localhost", ".local", ".ngrok.io"],
   },

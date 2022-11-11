@@ -19,7 +19,7 @@ export const init = ({ IDL }) => {
 document.body.onload = () => {
   let iiUrl;
   if (process.env.DFX_NETWORK === "local") {
-    iiUrl = `http://localhost:8000/?canisterId=${process.env.II_CANISTER_ID}`;
+    iiUrl = `http://localhost:4943/?canisterId=${process.env.II_CANISTER_ID}`;
   } else if (process.env.DFX_NETWORK === "ic") {
     iiUrl = `https://${process.env.II_CANISTER_ID}.ic0.app`;
   } else {

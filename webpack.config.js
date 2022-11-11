@@ -136,7 +136,7 @@ export default [
       port: 8080,
       proxy: {
         // Make sure /api calls land on the replica (and not on webpack)
-        "/api": "http://localhost:8000",
+        "/api": "http://localhost:4943",
       },
       allowedHosts: [".localhost", ".local", ".ngrok.io"],
     },
