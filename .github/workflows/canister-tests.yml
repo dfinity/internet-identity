@@ -563,9 +563,9 @@ jobs:
         run: |
           mv internet_identity_production.wasm internet_identity.wasm
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          archiveShaWithBackslashes=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
+          sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument "(opt record {archive_module_hash = opt blob \"$archiveShaWithBackSlashes\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
+            --argument "(opt record {archive_module_hash = opt blob \"$sha\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             internet_identity
 
       - name: "Deploy archive"
