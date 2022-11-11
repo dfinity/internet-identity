@@ -98,16 +98,6 @@ const mkLinks = ({
         >
       </li>
     </ul>
-    <ul class="c-list--flex">
-      <li>
-        <a href="/" class="t-link" id="manageButton">Home</a>
-      </li>
-      <li>
-        <a class="t-link" href="/faq" target="_blank" rel="noopener noreferrer"
-          >FAQ</a
-        >
-      </li>
-    </ul>
   </div>
 `;
 

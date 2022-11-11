@@ -19,7 +19,6 @@ pub enum ContentType {
     JS,
     ICO,
     WEBP,
-    SVG,
     CSS,
 }
 
@@ -72,7 +71,7 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 9] {
+fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     [
         (
@@ -123,12 +122,6 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             include_bytes!("../../../dist/favicon.ico"),
             ContentEncoding::Identity,
             ContentType::ICO,
-        ),
-        (
-            "/ic-badge.svg",
-            include_bytes!("../../../dist/ic-badge.svg"),
-            ContentEncoding::Identity,
-            ContentType::SVG,
         ),
     ]
 }
