@@ -93,12 +93,4 @@ then
     network_arg+=( "--network" "$network")
 fi
 
-tmp_arg_file=$(mktemp)
-
-echo -n '(blob "' > "$tmp_arg_file"
-hexdump -ve '1/1 "%.2x"' "$wasm" | sed 's/../\\&/g' >> "$tmp_arg_file"
-echo -n '")' >> "$tmp_arg_file"
-
-dfx canister "${network_arg[@]}" call "$canister_id" deploy_archive --argument-file "$tmp_arg_file"
-
-rm "$tmp_arg_file"
+dfx canister "${network_arg[@]}" call "$canister_id" deploy_archive --argument-file <(echo "(blob \"$(hexdump -ve '1/1 "%.2x"' "$wasm" | sed 's/../\\&/g')\")")
