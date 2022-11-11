@@ -75,7 +75,7 @@ A detailed description of what happens behind the scenes is available in the [cl
 
 Let's now use those canisters. Don't care about details? Skip to the [helpers](#helpers).
 
-In order to talk to those canisters (for instance to view the webapp in your browser) you need to figure the ID of each canister and then use an URL of the form `https://localhost:8000/?canisterId=<canister ID>` (where `8000` is the port used by `dfx` to proxy calls to the replica; that port is usually specified in the `dfx.json`). You can find the canister IDs in the output of the `dfx command`, or by checking `dfx`'s "internal" (read: non-documented) state:
+In order to talk to those canisters (for instance to view the webapp in your browser) you need to figure the ID of each canister and then use an URL of the form `https://localhost:4943/?canisterId=<canister ID>` (where `4943` is the port used by `dfx` to proxy calls to the replica; that port is usually specified in the `dfx.json`). You can find the canister IDs in the output of the `dfx command`, or by checking `dfx`'s "internal" (read: non-documented) state:
 
 ```
 ~/internet-identity/demos/using-dev-build$ cat .dfx/local/canister_ids.json
@@ -94,11 +94,11 @@ In order to talk to those canisters (for instance to view the webapp in your bro
 }
 ```
 
-You might get different canister IDs (and that's totally fine). If the `webapp` canister ID is `rrkah-fqaaa-aaaaa-aaaaq-cai`, you should be able to point your browser to [`http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai`](http://localhost:8000/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai) to see the webapp. Hurray!
+You might get different canister IDs (and that's totally fine). If the `webapp` canister ID is `rrkah-fqaaa-aaaaa-aaaaq-cai`, you should be able to point your browser to [`http://localhost:4943/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai`](http://localhost:4943/?canisterId=rrkah-fqaaa-aaaaa-aaaaq-cai) to see the webapp. Hurray!
 
 ![](./webapp.png)
 
-_If you actually use the webapp, make sure that the "Internet Identity URL" field points to `http://localhost:8000/?canisterId=<canister ID of the internet_identity canister>`._
+_If you actually use the webapp, make sure that the "Internet Identity URL" field points to `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`._
 
 ## Helpers
 

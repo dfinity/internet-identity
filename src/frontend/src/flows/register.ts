@@ -11,6 +11,7 @@ import { confirmRegister, makeCaptcha } from "./confirmRegister";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
+  cancel,
 } from "./login/flowResult";
 import { nextTick } from "process";
 import { icLogo } from "../components/icons";
@@ -19,10 +20,8 @@ import { validateAlias } from "./addDevice/validateAlias";
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
     <hgroup>
-      <h1 class="t-title t-title--main">
-        Create a new Internet Identity Anchor
-      </h1>
-      <p class="t-lead">Please provide a name for your device.</p>
+      <div class="c-logo">${icLogo}</div>
+      <p class="t-lead">What device are you using?</p>
     </hgroup>
     <form id="registerForm" class="l-stack">
       <input
@@ -44,7 +43,7 @@ const pageContent = html`
         >
           Cancel
         </button>
-        <button type="submit" class="c-button">Create</button>
+        <button type="submit" class="c-button">Next</button>
       </div>
     </form>
   </div>
@@ -52,17 +51,16 @@ const pageContent = html`
 
 const constructingContent = html`
   <div class="l-container c-card c-card--highlight">
-    <h1 class="t-title t-title--main">Constructing new Identity Anchor</h1>
     <div class="c-logo">${icLogo}</div>
     <p class="t-paragraph">
-      This may take a while. Please wait and do not refresh the page.
+      Creating your Identity Anchor. Do not refresh the page.
     </p>
   </div>
 `;
 
 export const register = async (
   connection: Connection
-): Promise<LoginFlowResult | null> => {
+): Promise<LoginFlowResult> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
   return init(connection);
@@ -73,14 +71,14 @@ export const renderConstructing = (): void => {
   render(constructingContent, container);
 };
 
-const init = (connection: Connection): Promise<LoginFlowResult | null> =>
+const init = (connection: Connection): Promise<LoginFlowResult> =>
   new Promise((resolve, reject) => {
     const form = document.getElementById("registerForm") as HTMLFormElement;
     const registerCancel = document.getElementById(
       "registerCancel"
     ) as HTMLButtonElement;
 
-    registerCancel.onclick = () => resolve(null);
+    registerCancel.onclick = () => resolve(cancel);
     form.onsubmit = async (e) => {
       e.preventDefault();
       e.stopPropagation();

@@ -3,7 +3,7 @@ import { displayError } from "../../../components/displayError";
 import { unreachable } from "../../../utils/utils";
 import {
   apiResultToLoginFlowResult,
-  canceled,
+  cancel,
   LoginFlowSuccess,
   LoginFlowCanceled,
 } from "../../login/flowResult";
@@ -84,7 +84,7 @@ const init = (
     ) as HTMLButtonElement | null;
     if (buttonCancel !== null) {
       buttonCancel.onclick = async () => {
-        resolve(canceled());
+        resolve(cancel);
       };
     }
   });

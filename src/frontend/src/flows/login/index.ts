@@ -1,19 +1,18 @@
-import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
+import { Connection } from "../../utils/iiConnection";
 import { Ref } from "lit-html/directives/ref.js";
 import { addRemoteDevice } from "../addDevice/welcomeView";
-import { apiResultToLoginFlowResult, LoginFlowResult } from "./flowResult";
+import { LoginFlowSuccess, LoginFlowError, LoginData } from "./flowResult";
 import { displayError } from "../../components/displayError";
 import { footer } from "../../components/footer";
 import { getUserNumber } from "../../utils/userNumber";
 import { html, render, TemplateResult } from "lit-html";
 import { icLogo } from "../../components/icons";
 import { mkAnchorInput } from "../../components/anchorInput";
-import { navbar } from "../../components/navbar";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import { unknownToString } from "../../utils/utils";
+import { authenticate } from "../authenticate";
+import { unknownToString, unreachable } from "../../utils/utils";
 import { useRecovery } from "../recovery/useRecovery";
-import { withLoader } from "../../components/loader";
 
 /** Data and callbacks used on the login page */
 type PageProps = {
@@ -31,12 +30,7 @@ export type Returning =
 
 // We retry logging in until we get a successful Identity Anchor connection pair
 // If we encounter an unexpected error we reload to be safe
-export const login = async (
-  connection: Connection
-): Promise<{
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-}> => {
+export const login = async (connection: Connection): Promise<LoginData> => {
   try {
     const userNumber = getUserNumber();
     const clearCache = () => {
@@ -52,24 +46,32 @@ export const login = async (
       userNumber !== undefined
         ? { returning: true, clearCache, userNumber }
         : { returning: false };
-    const x = await new Promise<LoginFlowResult>((resolve, reject) => {
-      loginPage({
-        submit: (userNumber) => doLogin(userNumber, connection).then(resolve),
-        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
-        recover: () => useRecovery(connection),
-        register: () =>
-          registerIfAllowed(connection)
-            .then((res) => {
-              if (res === null) {
-                window.location.reload();
-              } else {
-                resolve(res);
-              }
-            })
-            .catch(reject),
-        ...returning,
-      });
-    });
+    const x = await new Promise<LoginFlowSuccess | LoginFlowError>(
+      (resolve, reject) => {
+        loginPage({
+          submit: async (userNumber) => {
+            const loginData = await authenticate(connection, userNumber);
+            if (loginData.tag === "ok") {
+              setUserNumber(loginData.userNumber);
+            }
+            resolve(loginData);
+          },
+          addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+          recover: () => useRecovery(connection),
+          register: () =>
+            registerIfAllowed(connection)
+              .then((res) => {
+                if (res.tag === "canceled") {
+                  window.location.reload();
+                } else {
+                  resolve(res);
+                }
+              })
+              .catch(reject),
+          ...returning,
+        });
+      }
+    );
 
     switch (x.tag) {
       case "ok": {
@@ -79,6 +81,9 @@ export const login = async (
         await displayError({ ...x, primaryButton: "Try again" });
         return login(connection);
       }
+      default:
+        unreachable(x);
+        break;
     }
   } catch (err: unknown) {
     await displayError({
@@ -147,9 +152,6 @@ const pageContent = (
 
   const signup = html`
     <div class="${!props.returning && "l-stack"}">
-      <p class="t-paragraph t-centered ${props.returning && "t-weak"}">
-        Claim an Identity Anchor to interact with apps on the Internet Computer.
-      </p>
       <div class="l-stack">
         <button
           type="button"
@@ -157,7 +159,7 @@ const pageContent = (
           id="registerButton"
           class="c-button ${props.returning ? "c-button--secondary" : ""}"
         >
-          Claim an Anchor
+          Create an Anchor
         </button>
       </div>
     </div>
@@ -179,11 +181,8 @@ const pageContent = (
       aria-label="Authentication"
     >
       <div class="c-logo">${icLogo}</div>
+      <p class="t-paragraph t-centered">Unlock the full power of Web3</p>
       <article class="l-stack">
-        <h1 id="loginWelcome" class="t-title t-title--main t-centered">
-          Unlock the <br />Full Power of Web3
-        </h1>
-
         ${props.returning ? signin : signup}
         ${props.returning ? dividerReturning : divider}
         ${props.returning ? signup : signin}
@@ -199,20 +198,8 @@ const pageContent = (
             </p>
           `
         : ""}
-      ${navbar}
     </section>
     ${footer}`;
 
   return { ...anchorInput, template };
-};
-
-const doLogin = async (
-  userNumber: bigint,
-  connection: Connection
-): Promise<LoginFlowResult> => {
-  const result = await withLoader(() => connection.login(userNumber));
-  if (result.kind === "loginSuccess") {
-    setUserNumber(userNumber);
-  }
-  return apiResultToLoginFlowResult(result);
 };

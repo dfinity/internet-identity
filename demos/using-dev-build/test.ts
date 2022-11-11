@@ -7,7 +7,7 @@
  */
 
 import * as fs from "fs";
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, spawn, execSync } from "child_process";
 
 // Port and URL for II and the sign in app, then exported to the tests
 const II_DAPP_PORT = 8086;
@@ -57,19 +57,9 @@ function parseCanisterIDs(): CanisterIDs {
   }
 }
 
-function parseReplicaHost(): string {
-  const DFX_JSON_PATH = `${__dirname}/dfx.json`;
-  try {
-    const dfx_json = JSON.parse(fs.readFileSync(DFX_JSON_PATH, "utf8"));
-    let replicaHost = dfx_json.networks.local.bind;
-    if (!replicaHost.startsWith("http://")) {
-      replicaHost = `http://${replicaHost}`;
-    }
-    return replicaHost;
-  } catch (e) {
-    console.log(`Could not read replica host from ${DFX_JSON_PATH}`);
-    throw e;
-  }
+function getReplicaHost(): string {
+  let port = execSync("dfx info webserver-port");
+  return `http://localhost:${port}`;
 }
 
 /*
@@ -99,7 +89,7 @@ function main() {
     `Using canister IDs: internet_identity: ${canisterIds.internetIdentity}, webapp: ${canisterIds.webapp}`
   );
 
-  const replicaHost = parseReplicaHost();
+  const replicaHost = getReplicaHost();
   console.log(`Using replica host: ${replicaHost}`);
 
   const proxy = spawnProxy(canisterIds, replicaHost);

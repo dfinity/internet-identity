@@ -9,17 +9,15 @@ import { Connection } from "../../utils/iiConnection";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
+  LoginFlowResult,
   LoginFlowSuccess,
+  LoginFlowError,
+  LoginData,
 } from "../login/flowResult";
 import { displayError } from "../../components/displayError";
 import { useRecovery } from "../recovery/useRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
-import {
-  AuthContext,
-  AuthSuccess,
-  authenticationProtocol,
-} from "./postMessageInterface";
-import { fetchDelegation } from "./fetchDelegation";
+import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 import { withRef } from "../../utils/lit-html";
 
@@ -100,16 +98,6 @@ const mkLinks = ({
         >
       </li>
     </ul>
-    <ul class="c-list--flex">
-      <li>
-        <a href="/" class="t-link" id="manageButton">Home</a>
-      </li>
-      <li>
-        <a class="t-link" href="/faq" target="_blank" rel="noopener noreferrer"
-          >FAQ</a
-        >
-      </li>
-    </ul>
   </div>
 `;
 
@@ -168,38 +156,47 @@ const pageContent = ({
 export const authenticatePage = (
   connection: Connection,
   authContext: AuthContext
-): Promise<AuthSuccess> => {
-  return new Promise((resolve) => {
+): Promise<LoginData> => {
+  const retryOnError = async (result: LoginFlowResult): Promise<LoginData> => {
+    switch (result.tag) {
+      case "err":
+        await displayError({
+          title: result.title,
+          message: result.message,
+          detail: result.detail !== "" ? result.detail : undefined,
+          primaryButton: "Try again",
+        });
+        return authenticatePage(connection, authContext);
+      case "ok":
+        return {
+          userNumber: result.userNumber,
+          connection: result.connection,
+        };
+      case "canceled":
+        return authenticatePage(connection, authContext);
+      default:
+        unreachable(result);
+        break;
+    }
+  };
+
+  return new Promise<LoginData>((resolve) => {
     displayPage({
       origin: authContext.requestOrigin,
       onContinue: async (userNumber) => {
-        const authSuccess = await authenticate(
-          connection,
-          authContext,
-          userNumber
+        const loginData = await authenticate(connection, userNumber).then(
+          retryOnError
         );
-        resolve(authSuccess);
+        setUserNumber(loginData.userNumber);
+        resolve(loginData);
       },
-      register: () =>
-        registerIfAllowed(connection)
-          .then((result) => {
-            if (result === null) {
-              // user canceled registration
-              return authenticatePage(connection, authContext);
-            }
-            if (result.tag === "ok") {
-              return handleAuthSuccess(result, authContext);
-            }
-            // something went wrong, display error and try again
-            return displayError({
-              title: result.title,
-              message: result.message,
-              detail: result.detail !== "" ? result.detail : undefined,
-              primaryButton: "Try again",
-            }).then(() => authenticatePage(connection, authContext));
-          })
-          .then(resolve),
-
+      register: async () => {
+        const loginData = await registerIfAllowed(connection).then(
+          retryOnError
+        );
+        setUserNumber(loginData.userNumber);
+        resolve(loginData);
+      },
       recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
       userNumber: getUserNumber(),
       derivationOrigin: authContext.authRequest.derivationOrigin,
@@ -207,58 +204,27 @@ export const authenticatePage = (
   });
 };
 
-const authenticate = async (
+export const authenticate = async (
   connection: Connection,
-  authContext: AuthContext,
   userNumber: bigint
-): Promise<AuthSuccess> => {
+): Promise<LoginFlowSuccess | LoginFlowError> => {
   try {
     const result = await withLoader(() => connection.login(userNumber));
-    const loginResult = apiResultToLoginFlowResult(result);
-    if (loginResult.tag === "ok") {
-      return await withLoader(() =>
-        handleAuthSuccess(loginResult, authContext)
-      );
-    }
-    await displayError({
-      title: loginResult.title,
-      message: loginResult.message,
-      detail: loginResult.detail !== "" ? loginResult.detail : undefined,
-      primaryButton: "Try again",
-    });
+    return apiResultToLoginFlowResult(result);
   } catch (error) {
-    await displayError({
+    return {
+      tag: "err",
       title: "Authentication Failed",
       message: "An error occurred during authentication.",
       detail: error instanceof Error ? error.message : JSON.stringify(error),
-      primaryButton: "Try again",
-    });
+    };
   }
-  return authenticatePage(connection, authContext);
 };
 
 export const displayPage = (props: PageProps): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(props), container);
 };
-
-async function handleAuthSuccess(
-  loginResult: LoginFlowSuccess,
-  authContext: AuthContext
-): Promise<AuthSuccess> {
-  // successful login, store user number for next time
-  setUserNumber(loginResult.userNumber);
-  const [userKey, parsed_signed_delegation] = await fetchDelegation(
-    loginResult,
-    authContext
-  );
-  return {
-    userNumber: loginResult.userNumber,
-    connection: loginResult.connection,
-    parsedSignedDelegation: parsed_signed_delegation,
-    userKey,
-  };
-}
 
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
  * using an existing anchor or creating a new anchor, etc.
@@ -293,6 +259,9 @@ export const authenticationFlow = async (
         case "validating":
           render(html`<h1>validating authentication data...</h1>`, container);
           break;
+        case "fetching delegation":
+          render(html`<h1>fetching delegation...</h1>`, container);
+          break;
         default:
           unreachable(status);
           break;
@@ -322,7 +291,9 @@ export const authenticationFlow = async (
       break;
     case "success":
       render(
-        html`<h1>Authentication sucessful. You may close this page.</h1>`,
+        html`<h1 data-role="notify-auth-success">
+          Authentication successful. You may close this page.
+        </h1>`,
         container
       );
       break;

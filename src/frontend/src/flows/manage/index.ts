@@ -3,7 +3,6 @@ import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { navbar } from "../../components/navbar";
 import { footer } from "../../components/footer";
 import { deviceSettings } from "./deviceSettings";
 import {
@@ -58,7 +57,7 @@ const pageContent = (
     </hgroup>
     ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
     ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
-    ${recoverySection(devices, onAddRecovery)} ${logoutSection()} ${navbar}
+    ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
   </section>
   ${footer}
 `;

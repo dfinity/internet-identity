@@ -119,7 +119,7 @@ jobs:
               exit 1
             fi
 
-            if (( metric <= 30 ))
+            if (( metric <= 100 ))
             then
               echo "Pixel difference ($metric) is too small, reverting"
               git checkout HEAD -- "$modified"

@@ -1,15 +1,24 @@
 import { AuthenticatedConnection, ApiResult } from "../../utils/iiConnection";
 
-export type LoginFlowResult = LoginFlowSuccess | LoginFlowError;
+export type LoginFlowResult =
+  | LoginFlowSuccess
+  | LoginFlowError
+  | LoginFlowCanceled;
 
 export type LoginFlowSuccess = {
   tag: "ok";
+} & LoginData;
+
+export type LoginData = {
   userNumber: bigint;
   connection: AuthenticatedConnection;
 };
 
 export type LoginFlowError = {
   tag: "err";
+} & LoginError;
+
+export type LoginError = {
   title: string;
   message: string;
   detail?: string;
@@ -17,13 +26,11 @@ export type LoginFlowError = {
 
 /** The result of a login flow that was canceled */
 export type LoginFlowCanceled = { tag: "canceled" };
-export function canceled(): LoginFlowCanceled {
-  return { tag: "canceled" };
-}
+export const cancel: LoginFlowCanceled = { tag: "canceled" };
 
 export const apiResultToLoginFlowResult = (
   result: ApiResult
-): LoginFlowResult => {
+): LoginFlowSuccess | LoginFlowError => {
   switch (result.kind) {
     case "loginSuccess": {
       return {

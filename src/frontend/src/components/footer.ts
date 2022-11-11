@@ -1,12 +1,40 @@
-import { html } from "lit-html";
+import { html, TemplateResult } from "lit-html";
+
+export const navigationLink = ({
+  labelText,
+  id,
+  url,
+  classes,
+}: {
+  labelText: string;
+  id: string;
+  url: string;
+  classes: string;
+}): TemplateResult => html`<a
+  id="${id}"
+  class="${classes}"
+  href="${url}"
+  target="_blank"
+  >${labelText}</a
+>`;
 
 export const footer = html`<footer class="l-footer">
-  <a
-    class="page-signature"
-    aria-label="Internet Computer homepage"
-    href="https://internetcomputer.org/"
-    rel="noopener noreferrer"
-    target="_blank"
-    ><img src="/ic-badge.svg" alt="Built on Crypto | Internet Computer"
-  /></a>
+  ${navigationLink({
+    labelText: "Home",
+    id: "homeLink",
+    url: "/",
+    classes: "t-link--discreet l-footer__elem",
+  })}
+  ${navigationLink({
+    labelText: "About",
+    id: "aboutLink",
+    url: "/about",
+    classes: "t-link--discreet l-footer__elem",
+  })}
+  ${navigationLink({
+    labelText: "FAQ",
+    id: "faqLink",
+    url: "/faq",
+    classes: "t-link--discreet l-footer__elem",
+  })}
 </footer>`;
