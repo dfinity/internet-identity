@@ -1783,7 +1783,6 @@ mod http_tests {
             ("/index.js", Some("gzip")),
             ("/loader.webp", None),
             ("/favicon.ico", None),
-            ("/ic-badge.svg", None),
         ];
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, II_WASM.clone());

@@ -8,7 +8,6 @@ import { getUserNumber } from "../../utils/userNumber";
 import { html, render, TemplateResult } from "lit-html";
 import { icLogo } from "../../components/icons";
 import { mkAnchorInput } from "../../components/anchorInput";
-import { navbar } from "../../components/navbar";
 import { parseUserNumber, setUserNumber } from "../../utils/userNumber";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 import { authenticate } from "../authenticate";
@@ -199,7 +198,6 @@ const pageContent = (
             </p>
           `
         : ""}
-      ${navbar}
     </section>
     ${footer}`;
 

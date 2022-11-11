@@ -871,47 +871,17 @@ a:hover,
 .l-footer {
   padding: var(--rs-footer-gutter);
   margin-top: var(--rs-footer-stack);
-}
-
-/**
- *  Footer Navigation component
- *  1) radial shadow underneath the line below the links
- */
-
-.c-nav-links {
-  position: relative;
-  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: calc(var(--vs-gutter) * 10);
-  border-top: var(--vs-line) var(---rc-line) solid;
-  padding-top: var(--vs-bezel);
-  overflow: hidden;
 }
 
-.c-nav-links::before {
-  /* 1 */
-  content: "";
-  display: block;
-  height: 100%;
-  width: 100%;
-  position: absolute;
-  opacity: 0.5;
-  top: 0;
-  background: radial-gradient(var(--rc-line), transparent);
-  background-size: 80% 160%;
-  background-repeat: no-repeat;
-  background-position: center 170%;
-  pointer-events: none;
-}
-
-.c-nav-links li {
+.l-footer__elem {
   position: relative;
   padding: 0 var(--vs-inline);
 }
 
-.c-nav-links li + li::before {
+.l-footer__elem + .l-footer__elem::before {
   position: absolute;
   content: "·";
   top: 50%;
