@@ -153,9 +153,6 @@ const pageContent = (
 
   const signup = html`
     <div class="${!props.returning && "l-stack"}">
-      <p class="t-paragraph t-centered ${props.returning && "t-weak"}">
-        Claim an Identity Anchor to interact with apps on the Internet Computer.
-      </p>
       <div class="l-stack">
         <button
           type="button"
@@ -163,7 +160,7 @@ const pageContent = (
           id="registerButton"
           class="c-button ${props.returning ? "c-button--secondary" : ""}"
         >
-          Claim an Anchor
+          Create an Anchor
         </button>
       </div>
     </div>
@@ -185,11 +182,8 @@ const pageContent = (
       aria-label="Authentication"
     >
       <div class="c-logo">${icLogo}</div>
+      <p class="t-paragraph t-centered">Unlock the full power of Web3</p>
       <article class="l-stack">
-        <h1 id="loginWelcome" class="t-title t-title--main t-centered">
-          Unlock the <br />Full Power of Web3
-        </h1>
-
         ${props.returning ? signin : signup}
         ${props.returning ? dividerReturning : divider}
         ${props.returning ? signup : signin}
