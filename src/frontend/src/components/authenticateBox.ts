@@ -185,7 +185,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   return html`
     <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
     chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
+  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
       <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
         <div class="c-chasm__arrow"></div>
         <div class="t-weak c-chasm__content">
