@@ -50,7 +50,7 @@ const pageContent = ({
           type="button"
           @click=${signin}
           id="loginButton"
-          class="c-button c-button--secondary c-button--narrow"
+          class="c-button c-button--secondary"
         >
           Use Existing
         </button>

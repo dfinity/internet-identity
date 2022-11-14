@@ -652,12 +652,6 @@ a:hover,
   border-radius: 99999px;
 }
 
-.c-button--narrow {
-  max-width: 90%;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .c-button__icon svg {
   height: 100%;
 }
