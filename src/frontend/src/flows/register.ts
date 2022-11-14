@@ -21,12 +21,12 @@ const pageContent = html`
   <div class="l-container c-card c-card--highlight">
     <hgroup>
       <div class="c-logo">${icLogo}</div>
-      <p class="t-lead">What device are you using?</p>
+      <p class="t-lead t-centered">What device are you using?</p>
     </hgroup>
     <form id="registerForm" class="l-stack">
       <input
         id="registerAlias"
-        placeholder="Device name"
+        placeholder="Chrome on iPhone"
         aria-label="device name"
         type="text"
         required

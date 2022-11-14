@@ -37,24 +37,22 @@ const pageContent = ({
     <div class="c-logo">${icLogo}</div>
     <p class="t-paragraph t-centered">Unlock the full power of Web3</p>
     <article class="l-stack">
-      <div class="l-stack">
-        <button
-          type="button"
-          @click=${register}
-          id="registerButton"
-          class="c-button"
-        >
-          Create an Anchor
-        </button>
-        <button
-          type="button"
-          @click=${signin}
-          id="loginButton"
-          class="c-button c-button--secondary"
-        >
-          Use Existing
-        </button>
-      </div>
+      <button
+        type="button"
+        @click=${register}
+        id="registerButton"
+        class="c-button"
+      >
+        Create an Anchor
+      </button>
+      <button
+        type="button"
+        @click=${signin}
+        id="loginButton"
+        class="c-button c-button--secondary"
+      >
+        Use Existing
+      </button>
     </article>
 
     ${learnMore}

@@ -23,8 +23,8 @@ import { withRef } from "../utils/lit-html";
 /** Properties for the authentication box component which authenticates a user
  * to II or to another dapp */
 type PageProps = { templates: AuthTemplates } & {
-  onContinue: (arg: bigint) => void;
-  recoverAnchor: (userNumner?: bigint) => void;
+  onContinue: (userNumber: bigint) => void;
+  recoverAnchor: (userNumber?: bigint) => void;
   register: () => void;
   addDevice: () => void;
   userNumber?: bigint;

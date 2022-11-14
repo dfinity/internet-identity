@@ -28,7 +28,7 @@ export const mkAuthTemplates = ({
           message: html`<span class="t-strong">${origin}</span> is an
             alternative domain of <br /><span class="t-strong"
               >${derivationOrigin}</span
-            ><br />and you will be authenticated to both with the same identity. `,
+            ><br />and you will be authenticated to both with the same identity.`,
         }
       : undefined;
 
