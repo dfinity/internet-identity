@@ -9,7 +9,7 @@ import { footer } from "../components/footer";
 import { icLogo } from "../components/icons";
 import { auth } from "../flows/login";
 
-/** Properties of the "Welcome" screen, which welcome new users. */
+/** Properties of the "Welcome" screen, which welcomes new users. */
 type WelcomeProps = {
   register: () => void;
   signin: () => void;
