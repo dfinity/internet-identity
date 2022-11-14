@@ -78,7 +78,7 @@ Finally, to test workflows like authentication from a client application, you st
 ```bash
 cd demos/selenium-test-app
 npm ci
-npm run develop
+npm run start
 ```
 
 Then open `http://localhost:8081` in your browser.
