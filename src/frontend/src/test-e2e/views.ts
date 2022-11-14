@@ -5,7 +5,7 @@ class View {
 export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-role="anchor-input"]')
+      .$("#registerButton")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
@@ -22,10 +22,12 @@ export class WelcomeView extends View {
   }
 
   async addDevice(): Promise<void> {
+    await this.browser.$("#loginButton").click();
     await this.browser.$("#addNewDeviceButton").click();
   }
 
   async recover(): Promise<void> {
+    await this.browser.$("#loginButton").click();
     await this.browser.$("#recoverButton").click();
   }
 }
