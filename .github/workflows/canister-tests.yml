@@ -511,7 +511,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build-ii
+    needs: [docker-build-ii, docker-build-archive]
     steps:
       - uses: actions/checkout@v3
 
@@ -555,7 +555,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build-ii
+    needs: [docker-build-ii, docker-build-archive]
 
     steps:
       - uses: actions/checkout@v3
