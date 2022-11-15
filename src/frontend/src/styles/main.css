@@ -46,6 +46,7 @@
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
 
 /* I) Settings: Global variables, config switches. */
 
@@ -89,6 +90,8 @@
   --vs-inline: calc(var(--vs-gutter) * 2); /* 3 */
   --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
   --vs-line: 1px; /* 5 */
+
+  --vs-border-radius: 0.4rem;
 
   /* value tokens: z-index (--vz => valueZindex) */
 
@@ -135,6 +138,8 @@
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
+  --rc-pill: var(--rc-light);
+
   --rc-input-readonly: var(--vc-silver);
   --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
@@ -147,7 +152,7 @@
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
-  --rs-footer-stack: calc(var(--vs-stack) * 1.5);
+  --rs-footer-stack: var(--vs-stack);
 
   --rs-footer-gutter: var(--vs-gutter);
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
@@ -275,6 +280,8 @@ display:revert; revert to element instead of attribute */
 :root {
   /* general styles */
   font-family: "Montserrat", sans-serif;
+  font-family: "Inter", sans-serif;
+  font-weight: 200;
   font-size: 62.5%; /* 10px */
   font-size: max(62.5%, calc(0.6vh + 0.25rem));
 
@@ -293,9 +300,18 @@ body {
 body {
   font-size: 1.6rem;
   line-height: var(--vs-line-height);
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -3;
   background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
   background-size: 100% 100%;
-  min-height: 100vh;
+  opacity: 1;
+  display: none;
 }
 
 /**
@@ -321,7 +337,6 @@ body {
 }
 
 .t-weak {
-  font-weight: normal;
   font-size: 0.8em;
 }
 
@@ -330,7 +345,7 @@ body {
 }
 
 .t-title {
-  font-weight: bold;
+  font-weight: 340;
   font-size: 1.8rem;
   line-height: 1.1;
   margin-top: 1em;
@@ -458,7 +473,7 @@ a:hover,
   position: relative;
   font-size: 1.6rem;
   min-width: 30rem;
-  max-width: 40rem;
+  max-width: 35rem;
   margin: 0 auto;
 }
 
@@ -511,6 +526,15 @@ a:hover,
  * Title with counter and Actions
  */
 
+.c-pill {
+  display: inline-block;
+  padding: 0.55em 1.25em 0.5em;
+  border-radius: 2em;
+  background: var(--rc-pill);
+  color: var(--rc-pill-text);
+  font-size: 0.8em;
+}
+
 /**
  * Card components
  */
@@ -521,19 +545,64 @@ a:hover,
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--vs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
-  border-radius: 0.4rem;
-  margin-top: var(--rs-card-stack);
+  border-radius: var(--vs-border-radius);
 }
 
-.c-card--highlight {
-  padding: calc(var(--rs-card-bezel) * 1.25);
+.c-card--highlight,
+.c-card--background {
+  padding: calc(var(--rs-card-bezel) * 1);
   background-color: var(--rc-background-transparent);
-  box-shadow: 0 1rem 1rem var(--rc-line);
-  border-radius: 2rem;
+  border-color: transparent;
 }
 
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
+}
+
+.c-card--background {
+  padding: calc(var(--rs-card-bezel) * 0.3);
+  background: rgba(255, 255, 255, 0.3);
+  border-color: #fff;
+}
+
+.c-card--background::after {
+  position: absolute;
+  content: "";
+  z-index: -1;
+  inset: -0.2em;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 10%, var(--rg-brand));
+  opacity: 0.1;
+  filter: blur(8px);
+}
+
+.c-card--background::before {
+  position: absolute;
+  content: "";
+  z-index: -2;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-image: linear-gradient(170deg, var(--rg-brand));
+  background-size: 200% 200%;
+  filter: blur(120px);
+  opacity: 0.75;
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0);
+
+  animation: 20s bganim linear infinite;
+}
+
+@keyframes bganim {
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: -200% -200%;
+  }
 }
 
 @media (max-width: 512px) {
@@ -589,7 +658,7 @@ a:hover,
 .c-card--warning {
   position: relative;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--vs-border-radius);
 }
 
 .c-card--warning::before {
@@ -609,7 +678,7 @@ a:hover,
   inset: 0;
   z-index: var(--vz-background);
   background: var(--rc-background);
-  border-radius: 4px;
+  border-radius: var(--vs-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
@@ -619,14 +688,26 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  /* margin: var(--rs-logo-stack) 0 var(--rs-logo-stack); */
   font-weight: 600;
+  font-size: 0.6em;
+
+  position: absolute;
+  left: 50%;
+  top: 0;
+
+  /*background-color: var(--rc-background-transparent);*/
+  transform: translate(-50%, -200%);
 }
 
 .c-logo svg {
   display: block;
-  width: 25%;
   margin: 0 auto;
+}
+
+.c-logo__type {
+  text-align: center;
+  margin-top: var(--vs-stack);
 }
 
 .t-title + .c-logo {
@@ -649,7 +730,8 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: 99999px;
+  border-radius: var(--vs-border-radius);
+  font-weight: 600;
 }
 
 .c-button__icon svg {
@@ -671,6 +753,7 @@ a:hover,
   background: var(--rc-button-secondary);
   color: var(--rc-button);
   border: var(--vs-line) solid var(--rc-line);
+  font-weight: inherit;
 }
 
 .c-button:not([disabled]):focus,
@@ -710,6 +793,11 @@ a:hover,
   color: var(--rc-onInput);
   border: calc(var(--vs-line) * 2) solid var(--rc-line);
   word-break: break-word;
+  border-radius: var(--vs-border-radius);
+}
+
+.c-input:first-of-type {
+  margin-top: 0;
 }
 
 .c-button-group {
@@ -733,7 +821,7 @@ a:hover,
 }
 
 .c-input--rounded {
-  border-radius: 999999px;
+  /*border-radius: 999999px;*/
 }
 
 .c-input--centered {
@@ -778,10 +866,9 @@ a:hover,
   z-index: var(--vz-foreground);
   background-color: var(--rc-input);
   border: var(--vs-line) solid var(--rc-line);
-  border-radius: 4px;
   display: flex;
   padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
-  border-radius: 5rem;
+  border-radius: var(--vs-border-radius);
   background: var(--rc-button);
   color: var(--rc-onButton);
   transform: translate(50%, 50%) scale(0.9);
@@ -874,6 +961,7 @@ a:hover,
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 0.8em;
 }
 
 .l-footer__elem {
@@ -943,8 +1031,7 @@ a:hover,
 }
 
 .c-list--anchors {
-  --border-radius: 8px;
-  width: 40rem;
+  --border-radius: var(--vs-border-radius);
 }
 
 .c-list__item--icon {
@@ -960,6 +1047,11 @@ a:hover,
   flex-wrap: wrap;
   border: var(--vs-line) var(--rc-line) solid;
   position: relative;
+}
+
+.c-list--anchors .c-list__item:has(.c-list__parcel--detail),
+.c-list--anchors .c-list__item:has(.c-list__parcel--detail) .c-list__parcel {
+  border-color: transparent;
 }
 
 .c-list--anchors .c-list__item:focus-within,
@@ -1048,9 +1140,10 @@ a:hover,
 }
 
 .c-list__parcel--detail {
-  overflow: hidden;
+  overflow: visible;
   white-space: inherit;
-  padding: var(--vs-bezel) 0.8em;
+  padding: calc(var(--vs-bezel) * 2.5) 0;
+  background: none;
 }
 
 .c-list__parcel--fullwidth {
@@ -1139,8 +1232,7 @@ a:hover,
 /* chasm: alternative to tooltips, where the card opens to reveal details */
 
 .c-chasm {
-  margin-left: calc(-1.25 * var(--rs-card-bezel));
-  margin-right: calc(-1.25 * var(--rs-card-bezel));
+  overflow: hidden;
 }
 
 .c-chasm--closed {
@@ -1157,7 +1249,8 @@ a:hover,
 
 .c-chasm__content {
   background-color: var(--rc-input);
-  padding: calc(1.25 * var(--rs-card-bezel));
+  padding: 0 var(--rs-card-bezel) var(--rs-card-bezel);
+  text-align: left;
 }
 
 .c-chasm__arrow {
@@ -1268,7 +1361,7 @@ a:hover,
   pointer-events: none;
   inset: 0;
   border-radius: 999999px;
-  background-image: linear-gradient(270deg, var(--rg-brand));
+  background-image: linear-gradient(170deg, var(--rg-brand));
   filter: blur(20px);
   opacity: 0;
   transform: scale(1) translateZ(0);
@@ -1276,7 +1369,7 @@ a:hover,
 }
 
 .c-input--anchor__wrap:focus-within::before {
-  opacity: 1;
+  opacity: 0.5;
   transform: scale(1) translateZ(0);
 }
 
@@ -1284,10 +1377,10 @@ a:hover,
   border-style: double;
   border-width: calc(var(--vs-line) * 2);
   border-color: transparent;
-  background-image: linear-gradient(white, white),
+  /*background-image: linear-gradient(white, white),
     linear-gradient(270deg, var(--rg-brand));
   background-origin: border-box;
-  background-clip: padding-box, border-box;
+  background-clip: padding-box, border-box;*/
   box-shadow: none;
 }
 

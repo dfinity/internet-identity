@@ -118,7 +118,7 @@ function otherAnchorMenu(props: { pick: PickCB }): TemplateResult {
         data-role="anchor-create"
         @click="${anchorInput.submit}"
       >
-        Oh ouiiii
+        Authenticate
       </button>
       <p class="l-stack">
         An <b class="t-strong">Identity Anchor</b> is a

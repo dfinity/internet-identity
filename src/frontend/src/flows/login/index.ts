@@ -176,7 +176,8 @@ const pageContent = (
     Returning?
   </div>`;
 
-  const template = html` <section
+  const template = html`<div class="c-card c-card--background">
+    <section
       class="l-container c-card c-card--highlight"
       aria-label="Authentication"
     >
@@ -199,7 +200,8 @@ const pageContent = (
           `
         : ""}
     </section>
-    ${footer}`;
+    ${footer}
+  </div>`;
 
   return { ...anchorInput, template };
 };

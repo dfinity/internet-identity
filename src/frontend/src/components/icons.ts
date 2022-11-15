@@ -79,7 +79,7 @@ export const icLogo = html`
         />
       <g>
     </svg>
-    <h1 class="t-title t-title--main t-centered" style="margin-top: 2rem;">Internet Identity</h1>
+    <h1 class="c-logo__type">Internet Identity</h1>
   </div>
 `;
 

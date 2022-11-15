@@ -20,6 +20,7 @@ import { recoveryWizard } from "../recovery/recoveryWizard";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 import { registerIfAllowed } from "../../utils/registerAllowedCheck";
 import { withRef } from "../../utils/lit-html";
+import { mkAnchorPicker } from "../../components/anchorPicker";
 
 type PageProps = {
   origin: string;
@@ -65,17 +66,20 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
     });
 
   return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
-    chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
-      <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
-        <div class="c-chasm__arrow"></div>
-        <div class="t-weak c-chasm__content">
-            ${message}
-        </div>
-      </div>
-    </p>
-`;
+    <span
+      id="alternative-origin-chasm-toggle"
+      class="t-action"
+      @click="${chasmToggle}"
+      >${info}
+      <span ${ref(chasmToggleRef)} class="t-link__icon c-chasm__button"
+        >⚠️</span
+      ></span
+    ><br />
+    <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
+      <div class="c-chasm__arrow"></div>
+      <div class="t-weak c-chasm__content">${message}</div>
+    </div>
+  `;
 };
 
 const mkLinks = ({
@@ -114,43 +118,50 @@ const pageContent = ({
     onSubmit: onContinue,
   });
 
-  return html` <div class="l-container c-card c-card--highlight">
+  return html`<div class="c-card c-card--background">
+    <div class="c-logo">${icLogo}</div>
+    <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
       <h1 class="is-hidden">Internet Identity</h1>
-      <div class="c-logo">${icLogo}</div>
-      <div class="l-stack t-centered">
-        <p class="t-lead">
-          Connect to<br />
-          <span class="t-strong">${origin}</span>
-          <br />
-        </p>
-        ${derivationOrigin !== undefined
-          ? mkChasm({
-              info: "shared identity",
-              message: html`<span class="t-strong">${origin}</span> is an
-                alternative domain of <br /><span class="t-strong"
-                  >${derivationOrigin}</span
-                ><br />and you will be authenticated to both with the same
-                identity. `,
-            })
-          : ""}
+      <div class="t-centered">
+        <div class="c-pill">
+          <span>Connect to</span>
+          <strong class="t-strong">${origin}</strong>
+          ${derivationOrigin !== undefined
+            ? mkChasm({
+                info: "",
+                message: html`<span class="t-strong">${origin}</span> is an
+                  alternative domain of <br /><span class="t-strong"
+                    >${derivationOrigin}</span
+                  ><br />and you will be authenticated to both with the same
+                  identity. `,
+              })
+            : ""}
+        </div>
       </div>
 
-      ${anchorInput.template}
+      ${mkAnchorPicker({
+        savedAnchors: [BigInt(1231235), BigInt(78345987)],
+        pick: (anchor) => {
+          anchorInput.submit;
+        },
+      }).template}
 
-      <button
+      <!--button
         @click="${anchorInput.submit}"
         id="authorizeButton"
         class="c-button"
       >
         Authorize
-      </button>
+      </button-->
+      <!--
       ${mkLinks({
         register,
         recoverAnchor: () => recoverAnchor(anchorInput.readUserNumber()),
-      })}
+      })} -->
     </div>
-    ${footer}`;
+    ${footer}
+  </div>`;
 };
 
 export const authenticatePage = (
