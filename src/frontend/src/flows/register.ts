@@ -28,7 +28,7 @@ const pageContent = html`
     <form id="registerForm" class="l-stack">
       <input
         id="registerAlias"
-        placeholder="E.g. Chrome on iPhone"
+        placeholder="Device name"
         aria-label="device name"
         type="text"
         required
