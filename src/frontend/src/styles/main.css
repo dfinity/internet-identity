@@ -834,7 +834,8 @@ a:hover,
 }
 
 .c-input--vip {
-  font-size: 1.4em;
+  font-weight: bold;
+  font-size: 2rem;
   padding: calc(1.2 * var(--rs-input-bezel)) calc(3 * var(--rs-input-bezel))
     var(--rs-input-bezel);
 }
@@ -1075,7 +1076,7 @@ a:hover,
 
 .c-list--anchors .c-list__item:focus-within::before,
 .c-list--anchors .c-list__item--focus::before {
-  opacity: 1;
+  opacity: .8;
   transform: scaleX(1) scaleY(0.8);
 }
 
@@ -1249,7 +1250,7 @@ a:hover,
 
 .c-chasm__content {
   background-color: var(--rc-input);
-  padding: 0 var(--rs-card-bezel) var(--rs-card-bezel);
+  padding: 0 var(--rs-card-bezel) calc(var(--rs-card-bezel) * .5);
   text-align: left;
 }
 
@@ -1272,7 +1273,7 @@ a:hover,
 }
 
 .c-chasm__button--flipped {
-  transform: rotate(180deg);
+  text-shadow: 0 0 0.3rem currentColor;
 }
 
 .c-action-list {

@@ -54,7 +54,7 @@ function elements(props: PickerProps): TemplateResult[] {
         }}"
         data-role="use-another-anchor"
       >
-        Use another anchor<i class="c-list__icon"> … </i>
+        <span class="t-weak">Use another anchor</span><i class="c-list__icon"> … </i>
       </button>
     `;
 
