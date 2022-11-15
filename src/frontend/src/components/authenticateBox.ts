@@ -33,6 +33,7 @@ type PageProps = { templates: AuthTemplates } & {
 /** Text and content to display in the box */
 export type AuthTemplates = {
   message: TemplateResult;
+  button: string;
   chasm?: ChasmOpts;
 };
 
@@ -125,7 +126,7 @@ const pageContent = ({
         id="authorizeButton"
         class="c-button"
       >
-        Authorize
+        ${templates.button}
       </button>
       ${mkLinks({
         register,

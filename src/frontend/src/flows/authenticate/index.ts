@@ -32,7 +32,7 @@ export const mkAuthTemplates = ({
         }
       : undefined;
 
-  return { message, chasm };
+  return { message, chasm, button: "Authorize" };
 };
 
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
