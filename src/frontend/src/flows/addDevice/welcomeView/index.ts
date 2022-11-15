@@ -25,7 +25,8 @@ const pageContent = (connection: Connection, userNumber?: bigint) => {
       <div class="c-button-group">
         <button
           @click="${
-            window.location.reload /* TODO: L2-309: do this without reload */
+            () =>
+              window.location.reload() /* TODO: L2-309: do this without reload */
           }"
           class="c-button c-button--secondary"
           id="addDeviceUserNumberCancel"
