@@ -21,12 +21,14 @@ const pageContent = html`
   <div class="l-container c-card c-card--highlight">
     <hgroup>
       <div class="c-logo">${icLogo}</div>
-      <p class="t-lead t-centered">What device are you using?</p>
+      <p class="t-lead t-centered t-paragraph l-stack">
+        What device are you using?
+      </p>
     </hgroup>
     <form id="registerForm" class="l-stack">
       <input
         id="registerAlias"
-        placeholder="Chrome on iPhone"
+        placeholder="E.g. Chrome on iPhone"
         aria-label="device name"
         type="text"
         required
@@ -52,7 +54,7 @@ const pageContent = html`
 const constructingContent = html`
   <div class="l-container c-card c-card--highlight">
     <div class="c-logo">${icLogo}</div>
-    <p class="t-paragraph">
+    <p class="t-lead t-centered t-paragraph l-stack">
       Creating your Identity Anchor. Do not refresh the page.
     </p>
   </div>
