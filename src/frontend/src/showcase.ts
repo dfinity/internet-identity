@@ -52,6 +52,7 @@ import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
+import { manageTemplates } from "./flows/login";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -122,6 +123,15 @@ const welcome = () =>
 
 const iiPages: Record<string, () => void> = {
   welcome,
+  welcomeReturn: () =>
+    authenticateBoxTemplate({
+      templates: manageTemplates,
+      addDevice: () => console.log("Add device requested"),
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+      userNumber: BigInt(10000),
+    }),
   displayUserNumber: () => displayUserNumber(userNumber),
   faq: () => faqView(),
   about: () => aboutView(),
