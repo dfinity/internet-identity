@@ -62,7 +62,8 @@ pub struct ArchiveStatusCache {
 struct VerifiedWasm(Vec<u8>);
 
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
-    // archive state without creation_in_progress (because we exit early in that case)
+    // archive state without creation_in_progress
+    // if creation is in progress we exit early since we do not want to deploy the archive twice
     enum ReducedArchiveState {
         NotCreated,
         Created(ArchiveData),
@@ -224,9 +225,9 @@ fn verify_wasm(wasm: Vec<u8>) -> Result<VerifiedWasm, String> {
 
     let mut hasher = Sha256::new();
     hasher.update(&wasm);
-    let wasm_hash: [u8; 32] = hasher.finalize().into();
+    let actual_hash: [u8; 32] = hasher.finalize().into();
 
-    if wasm_hash != expected_hash {
+    if actual_hash != expected_hash {
         return Err("invalid wasm module".to_string());
     }
 
