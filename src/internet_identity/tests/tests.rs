@@ -142,8 +142,11 @@ mod rollback_tests {
         let frontend_hostname = "frontend.com";
         let env = StateMachine::new();
 
+        // start off with the previous version because otherwise II will use the post-migration layout
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+
         // use the new version to register an anchor
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let principal = api::get_principal(
             &env,
@@ -863,6 +866,7 @@ mod device_management_tests {
             let mut device = device_data_1();
             device.protection = DeviceProtection::Protected;
             device.key_type = KeyType::SeedPhrase;
+            device.purpose = Purpose::Recovery;
 
             let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
@@ -2012,15 +2016,14 @@ mod http_tests {
         // empty II has some metadata in stable memory which requires at least one page
         assert_eq!(stable_memory_pages, 1);
 
-        // a wasm page is 64kb and a single user takes up 2kb -> 33rd anchor record starts on the second wasm page
-        for _ in 0..33 {
-            flows::register_anchor(&env, canister_id);
-        }
+        // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage to
+        // 3 pages
+        flows::register_anchor(&env, canister_id);
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (stable_memory_pages, _) =
             parse_metric(&metrics, "internet_identity_stable_memory_pages");
-        assert_eq!(stable_memory_pages, 2);
+        assert_eq!(stable_memory_pages, 3);
         Ok(())
     }
 

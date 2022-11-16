@@ -137,7 +137,7 @@ impl From<Device> for DeviceDataInternal {
         match device {
             Device::RecoveryPhrase(recovery_phrase) => Self {
                 pubkey: recovery_phrase.pubkey,
-                alias: "Recovery phrase".to_string(),
+                alias: recovery_phrase.alias,
                 credential_id: None,
                 purpose: Some(Purpose::Recovery),
                 key_type: Some(KeyType::SeedPhrase),
@@ -146,7 +146,7 @@ impl From<Device> for DeviceDataInternal {
             Device::WebAuthnDevice(webauthn_device) => Self {
                 pubkey: webauthn_device.pubkey,
                 alias: webauthn_device.alias,
-                credential_id: Some(webauthn_device.credential_id),
+                credential_id: webauthn_device.credential_id,
                 purpose: Some(webauthn_device.purpose),
                 key_type: Some(KeyType::from(webauthn_device.key_type)),
                 protection: Some(DeviceProtection::Unprotected),
@@ -158,16 +158,18 @@ impl From<Device> for DeviceDataInternal {
 impl From<DeviceDataInternal> for Device {
     fn from(internal_device: DeviceDataInternal) -> Self {
         match internal_device.key_type {
+            // note: this strips away the purpose field (which is always recover for recovery phrases)
             Some(KeyType::SeedPhrase) => Device::RecoveryPhrase(RecoveryPhrase {
                 pubkey: internal_device.pubkey,
                 protection: internal_device
                     .protection
                     .unwrap_or(DeviceProtection::Unprotected),
+                alias: internal_device.alias,
             }),
             None | Some(_) => Device::WebAuthnDevice(WebAuthnDevice {
                 pubkey: internal_device.pubkey,
                 alias: internal_device.alias,
-                credential_id: internal_device.credential_id.unwrap(),
+                credential_id: internal_device.credential_id,
                 purpose: internal_device.purpose.unwrap_or(Purpose::Authentication),
                 key_type: WebAuthnKeyType::from(
                     internal_device.key_type.unwrap_or(KeyType::Unknown),
@@ -182,13 +184,21 @@ impl From<DeviceDataInternal> for Device {
 struct RecoveryPhrase {
     pubkey: DeviceKey,
     protection: DeviceProtection,
+    // Currently, the II front-end hard codes this to "Recovery phrase". However, there could be
+    // recovery phrases with different name added by different clients (e.g. other front-ends, dfx).
+    alias: String,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 struct WebAuthnDevice {
     pubkey: DeviceKey,
     alias: String,
-    credential_id: CredentialId,
+    // this is still optional for legacy reasons: We did not validate that all webauthn devices had
+    // a credential id so far thus there might by some devices manually added (e.g. with dfx) that
+    // do not have one.
+    // In the context of the II front-end those devices are useless. But we cannot delete them
+    // as they can be successfully used by e.g. dfx.
+    credential_id: Option<CredentialId>,
     purpose: Purpose,
     key_type: WebAuthnKeyType,
     domain: Domain,
@@ -235,6 +245,22 @@ struct RecordMeta {
 }
 
 impl RecordMeta {
+    pub fn layout_v1(record_number: u32, entry_size: u16) -> Self {
+        RecordMeta {
+            layout: Layout::V1,
+            offset: RESERVED_HEADER_BYTES_V1 + record_number as u64 * entry_size as u64,
+            entry_size,
+        }
+    }
+
+    pub fn layout_v3(record_number: u32, entry_size: u16) -> Self {
+        RecordMeta {
+            layout: Layout::V3,
+            offset: RESERVED_HEADER_BYTES_V3 + record_number as u64 * entry_size as u64,
+            entry_size,
+        }
+    }
+
     pub fn candid_size_limit(&self) -> usize {
         // u16 is the length of candid before the actual candid starts
         self.entry_size as usize - std::mem::size_of::<u16>()
@@ -494,8 +520,10 @@ impl<M: Memory> Storage<M> {
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
+        // Always return layout v1 max entries even when migration is completed.
+        // This will be adapted in the subsequent clean-up after successful migration.
         ((LEGACY_STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES_V1 - STABLE_MEMORY_RESERVE)
-            / self.header.entry_size as u64) as usize
+            / DEFAULT_ENTRY_SIZE_V1 as u64) as usize
     }
 
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
@@ -523,19 +551,19 @@ impl<M: Memory> Storage<M> {
     }
 
     fn record_meta(&self, record_number: u32) -> RecordMeta {
-        if record_number < self.header.new_layout_start {
-            RecordMeta {
-                layout: Layout::V1,
-                offset: RESERVED_HEADER_BYTES_V1
-                    + record_number as u64 * self.header.entry_size as u64,
-                entry_size: self.header.entry_size,
+        match self.migration_state() {
+            MigrationState::NotStarted => {
+                RecordMeta::layout_v1(record_number, self.header.entry_size)
             }
-        } else {
-            RecordMeta {
-                layout: Layout::V3,
-                offset: RESERVED_HEADER_BYTES_V3
-                    + record_number as u64 * self.header.entry_size_new as u64,
-                entry_size: self.header.entry_size_new,
+            MigrationState::InProgress { .. } | MigrationState::Paused => {
+                if record_number < self.header.new_layout_start {
+                    RecordMeta::layout_v1(record_number, self.header.entry_size)
+                } else {
+                    RecordMeta::layout_v3(record_number, self.header.entry_size_new)
+                }
+            }
+            MigrationState::Finished => {
+                RecordMeta::layout_v3(record_number, self.header.entry_size)
             }
         }
     }
@@ -634,7 +662,7 @@ impl<M: Memory> Storage<M> {
             self.header.version = 2;
             self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
             // the next user will start using the new layout
-            self.header.new_layout_start = self.header.num_users + 1;
+            self.header.new_layout_start = self.header.num_users;
         }
 
         self.header.migration_batch_size = batch_size;
