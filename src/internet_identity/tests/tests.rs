@@ -795,6 +795,24 @@ mod device_management_tests {
         );
     }
 
+    /// Verifies that webauthn credentials are only accepted if they have a credential id.
+    #[test]
+    fn should_not_add_webauthn_device_without_credential_id() {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let mut device = device_data_2();
+        device.credential_id = None;
+        let result = api::add(&env, canister_id, principal_1(), user_number, device);
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("All credentials except recovery phrases require a credential id").unwrap(),
+        );
+    }
+
     /// Verifies that a new device can be added to anchors that were registered using the previous II release.
     #[test]
     fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {

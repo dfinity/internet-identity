@@ -674,7 +674,13 @@ mod stable_memory_tests {
         let add_entry = Entry {
             anchor: ANCHOR,
             operation: Operation::AddDevice {
-                device: DeviceDataWithoutAlias::from(device_data_2()),
+                device: DeviceDataWithoutAlias {
+                    pubkey: device_data_2().pubkey,
+                    credential_id: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::Unknown,
+                    protection: DeviceProtection::Unprotected,
+                },
             },
             timestamp: TIMESTAMP,
             caller: Principal::from(principal_1()),

@@ -196,6 +196,12 @@ fn write_anchor_data(user_number: UserNumber, entries: Vec<DeviceDataInternal>) 
 fn check_device(device_data: &DeviceData, existing_devices: &[DeviceDataInternal]) {
     check_entry_limits(device_data);
 
+    if device_data.key_type != KeyType::SeedPhrase && device_data.credential_id.is_none() {
+        trap(&format!(
+            "All credentials except recovery phrases require a credential id"
+        ));
+    }
+
     if device_data.protection == DeviceProtection::Protected
         && device_data.key_type != KeyType::SeedPhrase
     {

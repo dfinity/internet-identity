@@ -207,7 +207,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
         operation: Operation::RegisterAnchor {
             device: DeviceDataWithoutAlias {
                 pubkey: device_data_1().pubkey,
-                credential_id: None,
+                credential_id: device_data_1().credential_id,
                 purpose: Purpose::Authentication,
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
