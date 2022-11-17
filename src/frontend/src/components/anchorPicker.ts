@@ -7,6 +7,13 @@ import { until } from "lit-html/directives/until.js";
 type PickerProps = {
   savedAnchors: bigint[];
   pick: PickCB;
+  button: string;
+} & Links;
+
+type Links = {
+  recoverAnchor: () => void;
+  register: () => void;
+  addDevice: () => void;
 };
 
 type PickCB = (userNumber: bigint) => void;
@@ -28,7 +35,7 @@ export const mkAnchorPicker = (
 
 // The list elements, including the anchor creation menu
 function elements(props: PickerProps): TemplateResult[] {
-  const otherAnchorMenuTpl = otherAnchorMenu({ pick: props.pick });
+  const otherAnchorMenuTpl = otherAnchorMenu(props);
   const savedAnchorsTpl = props.savedAnchors.map((anchor, i) =>
     anchorItem({ anchor, pick: props.pick, focus: i == 0 })
   );
@@ -52,9 +59,9 @@ function elements(props: PickerProps): TemplateResult[] {
         @focus="${() => {
           otherAnchorOpen?.();
         }}"
-        data-role="use-another-anchor"
+        data-role="more-options"
       >
-        Use another anchor<i class="c-list__icon"> … </i>
+        More options<i class="c-list__icon"> … </i>
       </button>
     `;
 
@@ -64,7 +71,7 @@ function elements(props: PickerProps): TemplateResult[] {
         // replace the "use another anchor" button with actual menu when ready (clicked)
         new Promise<void>((resolve) => {
           otherAnchorOpen = resolve;
-        }).then(() => Promise.resolve(otherAnchorMenu({ pick: props.pick }))),
+        }).then(() => Promise.resolve(otherAnchorMenu(props))),
         otherAnchorOffer
       )}
     </li>`);
@@ -105,7 +112,7 @@ const anchorItem = (props: {
   </li>
 `;
 
-function otherAnchorMenu(props: { pick: PickCB }): TemplateResult {
+function otherAnchorMenu(props: PickerProps): TemplateResult {
   const anchorInput = mkAnchorInput({ onSubmit: props.pick });
 
   return html`
@@ -115,22 +122,39 @@ function otherAnchorMenu(props: { pick: PickCB }): TemplateResult {
       ${anchorInput.template}
       <button
         class="c-button"
+        id="authorizeButton"
         data-role="anchor-create"
         @click="${anchorInput.submit}"
       >
-        Oh ouiiii
+        ${props.button}
       </button>
-      <p class="l-stack">
-        An <b class="t-strong">Identity Anchor</b> is a
-        <b class="t-strong">unique ID</b> that is used to authenticate yourself.
-        You will be able to use it to <b class="t-strong">log in</b> to all
-        kinds of apps.
+      <p class="l-stack t-centered">
+        An <b class="t-strong">Anchor</b> is used to authenticate yourself when
+        using dapps on the Internet Computer.
       </p>
-      <div class="l-stack">
-        <button class="c-button c-button--secondary">
-          Create a new anchor
-        </button>
-      </div>
+      ${mkLinks(props)}
     </div>
   `;
 }
+
+const mkLinks = ({ recoverAnchor, register, addDevice }: Links) => html`
+  <div class="l-stack">
+    <ul class="c-list--flex">
+      <li>
+        <a @click=${() => register()} id="registerButton" class="t-link"
+          >Create Anchor</a
+        >
+      </li>
+      <li>
+        <a @click="${() => recoverAnchor()}" id="recoverButton" class="t-link"
+          >Lost Access?</a
+        >
+      </li>
+      <li>
+        <a @click="${() => addDevice()}" id="addNewDeviceButton" class="t-link"
+          >Add a device</a
+        >
+      </li>
+    </ul>
+  </div>
+`;

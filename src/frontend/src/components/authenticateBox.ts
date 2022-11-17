@@ -3,7 +3,7 @@ import { icLogo, caretDownIcon } from "./icons";
 import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { addRemoteDevice } from "../flows/addDevice/welcomeView";
-import { mkAnchorInput } from "./anchorInput";
+import { mkAnchorPicker } from "./anchorPicker";
 import { getUserNumber, setUserNumber } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
@@ -102,33 +102,24 @@ const pageContent = ({
   register,
   userNumber,
 }: PageProps): TemplateResult => {
-  const anchorInput = mkAnchorInput({
-    userNumber,
-    onSubmit: onContinue,
+  const anchorInput = mkAnchorPicker({
+    savedAnchors: userNumber !== undefined ? [userNumber] : [],
+    pick: onContinue,
+    button: templates.button,
+    addDevice,
+    recoverAnchor,
+    register,
   });
 
   return html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
-      <h1 class="is-hidden">Internet Identity</h1>
+      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       <div class="c-logo">${icLogo}</div>
       <div class="l-stack t-centered">
         ${templates.message} ${templates.chasm ? mkChasm(templates.chasm) : ""}
       </div>
 
       ${anchorInput.template}
-
-      <button
-        @click="${anchorInput.submit}"
-        id="authorizeButton"
-        class="c-button"
-      >
-        ${templates.button}
-      </button>
-      ${mkLinks({
-        register,
-        recoverAnchor: () => recoverAnchor(anchorInput.readUserNumber()),
-        addDevice,
-      })}
     </div>
     ${footer}`;
 };
@@ -192,33 +183,3 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
     </p>
 `;
 };
-
-const mkLinks = ({
-  recoverAnchor,
-  register,
-  addDevice,
-}: {
-  recoverAnchor: () => void;
-  register: () => void;
-  addDevice: () => void;
-}) => html`
-  <div class="l-stack">
-    <ul class="c-list--flex">
-      <li>
-        <a @click=${register} id="registerButton" class="t-link"
-          >Create Anchor</a
-        >
-      </li>
-      <li>
-        <a @click="${recoverAnchor}" id="recoverButton" class="t-link"
-          >Lost Access?</a
-        >
-      </li>
-      <li>
-        <a @click="${addDevice}" id="addNewDeviceButton" class="t-link"
-          >Add a device</a
-        >
-      </li>
-    </ul>
-  </div>
-`;

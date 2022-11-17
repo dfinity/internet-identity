@@ -1,10 +1,18 @@
 import { mkAnchorPicker } from "./anchorPicker";
 import { render } from "lit-html";
 
+const commonProps = {
+  button: "go",
+  recoverAnchor: () => {},
+  register: () => {},
+  addDevice: () => {},
+};
+
 test("first anchor is focused", async () => {
   const picker = mkAnchorPicker({
     savedAnchors: [BigInt(10000), BigInt(9990042)],
     pick: () => {},
+    ...commonProps,
   });
   render(picker.template, document.body);
   // Tick once, otherwise element isn't focused yet
@@ -20,6 +28,7 @@ test("pick saved anchor", async () => {
     pick: (anchor) => {
       picked = anchor;
     },
+    ...commonProps,
   });
   render(picker.template, document.body);
   // Tick once, otherwise element isn't focused yet
@@ -38,12 +47,13 @@ test("pick custom anchor", async () => {
     pick: (anchor) => {
       picked = anchor;
     },
+    ...commonProps,
   });
   render(picker.template, document.body);
   // Tick once, otherwise element isn't focused yet
   await tick();
   const elem = document.querySelector(
-    '[data-role="use-another-anchor"]'
+    '[data-role="more-options"]'
   ) as HTMLElement;
   elem.click();
   await tick();

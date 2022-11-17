@@ -122,8 +122,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
     );
     let authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.expectPrefilledAnchorToBe(userNumber);
-    await authenticateView.authenticate();
+    await authenticateView.pickAnchor(userNumber);
     await waitToClose(browser);
 
     const principal1 = await canonicalDemoAppView.getPrincipal();
@@ -150,8 +149,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
     );
     authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.expectPrefilledAnchorToBe(userNumber);
-    await authenticateView.authenticate();
+    await authenticateView.pickAnchor(userNumber);
     await waitToClose(browser);
 
     const principal2 = await niceDemoAppView.getPrincipal();
