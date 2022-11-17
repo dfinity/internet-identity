@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+declare pubkey=
+declare canister_id=
+declare network=
+declare count=
+
+number_check='^[0-9]+$'
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Generate test anchors in an II instance (with the II_DUMMY_CAPTCHA flavor)"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 --canister-id CANISTER_ID --pubkey PATH [--network URL] --count NUMBER_OF_ANCHORS
+
+Options:
+  --canister-id CANISTER_ID       Canister id of the II canister to generate the test anchors with.
+  --pubkey PATH                   Path to a file containing the DER encoded public key that dfx is using.
+  --network URL                   Optional network parameter. Defaults to local replica.
+  --count NUMBER_OF_ANCHORS       The number of anchors to generate.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Generates many test anchors on the specified II instance.
+
+NOTE: This requires dfx, hexdump, sed, running II canister with the II_DUMMY_CAPTCHA flavor and a public key file of the dfx identity.
+The public key file can be obtained using
+
+    dfx identity export IDENTITY | openssl ec -out FILE_NAME -pubout -outform der
+
+This works only for identities generated with dfx 0.12.0 or higher. The public key must correspond to the identity that
+is active in dfx when running this script. To see which identity is active run "dfx identity list". To switch to a different
+identity run "dfx identity use IDENTITY". It is recommended to use an identity without encryption as the passphrase has
+to be submitted for every operation.
+EOF
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --pubkey)
+            pubkey="${2:?missing value for '--pubkey'}"
+            shift; # shift past --pubkey and value
+            shift;
+            ;;
+        --canister-id)
+            canister_id="${2:?missing value for '--canister-id'}"
+            shift; # shift past --canister-id and value
+            shift;
+            ;;
+        --network)
+            network="${2:?missing value for '--network'}"
+            shift; # shift past --network and value
+            shift;
+            ;;
+        --count)
+            count="${2:?missing value for '--count'}"
+            shift; # shift past --count and value
+            shift;
+            if ! [[ $count =~ $number_check ]] ; then
+               echo "error: count \"$count\" is not a number" >&2; exit 1
+            fi
+
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'release --help' for more information."
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z "$pubkey" ]
+then
+    echo no public key path
+    usage
+    exit 1
+fi
+
+if [ -z "$canister_id" ]
+then
+    echo no canister id
+    usage
+    exit 1
+fi
+
+if [ -z "$count" ]
+then
+    echo no count
+    usage
+    exit 1
+fi
+
+declare -a network_arg=( )
+
+if [ "$network" ]
+then
+    network_arg+=( "--network" "$network")
+fi
+
+function create_anchor {
+    challenge_key=$(dfx canister "${network_arg[@]}" call "$canister_id" create_challenge --candid src/internet_identity/internet_identity.did -qq | sed -n 's/.*challenge_key[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p')
+    pubkey_blob=$(hexdump -ve '1/1 "%.2x"' "$pubkey" | sed 's/../\\&/g')
+    dfx canister "${network_arg[@]}" call "$canister_id" \
+        register "(record{pubkey=blob \"$pubkey_blob\";alias=\"dfx test key\";purpose=variant{authentication};key_type=variant{unknown};protection=variant{unprotected};},record{key=\"$challenge_key\";chars=\"a\"})" \
+        --candid src/internet_identity/internet_identity.did \
+        -qq
+}
+
+function create_anchor_batch {
+    for ((i=0; i < $1; i++))
+    do
+      create_anchor
+    done
+}
+
+SECONDS=0
+declare -a pids=( )
+N=100
+batch_size=$((count/N))
+echo "batch_size: $batch_size"
+
+# do N parallel batches
+for ((i=0; i < N; i++))
+do
+    create_anchor_batch "$batch_size" "$i"&
+    pids+=( "$!" )
+done
+
+# create the remainder in parallel
+for ((i=0; i < count % N ; i++))
+do
+    create_anchor_batch 1 "$i"&
+    pids+=( "$!" )
+done
+
+# wait for all pids
+for pid in ${pids[*]}; do
+    wait "$pid"
+done
+duration=$SECONDS
+echo "$((duration / 60)) minutes and $((duration % 60)) seconds elapsed."
