@@ -35,7 +35,7 @@ const pageContent = ({
     aria-label="Authentication"
   >
     <div class="c-logo">${icLogo}</div>
-    <p class="t-paragraph t-centered">Unlock the full power of Web3</p>
+    <p class="t-paragraph t-centered">Use anchors to authenticate to dapps<br/>on the Internet Computer</p>
     <article class="l-stack">
       <button
         type="button"
@@ -51,7 +51,7 @@ const pageContent = ({
         id="loginButton"
         class="c-button c-button--secondary"
       >
-        Use Existing
+        Manage Existing
       </button>
     </article>
 
