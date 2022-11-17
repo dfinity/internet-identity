@@ -198,6 +198,29 @@ fn should_save_persistent_state_at_expected_memory_address() {
 }
 
 #[test]
+fn should_not_find_persistent_state() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    let result = storage.read_persistent_state();
+    assert!(matches!(result, Err(PersistentStateError::NotFound)))
+}
+
+#[test]
+fn should_not_find_persistent_state_on_magic_bytes_mismatch() {
+    let memory = VectorMemory::default();
+
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    memory.write(RESERVED_HEADER_BYTES, b"IIPX"); // correct magic bytes are IIPS
+
+    let result = storage.read_persistent_state();
+    assert!(matches!(result, Err(PersistentStateError::NotFound)))
+}
+
+#[test]
 fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 100 * 2048; // number of anchors is 100
 
@@ -223,7 +246,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     let memory = VectorMemory::default();
     memory.grow(1);
     memory.write(0, &hex::decode("49494301C0C62D001027000000000000a9c039000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3_000_000 * 2048; // number of anchors is 100
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3_000_000 * 2048; // number of anchors is 3'000'000
 
     let mut storage = Storage::<VectorMemory>::from_memory(memory.clone()).unwrap();
     storage.write_persistent_state(&sample_persistent_state());
@@ -231,6 +254,24 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     let mut buf = vec![0u8; 4];
     memory.read(EXPECTED_ADDRESS, &mut buf);
     assert_eq!(buf, PERSISTENT_STATE_MAGIC);
+}
+
+/// This test verifies that storage correctly reports `NotFound` if the persistent state address
+/// lies outside of the allocated stable memory range. This can happen on upgrade from a version
+/// that did not serialize a persistent state into stable memory.
+#[test]
+fn should_not_panic_on_unallocated_persistent_state_mem_address() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    assert!(matches!(
+        storage.read_persistent_state(),
+        Err(PersistentStateError::NotFound)
+    ));
 }
 
 #[test]

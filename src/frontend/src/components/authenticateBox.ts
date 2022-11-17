@@ -3,7 +3,7 @@ import { icLogo, caretDownIcon } from "./icons";
 import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { addRemoteDevice } from "../flows/addDevice/welcomeView";
-import { mkAnchorInput } from "./anchorInput";
+import { mkAnchorPicker } from "./anchorPicker";
 import { getUserNumber, setUserNumber } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
@@ -45,12 +45,33 @@ type ChasmOpts = {
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBox = (
+export const authenticateBox = async (
   connection: Connection,
   templates: AuthTemplates
 ): Promise<LoginData> => {
-  const retryOnError = async (result: LoginFlowResult): Promise<LoginData> => {
+  const promptAuth = () =>
+    new Promise<LoginFlowResult>((resolve) => {
+      authenticateBoxTemplate({
+        templates,
+        addDevice: () => addRemoteDevice(connection),
+        onContinue: (userNumber) => {
+          resolve(authenticate(connection, userNumber));
+        },
+        register: () => {
+          resolve(registerIfAllowed(connection));
+        },
+        recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
+        userNumber: getUserNumber(),
+      });
+    });
+
+  // Retry until user has successfully authenticated
+  for (;;) {
+    const result = await promptAuth();
     switch (result.tag) {
+      case "ok":
+        setUserNumber(result.userNumber);
+        return result;
       case "err":
         await displayError({
           title: result.title,
@@ -58,39 +79,14 @@ export const authenticateBox = (
           detail: result.detail !== "" ? result.detail : undefined,
           primaryButton: "Try again",
         });
-        return authenticateBox(connection, templates);
-      case "ok":
-        return result;
+        break;
       case "canceled":
-        return authenticateBox(connection, templates);
+        break;
       default:
         unreachable(result);
         break;
     }
-  };
-
-  return new Promise<LoginData>((resolve) => {
-    authenticateBoxTemplate({
-      templates,
-      addDevice: () => addRemoteDevice(connection),
-      onContinue: async (userNumber) => {
-        const loginData = await authenticate(connection, userNumber).then(
-          retryOnError
-        );
-        setUserNumber(loginData.userNumber);
-        resolve(loginData);
-      },
-      register: async () => {
-        const loginData = await registerIfAllowed(connection).then(
-          retryOnError
-        );
-        setUserNumber(loginData.userNumber);
-        resolve(loginData);
-      },
-      recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-      userNumber: getUserNumber(),
-    });
-  });
+  }
 };
 
 export const authenticateBoxTemplate = (props: PageProps): void => {
@@ -106,33 +102,24 @@ const pageContent = ({
   register,
   userNumber,
 }: PageProps): TemplateResult => {
-  const anchorInput = mkAnchorInput({
-    userNumber,
-    onSubmit: onContinue,
+  const anchorInput = mkAnchorPicker({
+    savedAnchors: userNumber !== undefined ? [userNumber] : [],
+    pick: onContinue,
+    button: templates.button,
+    addDevice,
+    recoverAnchor,
+    register,
   });
 
   return html` <div class="l-container c-card c-card--highlight">
       <!-- The title is hidden but used for accessibility -->
-      <h1 class="is-hidden">Internet Identity</h1>
+      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       <div class="c-logo">${icLogo}</div>
       <div class="l-stack t-centered">
         ${templates.message} ${templates.chasm ? mkChasm(templates.chasm) : ""}
       </div>
 
       ${anchorInput.template}
-
-      <button
-        @click="${anchorInput.submit}"
-        id="authorizeButton"
-        class="c-button"
-      >
-        ${templates.button}
-      </button>
-      ${mkLinks({
-        register,
-        recoverAnchor: () => recoverAnchor(anchorInput.readUserNumber()),
-        addDevice,
-      })}
     </div>
     ${footer}`;
 };
@@ -196,33 +183,3 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
     </p>
 `;
 };
-
-const mkLinks = ({
-  recoverAnchor,
-  register,
-  addDevice,
-}: {
-  recoverAnchor: () => void;
-  register: () => void;
-  addDevice: () => void;
-}) => html`
-  <div class="l-stack">
-    <ul class="c-list--flex">
-      <li>
-        <a @click=${register} id="registerButton" class="t-link"
-          >Create Anchor</a
-        >
-      </li>
-      <li>
-        <a @click="${recoverAnchor}" id="recoverButton" class="t-link"
-          >Lost Access?</a
-        >
-      </li>
-      <li>
-        <a @click="${addDevice}" id="addNewDeviceButton" class="t-link"
-          >Add a device</a
-        >
-      </li>
-    </ul>
-  </div>
-`;

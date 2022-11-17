@@ -43,6 +43,15 @@ export const authenticationFlow = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(html`<h1>starting authentication</h1>`, container);
+  const showMessage = (msg: string) =>
+    render(
+      html`<h1
+        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+      >
+        ${msg}
+      </h1>`,
+      container
+    );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
@@ -66,16 +75,13 @@ export const authenticationFlow = async (
     onProgress: (status) => {
       switch (status) {
         case "waiting":
-          render(
-            html`<h1>waiting for authentication data from service...</h1>`,
-            container
-          );
+          showMessage("waiting for authentication data from service...");
           break;
         case "validating":
-          render(html`<h1>validating authentication data...</h1>`, container);
+          showMessage("validating authentication data...");
           break;
         case "fetching delegation":
-          render(html`<h1>fetching delegation...</h1>`, container);
+          showMessage("fetching delegation...");
           break;
         default:
           unreachable(status);
@@ -106,7 +112,10 @@ export const authenticationFlow = async (
       break;
     case "success":
       render(
-        html`<h1 data-role="notify-auth-success">
+        html`<h1
+          style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+          data-role="notify-auth-success"
+        >
           Authentication successful. You may close this page.
         </h1>`,
         container

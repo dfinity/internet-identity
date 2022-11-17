@@ -256,6 +256,11 @@ const components = (): TemplateResult => {
         withRef(showSelected, (div) => {
           div.innerText = anchor.toString();
         }),
+      button: "Let's go",
+
+      addDevice: () => console.log("Add device requested"),
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
     }).template;
 
   const chan = new Chan<TemplateResult>();
