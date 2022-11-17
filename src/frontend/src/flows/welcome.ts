@@ -35,7 +35,9 @@ const pageContent = ({
     aria-label="Authentication"
   >
     <div class="c-logo">${icLogo}</div>
-    <p class="t-paragraph t-centered">Use anchors to authenticate to dapps<br/>on the Internet Computer</p>
+    <p class="t-paragraph t-centered">
+      Use anchors to authenticate to dapps<br />on the Internet Computer
+    </p>
     <article class="l-stack">
       <button
         type="button"
