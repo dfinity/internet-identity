@@ -866,7 +866,6 @@ mod device_management_tests {
             let mut device = device_data_1();
             device.protection = DeviceProtection::Protected;
             device.key_type = KeyType::SeedPhrase;
-            device.purpose = Purpose::Recovery;
 
             let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 

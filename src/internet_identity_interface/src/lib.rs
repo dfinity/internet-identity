@@ -190,7 +190,7 @@ pub enum MigrationState {
     Finished,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityStats {
     pub assigned_user_number_range: (UserNumber, UserNumber),
     pub users_registered: u64,
@@ -291,7 +291,7 @@ pub enum Cursor {
 }
 
 /// Information about the archive.
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct ArchiveInfo {
     pub archive_canister: Option<Principal>,
     pub expected_wasm_hash: Option<[u8; 32]>,

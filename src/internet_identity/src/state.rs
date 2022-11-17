@@ -11,6 +11,8 @@ use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::iter::Chain;
+use std::slice::Iter;
 use std::time::Duration;
 
 pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
@@ -19,6 +21,46 @@ pub type AssetHashes = RbTree<&'static str, Hash>;
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<Assets> = RefCell::new(HashMap::default());
+}
+
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Anchor {
+    pub devices: Vec<DeviceDataInternal>,
+    pub devices_to_migrate: Vec<DeviceDataInternal>,
+}
+
+impl Anchor {
+    pub fn into_devices(mut self) -> Vec<DeviceDataInternal> {
+        let mut devices = vec![];
+        devices.append(&mut self.devices);
+        devices.append(&mut self.devices_to_migrate);
+        devices
+    }
+
+    pub fn all_devices(&self) -> Chain<Iter<DeviceDataInternal>, Iter<DeviceDataInternal>> {
+        self.devices.iter().chain(self.devices_to_migrate.iter())
+    }
+}
+
+impl From<Vec<DeviceDataInternal>> for Anchor {
+    fn from(internal_devices: Vec<DeviceDataInternal>) -> Self {
+        let mut devices = vec![];
+        let mut devices_to_migrate = vec![];
+        for device in internal_devices {
+            // we need to migrate everything that is a webauthn device (i.e. has a credential id)
+            // and is not clearly marked as a recovery phrase
+            if device.credential_id.is_none() || device.key_type == Some(KeyType::SeedPhrase) {
+                devices.push(device)
+            } else {
+                devices_to_migrate.push(device)
+            }
+        }
+
+        Self {
+            devices,
+            devices_to_migrate,
+        }
+    }
 }
 
 /// This is an internal version of `DeviceData` primarily useful to provide a
@@ -263,7 +305,7 @@ pub fn load_persistent_state() {
 
 // helper methods to access / modify the state in a convenient way
 
-pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
+pub fn anchor(anchor: UserNumber) -> Anchor {
     STATE.with(|s| {
         s.storage.borrow().read(anchor).unwrap_or_else(|err| {
             trap(&format!(

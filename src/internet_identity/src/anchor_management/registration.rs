@@ -1,6 +1,6 @@
 use crate::anchor_management::{check_device, write_anchor_data};
 use crate::archive::archive_operation;
-use crate::state::{ChallengeInfo, DeviceDataInternal};
+use crate::state::{Anchor, ChallengeInfo, DeviceDataInternal};
 use crate::storage::Salt;
 use crate::{delegation, secs_to_nanos, state};
 use candid::Principal;
@@ -179,7 +179,7 @@ pub async fn register(
         Some(user_number) => {
             write_anchor_data(
                 user_number,
-                vec![DeviceDataInternal::from(device_data.clone())],
+                Anchor::from(vec![DeviceDataInternal::from(device_data.clone())]),
             );
             archive_operation(
                 user_number,
