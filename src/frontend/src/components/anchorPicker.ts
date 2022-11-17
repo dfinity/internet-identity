@@ -137,15 +137,7 @@ function otherAnchorMenu(props: PickerProps): TemplateResult {
   `;
 }
 
-const mkLinks = ({
-  recoverAnchor,
-  register,
-  addDevice,
-}: {
-  recoverAnchor: () => void;
-  register: () => void;
-  addDevice: () => void;
-}) => html`
+const mkLinks = ({ recoverAnchor, register, addDevice }: Links) => html`
   <div class="l-stack">
     <ul class="c-list--flex">
       <li>
