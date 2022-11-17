@@ -916,10 +916,6 @@ a:hover,
   margin: 0.5rem;
 }
 
-.c-list li + li {
-  margin-top: var(--vs-stack);
-}
-
 .c-list--bulleted {
   list-style-type: disc;
 }
@@ -944,7 +940,6 @@ a:hover,
 
 .c-list--anchors {
   --border-radius: 8px;
-  width: 40rem;
 }
 
 .c-list__item--icon {

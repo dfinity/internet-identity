@@ -321,14 +321,12 @@ export class VerifyRemoteDeviceView extends View {
 export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#authorizeButton")
-      .waitForDisplayed({ timeout: 5_000 });
+      .$('[data-page="authenticate"]')
+      .waitForExist({ timeout: 5_000 });
   }
 
-  async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
-    expect(await this.browser.$('[data-role="anchor-input"]').getValue()).toBe(
-      anchor
-    );
+  async pickAnchor(anchor: string): Promise<void> {
+    await this.browser.$(`[data-anchor-id="${anchor}"]`).click();
   }
 
   async expectAnchorInputField(): Promise<void> {
@@ -338,6 +336,10 @@ export class AuthenticateView extends View {
   }
 
   async authenticate(): Promise<void> {
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
+    if (await moreOptions.isExisting()) {
+      await moreOptions.click();
+    }
     await this.browser.$("#authorizeButton").click();
   }
 

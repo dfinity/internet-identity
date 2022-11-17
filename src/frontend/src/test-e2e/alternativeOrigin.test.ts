@@ -227,8 +227,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     // This works anyway --> fetched using non-raw
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.expectPrefilledAnchorToBe(userNumber);
-    await authenticateView.authenticate();
+    await authenticateView.pickAnchor(userNumber);
     await waitToClose(browser);
 
     expect(await niceDemoAppView.getPrincipal()).not.toBe("2vxsx-fae");

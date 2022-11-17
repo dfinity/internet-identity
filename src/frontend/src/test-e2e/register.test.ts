@@ -260,8 +260,7 @@ test("Register first then log into client application", async () => {
 
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.expectPrefilledAnchorToBe(userNumber);
-    await authenticateView.authenticate();
+    await authenticateView.pickAnchor(userNumber);
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
