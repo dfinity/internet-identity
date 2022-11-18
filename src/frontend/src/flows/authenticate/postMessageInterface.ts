@@ -4,6 +4,7 @@ import { Principal } from "@dfinity/principal";
 import { fetchDelegation } from "./fetchDelegation";
 import { LoginData } from "../login/flowResult";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
+import { hasOwnProperty } from "../../utils/utils";
 
 export interface Delegation {
   delegation: {
@@ -35,6 +36,56 @@ export interface AuthRequest {
   maxTimeToLive?: bigint;
   derivationOrigin?: string;
 }
+
+/** Try to read unknown data as authentication request */
+const asAuthRequest = (msg: unknown): AuthRequest | undefined => {
+  if (typeof msg !== "object") {
+    return undefined;
+  }
+
+  if (msg === null) {
+    return undefined;
+  }
+
+  // Some extra conversions to take typescript by the hand
+  // eslint-disable-next-line
+  const tmp: {} = msg;
+  const obj: Record<string, unknown> = tmp;
+
+  if (!hasOwnProperty(obj, "kind") || obj.kind !== "authorize-client") {
+    return undefined;
+  }
+
+  if (
+    !hasOwnProperty(obj, "sessionPublicKey") ||
+    !(obj.sessionPublicKey instanceof Uint8Array)
+  ) {
+    return undefined;
+  }
+
+  const maxTimeToLive = obj.maxTimeToLive;
+  if (
+    typeof maxTimeToLive !== "undefined" &&
+    typeof maxTimeToLive !== "bigint"
+  ) {
+    return undefined;
+  }
+
+  const derivationOrigin = obj.derivationOrigin;
+  if (
+    typeof derivationOrigin !== "undefined" &&
+    typeof derivationOrigin !== "string"
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: obj.kind,
+    sessionPublicKey: obj.sessionPublicKey,
+    maxTimeToLive,
+    derivationOrigin,
+  };
+};
 
 /**
  * The postMessage-based authentication protocol.
@@ -119,21 +170,23 @@ export async function authenticationProtocol({
 const waitForAuthRequest = (): Promise<AuthContext> =>
   new Promise<AuthContext>((resolve) => {
     const eventHandler = async (event: MessageEvent) => {
-      const message = event.data;
-      if (message.kind === "authorize-client") {
+      const message: unknown = event.data; // Drop assumptions about event.data (an 'any')
+      const authRequest = asAuthRequest(message);
+      if (authRequest !== undefined) {
         window.removeEventListener("message", eventHandler);
         console.log(
-          `Handling authorize-client request ${JSON.stringify(message, (_, v) =>
-            typeof v === "bigint" ? v.toString() : v
+          `Handling authorize-client request ${JSON.stringify(
+            authRequest,
+            (_, v) => (typeof v === "bigint" ? v.toString() : v)
           )}`
         );
         resolve({
-          authRequest: message,
+          authRequest,
           requestOrigin: event.origin,
         });
       } else {
         console.warn(
-          `Message of unknown kind received: ${JSON.stringify(message)}`
+          `Bad authentication request received: ${JSON.stringify(message)}`
         );
       }
     };
