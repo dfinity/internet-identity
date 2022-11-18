@@ -67,9 +67,16 @@ use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 
 #[cfg(test)]
 mod tests;
+
+// version 0: invalid
+// version 1: genesis layout, might have persistent state
+// version 2: genesis layout, must have persistent state
+// version 3+: invalid
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 1..=2;
 
 /// Reserved space for the header before the anchor records start.
 const RESERVED_HEADER_BYTES: u64 = 512;
@@ -99,6 +106,10 @@ pub struct Storage<T, M> {
 #[repr(packed)]
 struct Header {
     magic: [u8; 3],
+    // version 0: invalid
+    // version 1: genesis layout, might have persistent state
+    // version 2: genesis layout, must have persistent state
+    // version 3+: invalid
     version: u8,
     num_users: u32,
     id_range_lo: u64,
@@ -183,7 +194,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
                 &header.magic,
             ));
         }
-        if header.version != 1 {
+        if !SUPPORTED_LAYOUT_VERSIONS.contains(&header.version) {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
@@ -421,6 +432,10 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         }
 
         candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+    }
+
+    pub fn version(&self) -> u8 {
+        self.header.version
     }
 }
 
