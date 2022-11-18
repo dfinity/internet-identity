@@ -246,11 +246,13 @@ pub fn save_persistent_state() {
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        match s.storage.borrow().read_persistent_state() {
+        let storage = s.storage.borrow();
+        match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(PersistentStateError::NotFound) => {
-                // This is allowed for the first release of this feature only!
-                // After this feature has been deployed, we will panic on this error.
+                if storage.version() >= 2 {
+                    trap("unable to load persistent state: not found")
+                }
                 *s.persistent_state.borrow_mut() = PersistentState::default()
             }
             Err(err) => trap(&format!(
