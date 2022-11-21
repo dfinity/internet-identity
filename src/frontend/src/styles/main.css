@@ -637,6 +637,20 @@ a:hover,
   color: var(--vc-brand-blue);
 }
 
+.c-spinner {
+  display: block;
+  position: relative;
+  width: 25%;
+  height: 25%;
+  margin: var(--rs-logo-stack) auto;
+  color: var(--vc-brand-purple);
+}
+
+.c-spinner svg {
+  overflow: visible;
+  animation: rotate 4s linear infinite;
+}
+
 /**
  *  Forms and Buttons
  */
@@ -1342,4 +1356,10 @@ input[type="checkbox"] {
   -ms-appearance: checkbox !important;
   -o-appearance: checkbox !important;
   appearance: checkbox !important;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
 }
