@@ -934,6 +934,10 @@ a:hover,
   font-weight: bold;
 }
 
+.c-list__parcel--select {
+  cursor: pointer;
+}
+
 .c-list__parcel--select:hover {
   transition: background-color 400ms cubic-bezier(0.3, 0.7, 0, 1);
 }
@@ -1055,6 +1059,7 @@ a:hover,
 
 .c-list__icon {
   position: absolute;
+  pointer-events: none;
   top: 50%;
   right: calc(var(--vs-bezel) * 1.5);
   transform: translateY(-50%);

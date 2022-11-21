@@ -97,9 +97,16 @@ use internet_identity_interface::{MigrationState, UserNumber};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
+use std::ops::RangeInclusive;
 
 #[cfg(test)]
 mod tests;
+
+// version 0: invalid
+// version 1: genesis layout, might have persistent state
+// version 2: migration in progress genesis -> post-migration layout, must have persistent state
+// version 3: post-migration layout
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 1..=3;
 
 /// Reserved space for the header before the anchor records start.
 const WASM_PAGE_SIZE: u64 = 65_536;
@@ -138,6 +145,10 @@ pub struct Storage<M> {
 #[repr(packed)]
 struct Header {
     magic: [u8; 3],
+    // version 0: invalid
+    // version 1: genesis layout, might have persistent state
+    // version 2: migration in progress genesis -> post-migration layout, must have persistent state
+    // version 3: post-migration layout
     version: u8,
     num_users: u32,
     id_range_lo: u64,
@@ -273,6 +284,10 @@ impl<M: Memory> Storage<M> {
                 "stable memory header: invalid magic: {:?}",
                 &header.magic,
             ));
+        }
+
+        if !SUPPORTED_LAYOUT_VERSIONS.contains(&header.version) {
+            trap(&format!("unsupported header version: {}", header.version));
         }
 
         Some(Self { header, memory })
@@ -652,6 +667,10 @@ impl<M: Memory> Storage<M> {
         self.header.migration_batch_size = 0;
         self.header.new_layout_start = 0;
         self.flush();
+    }
+
+    pub fn version(&self) -> u8 {
+        self.header.version
     }
 }
 
