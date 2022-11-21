@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { unreachable } from "../../utils/utils";
 import { Connection } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
+import { spinner } from "../../components/icons";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { authenticationProtocol } from "./postMessageInterface";
 import {
@@ -45,11 +46,12 @@ export const authenticationFlow = async (
   render(html`<h1>starting authentication</h1>`, container);
   const showMessage = (msg: string) =>
     render(
-      html`<h1
-        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-      >
-        ${msg}
-      </h1>`,
+      html`
+        <div class="l-container c-card c-card--highlight t-centered">
+          <div class="c-spinner">${spinner}</div>
+          <p class="t-lead t-paragraph l-stack">${msg}</p>
+        </div>
+      `,
       container
     );
   const result = await authenticationProtocol({
@@ -75,13 +77,13 @@ export const authenticationFlow = async (
     onProgress: (status) => {
       switch (status) {
         case "waiting":
-          showMessage("waiting for authentication data from service...");
+          showMessage("Waiting for authentication data...");
           break;
         case "validating":
           showMessage("validating authentication data...");
           break;
         case "fetching delegation":
-          showMessage("fetching delegation...");
+          showMessage("Finalizing authentication...");
           break;
         default:
           unreachable(status);
