@@ -21,8 +21,10 @@ These backup memory files are generated using the `canister_tests` infrastructur
     ```
 ### Using the Local Replica
 
-The stable memory can also be copied from the local replica from the following path:
-`~/Library/Application Support/org.dfinity.dfx/network/local/state/replicated_state/node-100/state/tip/canister_states/CANISTER_ID/stable_memory.bin`
+The stable memory can also be copied from the local replica from the following path `DFX_STATE/state/replicated_state/node-100/state/tip/canister_states/CANISTER_ID/stable_memory.bin`, where DFX_STATE expands to:
+* on mac os: `~/Library/Application Support/org.dfinity.dfx/network/local`
+* on linux: `$HOME/.local/share/dfx/network/local`
+* for legacy projects where dfx.json defines the local network (relative to `dfx.json`): `dfx/network/local`
 
 ## Registering the DFX Key as II Device
 
@@ -37,7 +39,7 @@ To register dfx as a device:
     ```bash
     dfx identity use IDENTITY
     ```
-3. Register an anchor using `dfx` (assuming DUMMY_CAPTCHA, otherwise the actual challenge key has to be submitted)
+3. Register an anchor using `dfx` (assuming DUMMY_CAPTCHA, otherwise the actual challenge `chars` have to be submitted)
     ```bash
     challenge_key=$(dfx canister call II_CANISTER_ID create_challenge --candid src/internet_identity/internet_identity.did | sed -n 's/.*challenge_key[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p')
     pubkey_blob=$(hexdump -ve '1/1 "%.2x"' DER_PUBKEY_FILE_NAME | sed 's/../\\&/g')
