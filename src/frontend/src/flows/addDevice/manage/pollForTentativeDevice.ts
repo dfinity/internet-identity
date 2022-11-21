@@ -27,10 +27,9 @@ const pageContent = (userNumber: bigint) => html`
       </li>
       <li>
         On your <em>new</em> device:<br />
-        Chose
-        <strong class="t-strong"
-          >Already have an anchor but using a new device?</strong
-        >
+        Chose <strong class="t-strong">Add a Device</strong> (if you don't see
+        the option, click on
+        <strong class="t-strong">Use Existing</strong> first)
       </li>
       <li>
         On your <em>new</em> device:<br />

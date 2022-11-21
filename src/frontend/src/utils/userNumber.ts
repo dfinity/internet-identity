@@ -11,6 +11,9 @@ export const setUserNumber = (userNumber: bigint | undefined): void => {
   }
 };
 
+/** Whether or not the user is returning (false for first time users) */
+export const returning = (): boolean => getUserNumber() !== undefined;
+
 // We check that the user has entered a sequence of digits only,
 // before attempting to parse
 export const parseUserNumber = (s: string): bigint | null => {

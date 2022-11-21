@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "webpack",
-    "develop": "webpack-dev-server",
+    "start": "webpack-dev-server",
     "lint:fix": "npm run lint -- --fix",
     "make:docs/reference": "",
     "publish:release": "",

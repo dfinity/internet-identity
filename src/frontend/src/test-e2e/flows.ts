@@ -55,8 +55,9 @@ export const FLOWS = {
   ): Promise<void> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
-    await welcomeView.typeUserNumber(userNumber);
     await welcomeView.login();
+    await welcomeView.typeUserNumber(userNumber);
+    await browser.$("#authorizeButton").click();
     // NOTE: depending on the browser, we issue different warnings. On Safari,
     // the warning comes before the recovery method selector. Since we only
     // test on Chrome we always expect the recovery selector first.

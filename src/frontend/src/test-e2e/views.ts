@@ -5,7 +5,7 @@ class View {
 export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-role="anchor-input"]')
+      .$("#registerButton")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
@@ -22,10 +22,12 @@ export class WelcomeView extends View {
   }
 
   async addDevice(): Promise<void> {
+    await this.browser.$("#loginButton").click();
     await this.browser.$("#addNewDeviceButton").click();
   }
 
   async recover(): Promise<void> {
+    await this.browser.$("#loginButton").click();
     await this.browser.$("#recoverButton").click();
   }
 }
@@ -319,14 +321,12 @@ export class VerifyRemoteDeviceView extends View {
 export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#authorizeButton")
-      .waitForDisplayed({ timeout: 5_000 });
+      .$('[data-page="authenticate"]')
+      .waitForExist({ timeout: 5_000 });
   }
 
-  async expectPrefilledAnchorToBe(anchor: string): Promise<void> {
-    expect(await this.browser.$('[data-role="anchor-input"]').getValue()).toBe(
-      anchor
-    );
+  async pickAnchor(anchor: string): Promise<void> {
+    await this.browser.$(`[data-anchor-id="${anchor}"]`).click();
   }
 
   async expectAnchorInputField(): Promise<void> {
@@ -336,6 +336,10 @@ export class AuthenticateView extends View {
   }
 
   async authenticate(): Promise<void> {
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
+    if (await moreOptions.isExisting()) {
+      await moreOptions.click();
+    }
     await this.browser.$("#authorizeButton").click();
   }
 

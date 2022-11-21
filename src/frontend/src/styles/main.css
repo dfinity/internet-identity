@@ -619,7 +619,7 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  margin: var(--rs-logo-stack) 0 calc(var(--rs-logo-stack) * 1.5);
+  margin: var(--rs-logo-stack) 0 0;
   font-weight: 600;
 }
 
@@ -916,10 +916,6 @@ a:hover,
   margin: 0.5rem;
 }
 
-.c-list li + li {
-  margin-top: var(--vs-stack);
-}
-
 .c-list--bulleted {
   list-style-type: disc;
 }
@@ -938,13 +934,16 @@ a:hover,
   font-weight: bold;
 }
 
+.c-list__parcel--select {
+  cursor: pointer;
+}
+
 .c-list__parcel--select:hover {
   transition: background-color 400ms cubic-bezier(0.3, 0.7, 0, 1);
 }
 
 .c-list--anchors {
   --border-radius: 8px;
-  width: 40rem;
 }
 
 .c-list__item--icon {
@@ -1079,6 +1078,7 @@ a:hover,
 
 .c-list__icon {
   position: absolute;
+  pointer-events: none;
   top: 50%;
   right: calc(var(--vs-bezel) * 1.5);
   transform: translateY(-50%);

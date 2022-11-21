@@ -511,7 +511,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build-ii
+    needs: [docker-build-ii, docker-build-archive]
     steps:
       - uses: actions/checkout@v3
 
@@ -540,11 +540,11 @@ jobs:
 
       - name: "Deploy II"
         run: |
-          mv internet_identity_production.wasm internet_identity.wasm
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
           sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --argument "(opt record {archive_module_hash = opt blob \"$sha\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
+            --wasm internet_identity_production.wasm \
             internet_identity
 
       - name: "Deploy archive"
@@ -555,7 +555,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: docker-build-ii
+    needs: [docker-build-ii, docker-build-archive]
 
     steps:
       - uses: actions/checkout@v3

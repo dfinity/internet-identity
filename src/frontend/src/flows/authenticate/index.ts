@@ -1,229 +1,38 @@
-import { html, render, TemplateResult } from "lit-html";
-import { icLogo, caretDownIcon } from "../../components/icons";
-import { footer } from "../../components/footer";
-import { getUserNumber, setUserNumber } from "../../utils/userNumber";
+import { html, render } from "lit-html";
 import { unreachable } from "../../utils/utils";
-import { withLoader } from "../../components/loader";
-import { mkAnchorInput } from "../../components/anchorInput";
 import { Connection } from "../../utils/iiConnection";
-import { ref, createRef, Ref } from "lit-html/directives/ref.js";
-import {
-  apiResultToLoginFlowResult,
-  LoginFlowResult,
-  LoginFlowSuccess,
-  LoginFlowError,
-  LoginData,
-} from "../login/flowResult";
 import { displayError } from "../../components/displayError";
-import { useRecovery } from "../recovery/useRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
-import { AuthContext, authenticationProtocol } from "./postMessageInterface";
-import { registerIfAllowed } from "../../utils/registerAllowedCheck";
-import { withRef } from "../../utils/lit-html";
+import { authenticationProtocol } from "./postMessageInterface";
+import {
+  authenticateBox,
+  AuthTemplates,
+} from "../../components/authenticateBox";
 
-type PageProps = {
-  origin: string;
-  onContinue: (arg: bigint) => void;
-  recoverAnchor: (userNumner?: bigint) => void;
-  register: () => void;
-  userNumber?: bigint;
-  derivationOrigin?: string;
-};
-
-type ChasmOpts = {
-  info: string;
-  message: TemplateResult;
-};
-
-const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
-  /* the chasm that opens to reveal details about alternative origin */
-  const chasmRef: Ref<HTMLDivElement> = createRef();
-
-  /* the (purely visual) arrow on the chasm */
-  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
-
-  /* Toggle the chasm open/closed */
-  const chasmToggle = () =>
-    withRef(chasmRef, (chasm) => {
-      const classes = chasm.classList;
-
-      if (classes.contains("c-chasm--closed")) {
-        classes.remove("c-chasm--closed");
-        classes.add("c-chasm--open");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.add("c-chasm__button--flipped")
-        );
-      } else if (classes.contains("c-chasm--open")) {
-        classes.remove("c-chasm--open");
-        classes.add("c-chasm--closed");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.remove("c-chasm__button--flipped")
-        );
-      }
-    });
-
-  return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
-    chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span><br/>
-      <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
-        <div class="c-chasm__arrow"></div>
-        <div class="t-weak c-chasm__content">
-            ${message}
-        </div>
-      </div>
-    </p>
-`;
-};
-
-const mkLinks = ({
-  recoverAnchor,
-  register,
-}: {
-  recoverAnchor: () => void;
-  register: () => void;
-}) => html`
-  <div class="l-stack">
-    <ul class="c-list--flex">
-      <li>
-        <a @click=${register} id="registerButton" class="t-link"
-          >Create Anchor</a
-        >
-      </li>
-      <li>
-        <a @click="${recoverAnchor}" id="recoverButton" class="t-link"
-          >Lost Access?</a
-        >
-      </li>
-    </ul>
-  </div>
-`;
-
-const pageContent = ({
+/* Template for the authbox when authenticating to a dapp */
+export const mkAuthTemplates = ({
   origin,
-  onContinue,
-  recoverAnchor,
-  register,
-  userNumber,
   derivationOrigin,
-}: PageProps): TemplateResult => {
-  const anchorInput = mkAnchorInput({
-    userNumber,
-    onSubmit: onContinue,
-  });
+}: {
+  origin: string;
+  derivationOrigin?: string;
+}): AuthTemplates => {
+  const message = html`<p class="t-lead">
+    Connect to<br />
+    <span class="t-strong">${origin}</span><br />
+  </p>`;
+  const chasm =
+    derivationOrigin !== undefined
+      ? {
+          info: "shared identity",
+          message: html`<span class="t-strong">${origin}</span> is an
+            alternative domain of <br /><span class="t-strong"
+              >${derivationOrigin}</span
+            ><br />and you will be authenticated to both with the same identity.`,
+        }
+      : undefined;
 
-  return html` <div class="l-container c-card c-card--highlight">
-      <!-- The title is hidden but used for accessibility -->
-      <h1 class="is-hidden">Internet Identity</h1>
-      <div class="c-logo">${icLogo}</div>
-      <div class="l-stack t-centered">
-        <p class="t-lead">
-          Connect to<br />
-          <span class="t-strong">${origin}</span>
-          <br />
-        </p>
-        ${derivationOrigin !== undefined
-          ? mkChasm({
-              info: "shared identity",
-              message: html`<span class="t-strong">${origin}</span> is an
-                alternative domain of <br /><span class="t-strong"
-                  >${derivationOrigin}</span
-                ><br />and you will be authenticated to both with the same
-                identity. `,
-            })
-          : ""}
-      </div>
-
-      ${anchorInput.template}
-
-      <button
-        @click="${anchorInput.submit}"
-        id="authorizeButton"
-        class="c-button"
-      >
-        Authorize
-      </button>
-      ${mkLinks({
-        register,
-        recoverAnchor: () => recoverAnchor(anchorInput.readUserNumber()),
-      })}
-    </div>
-    ${footer}`;
-};
-
-export const authenticatePage = (
-  connection: Connection,
-  authContext: AuthContext
-): Promise<LoginData> => {
-  const retryOnError = async (result: LoginFlowResult): Promise<LoginData> => {
-    switch (result.tag) {
-      case "err":
-        await displayError({
-          title: result.title,
-          message: result.message,
-          detail: result.detail !== "" ? result.detail : undefined,
-          primaryButton: "Try again",
-        });
-        return authenticatePage(connection, authContext);
-      case "ok":
-        return {
-          userNumber: result.userNumber,
-          connection: result.connection,
-        };
-      case "canceled":
-        return authenticatePage(connection, authContext);
-      default:
-        unreachable(result);
-        break;
-    }
-  };
-
-  return new Promise<LoginData>((resolve) => {
-    displayPage({
-      origin: authContext.requestOrigin,
-      onContinue: async (userNumber) => {
-        const loginData = await authenticate(connection, userNumber).then(
-          retryOnError
-        );
-        setUserNumber(loginData.userNumber);
-        resolve(loginData);
-      },
-      register: async () => {
-        const loginData = await registerIfAllowed(connection).then(
-          retryOnError
-        );
-        setUserNumber(loginData.userNumber);
-        resolve(loginData);
-      },
-      recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-      userNumber: getUserNumber(),
-      derivationOrigin: authContext.authRequest.derivationOrigin,
-    });
-  });
-};
-
-export const authenticate = async (
-  connection: Connection,
-  userNumber: bigint
-): Promise<LoginFlowSuccess | LoginFlowError> => {
-  try {
-    const result = await withLoader(() => connection.login(userNumber));
-    return apiResultToLoginFlowResult(result);
-  } catch (error) {
-    return {
-      tag: "err",
-      title: "Authentication Failed",
-      message: "An error occurred during authentication.",
-      detail: error instanceof Error ? error.message : JSON.stringify(error),
-    };
-  }
-};
-
-export const displayPage = (props: PageProps): void => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(props), container);
+  return { message, chasm, button: "Authorize" };
 };
 
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
@@ -234,9 +43,24 @@ export const authenticationFlow = async (
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(html`<h1>starting authentication</h1>`, container);
+  const showMessage = (msg: string) =>
+    render(
+      html`<h1
+        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+      >
+        ${msg}
+      </h1>`,
+      container
+    );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
-      const authSuccess = await authenticatePage(connection, authContext);
+      const authSuccess = await authenticateBox(
+        connection,
+        mkAuthTemplates({
+          origin: authContext.requestOrigin,
+          derivationOrigin: authContext.authRequest.derivationOrigin,
+        })
+      );
       await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
       return authSuccess;
     },
@@ -251,16 +75,13 @@ export const authenticationFlow = async (
     onProgress: (status) => {
       switch (status) {
         case "waiting":
-          render(
-            html`<h1>waiting for authentication data from service...</h1>`,
-            container
-          );
+          showMessage("waiting for authentication data from service...");
           break;
         case "validating":
-          render(html`<h1>validating authentication data...</h1>`, container);
+          showMessage("validating authentication data...");
           break;
         case "fetching delegation":
-          render(html`<h1>fetching delegation...</h1>`, container);
+          showMessage("fetching delegation...");
           break;
         default:
           unreachable(status);
@@ -291,7 +112,10 @@ export const authenticationFlow = async (
       break;
     case "success":
       render(
-        html`<h1 data-role="notify-auth-success">
+        html`<h1
+          style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+          data-role="notify-auth-success"
+        >
           Authentication successful. You may close this page.
         </h1>`,
         container

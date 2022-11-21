@@ -23,12 +23,13 @@ import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { showWarning } from "./banner";
 import { displayUserNumber } from "./flows/displayUserNumber";
-import { loginPage, Returning } from "./flows/login";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
-import { displayPage } from "./flows/authenticate";
+import { authenticateBoxTemplate } from "./components/authenticateBox";
+import { welcomePage } from "./flows/welcome";
+import { mkAuthTemplates } from "./flows/authenticate";
 import { register, renderConstructing } from "./flows/register";
 import { confirmRegister } from "./flows/confirmRegister";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
@@ -51,6 +52,7 @@ import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
+import { manageTemplates } from "./flows/login";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -113,58 +115,50 @@ const dummyChallenge: Challenge = {
 const dummyIdentity: IdentifiableIdentity =
   undefined as unknown as IdentifiableIdentity;
 
-const login = (userNumber?: bigint): void => {
-  const returning: Returning =
-    userNumber !== undefined
-      ? {
-          returning: true,
-          clearCache: () => console.log("clear cache"),
-          userNumber: userNumber,
-        }
-      : { returning: false };
-  loginPage({
-    submit: (userNumber) => {
-      console.log("Submitted:", userNumber);
-    },
-    addDevice: (userNumber) => {
-      console.log("Add device:", userNumber);
-    },
-    recover: () => {
-      console.log("Recover");
-    },
-    register: () => {
-      console.log("Register");
-    },
-    ...returning,
+const welcome = () =>
+  welcomePage({
+    register: () => console.log("register"),
+    signin: () => console.log("signin"),
   });
-};
 
 const iiPages: Record<string, () => void> = {
+  welcome,
+  welcomeReturn: () =>
+    authenticateBoxTemplate({
+      templates: manageTemplates,
+      addDevice: () => console.log("Add device requested"),
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+      userNumber: BigInt(10000),
+    }),
   displayUserNumber: () => displayUserNumber(userNumber),
   faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
-  login: login,
-  loginReturn: () => login(BigInt(10002)),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   register: () => register(dummyConnection),
   authenticate: () =>
-    displayPage({
-      origin: "https://nowhere.com",
+    authenticateBoxTemplate({
+      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
       userNumber: BigInt(10000),
     }),
   authenticateAlternative: () =>
-    displayPage({
-      origin: "https://nowhere.com",
+    authenticateBoxTemplate({
+      templates: mkAuthTemplates({
+        origin: "https://nowhere.com",
+        derivationOrigin: "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app",
+      }),
+      addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
       userNumber: BigInt(10000),
-      derivationOrigin: "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app",
     }),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
@@ -230,7 +224,7 @@ const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
   banner: () => {
-    login();
+    welcome();
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
@@ -262,6 +256,11 @@ const components = (): TemplateResult => {
         withRef(showSelected, (div) => {
           div.innerText = anchor.toString();
         }),
+      button: "Let's go",
+
+      addDevice: () => console.log("Add device requested"),
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
     }).template;
 
   const chan = new Chan<TemplateResult>();

@@ -14,5 +14,5 @@ outputs:
     description: The notes file
 runs:
     using: 'node16'
-    main: 'main.js'
-    post: 'main.js'
+    main: 'main.cjs'
+    post: 'main.cjs'

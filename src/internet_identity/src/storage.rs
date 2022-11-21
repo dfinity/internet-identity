@@ -67,9 +67,16 @@ use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 
 #[cfg(test)]
 mod tests;
+
+// version 0: invalid
+// version 1: genesis layout, might have persistent state
+// version 2: genesis layout, must have persistent state
+// version 3+: invalid
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 1..=2;
 
 /// Reserved space for the header before the anchor records start.
 const RESERVED_HEADER_BYTES: u64 = 512;
@@ -99,6 +106,10 @@ pub struct Storage<T, M> {
 #[repr(packed)]
 struct Header {
     magic: [u8; 3],
+    // version 0: invalid
+    // version 1: genesis layout, might have persistent state
+    // version 2: genesis layout, must have persistent state
+    // version 3+: invalid
     version: u8,
     num_users: u32,
     id_range_lo: u64,
@@ -183,7 +194,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
                 &header.magic,
             ));
         }
-        if header.version != 1 {
+        if !SUPPORTED_LAYOUT_VERSIONS.contains(&header.version) {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
@@ -366,31 +377,65 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
     /// This is only used to restore state in `post_upgrade`.
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
+        const WASM_PAGE_SIZE: u64 = 65536;
         let address = self.unused_memory_start();
+
+        if address > self.memory.size() * WASM_PAGE_SIZE {
+            // the address where the persistent state would be is not allocated yet
+            return Err(PersistentStateError::NotFound);
+        }
+
         let mut reader = Reader::new(&self.memory, address);
-
         let mut magic_buf: [u8; 4] = [0; 4];
-        reader
+        let bytes_read = reader
             .read(&mut magic_buf)
-            .map_err(|err| PersistentStateError::ReadError(err))?;
+            // if we hit out of bounds here, this means that the persistent state has not been
+            // written at the expected location and thus cannot be found
+            .map_err(|_| PersistentStateError::NotFound)?;
 
-        if magic_buf != PERSISTENT_STATE_MAGIC {
+        if bytes_read != 4 || magic_buf != PERSISTENT_STATE_MAGIC {
+            // less than the expected number of bytes were read or the magic does not match
+            // --> this is not the persistent state
             return Err(PersistentStateError::NotFound);
         }
 
         let mut size_buf: [u8; 8] = [0; 8];
-        reader
+        let bytes_read = reader
             .read(&mut size_buf)
-            .map_err(|err| PersistentStateError::ReadError(err))?;
+            .map_err(|err| PersistentStateError::ReadError(err))? as u64;
+
+        // check if we actually read the required amount of data
+        // note: this will only happen if we hit the memory bounds during read
+        if bytes_read != 8 {
+            let max_address = address + 4 + bytes_read;
+            return Err(PersistentStateError::ReadError(OutOfBounds {
+                max_address,
+                attempted_read_address: max_address + 1,
+            }));
+        }
 
         let size = u64::from_le_bytes(size_buf);
         let mut data_buf = Vec::new();
         data_buf.resize(size as usize, 0);
-        reader
+        let bytes_read = reader
             .read(data_buf.as_mut_slice())
-            .map_err(|err| PersistentStateError::ReadError(err))?;
+            .map_err(|err| PersistentStateError::ReadError(err))? as u64;
+
+        // check if we actually read the required amount of data
+        // note: this will only happen if we hit the memory bounds during read
+        if bytes_read != size {
+            let max_address = address + 4 + 8 + bytes_read;
+            return Err(PersistentStateError::ReadError(OutOfBounds {
+                max_address,
+                attempted_read_address: max_address + 1,
+            }));
+        }
 
         candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+    }
+
+    pub fn version(&self) -> u8 {
+        self.header.version
     }
 }
 
