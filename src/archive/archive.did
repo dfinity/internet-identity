@@ -61,8 +61,8 @@ type DeviceDataUpdate = record {
     protection: opt DeviceProtection;
 };
 
-// Placeholder for information that has been hidden for privacy reasons.
 type Private = variant {
+    // Placeholder for information that has been hidden for privacy reasons.
     redacted;
 };
 
@@ -72,77 +72,80 @@ type Cursor = variant {
 };
 
 type AnchorEntries = record {
-  entries: vec opt Entry;
-  next_token: opt blob // cursor to fetch the next page of entries (if any)
+    entries: vec opt Entry;
+    next_token: opt blob // cursor to fetch the next page of entries (if any)
 };
 
 type Entries = record {
-  entries: vec opt Entry;
+    entries: vec opt Entry;
 };
 
 type ArchiveInit = record {
-  // Principal of the internet identity canister allowed to write entries.
-  // This value is configurable to allow dynamic deployments of II.
-  ii_canister: principal;
-  // The maximum number of entries to be returned per call.
-  max_entries_per_call: nat16;
+    // Principal of the internet identity canister allowed to write entries.
+    // This value is configurable to allow dynamic deployments of II.
+    ii_canister: principal;
+    // The maximum number of entries to be returned per call.
+    max_entries_per_call: nat16;
 };
 
 // HTTP gateway types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
-type HeaderField = record { text; text; };
+
+type HeaderField = record {
+    text;
+    text;
+};
 
 type HttpRequest = record {
-  method: text;
-  url: text;
-  headers: vec HeaderField;
-  body: blob;
+    method: text;
+    url: text;
+    headers: vec HeaderField;
+    body: blob;
 };
 
 type HttpResponse = record {
-  status_code: nat16;
-  headers: vec HeaderField;
-  body: blob;
-  upgrade : opt bool;
-  streaming_strategy: opt StreamingStrategy;
+    status_code: nat16;
+    headers: vec HeaderField;
+    body: blob;
+    upgrade : opt bool;
+    streaming_strategy: opt StreamingStrategy;
 };
 
 type StreamingCallbackHttpResponse = record {
-  body: blob;
-  token: opt Token;
+    body: blob;
+    token: opt Token;
 };
 
 type Token = record {};
 
 type StreamingStrategy = variant {
-  Callback: record {
-    callback: func (Token) -> (StreamingCallbackHttpResponse) query;
-    token: Token;
-  };
+    Callback: record {
+        callback: func (Token) -> (StreamingCallbackHttpResponse) query;
+        token: Token;
+    };
 };
 
 service : (ArchiveInit) -> {
+    // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
+    // returned. Use the Cursor to skip to later entries.
+    // This function can be called anonymously.
+    //
+    // Parameters:
+    // 1. anchor to fetch the entries for
+    // 2. optional cursor to specify which entries to fetch
+    // 3. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
+    get_anchor_entries : (Anchor, opt Cursor, opt nat16) -> (AnchorEntries) query;
 
-  // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
-  // returned. Use the Cursor to skip to later entries.
-  // This function can be called anonymously.
-  //
-  // Parameters:
-  // 1. anchor to fetch the entries for
-  // 2. optional cursor to specify which entries to fetch
-  // 3. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
-  get_anchor_entries : (Anchor, opt Cursor, opt nat16) -> (AnchorEntries) query;
+    // Returns the latest entries. If an index is given, entries starting from the given index are returned.
+    // This function can be called anonymously.
+    //
+    // Parameters:
+    // 1. optional index into the list of entries
+    // 2. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
+    get_entries : (opt nat64, opt nat16) -> (Entries) query;
 
-  // Returns the latest entries. If an index is given, entries starting from the given index are returned.
-  // This function can be called anonymously.
-  //
-  // Parameters:
-  // 1. optional index into the list of entries
-  // 2. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
-  get_entries : (opt nat64, opt nat16) -> (Entries) query;
+    // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
+    write_entry : (Anchor, Timestamp, blob) -> ();
 
-  // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
-  write_entry : (Anchor, Timestamp, blob) -> ();
-
-  // HTTP endpoint to expose metrics for Prometheus.
-  http_request: (request: HttpRequest) -> (HttpResponse) query;
+    // HTTP endpoint to expose metrics for Prometheus.
+    http_request: (request: HttpRequest) -> (HttpResponse) query;
 }
