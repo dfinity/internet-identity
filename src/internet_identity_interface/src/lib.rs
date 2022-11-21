@@ -185,7 +185,7 @@ pub enum MigrationState {
     #[serde(rename = "in_progress")]
     InProgress { anchors_left: u64, batch_size: u64 },
     #[serde(rename = "paused")]
-    Paused,
+    Paused { anchors_left: u64, batch_size: u64 },
     #[serde(rename = "finished")]
     Finished,
 }

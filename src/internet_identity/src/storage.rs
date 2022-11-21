@@ -249,7 +249,10 @@ impl<M: Memory> Storage<M> {
     pub fn migration_state(&self) -> MigrationState {
         match self.header.version {
             1 => MigrationState::NotStarted,
-            2 if self.header.migration_batch_size == 0 => MigrationState::Paused,
+            2 if self.header.migration_batch_size == 0 => MigrationState::Paused {
+                anchors_left: self.header.new_layout_start as u64,
+                batch_size: self.header.migration_batch_size as u64,
+            },
             2 => MigrationState::InProgress {
                 anchors_left: self.header.new_layout_start as u64,
                 batch_size: self.header.migration_batch_size as u64,
@@ -462,7 +465,7 @@ impl<M: Memory> Storage<M> {
             MigrationState::NotStarted => {
                 RecordMeta::layout_v1(record_number, self.header.entry_size)
             }
-            MigrationState::InProgress { .. } | MigrationState::Paused => {
+            MigrationState::InProgress { .. } | MigrationState::Paused { .. } => {
                 if record_number < self.header.new_layout_start {
                     RecordMeta::layout_v1(record_number, self.header.entry_size)
                 } else {
@@ -499,7 +502,7 @@ impl<M: Memory> Storage<M> {
             MigrationState::NotStarted => {
                 RESERVED_HEADER_BYTES_V1 + record_number * self.header.entry_size as u64
             }
-            MigrationState::InProgress { .. } | MigrationState::Paused => {
+            MigrationState::InProgress { .. } | MigrationState::Paused { .. } => {
                 RESERVED_HEADER_BYTES_V3 + record_number * self.header.entry_size_new as u64
             }
             MigrationState::Finished => {
@@ -608,9 +611,9 @@ impl<M: Memory> Storage<M> {
 
     fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
         match self.migration_state() {
-            MigrationState::NotStarted | MigrationState::Paused | MigrationState::Finished => {
-                return Ok(())
-            }
+            MigrationState::NotStarted
+            | MigrationState::Paused { .. }
+            | MigrationState::Finished => return Ok(()),
             MigrationState::InProgress { .. } => {}
         }
 
