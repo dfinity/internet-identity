@@ -151,8 +151,6 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   /* Toggle the chasm open/closed */
   const chasmToggle = () =>
     withRef(chasmRef, (chasm) => {
-      const classes = chasm.classList;
-
       const expanded = chasm.getAttribute("aria-expanded") === "true";
       if (!expanded) {
         chasm.setAttribute("aria-expanded", "true");
