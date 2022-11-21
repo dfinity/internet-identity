@@ -600,7 +600,7 @@ a:hover,
     background-position: 0% 0%;
   }
   50% {
-    background-position: -200% -200%;
+    background-position: 0% -200%;
   }
 }
 
