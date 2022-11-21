@@ -968,8 +968,6 @@ a:hover,
   z-index: var(--vz-foreground);
 }
 
-
-
 .c-list--anchors .c-list__item::before,
 .c-list--anchors .c-list__item::after {
   content: "";
@@ -985,9 +983,8 @@ a:hover,
   transition: opacity 200ms linear;
 }
 
-
 .c-list--anchors .c-list__item:hover::after {
-  opacity: .3; 
+  opacity: 0.3;
 }
 
 .c-list--anchors .c-list__item--noFocusStyle:hover::after {
