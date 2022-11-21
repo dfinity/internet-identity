@@ -6,16 +6,15 @@ import {
   creationOptions,
 } from "../../utils/iiConnection";
 import { nextTick } from "process";
-import { icLogo } from "../../components/icons";
+import { spinner } from "../../components/icons";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const constructingContent = html`
-  <div class="l-container c-card c-card--highlight">
-    <div class="c-logo">${icLogo}</div>
-    <p class="t-lead t-centered t-paragraph l-stack">
-      Creating your Identity Anchor. Do not refresh the page.
-    </p>
+  <div class="l-container c-card c-card--highlight t-centered">
+    <div class="c-spinner">${spinner}</div>
+    <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
+    <p><strong class="t-strong">Do not refresh the page</strong></p>
   </div>
 `;
 
