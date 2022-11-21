@@ -148,6 +148,14 @@ const iiPages: Record<string, () => void> = {
       register: () => console.log("Register requested"),
       userNumber: BigInt(10000),
     }),
+  authenticateNew: () =>
+    authenticateBoxTemplate({
+      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      addDevice: () => console.log("Add device requested"),
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+    }),
   authenticateAlternative: () =>
     authenticateBoxTemplate({
       templates: mkAuthTemplates({
