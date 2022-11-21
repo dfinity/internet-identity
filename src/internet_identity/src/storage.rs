@@ -367,6 +367,11 @@ impl<M: Memory> Storage<M> {
         let record_meta = self.record_meta(record_number);
         let candid_bytes = self.read_entry_bytes(&record_meta);
 
+        if candid_bytes.is_empty() {
+            // size 0 --> the anchor has never been written
+            return Ok(Anchor::default());
+        }
+
         match record_meta.layout {
             Layout::V1 => {
                 let internal_devices: Vec<DeviceDataInternal> =

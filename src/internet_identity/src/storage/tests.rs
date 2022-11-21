@@ -4,13 +4,15 @@ use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
-use internet_identity_interface::{DeviceProtection, KeyType, Purpose, UserNumber};
+use internet_identity_interface::{DeviceProtection, KeyType, MigrationState, Purpose, UserNumber};
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+const WASM_PAGE_SIZE: u64 = 1 << 16;
 const HEADER_SIZE: usize = 68;
-const RESERVED_HEADER_BYTES: u64 = 512;
+const RESERVED_HEADER_BYTES_V1: u64 = 512;
+const RESERVED_HEADER_BYTES_V3: u64 = 2 * WASM_PAGE_SIZE;
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS";
 
 #[test]
@@ -74,23 +76,41 @@ fn should_update_header() {
 }
 
 #[test]
-fn should_serialize_first_record() {
+fn should_serialize_first_record_v1() {
+    const EXPECTED_LENGTH: usize = 192;
     let memory = VectorMemory::default();
     let mut storage = layout_v1_storage((123, 456), memory.clone());
     let user_number = storage.allocate_user_number().unwrap();
     assert_eq!(user_number, 123u64);
 
-    let device_vec = sample_anchor_record();
-    storage.write(user_number, device_vec.clone()).unwrap();
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
 
-    let mut buf = [0u8; 192];
-    memory.read(512, &mut buf);
+    let mut buf = [0u8; EXPECTED_LENGTH];
+    memory.read(RESERVED_HEADER_BYTES_V1, &mut buf);
     let decoded_from_memory: Vec<DeviceDataInternal> = candid::decode_one(&buf[2..]).unwrap();
-    assert_eq!(decoded_from_memory, device_vec.into_devices());
+    assert_eq!(decoded_from_memory, anchor.into_devices());
 }
 
 #[test]
-fn should_serialize_subsequent_record_to_expected_memory_location() {
+fn should_serialize_first_record_v3() {
+    const EXPECTED_LENGTH: usize = 206;
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((123, 456), memory.clone());
+    let user_number = storage.allocate_user_number().unwrap();
+    assert_eq!(user_number, 123u64);
+
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
+
+    let mut buf = [0u8; EXPECTED_LENGTH];
+    memory.read(RESERVED_HEADER_BYTES_V3, &mut buf);
+    let decoded_from_memory: Anchor = candid::decode_one(&buf[2..]).unwrap();
+    assert_eq!(decoded_from_memory, anchor);
+}
+
+#[test]
+fn should_serialize_subsequent_record_to_expected_memory_location_v1() {
     const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
     let mut storage = layout_v1_storage((123, 456), memory.clone());
@@ -100,19 +120,39 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
     let user_number = storage.allocate_user_number().unwrap();
     assert_eq!(user_number, 223u64);
 
-    let device_vec = sample_anchor_record();
-    storage.write(user_number, device_vec.clone()).unwrap();
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
 
     let mut buf = [0u8; 192];
-    memory.read(512 + EXPECTED_RECORD_OFFSET, &mut buf);
+    memory.read(RESERVED_HEADER_BYTES_V1 + EXPECTED_RECORD_OFFSET, &mut buf);
     let decoded_from_memory: Vec<DeviceDataInternal> = candid::decode_one(&buf[2..]).unwrap();
-    assert_eq!(decoded_from_memory, device_vec.into_devices());
+    assert_eq!(decoded_from_memory, anchor.into_devices());
+}
+
+#[test]
+fn should_serialize_subsequent_record_to_expected_memory_location_v3() {
+    const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((123, 456), memory.clone());
+    for _ in 0..100 {
+        storage.allocate_user_number().unwrap();
+    }
+    let user_number = storage.allocate_user_number().unwrap();
+    assert_eq!(user_number, 223u64);
+
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
+
+    let mut buf = [0u8; 206];
+    memory.read(RESERVED_HEADER_BYTES_V3 + EXPECTED_RECORD_OFFSET, &mut buf);
+    let decoded_from_memory: Anchor = candid::decode_one(&buf[2..]).unwrap();
+    assert_eq!(decoded_from_memory, anchor);
 }
 
 #[test]
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::<VectorMemory>::new((123, 456), memory.clone());
+    let mut storage = Storage::new((123, 456), memory.clone());
     storage.allocate_user_number().unwrap();
 
     let result = storage.write(222, sample_anchor_record().clone());
@@ -138,7 +178,7 @@ fn should_deserialize_first_record() {
 }
 
 #[test]
-fn should_deserialize_subsequent_record_at_expected_memory_location() {
+fn should_deserialize_subsequent_record_at_expected_memory_location_v1() {
     const EXPECTED_RECORD_OFFSET: u64 = 204_800; // 100 * max anchor size
     let memory = VectorMemory::default();
     memory.grow(4); // grow memory to accommodate a write to EXPECTED_RECORD_OFFSET
@@ -152,10 +192,34 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
     let anchor = sample_anchor_record();
     let buf = candid::encode_one(&anchor.clone().into_devices()).unwrap();
     memory.write(
-        512 + EXPECTED_RECORD_OFFSET,
+        RESERVED_HEADER_BYTES_V1 + EXPECTED_RECORD_OFFSET,
         &(buf.len() as u16).to_le_bytes(),
     );
-    memory.write(514 + EXPECTED_RECORD_OFFSET, &buf);
+    memory.write(RESERVED_HEADER_BYTES_V1 + 2 + EXPECTED_RECORD_OFFSET, &buf);
+
+    let read_from_storage = storage.read(223).unwrap();
+    assert_eq!(read_from_storage, anchor);
+}
+
+#[test]
+fn should_deserialize_subsequent_record_at_expected_memory_location_v3() {
+    const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
+    let memory = VectorMemory::default();
+    memory.grow(9); // grow memory to accommodate a write to EXPECTED_RECORD_OFFSET
+    let mut storage = Storage::new((123, 456), memory.clone());
+    for _ in 0..100 {
+        storage.allocate_user_number().unwrap();
+    }
+    let user_number = storage.allocate_user_number().unwrap();
+    assert_eq!(user_number, 223u64);
+
+    let anchor = sample_anchor_record();
+    let buf = candid::encode_one(&anchor.clone()).unwrap();
+    memory.write(
+        RESERVED_HEADER_BYTES_V3 + EXPECTED_RECORD_OFFSET,
+        &(buf.len() as u16).to_le_bytes(),
+    );
+    memory.write(RESERVED_HEADER_BYTES_V3 + 2 + EXPECTED_RECORD_OFFSET, &buf);
 
     let read_from_storage = storage.read(223).unwrap();
     assert_eq!(read_from_storage, anchor);
@@ -185,7 +249,7 @@ fn should_save_and_restore_persistent_state() {
 }
 
 #[test]
-fn should_save_persistent_state_at_expected_memory_address() {
+fn should_save_persistent_state_at_expected_memory_address_v1() {
     let memory = VectorMemory::default();
     let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
     storage.flush();
@@ -193,7 +257,20 @@ fn should_save_persistent_state_at_expected_memory_address() {
     storage.write_persistent_state(&sample_persistent_state());
 
     let mut buf = vec![0u8; 4];
-    memory.read(RESERVED_HEADER_BYTES, &mut buf);
+    memory.read(RESERVED_HEADER_BYTES_V1, &mut buf);
+    assert_eq!(buf, PERSISTENT_STATE_MAGIC);
+}
+
+#[test]
+fn should_save_persistent_state_at_expected_memory_address_v3() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    storage.write_persistent_state(&sample_persistent_state());
+
+    let mut buf = vec![0u8; 4];
+    memory.read(RESERVED_HEADER_BYTES_V3, &mut buf);
     assert_eq!(buf, PERSISTENT_STATE_MAGIC);
 }
 
@@ -214,18 +291,37 @@ fn should_not_find_persistent_state_on_magic_bytes_mismatch() {
     let mut storage = Storage::<VectorMemory>::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
-    memory.write(RESERVED_HEADER_BYTES, b"IIPX"); // correct magic bytes are IIPS
+    memory.write(RESERVED_HEADER_BYTES_V1, b"IIPX"); // correct magic bytes are IIPS
 
     let result = storage.read_persistent_state();
     assert!(matches!(result, Err(PersistentStateError::NotFound)))
 }
 
 #[test]
-fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 100 * 2048; // number of anchors is 100
+fn should_save_persistent_state_at_expected_memory_address_with_anchors_v1() {
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES_V1 + 100 * 2048; // number of anchors is 100
 
     let memory = VectorMemory::default();
     let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    for _ in 0..100 {
+        storage.allocate_user_number().unwrap();
+    }
+
+    storage.write_persistent_state(&sample_persistent_state());
+
+    let mut buf = vec![0u8; 4];
+    memory.read(EXPECTED_ADDRESS, &mut buf);
+    assert_eq!(buf, PERSISTENT_STATE_MAGIC);
+}
+
+#[test]
+fn should_save_persistent_state_at_expected_memory_address_with_anchors_v3() {
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES_V3 + 100 * 4096; // number of anchors is 100
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     for _ in 0..100 {
@@ -246,7 +342,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     let memory = VectorMemory::default();
     memory.grow(1);
     memory.write(0, &hex::decode("49494301C0C62D001027000000000000a9c039000000000000084343434343434343434343434343434343434343434343434343434343434343").unwrap());
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3_000_000 * 2048; // number of anchors is 3'000'000
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES_V1 + 3_000_000 * 2048; // number of anchors is 3'000'000
 
     let mut storage = Storage::<VectorMemory>::from_memory(memory.clone()).unwrap();
     storage.write_persistent_state(&sample_persistent_state());
@@ -276,10 +372,10 @@ fn should_not_panic_on_unallocated_persistent_state_mem_address() {
 
 #[test]
 fn should_overwrite_persistent_state_with_next_anchor() {
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 2048; // only one anchor exists
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES_V3 + 4096; // only one anchor exists
 
     let memory = VectorMemory::default();
-    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     storage.allocate_user_number().unwrap();
@@ -304,7 +400,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 
 #[test]
 fn should_read_previously_stored_layout_v1_persistent_state() {
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES_V1 + 3 * 2048; // 3 anchors
     const PERSISTENT_STATE_BYTES: &'static str = "4949505388000000000000004449444c066c02cbc282b70501f7f5cbfb07786c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b001018002e1df02000000";
 
     let memory = VectorMemory::default();
@@ -324,6 +420,162 @@ fn should_read_previously_stored_layout_v1_persistent_state() {
         storage.read_persistent_state().unwrap(),
         sample_persistent_state()
     );
+}
+
+#[test]
+fn should_stay_in_v1_if_no_migration_configured() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    assert!(matches!(
+        storage.migration_state(),
+        MigrationState::NotStarted
+    ));
+}
+
+#[test]
+fn should_start_migration_when_configuring() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    storage.configure_migration(100);
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::InProgress {
+            anchors_left: 32,
+            batch_size: 100
+        }
+    );
+}
+
+#[test]
+fn should_migrate_anchors() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    storage.configure_migration(100);
+    storage.write(10_000, sample_anchor_record()).unwrap();
+
+    assert_eq!(storage.migration_state(), MigrationState::Finished);
+}
+
+#[test]
+fn should_pause_migration_with_batch_size_0() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    storage.configure_migration(5);
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::InProgress {
+            anchors_left: 32,
+            batch_size: 5
+        }
+    );
+
+    storage.write(10_000, sample_anchor_record()).unwrap();
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::InProgress {
+            anchors_left: 27,
+            batch_size: 5
+        }
+    );
+
+    storage.configure_migration(0);
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::Paused {
+            anchors_left: 27,
+            batch_size: 0
+        }
+    );
+
+    storage.write(10_000, sample_anchor_record()).unwrap();
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::Paused {
+            anchors_left: 27,
+            batch_size: 0
+        }
+    );
+}
+
+#[test]
+fn should_recover_migration_state_from_memory() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    storage.configure_migration(5);
+    storage.write(10_000, sample_anchor_record()).unwrap();
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::InProgress {
+            anchors_left: 27,
+            batch_size: 5
+        }
+    );
+
+    let storage = Storage::from_memory(memory.clone()).unwrap();
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::InProgress {
+            anchors_left: 27,
+            batch_size: 5
+        }
+    );
+}
+
+#[test]
+fn should_restart_paused_migration() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    storage.configure_migration(5);
+    storage.write(10_000, sample_anchor_record()).unwrap();
+    storage.configure_migration(0);
+
+    assert_eq!(
+        storage.migration_state(),
+        MigrationState::Paused {
+            anchors_left: 27,
+            batch_size: 0
+        }
+    );
+
+    storage.configure_migration(100);
+    storage.write(10_000, sample_anchor_record()).unwrap();
+    assert_eq!(storage.migration_state(), MigrationState::Finished);
 }
 
 fn layout_v1_storage(
