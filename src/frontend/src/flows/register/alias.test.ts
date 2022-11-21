@@ -1,5 +1,4 @@
 import { promptDeviceAliasPage } from "./alias";
-import { render } from "lit-html";
 
 test("can be canceled", async () => {
   const cancel = jest.fn();
