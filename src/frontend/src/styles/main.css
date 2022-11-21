@@ -981,11 +981,30 @@ a:hover,
   z-index: var(--vz-foreground);
 }
 
-.c-list--anchors .c-list__item::before {
+.c-list--anchors .c-list__item::before,
+.c-list--anchors .c-list__item::after {
   content: "";
   position: absolute;
   pointer-events: none;
   inset: 0;
+}
+
+.c-list--anchors .c-list__item::after {
+  background: var(--vc-brand-alt);
+  opacity: 0;
+  mix-blend-mode: darken;
+  transition: opacity 200ms linear;
+}
+
+.c-list--anchors .c-list__item:hover::after {
+  opacity: 0.3;
+}
+
+.c-list--anchors .c-list__item--noFocusStyle:hover::after {
+  opacity: 0;
+}
+
+.c-list--anchors .c-list__item::before {
   will-change: filter;
   background-image: linear-gradient(270deg, var(--rg-brand));
   filter: blur(20px);
