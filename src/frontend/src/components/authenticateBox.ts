@@ -151,18 +151,15 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   /* Toggle the chasm open/closed */
   const chasmToggle = () =>
     withRef(chasmRef, (chasm) => {
-      const classes = chasm.classList;
-
-      if (classes.contains("c-chasm--closed")) {
-        classes.remove("c-chasm--closed");
-        classes.add("c-chasm--open");
+      const expanded = chasm.getAttribute("aria-expanded") === "true";
+      if (!expanded) {
+        chasm.setAttribute("aria-expanded", "true");
 
         withRef(chasmToggleRef, (arrow) =>
           arrow.classList.add("c-chasm__button--flipped")
         );
-      } else if (classes.contains("c-chasm--open")) {
-        classes.remove("c-chasm--open");
-        classes.add("c-chasm--closed");
+      } else {
+        chasm.setAttribute("aria-expanded", "false");
 
         withRef(chasmToggleRef, (arrow) =>
           arrow.classList.remove("c-chasm__button--flipped")
@@ -174,7 +171,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
     <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
     chasmToggleRef
   )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
-      <div ${ref(chasmRef)} class="c-chasm c-chasm--closed">
+      <div ${ref(chasmRef)} class="c-chasm" aria-expanded="false">
         <div class="c-chasm__arrow"></div>
         <div class="t-weak c-chasm__content">
             ${message}
