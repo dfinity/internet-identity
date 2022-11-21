@@ -481,6 +481,110 @@ mod stable_memory_tests {
         Ok(())
     }
 
+    /// Tests that some known anchors with their respective devices are available after stable memory restore.
+    /// Uses the same data as `should_recover_anchors_and_devices_from_backup` but migrated to v3.
+    #[test]
+    fn should_load_layout_v3_backup() -> Result<(), CallError> {
+        const CREDENTIAL_ID_1: &str = "63b8afb386dd757dfa5ba9550bca66936717766f395bafad9052a384edc446b11228bcb9cb684980bb5a81270b31d4b9561787296d40204d31e96c1b386b4984";
+        const PUB_KEY_1: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820ee6f212d1b94fcc014f050b087f06ad34157ff53c19981e3976842b1644b0a1c2258200d6bc5ee077bd2300b3c86df87aa5fdf90d256d0131efbe44424330de8b00471";
+        const CREDENTIAL_ID_2: &str = "01bf2325d975f7b24c2d4bb6fef94a2e6dbbb35f490689f460a36f0f96717ac5487ad63899efd59fd01ef38aab8a228badaa1b94cd819572695c446e2c379792af7f";
+        const PUB_KEY_2: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820724d6d2ae54244650134e475aaced8d82d45520ba672d9892c8de34d2a40e6f3225820e1f89fbff2e05a3ef1a35c1d9bb2de8b5e8856fd710b1a534a0841835cb793aa";
+        const CREDENTIAL_ID_3: &str = "2ceb7800078c607e94f8e9432fb1cd9e033081a7";
+        const PUB_KEY_3: &str = "305e300c060a2b0601040183b8430101034e00a50102032620012158208ca9cb400318172cb199b3df2f7c601f02fc72be73282ebc88ab0fb5562aae40225820f53cae416256e1ea0592f781f506c8cdd9fa67dbb329c5fca469ac6b5868b4cd";
+        const CREDENTIAL_ID_4: &str = "0192eea062df84cde762eff346aaa3a7fb44f1aa19d888ae407295b77c4c754b755b2b7b90d9174c0cf41d3eb3928f1eb310e3b3a4bc00445179df0f84b7f8b1db";
+        const PUB_KEY_4: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820c8423e7f1df8dc91f599dd3683f37541514341643e916b0a77e935da1a7e5ff42258204f5d37a73d6e1b1ac6ebd0d7739ebf477a8f88ed6992cb36b6c481efee01b462";
+        const PUB_KEY_5: &str =
+            "302a300506032b6570032100f1ba3b80ce24f382fa32fd07233ceb8e305d57dafe6ad3d1c00e401315692631";
+        const PUB_KEY_6: &str = "305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387";
+
+        let device1 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_1).unwrap()),
+            alias: "Desktop".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+        let device2 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
+            alias: "andrew-mbp".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+        let device3 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
+            alias: "andrew phone chrome".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+        let device4 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
+            alias: "Pixel".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+        let device5 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
+            alias: "dfx".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: None,
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+        let device6 = DeviceData {
+            pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
+            alias: "testkey".to_string(),
+            purpose: Purpose::Authentication,
+            credential_id: None,
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+        };
+
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/genesis-migrated-to-v3.bin.gz",
+        );
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: None,
+                archive_module_hash: None,
+                canister_creation_cycles_cost: None,
+                memory_migration_batch_size: Some(100),
+            }),
+        )
+        .unwrap();
+
+        // check known anchors in the backup
+        let devices = api::lookup(&env, canister_id, 10_000)?;
+        assert_eq!(devices, vec![device1]);
+
+        let mut devices = api::lookup(&env, canister_id, 10_002)?;
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        println!("10002 devices: {:?}", &devices);
+        assert_eq!(devices, vec![device2, device3]);
+
+        let devices = api::lookup(&env, canister_id, 10_029)?;
+        assert_eq!(devices, vec![device4]);
+
+        let devices = api::lookup(&env, canister_id, 10_030)?;
+        assert_eq!(devices, vec![device5, device6]);
+
+        Ok(())
+    }
+
     /// Tests that II will issue the same principals after stable memory restore.
     #[test]
     fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError> {

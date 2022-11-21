@@ -671,7 +671,7 @@ impl<M: Memory> Storage<M> {
 
     fn finalize_migration(&mut self) {
         self.header.version = 3;
-        self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
+        self.header.entry_size = DEFAULT_ENTRY_SIZE_V3;
         self.header.migration_batch_size = 0;
         self.header.new_layout_start = 0;
         self.flush();
