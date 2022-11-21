@@ -1,19 +1,19 @@
+import { Challenge } from "../../../generated/internet_identity_types";
 import { html, render } from "lit-html";
-import { displayUserNumber } from "./displayUserNumber";
-import { displayError } from "../components/displayError";
-import { setUserNumber } from "../utils/userNumber";
+import { displayUserNumber } from "./finish";
+import { displayError } from "../../components/displayError";
+import { setUserNumber } from "../../utils/userNumber";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
   cancel,
-} from "./login/flowResult";
-import { Challenge } from "../../generated/internet_identity_types";
-import { withLoader } from "../components/loader";
+} from "../login/flowResult";
+import { withLoader } from "../../components/loader";
 import {
   IdentifiableIdentity,
   ChallengeResult,
   Connection,
-} from "../utils/iiConnection";
+} from "../../utils/iiConnection";
 
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
