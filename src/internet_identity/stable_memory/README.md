@@ -1,6 +1,6 @@
 # Stable Memory Tests
 
-These test serve two purposes:
+These tests serve two purposes:
 * Ensure backward compatibility with our stable memory format.
 * Show that we can indeed fully recover in case of a disaster, assuming
   we have a backup of the stable memory.
