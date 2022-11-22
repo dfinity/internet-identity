@@ -183,6 +183,7 @@ pub struct InternetIdentityStats {
     pub users_registered: u64,
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
+    pub storage_layout_version: u8,
 }
 
 // Archive specific types

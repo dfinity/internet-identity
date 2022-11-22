@@ -44,7 +44,7 @@ export class RegisterView extends View {
   }
 
   async create(): Promise<void> {
-    await this.browser.$('button[type="submit"]').click();
+    await this.browser.$("#registerButton").click();
   }
 
   // View: Register confirmation
