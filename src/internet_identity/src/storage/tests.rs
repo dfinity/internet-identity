@@ -473,6 +473,38 @@ fn should_migrate_anchors() {
 }
 
 #[test]
+fn should_load_anchors_from_memory_after_migration() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    for _ in 0..32 {
+        storage.allocate_user_number();
+    }
+
+    // write some data to check for migration
+    let mut test_anchor = sample_anchor_record();
+    test_anchor.devices.push(DeviceDataInternal {
+        pubkey: ByteBuf::from("recovery pub key"),
+        alias: "my protected recovery phrase".to_string(),
+        credential_id: None,
+        purpose: Some(Purpose::Recovery),
+        key_type: Some(KeyType::SeedPhrase),
+        protection: Some(DeviceProtection::Protected),
+    });
+    storage.write(10_001, test_anchor.clone()).unwrap();
+
+    storage.configure_migration(100);
+    // write data to trigger migration
+    storage.write(10_000, sample_anchor_record()).unwrap();
+
+    assert_eq!(storage.migration_state(), MigrationState::Finished);
+
+    let storage = Storage::from_memory(memory.clone()).unwrap();
+    assert_eq!(storage.version(), 3);
+    assert_eq!(storage.read(10_001).unwrap(), test_anchor);
+}
+
+#[test]
 fn should_pause_migration_with_batch_size_0() {
     let memory = VectorMemory::default();
     let mut storage = layout_v1_storage((10_000, 3_784_873), memory.clone());
