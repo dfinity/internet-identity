@@ -1,6 +1,6 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::{DeviceDataInternal, TentativeDeviceRegistration};
+use crate::state::{Anchor, DeviceDataInternal, TentativeDeviceRegistration};
 use crate::{delegation, state, trap_if_not_authenticated};
 use candid::Principal;
 use ic_cdk::api::time;
@@ -11,10 +11,10 @@ pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
-    let entries = state::anchor_devices(user_number);
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    let anchor = state::anchor(user_number);
+    trap_if_not_authenticated(&anchor);
 
-    let devices = entries.into_iter().map(DeviceData::from).collect();
+    let devices = anchor.devices.into_iter().map(DeviceData::from).collect();
     let now = time();
 
     state::tentative_device_registrations(|tentative_device_registrations| {
@@ -52,15 +52,16 @@ pub fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
 pub async fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
-    let mut entries = state::anchor_devices(user_number);
+    let mut anchor = state::anchor(user_number);
     // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    trap_if_not_authenticated(&anchor);
     let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
 
-    check_device(&device_data, &entries);
+    check_device(&device_data, &anchor.devices);
 
-    if entries
+    if anchor
+        .devices
         .iter()
         .find(|e| e.pubkey == device_data.pubkey)
         .is_some()
@@ -68,15 +69,17 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
         trap("Device already added.");
     }
 
-    if entries.len() >= MAX_ENTRIES_PER_USER {
+    if anchor.devices.len() >= MAX_ENTRIES_PER_USER {
         trap(&format!(
             "at most {} authentication information entries are allowed per user",
             MAX_ENTRIES_PER_USER,
         ));
     }
 
-    entries.push(DeviceDataInternal::from(device_data.clone()));
-    write_anchor_data(user_number, entries);
+    anchor
+        .devices
+        .push(DeviceDataInternal::from(device_data.clone()));
+    write_anchor_data(user_number, anchor);
 
     delegation::prune_expired_signatures();
 
@@ -139,14 +142,14 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
     if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
-    let mut entries = state::anchor_devices(user_number);
+    let mut anchor = state::anchor(user_number);
 
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
-    check_device(&device_data, &entries);
+    trap_if_not_authenticated(&anchor);
+    check_device(&device_data, &anchor.devices);
 
-    let operation = mutate_device_or_trap(&mut entries, device_key, Some(device_data));
+    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, Some(device_data));
 
-    write_anchor_data(user_number, entries);
+    write_anchor_data(user_number, anchor);
 
     delegation::prune_expired_signatures();
 
@@ -154,26 +157,26 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
 }
 
 pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
-    let mut entries = state::anchor_devices(user_number);
+    let mut anchor = state::anchor(user_number);
     // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    trap_if_not_authenticated(&anchor);
 
     let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
     delegation::prune_expired_signatures();
 
-    let operation = mutate_device_or_trap(&mut entries, device_key, None);
-    write_anchor_data(user_number, entries);
+    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, None);
+    write_anchor_data(user_number, anchor);
 
     archive_operation(user_number, caller, operation);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
-fn write_anchor_data(user_number: UserNumber, entries: Vec<DeviceDataInternal>) {
+fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
     state::storage_mut(|storage| {
-        storage.write(user_number, entries).unwrap_or_else(|err| {
+        storage.write(user_number, anchor).unwrap_or_else(|err| {
             trap(&format!(
-                "failed to write device data of user {}: {}",
+                "failed to write data of anchor {}: {}",
                 user_number, err
             ))
         });

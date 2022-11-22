@@ -56,7 +56,7 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::PersistentState;
+use crate::state::{Anchor, DeviceDataInternal, PersistentState};
 use candid;
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
@@ -66,7 +66,6 @@ use internet_identity_interface::UserNumber;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 
 #[cfg(test)]
@@ -97,10 +96,9 @@ pub const DEFAULT_RANGE_SIZE: u64 =
 pub type Salt = [u8; 32];
 
 /// Data type responsible for managing user data in stable memory.
-pub struct Storage<T, M> {
+pub struct Storage<M> {
     header: Header,
     memory: M,
-    _marker: PhantomData<T>,
 }
 
 #[repr(packed)]
@@ -118,7 +116,7 @@ struct Header {
     salt: [u8; 32],
 }
 
-impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, M> {
+impl<M: Memory> Storage<M> {
     /// Creates a new empty storage that manages the data of users in
     /// the specified range.
     pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber), memory: M) -> Self {
@@ -147,7 +145,6 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
                 salt: EMPTY_SALT,
             },
             memory,
-            _marker: PhantomData,
         }
     }
 
@@ -198,11 +195,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
             trap(&format!("unsupported header version: {}", header.version));
         }
 
-        Some(Self {
-            header,
-            memory,
-            _marker: PhantomData,
-        })
+        Some(Self { header, memory })
     }
 
     /// Allocates a fresh Identity Anchor.
@@ -220,12 +213,12 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     }
 
     /// Writes the data of the specified user to stable memory.
-    pub fn write(&mut self, user_number: UserNumber, data: T) -> Result<(), StorageError> {
+    pub fn write(&mut self, user_number: UserNumber, data: Anchor) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
 
         let stable_offset =
             RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
-        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
+        let buf = candid::encode_one(data.devices).map_err(StorageError::SerializationError)?;
 
         if buf.len() > self.value_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
@@ -245,7 +238,7 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
     }
 
     /// Reads the data of the specified user from stable memory.
-    pub fn read(&self, user_number: UserNumber) -> Result<T, StorageError> {
+    pub fn read(&self, user_number: UserNumber) -> Result<Anchor, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
         let stable_offset =
             RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
@@ -276,9 +269,10 @@ impl<T: candid::CandidType + serde::de::DeserializeOwned, M: Memory> Storage<T, 
         reader
             .read(&mut data_buf.as_mut_slice())
             .expect("failed to read memory");
-        let data: T = candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
+        let devices: Vec<DeviceDataInternal> =
+            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
 
-        Ok(data)
+        Ok(Anchor { devices })
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
