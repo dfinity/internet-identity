@@ -61,6 +61,7 @@ mod upgrade_tests {
                 assigned_user_number_range: Some((2000, 4000)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                memory_migration_batch_size: None,
             }),
         );
 
@@ -88,6 +89,7 @@ mod upgrade_tests {
                 assigned_user_number_range: Some(stats.assigned_user_number_range),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                memory_migration_batch_size: None,
             }),
         );
 
@@ -140,8 +142,11 @@ mod rollback_tests {
         let frontend_hostname = "frontend.com";
         let env = StateMachine::new();
 
+        // start with the previous release to initialize v1 layout
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+
         // use the new version to register an anchor
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
         let principal = api::get_principal(
             &env,
@@ -235,6 +240,7 @@ mod registration_tests {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                memory_migration_batch_size: None,
             }),
         );
 
@@ -386,9 +392,15 @@ mod registration_tests {
 mod stable_memory_tests {
     use super::*;
 
-    /// Tests that some known anchors with their respective devices are available after stable memory restore.
-    #[test]
-    fn should_recover_anchors_and_devices_from_backup() -> Result<(), CallError> {
+    /// Known devices that exist in the genesis memory backups.
+    fn known_devices() -> (
+        DeviceData,
+        DeviceData,
+        DeviceData,
+        DeviceData,
+        DeviceData,
+        DeviceData,
+    ) {
         const CREDENTIAL_ID_1: &str = "63b8afb386dd757dfa5ba9550bca66936717766f395bafad9052a384edc446b11228bcb9cb684980bb5a81270b31d4b9561787296d40204d31e96c1b386b4984";
         const PUB_KEY_1: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820ee6f212d1b94fcc014f050b087f06ad34157ff53c19981e3976842b1644b0a1c2258200d6bc5ee077bd2300b3c86df87aa5fdf90d256d0131efbe44424330de8b00471";
         const CREDENTIAL_ID_2: &str = "01bf2325d975f7b24c2d4bb6fef94a2e6dbbb35f490689f460a36f0f96717ac5487ad63899efd59fd01ef38aab8a228badaa1b94cd819572695c446e2c379792af7f";
@@ -398,7 +410,7 @@ mod stable_memory_tests {
         const CREDENTIAL_ID_4: &str = "0192eea062df84cde762eff346aaa3a7fb44f1aa19d888ae407295b77c4c754b755b2b7b90d9174c0cf41d3eb3928f1eb310e3b3a4bc00445179df0f84b7f8b1db";
         const PUB_KEY_4: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820c8423e7f1df8dc91f599dd3683f37541514341643e916b0a77e935da1a7e5ff42258204f5d37a73d6e1b1ac6ebd0d7739ebf477a8f88ed6992cb36b6c481efee01b462";
         const PUB_KEY_5: &str =
-        "302a300506032b6570032100f1ba3b80ce24f382fa32fd07233ceb8e305d57dafe6ad3d1c00e401315692631";
+            "302a300506032b6570032100f1ba3b80ce24f382fa32fd07233ceb8e305d57dafe6ad3d1c00e401315692631";
         const PUB_KEY_6: &str = "305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387";
 
         let device1 = DeviceData {
@@ -449,6 +461,13 @@ mod stable_memory_tests {
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
         };
+        (device1, device2, device3, device4, device5, device6)
+    }
+
+    /// Tests that some known anchors with their respective devices are available after stable memory restore.
+    #[test]
+    fn should_recover_anchors_and_devices_from_backup() -> Result<(), CallError> {
+        let (device1, device2, device3, device4, device5, device6) = known_devices();
 
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
@@ -456,6 +475,39 @@ mod stable_memory_tests {
         let stable_memory_backup =
             std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
         env.set_stable_memory(canister_id, &stable_memory_backup);
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        // check known anchors in the backup
+        let devices = api::lookup(&env, canister_id, 10_000)?;
+        assert_eq!(devices, vec![device1]);
+
+        let mut devices = api::lookup(&env, canister_id, 10_002)?;
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        assert_eq!(devices, vec![device2, device3]);
+
+        let devices = api::lookup(&env, canister_id, 10_029)?;
+        assert_eq!(devices, vec![device4]);
+
+        let devices = api::lookup(&env, canister_id, 10_030)?;
+        assert_eq!(devices, vec![device5, device6]);
+
+        Ok(())
+    }
+
+    /// Tests that some known anchors with their respective devices are available after stable memory restore.
+    /// Uses the same data as `should_recover_anchors_and_devices_from_backup` but migrated to v3.    
+    #[test]
+    fn should_load_layout_v3_backup() -> Result<(), CallError> {
+        let (device1, device2, device3, device4, device5, device6) = known_devices();
+
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/genesis-layout-migrated-to-v3.bin.gz",
+        );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         // check known anchors in the backup
@@ -1891,6 +1943,7 @@ mod http_tests {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                memory_migration_batch_size: None,
             }),
         );
 
@@ -2008,15 +2061,14 @@ mod http_tests {
         // empty II has some metadata in stable memory which requires at least one page
         assert_eq!(stable_memory_pages, 1);
 
-        // a wasm page is 64kb and a single user takes up 2kb -> 33rd anchor record starts on the second wasm page
-        for _ in 0..33 {
-            flows::register_anchor(&env, canister_id);
-        }
+        // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage to
+        // 3 pages
+        flows::register_anchor(&env, canister_id);
 
         let metrics = flows::get_metrics(&env, canister_id);
         let (stable_memory_pages, _) =
             parse_metric(&metrics, "internet_identity_stable_memory_pages");
-        assert_eq!(stable_memory_pages, 2);
+        assert_eq!(stable_memory_pages, 3);
         Ok(())
     }
 
