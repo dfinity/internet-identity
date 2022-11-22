@@ -1,5 +1,6 @@
 use crate::anchor_management::tentative_device_registration;
 use crate::assets::init_assets;
+use crate::state::Anchor;
 use candid::Principal;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -91,6 +92,7 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
         storage
             .read(user_number)
             .unwrap_or_default()
+            .devices
             .into_iter()
             .map(DeviceData::from)
             .collect()
@@ -251,11 +253,10 @@ fn update_root_hash() {
     })
 }
 
-// Checks if the caller is authenticated against any of the public keys provided
-// and traps if not.
-fn trap_if_not_authenticated<'a>(public_keys: impl Iterator<Item = &'a PublicKey>) {
-    for pk in public_keys {
-        if caller() == Principal::self_authenticating(pk) {
+/// Checks if the caller is authenticated against the anchor provided and traps if not.
+fn trap_if_not_authenticated(anchor: &Anchor) {
+    for device in &anchor.devices {
+        if caller() == Principal::self_authenticating(&device.pubkey) {
             return;
         }
     }

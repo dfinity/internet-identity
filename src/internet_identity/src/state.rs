@@ -21,6 +21,13 @@ thread_local! {
     static ASSETS: RefCell<Assets> = RefCell::new(HashMap::default());
 }
 
+/// Internal representation of the anchor.
+/// After the upcoming stable memory migration, new fields can be added to this struct.
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Anchor {
+    pub devices: Vec<DeviceDataInternal>,
+}
+
 /// This is an internal version of `DeviceData` primarily useful to provide a
 /// backwards compatible level between older device data stored in stable memory
 /// (that might not contain purpose or key_type) and new ones added.
@@ -118,7 +125,7 @@ pub struct PersistentState {
 }
 
 struct State {
-    storage: RefCell<Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>>,
+    storage: RefCell<Storage<DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -265,7 +272,7 @@ pub fn load_persistent_state() {
 
 // helper methods to access / modify the state in a convenient way
 
-pub fn anchor_devices(anchor: UserNumber) -> Vec<DeviceDataInternal> {
+pub fn anchor(anchor: UserNumber) -> Anchor {
     STATE.with(|s| {
         s.storage.borrow().read(anchor).unwrap_or_else(|err| {
             trap(&format!(
@@ -346,13 +353,11 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut *s.sigs.borrow_mut()))
 }
 
-pub fn storage<R>(f: impl FnOnce(&Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R) -> R {
+pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&*s.storage.borrow()))
 }
 
-pub fn storage_mut<R>(
-    f: impl FnOnce(&mut Storage<Vec<DeviceDataInternal>, DefaultMemoryImpl>) -> R,
-) -> R {
+pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&mut *s.storage.borrow_mut()))
 }
 

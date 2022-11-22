@@ -21,8 +21,7 @@ const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 /// Enables device registration mode for the given user and returns the expiration timestamp (when it will be disabled again).
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 pub fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
-    let entries = state::anchor_devices(user_number);
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    trap_if_not_authenticated(&state::anchor(user_number));
 
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
@@ -48,8 +47,7 @@ pub fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
 }
 
 pub fn exit_device_registration_mode(user_number: UserNumber) {
-    let entries = state::anchor_devices(user_number);
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    trap_if_not_authenticated(&state::anchor(user_number));
 
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
@@ -111,8 +109,7 @@ fn get_verified_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
-    let entries = state::anchor_devices(user_number);
-    trap_if_not_authenticated(entries.iter().map(|e| &e.pubkey));
+    trap_if_not_authenticated(&state::anchor(user_number));
 
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
