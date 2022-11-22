@@ -637,6 +637,20 @@ a:hover,
   color: var(--vc-brand-blue);
 }
 
+.c-spinner {
+  display: block;
+  position: relative;
+  width: 25%;
+  height: 25%;
+  margin: var(--rs-logo-stack) auto;
+  color: var(--vc-brand-purple);
+}
+
+.c-spinner svg {
+  overflow: visible;
+  animation: rotate 4s linear infinite;
+}
+
 /**
  *  Forms and Buttons
  */
@@ -1162,13 +1176,13 @@ a:hover,
   margin-right: calc(-1.25 * var(--rs-card-bezel));
 }
 
-.c-chasm--closed {
+.c-chasm[aria-expanded="false"] {
   max-height: 0;
   visibility: hidden;
   transition: max-height 0.15s ease-out;
 }
 
-.c-chasm--open {
+.c-chasm[aria-expanded="true"] {
   max-height: calc(5em * var(--vs-line-height) + var(--rs-card-bezel) * 2);
   visibility: visible;
   transition: max-height 400ms cubic-bezier(0.3, 0.7, 0, 1);
@@ -1342,4 +1356,10 @@ input[type="checkbox"] {
   -ms-appearance: checkbox !important;
   -o-appearance: checkbox !important;
   appearance: checkbox !important;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
 }
