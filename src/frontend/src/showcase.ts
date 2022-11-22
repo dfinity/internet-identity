@@ -22,7 +22,6 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { showWarning } from "./banner";
-import { displayUserNumber } from "./flows/displayUserNumber";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
@@ -30,8 +29,10 @@ import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authenticateBoxTemplate } from "./components/authenticateBox";
 import { welcomePage } from "./flows/welcome";
 import { mkAuthTemplates } from "./flows/authenticate";
-import { register, renderConstructing } from "./flows/register";
-import { confirmRegister } from "./flows/confirmRegister";
+import { promptDeviceAliasPage } from "./flows/register/alias";
+import { renderConstructing } from "./flows/register/construct";
+import { confirmRegister } from "./flows/register/captcha";
+import { displayUserNumber } from "./flows/register/finish";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage } from "./flows/manage";
@@ -138,7 +139,11 @@ const iiPages: Record<string, () => void> = {
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
-  register: () => register(dummyConnection),
+  promptDeviceAlias: () =>
+    promptDeviceAliasPage({
+      cancel: () => console.log("canceled"),
+      continue: (alias) => console.log("device alias:", alias),
+    }),
   authenticate: () =>
     authenticateBoxTemplate({
       templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
@@ -147,6 +152,14 @@ const iiPages: Record<string, () => void> = {
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
       userNumber: BigInt(10000),
+    }),
+  authenticateNew: () =>
+    authenticateBoxTemplate({
+      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      addDevice: () => console.log("Add device requested"),
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
     }),
   authenticateAlternative: () =>
     authenticateBoxTemplate({

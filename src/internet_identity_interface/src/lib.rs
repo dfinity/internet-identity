@@ -197,6 +197,7 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub anchor_migration_state: Option<MigrationState>,
+    pub storage_layout_version: u8,
 }
 
 // Archive specific types

@@ -26,7 +26,7 @@ testLocalStorage(
   () => {
     expect(getUserNumber()).toStrictEqual(BigInt(123456));
   },
-  { before: { userNumber: 123456 } }
+  { before: { userNumber: "123456" } }
 );
 
 /** Run a test that makes use of localStorage. Local storage is always cleared after
@@ -57,12 +57,12 @@ function testLocalStorage(
 }
 
 /// Type representing the whole localStorage, used for tests.
-type LocalStorage = Record<string, unknown>;
+type LocalStorage = Record<string, string>;
 
 /// Set the entire localStorage (does NOT clear localStorage)
 function setLocalStorage(ls: LocalStorage) {
   for (const key in ls) {
-    localStorage.setItem(key, JSON.stringify(ls[key]));
+    localStorage.setItem(key, ls[key]);
   }
 }
 
@@ -71,7 +71,7 @@ function readLocalStorage(): LocalStorage {
   for (let i = 0, len = localStorage.length; i < len; ++i) {
     const key = localStorage.key(i);
     if (key !== null) {
-      ls[key] = localStorage.getItem(key);
+      ls[key] = localStorage.getItem(key) as string;
     }
   }
 

@@ -86,7 +86,7 @@ async function withChrome<T>(
 async function visit(browser: WebdriverIO.Browser, url: string) {
   await browser.url(url);
 
-  /* Disable transitions to make sure we screenshot the (final) actual state */
+  /* Disable transitions and animations to make sure we screenshot the (final) actual state */
   await browser.execute(() => {
     const notransition = `
 *, *::before, *::after {
@@ -97,8 +97,15 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
     transition-property: none !important;
 }
         `;
+
+    const noanimation = `
+*, *::before, *::after {
+    animation: none !important;
+}
+        `;
     const style = document.createElement("style");
     style.appendChild(document.createTextNode(notransition));
+    style.appendChild(document.createTextNode(noanimation));
     document.body.appendChild(style);
   });
 

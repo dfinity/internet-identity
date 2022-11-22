@@ -29,7 +29,8 @@ const pageContent = (userNumber: bigint) => html`
         On your <em>new</em> device:<br />
         Chose <strong class="t-strong">Add a Device</strong> (if you don't see
         the option, click on
-        <strong class="t-strong">Use Existing</strong> first)
+        <strong class="t-strong">Manage Existing</strong> and/or
+        <strong class="t-strong">More options</strong> first)
       </li>
       <li>
         On your <em>new</em> device:<br />

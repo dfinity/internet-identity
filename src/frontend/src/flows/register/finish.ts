@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { warnBox } from "../components/warnBox";
+import { warnBox } from "../../components/warnBox";
 
 const pageContent = (userNumber: bigint) => html`
   <div class="l-container c-card c-card--highlight">

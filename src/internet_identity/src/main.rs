@@ -169,6 +169,7 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         anchor_migration_state: Some(storage.migration_state()),
+        storage_layout_version: storage.version(),
     })
 }
 

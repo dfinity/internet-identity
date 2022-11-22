@@ -16,5 +16,7 @@ function isRegistrationAllowed() {
 export const registerIfAllowed = async (
   connection: Connection
 ): Promise<LoginFlowResult> => {
-  return isRegistrationAllowed() ? register(connection) : registerDisabled();
+  return isRegistrationAllowed()
+    ? register({ connection })
+    : registerDisabled();
 };
