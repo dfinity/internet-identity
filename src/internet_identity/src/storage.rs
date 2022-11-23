@@ -436,16 +436,14 @@ impl<M: Memory> Storage<M> {
     }
 
     fn record_meta(&self, record_number: u32) -> RecordMeta {
-        match self.migration_state() {
-            MigrationState::NotStarted | MigrationState::Finished => {
-                return RecordMeta::new(
-                    record_number,
-                    self.header.entry_size,
-                    self.header.entry_offset,
-                )
-            }
-            MigrationState::Started { .. } => {}
+        if self.header.version == 1 || self.header.version == 3 {
+            return RecordMeta::new(
+                record_number,
+                self.header.entry_size,
+                self.header.entry_offset,
+            );
         }
+        assert_eq!(self.header.version, 2);
 
         // we only have to check the layout pointer if we are in the middle of a migration
         if record_number < self.header.new_layout_start {
@@ -551,27 +549,14 @@ impl<M: Memory> Storage<M> {
     pub fn version(&self) -> u8 {
         self.header.version
     }
-    pub fn migration_state(&self) -> MigrationState {
-        match self.header.version {
-            1 => MigrationState::NotStarted,
-            2 => MigrationState::Started {
-                anchors_left: self.header.new_layout_start as u64,
-                batch_size: self.header.migration_batch_size as u64,
-            },
-            3 => MigrationState::Finished,
-            _ => trap("unsupported header version"),
-        }
-    }
 
     pub fn configure_migration(&mut self, batch_size: u32) {
-        let migration_state = self.migration_state();
-
-        if let MigrationState::Finished = migration_state {
+        if self.header.version == 3 {
             // nothing to do, we're done
             return;
         }
 
-        if batch_size > 0 && migration_state == MigrationState::NotStarted {
+        if batch_size > 0 && self.header.version == 1 {
             // initialize header for migration
             self.header.version = 2;
             self.header.entry_offset_new = ENTRY_OFFSET_V3;
@@ -585,11 +570,11 @@ impl<M: Memory> Storage<M> {
     }
 
     fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
-        match self.migration_state() {
-            MigrationState::NotStarted | MigrationState::Finished => return Ok(()),
-            MigrationState::Started { .. } => {}
+        if self.header.version == 1 || self.header.version == 3 {
+            // migration not started or already finished --> nothing to do
+            return Ok(());
         }
-
+        assert_eq!(self.header.version, 2);
         assert!(self.header.new_layout_start > 0);
 
         for _ in 0..self.header.migration_batch_size {
@@ -641,6 +626,19 @@ impl<M: Memory> Storage<M> {
         self.header.entry_offset_new = 0;
         self.header.entry_size_new = 0;
         self.flush();
+    }
+
+    /// External view into the migration progress. Only used for the `stats` query call.
+    pub fn migration_state(&self) -> MigrationState {
+        match self.header.version {
+            1 => MigrationState::NotStarted,
+            2 => MigrationState::Started {
+                anchors_left: self.header.new_layout_start as u64,
+                batch_size: self.header.migration_batch_size as u64,
+            },
+            3 => MigrationState::Finished,
+            _ => trap("unsupported header version"),
+        }
     }
 }
 
