@@ -1,32 +1,80 @@
-import { getUserNumber, setUserNumber } from "./userNumber";
+import { getAnchors, setAnchorUsed, MAX_SAVED_ANCHORS } from "./userNumber";
 
-testLocalStorage("user number can be set", () => {
-  expect(getUserNumber()).toBe(undefined);
-  setUserNumber(BigInt(123456));
-  expect(getUserNumber()).toBe(BigInt(123456));
-});
-
-testLocalStorage("user number can be cleared", () => {
-  setUserNumber(BigInt(123456));
-  expect(getUserNumber()).toBe(BigInt(123456));
-  setUserNumber(undefined);
-  expect(getUserNumber()).toBe(undefined);
+testLocalStorage("anchors default to nothing", () => {
+  expect(getAnchors()).toStrictEqual([]);
 });
 
 testLocalStorage(
-  "user number localStorage format",
+  "old userNumber is recovered",
   () => {
-    setUserNumber(BigInt(123456));
-  },
-  { after: { userNumber: "123456" } }
-);
-
-testLocalStorage(
-  "user number read from known localStorage format",
-  () => {
-    expect(getUserNumber()).toStrictEqual(BigInt(123456));
+    expect(getAnchors()).toStrictEqual([BigInt(123456)]);
   },
   { before: { userNumber: "123456" } }
+);
+
+testLocalStorage("one anchor can be stored", () => {
+  setAnchorUsed(BigInt(10000));
+  expect(getAnchors()).toStrictEqual([BigInt(10000)]);
+});
+
+testLocalStorage("multiple anchors can be stored", () => {
+  setAnchorUsed(BigInt(10000));
+  setAnchorUsed(BigInt(10001));
+  setAnchorUsed(BigInt(10003));
+  expect(getAnchors()).toContain(BigInt(10000));
+  expect(getAnchors()).toContain(BigInt(10001));
+  expect(getAnchors()).toContain(BigInt(10003));
+});
+
+testLocalStorage("anchors are sorted", () => {
+  const anchors = [BigInt(10400), BigInt(10001), BigInt(1011003)];
+  for (const anchor of anchors) {
+    setAnchorUsed(anchor);
+  }
+  anchors.sort();
+  expect(getAnchors()).toStrictEqual(anchors);
+});
+
+testLocalStorage("only N anchors are stored", () => {
+  for (let i = 0; i < MAX_SAVED_ANCHORS + 5; i++) {
+    setAnchorUsed(BigInt(i));
+  }
+  expect(getAnchors().length).toStrictEqual(MAX_SAVED_ANCHORS);
+});
+
+testLocalStorage("old anchors are dropped", () => {
+  jest.useFakeTimers().setSystemTime(new Date(0));
+  setAnchorUsed(BigInt(10000));
+  jest.useFakeTimers().setSystemTime(new Date(1));
+  setAnchorUsed(BigInt(203000));
+  jest.useFakeTimers().setSystemTime(new Date(2));
+  for (let i = 0; i < MAX_SAVED_ANCHORS; i++) {
+    setAnchorUsed(BigInt(i));
+  }
+  expect(getAnchors()).not.toContain(BigInt(10000));
+  expect(getAnchors()).not.toContain(BigInt(203000));
+  jest.useRealTimers();
+});
+
+testLocalStorage(
+  "unknown fields are not dropped",
+  () => {
+    jest.useFakeTimers().setSystemTime(new Date(20));
+    setAnchorUsed(BigInt(10000));
+    jest.useRealTimers();
+  },
+  {
+    before: {
+      anchors: JSON.stringify({
+        "10000": { lastUsedTimestamp: 10, hello: "world" },
+      }),
+    },
+    after: {
+      anchors: JSON.stringify({
+        "10000": { lastUsedTimestamp: 20, hello: "world" },
+      }),
+    },
+  }
 );
 
 /** Run a test that makes use of localStorage. Local storage is always cleared after
