@@ -175,7 +175,7 @@ This section describes the Internet Identity Service from the point of view of a
           userPublicKey: Uint8Array;
         }
 
-    where the `userPublicKey` is the user's Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for [*authentication on the IC*](https://smartcontracts.org/docs/interface-spec/index.html#authentication).
+    where the `userPublicKey` is the user's Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for [*authentication on the IC*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication).
 
 9.  It could also receive a failure message of the following type
 
