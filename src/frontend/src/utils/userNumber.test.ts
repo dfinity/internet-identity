@@ -1,61 +1,61 @@
-import { AnchorStore, anchorStore, MAX_SAVED_ANCHORS } from "./userNumber";
+import { getAnchors, setAnchorUsed, MAX_SAVED_ANCHORS } from "./userNumber";
 
-testLocalStorage("anchors default to nothing", (store) => {
-  expect(store.getAnchors()).toStrictEqual([]);
+testLocalStorage("anchors default to nothing", () => {
+  expect(getAnchors()).toStrictEqual([]);
 });
 
 testLocalStorage(
   "old userNumber is recovered",
-  (store) => {
-    expect(store.getAnchors()).toStrictEqual([BigInt(123456)]);
+  () => {
+    expect(getAnchors()).toStrictEqual([BigInt(123456)]);
   },
   { before: { userNumber: "123456" } }
 );
 
-testLocalStorage("one anchor can be stored", (store) => {
-  store.setAnchorUsed(BigInt(10000));
-  expect(store.getAnchors()).toStrictEqual([BigInt(10000)]);
+testLocalStorage("one anchor can be stored", () => {
+  setAnchorUsed(BigInt(10000));
+  expect(getAnchors()).toStrictEqual([BigInt(10000)]);
 });
 
-testLocalStorage("multiple anchors can be stored", (store) => {
-  store.setAnchorUsed(BigInt(10000));
-  store.setAnchorUsed(BigInt(10001));
-  store.setAnchorUsed(BigInt(10003));
-  expect(store.getAnchors()).toContain(BigInt(10000));
-  expect(store.getAnchors()).toContain(BigInt(10001));
-  expect(store.getAnchors()).toContain(BigInt(10003));
+testLocalStorage("multiple anchors can be stored", () => {
+  setAnchorUsed(BigInt(10000));
+  setAnchorUsed(BigInt(10001));
+  setAnchorUsed(BigInt(10003));
+  expect(getAnchors()).toContain(BigInt(10000));
+  expect(getAnchors()).toContain(BigInt(10001));
+  expect(getAnchors()).toContain(BigInt(10003));
 });
 
-testLocalStorage("anchors are sorted", (store) => {
+testLocalStorage("anchors are sorted", () => {
   const anchors = [BigInt(10400), BigInt(10001), BigInt(1011003)];
   for (const anchor of anchors) {
-    store.setAnchorUsed(anchor);
+    setAnchorUsed(anchor);
   }
   anchors.sort();
-  expect(store.getAnchors()).toStrictEqual(anchors);
+  expect(getAnchors()).toStrictEqual(anchors);
 });
 
-testLocalStorage("only N anchors are stored", (store) => {
+testLocalStorage("only N anchors are stored", () => {
   for (let i = 0; i < MAX_SAVED_ANCHORS + 5; i++) {
-    store.setAnchorUsed(BigInt(i));
+    setAnchorUsed(BigInt(i));
   }
-  expect(store.getAnchors().length).toStrictEqual(MAX_SAVED_ANCHORS);
+  expect(getAnchors().length).toStrictEqual(MAX_SAVED_ANCHORS);
 });
 
-testLocalStorage("old anchors are dropped", (store) => {
-  store.setAnchorUsed(BigInt(10000));
-  store.setAnchorUsed(BigInt(203000));
+testLocalStorage("old anchors are dropped", () => {
+  setAnchorUsed(BigInt(10000));
+  setAnchorUsed(BigInt(203000));
   for (let i = 0; i < MAX_SAVED_ANCHORS + 2; i++) {
-    store.setAnchorUsed(BigInt(i));
+    setAnchorUsed(BigInt(i));
   }
-  expect(store.getAnchors()).not.toContain(BigInt(10000));
-  expect(store.getAnchors()).not.toContain(BigInt(203000));
+  expect(getAnchors()).not.toContain(BigInt(10000));
+  expect(getAnchors()).not.toContain(BigInt(203000));
 });
 
 testLocalStorage(
   "unknown fields are not dropped",
-  (store) => {
-    store.setAnchorUsed(BigInt(10000));
+  () => {
+    setAnchorUsed(BigInt(10000));
   },
   {
     before: {
@@ -75,7 +75,7 @@ testLocalStorage(
  */
 function testLocalStorage(
   name: string,
-  fn: (store: AnchorStore) => void,
+  fn: () => void,
   opts?: { before?: LocalStorage; after?: LocalStorage }
 ) {
   test(name, () => {
@@ -83,7 +83,7 @@ function testLocalStorage(
     if (opts?.before !== undefined) {
       setLocalStorage(opts.before);
     }
-    fn(anchorStore());
+    fn();
     if (opts?.after !== undefined) {
       const actual: LocalStorage = readLocalStorage();
       const expected: LocalStorage = opts.after;
