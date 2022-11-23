@@ -4,7 +4,7 @@ import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { addRemoteDevice } from "../flows/addDevice/welcomeView";
 import { mkAnchorPicker } from "./anchorPicker";
-import { getUserNumber, setUserNumber } from "../utils/userNumber";
+import { anchorStore } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
@@ -27,7 +27,7 @@ type PageProps = { templates: AuthTemplates } & {
   recoverAnchor: (userNumber?: bigint) => void;
   register: () => void;
   addDevice: () => void;
-  userNumber?: bigint;
+  anchors: bigint[];
 };
 
 /** Text and content to display in the box */
@@ -61,7 +61,7 @@ export const authenticateBox = async (
           resolve(registerIfAllowed(connection));
         },
         recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-        userNumber: getUserNumber(),
+        anchors: anchorStore().getAnchors(),
       });
     });
 
@@ -70,7 +70,7 @@ export const authenticateBox = async (
     const result = await promptAuth();
     switch (result.tag) {
       case "ok":
-        setUserNumber(result.userNumber);
+        anchorStore().setAnchorUsed(result.userNumber);
         return result;
       case "err":
         await displayError({
@@ -100,10 +100,10 @@ const pageContent = ({
   onContinue,
   recoverAnchor,
   register,
-  userNumber,
+  anchors,
 }: PageProps): TemplateResult => {
   const anchorInput = mkAnchorPicker({
-    savedAnchors: userNumber !== undefined ? [userNumber] : [],
+    savedAnchors: anchors,
     pick: onContinue,
     button: templates.button,
     addDevice,

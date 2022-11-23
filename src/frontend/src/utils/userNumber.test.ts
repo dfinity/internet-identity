@@ -1,32 +1,70 @@
-import { getUserNumber, setUserNumber } from "./userNumber";
+import { AnchorStore, anchorStore, MAX_SAVED_ANCHORS } from "./userNumber";
 
-testLocalStorage("user number can be set", () => {
-  expect(getUserNumber()).toBe(undefined);
-  setUserNumber(BigInt(123456));
-  expect(getUserNumber()).toBe(BigInt(123456));
-});
-
-testLocalStorage("user number can be cleared", () => {
-  setUserNumber(BigInt(123456));
-  expect(getUserNumber()).toBe(BigInt(123456));
-  setUserNumber(undefined);
-  expect(getUserNumber()).toBe(undefined);
+testLocalStorage("anchors default to nothing", (store) => {
+  expect(store.getAnchors()).toStrictEqual([]);
 });
 
 testLocalStorage(
-  "user number localStorage format",
-  () => {
-    setUserNumber(BigInt(123456));
-  },
-  { after: { userNumber: "123456" } }
-);
-
-testLocalStorage(
-  "user number read from known localStorage format",
-  () => {
-    expect(getUserNumber()).toStrictEqual(BigInt(123456));
+  "old userNumber is recovered",
+  (store) => {
+    expect(store.getAnchors()).toStrictEqual([BigInt(123456)]);
   },
   { before: { userNumber: "123456" } }
+);
+
+testLocalStorage("one anchor can be stored", (store) => {
+  store.setAnchorUsed(BigInt(10000));
+  expect(store.getAnchors()).toStrictEqual([BigInt(10000)]);
+});
+
+testLocalStorage("multiple anchors can be stored", (store) => {
+  store.setAnchorUsed(BigInt(10000));
+  store.setAnchorUsed(BigInt(10001));
+  store.setAnchorUsed(BigInt(10003));
+  expect(store.getAnchors()).toContain(BigInt(10000));
+  expect(store.getAnchors()).toContain(BigInt(10001));
+  expect(store.getAnchors()).toContain(BigInt(10003));
+});
+
+testLocalStorage("anchors are sorted", (store) => {
+  const anchors = [BigInt(10400), BigInt(10001), BigInt(1011003)];
+  for (const anchor of anchors) {
+    store.setAnchorUsed(anchor);
+  }
+  anchors.sort();
+  expect(store.getAnchors()).toStrictEqual(anchors);
+});
+
+testLocalStorage("only N anchors are stored", (store) => {
+  for (let i = 0; i < MAX_SAVED_ANCHORS + 5; i++) {
+    store.setAnchorUsed(BigInt(i));
+  }
+  expect(store.getAnchors().length).toStrictEqual(MAX_SAVED_ANCHORS);
+});
+
+testLocalStorage("old anchors are dropped", (store) => {
+  store.setAnchorUsed(BigInt(10000));
+  store.setAnchorUsed(BigInt(203000));
+  for (let i = 0; i < MAX_SAVED_ANCHORS + 2; i++) {
+    store.setAnchorUsed(BigInt(i));
+  }
+  expect(store.getAnchors()).not.toContain(BigInt(10000));
+  expect(store.getAnchors()).not.toContain(BigInt(203000));
+});
+
+testLocalStorage(
+  "unknown fields are not dropped",
+  (store) => {
+    store.setAnchorUsed(BigInt(10000));
+  },
+  {
+    before: {
+      anchors: JSON.stringify({ "10000": { unusedCount: 10, hello: "world" } }),
+    },
+    after: {
+      anchors: JSON.stringify({ "10000": { unusedCount: 0, hello: "world" } }),
+    },
+  }
 );
 
 /** Run a test that makes use of localStorage. Local storage is always cleared after
@@ -37,7 +75,7 @@ testLocalStorage(
  */
 function testLocalStorage(
   name: string,
-  fn: () => void,
+  fn: (store: AnchorStore) => void,
   opts?: { before?: LocalStorage; after?: LocalStorage }
 ) {
   test(name, () => {
@@ -45,7 +83,7 @@ function testLocalStorage(
     if (opts?.before !== undefined) {
       setLocalStorage(opts.before);
     }
-    fn();
+    fn(anchorStore());
     if (opts?.after !== undefined) {
       const actual: LocalStorage = readLocalStorage();
       const expected: LocalStorage = opts.after;

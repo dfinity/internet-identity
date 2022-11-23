@@ -131,7 +131,7 @@ const iiPages: Record<string, () => void> = {
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
-      userNumber: BigInt(10000),
+      anchors: [BigInt(10000)],
     }),
   displayUserNumber: () => displayUserNumber(userNumber),
   faq: () => faqView(),
@@ -151,7 +151,16 @@ const iiPages: Record<string, () => void> = {
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
-      userNumber: BigInt(10000),
+      anchors: [BigInt(10000), BigInt(123456)],
+    }),
+  authenticateMany: () =>
+    authenticateBoxTemplate({
+      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      addDevice: () => console.log("Add device requested"),
+      onContinue: console.log,
+      recoverAnchor: console.log,
+      register: () => console.log("Register requested"),
+      anchors: [...Array(10).keys()].map((x) => BigInt(10000 + 129 * x * x)),
     }),
   authenticateNew: () =>
     authenticateBoxTemplate({
@@ -160,6 +169,7 @@ const iiPages: Record<string, () => void> = {
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
+      anchors: [],
     }),
   authenticateAlternative: () =>
     authenticateBoxTemplate({
@@ -171,7 +181,7 @@ const iiPages: Record<string, () => void> = {
       onContinue: console.log,
       recoverAnchor: console.log,
       register: () => console.log("Register requested"),
-      userNumber: BigInt(10000),
+      anchors: [BigInt(10000), BigInt(123456)],
     }),
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
