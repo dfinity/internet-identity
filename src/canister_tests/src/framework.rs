@@ -472,6 +472,19 @@ pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
     assert_eq!(value, expected);
 }
 
+pub fn assert_devices_equal(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    anchor: types::UserNumber,
+    mut expected_devices: Vec<types::DeviceData>,
+) {
+    expected_devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+    let mut devices = api::internet_identity::lookup(&env, canister_id, anchor).unwrap();
+    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+    assert_eq!(devices, expected_devices, "expected devices to match");
+}
+
 pub fn verify_delegation(
     env: &StateMachine,
     user_key: types::UserKey,
