@@ -157,11 +157,11 @@ struct Header {
     id_range_hi: u64,
     entry_size: u16,
     salt: [u8; 32],
-    entry_offset: u64,         // offset of first entry
-    entry_offset_new: u64,     // post-migration offset of first entry
-    entry_size_new: u16,       // post-migration entry size
-    new_layout_start: u32,     // all records < this value are still using the old anchor size
-    migration_batch_size: u32, // batch size for incremental anchor migration
+    first_entry_offset: u64,     // offset of first entry
+    first_entry_offset_new: u64, // post-migration offset of first entry
+    entry_size_new: u16,         // post-migration entry size
+    new_layout_start: u32,       // all records < this value are still using the old anchor size
+    migration_batch_size: u32,   // batch size for incremental anchor migration
 }
 
 /// Small struct to keep record information required to read and write anchors separated from the
@@ -217,10 +217,10 @@ impl<M: Memory> Storage<M> {
                 id_range_hi,
                 entry_size: DEFAULT_ENTRY_SIZE_V3,
                 salt: EMPTY_SALT,
-                entry_offset: ENTRY_OFFSET_V3,
+                first_entry_offset: ENTRY_OFFSET_V3,
 
                 // the following fields are no longer relevant in the post-migration state:
-                entry_offset_new: 0,
+                first_entry_offset_new: 0,
                 entry_size_new: 0,
                 new_layout_start: 0,
                 migration_batch_size: 0,
@@ -278,7 +278,7 @@ impl<M: Memory> Storage<M> {
 
         // header version 1 did not have this field
         if header.version == 1 {
-            header.entry_offset = ENTRY_OFFSET_V1;
+            header.first_entry_offset = ENTRY_OFFSET_V1;
         }
 
         Some(Self { header, memory })
@@ -440,7 +440,7 @@ impl<M: Memory> Storage<M> {
             return RecordMeta::new(
                 record_number,
                 self.header.entry_size,
-                self.header.entry_offset,
+                self.header.first_entry_offset,
             );
         }
         assert_eq!(self.header.version, 2);
@@ -450,13 +450,13 @@ impl<M: Memory> Storage<M> {
             RecordMeta::new(
                 record_number,
                 self.header.entry_size,
-                self.header.entry_offset,
+                self.header.first_entry_offset,
             )
         } else {
             RecordMeta::new(
                 record_number,
                 self.header.entry_size_new,
-                self.header.entry_offset_new,
+                self.header.first_entry_offset_new,
             )
         }
     }
@@ -559,7 +559,7 @@ impl<M: Memory> Storage<M> {
         if batch_size > 0 && self.header.version == 1 {
             // initialize header for migration
             self.header.version = 2;
-            self.header.entry_offset_new = ENTRY_OFFSET_V3;
+            self.header.first_entry_offset_new = ENTRY_OFFSET_V3;
             self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
             // the next user will start using the new layout
             self.header.new_layout_start = self.header.num_users;
@@ -617,13 +617,13 @@ impl<M: Memory> Storage<M> {
 
     fn finalize_migration(&mut self) {
         self.header.version = 3;
-        self.header.entry_offset = self.header.entry_offset_new;
+        self.header.first_entry_offset = self.header.first_entry_offset_new;
         self.header.entry_size = self.header.entry_size_new;
 
         // reset now obsolete fields
         self.header.migration_batch_size = 0;
         self.header.new_layout_start = 0;
-        self.header.entry_offset_new = 0;
+        self.header.first_entry_offset_new = 0;
         self.header.entry_size_new = 0;
         self.flush();
     }
