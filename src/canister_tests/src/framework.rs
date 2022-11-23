@@ -61,7 +61,7 @@ lazy_static! {
         let err = format!("
         Could not find Internet Identity Wasm module for previous build/latest release.
 
-        I will look for at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
+        I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
             curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
@@ -69,14 +69,14 @@ lazy_static! {
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
-        /** The Wasm module for the _previous_ II build, or latest release, which is used when testing
+        /** The Wasm module for the _previous_ archive build, or latest release, which is used when testing
             * upgrades and downgrades */
     pub static ref ARCHIVE_WASM_PREVIOUS: Vec<u8> = {
         let def_path = path::PathBuf::from("..").join("..").join("archive_previous.wasm");
         let err = format!("
         Could not find Archive Wasm module for previous build/latest release.
 
-        I will look for at {:?}, and you can specify another path with the environment variable ARCHIVE_WASM_PREVIOUS (note that I run from {:?}).
+        I will look for it at {:?}, and you can specify another path with the environment variable ARCHIVE_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
             curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm -o archive_previous.wasm
