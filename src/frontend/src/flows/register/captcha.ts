@@ -2,7 +2,7 @@ import { Challenge } from "../../../generated/internet_identity_types";
 import { html, render } from "lit-html";
 import { displayUserNumber } from "./finish";
 import { displayError } from "../../components/displayError";
-import { setUserNumber } from "../../utils/userNumber";
+import { setAnchorUsed } from "../../utils/userNumber";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
@@ -69,7 +69,7 @@ const tryRegister = (
   }).then((result) => {
     if (result.kind == "loginSuccess") {
       // Write user number to storage
-      setUserNumber(result.userNumber);
+      setAnchorUsed(result.userNumber);
 
       // Congratulate user
       displayUserNumber(result.userNumber).then(() => {
