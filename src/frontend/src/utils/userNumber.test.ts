@@ -43,26 +43,36 @@ testLocalStorage("only N anchors are stored", () => {
 });
 
 testLocalStorage("old anchors are dropped", () => {
+  jest.useFakeTimers().setSystemTime(new Date(0));
   setAnchorUsed(BigInt(10000));
+  jest.useFakeTimers().setSystemTime(new Date(1));
   setAnchorUsed(BigInt(203000));
-  for (let i = 0; i < MAX_SAVED_ANCHORS + 2; i++) {
+  jest.useFakeTimers().setSystemTime(new Date(2));
+  for (let i = 0; i < MAX_SAVED_ANCHORS; i++) {
     setAnchorUsed(BigInt(i));
   }
   expect(getAnchors()).not.toContain(BigInt(10000));
   expect(getAnchors()).not.toContain(BigInt(203000));
+  jest.useRealTimers();
 });
 
 testLocalStorage(
   "unknown fields are not dropped",
   () => {
+    jest.useFakeTimers().setSystemTime(new Date(20));
     setAnchorUsed(BigInt(10000));
+    jest.useRealTimers();
   },
   {
     before: {
-      anchors: JSON.stringify({ "10000": { unusedCount: 10, hello: "world" } }),
+      anchors: JSON.stringify({
+        "10000": { lastUsedTimestamp: 10, hello: "world" },
+      }),
     },
     after: {
-      anchors: JSON.stringify({ "10000": { unusedCount: 0, hello: "world" } }),
+      anchors: JSON.stringify({
+        "10000": { lastUsedTimestamp: 20, hello: "world" },
+      }),
     },
   }
 );

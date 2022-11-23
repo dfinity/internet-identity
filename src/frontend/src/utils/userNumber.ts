@@ -4,8 +4,8 @@ import { hasNumberProperty, unknownToRecord } from "./utils";
  * at which the anchor is used.
  * If you change this type, please add a migration */
 type Anchor = {
-  /** how many times in a row this anchor was _not_ used */
-  unusedCount: number;
+  /** Timestamp (mills since epoch) of when anchor was last used */
+  lastUsedTimestamp: number;
 };
 
 /** The type of all anchors in local storage. Because we deal with local storage we only
@@ -51,14 +51,11 @@ const setAnchorUsedMigrated = (anchor: bigint) => {
 /** Set the most recently used anchor */
 const setAnchorUsed = (anchor: bigint) => {
   const anchors = readAnchors();
-  for (const ix in anchors) {
-    anchors[ix].unusedCount++;
-  }
 
   const ix = anchor.toString();
   // Here we try to be as non-destructive as possible and we keep potentially unknown
   // fields
-  anchors[ix] = { ...anchors[ix], unusedCount: 0 };
+  anchors[ix] = { ...anchors[ix], lastUsedTimestamp: new Date().getTime() };
   writeAnchors(pruneAnchors(anchors));
 };
 
@@ -107,14 +104,14 @@ export const migrate = () => {
 
 /** Figure out which anchor was used the least recently (if there are any) */
 const mostUnused = (anchors: Anchors): string | undefined => {
-  // First turn the { 123: { unusedCount: ... } } into [{ ix: 123, unusedCount: ... }],
-  // then (reverse) sort by unusedCount and return first element
+  // First turn the { 123: { lastUsedTimestamp: ... } } into [{ ix: 123, lastUsedTimestamp: ... }],
+  // then sort by last used and return first element
   const arr = Object.keys(anchors).map((ix) => ({
     ix,
-    unusedCount: anchors[ix].unusedCount,
+    lastUsedTimestamp: anchors[ix].lastUsedTimestamp,
   }));
 
-  arr.sort((a, b) => b.unusedCount - a.unusedCount);
+  arr.sort((a, b) => a.lastUsedTimestamp - b.lastUsedTimestamp);
 
   return arr[0]?.ix;
 };
@@ -168,7 +165,7 @@ const asAnchor = (msg: unknown): Anchor | undefined => {
     return undefined;
   }
 
-  if (!hasNumberProperty(obj, "unusedCount")) {
+  if (!hasNumberProperty(obj, "lastUsedTimestamp")) {
     return undefined;
   }
 
