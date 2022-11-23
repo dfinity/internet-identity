@@ -4,7 +4,7 @@ import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { addRemoteDevice } from "../flows/addDevice/welcomeView";
 import { mkAnchorPicker } from "./anchorPicker";
-import { anchorStore } from "../utils/userNumber";
+import { getAnchors, setAnchorUsed } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
@@ -61,7 +61,7 @@ export const authenticateBox = async (
           resolve(registerIfAllowed(connection));
         },
         recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-        anchors: anchorStore().getAnchors(),
+        anchors: getAnchors(),
       });
     });
 
@@ -70,7 +70,7 @@ export const authenticateBox = async (
     const result = await promptAuth();
     switch (result.tag) {
       case "ok":
-        anchorStore().setAnchorUsed(result.userNumber);
+        setAnchorUsed(result.userNumber);
         return result;
       case "err":
         await displayError({

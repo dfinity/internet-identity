@@ -4,7 +4,7 @@ import {
   CredentialId,
   Timestamp,
 } from "../../../../generated/internet_identity_types";
-import { anchorStore } from "../../../utils/userNumber";
+import { setAnchorUsed } from "../../../utils/userNumber";
 import { setupCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 
@@ -118,7 +118,7 @@ const init = async (
   ).then((verified) => {
     if (verified) {
       countdown.stop();
-      anchorStore().setAnchorUsed(userNumber);
+      setAnchorUsed(userNumber);
       // TODO L2-309: do this without reload
       window.location.reload();
     }

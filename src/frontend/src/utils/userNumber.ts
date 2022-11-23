@@ -20,32 +20,32 @@ type Anchors = Record<string, Anchor>;
  */
 export const MAX_SAVED_ANCHORS = 10;
 
-export type AnchorStore = {
-  getAnchors: typeof getAnchors;
-  setAnchorUsed: typeof setAnchorUsed;
-};
-
-/** A wrapper around the actual getters and setters that ensures
- * that localStorage was migrated */
-export const anchorStore = (): AnchorStore => {
+/* Migrated version, see function below for implementation */
+export { getAnchorsMigrated as getAnchors };
+const getAnchorsMigrated = (): bigint[] => {
   migrate();
-  return { getAnchors, setAnchorUsed };
+  return getAnchors();
 };
 
 /** Read saved anchors from local storage, returning at most
  * MAX_SAVED_ANCHORS */
 const getAnchors = (): bigint[] => {
-  const anchors = [];
   const data = pruneAnchors(readAnchors());
-  for (const ix in data) {
-    anchors.push(BigInt(ix));
-  }
+
+  const anchors = Object.keys(data).map((ix) => BigInt(ix));
 
   // NOTE: this sort has nothing to do with the sorting we use to prune anchors.
   // This sort here is only used to ensure users see a stable ordering of anchors.
   anchors.sort();
 
   return anchors;
+};
+
+/* Migrated version, see function below for implementation */
+export { setAnchorUsedMigrated as setAnchorUsed };
+const setAnchorUsedMigrated = (anchor: bigint) => {
+  migrate();
+  return setAnchorUsed(anchor);
 };
 
 /** Set the most recently used anchor */
@@ -68,14 +68,15 @@ const pruneAnchors = (anchors: Anchors): Anchors => {
   // but avoids potential infinite loops if for some reason anchors can't
   // be deleted
   const extras = Math.max(Object.keys(anchors).length - MAX_SAVED_ANCHORS, 0);
+  const filtered = { ...anchors };
   for (let i = 0; i < extras; i++) {
-    const unused = mostUnused(anchors);
+    const unused = mostUnused(filtered);
     if (unused !== undefined) {
-      delete anchors[unused];
+      delete filtered[unused];
     }
   }
 
-  return anchors;
+  return filtered;
 };
 
 /** Best effort to migrate potentially old localStorage data to
@@ -108,11 +109,10 @@ export const migrate = () => {
 const mostUnused = (anchors: Anchors): string | undefined => {
   // First turn the { 123: { unusedCount: ... } } into [{ ix: 123, unusedCount: ... }],
   // then (reverse) sort by unusedCount and return first element
-
-  const arr: { ix: string; unusedCount: number }[] = [];
-  for (const ix in anchors) {
-    arr.push({ ix, unusedCount: anchors[ix].unusedCount });
-  }
+  const arr = Object.keys(anchors).map((ix) => ({
+    ix,
+    unusedCount: anchors[ix].unusedCount,
+  }));
 
   arr.sort((a, b) => b.unusedCount - a.unusedCount);
 
@@ -122,18 +122,18 @@ const mostUnused = (anchors: Anchors): string | undefined => {
 /* "Low-level" serialization functions to read and write anchors to local storage */
 
 const readAnchors = (): Anchors => {
-  const blob = localStorage.getItem("anchors");
+  const raw = localStorage.getItem("anchors");
 
-  if (blob === null) {
+  if (raw === null) {
     return {};
   }
 
   let item;
   try {
-    item = JSON.parse(blob);
+    item = JSON.parse(raw);
   } catch (e) {
     // If the parsing fail there isn't much we can do
-    console.error("could not parse stored data as anchors", blob, e);
+    console.error("could not parse stored data as anchors", raw, e);
     item = {};
   }
 
@@ -180,7 +180,10 @@ const writeAnchors = (anchors: Anchors) => {
 };
 
 /** Whether or not the user is returning (false for first time users) */
-export const returning = (): boolean => anchorStore().getAnchors().length !== 0;
+export const returning = (): boolean => {
+  migrate();
+  return getAnchors().length !== 0;
+};
 
 // We check that the user has entered a sequence of digits only,
 // before attempting to parse
