@@ -66,7 +66,7 @@ type AnchorIndex = StableBTreeMap<VirtualMemory<Memory>, AnchorIndexKey, ()>;
 
 const GIB: u64 = 1 << 30;
 const WASM_PAGE_SIZE: u64 = 65536;
-const MAX_STABLE_MEMORY_SIZE: u64 = 8 * GIB;
+const MAX_STABLE_MEMORY_SIZE: u64 = 32 * GIB;
 /// The maximum number of Wasm pages that we allow to use for the stable storage.
 const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
 
