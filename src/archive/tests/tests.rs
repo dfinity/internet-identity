@@ -47,6 +47,74 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     Ok(())
 }
 
+#[cfg(test)]
+mod rollback_tests {
+    use super::*;
+
+    /// Verifies that the archive can be rolled back
+    #[test]
+    fn should_rollback() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
+
+        let entry = log_entry_1();
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            candid::encode_one(entry.clone()).expect("failed to encode entry"),
+        )?;
+
+        // upgrade
+        upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM.clone());
+
+        // rollback
+        upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
+
+        let logs = api::get_entries(&env, canister_id, None, None)?;
+        assert_eq!(logs.entries.len(), 1);
+        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
+        Ok(())
+    }
+
+    /// Verifies that the archive keeps entries made with the newer version when doing a rollback.
+    #[test]
+    fn should_keep_entries_across_rollback() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
+
+        let entry1 = log_entry_1();
+        let entry2 = log_entry_2();
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_1,
+            TIMESTAMP_1,
+            candid::encode_one(entry1.clone()).expect("failed to encode entry"),
+        )?;
+        api::add_entry(
+            &env,
+            canister_id,
+            principal_1(),
+            USER_NUMBER_2,
+            TIMESTAMP_2,
+            candid::encode_one(entry2.clone()).expect("failed to encode entry"),
+        )?;
+
+        // rollback
+        upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
+
+        let logs = api::get_entries(&env, canister_id, None, None)?;
+        assert_eq!(logs.entries.len(), 2);
+        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry1);
+        assert_eq!(logs.entries.get(1).unwrap().as_ref().unwrap(), &entry2);
+        Ok(())
+    }
+}
+
 /// Verifies the write functionality of the archive canister.
 #[cfg(test)]
 mod write_tests {
