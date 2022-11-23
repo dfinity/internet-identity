@@ -4,7 +4,7 @@ import { Principal } from "@dfinity/principal";
 import { fetchDelegation } from "./fetchDelegation";
 import { LoginData } from "../login/flowResult";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
-import { hasOwnProperty } from "../../utils/utils";
+import { hasOwnProperty, unknownToRecord } from "../../utils/utils";
 
 export interface Delegation {
   delegation: {
@@ -39,18 +39,11 @@ export interface AuthRequest {
 
 /** Try to read unknown data as authentication request */
 const asAuthRequest = (msg: unknown): AuthRequest | undefined => {
-  if (typeof msg !== "object") {
+  const obj = unknownToRecord(msg);
+
+  if (obj === undefined) {
     return undefined;
   }
-
-  if (msg === null) {
-    return undefined;
-  }
-
-  // Some extra conversions to take typescript by the hand
-  // eslint-disable-next-line
-  const tmp: {} = msg;
-  const obj: Record<string, unknown> = tmp;
 
   if (!hasOwnProperty(obj, "kind") || obj.kind !== "authorize-client") {
     return undefined;
