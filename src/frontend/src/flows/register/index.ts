@@ -2,7 +2,7 @@ import { Connection } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
 import { confirmRegister } from "./captcha";
 import { makeCaptcha } from "./captcha";
-import { LoginFlowResult, cancel } from "../login/flowResult";
+import { LoginFlowResult, cancel } from "../../utils/flowResult";
 import { constructIdentity } from "./construct";
 import { promptDeviceAlias } from "./alias";
 

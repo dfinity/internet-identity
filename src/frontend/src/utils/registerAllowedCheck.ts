@@ -1,4 +1,4 @@
-import { LoginFlowResult } from "../flows/login/flowResult";
+import { LoginFlowResult } from "./flowResult";
 import { register } from "../flows/register";
 import { registerDisabled } from "../flows/registerDisabled";
 import { Connection } from "../utils/iiConnection";
