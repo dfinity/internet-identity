@@ -126,7 +126,7 @@ type StreamingStrategy = variant {
 
 // management canister types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-candid
 
-type DefiniteCanisterCettings = record {
+type DefiniteCanisterSettings = record {
     controllers : vec principal;
     compute_allocation : nat;
     memory_allocation : nat;
@@ -139,7 +139,7 @@ type CanisterStatus = record {
         stopping;
         stopped
     };
-    settings: DefiniteCanisterCettings;
+    settings: DefiniteCanisterSettings;
     module_hash: opt blob;
     memory_size: nat;
     cycles: nat;
