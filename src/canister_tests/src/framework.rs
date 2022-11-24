@@ -144,6 +144,7 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<types::InternetIdentityInit> 
         assigned_user_number_range: None,
         archive_module_hash: Some(archive_wasm_hash(&wasm)),
         canister_creation_cycles_cost: Some(0),
+        memory_migration_batch_size: None,
     })
 }
 
@@ -485,6 +486,19 @@ pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
     let (value, _) = parse_metric(&metrics, metric_name);
     assert_eq!(value, expected);
+}
+
+pub fn assert_devices_equal(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    anchor: types::UserNumber,
+    mut expected_devices: Vec<types::DeviceData>,
+) {
+    expected_devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+    let mut devices = api::internet_identity::lookup(&env, canister_id, anchor).unwrap();
+    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+    assert_eq!(devices, expected_devices, "expected devices to match");
 }
 
 pub fn verify_delegation(

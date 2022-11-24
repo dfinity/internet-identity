@@ -2,6 +2,22 @@
 //! It uses the [Reader] and [Writer] implementations of the `stable_structures` crate.
 //!
 //! ## Stable Memory Layout
+//!
+//! Variables used below with different values depending on memory layout version:
+//!
+//! * HEADER_SIZE
+//!     * v1: 58 bytes
+//!     * v2: 84 bytes
+//!     * v3: 66 bytes
+//! * ENTRY_OFFSET
+//!     * v1: 512 bytes
+//!     * v2: n/a (v2 denotes the state of v1 and v3 anchor records existing in parallel)
+//!     * v3: 131 072 bytes = 2 WASM Pages
+//! * Anchor size
+//!     * v1: 2048 bytes
+//!     * v2: n/a (v2 denotes the state of v1 and v3 anchor records existing in parallel)
+//!     * v3: 4096 bytes
+//!
 //! ```text
 //! ------------------------------------------- <- Address 0
 //! Magic "IIC"                 ↕ 3 bytes
@@ -17,23 +33,25 @@
 //! max_entry_size (SIZE_MAX)   ↕ 2 bytes
 //! -------------------------------------------
 //! Salt                        ↕ 32 bytes
-//! ------------------------------------------- <- Address 58 (header size)
-//! Reserved space              ↕ 454 bytes
-//! ------------------------------------------- <- Address 512 = A_0_offset = RESERVED_HEADER_BYTES
+//! -------------------------------------------
+//! Entry offset (ENTRY_OFFSET) ↕ 8 bytes
+//! ------------------------------------------- <- HEADER_SIZE
+//! Reserved space              ↕ (RESERVED_HEADER_BYTES - HEADER_SIZE) bytes
+//! ------------------------------------------- <- ENTRY_OFFSET
 //! A_0_size                    ↕ 2 bytes
 //! -------------------------------------------
 //! Candid encoded entry        ↕ A_0_size bytes
 //! -------------------------------------------
 //! Unused space A_0            ↕ (SIZE_MAX - A_0_size - 2) bytes
-//! ------------------------------------------- <- A_1_offset = A_0_offset + (A_1 - A_0) * SIZE_MAX  ┬
-//! A_1_size                    ↕ 2 bytes                                                            │
-//! -------------------------------------------                                                      │
-//! Candid encoded entry        ↕ A_1_size bytes                                          anchor A_1 │
-//! -------------------------------------------                                                      │
-//! Unused space A_1            ↕ (SIZE_MAX - A_1_size - 2) bytes                                    │
-//! -------------------------------------------                                                      ┴
+//! ------------------------------------------- <- A_1_offset = ENTRY_OFFSET + (A_1 - A_0) * SIZE_MAX  ┬
+//! A_1_size                    ↕ 2 bytes                                                              │
+//! -------------------------------------------                                                        │
+//! Candid encoded entry        ↕ A_1_size bytes                                            anchor A_1 │
+//! -------------------------------------------                                                        │
+//! Unused space A_1            ↕ (SIZE_MAX - A_1_size - 2) bytes                                      │
+//! -------------------------------------------                                                        ┴
 //! ...
-//! ------------------------------------------- <- A_MAX_offset = A_0_offset + (A_MAX - A_0) * SIZE_MAX
+//! ------------------------------------------- <- A_MAX_offset = ENTRY_OFFSET + (A_MAX - A_0) * SIZE_MAX
 //! A_MAX_size                  ↕ 2 bytes
 //! -------------------------------------------
 //! Candid encoded entry        ↕ A_MAX_size bytes
@@ -43,6 +61,20 @@
 //! Unallocated space           ↕ STABLE_MEMORY_RESERVE bytes
 //! -------------------------------------------
 //! ```
+//! ### Stable Memory Migration
+//!
+//! This release supports a stable memory migration which will shift all anchors to higher memory
+//! addresses.
+//! For any individual anchor the following changes are made:
+//! * entry size increased from 2kiB to 4kiB
+//!
+//! During the migration, the header version will be set to 2, when finished it will be set to 3.
+//! The anchors are migrated in configurable batches after any write operation.
+//!
+//! After this migration is complete, the following additional changes need to be made:
+//! * change the individual anchor candid types from `Vec<DeviceDataInternal>` to [Anchor]
+//! * clean up no longer needed infrastructure to handle versions < 3
+//! * start using virtual memory managed by the memory manager (stable-structures crate)
 //!
 //! ## Persistent State
 //!
@@ -62,7 +94,7 @@ use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
-use internet_identity_interface::UserNumber;
+use internet_identity_interface::{MigrationState, UserNumber};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
@@ -73,25 +105,35 @@ mod tests;
 
 // version 0: invalid
 // version 1: genesis layout, might have persistent state
-// version 2: genesis layout, must have persistent state
-// version 3+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 1..=2;
+// version 2: migration in progress genesis -> 4KB anchors layout, must have persistent state
+// version 3: 4KB anchors layout
+// version 4+: invalid
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 1..=3;
+
+const WASM_PAGE_SIZE: u64 = 65_536;
 
 /// Reserved space for the header before the anchor records start.
-const RESERVED_HEADER_BYTES: u64 = 512;
-const DEFAULT_ENTRY_SIZE: u16 = 2048;
+const ENTRY_OFFSET_V1: u64 = 512;
+const ENTRY_OFFSET_V3: u64 = 2 * WASM_PAGE_SIZE; // 1 page reserved for II config, 1 for memory manager
+
+const DEFAULT_ENTRY_SIZE_V1: u16 = 2048;
+const DEFAULT_ENTRY_SIZE_V3: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
-const STABLE_MEMORY_SIZE: u64 = 8 * GB;
-/// We reserve last ~10% of the stable memory for later new features.
-const STABLE_MEMORY_RESERVE: u64 = STABLE_MEMORY_SIZE / 10;
+
+/// In practice, II has 32 GB of stable memory available. But we want to keep the default
+/// user range until the stable memory migration is complete. Thus we keep this value for anchor
+/// range checking for the time being.
+const LEGACY_STABLE_MEMORY_SIZE: u64 = 8 * GB;
+/// We reserve last ~10% of the (legacy) stable memory for later new features.
+const STABLE_MEMORY_RESERVE: u64 = LEGACY_STABLE_MEMORY_SIZE / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// The maximum number of users this canister can store.
-pub const DEFAULT_RANGE_SIZE: u64 =
-    (STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
-        / DEFAULT_ENTRY_SIZE as u64;
+pub const DEFAULT_RANGE_SIZE_V1: u64 =
+    (LEGACY_STABLE_MEMORY_SIZE - ENTRY_OFFSET_V1 - STABLE_MEMORY_RESERVE)
+        / DEFAULT_ENTRY_SIZE_V1 as u64;
 
 pub type Salt = [u8; 32];
 
@@ -106,14 +148,46 @@ struct Header {
     magic: [u8; 3],
     // version 0: invalid
     // version 1: genesis layout, might have persistent state
-    // version 2: genesis layout, must have persistent state
-    // version 3+: invalid
+    // version 2: migration in progress genesis -> 4KB anchors layout, must have persistent state
+    // version 3: 4KB anchors layout
+    // version 4+: invalid
     version: u8,
     num_users: u32,
     id_range_lo: u64,
     id_range_hi: u64,
     entry_size: u16,
     salt: [u8; 32],
+    first_entry_offset: u64,     // offset of first entry
+    first_entry_offset_new: u64, // post-migration offset of first entry
+    entry_size_new: u16,         // post-migration entry size
+    new_layout_start: u32,       // all records < this value are still using the old anchor size
+    migration_batch_size: u32,   // batch size for incremental anchor migration
+}
+
+/// Small struct to keep record information required to read and write anchors separated from the
+/// layout information.
+#[derive(Debug, Eq, PartialEq)]
+struct RecordMeta {
+    offset: u64,
+    entry_size: u16,
+}
+
+impl RecordMeta {
+    pub fn new(record_number: u32, entry_size: u16, entry_offset: u64) -> Self {
+        RecordMeta {
+            offset: entry_offset + record_number as u64 * entry_size as u64,
+            entry_size,
+        }
+    }
+
+    /// The anchor space is divided into two parts:
+    /// * 2 bytes of candid length (u16 little endian)
+    /// * length bytes of encoded candid
+    ///
+    /// This function returns the length limit of the candid part.
+    pub fn candid_size_limit(&self) -> usize {
+        self.entry_size as usize - std::mem::size_of::<u16>()
+    }
 }
 
 impl<M: Memory> Storage<M> {
@@ -127,22 +201,29 @@ impl<M: Memory> Storage<M> {
             ));
         }
 
-        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
+        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE_V1 {
             trap(&format!(
                 "id range [{}, {}) is too large for a single canister (max {} entries)",
-                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE,
+                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE_V1,
             ));
         }
 
         Self {
             header: Header {
                 magic: *b"IIC",
-                version: 1,
+                version: 3,
                 num_users: 0,
                 id_range_lo,
                 id_range_hi,
-                entry_size: DEFAULT_ENTRY_SIZE,
+                entry_size: DEFAULT_ENTRY_SIZE_V3,
                 salt: EMPTY_SALT,
+                first_entry_offset: ENTRY_OFFSET_V3,
+
+                // the following fields are no longer relevant in the post-migration state:
+                first_entry_offset_new: 0,
+                entry_size_new: 0,
+                new_layout_start: 0,
+                migration_batch_size: 0,
             },
             memory,
         }
@@ -195,6 +276,11 @@ impl<M: Memory> Storage<M> {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
+        // header version 1 did not have this field
+        if header.version == 1 {
+            header.first_entry_offset = ENTRY_OFFSET_V1;
+        }
+
         Some(Self { header, memory })
     }
 
@@ -215,19 +301,26 @@ impl<M: Memory> Storage<M> {
     /// Writes the data of the specified user to stable memory.
     pub fn write(&mut self, user_number: UserNumber, data: Anchor) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
-
-        let stable_offset =
-            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
+        let record_meta = self.record_meta(record_number);
         let buf = candid::encode_one(data.devices).map_err(StorageError::SerializationError)?;
+        self.write_entry_bytes(&record_meta, buf)?;
+        self.migrate_record_batch()?;
+        Ok(())
+    }
 
-        if buf.len() > self.value_size_limit() {
+    fn write_entry_bytes(
+        &mut self,
+        record_meta: &RecordMeta,
+        buf: Vec<u8>,
+    ) -> Result<(), StorageError> {
+        if buf.len() > record_meta.candid_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
         // use buffered writer to minimize expensive stable memory operations
         let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(&mut self.memory, stable_offset),
+            record_meta.entry_size as usize,
+            Writer::new(&mut self.memory, record_meta.offset),
         );
         writer
             .write(&(buf.len() as u16).to_le_bytes())
@@ -240,14 +333,19 @@ impl<M: Memory> Storage<M> {
     /// Reads the data of the specified user from stable memory.
     pub fn read(&self, user_number: UserNumber) -> Result<Anchor, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
-        let stable_offset =
-            RESERVED_HEADER_BYTES + record_number as u64 * self.header.entry_size as u64;
+        let record_meta = self.record_meta(record_number);
+        let data_buf = self.read_entry_bytes(&record_meta);
+        let devices: Vec<DeviceDataInternal> =
+            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
+        Ok(Anchor { devices })
+    }
 
+    fn read_entry_bytes(&self, record_meta: &RecordMeta) -> Vec<u8> {
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
         let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(&self.memory, stable_offset),
+            record_meta.entry_size as usize,
+            Reader::new(&self.memory, record_meta.offset),
         );
 
         let mut len_buf = vec![0; 2];
@@ -257,11 +355,11 @@ impl<M: Memory> Storage<M> {
         let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
 
         // This error most likely indicates stable memory corruption.
-        if len > self.value_size_limit() {
+        if len > record_meta.candid_size_limit() {
             trap(&format!(
-                "persisted value size {} exeeds maximum size {}",
+                "persisted value size {} exceeds maximum size {}",
                 len,
-                self.value_size_limit()
+                record_meta.candid_size_limit()
             ))
         }
 
@@ -269,10 +367,7 @@ impl<M: Memory> Storage<M> {
         reader
             .read(&mut data_buf.as_mut_slice())
             .expect("failed to read memory");
-        let devices: Vec<DeviceDataInternal> =
-            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-
-        Ok(Anchor { devices })
+        data_buf
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -295,8 +390,10 @@ impl<M: Memory> Storage<M> {
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - RESERVED_HEADER_BYTES - STABLE_MEMORY_RESERVE)
-            / self.header.entry_size as u64) as usize
+        // Always return layout v1 max entries even when migration is completed.
+        // This will be adapted in the subsequent clean-up after successful migration.
+        ((LEGACY_STABLE_MEMORY_SIZE - ENTRY_OFFSET_V1 - STABLE_MEMORY_RESERVE)
+            / DEFAULT_ENTRY_SIZE_V1 as u64) as usize
     }
 
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
@@ -323,10 +420,6 @@ impl<M: Memory> Storage<M> {
         self.flush();
     }
 
-    fn value_size_limit(&self) -> usize {
-        self.header.entry_size as usize - std::mem::size_of::<u16>()
-    }
-
     fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
         if user_number < self.header.id_range_lo || user_number >= self.header.id_range_hi {
             return Err(StorageError::UserNumberOutOfRange {
@@ -342,12 +435,37 @@ impl<M: Memory> Storage<M> {
         Ok(record_number)
     }
 
+    fn record_meta(&self, record_number: u32) -> RecordMeta {
+        if self.header.version == 1 || self.header.version == 3 {
+            return RecordMeta::new(
+                record_number,
+                self.header.entry_size,
+                self.header.first_entry_offset,
+            );
+        }
+        assert_eq!(self.header.version, 2);
+
+        // we only have to check the layout pointer if we are in the middle of a migration
+        if record_number < self.header.new_layout_start {
+            RecordMeta::new(
+                record_number,
+                self.header.entry_size,
+                self.header.first_entry_offset,
+            )
+        } else {
+            RecordMeta::new(
+                record_number,
+                self.header.entry_size_new,
+                self.header.first_entry_offset_new,
+            )
+        }
+    }
+
     /// Returns the address of the first byte not yet allocated to a user.
     /// This address exists even if the max user number has been reached, because there is a memory
     /// reserve at the end of stable memory.
     fn unused_memory_start(&self) -> u64 {
-        let record_number = self.header.num_users as u64;
-        RESERVED_HEADER_BYTES + record_number * self.header.entry_size as u64
+        self.record_meta(self.header.num_users).offset
     }
 
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
@@ -430,6 +548,97 @@ impl<M: Memory> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
+    }
+
+    pub fn configure_migration(&mut self, batch_size: u32) {
+        if self.header.version == 3 {
+            // nothing to do, we're done
+            return;
+        }
+
+        if batch_size > 0 && self.header.version == 1 {
+            // initialize header for migration
+            self.header.version = 2;
+            self.header.first_entry_offset_new = ENTRY_OFFSET_V3;
+            self.header.entry_size_new = DEFAULT_ENTRY_SIZE_V3;
+            // the next user will start using the new layout
+            self.header.new_layout_start = self.header.num_users;
+        }
+
+        self.header.migration_batch_size = batch_size;
+        self.flush();
+    }
+
+    fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
+        if self.header.version == 1 || self.header.version == 3 {
+            // migration not started or already finished --> nothing to do
+            return Ok(());
+        }
+        assert_eq!(self.header.version, 2);
+        assert!(self.header.new_layout_start > 0);
+
+        for _ in 0..self.header.migration_batch_size {
+            let record = self.header.new_layout_start - 1;
+            self.migrate_record(record)?;
+
+            if self.header.new_layout_start == 0 {
+                self.finalize_migration();
+                return Ok(());
+            }
+        }
+
+        // write the modified migration state back to stable memory
+        self.flush();
+        Ok(())
+    }
+
+    fn migrate_record(&mut self, record: u32) -> Result<(), StorageError> {
+        let pre_migration_meta = self.record_meta(record);
+        let entry_data = self.read_entry_bytes(&pre_migration_meta);
+
+        // modifying this pointer will make record_meta switch to the new layout.
+        self.header.new_layout_start -= 1;
+
+        assert_eq!(
+            record,
+            { self.header.new_layout_start },
+            "the migrated record must be the lowest record using the new layout"
+        );
+
+        let post_migration_meta = self.record_meta(record);
+
+        assert_ne!(
+            pre_migration_meta, post_migration_meta,
+            "anchor record meta information must change during migration"
+        );
+
+        self.write_entry_bytes(&post_migration_meta, entry_data)
+    }
+
+    fn finalize_migration(&mut self) {
+        self.header.version = 3;
+        self.header.first_entry_offset = self.header.first_entry_offset_new;
+        self.header.entry_size = self.header.entry_size_new;
+
+        // reset now obsolete fields
+        self.header.migration_batch_size = 0;
+        self.header.new_layout_start = 0;
+        self.header.first_entry_offset_new = 0;
+        self.header.entry_size_new = 0;
+        self.flush();
+    }
+
+    /// External view into the migration progress. Only used for the `stats` query call.
+    pub fn migration_state(&self) -> MigrationState {
+        match self.header.version {
+            1 => MigrationState::NotStarted,
+            2 => MigrationState::Started {
+                anchors_left: self.header.new_layout_start as u64,
+                batch_size: self.header.migration_batch_size as u64,
+            },
+            3 => MigrationState::Finished,
+            _ => trap("unsupported header version"),
+        }
     }
 }
 

@@ -129,6 +129,16 @@ type GetDelegationResponse = variant {
     no_such_delegation
 };
 
+type MigrationState = variant {
+    not_started;
+    started: record {
+        // number of anchors that still need migration. Once it reaches 0, the migration is finished.
+        anchors_left: nat64;
+        batch_size: nat64;
+    };
+    finished;
+};
+
 type InternetIdentityStats = record {
     users_registered: nat64;
     storage_layout_version: nat8;
@@ -138,6 +148,8 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
+    // this is opt so that we can remove the migration state after the migration without breaking any clients
+    memory_migration_state: opt MigrationState;
 };
 
 // Information about the archive.
@@ -165,6 +177,9 @@ type InternetIdentityInit = record {
     // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
     // canister creation cost, the newly created canister will keep extra cycles.
     canister_creation_cycles_cost : opt nat64;
+    // Anchor migration batch size for the stable memory migration.
+    // If set to 0, migration is disabled (if the migration was already started, it will be paused in the current state).
+    memory_migration_batch_size: opt nat32;
 };
 
 type ChallengeKey = text;
