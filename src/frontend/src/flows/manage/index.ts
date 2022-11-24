@@ -1,6 +1,7 @@
 import { TemplateResult, render, html } from "lit-html";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
+import { LoginData } from "../../utils/flowResult";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { footer } from "../../components/footer";
@@ -11,12 +12,27 @@ import {
 } from "../../../generated/internet_identity_types";
 import { settingsIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
+import {
+  authenticateBox,
+  AuthTemplates,
+} from "../../components/authenticateBox";
 import { setupRecovery } from "../recovery/setupRecovery";
 import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
+
+/* Template for the authbox when authenticating to II */
+export const authTemplatesManage: AuthTemplates = {
+  message: html`<p class="t-lead">Authenticate to manage your anchor</p>`,
+  button: "Authenticate",
+};
+
+/* the II authentication flow */
+export const authFlowManage = async (
+  connection: Connection
+): Promise<LoginData> => authenticateBox(connection, authTemplatesManage);
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({

@@ -7,7 +7,7 @@ import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
   cancel,
-} from "../login/flowResult";
+} from "../../utils/flowResult";
 import { withLoader } from "../../components/loader";
 import {
   IdentifiableIdentity,

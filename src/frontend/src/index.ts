@@ -1,11 +1,10 @@
 import "./styles/main.css";
-import { auth } from "./flows/login";
-import { renderManage } from "./flows/manage";
+import { renderManage, authFlowManage } from "./flows/manage";
+import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
-import { authenticationFlow } from "./flows/authenticate";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
@@ -65,14 +64,14 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      await authenticationFlow(connection);
+      await authFlowAuthorize(connection);
       break;
     }
     // Open the management page
     case "manage": {
       // Go through the login flow, potentially creating an anchor.
       const { userNumber, connection: authenticatedConnection } = returning()
-        ? await auth(connection)
+        ? await authFlowManage(connection)
         : await welcome(connection);
 
       // Here, if the user doesn't have any recovery device, we prompt them to add

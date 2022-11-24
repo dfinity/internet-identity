@@ -28,7 +28,7 @@ import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authenticateBoxTemplate } from "./components/authenticateBox";
 import { welcomePage } from "./flows/welcome";
-import { mkAuthTemplates } from "./flows/authenticate";
+import { authTemplatesAuthorize } from "./flows/authorize";
 import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { confirmRegister } from "./flows/register/captcha";
@@ -53,7 +53,7 @@ import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
-import { manageTemplates } from "./flows/login";
+import { authTemplatesManage } from "./flows/manage";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -126,7 +126,7 @@ const iiPages: Record<string, () => void> = {
   welcome,
   welcomeReturn: () =>
     authenticateBoxTemplate({
-      templates: manageTemplates,
+      templates: authTemplatesManage,
       addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
@@ -146,7 +146,7 @@ const iiPages: Record<string, () => void> = {
     }),
   authenticate: () =>
     authenticateBoxTemplate({
-      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
       addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
@@ -155,7 +155,7 @@ const iiPages: Record<string, () => void> = {
     }),
   authenticateMany: () =>
     authenticateBoxTemplate({
-      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
       addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
@@ -164,7 +164,7 @@ const iiPages: Record<string, () => void> = {
     }),
   authenticateNew: () =>
     authenticateBoxTemplate({
-      templates: mkAuthTemplates({ origin: "https://nowhere.com" }),
+      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
       addDevice: () => console.log("Add device requested"),
       onContinue: console.log,
       recoverAnchor: console.log,
@@ -173,7 +173,7 @@ const iiPages: Record<string, () => void> = {
     }),
   authenticateAlternative: () =>
     authenticateBoxTemplate({
-      templates: mkAuthTemplates({
+      templates: authTemplatesAuthorize({
         origin: "https://nowhere.com",
         derivationOrigin: "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app",
       }),

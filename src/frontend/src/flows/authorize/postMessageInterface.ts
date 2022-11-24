@@ -2,9 +2,9 @@
 // applications that want to authenticate the user using Internet Identity
 import { Principal } from "@dfinity/principal";
 import { fetchDelegation } from "./fetchDelegation";
-import { LoginData } from "../login/flowResult";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
 import { hasOwnProperty, unknownToRecord } from "../../utils/utils";
+import { LoginData } from "../../utils/flowResult";
 
 export interface Delegation {
   delegation: {

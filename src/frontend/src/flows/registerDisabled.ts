@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
-import { LoginFlowCanceled, cancel } from "./login/flowResult";
+import { LoginFlowCanceled, cancel } from "../utils/flowResult";
 
 const pageContent = (onCancel: () => void) => html`
   <div class="l-container c-card c-card--highlight">

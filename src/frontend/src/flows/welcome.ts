@@ -3,11 +3,11 @@ import { registerIfAllowed } from "../utils/registerAllowedCheck";
 import { setAnchorUsed } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
-import { LoginFlowResult, LoginData } from "../flows/login/flowResult";
+import { LoginFlowResult, LoginData } from "../utils/flowResult";
 import { displayError } from "../components/displayError";
 import { footer } from "../components/footer";
 import { icLogo } from "../components/icons";
-import { auth } from "../flows/login";
+import { authFlowManage } from "../flows/manage";
 
 /** Properties of the "Welcome" screen, which welcomes new users. */
 type WelcomeProps = {
@@ -97,7 +97,7 @@ export const welcome = (connection: Connection): Promise<LoginData> => {
         resolve(loginData);
       },
       signin: async () => {
-        const loginData = await auth(connection);
+        const loginData = await authFlowManage(connection);
         resolve(loginData);
       },
     });
