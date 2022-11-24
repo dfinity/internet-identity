@@ -11,7 +11,7 @@ import {
 } from "../../components/authenticateBox";
 
 /* Template for the authbox when authenticating to a dapp */
-export const mkAuthTemplates = ({
+export const authTemplatesAuthorize = ({
   origin,
   derivationOrigin,
 }: {
@@ -39,7 +39,7 @@ export const mkAuthTemplates = ({
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
  * using an existing anchor or creating a new anchor, etc.
  */
-export const authenticationFlow = async (
+export const authFlowAuthorize = async (
   connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -58,7 +58,7 @@ export const authenticationFlow = async (
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
         connection,
-        mkAuthTemplates({
+        authTemplatesAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
         })

@@ -5,7 +5,7 @@ import {
   LoginFlowCanceled,
   cancel,
   LoginFlowSuccess,
-} from "../../login/flowResult";
+} from "../../../utils/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
 import { Connection } from "../../../utils/iiConnection";
 import { displayError } from "../../../components/displayError";

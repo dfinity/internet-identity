@@ -6,7 +6,7 @@ import {
   cancel,
   LoginFlowSuccess,
   LoginFlowCanceled,
-} from "../../login/flowResult";
+} from "../../../utils/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
 

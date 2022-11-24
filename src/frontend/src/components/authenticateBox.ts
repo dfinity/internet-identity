@@ -14,7 +14,7 @@ import {
   LoginFlowSuccess,
   LoginFlowError,
   LoginData,
-} from "../flows/login/flowResult";
+} from "../utils/flowResult";
 import { displayError } from "./displayError";
 import { useRecovery } from "../flows/recovery/useRecovery";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
