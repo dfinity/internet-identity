@@ -1,6 +1,6 @@
 import { render, html, TemplateResult } from "lit-html";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
-import { setUserNumber } from "../utils/userNumber";
+import { setAnchorUsed } from "../utils/userNumber";
 import { unreachable } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
 import { LoginFlowResult, LoginData } from "../flows/login/flowResult";
@@ -93,7 +93,7 @@ export const welcome = (connection: Connection): Promise<LoginData> => {
         const loginData = await registerIfAllowed(connection).then(
           retryOnError
         );
-        setUserNumber(loginData.userNumber);
+        setAnchorUsed(loginData.userNumber);
         resolve(loginData);
       },
       signin: async () => {

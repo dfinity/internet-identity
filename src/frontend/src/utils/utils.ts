@@ -6,6 +6,15 @@ export function hasOwnProperty<
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
+// A `hasOwnProperty` variant that checks that the property is a number
+// and produces evidence for the typechecked
+export function hasNumberProperty<
+  X extends Record<string, unknown>,
+  Y extends PropertyKey
+>(obj: X, prop: Y): obj is X & Record<Y, number> {
+  return hasOwnProperty(obj, prop) && typeof obj[prop] === "number";
+}
+
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
 export function unknownToString(obj: unknown, def: string): string {
@@ -24,6 +33,25 @@ export function unknownToString(obj: unknown, def: string): string {
   // Only "null" and "undefined" do not have 'toString', though typescript
   // doesn't know that.
   return def;
+}
+
+/** Try to read unknown data as a record */
+export function unknownToRecord(
+  msg: unknown
+): Record<string, unknown> | undefined {
+  if (typeof msg !== "object") {
+    return undefined;
+  }
+
+  if (msg === null) {
+    return undefined;
+  }
+
+  // Some extra conversions to take typescript by the hand
+  // eslint-disable-next-line
+  const tmp: {} = msg;
+  const obj: Record<string, unknown> = tmp;
+  return obj;
 }
 
 // Returns true if we're in Safari or iOS (although technically iOS only has
