@@ -38,30 +38,44 @@ export interface AuthRequest {
 }
 
 /** Try to read unknown data as authentication request */
-const asAuthRequest = (msg: unknown): AuthRequest | undefined => {
+const asAuthRequest = (msg: unknown): AuthRequest | string => {
   const obj = unknownToRecord(msg);
 
   if (obj === undefined) {
-    return undefined;
+    return "request is undefined";
   }
 
-  if (!hasOwnProperty(obj, "kind") || obj.kind !== "authorize-client") {
-    return undefined;
+  if (!hasOwnProperty(obj, "kind")) {
+    return "request does not have 'kind'";
   }
 
-  if (
-    !hasOwnProperty(obj, "sessionPublicKey") ||
-    !(obj.sessionPublicKey instanceof Uint8Array)
-  ) {
-    return undefined;
+  if (obj.kind !== "authorize-client") {
+    return "'kind' is not 'authorize-client'";
   }
 
-  const maxTimeToLive = obj.maxTimeToLive;
+  if (!hasOwnProperty(obj, "sessionPublicKey")) {
+    return "request does not have 'sessionPublicKey'";
+  }
+
+  if (!(obj.sessionPublicKey instanceof Uint8Array)) {
+    return "'sessionPublicKey' is not 'Uint8Array'";
+  }
+
+  // Temporary work around for clients that use 'number' instead of 'bigint'
+  // https://github.com/dfinity/internet-identity/issues/1050
+  let maxTimeToLive = obj.maxTimeToLive;
+  if (typeof maxTimeToLive === "number") {
+    console.warn(
+      "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future"
+    );
+    maxTimeToLive = BigInt(maxTimeToLive);
+  }
+
   if (
     typeof maxTimeToLive !== "undefined" &&
     typeof maxTimeToLive !== "bigint"
   ) {
-    return undefined;
+    return "'maxTimeToLive' is not 'bigint'";
   }
 
   const derivationOrigin = obj.derivationOrigin;
@@ -69,7 +83,7 @@ const asAuthRequest = (msg: unknown): AuthRequest | undefined => {
     typeof derivationOrigin !== "undefined" &&
     typeof derivationOrigin !== "string"
   ) {
-    return undefined;
+    return "'derivationOrigin' is not 'string'";
   }
 
   return {
@@ -165,7 +179,7 @@ const waitForAuthRequest = (): Promise<AuthContext> =>
     const eventHandler = async (event: MessageEvent) => {
       const message: unknown = event.data; // Drop assumptions about event.data (an 'any')
       const authRequest = asAuthRequest(message);
-      if (authRequest !== undefined) {
+      if (typeof authRequest !== "string") {
         window.removeEventListener("message", eventHandler);
         console.log(
           `Handling authorize-client request ${JSON.stringify(
@@ -179,7 +193,8 @@ const waitForAuthRequest = (): Promise<AuthContext> =>
         });
       } else {
         console.warn(
-          `Bad authentication request received: ${JSON.stringify(message)}`
+          `Bad authentication request received: ${authRequest}`,
+          message
         );
       }
     };
