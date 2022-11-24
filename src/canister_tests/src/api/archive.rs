@@ -1,5 +1,6 @@
 use crate::framework;
 use crate::framework::CallError;
+use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
 use internet_identity_interface as types;
 
@@ -43,6 +44,13 @@ pub fn get_anchor_entries(
         (anchor, cursor, limit),
     )
     .map(|(x,)| x)
+}
+
+pub fn status(
+    env: &StateMachine,
+    canister_id: CanisterId,
+) -> Result<CanisterStatusResponse, CallError> {
+    framework::call_candid(env, canister_id, "status", ()).map(|(x,)| x)
 }
 
 pub fn http_request(

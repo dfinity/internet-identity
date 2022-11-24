@@ -47,6 +47,16 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Should expose status to anonymous callers.
+#[test]
+fn should_expose_status() -> Result<(), CallError> {
+    let env = StateMachine::new();
+    let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
+    let status = api::status(&env, canister_id)?;
+    assert_eq!(status.cycles, 0);
+    Ok(())
+}
+
 #[cfg(test)]
 mod rollback_tests {
     use super::*;

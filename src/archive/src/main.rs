@@ -37,9 +37,12 @@
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
 use candid::{CandidType, Deserialize, Principal};
+use ic_cdk::api::management_canister::main::{
+    canister_status, CanisterIdRecord, CanisterStatusResponse,
+};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
-use ic_cdk::{caller, trap};
+use ic_cdk::{caller, id, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{
@@ -470,6 +473,17 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         "Number of stable memory pages used by this canister.",
     )?;
     Ok(())
+}
+
+/// Publicly exposes the status of the archive canister.
+/// This is useful to check the cycles balance in testing environments.
+#[update]
+async fn status() -> CanisterStatusResponse {
+    let canister_id = id();
+    let (status,) = canister_status(CanisterIdRecord { canister_id })
+        .await
+        .expect("failed to retrieve canister status");
+    status
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other

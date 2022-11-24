@@ -124,6 +124,28 @@ type StreamingStrategy = variant {
     };
 };
 
+// management canister types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-candid
+
+type DefiniteCanisterCettings = record {
+    controllers : vec principal;
+    compute_allocation : nat;
+    memory_allocation : nat;
+    freezing_threshold : nat;
+};
+
+type CanisterStatus = record {
+    status : variant {
+        running;
+        stopping;
+        stopped
+    };
+    settings: DefiniteCanisterCettings;
+    module_hash: opt blob;
+    memory_size: nat;
+    cycles: nat;
+    idle_cycles_burned_per_day: nat;
+}
+
 service : (ArchiveInit) -> {
     // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
     // returned. Use the Cursor to skip to later entries.
@@ -148,4 +170,7 @@ service : (ArchiveInit) -> {
 
     // HTTP endpoint to expose metrics for Prometheus.
     http_request: (request: HttpRequest) -> (HttpResponse) query;
+
+    // Exposes the canister status of this canister.
+    status : () -> (CanisterStatus);
 }

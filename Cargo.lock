@@ -431,6 +431,7 @@ dependencies = [
  "candid",
  "flate2",
  "hex",
+ "ic-cdk",
  "ic-certification",
  "ic-crypto-iccsa",
  "ic-state-machine-tests",
