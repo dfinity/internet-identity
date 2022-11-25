@@ -19,10 +19,10 @@ export const mkAnchorPicker = (
   template: TemplateResult;
 } => {
   const elems = props.savedAnchors.map((anchor, i) =>
-    anchorItem({ anchor, pick: props.pick, focus: i == 0 })
+    anchorItem({ anchor, pick: props.pick, focus: i === 0 })
   );
 
-  elems.push(html` <li class="c-list__item c-list__item--noFocusStyle">
+  const moreOptions = html` <li class="c-list__item c-list__item--noFocusStyle">
     <button
       class="t-link c-list__parcel c-list__parcel--fullwidth c-list__parcel--summary"
       @click="${() => props.moreOptions()}"
@@ -30,10 +30,10 @@ export const mkAnchorPicker = (
     >
       More options<i class="c-list__icon"> … </i>
     </button>
-  </li>`);
+  </li>`;
 
   const template = html`<ul class="c-list c-list--anchors l-stack">
-    ${elems}
+    ${[...elems, moreOptions]}
   </ul>`;
 
   return { template };

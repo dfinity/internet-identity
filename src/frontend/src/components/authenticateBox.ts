@@ -21,9 +21,9 @@ import { useRecovery } from "../flows/recovery/useRecovery";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
- * for meaning of "new", "useExisting" and "pick". */
+ * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
-  new: {
+  firstTime: {
     slot: TemplateResult;
     useExistingText: string /** text shown on the button leading to "useExisting" */;
   };
@@ -56,7 +56,7 @@ export const authenticateBox = async (
       });
 
       // If there _are_ some anchors, then we show the "pick" screen, otherwise
-      // we assume a new user and show the "new" screen.
+      // we assume a new user and show the "firstTime" screen.
       const anchors = getAnchors();
       if (isNonEmptyArray(anchors)) {
         pages.pick({
@@ -64,7 +64,7 @@ export const authenticateBox = async (
           moreOptions: () => pages.useExisting(),
         });
       } else {
-        pages.new({ useExisting: () => pages.useExisting() });
+        pages.firstTime({ useExisting: () => pages.useExisting() });
       }
     });
 
@@ -92,7 +92,7 @@ export const authenticateBox = async (
   }
 };
 
-/** The authentication pages, namely "new" (for new users), "useExisting" (for users who
+/** The authentication pages, namely "firstTime" (for new users), "useExisting" (for users who
  * don't have saved anchors or who wish to use non-saved anchors) and "pick" (for users
  * picking a saved anchor) */
 export const authnPages = (
@@ -103,8 +103,8 @@ export const authnPages = (
     recover: () => void;
   } & AuthnTemplates
 ) => ({
-  new: (newProps: { useExisting: () => void }) =>
-    page(html`${props.new.slot}
+  firstTime: (firstTimeProps: { useExisting: () => void }) =>
+    page(html`${props.firstTime.slot}
       <div class="l-stack">
         <button
           type="button"
@@ -116,11 +116,11 @@ export const authnPages = (
         </button>
         <button
           type="button"
-          @click=${() => newProps.useExisting()}
+          @click=${() => firstTimeProps.useExisting()}
           id="loginButton"
           class="c-button c-button--secondary"
         >
-          ${props.new.useExistingText}
+          ${props.firstTime.useExistingText}
         </button>
       </div>
       <p class="t-paragraph t-centered l-stack">

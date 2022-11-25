@@ -29,7 +29,7 @@ export const authnTemplateManage = (): AuthnTemplates => {
     <div class="t-centered l-stack">${slot}</div>
   `;
   return {
-    new: {
+    firstTime: {
       slot: wrap(`Anonymously connect to dapps on the Internet Computer`),
       useExistingText: "Manage Existing",
     },

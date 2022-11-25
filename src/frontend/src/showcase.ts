@@ -153,7 +153,7 @@ const iiPages: Record<string, () => void> = {
   // Authorize screens
 
   authorizeNew: () =>
-    authz.new({ useExisting: () => console.log("Use existing") }),
+    authz.firstTime({ useExisting: () => console.log("Use existing") }),
   authorizeUseExisting: () => authz.useExisting(),
   authorizePick: () =>
     authz.pick({
@@ -175,7 +175,7 @@ const iiPages: Record<string, () => void> = {
 
   // Manage Auth screens
   manageNew: () =>
-    manage.new({ useExisting: () => console.log("Use existing") }),
+    manage.firstTime({ useExisting: () => console.log("Use existing") }),
 
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
@@ -241,7 +241,7 @@ const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
   banner: () => {
-    manage.new({ useExisting: () => console.log("Use existing") });
+    manage.firstTime({ useExisting: () => console.log("Use existing") });
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),

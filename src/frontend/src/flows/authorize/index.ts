@@ -42,7 +42,7 @@ export const authnTemplateAuthorize = ({
     </div>
   `;
   return {
-    new: {
+    firstTime: {
       slot: wrap("Create an anchor to continue to"),
       useExistingText: "Use Existing",
     },
