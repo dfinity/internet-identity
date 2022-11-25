@@ -8,13 +8,9 @@ import { parseUserNumber } from "../utils/userNumber";
 export const mkAnchorInput = ({
   userNumber,
   onSubmit,
-  focus = true,
-  important = true,
 }: {
   userNumber?: bigint;
-  onSubmit?: (userNumber: bigint) => void;
-  focus?: boolean;
-  important?: boolean;
+  onSubmit: (userNumber: bigint) => void;
 }): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
@@ -50,7 +46,7 @@ export const mkAnchorInput = ({
     if (result === undefined) {
       return showHint("Please enter an Anchor");
     }
-    onSubmit?.(result);
+    onSubmit(result);
   };
 
   // How we react on unexpected (i.e. non-digit) input
@@ -101,11 +97,10 @@ export const mkAnchorInput = ({
     <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}
-        ${focus ? mount(selectInput) : ""}
+        ${mount(selectInput)}
         type="text"
         data-role="anchor-input"
-        class="c-input ${important &&
-        "c-input--vip"} c-input--rounded c-input--centered c-input--spacious"
+        class="c-input c-input--vip c-input--rounded c-input--centered c-input--spacious"
         placeholder="Enter anchor"
         value="${ifDefined(userNumber?.toString())}"
         @input=${inputFilter(isDigits, onBadInput)}

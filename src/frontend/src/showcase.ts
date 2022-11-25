@@ -4,7 +4,7 @@
 import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Chan } from "./utils/utils";
+import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
 import { withRef } from "./utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
 import {
@@ -26,16 +26,15 @@ import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
-import { authenticateBoxTemplate } from "./components/authenticateBox";
-import { welcomePage } from "./flows/welcome";
-import { authTemplatesAuthorize } from "./flows/authorize";
+import { authnPages } from "./components/authenticateBox";
+import { authnTemplateAuthorize } from "./flows/authorize";
 import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { confirmRegister } from "./flows/register/captcha";
 import { displayUserNumber } from "./flows/register/finish";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
-import { displayManage } from "./flows/manage";
+import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { deviceSettings } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
@@ -53,7 +52,6 @@ import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./flows/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
-import { authTemplatesManage } from "./flows/manage";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -116,23 +114,30 @@ const dummyChallenge: Challenge = {
 const dummyIdentity: IdentifiableIdentity =
   undefined as unknown as IdentifiableIdentity;
 
-const welcome = () =>
-  welcomePage({
-    register: () => console.log("register"),
-    signin: () => console.log("signin"),
-  });
+/* Various values used for showcasing both authz & manage authentication flows */
+
+const authnCnfg = {
+  register: () => console.log("Register requested"),
+  addDevice: () => console.log("Add device requested"),
+  recover: () => console.log("Recover requested"),
+  onSubmit: (anchor: bigint) => console.log("Submitting anchor", anchor),
+};
+
+const authzTemplates = authnTemplateAuthorize({
+  origin: "https://nowhere.com",
+});
+const authzTemplatesAlt = authnTemplateAuthorize({
+  origin: "https://nowhere.com",
+  derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+});
+
+const authz = authnPages({ ...authnCnfg, ...authzTemplates });
+const authzAlt = authnPages({ ...authnCnfg, ...authzTemplatesAlt });
+
+const manageTemplates = authnTemplateManage();
+const manage = authnPages({ ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
-  welcome,
-  welcomeReturn: () =>
-    authenticateBoxTemplate({
-      templates: authTemplatesManage,
-      addDevice: () => console.log("Add device requested"),
-      onContinue: console.log,
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
-      anchors: [BigInt(10000)],
-    }),
   displayUserNumber: () => displayUserNumber(userNumber),
   faq: () => faqView(),
   about: () => aboutView(),
@@ -144,45 +149,39 @@ const iiPages: Record<string, () => void> = {
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
     }),
-  authenticate: () =>
-    authenticateBoxTemplate({
-      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
-      addDevice: () => console.log("Add device requested"),
-      onContinue: console.log,
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
-      anchors: [BigInt(10000), BigInt(123456)],
+
+  // Authorize screens
+
+  authorizeNew: () =>
+    authz.firstTime({ useExisting: () => console.log("Use existing") }),
+  authorizeUseExisting: () => authz.useExisting(),
+  authorizePick: () =>
+    authz.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => console.log("More options requested"),
     }),
-  authenticateMany: () =>
-    authenticateBoxTemplate({
-      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
-      addDevice: () => console.log("Add device requested"),
-      onContinue: console.log,
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
-      anchors: [...Array(10).keys()].map((x) => BigInt(10000 + 129 * x * x)),
+  authorizePickAlt: () =>
+    authzAlt.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => console.log("More options requested"),
     }),
-  authenticateNew: () =>
-    authenticateBoxTemplate({
-      templates: authTemplatesAuthorize({ origin: "https://nowhere.com" }),
-      addDevice: () => console.log("Add device requested"),
-      onContinue: console.log,
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
-      anchors: [],
+  authorizePickAltOpen: () =>
+    authzAlt.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => console.log("More options requested"),
     }),
-  authenticateAlternative: () =>
-    authenticateBoxTemplate({
-      templates: authTemplatesAuthorize({
-        origin: "https://nowhere.com",
-        derivationOrigin: "http://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app",
-      }),
-      addDevice: () => console.log("Add device requested"),
-      onContinue: console.log,
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
-      anchors: [BigInt(10000), BigInt(123456)],
+  authorizePickMany: () =>
+    authz.pick({
+      anchors: [...Array(10).keys()].map((x) =>
+        BigInt(10000 + 129 * x * x)
+      ) as NonEmptyArray<bigint>,
+      moreOptions: () => console.log("More options requested"),
     }),
+
+  // Manage Auth screens
+  manageNew: () =>
+    manage.firstTime({ useExisting: () => console.log("Use existing") }),
+
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
   recoverWithDevice: () =>
@@ -247,7 +246,7 @@ const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber("hello", null),
   banner: () => {
-    welcome();
+    manage.firstTime({ useExisting: () => console.log("Use existing") });
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
@@ -272,18 +271,14 @@ const components = (): TemplateResult => {
   const savedAnchors: Ref<HTMLInputElement> = createRef();
   const updateSavedAnchors: Ref<HTMLButtonElement> = createRef();
 
-  const mk = (anchors: bigint[]): TemplateResult =>
+  const mk = (anchors: NonEmptyArray<bigint>): TemplateResult =>
     mkAnchorPicker({
       savedAnchors: anchors,
       pick: (anchor: bigint) =>
         withRef(showSelected, (div) => {
           div.innerText = anchor.toString();
         }),
-      button: "Let's go",
-
-      addDevice: () => console.log("Add device requested"),
-      recoverAnchor: console.log,
-      register: () => console.log("Register requested"),
+      moreOptions: () => console.log("More options requested"),
     }).template;
 
   const chan = new Chan<TemplateResult>();
@@ -291,14 +286,12 @@ const components = (): TemplateResult => {
   const update = () => {
     const value = savedAnchors.value?.value;
     if (value !== undefined) {
-      if (value === "") {
-        chan.send(mk([]));
-      } else {
-        const values = value.split(",").map((x) => {
-          return BigInt(x);
-        });
-
-        chan.send(mk(values));
+      if (value !== "") {
+        const values = value.split(",").map((x) => BigInt(x));
+        const anchors = asNonEmptyArray(values);
+        if (anchors !== undefined) {
+          chan.send(mk(anchors));
+        }
       }
     }
   };

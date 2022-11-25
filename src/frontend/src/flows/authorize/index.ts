@@ -1,4 +1,7 @@
-import { html, render } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
+import { withRef } from "../../utils/lit-html";
+import { caretDownIcon } from "../../components/icons";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { unreachable } from "../../utils/utils";
 import { Connection } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
@@ -7,33 +10,50 @@ import { recoveryWizard } from "../recovery/recoveryWizard";
 import { authenticationProtocol } from "./postMessageInterface";
 import {
   authenticateBox,
-  AuthTemplates,
+  AuthnTemplates,
 } from "../../components/authenticateBox";
 
 /* Template for the authbox when authenticating to a dapp */
-export const authTemplatesAuthorize = ({
+export const authnTemplateAuthorize = ({
   origin,
   derivationOrigin,
 }: {
   origin: string;
   derivationOrigin?: string;
-}): AuthTemplates => {
-  const message = html`<p class="t-lead">
-    Connect to<br />
-    <span class="t-strong">${origin}</span><br />
-  </p>`;
+}): AuthnTemplates => {
   const chasm =
     derivationOrigin !== undefined
-      ? {
+      ? mkChasm({
           info: "shared identity",
           message: html`<span class="t-strong">${origin}</span> is an
             alternative domain of <br /><span class="t-strong"
               >${derivationOrigin}</span
             ><br />and you will be authenticated to both with the same identity.`,
-        }
+        })
       : undefined;
 
-  return { message, chasm, button: "Authorize" };
+  const wrap = (slot: string) => html`
+    <div class="l-stack t-centered">
+      <p class="t-lead">
+        ${slot}<br />
+        <span class="t-strong">${origin}</span><br />
+      </p>
+      ${chasm}
+    </div>
+  `;
+  return {
+    firstTime: {
+      slot: wrap("Create an anchor to continue to"),
+      useExistingText: "Use Existing",
+    },
+    useExisting: {
+      slot: wrap("Enter your anchor to continue to"),
+    },
+
+    pick: {
+      slot: wrap("Choose an anchor to continue to"),
+    },
+  };
 };
 
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
@@ -58,7 +78,7 @@ export const authFlowAuthorize = async (
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
         connection,
-        authTemplatesAuthorize({
+        authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
         })
@@ -127,4 +147,50 @@ export const authFlowAuthorize = async (
       unreachable(result);
       break;
   }
+};
+
+/** Options to display a "chasm" in the authbox */
+type ChasmOpts = {
+  info: string;
+  message: TemplateResult;
+};
+
+const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
+  /* the chasm that opens to reveal details about alternative origin */
+  const chasmRef: Ref<HTMLDivElement> = createRef();
+
+  /* the (purely visual) arrow on the chasm */
+  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
+
+  /* Toggle the chasm open/closed */
+  const chasmToggle = () =>
+    withRef(chasmRef, (chasm) => {
+      const expanded = chasm.getAttribute("aria-expanded") === "true";
+      if (!expanded) {
+        chasm.setAttribute("aria-expanded", "true");
+
+        withRef(chasmToggleRef, (arrow) =>
+          arrow.classList.add("c-chasm__button--flipped")
+        );
+      } else {
+        chasm.setAttribute("aria-expanded", "false");
+
+        withRef(chasmToggleRef, (arrow) =>
+          arrow.classList.remove("c-chasm__button--flipped")
+        );
+      }
+    });
+
+  return html`
+    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
+    chasmToggleRef
+  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
+      <div ${ref(chasmRef)} class="c-chasm" aria-expanded="false">
+        <div class="c-chasm__arrow"></div>
+        <div class="t-weak c-chasm__content">
+            ${message}
+        </div>
+      </div>
+    </p>
+`;
 };

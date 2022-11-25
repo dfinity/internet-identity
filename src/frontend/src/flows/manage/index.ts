@@ -1,7 +1,6 @@
 import { TemplateResult, render, html } from "lit-html";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { LoginData } from "../../utils/flowResult";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { footer } from "../../components/footer";
@@ -14,9 +13,10 @@ import { settingsIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
-  AuthTemplates,
+  AuthnTemplates,
 } from "../../components/authenticateBox";
 import { setupRecovery } from "../recovery/setupRecovery";
+import { recoveryWizard } from "../recovery/recoveryWizard";
 import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
@@ -24,15 +24,35 @@ import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
 
 /* Template for the authbox when authenticating to II */
-export const authTemplatesManage: AuthTemplates = {
-  message: html`<p class="t-lead">Authenticate to manage your anchor</p>`,
-  button: "Authenticate",
+export const authnTemplateManage = (): AuthnTemplates => {
+  const wrap = (slot: string): TemplateResult => html`
+    <div class="t-centered l-stack">${slot}</div>
+  `;
+  return {
+    firstTime: {
+      slot: wrap(`Anonymously connect to dapps on the Internet Computer`),
+      useExistingText: "Manage Existing",
+    },
+    useExisting: {
+      slot: wrap(`Enter your Anchor to continue to Internet Identity`),
+    },
+
+    pick: { slot: wrap("Choose an Anchor") },
+  };
 };
 
 /* the II authentication flow */
-export const authFlowManage = async (
-  connection: Connection
-): Promise<LoginData> => authenticateBox(connection, authTemplatesManage);
+export const authFlowManage = async (connection: Connection) => {
+  // Go through the login flow, potentially creating an anchor.
+  const { userNumber, connection: authenticatedConnection } =
+    await authenticateBox(connection, authnTemplateManage());
+
+  // Here, if the user doesn't have any recovery device, we prompt them to add
+  // one. The exact flow depends on the device they use.
+  await recoveryWizard(userNumber, authenticatedConnection);
+  // From here on, the user is authenticated to II.
+  renderManage(userNumber, authenticatedConnection);
+};
 
 const displayFailedToListDevices = (error: Error) =>
   displayError({

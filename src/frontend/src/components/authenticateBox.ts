@@ -1,13 +1,14 @@
 import { html, render, TemplateResult } from "lit-html";
-import { icLogo, caretDownIcon } from "./icons";
+import { NonEmptyArray } from "../utils/utils";
+import { icLogo } from "./icons";
 import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { addRemoteDevice } from "../flows/addDevice/welcomeView";
 import { mkAnchorPicker } from "./anchorPicker";
+import { mkAnchorInput } from "./anchorInput";
 import { getAnchors, setAnchorUsed } from "../utils/userNumber";
-import { unreachable } from "../utils/utils";
+import { unreachable, isNonEmptyArray } from "../utils/utils";
 import { Connection } from "../utils/iiConnection";
-import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
@@ -18,51 +19,53 @@ import {
 import { displayError } from "./displayError";
 import { useRecovery } from "../flows/recovery/useRecovery";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
-import { withRef } from "../utils/lit-html";
 
-/** Properties for the authentication box component which authenticates a user
- * to II or to another dapp */
-type PageProps = { templates: AuthTemplates } & {
-  onContinue: (userNumber: bigint) => void;
-  recoverAnchor: (userNumber?: bigint) => void;
-  register: () => void;
-  addDevice: () => void;
-  anchors: bigint[];
-};
-
-/** Text and content to display in the box */
-export type AuthTemplates = {
-  message: TemplateResult;
-  button: string;
-  chasm?: ChasmOpts;
-};
-
-/** Options to display a "chasm" in the authbox */
-type ChasmOpts = {
-  info: string;
-  message: TemplateResult;
+/** Template used for rendering specific authentication screens. See `authnPages` below
+ * for meaning of "firstTime", "useExisting" and "pick". */
+export type AuthnTemplates = {
+  firstTime: {
+    slot: TemplateResult;
+    useExistingText: string /** text shown on the button leading to "useExisting" */;
+  };
+  useExisting: {
+    slot: TemplateResult;
+  };
+  pick: {
+    slot: TemplateResult;
+  };
 };
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
 export const authenticateBox = async (
   connection: Connection,
-  templates: AuthTemplates
+  templates: AuthnTemplates
 ): Promise<LoginData> => {
   const promptAuth = () =>
     new Promise<LoginFlowResult>((resolve) => {
-      authenticateBoxTemplate({
-        templates,
+      const pages = authnPages({
+        ...templates,
         addDevice: () => addRemoteDevice(connection),
-        onContinue: (userNumber) => {
+        onSubmit: (userNumber) => {
           resolve(authenticate(connection, userNumber));
         },
         register: () => {
           resolve(registerIfAllowed(connection));
         },
-        recoverAnchor: (userNumber) => useRecovery(connection, userNumber),
-        anchors: getAnchors(),
+        recover: () => useRecovery(connection),
       });
+
+      // If there _are_ some anchors, then we show the "pick" screen, otherwise
+      // we assume a new user and show the "firstTime" screen.
+      const anchors = getAnchors();
+      if (isNonEmptyArray(anchors)) {
+        pages.pick({
+          anchors: anchors,
+          moreOptions: () => pages.useExisting(),
+        });
+      } else {
+        pages.firstTime({ useExisting: () => pages.useExisting() });
+      }
     });
 
   // Retry until user has successfully authenticated
@@ -89,40 +92,95 @@ export const authenticateBox = async (
   }
 };
 
-export const authenticateBoxTemplate = (props: PageProps): void => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(props), container);
-};
-
-const pageContent = ({
-  templates,
-  addDevice,
-  onContinue,
-  recoverAnchor,
-  register,
-  anchors,
-}: PageProps): TemplateResult => {
-  const anchorInput = mkAnchorPicker({
-    savedAnchors: anchors,
-    pick: onContinue,
-    button: templates.button,
-    addDevice,
-    recoverAnchor,
-    register,
-  });
-
-  return html` <div class="l-container c-card c-card--highlight">
-      <!-- The title is hidden but used for accessibility -->
-      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-      <div class="c-logo">${icLogo}</div>
-      <div class="l-stack t-centered">
-        ${templates.message} ${templates.chasm ? mkChasm(templates.chasm) : ""}
+/** The authentication pages, namely "firstTime" (for new users), "useExisting" (for users who
+ * don't have saved anchors or who wish to use non-saved anchors) and "pick" (for users
+ * picking a saved anchor) */
+export const authnPages = (
+  props: {
+    register: () => void;
+    onSubmit: (anchor: bigint) => void;
+    addDevice: () => void;
+    recover: () => void;
+  } & AuthnTemplates
+) => ({
+  firstTime: (firstTimeProps: { useExisting: () => void }) =>
+    page(html`${props.firstTime.slot}
+      <div class="l-stack">
+        <button
+          type="button"
+          @click=${() => props.register()}
+          id="registerButton"
+          class="c-button"
+        >
+          Create an Anchor
+        </button>
+        <button
+          type="button"
+          @click=${() => firstTimeProps.useExisting()}
+          id="loginButton"
+          class="c-button c-button--secondary"
+        >
+          ${props.firstTime.useExistingText}
+        </button>
       </div>
-
-      ${anchorInput.template}
-    </div>
-    ${footer}`;
-};
+      <p class="t-paragraph t-centered l-stack">
+        <a
+          class="t-link"
+          href="https://medium.com/dfinity/internet-identity-the-end-of-usernames-and-passwords-ff45e4861bf7"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Learn More</a
+        >
+      </p> `),
+  useExisting: () => {
+    const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
+    page(html` ${props.useExisting.slot} ${anchorInput.template}
+      <ul class="c-list--flex">
+        <li>
+          <a
+            @click="${() => props.addDevice()}"
+            id="addNewDeviceButton"
+            class="t-link"
+            >Add a new device?</a
+          >
+        </li>
+        <li>
+          <a @click="${() => props.recover()}" id="recoverButton" class="t-link"
+            >Lost Access?</a
+          >
+        </li>
+      </ul>
+      <div class="c-button-group">
+        <button
+          @click=${() => props.register()}
+          class="c-button c-button--secondary"
+        >
+          Create New
+        </button>
+        <button
+          data-action="continue"
+          @click=${() => anchorInput.submit()}
+          class="c-button"
+        >
+          Continue
+        </button>
+      </div>`);
+  },
+  pick: (pickProps: {
+    anchors: NonEmptyArray<bigint>;
+    moreOptions: () => void;
+  }) =>
+    page(
+      html`
+        ${props.pick.slot}
+        ${mkAnchorPicker({
+          savedAnchors: pickProps.anchors,
+          pick: props.onSubmit,
+          moreOptions: pickProps.moreOptions,
+        }).template}
+      `
+    ),
+});
 
 export const authenticate = async (
   connection: Connection,
@@ -141,42 +199,18 @@ export const authenticate = async (
   }
 };
 
-const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
-  /* the chasm that opens to reveal details about alternative origin */
-  const chasmRef: Ref<HTMLDivElement> = createRef();
+// Wrap the template with header & footer and render the page
+const page = (slot: TemplateResult) => {
+  const template = html`
+    <div class="l-container c-card c-card--highlight">
+      <!-- The title is hidden but used for accessibility -->
+      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+      <div class="c-logo">${icLogo}</div>
+      ${slot}
+    </div>
+    ${footer}
+  `;
 
-  /* the (purely visual) arrow on the chasm */
-  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
-
-  /* Toggle the chasm open/closed */
-  const chasmToggle = () =>
-    withRef(chasmRef, (chasm) => {
-      const expanded = chasm.getAttribute("aria-expanded") === "true";
-      if (!expanded) {
-        chasm.setAttribute("aria-expanded", "true");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.add("c-chasm__button--flipped")
-        );
-      } else {
-        chasm.setAttribute("aria-expanded", "false");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.remove("c-chasm__button--flipped")
-        );
-      }
-    });
-
-  return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
-    chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
-      <div ${ref(chasmRef)} class="c-chasm" aria-expanded="false">
-        <div class="c-chasm__arrow"></div>
-        <div class="t-weak c-chasm__content">
-            ${message}
-        </div>
-      </div>
-    </p>
-`;
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(template, container);
 };
