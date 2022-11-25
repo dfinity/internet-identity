@@ -45,7 +45,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
     }
 
     // When authenticating with alternative origins, toggle the chasm
-    if (pageName === "authenticateAlternative") {
+    if (pageName === "authorizePickAltOpen") {
       await browser.$("#alternative-origin-chasm-toggle").click();
       // Ensure the button is not hovered anymore for screenshot stability
       await browser

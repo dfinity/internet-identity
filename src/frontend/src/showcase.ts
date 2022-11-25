@@ -165,6 +165,11 @@ const iiPages: Record<string, () => void> = {
       anchors: [BigInt(10000), BigInt(243099)],
       moreOptions: () => console.log("More options requested"),
     }),
+  authorizePickAltOpen: () =>
+    authzAlt.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => console.log("More options requested"),
+    }),
   authorizePickMany: () =>
     authz.pick({
       anchors: [...Array(10).keys()].map((x) =>
