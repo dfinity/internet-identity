@@ -1,17 +1,14 @@
 import "./styles/main.css";
-import { renderManage, authFlowManage } from "./flows/manage";
+import { authFlowManage } from "./flows/manage";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { checkRequiredFeatures } from "./utils/featureDetection";
-import { recoveryWizard } from "./flows/recovery/recoveryWizard";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
-import { returning } from "./utils/userNumber";
-import { welcome } from "./flows/welcome";
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -69,16 +66,8 @@ const init = async () => {
     }
     // Open the management page
     case "manage": {
-      // Go through the login flow, potentially creating an anchor.
-      const { userNumber, connection: authenticatedConnection } = returning()
-        ? await authFlowManage(connection)
-        : await welcome(connection);
-
-      // Here, if the user doesn't have any recovery device, we prompt them to add
-      // one. The exact flow depends on the device they use.
-      await recoveryWizard(userNumber, authenticatedConnection);
-      // From here on, the user is authenticated to II.
-      renderManage(userNumber, authenticatedConnection);
+      await authFlowManage(connection);
+      break;
     }
   }
 };

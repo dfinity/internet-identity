@@ -54,6 +54,28 @@ export function unknownToRecord(
   return obj;
 }
 
+export type NonEmptyArray<T> = [T, ...T[]];
+
+export function isNonEmptyArray<T>(
+  original: T[]
+): original is NonEmptyArray<T> {
+  return original.length >= 1;
+}
+
+export function asNonEmptyArray<T>(
+  original: T[]
+): NonEmptyArray<T> | undefined {
+  const arr: T[] = [...original];
+
+  const first = arr.shift();
+
+  if (first === undefined) {
+    return undefined;
+  }
+
+  return [first, ...arr];
+}
+
 // Returns true if we're in Safari or iOS (although technically iOS only has
 // Safari)
 export function iOSOrSafari(): boolean {

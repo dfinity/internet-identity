@@ -176,12 +176,6 @@ const writeAnchors = (anchors: Anchors) => {
   localStorage.setItem("anchors", JSON.stringify(anchors));
 };
 
-/** Whether or not the user is returning (false for first time users) */
-export const returning = (): boolean => {
-  migrate();
-  return getAnchors().length !== 0;
-};
-
 // We check that the user has entered a sequence of digits only,
 // before attempting to parse
 export const parseUserNumber = (s: string): bigint | null => {
