@@ -44,7 +44,6 @@ export const FLOWS = {
   ): Promise<string> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.expectAnchorInputField();
     await authenticateView.register();
     return await FLOWS.register(browser, deviceName);
   },
@@ -57,7 +56,7 @@ export const FLOWS = {
     await welcomeView.waitForDisplay();
     await welcomeView.login();
     await welcomeView.typeUserNumber(userNumber);
-    await browser.$("#authorizeButton").click();
+    await browser.$("button[data-action='continue']").click();
     // NOTE: depending on the browser, we issue different warnings. On Safari,
     // the warning comes before the recovery method selector. Since we only
     // test on Chrome we always expect the recovery selector first.
