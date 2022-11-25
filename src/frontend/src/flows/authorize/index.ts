@@ -45,6 +45,7 @@ export const authnTemplateAuthorize = ({
     firstTime: {
       slot: wrap("Create an anchor to continue to"),
       useExistingText: "Use Existing",
+      createAnchorText: "Create an Anchor",
     },
     useExisting: {
       slot: wrap("Enter your anchor to continue to"),

@@ -32,6 +32,7 @@ export const authnTemplateManage = (): AuthnTemplates => {
     firstTime: {
       slot: wrap(`Anonymously connect to dapps on the Internet Computer`),
       useExistingText: "Manage Existing",
+      createAnchorText: "Create Identity Anchor",
     },
     useExisting: {
       slot: wrap(`Enter your Anchor to continue to Internet Identity`),

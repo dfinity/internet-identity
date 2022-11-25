@@ -17,14 +17,12 @@ import {
 
 const pageContent = html`
   <div class="l-container c-card c-card--highlight">
-    <h1 class="t-title t-title--main">Confirm new device</h1>
-    <form id="confirmForm">
+    <h1 class="t-title t-title--main">Prove you're not a robot</h1>
+    <form class="l-stack t-centered" id="confirmForm">
       <p class="captcha-status-text">…</p>
       <img id="captchaImg" class="c-img-block l-stack" alt="captcha image" />
       <input id="captchaInput" class="c-input" />
-      <p class="t-paragraph confirm-paragraph">
-        Please confirm to add your device.
-      </p>
+      <p class="t-paragraph confirm-paragraph"></p>
       <div class="c-button-group">
         <button
           type="button"
@@ -39,7 +37,7 @@ const pageContent = html`
           id="confirmRegisterButton"
           disabled
         >
-          Confirm
+          Next
         </button>
       </div>
     </form>
@@ -144,7 +142,7 @@ const requestCaptcha = (
         "data-captcha-key",
         `${captchaResp.challenge_key}`
       );
-      captchaStatusText.innerHTML = "Please type in the characters you see.";
+      captchaStatusText.innerHTML = "Type the characters you see";
       confirmRegisterButton.disabled = false;
       captchaInput.disabled = false;
       captchaInput.value = "";

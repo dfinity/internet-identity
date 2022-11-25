@@ -26,6 +26,7 @@ export type AuthnTemplates = {
   firstTime: {
     slot: TemplateResult;
     useExistingText: string /** text shown on the button leading to "useExisting" */;
+    createAnchorText: string /** text shown on the button leading to anchor creation */;
   };
   useExisting: {
     slot: TemplateResult;
@@ -112,7 +113,7 @@ export const authnPages = (
           id="registerButton"
           class="c-button"
         >
-          Create an Anchor
+          ${props.firstTime.createAnchorText}
         </button>
         <button
           type="button"

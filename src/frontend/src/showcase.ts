@@ -181,6 +181,12 @@ const iiPages: Record<string, () => void> = {
   // Manage Auth screens
   manageNew: () =>
     manage.firstTime({ useExisting: () => console.log("Use existing") }),
+  manageUseExisting: () => manage.useExisting(),
+  managePick: () =>
+    manage.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => console.log("More options requested"),
+    }),
 
   recoverWithPhrase: () =>
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
