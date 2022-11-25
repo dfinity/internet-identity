@@ -58,12 +58,13 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
     let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
 
-    check_device(&device_data, &anchor.devices);
+    let new_device = DeviceDataInternal::from(device_data);
+    check_device(&new_device, &anchor.devices);
 
     if anchor
         .devices
         .iter()
-        .find(|e| e.pubkey == device_data.pubkey)
+        .find(|e| e.pubkey == new_device.pubkey)
         .is_some()
     {
         trap("Device already added.");
@@ -76,9 +77,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
         ));
     }
 
-    anchor
-        .devices
-        .push(DeviceDataInternal::from(device_data.clone()));
+    anchor.devices.push(new_device.clone());
     write_anchor_data(user_number, anchor);
 
     delegation::prune_expired_signatures();
@@ -87,7 +86,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
         user_number,
         caller,
         Operation::AddDevice {
-            device: DeviceDataWithoutAlias::from(device_data),
+            device: DeviceDataWithoutAlias::from(new_device),
         },
     );
 }
@@ -98,32 +97,31 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
 fn mutate_device_or_trap(
     entries: &mut Vec<DeviceDataInternal>,
     device_key: DeviceKey,
-    new_value: Option<DeviceData>,
+    new_value: Option<DeviceDataInternal>,
 ) -> Operation {
     let index = match entries.iter().position(|e| e.pubkey == device_key) {
         None => trap("Could not find device to mutate, check device key"),
         Some(index) => index,
     };
 
-    let device = entries.get_mut(index).unwrap();
+    let existing_device = entries.get_mut(index).unwrap();
 
     // Run appropriate checks for protected devices
-    match device.protection {
+    match existing_device.protection {
         None => (),
         Some(DeviceProtection::Unprotected) => (),
         Some(DeviceProtection::Protected) => {
             // If the call is not authenticated with the device to mutate, abort
-            if caller() != Principal::self_authenticating(&device.pubkey) {
+            if caller() != Principal::self_authenticating(&existing_device.pubkey) {
                 trap("Device is protected. Must be authenticated with this device to mutate");
             }
         }
     };
 
     match new_value {
-        Some(device_data) => {
-            let internal_device = device_data.into();
-            let diff = device_diff(device, &internal_device);
-            *device = internal_device;
+        Some(new_device) => {
+            let diff = device_diff(existing_device, &new_device);
+            *existing_device = new_device;
             Operation::UpdateDevice {
                 device: device_key,
                 new_values: diff,
@@ -145,9 +143,10 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
     let mut anchor = state::anchor(user_number);
 
     trap_if_not_authenticated(&anchor);
-    check_device(&device_data, &anchor.devices);
+    let new_device = DeviceDataInternal::from(device_data);
+    check_device(&new_device, &anchor.devices);
 
-    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, Some(device_data));
+    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, Some(new_device));
 
     write_anchor_data(user_number, anchor);
 
@@ -196,20 +195,20 @@ fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
-fn check_device(device_data: &DeviceData, existing_devices: &[DeviceDataInternal]) {
+fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceDataInternal]) {
     check_entry_limits(device_data);
 
-    if device_data.protection == DeviceProtection::Protected
-        && device_data.key_type != KeyType::SeedPhrase
+    if device_data.protection == Some(DeviceProtection::Protected)
+        && device_data.key_type != Some(KeyType::SeedPhrase)
     {
         trap(&format!(
             "Only recovery phrases can be protected but key type is {:?}",
-            device_data.key_type
+            device_data.key_type.unwrap_or(KeyType::Unknown)
         ));
     }
 
     // if the device is a recovery phrase, check if a different recovery phrase already exists
-    if device_data.key_type == KeyType::SeedPhrase
+    if device_data.key_type == Some(KeyType::SeedPhrase)
         && existing_devices.iter().any(|existing_device| {
             existing_device.pubkey != device_data.pubkey
                 && existing_device.key_type == Some(KeyType::SeedPhrase)
@@ -219,7 +218,7 @@ fn check_device(device_data: &DeviceData, existing_devices: &[DeviceDataInternal
     }
 }
 
-fn check_entry_limits(device_data: &DeviceData) {
+fn check_entry_limits(device_data: &DeviceDataInternal) {
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;
     const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
