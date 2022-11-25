@@ -869,6 +869,35 @@ mod device_management_tests {
         Ok(())
     }
 
+    /// Verifies that the total size of all devices stays under the variable length fields limit.
+    #[test]
+    fn should_respect_total_size_limit() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        for i in 0..3u8 {
+            let mut device = max_size_device();
+            device.pubkey = ByteBuf::from([i; 300]);
+            api::add(&env, canister_id, principal_1(), user_number, device)?;
+        }
+
+        let result = api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            max_size_device(),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Devices exceed allowed storage limit\\. Either use shorter aliases or remove an existing device\\.").unwrap(),
+        );
+        Ok(())
+    }
+
     #[cfg(test)]
     mod update {
         use super::*;

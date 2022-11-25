@@ -239,6 +239,17 @@ pub fn device_data_2() -> types::DeviceData {
     }
 }
 
+pub fn max_size_device() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from([255u8; 300]),
+        alias: "a".repeat(64).to_string(),
+        credential_id: Some(ByteBuf::from([7u8; 200])),
+        purpose: types::Purpose::Authentication,
+        key_type: types::KeyType::Unknown,
+        protection: types::DeviceProtection::Unprotected,
+    }
+}
+
 pub fn recovery_device_data_1() -> types::DeviceData {
     types::DeviceData {
         pubkey: ByteBuf::from(RECOVERY_PUBKEY_1),
