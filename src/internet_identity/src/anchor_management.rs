@@ -203,7 +203,7 @@ fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceData
     {
         trap(&format!(
             "Only recovery phrases can be protected but key type is {:?}",
-            device_data.key_type.unwrap_or(KeyType::Unknown)
+            device_data.key_type.as_ref().unwrap_or(&KeyType::Unknown)
         ));
     }
 
