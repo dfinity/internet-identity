@@ -161,13 +161,14 @@ pub async fn register(
         return RegisterResponse::BadChallenge;
     }
 
-    check_device(&device_data, &vec![]);
+    let device = DeviceDataInternal::from(device_data);
+    check_device(&device, &vec![]);
 
     let caller = caller();
-    if caller != Principal::self_authenticating(device_data.pubkey.clone()) {
+    if caller != Principal::self_authenticating(&device.pubkey) {
         trap(&format!(
             "{} could not be authenticated against {:?}",
-            caller, device_data.pubkey
+            caller, device.pubkey
         ));
     }
 
@@ -180,14 +181,14 @@ pub async fn register(
             write_anchor_data(
                 user_number,
                 Anchor {
-                    devices: vec![DeviceDataInternal::from(device_data.clone())],
+                    devices: vec![device.clone()],
                 },
             );
             archive_operation(
                 user_number,
                 caller,
                 Operation::RegisterAnchor {
-                    device: DeviceDataWithoutAlias::from(device_data),
+                    device: DeviceDataWithoutAlias::from(device),
                 },
             );
             RegisterResponse::Registered { user_number }

@@ -71,6 +71,20 @@ impl From<DeviceDataInternal> for DeviceData {
     }
 }
 
+impl From<DeviceDataInternal> for DeviceDataWithoutAlias {
+    fn from(device_data: DeviceDataInternal) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            credential_id: device_data.credential_id,
+            purpose: device_data.purpose.unwrap_or(Purpose::Authentication),
+            key_type: device_data.key_type.unwrap_or(KeyType::Unknown),
+            protection: device_data
+                .protection
+                .unwrap_or(DeviceProtection::Unprotected),
+        }
+    }
+}
+
 pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
