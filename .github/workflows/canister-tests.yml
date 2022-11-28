@@ -352,6 +352,7 @@ jobs:
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
+          curl -SL https://github.com/dfinity/internet-identity/releases/download/release-2022-11-23/internet_identity_test.wasm -o internet_identity_v1_storage.wasm
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm -o archive_previous.wasm
           cargo test --release
         env:
