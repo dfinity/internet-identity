@@ -42,3 +42,11 @@ export const constructIdentity = async (): Promise<IdentifiableIdentity> => {
 };
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));
+
+// stuff stolen from agent-js for this PoC
+
+// See https://www.iana.org/assignments/cose/cose.xhtml#algorithms for a complete
+// list of these algorithms. We only list the ones we support here.
+enum PubKeyCoseAlgo {
+  ECDSA_WITH_SHA256 = -7,
+}

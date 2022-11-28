@@ -514,7 +514,8 @@ export class AuthenticatedConnection extends Connection {
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: DeviceData[] = [],
-  authenticatorAttachment?: AuthenticatorAttachment
+  authenticatorAttachment?: AuthenticatorAttachment,
+  blob?: ArrayBuffer
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
@@ -529,7 +530,7 @@ export const creationOptions = (
             type: "public-key",
           }
     ),
-    challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+    challenge: blob ?? Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
     pubKeyCredParams: [
       {
         type: "public-key",
