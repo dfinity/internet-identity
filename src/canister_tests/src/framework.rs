@@ -69,6 +69,22 @@ lazy_static! {
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
+
+        /** The Wasm module for the last II build that still initializes storage as V1, which is used when testing
+            * the stable memory migration */
+    pub static ref II_WASM_V1_LAYOUT: Vec<u8> = {
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_v1_storage.wasm");
+        let err = format!("
+        Could not find Internet Identity Wasm module for release with v1 storage layout.
+
+        I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_V1_LAYOUT (note that I run from {:?}).
+
+        In order to get the Wasm module, please run the following command:
+            curl -SL https://github.com/dfinity/internet-identity/releases/download/release-2022-11-23/internet_identity_test.wasm -o internet_identity_v1_storage.wasm
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        get_wasm_path("II_WASM_V1_LAYOUT".to_string(), &def_path).expect(&err)
+    };
+
         /** The Wasm module for the _previous_ archive build, or latest release, which is used when testing
             * upgrades and downgrades */
     pub static ref ARCHIVE_WASM_PREVIOUS: Vec<u8> = {
@@ -233,6 +249,17 @@ pub fn device_data_2() -> types::DeviceData {
         pubkey: ByteBuf::from(PUBKEY_2),
         alias: "My second device".to_string(),
         credential_id: None,
+        purpose: types::Purpose::Authentication,
+        key_type: types::KeyType::Unknown,
+        protection: types::DeviceProtection::Unprotected,
+    }
+}
+
+pub fn max_size_device() -> types::DeviceData {
+    types::DeviceData {
+        pubkey: ByteBuf::from([255u8; 300]),
+        alias: "a".repeat(64).to_string(),
+        credential_id: Some(ByteBuf::from([7u8; 200])),
         purpose: types::Purpose::Authentication,
         key_type: types::KeyType::Unknown,
         protection: types::DeviceProtection::Unprotected,

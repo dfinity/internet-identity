@@ -41,6 +41,14 @@ pub struct DeviceDataInternal {
     pub protection: Option<DeviceProtection>,
 }
 
+impl DeviceDataInternal {
+    pub fn variable_fields_len(&self) -> usize {
+        self.alias.len()
+            + self.pubkey.len()
+            + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
+    }
+}
+
 impl From<DeviceData> for DeviceDataInternal {
     fn from(device_data: DeviceData) -> Self {
         Self {
