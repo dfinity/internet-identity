@@ -20,13 +20,12 @@ export const register = async ({
 
     const [captcha, identity] = await Promise.all([
       makeCaptcha(connection),
-      constructIdentity(),
+      constructIdentity(connection),
     ]);
 
     const result = await confirmRegister(
       connection,
       Promise.resolve(captcha),
-      identity,
       alias
     );
 

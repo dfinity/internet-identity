@@ -4,6 +4,8 @@ import {
   IdentifiableIdentity,
   DummyIdentity,
   creationOptions,
+  AuthenticatedConnection,
+  Connection,
 } from "../../utils/iiConnection";
 import { nextTick } from "process";
 import { spinner } from "../../components/icons";
@@ -23,30 +25,22 @@ export const renderConstructing = (): void => {
   render(constructingContent, container);
 };
 
-export const constructIdentity = async (): Promise<IdentifiableIdentity> => {
+export const constructIdentity = async (
+  connection: Connection
+): Promise<AuthenticatedConnection> => {
   renderConstructing();
   await tick();
 
-  /* The Identity (i.e. key pair) used when creating the anchor.
-   * If "II_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
-   */
-  const createIdentity =
-    process.env.II_DUMMY_AUTH === "1"
-      ? () => Promise.resolve(new DummyIdentity())
-      : () =>
-          WebAuthnIdentity.create({
-            publicKey: creationOptions(),
-          });
+  const [delegationIdentity, webauthnIdentity] =
+    await connection.createFEDelegation();
 
-  return createIdentity();
+  return new AuthenticatedConnection(
+    connection.canisterId,
+    webauthnIdentity,
+    delegationIdentity,
+    BigInt(0),
+    await connection.createActor(delegationIdentity)
+  );
 };
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));
-
-// stuff stolen from agent-js for this PoC
-
-// See https://www.iana.org/assignments/cose/cose.xhtml#algorithms for a complete
-// list of these algorithms. We only list the ones we support here.
-enum PubKeyCoseAlgo {
-  ECDSA_WITH_SHA256 = -7,
-}

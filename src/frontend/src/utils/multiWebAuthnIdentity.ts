@@ -49,9 +49,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * first signing.
    */
   public static async create(
-    blob: ArrayBuffer,
     creationOptions: PublicKeyCredentialCreationOptions
-  ): Promise<[SignIdentity, Signature]> {
+  ): Promise<[WebAuthnIdentity, Signature]> {
     const result = (await navigator.credentials.create({
       publicKey: creationOptions,
     })) as PublicKeyCredential;

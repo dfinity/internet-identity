@@ -6,6 +6,7 @@ import {
   ActorSubclass,
   DerEncodedPublicKey,
   HttpAgent,
+  requestIdOf,
   SignIdentity,
 } from "@dfinity/agent";
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
@@ -30,6 +31,7 @@ import {
   VerifyTentativeDeviceResponse,
 } from "../../generated/internet_identity_types";
 import {
+  Delegation,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -346,6 +348,48 @@ export class Connection {
     return actor;
   };
 
+  createFEDelegation = async (): Promise<
+    [DelegationIdentity, IdentifiableIdentity]
+  > => {
+    const sessionKey = Ed25519KeyIdentity.generate();
+    const tenMinutesInMsec = 10 * 1000 * 60;
+    const domainSeparator = new TextEncoder().encode(
+      "\x1Aic-request-auth-delegation"
+    );
+
+    const delegation: Delegation = new Delegation(
+      sessionKey.getPublicKey().toDer(),
+      BigInt(+tenMinutesInMsec) * BigInt(1000000), // In nanoseconds.
+      [Principal.from(this.canisterId)]
+    );
+    // The signature is calculated by signing the concatenation of the domain separator
+    // and the message.
+    // Note: To ensure Safari treats this as a user gesture, ensure to not use async methods
+    // besides the actualy webauthn functionality (such as `sign`). Safari will de-register
+    // a user gesture if you await an async call thats not fetch, xhr, or setTimeout.
+    const challenge = new Uint8Array([
+      ...domainSeparator,
+      ...new Uint8Array(requestIdOf(delegation)),
+    ]);
+    const [identity, signature] = await MultiWebAuthnIdentity.create(
+      creationOptions([], undefined, challenge.buffer)
+    );
+    const chainJson = {
+      delegations: [
+        {
+          signature: signature,
+          delegation: delegation.toJSON(),
+        },
+      ],
+      publicKey: Buffer.from(identity.getPublicKey().toDer()).toString("hex"),
+    };
+    const delegationChain = DelegationChain.fromJSON(JSON.stringify(chainJson));
+    return [
+      DelegationIdentity.fromDelegation(sessionKey, delegationChain),
+      identity,
+    ];
+  };
+
   requestFEDelegation = async (
     identity: SignIdentity
   ): Promise<DelegationIdentity> => {
@@ -413,6 +457,57 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<VerifyTentativeDeviceResponse> => {
     const actor = await this.getActor();
     return await actor.verify_tentative_device(this.userNumber, pin);
+  };
+
+  registerAuthenticated = async (
+    alias: string,
+    challengeResult: ChallengeResult,
+    rawId: ArrayBuffer
+  ): Promise<RegisterResult> => {
+    const actor = await this.getActor();
+    let registerResponse: RegisterResponse;
+    try {
+      registerResponse = await actor.register(
+        {
+          alias,
+          pubkey: Array.from(
+            new Uint8Array(this.identity.getPublicKey().toDer())
+          ),
+          credential_id: [Array.from(new Uint8Array(rawId))],
+          key_type: { unknown: null },
+          purpose: { authentication: null },
+          protection: { unprotected: null },
+        },
+        challengeResult
+      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
+    }
+
+    if (hasOwnProperty(registerResponse, "canister_full")) {
+      return { kind: "registerNoSpace" };
+    } else if ("registered" in registerResponse) {
+      const userNumber = registerResponse.registered.user_number;
+      console.log(`registered Identity Anchor ${userNumber}`);
+      this.userNumber = userNumber;
+      return {
+        kind: "loginSuccess",
+        connection: this,
+        userNumber,
+      };
+    } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
+      return { kind: "badChallenge" };
+    } else {
+      console.error("unexpected register response", registerResponse);
+      throw Error("unexpected register response");
+    }
   };
 
   add = async (

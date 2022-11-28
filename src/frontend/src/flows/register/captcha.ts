@@ -13,6 +13,7 @@ import {
   IdentifiableIdentity,
   ChallengeResult,
   Connection,
+  AuthenticatedConnection,
 } from "../../utils/iiConnection";
 
 const pageContent = html`
@@ -56,14 +57,18 @@ export const confirmRegister = (
 };
 
 const tryRegister = (
-  connection: Connection,
+  connection: AuthenticatedConnection,
   identity: IdentifiableIdentity,
   alias: string,
   challengeResult: ChallengeResult,
   func: (result: LoginFlowResult) => void
 ) => {
   withLoader(async () => {
-    return connection.register(identity, alias, challengeResult);
+    return connection.registerAuthenticated(
+      alias,
+      challengeResult,
+      identity.rawId
+    );
   }).then((result) => {
     if (result.kind == "loginSuccess") {
       // Write user number to storage
