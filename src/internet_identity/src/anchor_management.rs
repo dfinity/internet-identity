@@ -188,6 +188,7 @@ fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
 
 /// This checks some device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
+///   * Sum of sizes of all variable length fields does not exceed limit
 ///   * Only recovery phrases can be protected
 ///   * There can only be one recovery phrase
 ///
@@ -196,6 +197,16 @@ fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceDataInternal]) {
+    /// Single devices can use up to 564 bytes for the variable length fields alone.
+    /// In order to not give away all the anchor space to the device vector, we limit the sum of the
+    /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
+    /// or change anchors in the future.
+    /// The value 2048 was chosen because it is the max anchor size before the stable memory migration.
+    /// This means that all pre-existing anchors are below this limit. And after the migration, the
+    /// candid encoded `vec devices` will stay far below 4KB in size (testing showed anchors of up to
+    /// 2259 bytes).
+    const VARIABLE_FIELDS_LIMIT: usize = 2048;
+
     check_entry_limits(device_data);
 
     if device_data.protection == Some(DeviceProtection::Protected)
@@ -215,6 +226,17 @@ fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceData
         })
     {
         trap("There is already a recovery phrase and only one is allowed.");
+    }
+
+    let existing_variable_size: usize = existing_devices
+        .iter()
+        // filter out the device being checked to not count it twice in case of update operations
+        .filter(|device| device.pubkey != device_data.pubkey)
+        .map(|device| device.variable_fields_len())
+        .sum();
+
+    if existing_variable_size + device_data.variable_fields_len() > VARIABLE_FIELDS_LIMIT {
+        trap("Devices exceed allowed storage limit. Either use shorter aliases or remove an existing device.")
     }
 }
 
