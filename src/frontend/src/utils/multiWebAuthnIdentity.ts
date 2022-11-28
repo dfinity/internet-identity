@@ -11,7 +11,7 @@ import {
   DerEncodedPublicKey,
   PublicKey,
   Signature,
-  SignIdentity
+  SignIdentity,
 } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import borc from "borc";
@@ -48,33 +48,45 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * WebAuthnIdentity created with the pubkey that we picked up during the
    * first signing.
    */
-  public static async create(blob: ArrayBuffer, creationOptions: PublicKeyCredentialCreationOptions): Promise<(SignIdentity, Signature)> {
+  public static async create(
+    blob: ArrayBuffer,
+    creationOptions: PublicKeyCredentialCreationOptions
+  ): Promise<[SignIdentity, Signature]> {
     const result = (await navigator.credentials.create({
-      publicKey: creationOptions
+      publicKey: creationOptions,
     })) as PublicKeyCredential;
 
-    if (!result || result.type !== 'public-key') {
-      throw new Error('Could not create credentials.');
+    if (result === undefined || result.type !== "public-key") {
+      throw new Error("Could not create credentials.");
     }
 
     const response = result.response as AuthenticatorAttestationResponse;
-    if (!(response.attestationObject instanceof ArrayBuffer)) {
-      throw new Error('Was expecting an attestation response.');
-    }
 
     // Parse the attestationObject as CBOR.
-    const attObject = borc.decodeFirst(new Uint8Array(response.attestationObject));
-
-    const strippedKey = unwrapDER(result.credentialData.pubkey, DER_COSE_OID);
+    const attObject = borc.decodeFirst(
+      new Uint8Array(response.attestationObject)
+    );
+    const publicKey = _authDataToCose(attObject.authData);
     // would be nice if WebAuthnIdentity had a directly usable constructor
-    let identity = WebAuthnIdentity.fromJSON(
+    const identity = WebAuthnIdentity.fromJSON(
       JSON.stringify({
-        rawId: Buffer.from(result.credentialId).toString("hex"),
-        publicKey: Buffer.from(strippedKey).toString("hex")
+        rawId: Buffer.from(result.rawId).toString("hex"),
+        publicKey: Buffer.from(publicKey).toString("hex"),
       })
     );
 
-    return (undefined, undefined);
+    const assertionResponse = result.response as AuthenticatorAssertionResponse;
+    const cbor = borc.encode(
+      new borc.Tagged(55799, {
+        authenticator_data: new Uint8Array(assertionResponse.authenticatorData),
+        client_data_json: new TextDecoder().decode(
+          assertionResponse.clientDataJSON
+        ),
+        signature: new Uint8Array(assertionResponse.signature),
+      })
+    );
+
+    return [identity, new Uint8Array(cbor).buffer as Signature];
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -116,11 +128,11 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
-          id: cd.credentialId
+          id: cd.credentialId,
         })),
         challenge: blob,
-        userVerification: "discouraged"
-      }
+        userVerification: "discouraged",
+      },
     })) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
@@ -130,7 +142,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         this._actualIdentity = WebAuthnIdentity.fromJSON(
           JSON.stringify({
             rawId: Buffer.from(cd.credentialId).toString("hex"),
-            publicKey: Buffer.from(strippedKey).toString("hex")
+            publicKey: Buffer.from(strippedKey).toString("hex"),
           })
         );
         break;
@@ -147,7 +159,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       new borc.Tagged(55799, {
         authenticator_data: new Uint8Array(response.authenticatorData),
         client_data_json: new TextDecoder().decode(response.clientDataJSON),
-        signature: new Uint8Array(response.signature)
+        signature: new Uint8Array(response.signature),
       })
     );
     // eslint-disable-next-line
