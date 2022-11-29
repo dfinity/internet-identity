@@ -374,17 +374,19 @@ export class Connection {
     const [identity, signature] = await MultiWebAuthnIdentity.create(
       creationOptions([], undefined, challenge.buffer)
     );
+
+    console.log(`identity ${identity}, sig: ${signature}`);
     const chainJson = {
       delegations: [
         {
-          signature: signature,
+          signature: Buffer.from(signature).toString("hex"),
           delegation: delegation.toJSON(),
         },
       ],
       publicKey: Buffer.from(identity.getPublicKey().toDer()).toString("hex"),
     };
     const jsonDelegationChain = JSON.stringify(chainJson);
-    console.log(jsonDelegationChain);
+    console.log("json delegation chain" + jsonDelegationChain);
     const delegationChain = DelegationChain.fromJSON(jsonDelegationChain);
     return [
       DelegationIdentity.fromDelegation(sessionKey, delegationChain),
