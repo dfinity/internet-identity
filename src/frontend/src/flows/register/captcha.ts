@@ -46,7 +46,7 @@ const pageContent = html`
 `;
 
 export const confirmRegister = (
-  connection: Connection,
+  connection: AuthenticatedConnection,
   captcha: Promise<Challenge>,
   identity: IdentifiableIdentity,
   alias: string
@@ -166,7 +166,7 @@ export const makeCaptcha = (connection: Connection): Promise<Challenge> =>
   });
 
 const init = (
-  connection: Connection,
+  connection: AuthenticatedConnection,
   identity: IdentifiableIdentity,
   alias: string,
   captcha: Promise<Challenge>

@@ -27,20 +27,23 @@ export const renderConstructing = (): void => {
 
 export const constructIdentity = async (
   connection: Connection
-): Promise<AuthenticatedConnection> => {
+): Promise<[AuthenticatedConnection, IdentifiableIdentity]> => {
   renderConstructing();
   await tick();
 
   const [delegationIdentity, webauthnIdentity] =
     await connection.createFEDelegation();
 
-  return new AuthenticatedConnection(
-    connection.canisterId,
+  return [
+    new AuthenticatedConnection(
+      connection.canisterId,
+      webauthnIdentity,
+      delegationIdentity,
+      BigInt(0),
+      await connection.createActor(delegationIdentity)
+    ),
     webauthnIdentity,
-    delegationIdentity,
-    BigInt(0),
-    await connection.createActor(delegationIdentity)
-  );
+  ];
 };
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));
