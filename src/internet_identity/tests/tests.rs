@@ -61,7 +61,6 @@ mod upgrade_tests {
                 assigned_user_number_range: Some((2000, 4000)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
-                memory_migration_batch_size: None,
             }),
         );
 
@@ -89,7 +88,6 @@ mod upgrade_tests {
                 assigned_user_number_range: Some(stats.assigned_user_number_range),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
-                memory_migration_batch_size: None,
             }),
         );
 
@@ -240,7 +238,6 @@ mod registration_tests {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
-                memory_migration_batch_size: None,
             }),
         );
 
@@ -465,39 +462,9 @@ mod stable_memory_tests {
     }
 
     /// Tests that some known anchors with their respective devices are available after stable memory restore.
+    /// Uses the same data initially created using the genesis layout and then later migrated to v3.    
     #[test]
-    fn should_recover_anchors_and_devices_from_backup() -> Result<(), CallError> {
-        let (device1, device2, device3, device4, device5, device6) = known_devices();
-
-        let env = StateMachine::new();
-        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-        let stable_memory_backup =
-            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
-        env.set_stable_memory(canister_id, &stable_memory_backup);
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-        // check known anchors in the backup
-        let devices = api::lookup(&env, canister_id, 10_000)?;
-        assert_eq!(devices, vec![device1]);
-
-        let mut devices = api::lookup(&env, canister_id, 10_002)?;
-        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-        assert_eq!(devices, vec![device2, device3]);
-
-        let devices = api::lookup(&env, canister_id, 10_029)?;
-        assert_eq!(devices, vec![device4]);
-
-        let devices = api::lookup(&env, canister_id, 10_030)?;
-        assert_eq!(devices, vec![device5, device6]);
-
-        Ok(())
-    }
-
-    /// Tests that some known anchors with their respective devices are available after stable memory restore.
-    /// Uses the same data as `should_recover_anchors_and_devices_from_backup` but migrated to v3.    
-    #[test]
-    fn should_load_layout_v3_backup() -> Result<(), CallError> {
+    fn should_load_genesis_migrated_to_v3_backup() -> Result<(), CallError> {
         let (device1, device2, device3, device4, device5, device6) = known_devices();
 
         let env = StateMachine::new();
@@ -539,9 +506,11 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
-        let stable_memory_backup =
-            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
-        env.set_stable_memory(canister_id, &stable_memory_backup);
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/genesis-layout-migrated-to-v3.bin.gz",
+        );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let (user_key, _) = api::prepare_delegation(
@@ -579,9 +548,11 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
-        let stable_memory_backup =
-            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
-        env.set_stable_memory(canister_id, &stable_memory_backup);
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/genesis-layout-migrated-to-v3.bin.gz",
+        );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let devices = api::lookup(&env, canister_id, 10_030)?;
@@ -609,9 +580,11 @@ mod stable_memory_tests {
         let frontend_hostname = "frontend_hostname".to_string();
         let session_key = ByteBuf::from("session_key");
 
-        let stable_memory_backup =
-            std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
-        env.set_stable_memory(canister_id, &stable_memory_backup);
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/multiple-recovery-phrases.bin.gz",
+        );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         api::prepare_delegation(
@@ -642,9 +615,11 @@ mod stable_memory_tests {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
-        let stable_memory_backup =
-            std::fs::read(PathBuf::from("stable_memory/multiple-recovery-phrases.bin")).unwrap();
-        env.set_stable_memory(canister_id, &stable_memory_backup);
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/multiple-recovery-phrases.bin.gz",
+        );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let mut recovery_1 = recovery_device_data_1();
@@ -685,14 +660,14 @@ mod stable_memory_tests {
 
     /// Verifies that a stable memory backup with persistent state v1 can be used for an upgrade.
     #[test]
-    fn should_read_persistent_state_v1() -> Result<(), CallError> {
+    fn should_read_persistent_state() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         restore_compressed_stable_memory(
             &env,
             canister_id,
-            "stable_memory/persistent_state_no_archive_v1.bin.gz",
+            "stable_memory/persistent_state_no_archive_v3.bin.gz",
         );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -707,14 +682,14 @@ mod stable_memory_tests {
 
     /// Verifies that a stable memory backup with persistent state containing archive information is restored correctly.
     #[test]
-    fn should_read_persistent_state_with_archive_v1() -> Result<(), CallError> {
+    fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
         restore_compressed_stable_memory(
             &env,
             canister_id,
-            "stable_memory/persistent_state_archive_v1.bin.gz",
+            "stable_memory/persistent_state_archive_v3.bin.gz",
         );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -732,6 +707,23 @@ mod stable_memory_tests {
             hex::decode("12e2c2bd05dfcd86e3004ecd5f00533e6120e7bcf82bac0753af0a7fe14bfea1")
                 .unwrap()
         );
+        Ok(())
+    }
+
+    /// Tests that II will refuse to install on a stable memory layout that is no longer supported.  
+    #[test]
+    fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+        let stable_memory_backup =
+            std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
+        env.set_stable_memory(canister_id, &stable_memory_backup);
+        let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.code(), CanisterCalledTrap);
+        assert!(err.description().contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version"));
         Ok(())
     }
 }
