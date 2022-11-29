@@ -66,6 +66,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       new Uint8Array(response.attestationObject)
     );
     const publicKey = _authDataToCose(attObject.authData);
+    console.log("attestation object: " + JSON.stringify(attObject));
     // would be nice if WebAuthnIdentity had a directly usable constructor
     const identity = WebAuthnIdentity.fromJSON(
       JSON.stringify({
@@ -75,13 +76,15 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     );
 
     const assertionResponse = result.response as AuthenticatorAssertionResponse;
+    const clientDataJson = new TextDecoder().decode(
+      assertionResponse.clientDataJSON
+    );
+    console.log("client data JSON: " + clientDataJson);
     const cbor = borc.encode(
       new borc.Tagged(55799, {
-        authenticator_data: new Uint8Array(assertionResponse.authenticatorData),
-        client_data_json: new TextDecoder().decode(
-          assertionResponse.clientDataJSON
-        ),
-        signature: new Uint8Array(assertionResponse.signature),
+        authenticator_data: new Uint8Array(attObject.authData),
+        client_data_json: clientDataJson,
+        signature: new Uint8Array(attObject.attStmt.sig),
       })
     );
 

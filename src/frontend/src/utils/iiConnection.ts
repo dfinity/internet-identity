@@ -383,7 +383,9 @@ export class Connection {
       ],
       publicKey: Buffer.from(identity.getPublicKey().toDer()).toString("hex"),
     };
-    const delegationChain = DelegationChain.fromJSON(JSON.stringify(chainJson));
+    const jsonDelegationChain = JSON.stringify(chainJson);
+    console.log(jsonDelegationChain);
+    const delegationChain = DelegationChain.fromJSON(jsonDelegationChain);
     return [
       DelegationIdentity.fromDelegation(sessionKey, delegationChain),
       identity,
@@ -613,6 +615,7 @@ export const creationOptions = (
   blob?: ArrayBuffer
 ): PublicKeyCredentialCreationOptions => {
   return {
+    attestation: "indirect",
     authenticatorSelection: {
       userVerification: "preferred",
       authenticatorAttachment,
