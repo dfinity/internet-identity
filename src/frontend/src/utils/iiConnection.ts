@@ -36,7 +36,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { hasOwnProperty } from "./utils";
+import { hasOwnProperty, unreachable } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
@@ -60,6 +60,10 @@ export class DummyIdentity
 
     // A dummy rawId
     this.rawId = new Uint8Array(32);
+  }
+
+  public getAuthenticatorAttachment(): undefined {
+    return undefined;
   }
 }
 
@@ -229,19 +233,67 @@ export class Connection {
 
     const actor = await this.createActor(delegationIdentity);
 
+    const connection = new AuthenticatedConnection(
+      this.canisterId,
+      identity,
+      delegationIdentity,
+      userNumber,
+      actor
+    );
+
+    const attachmentInfo = identity.getAuthenticatorAttachment();
+    if (attachmentInfo !== undefined) {
+      this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
+    }
+
     return {
       kind: "loginSuccess",
       userNumber,
-      connection: new AuthenticatedConnection(
-        this.canisterId,
-        // eslint-disable-next-line
-        identity,
-        delegationIdentity,
-        userNumber,
-        actor
-      ),
+      connection,
     };
   };
+
+  private updateKeyTypeIfNecessary(
+    devices: DeviceData[],
+    attachmentInfo: {
+      credentialId: ArrayBuffer;
+      authenticatorAttachment: AuthenticatorAttachment;
+    },
+    authenticatedConnection: AuthenticatedConnection
+  ) {
+    const device = devices.find((device) => {
+      const credentialId = device.credential_id[0];
+      if (credentialId === undefined) {
+        return false;
+      }
+      return bufferEqual(
+        Buffer.from(credentialId),
+        attachmentInfo.credentialId
+      );
+    });
+
+    // only update devices with key-type unknown
+    if (device !== undefined && hasOwnProperty(device.key_type, "unknown")) {
+      switch (attachmentInfo.authenticatorAttachment) {
+        case "cross-platform":
+          device.key_type = { cross_platform: null };
+          break;
+        case "platform":
+          device.key_type = { platform: null };
+          break;
+        default:
+          unreachable(attachmentInfo.authenticatorAttachment);
+          break;
+      }
+      // we purposely do not await the promise as we just optimistically update
+      // if it fails, no harm done
+      authenticatedConnection.update(device).catch((error) => {
+        console.warn(
+          `unable to update device ${JSON.stringify(device)}, error: ${error}`
+        );
+      });
+    }
+  }
 
   fromSeedPhrase = async (
     userNumber: bigint,
@@ -436,23 +488,9 @@ export class AuthenticatedConnection extends Connection {
     });
   };
 
-  update = async (
-    publicKey: PublicKey,
-    alias: string,
-    keyType: KeyType,
-    purpose: Purpose,
-    protection: DeviceData["protection"],
-    credentialId: [] | [CredentialId]
-  ): Promise<void> => {
+  update = async (device: DeviceData): Promise<void> => {
     const actor = await this.getActor();
-    return await actor.update(this.userNumber, publicKey, {
-      alias,
-      pubkey: publicKey,
-      credential_id: credentialId,
-      key_type: keyType,
-      purpose,
-      protection,
-    });
+    return await actor.update(this.userNumber, device.pubkey, device);
   };
 
   remove = async (publicKey: PublicKey): Promise<void> => {

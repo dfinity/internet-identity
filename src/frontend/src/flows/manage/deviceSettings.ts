@@ -235,14 +235,7 @@ const protectDevice = async (
       return;
     }
 
-    await newConnection.update(
-      device.pubkey,
-      device.alias,
-      device.key_type,
-      device.purpose,
-      device.protection,
-      device.credential_id
-    );
+    await newConnection.update(device);
   });
   await deviceSettings(userNumber, connection, device, isOnlyDevice);
   back();

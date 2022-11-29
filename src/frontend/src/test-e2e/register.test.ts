@@ -26,11 +26,17 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
+import fetch from "node-fetch";
+import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import test_app_canister_ids from "../../../../demos/test-app/.dfx/local/canister_ids.json";
+import ii_canister_ids from "../../../../.dfx/local/canister_ids.json";
+import { Actor, HttpAgent } from "@dfinity/agent";
+import { _SERVICE } from "../../generated/internet_identity_types";
 
+const II_CANISTER_ID = ii_canister_ids.internet_identity.local;
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
@@ -228,6 +234,61 @@ test("Log into client application, after registration", async () => {
     // default value
     const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / (8 * 60 * 60_000_000_000)).toBeCloseTo(1);
+  });
+}, 300_000);
+
+test("Add key type on login if unknown", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const authenticatorId1 = await addVirtualAuthenticator(browser);
+
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
+
+    const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
+    expect(credentials).toHaveLength(1);
+
+    // check device in II canister
+    const agent = new HttpAgent({
+      host: "http://127.0.0.1:4943",
+      // @ts-ignore
+      fetch,
+    });
+    await agent.fetchRootKey();
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId: II_CANISTER_ID,
+    });
+    let devices = await actor.lookup(BigInt(userNumber));
+    expect(devices).toHaveLength(1);
+    expect(devices[0].key_type).toHaveProperty("unknown");
+
+    // sign in
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(TEST_APP_NICE_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    await demoAppView.signin();
+
+    const authenticatorId2 = await switchToPopup(browser);
+    await addWebAuthnCredential(
+      browser,
+      authenticatorId2,
+      credentials[0],
+      originToRelyingPartyId(II_URL)
+    );
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
+
+    // wait for the device to be updated by the front-end
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // check again for updated key type
+    let devicesAfterLogin = await actor.lookup(BigInt(userNumber));
+    expect(devicesAfterLogin).toHaveLength(1);
+    expect(devicesAfterLogin[0].key_type).toHaveProperty("cross_platform");
   });
 }, 300_000);
 
