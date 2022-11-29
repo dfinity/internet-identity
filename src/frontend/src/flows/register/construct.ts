@@ -34,16 +34,14 @@ export const constructIdentity = async (
   const [delegationIdentity, webauthnIdentity] =
     await connection.createFEDelegation();
 
-  return [
-    new AuthenticatedConnection(
-      connection.canisterId,
-      webauthnIdentity,
-      delegationIdentity,
-      BigInt(0),
-      await connection.createActor(delegationIdentity)
-    ),
+  const authenticatedConnection = new AuthenticatedConnection(
+    connection.canisterId,
     webauthnIdentity,
-  ];
+    delegationIdentity,
+    BigInt(0),
+    await connection.createActor(delegationIdentity)
+  );
+  return [authenticatedConnection, webauthnIdentity];
 };
 
 const tick = (): Promise<void> => new Promise((resolve) => nextTick(resolve));

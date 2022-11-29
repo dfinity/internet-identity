@@ -359,7 +359,7 @@ export class Connection {
 
     const delegation: Delegation = new Delegation(
       sessionKey.getPublicKey().toDer(),
-      BigInt(+tenMinutesInMsec) * BigInt(1000000), // In nanoseconds.
+      BigInt(Date.now() + tenMinutesInMsec) * BigInt(1000000), // In nanoseconds.
       [Principal.from(this.canisterId)]
     );
     // The signature is calculated by signing the concatenation of the domain separator
@@ -426,7 +426,11 @@ export class AuthenticatedConnection extends Connection {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
       // prettier-ignore
-      if (+new Date(Number(delegation.expiration / BigInt(1000000))) <= +Date.now()) {
+      const expiration = +new Date(Number(delegation.expiration / BigInt(1000000)));
+      console.log("expiration " + expiration);
+      const now = +Date.now();
+      console.log("now " + now);
+      if (expiration <= now) {
         this.actor = undefined;
         break;
       }
