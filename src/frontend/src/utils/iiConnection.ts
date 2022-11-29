@@ -621,7 +621,7 @@ export const creationOptions = (
   blob?: ArrayBuffer
 ): PublicKeyCredentialCreationOptions => {
   return {
-    attestation: "indirect",
+    attestation: "direct",
     authenticatorSelection: {
       userVerification: "preferred",
       authenticatorAttachment,
