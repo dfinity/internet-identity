@@ -61,7 +61,7 @@
    */
 
   /* value tokens: colors (--vc => valueColor) */
-  --vc-raven: #202124;
+  --vc-raven: #3c3545;
   --vc-snow: #ffffff;
 
   --vc-vapour: rgba(255, 255, 255, 0.6);
@@ -123,6 +123,7 @@
   --rc-background-transparent: var(--rc-light-transparent);
 
   --rc-line: var(--vc-brand-alt);
+  --rc-line-light: #e2d4e2;
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
@@ -131,6 +132,7 @@
   --rc-button: var(--vc-brand-purple);
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
   --rc-onButton: var(--rc-light);
+  --rc-onButton-secondary: var(--vc-brand-purple);
 
   --rc-warning: var(--vc-brand-pink);
   --rc-onWarning: var(--vc-snow);
@@ -170,7 +172,7 @@
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
-  --vs-line-height: 1.35;
+  --vs-line-height: 1.4;
 }
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -281,7 +283,9 @@ display:revert; revert to element instead of attribute */
   /* general styles */
   font-family: "Montserrat", sans-serif;
   font-family: "Inter", sans-serif;
-  font-weight: 200;
+  font-weight: 350;
+  letter-spacing: -0.005em;
+
   font-size: 62.5%; /* 10px */
   font-size: max(62.5%, calc(0.6vh + 0.25rem));
 
@@ -301,6 +305,10 @@ body {
   font-size: 1.6rem;
   line-height: var(--vs-line-height);
   min-height: 100vh;
+
+  background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
+  background-size: 100% 100%;
+  
 }
 
 body::before {
@@ -533,6 +541,7 @@ a:hover,
   background: var(--rc-pill);
   color: var(--rc-pill-text);
   font-size: 0.8em;
+  border: var(--vs-line) solid var(--rc-line-light);
 }
 
 /**
@@ -750,7 +759,7 @@ a:hover,
 
 .c-button--secondary {
   background: var(--rc-button-secondary);
-  color: var(--rc-button);
+  color: var(--rc-onButton-secondary);
   border: var(--vs-line) solid var(--rc-line);
   font-weight: inherit;
 }
@@ -1173,6 +1182,12 @@ a:hover,
 
 .c-list--anchors .c-list__item:hover .c-list__icon--masked {
   clip-path: inset(0 0 0 0%);
+}
+.c-list--anchors .c-list__item {
+  transition: 200ms color;
+}
+.c-list--anchors .c-list__item:hover {
+  color: var(--vc-brand-blue);
 }
 
 .c-list__icon svg {
