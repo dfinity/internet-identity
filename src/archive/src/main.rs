@@ -46,7 +46,7 @@ use ic_cdk::{caller, id, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{
-    cell::Cell as StableCell, log::Log, DefaultMemoryImpl, Memory as StableMemory,
+    cell::Cell as StableCell, log::Log, BoundedStorable, DefaultMemoryImpl, Memory as StableMemory,
     RestrictedMemory, StableBTreeMap, Storable,
 };
 use internet_identity_interface::*;
@@ -92,7 +92,7 @@ thread_local! {
 
     /// Index to efficiently retrieve entries by anchor.
     static ANCHOR_INDEX: RefCell<AnchorIndex> = with_memory_manager(|memory_manager| {
-        RefCell::new(StableBTreeMap::init(memory_manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID), std::mem::size_of::<AnchorIndexKey>() as u32, 0))
+        RefCell::new(StableBTreeMap::init(memory_manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID)))
     });
 }
 
@@ -218,6 +218,12 @@ impl Storable for AnchorIndexKey {
                 TryFrom::try_from(&bytes[16..]).expect("failed to read log_index"),
             ),
         }
+    }
+}
+
+impl BoundedStorable for AnchorIndexKey {
+    fn max_size() -> u32 {
+        std::mem::size_of::<AnchorIndexKey>() as u32
     }
 }
 
