@@ -5,7 +5,7 @@ use crate::certificate_validation::ValidationError::{
     AssetHashMismatch, AssetPathLookupFailed, CertificateExpired, MalformedCertificate,
 };
 use flate2::read::GzDecoder;
-use ic_certification::{verify_certificate, CertificateValidationError};
+use ic_certification::{verify_certified_data, CertificateValidationError};
 use ic_sdk_types::hash_tree::LookupResult;
 use ic_sdk_types::HashTree;
 use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey, Time};
@@ -54,8 +54,9 @@ pub fn validate_certification(
     // The subnet state tree in the certificate must reveal the canister's certified data.
     // 5. The root hash of that tree must match the canister's certified data.
     // (Out of order because verify_certificate also checks certified_data.)
-    let certificate_time = verify_certificate(&cert_blob, &canister_id, &root_key, &tree.digest())
-        .map_err(|err| ValidationError::CertificateValidationFailed { inner: err })?;
+    let certificate_time =
+        verify_certified_data(&cert_blob, &canister_id, &root_key, &tree.digest())
+            .map_err(|err| ValidationError::CertificateValidationFailed { inner: err })?;
 
     // 3. (cont.) The timestamp in /time must be recent.
     let certificate_validity = Duration::from_secs(300); // 5 min, also used by the service worker and deemed a reasonable interpretation of 'recent'
