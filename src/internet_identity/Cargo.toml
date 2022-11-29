@@ -30,7 +30,7 @@ candid = "0.8"
 ic-cdk = "0.6"
 ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
-ic-stable-structures = "0.3.0"
+ic-stable-structures = "0.3"
 
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
