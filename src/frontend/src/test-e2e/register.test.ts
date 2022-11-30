@@ -253,7 +253,9 @@ test("Add key type on login if unknown", async () => {
     // check device in II canister
     const agent = new HttpAgent({
       host: "http://127.0.0.1:4943",
-      // @ts-ignore
+      // @ts-ignore: TypeScript complains about type differences between
+      // expected `fetch` and the `node-fetch` implementation. But in practice
+      // this works fine.
       fetch,
     });
     await agent.fetchRootKey();
@@ -261,7 +263,7 @@ test("Add key type on login if unknown", async () => {
       agent,
       canisterId: II_CANISTER_ID,
     });
-    let devices = await actor.lookup(BigInt(userNumber));
+    const devices = await actor.lookup(BigInt(userNumber));
     expect(devices).toHaveLength(1);
     expect(devices[0].key_type).toHaveProperty("unknown");
 
@@ -286,7 +288,7 @@ test("Add key type on login if unknown", async () => {
     await new Promise((r) => setTimeout(r, 2000));
 
     // check again for updated key type
-    let devicesAfterLogin = await actor.lookup(BigInt(userNumber));
+    const devicesAfterLogin = await actor.lookup(BigInt(userNumber));
     expect(devicesAfterLogin).toHaveLength(1);
     expect(devicesAfterLogin[0].key_type).toHaveProperty("cross_platform");
   });
