@@ -23,8 +23,6 @@ export type CredentialData = {
   credentialId: CredentialId;
 };
 
-export type AuthenticatorAttachment = "cross-platform" | "platform";
-
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
  * more information about WebAuthentication.
@@ -42,7 +40,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   /* Set after the first `sign`, see `sign()` for more info. */
   protected _actualIdentity?: WebAuthnIdentity;
-  protected _authenticatorAttachment?: "cross-platform" | "platform";
+  protected _authenticatorAttachment?: AuthenticatorAttachment;
 
   protected constructor(readonly credentialData: CredentialData[]) {
     super();
