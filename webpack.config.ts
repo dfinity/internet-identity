@@ -20,8 +20,8 @@ function readCanisterId() {
   let canisterId;
 
   try {
-    canisterId = JSON.parse(fs.readFileSync(canisterIdsJson)).internet_identity
-      .local;
+    canisterId = JSON.parse(fs.readFileSync(canisterIdsJson).toString())
+      .internet_identity.local;
   } catch (e) {
     throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
   }
@@ -35,7 +35,7 @@ function readCanisterId() {
 // so we don't need to proxy to the backend canister for the index.html file.
 // This overcomes some issues with Safari and the CSP headers set in http.rs.
 class InjectCanisterIdPlugin {
-  apply(compiler) {
+  apply(compiler: webpack.Compiler) {
     compiler.hooks.compilation.tap("InjectCanisterIdPlugin", (compilation) => {
       HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
         "InjectCanisterIdPlugin",
@@ -100,7 +100,11 @@ const defaults = {
     new CompressionPlugin({
       test: /\.js(\?.*)?$/i,
     }),
-    new webpack.IgnorePlugin(/^\.\/wordlists\/(?!english)/, /bip39\/src$/),
+    new webpack.IgnorePlugin({
+      checkResource(resource) {
+        return /.*\/wordlists\/(?!english).*\.json/.test(resource);
+      },
+    }),
     new CopyPlugin({
       patterns: [
         {
