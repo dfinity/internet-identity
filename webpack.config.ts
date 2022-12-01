@@ -136,13 +136,13 @@ export default [
       index: path.join(__dirname, "src", "frontend", "src", "index"),
     },
     devServer: {
+      magicHtml: false,
+      static: false,
       // Set up a proxy that redirects API calls to the replica.
-      port: 8080,
       proxy: {
         // Make sure /api calls land on the replica (and not on webpack)
         "/api": "http://localhost:4943",
       },
-      allowedHosts: [".localhost", ".local", ".ngrok.io"],
     },
     plugins: [
       ...defaults.plugins,
@@ -158,7 +158,8 @@ export default [
       showcase: path.join(__dirname, "src", "frontend", "src", "showcase"),
     },
     devServer: {
-      port: 8080,
+      magicHtml: false,
+      static: false,
       historyApiFallback: true, // serves the app on all routes, which we use because the app itself does the routing
     },
   },
