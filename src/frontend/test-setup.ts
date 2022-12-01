@@ -38,4 +38,3 @@ declare global {
 
 global.crypto = crypto;
 global.TextEncoder = textEncoding.TextEncoder;
-global.TextDecoder = textEncoding.TextDecoder;

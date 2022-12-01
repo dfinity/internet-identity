@@ -261,6 +261,7 @@ export class Connection {
     },
     authenticatedConnection: AuthenticatedConnection
   ) {
+    // Find the device based on the credential_id
     const device = devices.find((device) => {
       const credentialId = device.credential_id[0];
       if (credentialId === undefined) {

@@ -72,11 +72,11 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * used so that the caller knows to which device the attachment applies.
    */
   public getAuthenticatorAttachment():
-    | undefined
     | {
         credentialId: ArrayBuffer;
         authenticatorAttachment: AuthenticatorAttachment;
-      } {
+      }
+    | undefined {
     if (
       this._actualIdentity === undefined ||
       this._authenticatorAttachment === undefined
@@ -114,6 +114,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         userVerification: "discouraged",
       },
     })) as PublicKeyCredential & {
+      // Extends `PublicKeyCredential` with an optional field that's only supported by Chrome & Safari
       authenticatorAttachment?: AuthenticatorAttachment;
     };
 
