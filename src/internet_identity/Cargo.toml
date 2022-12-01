@@ -23,14 +23,14 @@ base64 = "*"
 rand = { version ="*", default-features = false }
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
-captcha = { git = "https://github.com/nmattia/captcha", rev = "fb3fe931c20b8577bf02070ae6b8c0ca2f442427", default-features = false }
+captcha = "0.0.9"
 
 # All IC deps
 candid = "0.8"
 ic-cdk = "0.6"
 ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
-ic-stable-structures = "0.1.2"
+ic-stable-structures = "0.3"
 
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
