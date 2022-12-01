@@ -9,7 +9,13 @@
       "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
 
       "__1": "Currently, dfx tries to shrink already optimized wasm modules. This is why we disable it here.",
-      "shrink": false
+      "shrink": false,
+      "__2": "The remote block indicates that this canister is only used locally and should not be deployed on the IC.",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      }
     },
 
     "whoami": {

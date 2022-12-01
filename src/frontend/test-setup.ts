@@ -36,5 +36,7 @@ declare global {
   }
 }
 
-global.crypto = crypto;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+global.crypto.subtle = crypto.subtle;
 global.TextEncoder = textEncoding.TextEncoder;
