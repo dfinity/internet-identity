@@ -239,23 +239,7 @@ pub fn initialize_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time() as u64);
         match Storage::from_memory(DefaultMemoryImpl::default()) {
-            Some(mut storage) => {
-                let (lo, hi) = storage.assigned_user_number_range();
-                let max_entries = storage.max_entries() as u64;
-                if (hi - lo) != max_entries {
-                    // This code might be executed for 2 reasons:
-                    //
-                    // 1. We used to specify a nonsensical limit of 8B entries
-                    //    by default.  We couldn't store more than 2M entries
-                    //    in a single canister at that point, so we needed to
-                    //    lower the upper limit on upgrade.
-                    //
-                    // 2. After stable memory limits were increased, we could
-                    //    afford storing more entries by using the 64 bit
-                    //    stable memory API.  So we needed to increase the
-                    //    upper limit on upgrade.
-                    storage.set_user_number_range((lo, lo.saturating_add(max_entries)));
-                }
+            Some(storage) => {
                 s.storage.replace(storage);
             }
             None => {
