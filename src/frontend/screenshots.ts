@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { remote } from "webdriverio";
 import { existsSync, mkdirSync } from "fs";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";

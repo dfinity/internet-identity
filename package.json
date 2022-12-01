@@ -5,20 +5,21 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "start": "II_FETCH_ROOT_KEY=1 webpack serve --config-name app",
+    "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
+    "start": "II_FETCH_ROOT_KEY=1 npm run opts -- webpack serve --config-name app",
     "generate": "npm run generate:types && npm run generate:js",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "build": "NODE_ENV=production webpack --config-name app",
-    "showcase": "II_FETCH_ROOT_KEY=1 webpack serve --config-name showcase",
-    "screenshots": "node --loader ts-node/esm ./src/frontend/screenshots.ts",
+    "build": "NODE_ENV=production npm run opts -- webpack --config-name app",
+    "showcase": "II_FETCH_ROOT_KEY=1 npm run opts -- webpack serve --config-name showcase",
+    "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
     "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json webpack.config.js jest.config.ts",
-    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json webpack.config.js jest.config.ts"
+    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts",
+    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.16.5",
@@ -30,8 +31,8 @@
     "@typescript-eslint/parser": "5.39.0",
     "assert": "2.0.0",
     "buffer": "6.0.3",
-    "compression-webpack-plugin": "^8.0.1",
-    "copy-webpack-plugin": "^9.0.1",
+    "compression-webpack-plugin": "~10",
+    "copy-webpack-plugin": "~11",
     "css-loader": "^6.2.0",
     "css-minimizer-webpack-plugin": "^4.1.0",
     "dotenv": "^10.0.0",
@@ -55,8 +56,8 @@
     "util": "0.12.4",
     "webdriverio": "7.25.1",
     "webpack": "5.45.1",
-    "webpack-cli": "4.7.2",
-    "webpack-dev-server": "^4.3.1"
+    "webpack-cli": "~5",
+    "webpack-dev-server": "~4"
   },
   "dependencies": {
     "@dfinity/agent": "0.10.2",
