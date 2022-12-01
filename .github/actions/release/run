@@ -46,6 +46,22 @@ For more information please see the [Build flavors](https://github.com/dfinity/i
 | --- | --- |
 EOF
 
+# Starting the "wasm verification" section where we explain how to build the production assets
+section_wasm_verification=$(mktemp)
+cat > "$section_wasm_verification" <<EOF
+## Wasm Verification
+
+To build the wasm modules yourself and verify their hashes, run the following commands from the root of the [Internet Identity repository](https://github.com/dfinity/internet-identity):
+\`\`\`
+git pull # to ensure you have the latest changes.
+git checkout $GITHUB_SHA
+./scripts/docker-build
+sha256sum internet_identity.wasm
+./scripts/docker-build --archive
+sha256sum archive.wasm
+\`\`\`
+EOF
+
 # Read all "INPUT_ASSETS" (where "ASSETS" is the input specified in action.yml)
 # https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#example-specifying-inputs
 while IFS= read -r filename
@@ -143,6 +159,7 @@ body=$(mktemp)
 cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
 cat "$section_whats_changed" >> "$body" && echo >> "$body" && rm "$section_whats_changed"
 cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
+cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_wasm_verification"
 
 >&2 echo "body complete:"
 cat "$body"
