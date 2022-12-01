@@ -147,7 +147,7 @@ jobs:
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: "Check canister size"
         run: |
-          max_size=3670016 # maximum canister size, in bytes
+          max_size=2097152 # maximum canister size, in bytes
           actual_size=${{ steps.record-size.outputs.size }}
           if (( actual_size > max_size ))
           then
