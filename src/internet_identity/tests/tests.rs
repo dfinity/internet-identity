@@ -1962,38 +1962,6 @@ mod http_tests {
         Ok(())
     }
 
-    #[test]
-    fn should_widen_user_range_on_upgrade() {
-        let env = StateMachine::new();
-        let canister_id = install_ii_canister_with_arg(
-            &env,
-            II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((127, 129)),
-                archive_module_hash: None,
-                canister_creation_cycles_cost: None,
-                memory_migration_batch_size: None,
-            }),
-        );
-
-        let metrics = flows::get_metrics(&env, canister_id);
-        let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
-        let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
-        assert_eq!(min_user_number, 127);
-        assert_eq!(max_user_number, 128);
-
-        // The storage updates the upper bound on upgrade if it doesn't use the
-        // full capacity. This is a hack that has to go away when we start using
-        // multiple backend canisters.
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-        let metrics = flows::get_metrics(&env, canister_id);
-        let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
-        let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
-        assert_eq!(min_user_number, 127);
-        assert_eq!(max_user_number, 3_774_999);
-    }
-
     /// Verifies that the user count metric is updated correctly.
     #[test]
     fn metrics_user_count_should_increase_after_register() -> Result<(), CallError> {
