@@ -27,14 +27,21 @@ const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.async 
 
 // Fix up HTML pages, by injecting canister ID, script tag and CSP
 fn fixup_html(html: &str) -> String {
-        let canister_id = api::id();
-        let setup_js: String = JS_SETUP_SCRIPT.to_string();
-        let html = html.replace(
-            r#"<script id="setupJs"></script>"#,
-            &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#).to_string()
-        );
-        let html = html.replace("<meta replaceme-with-csp/>", &format!(r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,&http::content_security_policy_meta() ));
-        html
+    let canister_id = api::id();
+    let setup_js: String = JS_SETUP_SCRIPT.to_string();
+    let html = html.replace(
+        r#"<script id="setupJs"></script>"#,
+        &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#)
+            .to_string(),
+    );
+    let html = html.replace(
+        "<meta replaceme-with-csp/>",
+        &format!(
+            r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,
+            &http::content_security_policy_meta()
+        ),
+    );
+    html
 }
 
 lazy_static! {
