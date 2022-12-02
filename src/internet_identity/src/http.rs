@@ -264,7 +264,7 @@ fn content_security_policy_header() -> String {
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
 pub fn content_security_policy_meta() -> String {
-    let hash = assets::INDEX_HTML_SETUP_JS_SRI_HASH.to_string();
+    let hash = assets::JS_SETUP_SCRIPT_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
          connect-src 'self' https://ic0.app https://*.ic0.app;\

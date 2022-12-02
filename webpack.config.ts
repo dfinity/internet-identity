@@ -9,6 +9,11 @@ import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
 import { fileURLToPath } from "url";
 import { config } from "dotenv";
 
+import { TemplateResult } from "lit-html";
+import { render } from "@lit-labs/ssr/lib/render-lit-html";
+import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
+import { pageContent as faqStaticContent } from "./src/frontend/src/flows/faq";
+
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 config();
@@ -31,26 +36,71 @@ function readCanisterId() {
   return canisterId;
 }
 
-// This plugin emulates the behaviour of http.rs while using webpack dev server locally
-// so we don't need to proxy to the backend canister for the index.html file.
-// This overcomes some issues with Safari and the CSP headers set in http.rs.
-class InjectCanisterIdPlugin {
-  apply(compiler: webpack.Compiler) {
-    compiler.hooks.compilation.tap("InjectCanisterIdPlugin", (compilation) => {
-      HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
-        "InjectCanisterIdPlugin",
-        (data, cb) => {
-          data.html = data.html.replace(
-            '<script id="setupJs"></script>',
-            `<script data-canister-id="${readCanisterId()}" id="setupJs"></script>`
-          );
+// A plugin that replaces content in HTML files
+class HtmlReplacePlugin {
+  constructor(
+    /** The function to apply on the HTML */
+    private f: (html: string) => string,
+    /** If specified, only replace HTML in this file */
+    private name?: string
+  ) {}
 
+  apply(compiler: webpack.Compiler) {
+    compiler.hooks.compilation.tap(this.constructor.name, (compilation) => {
+      HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
+        this.constructor.name,
+        (data, cb) => {
+          if (this.name === undefined || this.name === data.outputName) {
+            data.html = this.f(data.html);
+          }
           cb(null, data);
         }
       );
     });
   }
 }
+
+// A plugin that creates an HTML page based on our index.html template
+const htmlPlugin = ({ filename }: { filename: string }): HtmlWebpackPlugin =>
+  new HtmlWebpackPlugin({
+    template: "src/frontend/assets/index.html",
+    // Don't inject the index.js in production, because the canister actually injects it (see http.rs for more details)
+    // When true, injects (a hot-reloading version of) the built javascript, which in turn inserts the CSS (through "style-loader").
+    // This value is read by the template; see index.html for more details.
+    inject: !isProduction,
+    filename,
+  });
+
+// A plugin that creates a static page by injecting a static TemplateResult into a page
+const staticPagePlugin = (
+  pageName: string,
+  pageContent: TemplateResult
+): HtmlReplacePlugin =>
+  new HtmlReplacePlugin((html) => {
+    const content = Array.from(render(pageContent)).reduce(
+      (acc, v) => acc + v,
+      ""
+    );
+    return html.replace(
+      '<main id="pageContent" class="l-wrap" aria-live="polite"></main>',
+      `<main id="pageContent" class="l-wrap" aria-live="polite">${content}</main>`
+    );
+  }, pageName);
+
+// This emulates the behaviour of http.rs while using webpack dev server locally
+// so we don't need to proxy to the backend canister for the index.html file.
+// This overcomes some issues with Safari and the CSP headers set in http.rs.
+const injectCanisterIdPlugin = () =>
+  new HtmlReplacePlugin((html) =>
+    html.replace(
+      '<script id="setupJs"></script>',
+      `<script data-canister-id="${readCanisterId()}" id="setupJs"></script>`
+    )
+  );
+
+const staticAboutPlugin = () =>
+  staticPagePlugin("about.html", aboutStaticContent);
+const staticFaqPlugin = () => staticPagePlugin("faq.html", faqStaticContent);
 
 const isProduction = process.env.NODE_ENV === "production";
 const devtool = isProduction ? undefined : "source-map";
@@ -93,6 +143,11 @@ const defaults = {
       process: "process/browser",
     }),
     new webpack.EnvironmentPlugin({
+      // Whether or not static pages should be hydrated
+      // (only done in production since we don't have statically rendered
+      // pages for development)
+      HYDRATE_STATIC_PAGES: isProduction ? "1" : "0",
+      // Feature flags (see README)
       II_FETCH_ROOT_KEY: "0",
       II_DUMMY_AUTH: "0",
       II_DUMMY_CAPTCHA: "0",
@@ -110,21 +165,17 @@ const defaults = {
         {
           from: path.join(__dirname, "src", "frontend", "assets"),
           to: path.join(__dirname, "dist"),
-          // We want the html file from HtmlWebpackPlugin, not the original one
+          // We want html files from HtmlWebpackPlugin, not the original ones
           filter: (resourcePath) => {
-            return !resourcePath.endsWith("index.html");
+            return !resourcePath.endsWith(".html");
           },
         },
       ],
     }),
 
-    new HtmlWebpackPlugin({
-      template: "src/frontend/assets/index.html",
-      // Don't inject the index.js in production, because the canister actually injects it (see http.rs for more details)
-      // When true, injects (a hot-reloading version of) the built javascript, which in turn inserts the CSS (through "style-loader").
-      // This value is read by the template; see index.html for more details.
-      inject: !isProduction,
-    }),
+    htmlPlugin({ filename: "index.html" }),
+    htmlPlugin({ filename: "about.html" }),
+    htmlPlugin({ filename: "faq.html" }),
   ],
 };
 
@@ -143,12 +194,25 @@ export default [
         // Make sure /api calls land on the replica (and not on webpack)
         "/api": "http://localhost:4943",
       },
+      historyApiFallback: {
+        // Make sure that visiting links like `/faq` serves the correct HTML
+        // (could also be `/index.html` since the content is the same in development, but it's
+        // less confusing to show the correct file)
+        rewrites: [
+          { from: /\/about/, to: "/about.html" },
+          { from: /\/faq/, to: "/faq.html" },
+        ],
+      },
     },
     plugins: [
       ...defaults.plugins,
-      // Inject canister ID when using the dev server, so that the local file can be used
-      // (instead of the HTML served by the canister)
-      ...(isProduction ? [] : [new InjectCanisterIdPlugin()]),
+      // In production, we generate static versions of our static pages (during development we
+      // prefer hot-reloading dynamic pages);
+      // in development, we inject canister ID when using the dev server, so that the local
+      // file can be used (instead of the HTML served by the canister)
+      ...(isProduction
+        ? [staticAboutPlugin(), staticFaqPlugin()]
+        : [injectCanisterIdPlugin()]),
     ],
   },
   {

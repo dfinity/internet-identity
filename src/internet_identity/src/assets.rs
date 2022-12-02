@@ -23,29 +23,48 @@ pub enum ContentType {
 }
 
 // The <script> tag that loads the 'index.js'
-const INDEX_HTML_SETUP_JS: &str = "let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);";
+const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);";
+
+// Fix up HTML pages, by injecting canister ID, script tag and CSP
+fn fixup_html(html: &str) -> String {
+    let canister_id = api::id();
+    let setup_js: String = JS_SETUP_SCRIPT.to_string();
+    let html = html.replace(
+        r#"<script id="setupJs"></script>"#,
+        &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#)
+            .to_string(),
+    );
+    let html = html.replace(
+        "<meta replaceme-with-csp/>",
+        &format!(
+            r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,
+            &http::content_security_policy_meta()
+        ),
+    );
+    html
+}
 
 lazy_static! {
     // The SRI sha256 hash of the script tag, used by the CSP policy.
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
-    pub static ref INDEX_HTML_SETUP_JS_SRI_HASH: String = {
-        let hash = &sha2::Sha256::digest(INDEX_HTML_SETUP_JS.as_bytes());
+    pub static ref JS_SETUP_SCRIPT_SRI_HASH: String = {
+        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT.as_bytes());
         let hash = base64::encode(hash);
         format!("sha256-{hash}")
     };
 
-    // The full content of the index.html, after the canister ID, the script tag and the CSP have been
-    // injected
+    // Various HTML pages, after the canister ID, the script tag and the CSP have been injected
+
     static ref INDEX_HTML_STR: String = {
-        let index_html = include_str!("../../../dist/index.html");
-        let canister_id = api::id();
-        let setup_js: String = INDEX_HTML_SETUP_JS.to_string();
-        let index_html = index_html.replace(
-            r#"<script id="setupJs"></script>"#,
-            &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#).to_string()
-        );
-        let index_html = index_html.replace("<meta replaceme-with-csp/>", &format!(r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,&http::content_security_policy_meta() ));
-        index_html
+        fixup_html(include_str!("../../../dist/index.html"))
+    };
+
+    static ref ABOUT_HTML_STR: String = {
+        fixup_html(include_str!("../../../dist/about.html"))
+    };
+
+    static ref FAQ_HTML_STR: String = {
+        fixup_html(include_str!("../../../dist/faq.html"))
     };
 }
 
@@ -73,6 +92,8 @@ pub fn init_assets() {
 // prepared only once (like injecting the canister ID).
 fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
+    let about_html: &[u8] = ABOUT_HTML_STR.as_bytes();
+    let faq_html: &[u8] = FAQ_HTML_STR.as_bytes();
     [
         (
             "/",
@@ -80,16 +101,15 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
-        // The FAQ and about pages are the same webapp, but the webapp routes to the correct page
         (
             "/faq",
-            index_html,
+            faq_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
         (
             "/about",
-            index_html,
+            about_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
