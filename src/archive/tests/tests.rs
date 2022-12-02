@@ -157,7 +157,7 @@ mod write_tests {
         // assert logs have been written without decoding entries
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_entries_count",
+            "ii_archive_entries_count{source=\"log\"}",
             2,
         );
         Ok(())
