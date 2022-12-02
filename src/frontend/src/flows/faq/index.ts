@@ -1,4 +1,5 @@
 import { TemplateResult, html, render } from "lit-html";
+import { hydrate } from "lit-html/experimental-hydrate.js";
 
 export interface Link {
   name: string;
@@ -281,7 +282,7 @@ export function mkExternalLink(link: {
 }
 
 // The FAQ page
-const pageContent = html`
+export const pageContent = html`
   <style>
     /* briefly flash the question when redirected to a particular question */
     @keyframes flash-question {
@@ -340,6 +341,9 @@ const openAnchor = (): void => {
 export const faqView = (): void => {
   document.title = "FAQ | Internet Identity";
   const container = document.getElementById("pageContent") as HTMLElement;
+  if (process.env.HYDRATE_STATIC_PAGES !== "0") {
+    hydrate(pageContent, container);
+  }
   render(pageContent, container);
   openAnchor(); // needs to happen after DOM was rendered
 };

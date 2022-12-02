@@ -1,8 +1,9 @@
 import { html, render } from "lit-html";
+import { hydrate } from "lit-html/experimental-hydrate.js";
 import { compatibilityData } from "../../components/compatibilityChart";
 
 // The About page
-const pageContent = html`
+export const pageContent = html`
   <div class="l-container l-container--wide c-card c-card--highlight">
     <h1 class="t-title t-title--main">About</h1>
     <div class="l-stack">
@@ -46,5 +47,8 @@ const pageContent = html`
 export const aboutView = (): void => {
   document.title = "About | Internet Identity";
   const container = document.getElementById("pageContent") as HTMLElement;
+  if (process.env.HYDRATE_STATIC_PAGES !== "0") {
+    hydrate(pageContent, container);
+  }
   render(pageContent, container);
 };
