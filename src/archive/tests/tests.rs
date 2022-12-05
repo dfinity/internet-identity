@@ -506,9 +506,9 @@ mod metrics_tests {
         let metrics = vec![
             "ii_archive_last_upgrade_timestamp_seconds",
             "ii_archive_entries_count{source=\"log\"}",
-            "ii_archive_log_bytes_total{memory=\"data\"}",
-            "ii_archive_log_bytes_total{memory=\"index\"}",
             "ii_archive_entries_count{source=\"anchor_index\"}",
+            "ii_archive_log_bytes{type=\"entries\"}",
+            "ii_archive_log_bytes{type=\"index\"}",
             "ii_archive_virtual_memory_pages{kind=\"log_index\"}",
             "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
@@ -601,12 +601,12 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_bytes_total{memory=\"index\"}",
+            "ii_archive_log_bytes{type=\"index\"}",
             INDEX_OVERHEAD, // empty index
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_bytes_total{memory=\"data\"}",
+            "ii_archive_log_bytes{type=\"entries\"}",
             DATA_OVERHEAD, // empty log
         );
 
@@ -623,12 +623,12 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_bytes_total{memory=\"index\"}",
+            "ii_archive_log_bytes{type=\"index\"}",
             INDEX_OVERHEAD + 8, // 8 bytes per entry
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_bytes_total{memory=\"data\"}",
+            "ii_archive_log_bytes{type=\"entries\"}",
             DATA_OVERHEAD + entry_size,
         );
         Ok(())

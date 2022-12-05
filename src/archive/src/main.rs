@@ -428,45 +428,42 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )
     })?;
     with_log(|log| {
-        w.encode_gauge(
-            "ii_archive_entries_count{source=\"log\"}",
-            log.len() as f64,
-            "Number of log entries stored in this canister.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_bytes_total{memory=\"data\"}",
-            log.data_size_bytes() as f64,
-            "Total size of all logged entries in bytes.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_bytes_total{memory=\"index\"}",
-            log.index_size_bytes() as f64,
-            "Total size of the log index in bytes.",
-        )
-    })?;
-    with_anchor_index_mut(|index| {
-        w.encode_gauge(
-            "ii_archive_entries_count{source=\"anchor_index\"}",
-            index.len() as f64,
-            "Number of entries in the anchor index.",
-        )
+        with_anchor_index_mut(|index| {
+            w.gauge_vec(
+                "ii_archive_entries_count",
+                "Number of log entries stored in this canister.",
+            )
+            .unwrap()
+            .value(&[("source", "log")], log.len() as f64)
+            .unwrap()
+            .value(&[("source", "anchor_index")], index.len() as f64)
+        })?;
+        w.gauge_vec("ii_archive_log_bytes", "Size of log data in bytes.")
+            .unwrap()
+            .value(&[("type", "entries")], log.data_size_bytes() as f64)
+            .unwrap()
+            .value(&[("type", "index")], log.index_size_bytes() as f64)
     })?;
     MEMORY_MANAGER.with(|cell| {
         let manager = cell.borrow();
-        w.encode_gauge(
-            "ii_archive_virtual_memory_pages{kind=\"log_index\"}",
+        w.gauge_vec(
+            "ii_archive_virtual_memory_pages",
+            "Number of allocated virtual memory pages.",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "log_index")],
             manager.get(LOG_INDEX_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the log index virtual memory.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "log_data")],
             manager.get(LOG_DATA_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the log data virtual memory.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "anchor_index")],
             manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the anchor index virtual memory.",
         )
     })?;
     w.encode_gauge(
