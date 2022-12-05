@@ -133,8 +133,8 @@ export function iOSOrSafari(): boolean {
 }
 
 /* A function that can never be called. Can be used to prove that all type alternatives have been exhausted. */
-export function unreachable(_: never): never {
-  throw new Error("The impossible happened");
+export function unreachable(_: never, reason?: string): never {
+  throw new Error(`Unexpected error ${reason ?? ""}`);
 }
 
 /* Wrap an unknown value as an error and try to extract a string from it */
