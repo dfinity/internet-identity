@@ -1,5 +1,33 @@
-//! Encodes metrics for Prometheus.
 use std::io;
+
+#[cfg(test)]
+mod test;
+
+/// A helper for encoding metrics that use
+/// [labels](https://prometheus.io/docs/practices/naming/#labels).
+/// See [MetricsEncoder::counter_vec] and [MetricsEncoder::gauge_vec].
+pub struct LabeledMetricsBuilder<'a, W>
+where
+    W: io::Write,
+{
+    encoder: &'a mut MetricsEncoder<W>,
+    name: &'a str,
+}
+
+impl<W: io::Write> LabeledMetricsBuilder<'_, W> {
+    /// Encodes the metrics value observed for the specified values of labels.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if one of the labels does not match pattern
+    /// [a-zA-Z_][a-zA-Z0-9_]. See
+    /// https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels.
+    pub fn value(self, labels: &[(&str, &str)], value: f64) -> io::Result<Self> {
+        self.encoder
+            .encode_value_with_labels(self.name, labels, value)?;
+        Ok(self)
+    }
+}
 
 /// `MetricsEncoder` provides methods to encode metrics in a text format
 /// that can be understood by Prometheus.
@@ -7,7 +35,8 @@ use std::io;
 /// Metrics are encoded with the block time included, to allow Prometheus
 /// to discard out-of-order samples collected from replicas that are behind.
 ///
-/// See [Exposition Formats][1] for an informal specification of the text format.
+/// See [Exposition Formats][1] for an informal specification of the text
+/// format.
 ///
 /// [1]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md
 pub struct MetricsEncoder<W: io::Write> {
@@ -48,6 +77,7 @@ impl<W: io::Write> MetricsEncoder<W> {
         sum: f64,
         help: &str,
     ) -> io::Result<()> {
+        validate_prometheus_name(name);
         self.encode_header(name, help, "histogram")?;
         let mut total: f64 = 0.0;
         let mut saw_infinity = false;
@@ -86,20 +116,131 @@ impl<W: io::Write> MetricsEncoder<W> {
         value: f64,
         help: &str,
     ) -> io::Result<()> {
+        validate_prometheus_name(name);
         self.encode_header(name, help, typ)?;
         writeln!(self.writer, "{} {} {}", name, value, self.now_millis)
     }
 
     /// Encodes the metadata and the value of a counter.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the `name` argument does not match pattern [a-zA-Z_][a-zA-Z0-9_].
     pub fn encode_counter(&mut self, name: &str, value: f64, help: &str) -> io::Result<()> {
         self.encode_single_value("counter", name, value, help)
     }
 
     /// Encodes the metadata and the value of a gauge.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the `name` argument does not match pattern [a-zA-Z_][a-zA-Z0-9_].
     pub fn encode_gauge(&mut self, name: &str, value: f64, help: &str) -> io::Result<()> {
         self.encode_single_value("gauge", name, value, help)
     }
+
+    /// Starts encoding of a counter that uses
+    /// [labels](https://prometheus.io/docs/practices/naming/#labels).
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the `name` argument does not match pattern [a-zA-Z_][a-zA-Z0-9_].
+    pub fn counter_vec<'a>(
+        &'a mut self,
+        name: &'a str,
+        help: &'a str,
+    ) -> io::Result<LabeledMetricsBuilder<'a, W>> {
+        validate_prometheus_name(name);
+        self.encode_header(name, help, "counter")?;
+        Ok(LabeledMetricsBuilder {
+            encoder: self,
+            name,
+        })
+    }
+
+    /// Starts encoding of a gauge that uses
+    /// [labels](https://prometheus.io/docs/practices/naming/#labels).
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the `name` argument does not match pattern [a-zA-Z_][a-zA-Z0-9_].
+    pub fn gauge_vec<'a>(
+        &'a mut self,
+        name: &'a str,
+        help: &'a str,
+    ) -> io::Result<LabeledMetricsBuilder<'a, W>> {
+        validate_prometheus_name(name);
+        self.encode_header(name, help, "gauge")?;
+        Ok(LabeledMetricsBuilder {
+            encoder: self,
+            name,
+        })
+    }
+
+    fn encode_labels(labels: &[(&str, &str)]) -> String {
+        let mut buf = String::new();
+        for (i, (k, v)) in labels.iter().enumerate() {
+            validate_prometheus_name(k);
+            if i > 0 {
+                buf.push(',')
+            }
+            buf.push_str(k);
+            buf.push('=');
+            buf.push('"');
+            for c in v.chars() {
+                match c {
+                    '\\' => {
+                        buf.push('\\');
+                        buf.push('\\');
+                    }
+                    '\n' => {
+                        buf.push('\\');
+                        buf.push('n');
+                    }
+                    '"' => {
+                        buf.push('\\');
+                        buf.push('"');
+                    }
+                    _ => buf.push(c),
+                }
+            }
+            buf.push('"');
+        }
+        buf
+    }
+
+    fn encode_value_with_labels(
+        &mut self,
+        name: &str,
+        label_values: &[(&str, &str)],
+        value: f64,
+    ) -> io::Result<()> {
+        writeln!(
+            self.writer,
+            "{}{{{}}} {} {}",
+            name,
+            Self::encode_labels(label_values),
+            value,
+            self.now_millis
+        )
+    }
 }
 
-#[cfg(test)]
-mod test;
+/// Panics if the specified string is not a valid Prometheus metric/label name.
+/// See https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels.
+fn validate_prometheus_name(name: &str) {
+    if name.is_empty() {
+        panic!("Empty names are not allowed");
+    }
+    let bytes = name.as_bytes();
+    if (!bytes[0].is_ascii_alphabetic() && bytes[0] != b'_')
+        || !bytes[1..]
+            .iter()
+            .all(|c| c.is_ascii_alphanumeric() || *c == b'_')
+    {
+        panic!(
+            "Name '{}' does not match pattern [a-zA-Z_][a-zA-Z0-9_]",
+            name
+        );
+    }
+}
