@@ -37,7 +37,7 @@ export const questions = {
     links: [
       {
         name: "Windows Hello Guide for Internet Identity",
-        link: "https://sdk.dfinity.org/docs/ic-identity-guide/hello-guide.html",
+        link: "https://internetcomputer.org/docs/current/tokenomics/identity-auth/hello-guide",
       },
     ],
   },
@@ -50,7 +50,7 @@ export const questions = {
     links: [
       {
         name: "Device Management How-To",
-        link: "https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html",
+        link: "https://internetcomputer.org/docs/current/tokenomics/identity-auth/auth-how-to",
       },
     ],
   },
@@ -63,7 +63,7 @@ export const questions = {
     links: [
       {
         name: "How to add a device",
-        link: "https://sdk.dfinity.org/docs/ic-identity-guide/auth-how-to.html#_add_a_device",
+        link: "https://internetcomputer.org/docs/current/tokenomics/identity-auth/auth-how-to#add-a-device",
       },
     ],
   },
