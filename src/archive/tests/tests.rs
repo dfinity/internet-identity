@@ -157,7 +157,7 @@ mod write_tests {
         // assert logs have been written without decoding entries
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_entries_count",
+            "ii_archive_entries_count{source=\"log\"}",
             2,
         );
         Ok(())
@@ -504,15 +504,14 @@ mod metrics_tests {
     #[test]
     fn should_return_metrics() -> Result<(), CallError> {
         let metrics = vec![
-            "ii_archive_last_upgrade_timestamp",
-            "ii_archive_log_entries_count",
-            "ii_archive_log_entries_size",
-            "ii_archive_log_index_memory_size",
-            "ii_archive_log_data_memory_size",
-            "ii_archive_anchor_index_entries_count",
-            "ii_archive_log_index_virtual_memory_size",
-            "ii_archive_log_data_virtual_memory_size",
-            "ii_archive_anchor_index_virtual_memory_size",
+            "ii_archive_last_upgrade_timestamp_seconds",
+            "ii_archive_entries_count{source=\"log\"}",
+            "ii_archive_entries_count{source=\"anchor_index\"}",
+            "ii_archive_log_bytes{type=\"entries\"}",
+            "ii_archive_log_bytes{type=\"index\"}",
+            "ii_archive_virtual_memory_pages{kind=\"log_index\"}",
+            "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
+            "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             "ii_archive_stable_memory_pages",
         ];
         let env = StateMachine::new();
@@ -539,11 +538,11 @@ mod metrics_tests {
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_last_upgrade_timestamp",
+            "ii_archive_last_upgrade_timestamp_seconds",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos() as u64,
+                .as_secs() as u64,
         );
         println!("{}", get_metrics(&env, canister_id));
 
@@ -553,11 +552,11 @@ mod metrics_tests {
         println!("{}", get_metrics(&env, canister_id));
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_last_upgrade_timestamp",
+            "ii_archive_last_upgrade_timestamp_seconds",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos() as u64,
+                .as_secs() as u64,
         );
         Ok(())
     }
@@ -566,8 +565,8 @@ mod metrics_tests {
     #[test]
     fn should_update_log_entries_count() -> Result<(), CallError> {
         let metrics = vec![
-            "ii_archive_log_entries_count",
-            "ii_archive_anchor_index_entries_count",
+            "ii_archive_entries_count{source=\"log\"}",
+            "ii_archive_entries_count{source=\"anchor_index\"}",
         ];
 
         let env = StateMachine::new();
@@ -602,18 +601,13 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_index_memory_size",
+            "ii_archive_log_bytes{type=\"index\"}",
             INDEX_OVERHEAD, // empty index
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_data_memory_size",
+            "ii_archive_log_bytes{type=\"entries\"}",
             DATA_OVERHEAD, // empty log
-        );
-        assert_metric(
-            &get_metrics(&env, canister_id),
-            "ii_archive_log_entries_size",
-            0, // size of actual entries
         );
 
         let entry = candid::encode_one(log_entry_1()).expect("failed to encode entry");
@@ -629,20 +623,14 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_index_memory_size",
+            "ii_archive_log_bytes{type=\"index\"}",
             INDEX_OVERHEAD + 8, // 8 bytes per entry
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_data_memory_size",
+            "ii_archive_log_bytes{type=\"entries\"}",
             DATA_OVERHEAD + entry_size,
         );
-        assert_metric(
-            &get_metrics(&env, canister_id),
-            "ii_archive_log_entries_size",
-            entry_size, // size of actual entries
-        );
-
         Ok(())
     }
 
@@ -657,17 +645,17 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_index_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"log_index\"}",
             1,
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_data_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             1,
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_anchor_index_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             1,
         );
         assert_metric(
@@ -687,17 +675,17 @@ mod metrics_tests {
 
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_index_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"log_index\"}",
             1, // does not change because the index additions are small
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_log_data_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             2,
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_anchor_index_virtual_memory_size",
+            "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             1, // does not change because the index additions are small
         );
         assert_metric(

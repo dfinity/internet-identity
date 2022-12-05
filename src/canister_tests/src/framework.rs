@@ -499,6 +499,7 @@ frame-ancestors 'none';$"
 }
 
 pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
+    let metric = metric.replace("{", "\\{").replace("}", "\\}");
     let metric_capture = Regex::new(&format!("(?m)^{} (\\d+) (\\d+)$", metric))
         .unwrap()
         .captures(body)

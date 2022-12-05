@@ -54,6 +54,7 @@ use metrics_encoder::MetricsEncoder;
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::time::Duration;
 
 #[cfg(test)]
 mod anchor_index_key_tests;
@@ -421,56 +422,48 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     with_config(|config| {
         w.encode_gauge(
-            "ii_archive_last_upgrade_timestamp",
-            config.last_upgrade_timestamp as f64,
+            "ii_archive_last_upgrade_timestamp_seconds",
+            Duration::from_nanos(config.last_upgrade_timestamp).as_secs_f64(),
             "Timestamp of the last upgrade of this canister.",
         )
     })?;
     with_log(|log| {
-        w.encode_gauge(
-            "ii_archive_log_entries_count",
-            log.len() as f64,
-            "Number of log entries stored in this canister.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_entries_size",
-            log.log_size_bytes() as f64,
-            "Total size of all logged entries in bytes, not counting data structure overhead.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_index_memory_size",
-            log.index_size_bytes() as f64,
-            "Total size of the log index in bytes.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_data_memory_size",
-            log.data_size_bytes() as f64,
-            "Total size of the log data in bytes.",
-        )
-    })?;
-    with_anchor_index_mut(|index| {
-        w.encode_gauge(
-            "ii_archive_anchor_index_entries_count",
-            index.len() as f64,
-            "Number of entries in the anchor index.",
-        )
+        with_anchor_index_mut(|index| {
+            w.gauge_vec(
+                "ii_archive_entries_count",
+                "Number of log entries stored in this canister.",
+            )
+            .unwrap()
+            .value(&[("source", "log")], log.len() as f64)
+            .unwrap()
+            .value(&[("source", "anchor_index")], index.len() as f64)
+        })?;
+        w.gauge_vec("ii_archive_log_bytes", "Size of log data in bytes.")
+            .unwrap()
+            .value(&[("type", "entries")], log.data_size_bytes() as f64)
+            .unwrap()
+            .value(&[("type", "index")], log.index_size_bytes() as f64)
     })?;
     MEMORY_MANAGER.with(|cell| {
         let manager = cell.borrow();
-        w.encode_gauge(
-            "ii_archive_log_index_virtual_memory_size",
+        w.gauge_vec(
+            "ii_archive_virtual_memory_pages",
+            "Number of allocated virtual memory pages.",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "log_index")],
             manager.get(LOG_INDEX_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the log index virtual memory.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_log_data_virtual_memory_size",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "log_data")],
             manager.get(LOG_DATA_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the log data virtual memory.",
-        )?;
-        w.encode_gauge(
-            "ii_archive_anchor_index_virtual_memory_size",
+        )
+        .unwrap()
+        .value(
+            &[("kind", "anchor_index")],
             manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID).size() as f64,
-            "Number of stable memory pages allocated to the anchor index virtual memory.",
         )
     })?;
     w.encode_gauge(
