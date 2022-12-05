@@ -35,7 +35,7 @@ ic-stable-structures = "0.3"
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.3"
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "7b21f564e911b4476169bc30d8093848fefc1c3d" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "9c4bc948fa244757379385617208934837098fed" }
 regex = "1.5.6"
 
 [features]
