@@ -3,7 +3,7 @@
 import { Principal } from "@dfinity/principal";
 import { fetchDelegation } from "./fetchDelegation";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
-import { hasOwnProperty, unknownToRecord } from "../../utils/utils";
+import { unknownToRecord } from "../../utils/utils";
 import { LoginData } from "../../utils/flowResult";
 
 export interface Delegation {
@@ -45,7 +45,7 @@ const asAuthRequest = (msg: unknown): AuthRequest | string => {
     return "request is undefined";
   }
 
-  if (!hasOwnProperty(obj, "kind")) {
+  if (!("kind" in obj)) {
     return "request does not have 'kind'";
   }
 
@@ -53,7 +53,7 @@ const asAuthRequest = (msg: unknown): AuthRequest | string => {
     return "'kind' is not 'authorize-client'";
   }
 
-  if (!hasOwnProperty(obj, "sessionPublicKey")) {
+  if (!("sessionPublicKey" in obj)) {
     return "request does not have 'sessionPublicKey'";
   }
 

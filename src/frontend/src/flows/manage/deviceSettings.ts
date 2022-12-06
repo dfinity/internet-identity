@@ -10,7 +10,6 @@ import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { footer } from "../../components/footer";
 import { DeviceData } from "../../../generated/internet_identity_types";
-import { hasOwnProperty } from "../../utils/utils";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 
 // The "device settings" page where users can view information about a device,
@@ -85,15 +84,15 @@ const pageContent = (
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices
 const shouldOfferToProtect = (device: DeviceData): boolean =>
-  hasOwnProperty(device.purpose, "recovery") &&
-  hasOwnProperty(device.key_type, "seed_phrase") &&
+  "recovery" in device.purpose &&
+  "seed_phrase" in device.key_type &&
   !isProtected(device);
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
 
 const isRecovery = (device: DeviceData): boolean =>
-  hasOwnProperty(device.purpose, "recovery");
+  "recovery" in device.purpose;
 
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
@@ -170,7 +169,7 @@ const deleteDevice = async (
       )
     : confirm(
         `Do you really want to remove the ${
-          hasOwnProperty(device.purpose, "recovery") ? "" : "device "
+          "recovery" in device.purpose ? "" : "device "
         }"${device.alias}"?`
       );
   if (!shouldProceed) {

@@ -7,7 +7,6 @@ import {
   KeyType,
   Purpose,
 } from "../../../../generated/internet_identity_types";
-import { hasOwnProperty } from "../../../utils/utils";
 import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
@@ -85,9 +84,9 @@ export const addTentativeDevice = async (
       result.added_tentatively,
       Array.from(new Uint8Array(tentativeDeviceInfo[5]))
     );
-  } else if (hasOwnProperty(result, "device_registration_mode_off")) {
+  } else if ("device_registration_mode_off" in result) {
     await deviceRegistrationDisabledInfo(connection, tentativeDeviceInfo);
-  } else if (hasOwnProperty(result, "another_device_tentatively_added")) {
+  } else if ("another_device_tentatively_added" in result) {
     await displayError({
       title: "Tentative Device Already Exists",
       message:
