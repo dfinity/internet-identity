@@ -54,3 +54,12 @@ export const mount = (callback: (elem: Element) => void): DirectiveResult =>
       observer.observe(document, { childList: true, subtree: true });
     }
   });
+
+/* A lit-html directive that focuses the element when the element is added
+ * to the DOM.
+ */
+export const autofocus = mount((elem: Element) => {
+  if (elem instanceof HTMLElement) {
+    elem.focus();
+  }
+});
