@@ -45,7 +45,7 @@
     "jest-cli": "~29",
     "jest-environment-jsdom": "~29",
     "mini-css-extract-plugin": "^2.6.1",
-    "prettier": "2.3.2",
+    "prettier": "2.8.0",
     "process": "0.11.10",
     "stream-browserify": "3.0.0",
     "style-loader": "^3.2.1",
