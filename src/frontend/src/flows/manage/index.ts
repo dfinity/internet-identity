@@ -17,7 +17,6 @@ import {
 } from "../../components/authenticateBox";
 import { setupRecovery } from "../recovery/setupRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
-import { hasOwnProperty } from "../../utils/utils";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
@@ -70,8 +69,7 @@ const displayFailedToListDevices = (error: Error) =>
 // which leaves room for 8 authenticator devices.
 const MAX_AUTHENTICATORS = 8;
 const numAuthenticators = (devices: DeviceData[]) =>
-  devices.filter((device) => hasOwnProperty(device.purpose, "authentication"))
-    .length;
+  devices.filter((device) => "authentication" in device.purpose).length;
 
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
@@ -292,7 +290,7 @@ const renderDevices = async (
         await renderManage(userNumber, connection);
       };
     }
-    hasOwnProperty(device.purpose, "recovery")
+    "recovery" in device.purpose
       ? recoveryList.appendChild(identityElement)
       : list.appendChild(identityElement);
   });
@@ -312,7 +310,7 @@ const renderDevices = async (
 
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
-  devices.some((device) => hasOwnProperty(device.purpose, "recovery"));
+  devices.some((device) => "recovery" in device.purpose);
 
 const unknownError = (): Error => {
   return new Error("Unknown error");

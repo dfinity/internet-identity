@@ -36,7 +36,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { hasOwnProperty, unreachable } from "./utils";
+import { unreachable } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
@@ -152,7 +152,7 @@ export class Connection {
       }
     }
 
-    if (hasOwnProperty(registerResponse, "canister_full")) {
+    if ("canister_full" in registerResponse) {
       return { kind: "registerNoSpace" };
     } else if ("registered" in registerResponse) {
       const userNumber = registerResponse.registered.user_number;
@@ -168,7 +168,7 @@ export class Connection {
         ),
         userNumber,
       };
-    } else if (hasOwnProperty(registerResponse, "bad_challenge")) {
+    } else if ("bad_challenge" in registerResponse) {
       return { kind: "badChallenge" };
     } else {
       console.error("unexpected register response", registerResponse);
@@ -243,7 +243,11 @@ export class Connection {
 
     const attachmentInfo = identity.getAuthenticatorAttachment();
     if (attachmentInfo !== undefined) {
-      this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
+      try {
+        this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
+      } catch (e) {
+        console.warn("Could not update key type:", e);
+      }
     }
 
     return {
@@ -274,7 +278,7 @@ export class Connection {
     });
 
     // only update devices with key-type unknown
-    if (device !== undefined && hasOwnProperty(device.key_type, "unknown")) {
+    if (device !== undefined && "unknown" in device.key_type) {
       switch (attachmentInfo.authenticatorAttachment) {
         case "cross-platform":
           device.key_type = { cross_platform: null };
@@ -283,7 +287,10 @@ export class Connection {
           device.key_type = { platform: null };
           break;
         default:
-          unreachable(attachmentInfo.authenticatorAttachment);
+          unreachable(
+            attachmentInfo.authenticatorAttachment,
+            `unexpected authenticator attachment: ${attachmentInfo.authenticatorAttachment}`
+          );
           break;
       }
       // we purposely do not await the promise as we just optimistically update
@@ -348,9 +355,7 @@ export class Connection {
   ): Promise<DeviceData[]> => {
     const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
-    return allDevices.filter((device) =>
-      hasOwnProperty(device.purpose, "authentication")
-    );
+    return allDevices.filter((device) => "authentication" in device.purpose);
   };
 
   addTentativeDevice = async (
@@ -377,9 +382,7 @@ export class Connection {
   lookupRecovery = async (userNumber: UserNumber): Promise<DeviceData[]> => {
     const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
-    return allDevices.filter((device) =>
-      hasOwnProperty(device.purpose, "recovery")
-    );
+    return allDevices.filter((device) => "recovery" in device.purpose);
   };
 
   // Create an actor representing the backend
