@@ -243,7 +243,11 @@ export class Connection {
 
     const attachmentInfo = identity.getAuthenticatorAttachment();
     if (attachmentInfo !== undefined) {
-      this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
+      try {
+        this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
+      } catch (e) {
+        console.warn("Could not update key type:", e);
+      }
     }
 
     return {
@@ -283,7 +287,10 @@ export class Connection {
           device.key_type = { platform: null };
           break;
         default:
-          unreachable(attachmentInfo.authenticatorAttachment);
+          unreachable(
+            attachmentInfo.authenticatorAttachment,
+            `unexpected authenticator attachment: ${attachmentInfo.authenticatorAttachment}`
+          );
           break;
       }
       // we purposely do not await the promise as we just optimistically update
