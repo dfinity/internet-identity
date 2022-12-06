@@ -1,6 +1,6 @@
 import { html, TemplateResult } from "lit-html";
 import { arrowRight } from "./icons";
-import { mount } from "../utils/lit-html";
+import { autofocus } from "../utils/lit-html";
 import { NonEmptyArray } from "../utils/utils";
 
 type PickerProps = {
@@ -46,13 +46,7 @@ const anchorItem = (props: {
 }): TemplateResult => html`
   <li class="c-list__item c-list__item--vip c-list__item--icon icon-trigger">
     <button
-      ${props.focus
-        ? mount((e) => {
-            if (e instanceof HTMLElement) {
-              e.focus();
-            }
-          })
-        : ""}
+      ${props.focus ? autofocus : undefined}
       data-anchor-id=${props.anchor}
       class="c-list__parcel c-list__parcel--select"
       @click="${() => props.pick(props.anchor)}"
