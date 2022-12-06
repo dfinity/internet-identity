@@ -79,7 +79,9 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     | undefined {
     if (
       this._actualIdentity === undefined ||
-      this._authenticatorAttachment === undefined
+      this._authenticatorAttachment === undefined ||
+      this._authenticatorAttachment ===
+        null /* on Windows the attachment is 'null' */
     ) {
       return undefined;
     }
