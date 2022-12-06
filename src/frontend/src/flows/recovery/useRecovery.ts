@@ -1,6 +1,5 @@
 import { displayError } from "../../components/displayError";
 import { Connection } from "../../utils/iiConnection";
-import { hasOwnProperty } from "../../utils/utils";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
@@ -43,9 +42,10 @@ const runRecovery = async (
       ? recoveryDevices[0]
       : await pickRecoveryDevice(recoveryDevices);
 
-  const res = hasOwnProperty(device.key_type, "seed_phrase")
-    ? await phraseRecoveryPage(userNumber, connection, device)
-    : await deviceRecoveryPage(userNumber, connection, device);
+  const res =
+    "seed_phrase" in device.key_type
+      ? await phraseRecoveryPage(userNumber, connection, device)
+      : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {

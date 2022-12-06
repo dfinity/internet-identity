@@ -2,7 +2,6 @@ import { html, render } from "lit-html";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
-import { hasOwnProperty } from "../../../utils/utils";
 import { displayError } from "../../../components/displayError";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
@@ -125,7 +124,7 @@ const init = (
       connection.verifyTentativeDevice(pinInput.value)
     );
 
-    if (hasOwnProperty(result, "verified")) {
+    if ("verified" in result) {
       countdown.stop();
       toggleErrorMessage("tentativeDeviceCode", "wrongCodeMessage", false);
       await renderManage(userNumber, connection);
@@ -141,7 +140,7 @@ const init = (
         });
         await renderManage(userNumber, connection);
       }
-    } else if (hasOwnProperty(result, "device_registration_mode_off")) {
+    } else if ("device_registration_mode_off" in result) {
       await displayError({
         title: "Device Registration Not Enabled",
         message:
@@ -149,7 +148,7 @@ const init = (
         primaryButton: "Continue",
       });
       await renderManage(userNumber, connection);
-    } else if (hasOwnProperty(result, "no_device_to_verify")) {
+    } else if ("no_device_to_verify" in result) {
       await displayError({
         title: "No Device To Verify",
         message:
