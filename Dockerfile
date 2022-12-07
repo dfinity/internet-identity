@@ -46,6 +46,7 @@ COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
 COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
+COPY src/state_machine_client/Cargo.toml src/state_machine_client/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
@@ -55,6 +56,8 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/archive/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
+    && mkdir -p src/state_machine_client/src \
+    && touch src/state_machine_client/src/lib.rs \
     && ./scripts/build --only-dependencies \
     && rm -rf src
 
@@ -70,6 +73,7 @@ ARG II_INSECURE_REQUESTS=
 RUN touch src/internet_identity/src/lib.rs
 RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
+RUN touch src/state_machine_client/src/lib.rs
 RUN npm ci
 
 RUN ./scripts/build
@@ -82,6 +86,7 @@ COPY . .
 RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/archive/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
+RUN touch src/state_machine_client/src/lib.rs
 
 RUN ./scripts/build --archive
 RUN sha256sum /archive.wasm

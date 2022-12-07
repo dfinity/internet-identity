@@ -1,20 +1,19 @@
-use candid::Principal;
 use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_state_machine_tests::StateMachine;
 use internet_identity_interface::{
     DeployArchiveResult, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
     InternetIdentityInit, KeyType, Operation, Purpose,
 };
 use serde_bytes::ByteBuf;
+use state_machine_client::CallError;
 use std::time::SystemTime;
 
 /// Test to verify that II can spawn an archive canister.
 #[test]
 fn should_deploy_archive() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -29,7 +28,7 @@ fn should_deploy_archive() -> Result<(), CallError> {
 /// Test to verify that II can spawn an archive canister when cycles are required.
 #[test]
 fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -51,7 +50,7 @@ fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
 /// Test to verify that II will not deploy wasm modules that have the wrong hash.
 #[test]
 fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -74,7 +73,7 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
 /// Test to verify that II will not spawn the archive canister if no hash is configured.
 #[test]
 fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister(&env, II_WASM.clone());
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
@@ -93,7 +92,7 @@ fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
 /// Test to verify that II will not lose information about the archive wasm hash on upgrade.
 #[test]
 fn should_keep_archive_module_hash_across_upgrades() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -109,7 +108,7 @@ fn should_keep_archive_module_hash_across_upgrades() -> Result<(), CallError> {
 /// Test to verify that the archive WASM hash can be changed on II upgrade and a the archive can be upgraded.
 #[test]
 fn should_upgrade_the_archive() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -128,9 +127,7 @@ fn should_upgrade_the_archive() -> Result<(), CallError> {
     .unwrap();
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
-    let archive_canister = if let DeployArchiveResult::Success(archive_canister) = result {
-        canister_id_from_principal(archive_canister)
-    } else {
+    let DeployArchiveResult::Success(archive_canister) = result else {
         panic!("Unexpected result")
     };
 
@@ -143,7 +140,7 @@ fn should_upgrade_the_archive() -> Result<(), CallError> {
 /// Test to verify that II will not lose information about already create archives on upgrade.
 #[test]
 fn should_keep_archive_across_upgrades() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -165,7 +162,7 @@ fn should_keep_archive_across_upgrades() -> Result<(), CallError> {
 /// Test to verify that II records the anchor operations after spawning an archive.
 #[test]
 fn should_record_anchor_operations() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
@@ -215,7 +212,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
             },
         },
         timestamp,
-        caller: Principal::from(principal_1()),
+        caller: principal_1(),
         sequence_number: 0,
     };
     assert_eq!(
@@ -229,7 +226,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
             device: DeviceDataWithoutAlias::from(device_data_2()),
         },
         timestamp,
-        caller: Principal::from(principal_1()),
+        caller: principal_1(),
         sequence_number: 1,
     };
     assert_eq!(
@@ -250,7 +247,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
             },
         },
         timestamp,
-        caller: Principal::from(principal_1()),
+        caller: principal_1(),
         sequence_number: 2,
     };
     assert_eq!(
@@ -264,7 +261,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
             device: pubkey.clone(),
         },
         timestamp,
-        caller: Principal::from(principal_1()),
+        caller: principal_1(),
         sequence_number: 3,
     };
     assert_eq!(

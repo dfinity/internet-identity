@@ -26,3 +26,4 @@ test-failures/
 
 # built canisters
 *.wasm
+ic-test-state-machine

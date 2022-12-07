@@ -1,10 +1,12 @@
 use crate::api::internet_identity::{create_challenge, http_request, register};
 use crate::framework::{device_data_1, principal_1};
-use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
+use candid::Principal;
+use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::{
     ChallengeAttempt, DeviceData, HttpRequest, RegisterResponse, UserNumber,
 };
 use serde_bytes::ByteBuf;
+use state_machine_client::StateMachine;
 
 pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> UserNumber {
     register_anchor_with(env, canister_id, principal_1(), &device_data_1())
@@ -13,12 +15,12 @@ pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> UserNumbe
 pub fn register_anchor_with(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     device_data: &DeviceData,
 ) -> UserNumber {
-    let challenge = create_challenge(&env, canister_id).expect("challenge creation failed");
+    let challenge = create_challenge(env, canister_id).expect("challenge creation failed");
     let user_number = match register(
-        &env,
+        env,
         canister_id,
         sender,
         device_data,
@@ -35,7 +37,7 @@ pub fn register_anchor_with(
 
 pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
     let response = http_request(
-        &env,
+        env,
         canister_id,
         HttpRequest {
             method: "GET".to_string(),

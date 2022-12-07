@@ -1,9 +1,10 @@
-use crate::framework;
-use crate::framework::CallError;
 use candid::Principal;
-use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
+use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface as types;
 use serde_bytes::ByteBuf;
+use state_machine_client::{
+    call_candid, call_candid_as, query_candid, query_candid_as, CallError, StateMachine,
+};
 
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
@@ -13,7 +14,7 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
     let _: (candid::parser::value::IDLValue,) =
-        framework::call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
+        call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
 pub fn http_request(
@@ -21,24 +22,24 @@ pub fn http_request(
     canister_id: CanisterId,
     http_request: types::HttpRequest,
 ) -> Result<types::HttpResponse, CallError> {
-    framework::query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
+    query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
 }
 
 pub fn create_challenge(
     env: &StateMachine,
     canister_id: CanisterId,
 ) -> Result<types::Challenge, CallError> {
-    framework::call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
+    call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
 }
 
 pub fn register(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     device_data: &types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
 ) -> Result<types::RegisterResponse, CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -51,13 +52,13 @@ pub fn register(
 pub fn prepare_delegation(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     frontend_hostname: types::FrontendHostname,
     session_key: types::SessionKey,
     max_time_to_live: Option<u64>,
 ) -> Result<(types::UserKey, types::Timestamp), CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -72,19 +73,19 @@ pub fn prepare_delegation(
 }
 
 pub fn init_salt(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {
-    framework::call_candid(env, canister_id, "init_salt", ())
+    call_candid(env, canister_id, "init_salt", ())
 }
 
 pub fn get_delegation(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     frontend_hostname: types::FrontendHostname,
     session_key: types::SessionKey,
     timestamp: u64,
 ) -> Result<types::GetDelegationResponse, CallError> {
-    framework::query_candid_as(
+    query_candid_as(
         env,
         canister_id,
         sender,
@@ -97,11 +98,11 @@ pub fn get_delegation(
 pub fn get_principal(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     frontend_hostname: types::FrontendHostname,
 ) -> Result<Principal, CallError> {
-    framework::query_candid_as(
+    query_candid_as(
         env,
         canister_id,
         sender,
@@ -116,28 +117,28 @@ pub fn lookup(
     canister_id: CanisterId,
     user_number: types::UserNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
-    framework::query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+    query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
 }
 
 pub fn add(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+    call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
 }
 
 pub fn update(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     device_key: types::PublicKey,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -149,11 +150,11 @@ pub fn update(
 pub fn remove(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     device_key: types::PublicKey,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -165,20 +166,19 @@ pub fn remove(
 pub fn get_anchor_info(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
 ) -> Result<types::IdentityAnchorInfo, CallError> {
-    framework::call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,))
-        .map(|(x,)| x)
+    call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)).map(|(x,)| x)
 }
 
 pub fn enter_device_registration_mode(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
 ) -> Result<types::Timestamp, CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -191,10 +191,10 @@ pub fn enter_device_registration_mode(
 pub fn exit_device_registration_mode(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -206,11 +206,11 @@ pub fn exit_device_registration_mode(
 pub fn add_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     device_data: types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -223,11 +223,11 @@ pub fn add_tentative_device(
 pub fn verify_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     user_number: types::UserNumber,
     verification_code: types::DeviceVerificationCode,
 ) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -242,14 +242,14 @@ pub fn deploy_archive(
     canister_id: CanisterId,
     wasm: ByteBuf,
 ) -> Result<types::DeployArchiveResult, CallError> {
-    framework::call_candid(env, canister_id, "deploy_archive", (wasm,)).map(|(x,)| x)
+    call_candid(env, canister_id, "deploy_archive", (wasm,)).map(|(x,)| x)
 }
 
 pub fn stats(
     env: &StateMachine,
     canister_id: CanisterId,
 ) -> Result<types::InternetIdentityStats, CallError> {
-    framework::query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
+    query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.
@@ -267,6 +267,6 @@ pub mod compat {
         env: &StateMachine,
         canister_id: CanisterId,
     ) -> Result<InternetIdentityStats, CallError> {
-        framework::query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
+        query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
     }
 }
