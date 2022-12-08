@@ -105,9 +105,15 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
     animation: none !important;
 }
         `;
+    const noscrollbar = `
+*::-webkit-scrollbar {
+    display: none !important;
+}
+        `;
     const style = document.createElement("style");
     style.appendChild(document.createTextNode(notransition));
     style.appendChild(document.createTextNode(noanimation));
+    style.appendChild(document.createTextNode(noscrollbar));
     document.body.appendChild(style);
   });
 
