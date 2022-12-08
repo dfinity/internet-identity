@@ -107,6 +107,7 @@ jobs:
             if ! compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
             then
               metric=$(<"$magick_out")
+              printf -v metric "%.f" "$metric"
               echo "Magick AE is: '$metric'"
             fi
 
