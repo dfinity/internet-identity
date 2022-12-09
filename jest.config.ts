@@ -6,11 +6,10 @@ const internet_identity = path.join(
 );
 
 export default {
-  preset: "ts-jest/presets/default-esm",
+  preset: "ts-jest/presets/js-with-ts-esm",
   testEnvironment: "jsdom",
   moduleNameMapper: {
     "dfx-generated/internet_identity": internet_identity,
-    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
 
