@@ -26,6 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
+      - name: Print chrome version
+        run: |
+          echo "google-chrome --version"
+          google-chrome --version
       - run: rm -v -f screenshots/${{ matrix.device }}*.png
       - run: npm ci
       - run: |
@@ -57,7 +61,9 @@ jobs:
 
     # don't upload screenshots on screenshot auto-update commits (to avoid screenshot-pushing
     # loops), don't upload screenshots to main, and don't upload screenshots on release.
-    if: ${{ ! contains(github.event.head_commit.message,'Selenium screenshots auto-update') && github.ref != 'refs/heads/main' && ! startsWith(github.ref, 'refs/tags/release-') }}
+    #if: ${{ ! contains(github.event.head_commit.message,'Selenium screenshots auto-update') && github.ref != 'refs/heads/main' && ! startsWith(github.ref, 'refs/tags/release-') }}
+    # temporarily disable screenshot upload due to flaky and buggy behaviour, see https://github.com/dfinity/internet-identity/pull/1085
+    if: false
 
     needs: screenshots
 
