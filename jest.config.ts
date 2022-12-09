@@ -6,10 +6,11 @@ const internet_identity = path.join(
 );
 
 export default {
-  preset: "ts-jest",
+  preset: "ts-jest/presets/default-esm",
   testEnvironment: "jsdom",
   moduleNameMapper: {
     "dfx-generated/internet_identity": internet_identity,
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
 
@@ -17,6 +18,15 @@ export default {
 
   // These two transform options make sure that jest can process files that include ES modules
   // (in particular, files that have lit-html import)
-  transform: { "\\.[jt]sx?$": "ts-jest" },
-  transformIgnorePatterns: ["node_modules/(?!(@?lit|@?devtools))"],
+  transform: {
+    // '^.+\\.[tj]sx?$' to process js/ts with `ts-jest`
+    // '^.+\\.m?[tj]sx?$' to process js/ts/mjs/mts with `ts-jest`
+    "^.+\\.[tj]sx?$": [
+      "ts-jest",
+      {
+        useESM: true,
+      },
+    ],
+  },
+  transformIgnorePatterns: ["node_modules/(?!(@?lit|devtools|uuid))"],
 };
