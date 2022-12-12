@@ -22,5 +22,5 @@ serde_bytes = "0.11"
 [dev-dependencies]
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "9c4bc948fa244757379385617208934837098fed" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic", rev = "7919a756d3b2925a9bc5068f1cf50256c57bfbf9" }
 regex = "1.5.6"
