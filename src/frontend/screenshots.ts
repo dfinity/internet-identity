@@ -67,16 +67,31 @@ async function withChrome<T>(
   // Screenshot image dimension, if specified
   const { mobileEmulation } = readScreenshotsConfig();
 
+  const binary = process.env["CHROME_BINARY"] ?? undefined;
+  console.log("chrome options binary: " + binary);
   const chromeOptions: ChromeOptions = {
     args: ["headless", "disable-gpu"],
     mobileEmulation,
+    binary: binary,
   };
 
   const browser = await remote({
     capabilities: {
-      browserName: "chrome",
+      browserName: "chromium",
       "goog:chromeOptions": chromeOptions,
+      browserVersion: "107.0.5304.110",
     },
+    outputDir: "./",
+    logLevel: "debug",
+    services: [
+      [
+        "chromedriver",
+        {
+          logFileName: "wdio-chromedriver.log", // default
+          outputDir: ".",
+        },
+      ],
+    ],
   });
 
   const res = await cb(browser);

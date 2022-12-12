@@ -26,6 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
+      - name: Install pinned chrome version
+        run: |
+          curl -sSL "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1047731%2Fchrome-linux.zip?generation=1663284576100523&alt=media" -o chrome-linux.zip
+          unzip "chrome-linux.zip"
+          ls -la chrome-linux
+          ./chrome-linux/chrome --version
       - name: Print chrome version
         run: |
           echo "google-chrome --version"
@@ -42,6 +48,7 @@ jobs:
           done
           SCREENSHOTS_DIR="./screenshots/${{ matrix.device }}" \
             SCREENSHOTS_TYPE=${{ matrix.device }} \
+            CHROME_BINARY=./chrome-linux/chrome \
             npm run screenshots
           kill "$showcase_pid"
 
@@ -54,6 +61,13 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.device }}
           path: screenshots/${{ matrix.device }}/*.png
+
+      - name: Archive test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: wdio-log-${{ matrix.device }}
+          path: ./*.log
 
   # This uploads the screenshots from both 'desktop' and 'mobile'
   upload-screenshots:
