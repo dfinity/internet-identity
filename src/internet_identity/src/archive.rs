@@ -1,5 +1,5 @@
 use crate::state;
-use crate::state::DeviceDataInternal;
+use crate::state::Device;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::main::{
@@ -280,7 +280,7 @@ pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Opera
     state::increment_archive_seq_nr();
 }
 
-pub fn device_diff(old: &DeviceDataInternal, new: &DeviceDataInternal) -> DeviceDataUpdate {
+pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
     DeviceDataUpdate {
         alias: if old.alias == new.alias {
             None
@@ -295,17 +295,17 @@ pub fn device_diff(old: &DeviceDataInternal, new: &DeviceDataInternal) -> Device
         purpose: if old.purpose == new.purpose {
             None
         } else {
-            new.purpose.clone()
+            Some(new.purpose.clone())
         },
         key_type: if old.key_type == new.key_type {
             None
         } else {
-            new.key_type.clone()
+            Some(new.key_type.clone())
         },
         protection: if old.protection == new.protection {
             None
         } else {
-            new.protection.clone()
+            Some(new.protection.clone())
         },
     }
 }

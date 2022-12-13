@@ -1,6 +1,6 @@
 use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState};
-use crate::state::{Anchor, DeviceDataInternal, PersistentState};
-use crate::storage::{Header, PersistentStateError, StorageError};
+use crate::state::{Anchor, Device, PersistentState};
+use crate::storage::{DeviceDataInternal, Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -85,7 +85,11 @@ fn should_serialize_first_record() {
 
     let mut buf = [0u8; EXPECTED_LENGTH];
     memory.read(RESERVED_HEADER_BYTES, &mut buf);
-    let decoded_from_memory: Vec<DeviceDataInternal> = candid::decode_one(&buf[2..]).unwrap();
+    let decoded_from_memory: Vec<Device> = candid::decode_one::<Vec<DeviceDataInternal>>(&buf[2..])
+        .unwrap()
+        .into_iter()
+        .map(|d| Device::from(d))
+        .collect();
     assert_eq!(decoded_from_memory, anchor.devices);
 }
 
@@ -106,7 +110,11 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
 
     let mut buf = [0u8; EXPECTED_LENGTH];
     memory.read(RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET, &mut buf);
-    let decoded_from_memory: Vec<DeviceDataInternal> = candid::decode_one(&buf[2..]).unwrap();
+    let decoded_from_memory: Vec<Device> = candid::decode_one::<Vec<DeviceDataInternal>>(&buf[2..])
+        .unwrap()
+        .into_iter()
+        .map(|d| Device::from(d))
+        .collect();
     assert_eq!(decoded_from_memory, anchor.devices);
 }
 
@@ -329,13 +337,13 @@ fn should_read_previously_stored_persistent_state() {
 
 fn sample_anchor_record() -> Anchor {
     Anchor {
-        devices: vec![DeviceDataInternal {
+        devices: vec![Device {
             pubkey: ByteBuf::from("hello world, I am a public key"),
             alias: "my test device".to_string(),
             credential_id: Some(ByteBuf::from("this is the credential id")),
-            purpose: Some(Purpose::Authentication),
-            key_type: Some(KeyType::Unknown),
-            protection: Some(DeviceProtection::Protected),
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Protected,
         }],
     }
 }

@@ -1,6 +1,6 @@
-use crate::anchor_management::{check_device, write_anchor_data};
+use crate::anchor_management::{check_device, write_anchor};
 use crate::archive::archive_operation;
-use crate::state::{Anchor, ChallengeInfo, DeviceDataInternal};
+use crate::state::{Anchor, ChallengeInfo, Device};
 use crate::storage::Salt;
 use crate::{delegation, secs_to_nanos, state};
 use candid::Principal;
@@ -161,7 +161,7 @@ pub async fn register(
         return RegisterResponse::BadChallenge;
     }
 
-    let device = DeviceDataInternal::from(device_data);
+    let device = Device::from(device_data);
     check_device(&device, &vec![]);
 
     let caller = caller();
@@ -178,7 +178,7 @@ pub async fn register(
     let allocation = state::storage_mut(|storage| storage.allocate_user_number());
     match allocation {
         Some(user_number) => {
-            write_anchor_data(
+            write_anchor(
                 user_number,
                 Anchor {
                     devices: vec![device.clone()],

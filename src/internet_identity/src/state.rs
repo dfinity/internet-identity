@@ -25,23 +25,24 @@ thread_local! {
 /// After the upcoming stable memory migration, new fields can be added to this struct.
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Anchor {
-    pub devices: Vec<DeviceDataInternal>,
+    pub devices: Vec<Device>,
 }
 
-/// This is an internal version of `DeviceData` primarily useful to provide a
-/// backwards compatible level between older device data stored in stable memory
-/// (that might not contain purpose or key_type) and new ones added.
+/// This is an internal version of `DeviceData` useful to provide a
+/// backwards compatible level between device data stored in stable memory.
+/// It is similar to `DeviceDataInternal` but with redundant options removed
+/// (which is possible due to the stable memory candid schema migration).
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct DeviceDataInternal {
+pub struct Device {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
-    pub purpose: Option<Purpose>,
-    pub key_type: Option<KeyType>,
-    pub protection: Option<DeviceProtection>,
+    pub purpose: Purpose,
+    pub key_type: KeyType,
+    pub protection: DeviceProtection,
 }
 
-impl DeviceDataInternal {
+impl Device {
     pub fn variable_fields_len(&self) -> usize {
         self.alias.len()
             + self.pubkey.len()
@@ -49,46 +50,40 @@ impl DeviceDataInternal {
     }
 }
 
-impl From<DeviceData> for DeviceDataInternal {
+impl From<DeviceData> for Device {
     fn from(device_data: DeviceData) -> Self {
         Self {
             pubkey: device_data.pubkey,
             alias: device_data.alias,
             credential_id: device_data.credential_id,
-            purpose: Some(device_data.purpose),
-            key_type: Some(device_data.key_type),
-            protection: Some(device_data.protection),
+            purpose: device_data.purpose,
+            key_type: device_data.key_type,
+            protection: device_data.protection,
         }
     }
 }
 
-impl From<DeviceDataInternal> for DeviceData {
-    fn from(device_data_internal: DeviceDataInternal) -> Self {
+impl From<Device> for DeviceData {
+    fn from(device: Device) -> Self {
         Self {
-            pubkey: device_data_internal.pubkey,
-            alias: device_data_internal.alias,
-            credential_id: device_data_internal.credential_id,
-            purpose: device_data_internal
-                .purpose
-                .unwrap_or(Purpose::Authentication),
-            key_type: device_data_internal.key_type.unwrap_or(KeyType::Unknown),
-            protection: device_data_internal
-                .protection
-                .unwrap_or(DeviceProtection::Unprotected),
+            pubkey: device.pubkey,
+            alias: device.alias,
+            credential_id: device.credential_id,
+            purpose: device.purpose,
+            key_type: device.key_type,
+            protection: device.protection,
         }
     }
 }
 
-impl From<DeviceDataInternal> for DeviceDataWithoutAlias {
-    fn from(device_data: DeviceDataInternal) -> Self {
+impl From<Device> for DeviceDataWithoutAlias {
+    fn from(device_data: Device) -> Self {
         Self {
             pubkey: device_data.pubkey,
             credential_id: device_data.credential_id,
-            purpose: device_data.purpose.unwrap_or(Purpose::Authentication),
-            key_type: device_data.key_type.unwrap_or(KeyType::Unknown),
-            protection: device_data
-                .protection
-                .unwrap_or(DeviceProtection::Unprotected),
+            purpose: device_data.purpose,
+            key_type: device_data.key_type,
+            protection: device_data.protection,
         }
     }
 }

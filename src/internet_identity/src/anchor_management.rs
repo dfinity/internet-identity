@@ -1,6 +1,6 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::{Anchor, DeviceDataInternal, TentativeDeviceRegistration};
+use crate::state::{Anchor, Device, TentativeDeviceRegistration};
 use crate::{delegation, state, trap_if_not_authenticated};
 use candid::Principal;
 use ic_cdk::api::time;
@@ -58,7 +58,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
     let caller = caller(); // caller is only available before await
     state::ensure_salt_set().await;
 
-    let new_device = DeviceDataInternal::from(device_data);
+    let new_device = Device::from(device_data);
     check_device(&new_device, &anchor.devices);
 
     if anchor
@@ -78,7 +78,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
     }
 
     anchor.devices.push(new_device.clone());
-    write_anchor_data(user_number, anchor);
+    write_anchor(user_number, anchor);
 
     delegation::prune_expired_signatures();
 
@@ -95,22 +95,21 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
 ///
 /// NOTE: all mutable operations should call this function because it handles device protection
 fn mutate_device_or_trap(
-    entries: &mut Vec<DeviceDataInternal>,
+    anchor: &mut Anchor,
     device_key: DeviceKey,
-    new_value: Option<DeviceDataInternal>,
+    new_value: Option<Device>,
 ) -> Operation {
-    let index = match entries.iter().position(|e| e.pubkey == device_key) {
+    let index = match anchor.devices.iter().position(|e| e.pubkey == device_key) {
         None => trap("Could not find device to mutate, check device key"),
         Some(index) => index,
     };
 
-    let existing_device = entries.get_mut(index).unwrap();
+    let existing_device = anchor.devices.get_mut(index).unwrap();
 
     // Run appropriate checks for protected devices
     match existing_device.protection {
-        None => (),
-        Some(DeviceProtection::Unprotected) => (),
-        Some(DeviceProtection::Protected) => {
+        DeviceProtection::Unprotected => (),
+        DeviceProtection::Protected => {
             // If the call is not authenticated with the device to mutate, abort
             if caller() != Principal::self_authenticating(&existing_device.pubkey) {
                 trap("Device is protected. Must be authenticated with this device to mutate");
@@ -130,7 +129,7 @@ fn mutate_device_or_trap(
         None => {
             // NOTE: we void the more efficient remove_swap to ensure device ordering
             // is not changed
-            entries.remove(index);
+            anchor.devices.remove(index);
             Operation::RemoveDevice { device: device_key }
         }
     }
@@ -143,12 +142,12 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
     let mut anchor = state::anchor(user_number);
 
     trap_if_not_authenticated(&anchor);
-    let new_device = DeviceDataInternal::from(device_data);
+    let new_device = Device::from(device_data);
     check_device(&new_device, &anchor.devices);
 
-    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, Some(new_device));
+    let operation = mutate_device_or_trap(&mut anchor, device_key, Some(new_device));
 
-    write_anchor_data(user_number, anchor);
+    write_anchor(user_number, anchor);
 
     delegation::prune_expired_signatures();
 
@@ -164,14 +163,14 @@ pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
     state::ensure_salt_set().await;
     delegation::prune_expired_signatures();
 
-    let operation = mutate_device_or_trap(&mut anchor.devices, device_key, None);
-    write_anchor_data(user_number, anchor);
+    let operation = mutate_device_or_trap(&mut anchor, device_key, None);
+    write_anchor(user_number, anchor);
 
     archive_operation(user_number, caller, operation);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
-fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
+fn write_anchor(user_number: UserNumber, anchor: Anchor) {
     state::storage_mut(|storage| {
         storage.write(user_number, anchor).unwrap_or_else(|err| {
             trap(&format!(
@@ -196,7 +195,7 @@ fn write_anchor_data(user_number: UserNumber, anchor: Anchor) {
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
-fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceDataInternal]) {
+fn check_device(device: &Device, existing_devices: &[Device]) {
     /// Single devices can use up to 564 bytes for the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector, we limit the sum of the
     /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
@@ -207,22 +206,20 @@ fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceData
     /// 2259 bytes).
     const VARIABLE_FIELDS_LIMIT: usize = 2048;
 
-    check_entry_limits(device_data);
+    check_entry_limits(device);
 
-    if device_data.protection == Some(DeviceProtection::Protected)
-        && device_data.key_type != Some(KeyType::SeedPhrase)
-    {
+    if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
         trap(&format!(
             "Only recovery phrases can be protected but key type is {:?}",
-            device_data.key_type.as_ref().unwrap_or(&KeyType::Unknown)
+            device.key_type
         ));
     }
 
     // if the device is a recovery phrase, check if a different recovery phrase already exists
-    if device_data.key_type == Some(KeyType::SeedPhrase)
+    if device.key_type == KeyType::SeedPhrase
         && existing_devices.iter().any(|existing_device| {
-            existing_device.pubkey != device_data.pubkey
-                && existing_device.key_type == Some(KeyType::SeedPhrase)
+            existing_device.pubkey != device.pubkey
+                && existing_device.key_type == KeyType::SeedPhrase
         })
     {
         trap("There is already a recovery phrase and only one is allowed.");
@@ -231,21 +228,21 @@ fn check_device(device_data: &DeviceDataInternal, existing_devices: &[DeviceData
     let existing_variable_size: usize = existing_devices
         .iter()
         // filter out the device being checked to not count it twice in case of update operations
-        .filter(|device| device.pubkey != device_data.pubkey)
+        .filter(|elem| elem.pubkey != device.pubkey)
         .map(|device| device.variable_fields_len())
         .sum();
 
-    if existing_variable_size + device_data.variable_fields_len() > VARIABLE_FIELDS_LIMIT {
+    if existing_variable_size + device.variable_fields_len() > VARIABLE_FIELDS_LIMIT {
         trap("Devices exceed allowed storage limit. Either use shorter aliases or remove an existing device.")
     }
 }
 
-fn check_entry_limits(device_data: &DeviceDataInternal) {
+fn check_entry_limits(device: &Device) {
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;
     const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
 
-    let n = device_data.alias.len();
+    let n = device.alias.len();
     if n > ALIAS_LEN_LIMIT {
         trap(&format!(
             "alias length {} exceeds the limit of {} bytes",
@@ -253,7 +250,7 @@ fn check_entry_limits(device_data: &DeviceDataInternal) {
         ));
     }
 
-    let n = device_data.pubkey.len();
+    let n = device.pubkey.len();
     if n > PK_LEN_LIMIT {
         trap(&format!(
             "public key length {} exceeds the limit of {} bytes",
@@ -261,7 +258,7 @@ fn check_entry_limits(device_data: &DeviceDataInternal) {
         ));
     }
 
-    let n = device_data
+    let n = device
         .credential_id
         .as_ref()
         .map(|bytes| bytes.len())
