@@ -3,7 +3,6 @@ members = [
     "src/internet_identity",
     "src/canister_tests",
     "src/internet_identity_interface",
-    "src/metrics_encoder",
     "src/archive",
 ]
 

@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 
 internet_identity_interface = { path = "../internet_identity_interface" }
-metrics_encoder = { path = "../metrics_encoder" }
 
 hex = "0.4"
 lazy_static = "1.4"
@@ -30,6 +29,7 @@ candid = "0.8"
 ic-cdk = "0.6"
 ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
+ic-metrics-encoder = "1"
 ic-stable-structures = "0.3"
 
 [dev-dependencies]
