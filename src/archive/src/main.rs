@@ -44,13 +44,13 @@ use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
 use ic_cdk::{caller, id, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_metrics_encoder::MetricsEncoder;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{
     cell::Cell as StableCell, log::Log, BoundedStorable, DefaultMemoryImpl, Memory as StableMemory,
     RestrictedMemory, StableBTreeMap, Storable,
 };
 use internet_identity_interface::*;
-use metrics_encoder::MetricsEncoder;
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
