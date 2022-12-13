@@ -61,6 +61,7 @@ mod upgrade_tests {
                 assigned_user_number_range: Some((2000, 4000)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                layout_migration_batch_size: None,
             }),
         );
 
@@ -88,6 +89,7 @@ mod upgrade_tests {
                 assigned_user_number_range: Some(stats.assigned_user_number_range),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                layout_migration_batch_size: None,
             }),
         );
 
@@ -238,6 +240,7 @@ mod registration_tests {
                 assigned_user_number_range: Some((127, 129)),
                 archive_module_hash: None,
                 canister_creation_cycles_cost: None,
+                layout_migration_batch_size: None,
             }),
         );
 

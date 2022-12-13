@@ -37,6 +37,7 @@ fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
             assigned_user_number_range: None,
             archive_module_hash: Some(archive_wasm_hash(&ARCHIVE_WASM)),
             canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
+            layout_migration_batch_size: None,
         }),
     );
     env.add_cycles(ii_canister, 150_000_000_000);

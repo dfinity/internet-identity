@@ -72,8 +72,9 @@ use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
 use internet_identity_interface::{
-    CredentialId, DeviceKey, DeviceProtection, KeyType, Purpose, UserNumber,
+    CredentialId, DeviceKey, DeviceProtection, KeyType, MigrationState, Purpose, UserNumber,
 };
+use std::cmp::min;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
@@ -84,8 +85,10 @@ mod tests;
 
 // version   0: invalid
 // version 1-2: no longer supported
-// version   3: 4KB anchors layout (current)
-// version  4+: invalid
+// version   3: 4KB anchors layout (current), vec<device> layout
+// version   4: migration from vec<devices> to anchor record in progress
+// version   5: candid anchor record layout
+// version  6+: invalid
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 3..=5;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
@@ -161,8 +164,10 @@ struct Header {
     magic: [u8; 3],
     // version   0: invalid
     // version 1-2: no longer supported
-    // version   3: 4KB anchors layout (current)
-    // version  4+: invalid
+    // version   3: 4KB anchors layout (current), vec<device> layout
+    // version   4: migration from vec<devices> to anchor record in progress
+    // version   5: candid anchor record layout
+    // version  6+: invalid
     version: u8,
     num_users: u32,
     id_range_lo: u64,
@@ -170,6 +175,8 @@ struct Header {
     entry_size: u16,
     salt: [u8; 32],
     first_entry_offset: u64,
+    new_layout_start: u32, // record number of the first entry using the new candid layout
+    migration_batch_size: u32,
 }
 
 impl<M: Memory> Storage<M> {
@@ -193,13 +200,15 @@ impl<M: Memory> Storage<M> {
         Self {
             header: Header {
                 magic: *b"IIC",
-                version: 3,
+                version: 5,
                 num_users: 0,
                 id_range_lo,
                 id_range_hi,
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
                 first_entry_offset: ENTRY_OFFSET,
+                new_layout_start: 0,
+                migration_batch_size: 0,
             },
             memory,
         }
@@ -275,14 +284,24 @@ impl<M: Memory> Storage<M> {
     /// Writes the data of the specified user to stable memory.
     pub fn write(&mut self, user_number: UserNumber, data: Anchor) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
-        let buf = candid::encode_one(
-            data.devices
-                .into_iter()
-                .map(|d| DeviceDataInternal::from(d))
-                .collect::<Vec<DeviceDataInternal>>(),
-        )
-        .map_err(StorageError::SerializationError)?;
+
+        let buf = if self.header.version > 3 && record_number >= self.header.new_layout_start {
+            // use the new candid layout
+            candid::encode_one(data).map_err(StorageError::SerializationError)?
+        } else {
+            // use the old candid layout
+            candid::encode_one(
+                data.devices
+                    .into_iter()
+                    .map(|d| DeviceDataInternal::from(d))
+                    .collect::<Vec<DeviceDataInternal>>(),
+            )
+            .map_err(StorageError::SerializationError)?
+        };
         self.write_entry_bytes(record_number, buf)?;
+
+        // piggy back on update call and migrate a batch of anchors
+        self.migrate_record_batch()?;
         Ok(())
     }
 
@@ -309,11 +328,20 @@ impl<M: Memory> Storage<M> {
     pub fn read(&self, user_number: UserNumber) -> Result<Anchor, StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
         let data_buf = self.read_entry_bytes(record_number);
-        let devices: Vec<DeviceDataInternal> =
-            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-        Ok(Anchor {
-            devices: devices.into_iter().map(|d| Device::from(d)).collect(),
-        })
+
+        let anchor = if self.header.version > 3 && record_number >= self.header.new_layout_start {
+            // use the new candid layout
+            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?
+        } else {
+            // use the old candid layout
+            let devices: Vec<DeviceDataInternal> =
+                candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
+            Anchor {
+                devices: devices.into_iter().map(|d| Device::from(d)).collect(),
+            }
+        };
+
+        Ok(anchor)
     }
 
     fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
@@ -510,6 +538,97 @@ impl<M: Memory> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
+    }
+
+    pub fn migration_state(&self) -> MigrationState {
+        match self.header.version {
+            3 => MigrationState::NotStarted,
+            4 => MigrationState::Started {
+                anchors_left: self.header.new_layout_start as u64,
+                batch_size: self.header.migration_batch_size as u64,
+            },
+            5 => MigrationState::Finished,
+            version => trap(&format!("unexpected header version: {}", version)),
+        }
+    }
+
+    pub fn configure_migration(&mut self, migration_batch_size: u32) {
+        if self.header.version == 5 {
+            // migration is already done, nothing to do
+            return;
+        }
+
+        if self.header.version == 3 {
+            // only initialize this on the first migration configuration
+            self.header.version = 4;
+            self.header.new_layout_start = self.header.num_users;
+        }
+
+        self.header.migration_batch_size = migration_batch_size;
+        self.flush();
+    }
+
+    fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
+        if self.header.version == 3 || self.header.version == 5 {
+            // migration is not started or already done, nothing to do
+            return Ok(());
+        }
+
+        for _ in 0..min(
+            self.header.new_layout_start,
+            self.header.migration_batch_size,
+        ) {
+            self.migrate_next_record()?;
+        }
+
+        if self.header.new_layout_start == 0 {
+            self.finalize_migration();
+        }
+        self.flush();
+        Ok(())
+    }
+
+    fn migrate_next_record(&mut self) -> Result<(), StorageError> {
+        let record_number = self.header.new_layout_start - 1;
+        let old_schema_bytes = self.read_entry_bytes(record_number);
+
+        if old_schema_bytes.len() == 0 {
+            // This anchor was only allocated but never written
+            // --> nothing to migrate just update pointer.
+            self.header.new_layout_start -= 1;
+            return Ok(());
+        }
+
+        let devices: Vec<DeviceDataInternal> =
+            candid::decode_one(&old_schema_bytes).map_err(StorageError::DeserializationError)?;
+        let anchor = Anchor {
+            devices: devices.into_iter().map(|d| Device::from(d)).collect(),
+        };
+
+        let new_schema_bytes =
+            candid::encode_one(anchor).map_err(StorageError::SerializationError)?;
+        self.write_entry_bytes(record_number, new_schema_bytes)?;
+        self.header.new_layout_start -= 1;
+        Ok(())
+    }
+
+    fn finalize_migration(&mut self) {
+        if self.header.version == 5 {
+            // migration is already done, nothing to do
+            return;
+        }
+
+        assert_eq!(
+            self.header.version, 4,
+            "unexpected header version during migration finalization {}",
+            self.header.version
+        );
+        assert_eq!({ self.header.new_layout_start }, 0, "cannot finalize migration when not all anchors were migrated! Remaining anchors to migrate: {}", { self.header.new_layout_start });
+
+        self.header.version = 5;
+        // clear now unused header fields
+        self.header.migration_batch_size = 0;
+        self.header.migration_batch_size = 0;
     }
 }
 
