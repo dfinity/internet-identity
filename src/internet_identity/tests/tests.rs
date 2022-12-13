@@ -1950,7 +1950,7 @@ mod http_tests {
         let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
         let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
         assert_eq!(min_user_number, 10_000);
-        assert_eq!(max_user_number, 3_784_872);
+        assert_eq!(max_user_number, 8_188_859);
         Ok(())
     }
 

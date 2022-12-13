@@ -88,27 +88,23 @@ const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 3..=3;
 const WASM_PAGE_SIZE: u64 = 65_536;
 
 /// Reserved space for the header before the anchor records start.
-const ENTRY_OFFSET_V1: u64 = 512;
-const ENTRY_OFFSET_V3: u64 = 2 * WASM_PAGE_SIZE; // 1 page reserved for II config, 1 for memory manager
-
-const DEFAULT_ENTRY_SIZE_V1: u16 = 2048;
-const DEFAULT_ENTRY_SIZE_V3: u16 = 4096;
+const ENTRY_OFFSET: u64 = 2 * WASM_PAGE_SIZE; // 1 page reserved for II config, 1 for memory manager
+const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
 /// In practice, II has 32 GB of stable memory available. But we want to keep the default
 /// user range until the stable memory migration is complete. Thus we keep this value for anchor
 /// range checking for the time being.
-const LEGACY_STABLE_MEMORY_SIZE: u64 = 8 * GB;
-/// We reserve last ~10% of the (legacy) stable memory for later new features.
-const STABLE_MEMORY_RESERVE: u64 = LEGACY_STABLE_MEMORY_SIZE / 10;
+const STABLE_MEMORY_SIZE: u64 = 32 * GB;
+/// We reserve the last ~800 MB of stable memory for later new features.
+const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// The maximum number of users this canister can store.
-pub const DEFAULT_RANGE_SIZE_V1: u64 =
-    (LEGACY_STABLE_MEMORY_SIZE - ENTRY_OFFSET_V1 - STABLE_MEMORY_RESERVE)
-        / DEFAULT_ENTRY_SIZE_V1 as u64;
+pub const DEFAULT_RANGE_SIZE: u64 =
+    (STABLE_MEMORY_SIZE - ENTRY_OFFSET - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
@@ -145,10 +141,10 @@ impl<M: Memory> Storage<M> {
             ));
         }
 
-        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE_V1 {
+        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
             trap(&format!(
                 "id range [{}, {}) is too large for a single canister (max {} entries)",
-                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE_V1,
+                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE,
             ));
         }
 
@@ -159,9 +155,9 @@ impl<M: Memory> Storage<M> {
                 num_users: 0,
                 id_range_lo,
                 id_range_hi,
-                entry_size: DEFAULT_ENTRY_SIZE_V3,
+                entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
-                first_entry_offset: ENTRY_OFFSET_V3,
+                first_entry_offset: ENTRY_OFFSET,
             },
             memory,
         }
@@ -321,10 +317,8 @@ impl<M: Memory> Storage<M> {
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
-        // Always return layout v1 max entries even when migration is completed.
-        // This will be adapted in the subsequent clean-up after successful migration.
-        ((LEGACY_STABLE_MEMORY_SIZE - ENTRY_OFFSET_V1 - STABLE_MEMORY_RESERVE)
-            / DEFAULT_ENTRY_SIZE_V1 as u64) as usize
+        ((STABLE_MEMORY_SIZE - self.header.first_entry_offset - STABLE_MEMORY_RESERVE)
+            / self.header.entry_size as u64) as usize
     }
 
     pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
