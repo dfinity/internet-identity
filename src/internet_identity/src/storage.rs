@@ -64,13 +64,16 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::{Anchor, DeviceDataInternal, PersistentState};
+use crate::state::{Anchor, Device, PersistentState};
 use candid;
+use candid::{CandidType, Deserialize};
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
-use internet_identity_interface::UserNumber;
+use internet_identity_interface::{
+    CredentialId, DeviceKey, DeviceProtection, KeyType, Purpose, UserNumber,
+};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
@@ -83,7 +86,7 @@ mod tests;
 // version 1-2: no longer supported
 // version   3: 4KB anchors layout (current)
 // version  4+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 3..=3;
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 3..=5;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
 
@@ -107,6 +110,45 @@ pub const DEFAULT_RANGE_SIZE: u64 =
     (STABLE_MEMORY_SIZE - ENTRY_OFFSET - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
+
+/// Legacy candid schema for devices stored in stable memory.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+struct DeviceDataInternal {
+    pubkey: DeviceKey,
+    alias: String,
+    credential_id: Option<CredentialId>,
+    purpose: Option<Purpose>,
+    key_type: Option<KeyType>,
+    protection: Option<DeviceProtection>,
+}
+
+impl From<Device> for DeviceDataInternal {
+    fn from(device_data: Device) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            alias: device_data.alias,
+            credential_id: device_data.credential_id,
+            purpose: Some(device_data.purpose),
+            key_type: Some(device_data.key_type),
+            protection: Some(device_data.protection),
+        }
+    }
+}
+
+impl From<DeviceDataInternal> for Device {
+    fn from(device_data: DeviceDataInternal) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            alias: device_data.alias,
+            credential_id: device_data.credential_id,
+            purpose: device_data.purpose.unwrap_or(Purpose::Authentication),
+            key_type: device_data.key_type.unwrap_or(KeyType::Unknown),
+            protection: device_data
+                .protection
+                .unwrap_or(DeviceProtection::Unprotected),
+        }
+    }
+}
 
 /// Data type responsible for managing user data in stable memory.
 pub struct Storage<M> {
@@ -233,7 +275,13 @@ impl<M: Memory> Storage<M> {
     /// Writes the data of the specified user to stable memory.
     pub fn write(&mut self, user_number: UserNumber, data: Anchor) -> Result<(), StorageError> {
         let record_number = self.user_number_to_record(user_number)?;
-        let buf = candid::encode_one(data.devices).map_err(StorageError::SerializationError)?;
+        let buf = candid::encode_one(
+            data.devices
+                .into_iter()
+                .map(|d| DeviceDataInternal::from(d))
+                .collect::<Vec<DeviceDataInternal>>(),
+        )
+        .map_err(StorageError::SerializationError)?;
         self.write_entry_bytes(record_number, buf)?;
         Ok(())
     }
@@ -263,7 +311,9 @@ impl<M: Memory> Storage<M> {
         let data_buf = self.read_entry_bytes(record_number);
         let devices: Vec<DeviceDataInternal> =
             candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-        Ok(Anchor { devices })
+        Ok(Anchor {
+            devices: devices.into_iter().map(|d| Device::from(d)).collect(),
+        })
     }
 
     fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
