@@ -726,6 +726,27 @@ mod stable_memory_tests {
         assert!(err.description().contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version"));
         Ok(())
     }
+
+    /// Tests that II will refuse to upgrade on stable memory without persistent state.
+    #[test]
+    fn should_trap_on_missing_persistent_state() -> Result<(), CallError> {
+        let env = StateMachine::new();
+        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+        restore_compressed_stable_memory(
+            &env,
+            canister_id,
+            "stable_memory/no-persistent-state.bin.gz",
+        );
+
+        let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
+
+        let err = result.err().unwrap();
+        assert_eq!(err.code(), CanisterCalledTrap);
+        assert!(err
+            .description()
+            .contains("failed to recover persistent state! Err: NotFound"));
+        Ok(())
+    }
 }
 
 /// Tests related to local device management (add, remove, lookup, get_anchor_info).

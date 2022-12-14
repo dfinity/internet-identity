@@ -1,6 +1,6 @@
 use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState, ArchiveStatusCache};
 use crate::storage::DEFAULT_RANGE_SIZE;
-use crate::{PersistentStateError, Salt, Storage};
+use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use ic_cdk::api::time;
@@ -257,12 +257,6 @@ pub fn load_persistent_state() {
         let storage = s.storage.borrow();
         match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
-            Err(PersistentStateError::NotFound) => {
-                if storage.version() >= 2 {
-                    trap("unable to load persistent state: not found")
-                }
-                *s.persistent_state.borrow_mut() = PersistentState::default()
-            }
             Err(err) => trap(&format!(
                 "failed to recover persistent state! Err: {:?}",
                 err
