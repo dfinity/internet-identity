@@ -6,7 +6,7 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use serde_bytes::ByteBuf;
-use storage::{PersistentStateError, Salt, Storage};
+use storage::{Salt, Storage};
 
 use crate::archive::ArchiveState;
 use internet_identity_interface::*;
