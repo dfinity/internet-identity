@@ -153,10 +153,8 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
-pub async fn register(
-    device_data: DeviceData,
-    challenge_result: ChallengeAttempt,
-) -> RegisterResponse {
+pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    delegation::prune_expired_signatures();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
@@ -164,16 +162,13 @@ pub async fn register(
     let device = Device::from(device_data);
     check_device(&device, &vec![]);
 
-    let caller = caller();
-    if caller != Principal::self_authenticating(&device.pubkey) {
+    if caller() != Principal::self_authenticating(&device.pubkey) {
         trap(&format!(
             "{} could not be authenticated against {:?}",
-            caller, device.pubkey
+            caller(),
+            device.pubkey
         ));
     }
-
-    state::ensure_salt_set().await;
-    delegation::prune_expired_signatures();
 
     let allocation = state::storage_mut(|storage| storage.allocate_user_number());
     match allocation {
@@ -186,7 +181,7 @@ pub async fn register(
             );
             archive_operation(
                 user_number,
-                caller,
+                caller(),
                 Operation::RegisterAnchor {
                     device: DeviceDataWithoutAlias::from(device),
                 },

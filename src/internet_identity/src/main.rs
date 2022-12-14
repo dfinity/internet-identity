@@ -51,12 +51,11 @@ async fn add_tentative_device(
 }
 
 #[update]
-async fn verify_tentative_device(
+fn verify_tentative_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
     tentative_device_registration::verify_tentative_device(user_number, user_verification_code)
-        .await
 }
 
 #[update]
@@ -65,23 +64,23 @@ async fn create_challenge() -> Challenge {
 }
 
 #[update]
-async fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
-    anchor_management::registration::register(device_data, challenge_result).await
+fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    anchor_management::registration::register(device_data, challenge_result)
 }
 
 #[update]
-async fn add(user_number: UserNumber, device_data: DeviceData) {
-    anchor_management::add(user_number, device_data).await
+fn add(user_number: UserNumber, device_data: DeviceData) {
+    anchor_management::add(user_number, device_data)
 }
 
 #[update]
-async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
-    anchor_management::update(user_number, device_key, device_data).await
+fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+    anchor_management::update(user_number, device_key, device_data)
 }
 
 #[update]
-async fn remove(user_number: UserNumber, device_key: DeviceKey) {
-    anchor_management::remove(user_number, device_key).await
+fn remove(user_number: UserNumber, device_key: DeviceKey) {
+    anchor_management::remove(user_number, device_key)
 }
 
 /// Returns all devices of the user (authentication and recovery) but no information about device registrations.
