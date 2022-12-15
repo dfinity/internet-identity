@@ -1,6 +1,7 @@
-use crate::anchor_management::{check_device, write_anchor};
+use crate::anchor_management::write_anchor;
 use crate::archive::archive_operation;
-use crate::state::{Anchor, ChallengeInfo, Device};
+use crate::state::ChallengeInfo;
+use crate::storage::anchor::Device;
 use crate::storage::Salt;
 use crate::{delegation, secs_to_nanos, state};
 use candid::Principal;
@@ -161,7 +162,6 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     }
 
     let device = Device::from(device_data);
-    check_device(&device, &vec![]);
 
     if caller() != Principal::self_authenticating(&device.pubkey) {
         trap(&format!(
@@ -171,15 +171,16 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         ));
     }
 
-    let allocation = state::storage_mut(|storage| storage.allocate_anchor_number());
+    let allocation = state::storage_mut(|storage| storage.allocate_anchor());
     match allocation {
-        Some(anchor_number) => {
-            write_anchor(
-                anchor_number,
-                Anchor {
-                    devices: vec![device.clone()],
-                },
-            );
+        Some((anchor_number, mut anchor)) => {
+            anchor.add_device(device.clone()).unwrap_or_else(|err| {
+                trap(&format!(
+                    "failed to register anchor {}: {}",
+                    anchor_number, err
+                ))
+            });
+            write_anchor(anchor_number, anchor);
             archive_operation(
                 anchor_number,
                 caller(),

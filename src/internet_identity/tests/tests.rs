@@ -851,7 +851,7 @@ mod device_management_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Device already added\\.").unwrap(),
+            Regex::new("Device with key \\w+ already exists on this anchor\\.").unwrap(),
         );
         Ok(())
     }
@@ -956,7 +956,7 @@ mod device_management_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Devices exceed allowed storage limit\\. Either use shorter aliases or remove an existing device\\.").unwrap(),
+            Regex::new("Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\. Either use shorter aliases or remove an existing device\\.").unwrap(),
         );
         Ok(())
     }
@@ -1054,7 +1054,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("device key may not be updated").unwrap(),
+                Regex::new("Device key cannot be updated\\.").unwrap(),
             );
         }
 
