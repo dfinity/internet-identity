@@ -71,6 +71,10 @@ pub fn prepare_delegation(
     )
 }
 
+pub fn init_salt(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {
+    framework::call_candid(env, canister_id, "init_salt", ())
+}
+
 pub fn get_delegation(
     env: &StateMachine,
     canister_id: CanisterId,
