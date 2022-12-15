@@ -167,6 +167,7 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
+        layout_migration_state: Some(storage.migration_state()),
     })
 }
 
@@ -231,6 +232,11 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(cost) = arg.canister_creation_cycles_cost {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.canister_creation_cycles_cost = cost;
+            })
+        }
+        if let Some(batch_size) = arg.layout_migration_batch_size {
+            state::storage_mut(|storage| {
+                storage.configure_migration(batch_size);
             })
         }
     }
