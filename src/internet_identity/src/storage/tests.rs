@@ -85,6 +85,32 @@ fn should_enforce_size_limit_for_devices() {
 }
 
 #[test]
+fn should_read_previous_write_v3() {
+    let memory = VectorMemory::default();
+    let mut storage = layout_v3_storage((12345, 678910), memory.clone());
+    let user_number = storage.allocate_user_number().unwrap();
+
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
+
+    let read_anchor = storage.read(user_number).unwrap();
+    assert_eq!(anchor, read_anchor);
+}
+
+#[test]
+fn should_read_previous_write_v5() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((12345, 678910), memory.clone());
+    let user_number = storage.allocate_user_number().unwrap();
+
+    let anchor = sample_anchor_record();
+    storage.write(user_number, anchor.clone()).unwrap();
+
+    let read_anchor = storage.read(user_number).unwrap();
+    assert_eq!(anchor, read_anchor);
+}
+
+#[test]
 fn should_serialize_first_record_v3() {
     const EXPECTED_LENGTH: usize = 192;
     let memory = VectorMemory::default();

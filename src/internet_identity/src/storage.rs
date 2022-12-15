@@ -626,8 +626,7 @@ impl<M: Memory> Storage<M> {
         assert_eq!({ self.header.new_layout_start }, 0, "cannot finalize migration when not all anchors were migrated! Remaining anchors to migrate: {}", { self.header.new_layout_start });
 
         self.header.version = 5;
-        // clear now unused header fields
-        self.header.migration_batch_size = 0;
+        // clear now unused header field (new_layout_start is already 0)
         self.header.migration_batch_size = 0;
     }
 }
