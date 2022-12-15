@@ -71,9 +71,7 @@ use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
-use internet_identity_interface::{
-    CredentialId, DeviceKey, DeviceProtection, KeyType, MigrationState, Purpose, UserNumber,
-};
+use internet_identity_interface::*;
 use std::cmp::min;
 use std::convert::TryInto;
 use std::fmt;
@@ -100,7 +98,7 @@ const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
 /// In practice, II has 32 GB of stable memory available. But we want to keep the default
-/// user range until the stable memory migration is complete. Thus we keep this value for anchor
+/// anchor range until the stable memory migration is complete. Thus we keep this value for anchor
 /// range checking for the time being.
 const STABLE_MEMORY_SIZE: u64 = 32 * GB;
 /// We reserve the last ~800 MB of stable memory for later new features.
@@ -108,7 +106,7 @@ const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
-/// The maximum number of users this canister can store.
+/// The maximum number of anchors this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
     (STABLE_MEMORY_SIZE - ENTRY_OFFSET - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
@@ -153,7 +151,7 @@ impl From<DeviceDataInternal> for Device {
     }
 }
 
-/// Data type responsible for managing user data in stable memory.
+/// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M> {
     header: Header,
     memory: M,
@@ -169,7 +167,7 @@ struct Header {
     // version   5: candid anchor record layout
     // version  6+: invalid
     version: u8,
-    num_users: u32,
+    num_anchors: u32,
     id_range_lo: u64,
     id_range_hi: u64,
     entry_size: u16,
@@ -180,9 +178,9 @@ struct Header {
 }
 
 impl<M: Memory> Storage<M> {
-    /// Creates a new empty storage that manages the data of users in
+    /// Creates a new empty storage that manages the data of anchors in
     /// the specified range.
-    pub fn new((id_range_lo, id_range_hi): (UserNumber, UserNumber), memory: M) -> Self {
+    pub fn new((id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber), memory: M) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
                 "improper Identity Anchor range: [{}, {})",
@@ -201,7 +199,7 @@ impl<M: Memory> Storage<M> {
             header: Header {
                 magic: *b"IIC",
                 version: 5,
-                num_users: 0,
+                num_anchors: 0,
                 id_range_lo,
                 id_range_hi,
                 entry_size: DEFAULT_ENTRY_SIZE,
@@ -271,19 +269,19 @@ impl<M: Memory> Storage<M> {
     ///
     /// Returns None if the range of Identity Anchor assigned to this
     /// storage is exhausted.
-    pub fn allocate_user_number(&mut self) -> Option<UserNumber> {
-        let user_number = self.header.id_range_lo + self.header.num_users as u64;
-        if user_number >= self.header.id_range_hi {
+    pub fn allocate_anchor_number(&mut self) -> Option<AnchorNumber> {
+        let anchor_number = self.header.id_range_lo + self.header.num_anchors as u64;
+        if anchor_number >= self.header.id_range_hi {
             return None;
         }
-        self.header.num_users += 1;
+        self.header.num_anchors += 1;
         self.flush();
-        Some(user_number)
+        Some(anchor_number)
     }
 
-    /// Writes the data of the specified user to stable memory.
-    pub fn write(&mut self, user_number: UserNumber, data: Anchor) -> Result<(), StorageError> {
-        let record_number = self.user_number_to_record(user_number)?;
+    /// Writes the data of the specified anchor to stable memory.
+    pub fn write(&mut self, anchor_number: AnchorNumber, data: Anchor) -> Result<(), StorageError> {
+        let record_number = self.anchor_number_to_record(anchor_number)?;
 
         let buf = if self.header.version > 3 && record_number >= self.header.new_layout_start {
             // use the new candid layout
@@ -324,9 +322,9 @@ impl<M: Memory> Storage<M> {
         Ok(())
     }
 
-    /// Reads the data of the specified user from stable memory.
-    pub fn read(&self, user_number: UserNumber) -> Result<Anchor, StorageError> {
-        let record_number = self.user_number_to_record(user_number)?;
+    /// Reads the data of the specified anchor from stable memory.
+    pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
+        let record_number = self.anchor_number_to_record(anchor_number)?;
         let data_buf = self.read_entry_bytes(record_number);
 
         let anchor = if self.header.version > 3 && record_number >= self.header.new_layout_start {
@@ -389,8 +387,8 @@ impl<M: Memory> Storage<M> {
         writer.write(slice).expect("bug: failed to grow memory");
     }
 
-    pub fn user_count(&self) -> usize {
-        self.header.num_users as usize
+    pub fn anchor_count(&self) -> usize {
+        self.header.num_anchors as usize
     }
 
     /// Returns the maximum number of entries that this storage can fit.
@@ -399,21 +397,21 @@ impl<M: Memory> Storage<M> {
             / self.header.entry_size as u64) as usize
     }
 
-    pub fn assigned_user_number_range(&self) -> (UserNumber, UserNumber) {
+    pub fn assigned_anchor_number_range(&self) -> (AnchorNumber, AnchorNumber) {
         (self.header.id_range_lo, self.header.id_range_hi)
     }
 
-    pub fn set_user_number_range(&mut self, (lo, hi): (UserNumber, UserNumber)) {
+    pub fn set_anchor_number_range(&mut self, (lo, hi): (AnchorNumber, AnchorNumber)) {
         if hi < lo {
             trap(&format!(
-                "set_user_number_range: improper Identity Anchor range [{}, {})",
+                "set_anchor_number_range: improper Identity Anchor range [{}, {})",
                 lo, hi
             ));
         }
         let max_entries = self.max_entries() as u64;
         if (hi - lo) > max_entries {
             trap(&format!(
-                "set_user_number_range: specified range [{}, {}) is too large for this canister \
+                "set_anchor_number_range: specified range [{}, {}) is too large for this canister \
                  (max {} entries)",
                 lo, hi, max_entries
             ));
@@ -423,17 +421,17 @@ impl<M: Memory> Storage<M> {
         self.flush();
     }
 
-    fn user_number_to_record(&self, user_number: u64) -> Result<u32, StorageError> {
-        if user_number < self.header.id_range_lo || user_number >= self.header.id_range_hi {
-            return Err(StorageError::UserNumberOutOfRange {
-                user_number,
-                range: self.assigned_user_number_range(),
+    fn anchor_number_to_record(&self, anchor_number: u64) -> Result<u32, StorageError> {
+        if anchor_number < self.header.id_range_lo || anchor_number >= self.header.id_range_hi {
+            return Err(StorageError::AnchorNumberOutOfRange {
+                anchor_number,
+                range: self.assigned_anchor_number_range(),
             });
         }
 
-        let record_number = (user_number - self.header.id_range_lo) as u32;
-        if record_number >= self.header.num_users {
-            return Err(StorageError::BadUserNumber(user_number));
+        let record_number = (anchor_number - self.header.id_range_lo) as u32;
+        if record_number >= self.header.num_anchors {
+            return Err(StorageError::BadAnchorNumber(anchor_number));
         }
         Ok(record_number)
     }
@@ -451,15 +449,15 @@ impl<M: Memory> Storage<M> {
         self.header.entry_size as usize - std::mem::size_of::<u16>()
     }
 
-    /// Returns the address of the first byte not yet allocated to a user.
-    /// This address exists even if the max user number has been reached, because there is a memory
+    /// Returns the address of the first byte not yet allocated to a anchor.
+    /// This address exists even if the max anchor number has been reached, because there is a memory
     /// reserve at the end of stable memory.
     fn unused_memory_start(&self) -> u64 {
-        self.record_address(self.header.num_users)
+        self.record_address(self.header.num_anchors)
     }
 
-    /// Writes the persistent state to stable memory just outside of the space allocated to the highest user number.
-    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next user registration.
+    /// Writes the persistent state to stable memory just outside of the space allocated to the highest anchor number.
+    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
@@ -476,7 +474,7 @@ impl<M: Memory> Storage<M> {
         writer.write(&encoded_state).unwrap();
     }
 
-    /// Reads the persistent state from stable memory just outside of the space allocated to the highest user number.
+    /// Reads the persistent state from stable memory just outside of the space allocated to the highest anchor number.
     /// This is only used to restore state in `post_upgrade`.
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
         const WASM_PAGE_SIZE: u64 = 65536;
@@ -561,7 +559,7 @@ impl<M: Memory> Storage<M> {
         if self.header.version == 3 {
             // only initialize this on the first migration configuration
             self.header.version = 4;
-            self.header.new_layout_start = self.header.num_users;
+            self.header.new_layout_start = self.header.num_anchors;
         }
 
         self.header.migration_batch_size = migration_batch_size;
@@ -640,11 +638,11 @@ pub enum PersistentStateError {
 
 #[derive(Debug)]
 pub enum StorageError {
-    UserNumberOutOfRange {
-        user_number: UserNumber,
-        range: (UserNumber, UserNumber),
+    AnchorNumberOutOfRange {
+        anchor_number: AnchorNumber,
+        range: (AnchorNumber, AnchorNumber),
     },
-    BadUserNumber(u64),
+    BadAnchorNumber(u64),
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
     EntrySizeLimitExceeded(usize),
@@ -653,12 +651,15 @@ pub enum StorageError {
 impl fmt::Display for StorageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UserNumberOutOfRange { user_number, range } => write!(
+            Self::AnchorNumberOutOfRange {
+                anchor_number,
+                range,
+            } => write!(
                 f,
                 "Identity Anchor {} is out of range [{}, {})",
-                user_number, range.0, range.1
+                anchor_number, range.0, range.1
             ),
-            Self::BadUserNumber(n) => write!(f, "bad Identity Anchor {}", n),
+            Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {}", n),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {}", err)
             }

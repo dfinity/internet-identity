@@ -10,7 +10,7 @@ use state_machine_client::{
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
-    let user_number: types::UserNumber = 0;
+    let user_number: types::AnchorNumber = 0;
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
     let _: (candid::parser::value::IDLValue,) =
@@ -53,7 +53,7 @@ pub fn prepare_delegation(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     frontend_hostname: types::FrontendHostname,
     session_key: types::SessionKey,
     max_time_to_live: Option<u64>,
@@ -64,7 +64,7 @@ pub fn prepare_delegation(
         sender,
         "prepare_delegation",
         (
-            user_number,
+            anchor_number,
             frontend_hostname,
             session_key,
             max_time_to_live,
@@ -80,7 +80,7 @@ pub fn get_delegation(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     frontend_hostname: types::FrontendHostname,
     session_key: types::SessionKey,
     timestamp: u64,
@@ -90,7 +90,7 @@ pub fn get_delegation(
         canister_id,
         sender,
         "get_delegation",
-        (user_number, frontend_hostname, session_key, timestamp),
+        (anchor_number, frontend_hostname, session_key, timestamp),
     )
     .map(|(x,)| x)
 }
@@ -99,7 +99,7 @@ pub fn get_principal(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     frontend_hostname: types::FrontendHostname,
 ) -> Result<Principal, CallError> {
     query_candid_as(
@@ -107,7 +107,7 @@ pub fn get_principal(
         canister_id,
         sender,
         "get_principal",
-        (user_number, frontend_hostname),
+        (anchor_number, frontend_hostname),
     )
     .map(|(x,)| x)
 }
@@ -115,26 +115,32 @@ pub fn get_principal(
 pub fn lookup(
     env: &StateMachine,
     canister_id: CanisterId,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
-    query_candid(env, canister_id, "lookup", (user_number,)).map(|(x,)| x)
+    query_candid(env, canister_id, "lookup", (anchor_number,)).map(|(x,)| x)
 }
 
 pub fn add(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
-    call_candid_as(env, canister_id, sender, "add", (user_number, device_data))
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "add",
+        (anchor_number, device_data),
+    )
 }
 
 pub fn update(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     device_key: types::PublicKey,
     device_data: types::DeviceData,
 ) -> Result<(), CallError> {
@@ -143,7 +149,7 @@ pub fn update(
         canister_id,
         sender,
         "update",
-        (user_number, device_key, device_data),
+        (anchor_number, device_key, device_data),
     )
 }
 
@@ -151,7 +157,7 @@ pub fn remove(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     device_key: types::PublicKey,
 ) -> Result<(), CallError> {
     call_candid_as(
@@ -159,7 +165,7 @@ pub fn remove(
         canister_id,
         sender,
         "remove",
-        (user_number, device_key),
+        (anchor_number, device_key),
     )
 }
 
@@ -167,23 +173,30 @@ pub fn get_anchor_info(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
 ) -> Result<types::IdentityAnchorInfo, CallError> {
-    call_candid_as(env, canister_id, sender, "get_anchor_info", (user_number,)).map(|(x,)| x)
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_anchor_info",
+        (anchor_number,),
+    )
+    .map(|(x,)| x)
 }
 
 pub fn enter_device_registration_mode(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
 ) -> Result<types::Timestamp, CallError> {
     call_candid_as(
         env,
         canister_id,
         sender,
         "enter_device_registration_mode",
-        (user_number,),
+        (anchor_number,),
     )
     .map(|(x,)| x)
 }
@@ -192,14 +205,14 @@ pub fn exit_device_registration_mode(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
 ) -> Result<(), CallError> {
     call_candid_as(
         env,
         canister_id,
         sender,
         "exit_device_registration_mode",
-        (user_number,),
+        (anchor_number,),
     )
 }
 
@@ -207,7 +220,7 @@ pub fn add_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     device_data: types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
     call_candid_as(
@@ -215,7 +228,7 @@ pub fn add_tentative_device(
         canister_id,
         sender,
         "add_tentative_device",
-        (user_number, device_data),
+        (anchor_number, device_data),
     )
     .map(|(x,)| x)
 }
@@ -224,7 +237,7 @@ pub fn verify_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
-    user_number: types::UserNumber,
+    anchor_number: types::AnchorNumber,
     verification_code: types::DeviceVerificationCode,
 ) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
     call_candid_as(
@@ -232,7 +245,7 @@ pub fn verify_tentative_device(
         canister_id,
         sender,
         "verify_tentative_device",
-        (user_number, verification_code),
+        (anchor_number, verification_code),
     )
     .map(|(x,)| x)
 }
@@ -259,7 +272,7 @@ pub mod compat {
 
     #[derive(Clone, Debug, CandidType, Deserialize)]
     pub struct InternetIdentityStats {
-        pub assigned_user_number_range: (types::UserNumber, types::UserNumber),
+        pub assigned_user_number_range: (types::AnchorNumber, types::AnchorNumber),
         pub users_registered: u64,
     }
 

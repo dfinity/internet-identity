@@ -3,12 +3,12 @@ use crate::framework::{device_data_1, principal_1};
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::{
-    ChallengeAttempt, DeviceData, HttpRequest, RegisterResponse, UserNumber,
+    AnchorNumber, ChallengeAttempt, DeviceData, HttpRequest, RegisterResponse,
 };
 use serde_bytes::ByteBuf;
 use state_machine_client::StateMachine;
 
-pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> UserNumber {
+pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> AnchorNumber {
     register_anchor_with(env, canister_id, principal_1(), &device_data_1())
 }
 
@@ -17,7 +17,7 @@ pub fn register_anchor_with(
     canister_id: CanisterId,
     sender: Principal,
     device_data: &DeviceData,
-) -> UserNumber {
+) -> AnchorNumber {
     let challenge = create_challenge(env, canister_id).expect("challenge creation failed");
     let user_number = match register(
         env,

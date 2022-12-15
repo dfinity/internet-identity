@@ -1,10 +1,8 @@
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
-use internet_identity_interface::{
-    ArchiveInit, Cursor, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
-    HttpRequest, KeyType, Operation, Purpose, Timestamp, UserNumber,
-};
+use internet_identity_interface::archive::*;
+use internet_identity_interface::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use state_machine_client::ErrorCode::CanisterCalledTrap;
@@ -32,7 +30,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_1(),
-        USER_NUMBER_1,
+        ANCHOR_NUMBER_1,
         TIMESTAMP_1,
         candid::encode_one(entry.clone()).expect("failed to encode entry"),
     )?;
@@ -42,7 +40,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 1);
     assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
-    let user_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+    let user_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
     assert_eq!(user_logs.entries.len(), 1);
     Ok(())
 }
@@ -72,7 +70,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(entry.clone()).expect("failed to encode entry"),
         )?;
@@ -101,7 +99,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(entry1.clone()).expect("failed to encode entry"),
         )?;
@@ -109,7 +107,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_2,
+            ANCHOR_NUMBER_2,
             TIMESTAMP_2,
             candid::encode_one(entry2.clone()).expect("failed to encode entry"),
         )?;
@@ -141,7 +139,7 @@ mod write_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -149,7 +147,7 @@ mod write_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             vec![1, 2, 3, 4], // not candid
         )?;
@@ -175,7 +173,7 @@ mod write_tests {
             &env,
             canister_id,
             principal_2(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         );
@@ -202,7 +200,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -225,7 +223,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -233,7 +231,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_2,
+            ANCHOR_NUMBER_2,
             TIMESTAMP_2,
             candid::encode_one(log_entry_2()).expect("failed to encode entry"),
         )?;
@@ -241,21 +239,21 @@ mod read_tests {
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
 
-        let user_1_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let user_1_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(user_1_logs.entries.len(), 1);
         assert_eq!(
             user_1_logs.entries.get(0).unwrap().as_ref().unwrap(),
             &log_entry_1()
         );
 
-        let user_2_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_2, None, None)?;
+        let user_2_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_2, None, None)?;
         assert_eq!(user_2_logs.entries.len(), 1);
         assert_eq!(
             user_2_logs.entries.get(0).unwrap().as_ref().unwrap(),
             &log_entry_2()
         );
 
-        let user_3_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_3, None, None)?;
+        let user_3_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_3, None, None)?;
         assert!(user_3_logs.entries.is_empty());
 
         Ok(())
@@ -364,7 +362,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -372,7 +370,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_2,
             candid::encode_one(log_entry_2()).expect("failed to encode entry"),
         )?;
@@ -380,16 +378,16 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_3,
-            candid::encode_one(log_entry(3, TIMESTAMP_3, USER_NUMBER_1))
+            candid::encode_one(log_entry(3, TIMESTAMP_3, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
 
         let logs = api::get_anchor_entries(
             &env,
             canister_id,
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             Some(Cursor::Timestamp {
                 timestamp: TIMESTAMP_2,
             }),
@@ -402,7 +400,7 @@ mod read_tests {
         );
         assert_eq!(
             logs.entries.get(1).unwrap().as_ref().unwrap(),
-            &log_entry(3, TIMESTAMP_3, USER_NUMBER_1)
+            &log_entry(3, TIMESTAMP_3, ANCHOR_NUMBER_1)
         );
         Ok(())
     }
@@ -417,30 +415,30 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64,
-            candid::encode_one(log_entry(0, 1, USER_NUMBER_1)).expect("failed to encode entry"),
+            candid::encode_one(log_entry(0, 1, ANCHOR_NUMBER_1)).expect("failed to encode entry"),
         )?;
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64 << 8,
-            candid::encode_one(log_entry(1, 1u64 << 8, USER_NUMBER_1))
+            candid::encode_one(log_entry(1, 1u64 << 8, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64 << 16,
-            candid::encode_one(log_entry(2, 1u64 << 16, USER_NUMBER_1))
+            candid::encode_one(log_entry(2, 1u64 << 16, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
 
-        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(logs.entries.len(), 3);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap().timestamp, 1);
         assert_eq!(
@@ -469,14 +467,14 @@ mod read_tests {
                 &env,
                 canister_id,
                 principal_1(),
-                USER_NUMBER_1,
+                ANCHOR_NUMBER_1,
                 TIMESTAMP_1,
-                candid::encode_one(log_entry(i, TIMESTAMP_1, USER_NUMBER_1))
+                candid::encode_one(log_entry(i, TIMESTAMP_1, ANCHOR_NUMBER_1))
                     .expect("failed to encode entry"),
             )?;
         }
 
-        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(logs.entries.len(), 257);
 
         for i in 0..257 {
@@ -578,7 +576,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -615,7 +613,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             entry,
         )?;
@@ -667,7 +665,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             vec![0; WASM_PAGE_SIZE], // large entry to ensure at least the data pages metric changes
         )?;
@@ -706,7 +704,7 @@ mod stable_memory_tests {
     #[test]
     fn should_restore_backup() {
         const TIMESTAMP: Timestamp = 1620328630000000000;
-        const ANCHOR: UserNumber = 10_000;
+        const ANCHOR: AnchorNumber = 10_000;
         let env = env();
         let canister_id = install_archive_canister(&env, EMPTY_WASM.clone());
 

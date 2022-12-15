@@ -1,15 +1,14 @@
 use crate::anchor_management::tentative_device_registration;
+use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::Anchor;
 use candid::Principal;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
+use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
-
-use crate::archive::ArchiveState;
-use internet_identity_interface::*;
 
 mod anchor_management;
 mod archive;
@@ -33,29 +32,29 @@ async fn init_salt() {
 }
 
 #[update]
-fn enter_device_registration_mode(user_number: UserNumber) -> Timestamp {
-    tentative_device_registration::enter_device_registration_mode(user_number)
+fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
+    tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
-fn exit_device_registration_mode(user_number: UserNumber) {
-    tentative_device_registration::exit_device_registration_mode(user_number)
+fn exit_device_registration_mode(anchor_number: AnchorNumber) {
+    tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
 #[update]
 async fn add_tentative_device(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    tentative_device_registration::add_tentative_device(user_number, device_data).await
+    tentative_device_registration::add_tentative_device(anchor_number, device_data).await
 }
 
 #[update]
 fn verify_tentative_device(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    tentative_device_registration::verify_tentative_device(user_number, user_verification_code)
+    tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
 }
 
 #[update]
@@ -69,27 +68,27 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 }
 
 #[update]
-fn add(user_number: UserNumber, device_data: DeviceData) {
-    anchor_management::add(user_number, device_data)
+fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
+    anchor_management::add(anchor_number, device_data)
 }
 
 #[update]
-fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
-    anchor_management::update(user_number, device_key, device_data)
+fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    anchor_management::update(anchor_number, device_key, device_data)
 }
 
 #[update]
-fn remove(user_number: UserNumber, device_key: DeviceKey) {
-    anchor_management::remove(user_number, device_key)
+fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
+    anchor_management::remove(anchor_number, device_key)
 }
 
-/// Returns all devices of the user (authentication and recovery) but no information about device registrations.
+/// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
 /// Note: Will be changed in the future to be more consistent with get_anchor_info.
 #[query]
-fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
+fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
         storage
-            .read(user_number)
+            .read(anchor_number)
             .unwrap_or_default()
             .devices
             .into_iter()
@@ -99,13 +98,13 @@ fn lookup(user_number: UserNumber) -> Vec<DeviceData> {
 }
 
 #[update] // this is an update call because queries are not (yet) certified
-fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
-    anchor_management::get_anchor_info(user_number)
+fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
+    anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
-fn get_principal(user_number: UserNumber, frontend: FrontendHostname) -> Principal {
-    delegation::get_principal(user_number, frontend)
+fn get_principal(anchor: AnchorNumber, frontend: FrontendHostname) -> Principal {
+    delegation::get_principal(anchor, frontend)
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other
@@ -118,22 +117,22 @@ fn __get_candid_interface_tmp_hack() -> String {
 
 #[update]
 async fn prepare_delegation(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    delegation::prepare_delegation(user_number, frontend, session_key, max_time_to_live).await
+    delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
 }
 
 #[query]
 fn get_delegation(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    delegation::get_delegation(user_number, frontend, session_key, expiration)
+    delegation::get_delegation(anchor_number, frontend, session_key, expiration)
 }
 
 #[query]
@@ -161,8 +160,8 @@ fn stats() -> InternetIdentityStats {
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
 
     state::storage(|storage| InternetIdentityStats {
-        assigned_user_number_range: storage.assigned_user_number_range(),
-        users_registered: storage.user_count() as u64,
+        assigned_user_number_range: storage.assigned_anchor_number_range(),
+        users_registered: storage.anchor_count() as u64,
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
@@ -182,7 +181,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
             state::storage_mut(|storage| {
-                storage.set_user_number_range(range);
+                storage.set_anchor_number_range(range);
             });
         }
         if let Some(archive_hash) = arg.archive_module_hash {
@@ -215,10 +214,10 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
-            let current_range = state::storage(|storage| storage.assigned_user_number_range());
+            let current_range = state::storage(|storage| storage.assigned_anchor_number_range());
             if range != current_range {
                 trap(&format!(
-                    "User number range cannot be changed. Current value: {:?}",
+                    "Anchor number range cannot be changed. Current value: {:?}",
                     current_range
                 ));
             }

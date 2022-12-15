@@ -8,6 +8,7 @@ use ic_cdk::{call, trap};
 use ic_certified_map::{Hash, RbTree};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
+use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -150,8 +151,8 @@ struct State {
     // through upgrades
     inflight_challenges: RefCell<HashMap<ChallengeKey, ChallengeInfo>>,
     // tentative device registrations, not persisted across updates
-    // if a user number is present in this map then registration mode is active until expiration
-    tentative_device_registrations: RefCell<HashMap<UserNumber, TentativeDeviceRegistration>>,
+    // if an anchor number is present in this map then registration mode is active until expiration
+    tentative_device_registrations: RefCell<HashMap<AnchorNumber, TentativeDeviceRegistration>>,
     // additional usage metrics, NOT persisted across updates (but probably should be in the future)
     usage_metrics: RefCell<UsageMetrics>,
     // State that is temporarily persisted in stable memory during upgrades using
@@ -165,12 +166,12 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        const FIRST_USER_ID: UserNumber = 10_000;
+        const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
         Self {
             storage: RefCell::new(Storage::new(
                 (
-                    FIRST_USER_ID,
-                    FIRST_USER_ID.saturating_add(DEFAULT_RANGE_SIZE),
+                    FIRST_ANCHOR_NUMBER,
+                    FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
                 ),
                 DefaultMemoryImpl::default(),
             )),
@@ -267,7 +268,7 @@ pub fn load_persistent_state() {
 
 // helper methods to access / modify the state in a convenient way
 
-pub fn anchor(anchor: UserNumber) -> Anchor {
+pub fn anchor(anchor: AnchorNumber) -> Anchor {
     STATE.with(|s| {
         s.storage.borrow().read(anchor).unwrap_or_else(|err| {
             trap(&format!(
@@ -315,13 +316,13 @@ pub fn increment_archive_seq_nr() {
 }
 
 pub fn tentative_device_registrations<R>(
-    f: impl FnOnce(&HashMap<UserNumber, TentativeDeviceRegistration>) -> R,
+    f: impl FnOnce(&HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
     STATE.with(|s| f(&*s.tentative_device_registrations.borrow()))
 }
 
 pub fn tentative_device_registrations_mut<R>(
-    f: impl FnOnce(&mut HashMap<UserNumber, TentativeDeviceRegistration>) -> R,
+    f: impl FnOnce(&mut HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
     STATE.with(|s| f(&mut *s.tentative_device_registrations.borrow_mut()))
 }

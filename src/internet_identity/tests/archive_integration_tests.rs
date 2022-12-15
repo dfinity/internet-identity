@@ -2,10 +2,8 @@ use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use internet_identity_interface::{
-    DeployArchiveResult, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
-    InternetIdentityInit, KeyType, Operation, Purpose,
-};
+use internet_identity_interface::archive::*;
+use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use state_machine_client::CallError;
 use std::time::SystemTime;
