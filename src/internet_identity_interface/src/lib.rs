@@ -175,6 +175,7 @@ pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(UserNumber, UserNumber)>,
     pub archive_module_hash: Option<[u8; 32]>,
     pub canister_creation_cycles_cost: Option<u64>,
+    pub layout_migration_batch_size: Option<u32>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -194,6 +195,7 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
+    pub layout_migration_state: Option<MigrationState>,
 }
 
 // Archive specific types
