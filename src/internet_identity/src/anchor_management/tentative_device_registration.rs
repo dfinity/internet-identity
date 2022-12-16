@@ -89,13 +89,13 @@ pub async fn add_tentative_device(
     })
 }
 
-pub async fn verify_tentative_device(
+pub fn verify_tentative_device(
     user_number: UserNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
     match get_verified_device(user_number, user_verification_code) {
         Ok(device) => {
-            add(user_number, device).await;
+            add(user_number, device);
             VerifyTentativeDeviceResponse::Verified
         }
         Err(err) => err,

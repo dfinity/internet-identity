@@ -144,6 +144,7 @@ mod rollback_tests {
 
         // start with the previous release to initialize v1 layout
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        api::init_salt(&env, canister_id)?;
 
         // use the new version to register an anchor
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -198,6 +199,7 @@ mod registration_tests {
     fn should_register_new_anchor() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
+        api::init_salt(&env, canister_id)?;
         let user_number = flows::register_anchor(&env, canister_id);
 
         let devices = api::lookup(&env, canister_id, user_number)?;
@@ -1816,6 +1818,7 @@ mod delegation_tests {
     fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
+        api::init_salt(&env, canister_id)?;
         let user_number = flows::register_anchor(&env, canister_id);
         let frontend_hostname_1 = "https://dapp-1.com";
         let frontend_hostname_2 = "https://dapp-2.com";
@@ -1845,6 +1848,7 @@ mod delegation_tests {
     fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
         let env = StateMachine::new();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
+        api::init_salt(&env, canister_id)?;
         let user_number_1 =
             flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
         let user_number_2 =

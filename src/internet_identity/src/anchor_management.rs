@@ -49,14 +49,12 @@ pub fn get_anchor_info(user_number: UserNumber) -> IdentityAnchorInfo {
     })
 }
 
-pub async fn add(user_number: UserNumber, device_data: DeviceData) {
+pub fn add(user_number: UserNumber, device_data: DeviceData) {
     const MAX_ENTRIES_PER_USER: usize = 10;
 
     let mut anchor = state::anchor(user_number);
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(&anchor);
-    let caller = caller(); // caller is only available before await
-    state::ensure_salt_set().await;
 
     let new_device = Device::from(device_data);
     check_device(&new_device, &anchor.devices);
@@ -84,7 +82,7 @@ pub async fn add(user_number: UserNumber, device_data: DeviceData) {
 
     archive_operation(
         user_number,
-        caller,
+        caller(),
         Operation::AddDevice {
             device: DeviceDataWithoutAlias::from(new_device),
         },
@@ -135,7 +133,7 @@ fn mutate_device_or_trap(
     }
 }
 
-pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
+pub fn update(user_number: UserNumber, device_key: DeviceKey, device_data: DeviceData) {
     if device_key != device_data.pubkey {
         trap("device key may not be updated");
     }
@@ -154,19 +152,16 @@ pub async fn update(user_number: UserNumber, device_key: DeviceKey, device_data:
     archive_operation(user_number, caller(), operation);
 }
 
-pub async fn remove(user_number: UserNumber, device_key: DeviceKey) {
+pub fn remove(user_number: UserNumber, device_key: DeviceKey) {
     let mut anchor = state::anchor(user_number);
     // must be called before the first await because it requires caller()
     trap_if_not_authenticated(&anchor);
 
-    let caller = caller(); // caller is only available before await
-    state::ensure_salt_set().await;
-    delegation::prune_expired_signatures();
-
     let operation = mutate_device_or_trap(&mut anchor, device_key, None);
     write_anchor(user_number, anchor);
 
-    archive_operation(user_number, caller, operation);
+    delegation::prune_expired_signatures();
+    archive_operation(user_number, caller(), operation);
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
