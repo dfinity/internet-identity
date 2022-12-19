@@ -5,10 +5,11 @@ use crate::certificate_validation::ValidationError::{
     AssetHashMismatch, AssetPathLookupFailed, CertificateExpired, MalformedCertificate,
 };
 use flate2::read::GzDecoder;
+use ic_cdk::api::management_canister::main::CanisterId;
 use ic_certification::{verify_certified_data, CertificateValidationError};
-use ic_sdk_types::hash_tree::LookupResult;
-use ic_sdk_types::HashTree;
-use ic_state_machine_tests::{CanisterId, ThresholdSigPublicKey, Time};
+use ic_crypto_utils_threshold_sig_der::parse_threshold_sig_key_from_der;
+use ic_sdk_certification::{HashTree, LookupResult};
+use ic_types::Time;
 use regex::Regex;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -36,9 +37,10 @@ pub fn validate_certification(
     uri_path: &str,
     body: &[u8],
     encoding: Option<&str>,
-    root_key: ThresholdSigPublicKey,
+    root_key: &[u8],
     current_time: SystemTime,
 ) -> Result<(), ValidationError> {
+    let root_key = parse_threshold_sig_key_from_der(root_key).unwrap();
     // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
     let (encoded_cert, encoded_tree) = parse_header(ic_certificate)?;
     let cert_blob = base64::decode(encoded_cert).map_err(|err| MalformedCertificate {
@@ -54,9 +56,13 @@ pub fn validate_certification(
     // The subnet state tree in the certificate must reveal the canister's certified data.
     // 5. The root hash of that tree must match the canister's certified data.
     // (Out of order because verify_certificate also checks certified_data.)
-    let certificate_time =
-        verify_certified_data(&cert_blob, &canister_id, &root_key, &tree.digest())
-            .map_err(|err| ValidationError::CertificateValidationFailed { inner: err })?;
+    let certificate_time = verify_certified_data(
+        &cert_blob,
+        &ic_types::CanisterId::try_from(canister_id.as_slice()).unwrap(),
+        &root_key,
+        &tree.digest(),
+    )
+    .map_err(|err| ValidationError::CertificateValidationFailed { inner: err })?;
 
     // 3. (cont.) The timestamp in /time must be recent.
     let certificate_validity = Duration::from_secs(300); // 5 min, also used by the service worker and deemed a reasonable interpretation of 'recent'

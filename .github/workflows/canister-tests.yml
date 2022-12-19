@@ -194,17 +194,11 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
-      - name: Install protobuf compiler (linux)
-        if: ${{ matrix.os  == 'ubuntu-latest' }}
-        run: |
-          sudo apt update && sudo apt install -y protobuf-compiler
-          protoc --version
-
-      - name: Install protobuf compiler (macos)
+      # Required by the ic-test-state-machine
+      - name: Install openssl (macos)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
-          brew install protobuf
-          protoc --version
+          brew install openssl@3
 
       - uses: actions/checkout@v3
         with:
@@ -334,6 +328,15 @@ jobs:
         run: |
           git checkout ${{ steps.git_info.outputs.commit_now }}
           cargo build --tests --release --frozen
+
+      - name: Download ic-test-state-machine binary
+        run: |
+          uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
+          echo "uname_sys: $uname_sys"
+          curl -sLO "https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
+          gzip -d ic-test-state-machine.gz
+          chmod a+x ic-test-state-machine
+          ./ic-test-state-machine --version
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3

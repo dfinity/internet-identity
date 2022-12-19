@@ -1,18 +1,17 @@
-use crate::framework;
-use crate::framework::CallError;
-use ic_cdk::api::management_canister::main::CanisterStatusResponse;
-use ic_state_machine_tests::{CanisterId, PrincipalId, StateMachine};
+use candid::Principal;
+use ic_cdk::api::management_canister::main::{CanisterId, CanisterStatusResponse};
 use internet_identity_interface as types;
+use state_machine_client::{call_candid, call_candid_as, query_candid, CallError, StateMachine};
 
 pub fn add_entry(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: PrincipalId,
+    sender: Principal,
     anchor: types::UserNumber,
     timestamp: types::Timestamp,
     entry: Vec<u8>,
 ) -> Result<(), CallError> {
-    framework::call_candid_as(
+    call_candid_as(
         env,
         canister_id,
         sender,
@@ -27,7 +26,7 @@ pub fn get_entries(
     idx: Option<u64>,
     limit: Option<u16>,
 ) -> Result<types::Entries, CallError> {
-    framework::query_candid(env, canister_id, "get_entries", (idx, limit)).map(|(x,)| x)
+    query_candid(env, canister_id, "get_entries", (idx, limit)).map(|(x,)| x)
 }
 
 pub fn get_anchor_entries(
@@ -37,7 +36,7 @@ pub fn get_anchor_entries(
     cursor: Option<types::Cursor>,
     limit: Option<u16>,
 ) -> Result<types::AnchorEntries, CallError> {
-    framework::query_candid(
+    query_candid(
         env,
         canister_id,
         "get_anchor_entries",
@@ -50,7 +49,7 @@ pub fn status(
     env: &StateMachine,
     canister_id: CanisterId,
 ) -> Result<CanisterStatusResponse, CallError> {
-    framework::call_candid(env, canister_id, "status", ()).map(|(x,)| x)
+    call_candid(env, canister_id, "status", ()).map(|(x,)| x)
 }
 
 pub fn http_request(
@@ -58,5 +57,5 @@ pub fn http_request(
     canister_id: CanisterId,
     http_request: types::HttpRequest,
 ) -> Result<types::HttpResponse, CallError> {
-    framework::query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
+    query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
 }

@@ -1,0 +1,12 @@
+[package]
+name = "state_machine_client"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+candid = "0.8"
+ciborium = "0.2"
+ic-cdk = "0.6"
+serde = "1"
+serde_bytes = "0.11"
