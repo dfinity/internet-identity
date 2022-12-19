@@ -70,18 +70,22 @@ pub struct StateMachine {
 }
 
 impl StateMachine {
-    pub fn new(binary_path: &str) -> Self {
-        let mut child = Command::new(&binary_path)
+    pub fn new(binary_path: &str, debug: bool) -> Self {
+        let mut command = Command::new(&binary_path)
             .env("LOG_TO_STDERR", "1")
             .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap_or_else(|err| {
-                panic!(
-                    "failed to start test state machine at path {}: {:?}",
-                    binary_path, err
-                )
-            });
+            .stdout(Stdio::piped());
+
+        if debug {
+            command = command.arg("--debug")
+        }
+
+        let mut child = command.spawn().unwrap_or_else(|err| {
+            panic!(
+                "failed to start test state machine at path {}: {:?}",
+                binary_path, err
+            )
+        });
 
         let child_in = child.stdin.take().unwrap();
         let child_out = child.stdout.take().unwrap();

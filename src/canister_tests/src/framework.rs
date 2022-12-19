@@ -162,7 +162,7 @@ pub fn env() -> StateMachine {
         ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
     }
 
-    StateMachine::new(&path)
+    StateMachine::new(&path, false)
 }
 
 pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
