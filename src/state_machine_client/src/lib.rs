@@ -71,13 +71,14 @@ pub struct StateMachine {
 
 impl StateMachine {
     pub fn new(binary_path: &str, debug: bool) -> Self {
-        let mut command = Command::new(&binary_path)
+        let mut command = Command::new(&binary_path);
+        command
             .env("LOG_TO_STDERR", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped());
 
         if debug {
-            command = command.arg("--debug")
+            command.arg("--debug");
         }
 
         let mut child = command.spawn().unwrap_or_else(|err| {

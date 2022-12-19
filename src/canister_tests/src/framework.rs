@@ -134,7 +134,7 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
     }
 }
 
-/** The Wasm module for the current II build, i.e. the one we're testing */
+/// The path to the state machine binary to run the tests with
 pub static STATE_MACHINE_BINARY: &str = "../../ic-test-state-machine";
 
 pub fn env() -> StateMachine {
