@@ -3,6 +3,7 @@
 import { remote } from "webdriverio";
 import { existsSync, mkdirSync } from "fs";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
+import { downloadChrome } from "./download-chrome";
 
 /** This executable takes screenshots of every page in the showcase.
  * This function expects the showcase to be running on 'http://localhost:8080'. Everything
@@ -66,10 +67,12 @@ async function withChrome<T>(
 ): Promise<T> {
   // Screenshot image dimension, if specified
   const { mobileEmulation } = readScreenshotsConfig();
+  const chromePath = await downloadChrome();
 
   const chromeOptions: ChromeOptions = {
     args: ["headless", "disable-gpu"],
     mobileEmulation,
+    binary: chromePath,
   };
 
   const browser = await remote({
