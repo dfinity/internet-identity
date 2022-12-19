@@ -1,5 +1,7 @@
 import { Connection } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
+import { setAnchorUsed } from "../../utils/userNumber";
+import { displayUserNumber } from "./finish";
 import { confirmRegister } from "./captcha";
 import { makeCaptcha } from "./captcha";
 import { LoginFlowResult, cancel } from "../../utils/flowResult";
@@ -29,6 +31,14 @@ export const register = async ({
       identity,
       alias
     );
+
+    if (result.tag === "ok") {
+      // Write user number to storage
+      setAnchorUsed(result.userNumber);
+
+      // Congratulate user
+      await displayUserNumber(result.userNumber);
+    }
 
     return result;
   } catch (e) {
