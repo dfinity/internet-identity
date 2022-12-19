@@ -12,7 +12,6 @@ const pipeline = promisify(stream.pipeline);
 const stat = promisify(fs.stat);
 const unlink = promisify(fs.unlink);
 
-const cacheRoot = `${os.homedir()}/.chromium-cache`;
 const installPath = `${os.homedir()}/.local-chromium`;
 
 type Config = { platform: "linux" | "darwin"; revision: string };
@@ -43,28 +42,14 @@ export async function downloadChrome() {
     /* noop */
   }
 
-  const globalExecutablePath = getExecutablePath(config, cacheRoot);
-  let exists = false;
-  try {
-    await stat(globalExecutablePath);
-    exists = true;
-  } catch (_) {
-    /* noop */
-  }
-
-  if (exists) {
-    await copyCacheToModule(config, moduleExecutablePath, installPath);
-    return moduleExecutablePath;
-  }
-
   // If not, create the cache and download
 
   try {
-    fs.mkdirSync(cacheRoot);
+    fs.mkdirSync(installPath);
   } catch (_) {
     /* noop */
   }
-  const folderPath = getFolderPath(config, cacheRoot);
+  const folderPath = getFolderPath(config, installPath);
   const zipPath = `${folderPath}.zip`;
 
   await pipeline(
@@ -75,27 +60,8 @@ export async function downloadChrome() {
   // Now extract the zip and install it to the cache
   await extract(zipPath, { dir: folderPath });
   await unlink(zipPath);
-  await copyCacheToModule(config, moduleExecutablePath, installPath);
 
   return moduleExecutablePath;
-}
-
-async function copyCacheToModule(
-  config: Config,
-  moduleExecutablePath: string,
-  installPath: string
-) {
-  if (!fs.existsSync(getFolderPath(config, installPath))) {
-    fs.mkdirSync(getFolderPath(config, installPath), {
-      recursive: true,
-    });
-  }
-
-  fs.cpSync(
-    getFolderPath(config, cacheRoot),
-    getFolderPath(config, installPath),
-    { recursive: true }
-  );
 }
 
 function getConfig(): Config {
