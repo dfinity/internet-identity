@@ -1,13 +1,7 @@
 import { Challenge } from "../../../generated/internet_identity_types";
 import { html, render } from "lit-html";
-import { displayUserNumber } from "./finish";
-import { displayError } from "../../components/displayError";
-import { setAnchorUsed } from "../../utils/userNumber";
-import {
-  apiResultToLoginFlowResult,
-  LoginFlowResult,
-  cancel,
-} from "../../utils/flowResult";
+import { LoginFlowResult, cancel } from "../../utils/flowResult";
+import { apiResultToLoginFlowResult } from "../../utils/flowResult";
 import { withLoader } from "../../components/loader";
 import {
   IdentifiableIdentity,
@@ -64,46 +58,16 @@ const tryRegister = (
 ) => {
   withLoader(async () => {
     return connection.register(identity, alias, challengeResult);
-  }).then((result) => {
-    if (result.kind == "loginSuccess") {
-      // Write user number to storage
-      setAnchorUsed(result.userNumber);
-
-      // Congratulate user
-      displayUserNumber(result.userNumber).then(() => {
-        func(apiResultToLoginFlowResult(result));
-      });
-    } else if (result.kind == "badChallenge") {
+  }).then((registerResult) => {
+    if (registerResult.kind == "badChallenge") {
       const confirmParagraph = document.querySelector(
         ".confirm-paragraph"
       ) as HTMLElement;
       confirmParagraph.innerHTML =
         "The value you entered is incorrect. A new challenge is generated.";
       requestCaptcha(connection);
-    } else if (result.kind == "registerNoSpace") {
-      // Currently, if something goes wrong we only tell the user that
-      // something went wrong and then reload the page.
-      displayError({
-        title: "No Space Left",
-        message:
-          "We could not create an identity anchor because Internet Identity is at maximum capacity. Click 'ok' to reload.",
-        primaryButton: "Ok",
-      }).then(() => {
-        window.location.reload();
-      });
     } else {
-      displayError({
-        title: "Something went wrong",
-        message:
-          "We could not create an identity anchor. You will find the full error message below. Click 'ok' to reload.",
-        primaryButton: "Ok",
-        detail: JSON.stringify(
-          result.error,
-          Object.getOwnPropertyNames(result.error)
-        ),
-      }).then(() => {
-        window.location.reload();
-      });
+      func(apiResultToLoginFlowResult(registerResult));
     }
   });
 };
