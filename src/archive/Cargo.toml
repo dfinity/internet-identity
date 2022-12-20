@@ -23,4 +23,4 @@ serde_bytes = "0.11"
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
 state_machine_client = { path = "../state_machine_client" }
-regex = "1.5.6"
+regex = "1.5"
