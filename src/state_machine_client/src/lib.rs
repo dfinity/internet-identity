@@ -219,7 +219,6 @@ impl StateMachine {
     fn send_request(&self, request: Request) {
         let mut cbor = vec![];
         ciborium::ser::into_writer(&request, &mut cbor).expect("failed to serialize request");
-        println!("send len {}", cbor.len());
         let mut child_in = self.child_in.borrow_mut();
         child_in
             .write(&(cbor.len() as u64).to_le_bytes())
