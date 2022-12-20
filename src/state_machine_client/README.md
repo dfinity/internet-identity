@@ -10,6 +10,10 @@ The `ic-test-state-machine` is an _incomplete_ wrapper around the `ic-state-mach
 
 The prebuilt binary can be downloaded from https://download.dfinity.systems/ic/$sha/binaries/x86_64-$platform/ic-test-state-machine.gz, where `sha` is the commit sha of a commit on the master branch of the IC repository and `platform` is either `linux` or `darwin`.
 
+## Dependencies
+
+The `ic-test-state-machine` binary requires `openssl 3`. On MacOs it can be installed using homebrew by running `brew install openssl@3`.
+
 ## Disclaimer
 
 While testing with the `ic-test-state-machine` might help the development process, it is not a replacement for testing with the actual replica.
