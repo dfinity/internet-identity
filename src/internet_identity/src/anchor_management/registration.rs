@@ -6,6 +6,7 @@ use crate::{delegation, secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, trap};
+use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::*;
 use rand_core::{RngCore, SeedableRng};
 
@@ -170,23 +171,25 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         ));
     }
 
-    let allocation = state::storage_mut(|storage| storage.allocate_user_number());
+    let allocation = state::storage_mut(|storage| storage.allocate_anchor_number());
     match allocation {
-        Some(user_number) => {
+        Some(anchor_number) => {
             write_anchor(
-                user_number,
+                anchor_number,
                 Anchor {
                     devices: vec![device.clone()],
                 },
             );
             archive_operation(
-                user_number,
+                anchor_number,
                 caller(),
                 Operation::RegisterAnchor {
                     device: DeviceDataWithoutAlias::from(device),
                 },
             );
-            RegisterResponse::Registered { user_number }
+            RegisterResponse::Registered {
+                user_number: anchor_number,
+            }
         }
         None => RegisterResponse::CanisterFull,
     }

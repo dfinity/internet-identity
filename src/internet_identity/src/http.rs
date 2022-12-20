@@ -88,10 +88,10 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     state::storage(|storage| {
         w.encode_gauge(
             "internet_identity_user_count",
-            storage.user_count() as f64,
+            storage.anchor_count() as f64,
             "Number of users registered in this canister.",
         )?;
-        let (lo, hi) = storage.assigned_user_number_range();
+        let (lo, hi) = storage.assigned_anchor_number_range();
         w.encode_gauge(
             "internet_identity_min_user_number",
             lo as f64,

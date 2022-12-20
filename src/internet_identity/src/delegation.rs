@@ -22,13 +22,13 @@ const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 24 * 60 * 60);
 const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
 
 pub async fn prepare_delegation(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
     // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&state::anchor(user_number));
+    trap_if_not_authenticated(&state::anchor(anchor_number));
 
     state::ensure_salt_set().await;
     prune_expired_signatures();
@@ -39,7 +39,7 @@ pub async fn prepare_delegation(
         MAX_EXPIRATION_PERIOD_NS,
     );
     let expiration = (time() as u64).saturating_add(delta);
-    let seed = calculate_seed(user_number, &frontend);
+    let seed = calculate_seed(anchor_number, &frontend);
 
     state::signature_map_mut(|sigs| {
         add_signature(sigs, session_key, seed, expiration);
@@ -56,20 +56,20 @@ pub async fn prepare_delegation(
 }
 
 pub fn get_delegation(
-    user_number: UserNumber,
+    anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
-    trap_if_not_authenticated(&state::anchor(user_number));
+    trap_if_not_authenticated(&state::anchor(anchor_number));
 
     state::asset_hashes_and_sigs(|asset_hashes, sigs| {
         match get_signature(
             asset_hashes,
             sigs,
             session_key.clone(),
-            calculate_seed(user_number, &frontend),
+            calculate_seed(anchor_number, &frontend),
             expiration,
         ) {
             Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
@@ -85,27 +85,27 @@ pub fn get_delegation(
     })
 }
 
-pub fn get_principal(user_number: UserNumber, frontend: FrontendHostname) -> Principal {
+pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
-    trap_if_not_authenticated(&state::anchor(user_number));
+    trap_if_not_authenticated(&state::anchor(anchor_number));
 
-    let seed = calculate_seed(user_number, &frontend);
+    let seed = calculate_seed(anchor_number, &frontend);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(&public_key)
 }
 
-fn calculate_seed(user_number: UserNumber, frontend: &FrontendHostname) -> Hash {
+fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
     blob.extend_from_slice(&salt);
 
-    let user_number_str = user_number.to_string();
-    let user_number_blob = user_number_str.bytes();
-    blob.push(user_number_blob.len() as u8);
-    blob.extend(user_number_blob);
+    let anchor_number_str = anchor_number.to_string();
+    let anchor_number_blob = anchor_number_str.bytes();
+    blob.push(anchor_number_blob.len() as u8);
+    blob.extend(anchor_number_blob);
 
     blob.push(frontend.bytes().len() as u8);
     blob.extend(frontend.bytes());

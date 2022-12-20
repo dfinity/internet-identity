@@ -9,10 +9,8 @@ use ic_cdk::api::management_canister::main::{
 };
 use ic_cdk::api::time;
 use ic_cdk::{id, notify};
-use internet_identity_interface::{
-    ArchiveInit, DeployArchiveResult, DeviceDataUpdate, Entry, Operation, Private, Timestamp,
-    UserNumber,
-};
+use internet_identity_interface::archive::*;
+use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
@@ -254,14 +252,14 @@ async fn archive_status(archive_canister: Principal) -> CanisterStatusResponse {
     }
 }
 
-pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Operation) {
+pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operation: Operation) {
     let archive_data = match state::archive_data() {
         Some(data) => data,
         None => return,
     };
     let timestamp = time();
     let entry = Entry {
-        anchor,
+        anchor: anchor_number,
         operation,
         timestamp,
         caller,
@@ -274,7 +272,7 @@ pub fn archive_operation(anchor: UserNumber, caller: Principal, operation: Opera
     let () = notify(
         archive_data.archive_canister,
         "write_entry",
-        (anchor, timestamp, encoded_entry),
+        (anchor_number, timestamp, encoded_entry),
     )
     .expect("failed to send archive entry notification");
     state::increment_archive_seq_nr();

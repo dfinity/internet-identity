@@ -1,4 +1,4 @@
-//! Maintains user signatures and expirations.
+//! Maintains anchor signatures and expirations.
 use ic_certified_map::{leaf_hash, AsHashTree, Hash, HashTree, RbTree};
 use std::borrow::Cow;
 use std::collections::BinaryHeap;

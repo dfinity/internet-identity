@@ -73,7 +73,7 @@ mod upgrade_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("User number range cannot be changed. Current value: \\(\\d+, \\d+\\)")
+            Regex::new("Anchor number range cannot be changed. Current value: \\(\\d+, \\d+\\)")
                 .unwrap(),
         );
     }
