@@ -11,7 +11,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-      echo '{}' | jq --arg text "$MESSAGE: https://github.com/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID" '.text = $text' | \
+        echo '{}' | jq --arg text "$MESSAGE: https://github.com/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID" '.text = $text' | \
             curl -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK_URL"
       shell: bash
       env:
