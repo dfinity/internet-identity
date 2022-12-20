@@ -65,15 +65,12 @@
 //! were used instead).
 
 use crate::state::PersistentState;
-use crate::storage::anchor::{Anchor, Device};
-use candid;
-use candid::{CandidType, Deserialize};
+use crate::storage::anchor::Anchor;
 use ic_cdk::api::trap;
 use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
 use internet_identity_interface::*;
-use std::cmp::min;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
@@ -85,12 +82,10 @@ pub mod anchor;
 mod tests;
 
 // version   0: invalid
-// version 1-2: no longer supported
-// version   3: 4KB anchors layout (current), vec<device> layout
-// version   4: migration from vec<devices> to anchor record in progress
-// version   5: candid anchor record layout
+// version 1-4: no longer supported
+// version   5: 4KB anchors, candid anchor record layout
 // version  6+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 3..=5;
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 5..=5;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
 
@@ -115,45 +110,6 @@ pub const DEFAULT_RANGE_SIZE: u64 =
 
 pub type Salt = [u8; 32];
 
-/// Legacy candid schema for devices stored in stable memory.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-struct DeviceDataInternal {
-    pubkey: DeviceKey,
-    alias: String,
-    credential_id: Option<CredentialId>,
-    purpose: Option<Purpose>,
-    key_type: Option<KeyType>,
-    protection: Option<DeviceProtection>,
-}
-
-impl From<Device> for DeviceDataInternal {
-    fn from(device_data: Device) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            alias: device_data.alias,
-            credential_id: device_data.credential_id,
-            purpose: Some(device_data.purpose),
-            key_type: Some(device_data.key_type),
-            protection: Some(device_data.protection),
-        }
-    }
-}
-
-impl From<DeviceDataInternal> for Device {
-    fn from(device_data: DeviceDataInternal) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            alias: device_data.alias,
-            credential_id: device_data.credential_id,
-            purpose: device_data.purpose.unwrap_or(Purpose::Authentication),
-            key_type: device_data.key_type.unwrap_or(KeyType::Unknown),
-            protection: device_data
-                .protection
-                .unwrap_or(DeviceProtection::Unprotected),
-        }
-    }
-}
-
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M> {
     header: Header,
@@ -164,10 +120,8 @@ pub struct Storage<M> {
 struct Header {
     magic: [u8; 3],
     // version   0: invalid
-    // version 1-2: no longer supported
-    // version   3: 4KB anchors layout (current), vec<device> layout
-    // version   4: migration from vec<devices> to anchor record in progress
-    // version   5: candid anchor record layout
+    // version 1-4: no longer supported
+    // version   5: 4KB anchors, candid anchor record layout
     // version  6+: invalid
     version: u8,
     num_anchors: u32,
@@ -176,8 +130,6 @@ struct Header {
     entry_size: u16,
     salt: [u8; 32],
     first_entry_offset: u64,
-    new_layout_start: u32, // record number of the first entry using the new candid layout
-    migration_batch_size: u32,
 }
 
 impl<M: Memory> Storage<M> {
@@ -208,8 +160,6 @@ impl<M: Memory> Storage<M> {
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
                 first_entry_offset: ENTRY_OFFSET,
-                new_layout_start: 0,
-                migration_batch_size: 0,
             },
             memory,
         }
@@ -285,25 +235,8 @@ impl<M: Memory> Storage<M> {
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, anchor_number: AnchorNumber, data: Anchor) -> Result<(), StorageError> {
         let record_number = self.anchor_number_to_record(anchor_number)?;
-
-        let buf = if self.header.version > 3 && record_number >= self.header.new_layout_start {
-            // use the new candid layout
-            candid::encode_one(data).map_err(StorageError::SerializationError)?
-        } else {
-            // use the old candid layout
-            candid::encode_one(
-                data.into_devices()
-                    .into_iter()
-                    .map(|d| DeviceDataInternal::from(d))
-                    .collect::<Vec<DeviceDataInternal>>(),
-            )
-            .map_err(StorageError::SerializationError)?
-        };
-        self.write_entry_bytes(record_number, buf)?;
-
-        // piggy back on update call and migrate a batch of anchors
-        self.migrate_record_batch()?;
-        Ok(())
+        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
+        self.write_entry_bytes(record_number, buf)
     }
 
     fn write_entry_bytes(&mut self, record_number: u32, buf: Vec<u8>) -> Result<(), StorageError> {
@@ -329,18 +262,7 @@ impl<M: Memory> Storage<M> {
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         let record_number = self.anchor_number_to_record(anchor_number)?;
         let data_buf = self.read_entry_bytes(record_number);
-
-        let anchor = if self.header.version > 3 && record_number >= self.header.new_layout_start {
-            // use the new candid layout
-            candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?
-        } else {
-            // use the old candid layout
-            let devices: Vec<DeviceDataInternal> =
-                candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-            Anchor::from_devices(devices.into_iter().map(|d| Device::from(d)).collect())
-        };
-
-        Ok(anchor)
+        candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)
     }
 
     fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
@@ -537,94 +459,6 @@ impl<M: Memory> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
-    }
-
-    pub fn migration_state(&self) -> MigrationState {
-        match self.header.version {
-            3 => MigrationState::NotStarted,
-            4 => MigrationState::Started {
-                anchors_left: self.header.new_layout_start as u64,
-                batch_size: self.header.migration_batch_size as u64,
-            },
-            5 => MigrationState::Finished,
-            version => trap(&format!("unexpected header version: {}", version)),
-        }
-    }
-
-    pub fn configure_migration(&mut self, migration_batch_size: u32) {
-        if self.header.version == 5 {
-            // migration is already done, nothing to do
-            return;
-        }
-
-        if self.header.version == 3 {
-            // only initialize this on the first migration configuration
-            self.header.version = 4;
-            self.header.new_layout_start = self.header.num_anchors;
-        }
-
-        self.header.migration_batch_size = migration_batch_size;
-        self.flush();
-    }
-
-    fn migrate_record_batch(&mut self) -> Result<(), StorageError> {
-        if self.header.version == 3 || self.header.version == 5 {
-            // migration is not started or already done, nothing to do
-            return Ok(());
-        }
-
-        for _ in 0..min(
-            self.header.new_layout_start,
-            self.header.migration_batch_size,
-        ) {
-            self.migrate_next_record()?;
-        }
-
-        if self.header.new_layout_start == 0 {
-            self.finalize_migration();
-        }
-        self.flush();
-        Ok(())
-    }
-
-    fn migrate_next_record(&mut self) -> Result<(), StorageError> {
-        let record_number = self.header.new_layout_start - 1;
-        let old_schema_bytes = self.read_entry_bytes(record_number);
-
-        if old_schema_bytes.len() == 0 {
-            // This anchor was only allocated but never written
-            // --> nothing to migrate just update pointer.
-            self.header.new_layout_start -= 1;
-            return Ok(());
-        }
-
-        let devices: Vec<DeviceDataInternal> =
-            candid::decode_one(&old_schema_bytes).map_err(StorageError::DeserializationError)?;
-        let anchor = Anchor::from_devices(devices.into_iter().map(|d| Device::from(d)).collect());
-
-        let new_schema_bytes =
-            candid::encode_one(anchor).map_err(StorageError::SerializationError)?;
-        self.write_entry_bytes(record_number, new_schema_bytes)?;
-        self.header.new_layout_start -= 1;
-        Ok(())
-    }
-
-    fn finalize_migration(&mut self) {
-        if self.header.version == 5 {
-            // migration is already done, nothing to do
-            return;
-        }
-
-        assert_eq!(
-            self.header.version, 4,
-            "unexpected header version during migration finalization {}",
-            self.header.version
-        );
-        assert_eq!({ self.header.new_layout_start }, 0, "cannot finalize migration when not all anchors were migrated! Remaining anchors to migrate: {}", { self.header.new_layout_start });
-
-        self.header.version = 5;
-        // clear now unused header field (new_layout_start is already 0)
-        self.header.migration_batch_size = 0;
     }
 }
 

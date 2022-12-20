@@ -10,8 +10,6 @@ mod tests;
 /// The anchor has limited visibility for the constructor to make sure it is loaded from storage.
 /// The devices can only be modified by the exposed functions which keeps invariant checking local
 /// to this module.
-///
-/// After the upcoming stable memory migration, new fields can be added to this struct.
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Anchor {
     devices: Vec<Device>,
@@ -60,14 +58,6 @@ impl Anchor {
     /// not accidentally bypassed.
     pub(super) fn new() -> Anchor {
         Self { devices: vec![] }
-    }
-
-    /// Creation of new anchors is restricted in order to make sure that the device checks are
-    /// not accidentally bypassed.
-    pub(super) fn from_devices(devices: Vec<Device>) -> Anchor {
-        // We do _not_ check invariants here, because there might be anchors that do not fulfill
-        // the invariants still stored in stable memory (e.g. anchors with multiple recovery phrases).
-        Self { devices }
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {

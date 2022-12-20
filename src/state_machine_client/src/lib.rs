@@ -189,7 +189,7 @@ impl StateMachine {
         self.call_state_machine(Request::AdvanceTime(duration))
     }
 
-    pub fn stable_memory(&self, canister_id: Principal) -> ByteBuf {
+    pub fn stable_memory(&self, canister_id: Principal) -> Vec<u8> {
         self.call_state_machine(Request::ReadStableMemory(RawCanisterId::from(canister_id)))
     }
 
