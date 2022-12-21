@@ -1,5 +1,5 @@
 use crate::state;
-use crate::state::Device;
+use crate::storage::anchor::Device;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::main::{

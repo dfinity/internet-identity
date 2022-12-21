@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState, ArchiveStatusCache};
+use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
@@ -8,7 +9,6 @@ use ic_cdk::{call, trap};
 use ic_certified_map::{Hash, RbTree};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
-use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -20,73 +20,6 @@ pub type AssetHashes = RbTree<&'static str, Hash>;
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<Assets> = RefCell::new(HashMap::default());
-}
-
-/// Internal representation of the anchor.
-/// After the upcoming stable memory migration, new fields can be added to this struct.
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
-pub struct Anchor {
-    pub devices: Vec<Device>,
-}
-
-/// This is an internal version of `DeviceData` useful to provide a
-/// backwards compatible level between device data stored in stable memory.
-/// It is similar to `DeviceDataInternal` but with redundant options removed
-/// (which is possible due to the stable memory candid schema migration).
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct Device {
-    pub pubkey: DeviceKey,
-    pub alias: String,
-    pub credential_id: Option<CredentialId>,
-    pub purpose: Purpose,
-    pub key_type: KeyType,
-    pub protection: DeviceProtection,
-}
-
-impl Device {
-    pub fn variable_fields_len(&self) -> usize {
-        self.alias.len()
-            + self.pubkey.len()
-            + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
-    }
-}
-
-impl From<DeviceData> for Device {
-    fn from(device_data: DeviceData) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            alias: device_data.alias,
-            credential_id: device_data.credential_id,
-            purpose: device_data.purpose,
-            key_type: device_data.key_type,
-            protection: device_data.protection,
-        }
-    }
-}
-
-impl From<Device> for DeviceData {
-    fn from(device: Device) -> Self {
-        Self {
-            pubkey: device.pubkey,
-            alias: device.alias,
-            credential_id: device.credential_id,
-            purpose: device.purpose,
-            key_type: device.key_type,
-            protection: device.protection,
-        }
-    }
-}
-
-impl From<Device> for DeviceDataWithoutAlias {
-    fn from(device_data: Device) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            credential_id: device_data.credential_id,
-            purpose: device_data.purpose,
-            key_type: device_data.key_type,
-            protection: device_data.protection,
-        }
-    }
 }
 
 pub struct TentativeDeviceRegistration {

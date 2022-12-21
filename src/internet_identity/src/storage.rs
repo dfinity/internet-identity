@@ -64,7 +64,8 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::{Anchor, Device, PersistentState};
+use crate::state::PersistentState;
+use crate::storage::anchor::{Anchor, Device};
 use candid;
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::trap;
@@ -77,6 +78,8 @@ use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
+
+pub mod anchor;
 
 #[cfg(test)]
 mod tests;
@@ -269,14 +272,14 @@ impl<M: Memory> Storage<M> {
     ///
     /// Returns None if the range of Identity Anchor assigned to this
     /// storage is exhausted.
-    pub fn allocate_anchor_number(&mut self) -> Option<AnchorNumber> {
+    pub fn allocate_anchor(&mut self) -> Option<(AnchorNumber, Anchor)> {
         let anchor_number = self.header.id_range_lo + self.header.num_anchors as u64;
         if anchor_number >= self.header.id_range_hi {
             return None;
         }
         self.header.num_anchors += 1;
         self.flush();
-        Some(anchor_number)
+        Some((anchor_number, Anchor::new()))
     }
 
     /// Writes the data of the specified anchor to stable memory.
@@ -289,7 +292,7 @@ impl<M: Memory> Storage<M> {
         } else {
             // use the old candid layout
             candid::encode_one(
-                data.devices
+                data.into_devices()
                     .into_iter()
                     .map(|d| DeviceDataInternal::from(d))
                     .collect::<Vec<DeviceDataInternal>>(),
@@ -334,9 +337,7 @@ impl<M: Memory> Storage<M> {
             // use the old candid layout
             let devices: Vec<DeviceDataInternal> =
                 candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)?;
-            Anchor {
-                devices: devices.into_iter().map(|d| Device::from(d)).collect(),
-            }
+            Anchor::from_devices(devices.into_iter().map(|d| Device::from(d)).collect())
         };
 
         Ok(anchor)
@@ -599,9 +600,7 @@ impl<M: Memory> Storage<M> {
 
         let devices: Vec<DeviceDataInternal> =
             candid::decode_one(&old_schema_bytes).map_err(StorageError::DeserializationError)?;
-        let anchor = Anchor {
-            devices: devices.into_iter().map(|d| Device::from(d)).collect(),
-        };
+        let anchor = Anchor::from_devices(devices.into_iter().map(|d| Device::from(d)).collect());
 
         let new_schema_bytes =
             candid::encode_one(anchor).map_err(StorageError::SerializationError)?;
