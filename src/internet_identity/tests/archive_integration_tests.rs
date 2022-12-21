@@ -254,9 +254,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
 
     let delete_entry = Entry {
         anchor,
-        operation: Operation::RemoveDevice {
-            device: pubkey.clone(),
-        },
+        operation: Operation::RemoveDevice { device: pubkey },
         timestamp,
         caller: principal_1(),
         sequence_number: 3,

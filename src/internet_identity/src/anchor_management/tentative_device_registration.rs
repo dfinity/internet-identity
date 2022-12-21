@@ -139,9 +139,9 @@ fn get_verified_device(
                     // reinsert because retries are allowed
                     registrations.insert(anchor_number, tentative_registration);
                 }
-                return Err(WrongCode {
+                Err(WrongCode {
                     retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
-                });
+                })
             }
         }
     })
@@ -170,7 +170,5 @@ fn prune_expired_tentative_device_registrations(
 ) {
     let now = time();
 
-    registrations.retain(|_, value| match &value {
-        TentativeDeviceRegistration { expiration, .. } => expiration > &now,
-    })
+    registrations.retain(|_, TentativeDeviceRegistration { expiration, .. }| *expiration > now)
 }

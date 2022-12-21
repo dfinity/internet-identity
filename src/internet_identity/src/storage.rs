@@ -67,7 +67,7 @@
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
 use ic_cdk::api::trap;
-use ic_stable_structures::reader::{BufferedReader, OutOfBounds, Reader};
+use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
 use internet_identity_interface::*;
@@ -251,9 +251,9 @@ impl<M: Memory> Storage<M> {
             Writer::new(&mut self.memory, address),
         );
         writer
-            .write(&(buf.len() as u16).to_le_bytes())
+            .write_all(&(buf.len() as u16).to_le_bytes())
             .expect("memory write failed");
-        writer.write(&buf).expect("memory write failed");
+        writer.write_all(&buf).expect("memory write failed");
         writer.flush().expect("memory write failed");
         Ok(())
     }
@@ -276,7 +276,7 @@ impl<M: Memory> Storage<M> {
 
         let mut len_buf = vec![0; 2];
         reader
-            .read(&mut len_buf.as_mut_slice())
+            .read_exact(len_buf.as_mut_slice())
             .expect("failed to read memory");
         let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
 
@@ -291,7 +291,7 @@ impl<M: Memory> Storage<M> {
 
         let mut data_buf = vec![0; len];
         reader
-            .read(&mut data_buf.as_mut_slice())
+            .read_exact(data_buf.as_mut_slice())
             .expect("failed to read memory");
         data_buf
     }
@@ -307,7 +307,7 @@ impl<M: Memory> Storage<M> {
         let mut writer = Writer::new(&mut self.memory, 0);
 
         // this should never fail as this write only requires a memory of size 1
-        writer.write(slice).expect("bug: failed to grow memory");
+        writer.write_all(slice).expect("bug: failed to grow memory");
     }
 
     pub fn anchor_count(&self) -> usize {
@@ -390,11 +390,11 @@ impl<M: Memory> Storage<M> {
         // In practice, for all reasonably sized persistent states (<800MB) the writes are
         // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
         let mut writer = Writer::new(&mut self.memory, address);
-        writer.write(&PERSISTENT_STATE_MAGIC).unwrap();
+        writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
         writer
-            .write(&(encoded_state.len() as u64).to_le_bytes())
+            .write_all(&(encoded_state.len() as u64).to_le_bytes())
             .unwrap();
-        writer.write(&encoded_state).unwrap();
+        writer.write_all(&encoded_state).unwrap();
     }
 
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest anchor number.
@@ -410,51 +410,30 @@ impl<M: Memory> Storage<M> {
 
         let mut reader = Reader::new(&self.memory, address);
         let mut magic_buf: [u8; 4] = [0; 4];
-        let bytes_read = reader
-            .read(&mut magic_buf)
+        reader
+            .read_exact(&mut magic_buf)
             // if we hit out of bounds here, this means that the persistent state has not been
             // written at the expected location and thus cannot be found
             .map_err(|_| PersistentStateError::NotFound)?;
 
-        if bytes_read != 4 || magic_buf != PERSISTENT_STATE_MAGIC {
-            // less than the expected number of bytes were read or the magic does not match
-            // --> this is not the persistent state
+        if magic_buf != PERSISTENT_STATE_MAGIC {
+            // magic does not match --> this is not the persistent state
             return Err(PersistentStateError::NotFound);
         }
 
         let mut size_buf: [u8; 8] = [0; 8];
-        let bytes_read = reader
-            .read(&mut size_buf)
-            .map_err(|err| PersistentStateError::ReadError(err))? as u64;
-
-        // check if we actually read the required amount of data
-        // note: this will only happen if we hit the memory bounds during read
-        if bytes_read != 8 {
-            let max_address = address + 4 + bytes_read;
-            return Err(PersistentStateError::ReadError(OutOfBounds {
-                max_address,
-                attempted_read_address: max_address + 1,
-            }));
-        }
+        reader
+            .read_exact(&mut size_buf)
+            .map_err(PersistentStateError::ReadError)?;
 
         let size = u64::from_le_bytes(size_buf);
         let mut data_buf = Vec::new();
         data_buf.resize(size as usize, 0);
-        let bytes_read = reader
-            .read(data_buf.as_mut_slice())
-            .map_err(|err| PersistentStateError::ReadError(err))? as u64;
+        reader
+            .read_exact(data_buf.as_mut_slice())
+            .map_err(PersistentStateError::ReadError)?;
 
-        // check if we actually read the required amount of data
-        // note: this will only happen if we hit the memory bounds during read
-        if bytes_read != size {
-            let max_address = address + 4 + 8 + bytes_read;
-            return Err(PersistentStateError::ReadError(OutOfBounds {
-                max_address,
-                attempted_read_address: max_address + 1,
-            }));
-        }
-
-        candid::decode_one(&data_buf).map_err(|err| PersistentStateError::CandidError(err))
+        candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
     }
 
     pub fn version(&self) -> u8 {
@@ -466,7 +445,7 @@ impl<M: Memory> Storage<M> {
 pub enum PersistentStateError {
     CandidError(candid::error::Error),
     NotFound,
-    ReadError(OutOfBounds),
+    ReadError(std::io::Error),
 }
 
 #[derive(Debug)]

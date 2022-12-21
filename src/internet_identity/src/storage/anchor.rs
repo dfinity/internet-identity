@@ -61,12 +61,7 @@ impl Anchor {
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {
-        if self
-            .devices
-            .iter()
-            .find(|e| e.pubkey == device.pubkey)
-            .is_some()
-        {
+        if self.devices.iter().any(|e| e.pubkey == device.pubkey) {
             return Err(AnchorError::DuplicateDevice {
                 device_key: device.pubkey,
             });

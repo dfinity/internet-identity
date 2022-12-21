@@ -71,7 +71,7 @@ pub struct StateMachine {
 
 impl StateMachine {
     pub fn new(binary_path: &str, debug: bool) -> Self {
-        let mut command = Command::new(&binary_path);
+        let mut command = Command::new(binary_path);
         command
             .env("LOG_TO_STDERR", "1")
             .stdin(Stdio::piped())
@@ -145,7 +145,7 @@ impl StateMachine {
 
     pub fn install_canister(&self, canister_id: CanisterId, wasm_module: Vec<u8>, arg: Vec<u8>) {
         call_candid::<(InstallCodeArgument,), ()>(
-            &self,
+            self,
             Principal::management_canister(),
             "install_code",
             (InstallCodeArgument {
@@ -165,7 +165,7 @@ impl StateMachine {
         arg: Vec<u8>,
     ) -> Result<(), CallError> {
         call_candid::<(InstallCodeArgument,), ()>(
-            &self,
+            self,
             Principal::management_canister(),
             "install_code",
             (InstallCodeArgument {
@@ -221,10 +221,10 @@ impl StateMachine {
         ciborium::ser::into_writer(&request, &mut cbor).expect("failed to serialize request");
         let mut child_in = self.child_in.borrow_mut();
         child_in
-            .write(&(cbor.len() as u64).to_le_bytes())
+            .write_all(&(cbor.len() as u64).to_le_bytes())
             .expect("failed to send request length");
         child_in
-            .write(cbor.as_slice())
+            .write_all(cbor.as_slice())
             .expect("failed to send request data");
         child_in.flush().expect("failed to flush child stdin");
     }

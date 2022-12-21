@@ -166,7 +166,7 @@ pub fn salt() -> [u8; 32] {
 
 pub fn initialize_from_stable_memory() {
     STATE.with(|s| {
-        s.last_upgrade_timestamp.set(time() as u64);
+        s.last_upgrade_timestamp.set(time());
         match Storage::from_memory(DefaultMemoryImpl::default()) {
             Some(storage) => {
                 s.storage.replace(storage);
@@ -222,7 +222,6 @@ pub fn expected_archive_hash() -> Option<[u8; 32]> {
             .borrow()
             .archive_info
             .expected_module_hash
-            .clone()
     })
 }
 
@@ -251,61 +250,61 @@ pub fn increment_archive_seq_nr() {
 pub fn tentative_device_registrations<R>(
     f: impl FnOnce(&HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
-    STATE.with(|s| f(&*s.tentative_device_registrations.borrow()))
+    STATE.with(|s| f(&s.tentative_device_registrations.borrow()))
 }
 
 pub fn tentative_device_registrations_mut<R>(
     f: impl FnOnce(&mut HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
-    STATE.with(|s| f(&mut *s.tentative_device_registrations.borrow_mut()))
+    STATE.with(|s| f(&mut s.tentative_device_registrations.borrow_mut()))
 }
 
 pub fn assets<R>(f: impl FnOnce(&Assets) -> R) -> R {
-    ASSETS.with(|assets| f(&*assets.borrow()))
+    ASSETS.with(|assets| f(&assets.borrow()))
 }
 
 pub fn assets_and_hashes_mut<R>(f: impl FnOnce(&mut Assets, &mut AssetHashes) -> R) -> R {
     ASSETS.with(|assets| {
-        STATE.with(|s| f(&mut *assets.borrow_mut(), &mut *s.asset_hashes.borrow_mut()))
+        STATE.with(|s| f(&mut assets.borrow_mut(), &mut s.asset_hashes.borrow_mut()))
     })
 }
 
 pub fn asset_hashes_and_sigs<R>(f: impl FnOnce(&AssetHashes, &SignatureMap) -> R) -> R {
-    STATE.with(|s| f(&*s.asset_hashes.borrow(), &*s.sigs.borrow()))
+    STATE.with(|s| f(&s.asset_hashes.borrow(), &s.sigs.borrow()))
 }
 
 pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {
-    STATE.with(|s| f(&*s.sigs.borrow()))
+    STATE.with(|s| f(&s.sigs.borrow()))
 }
 
 pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
-    STATE.with(|s| f(&mut *s.sigs.borrow_mut()))
+    STATE.with(|s| f(&mut s.sigs.borrow_mut()))
 }
 
 pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&*s.storage.borrow()))
+    STATE.with(|s| f(&s.storage.borrow()))
 }
 
 pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&mut *s.storage.borrow_mut()))
+    STATE.with(|s| f(&mut s.storage.borrow_mut()))
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
-    STATE.with(|s| f(&*s.usage_metrics.borrow()))
+    STATE.with(|s| f(&s.usage_metrics.borrow()))
 }
 
 pub fn usage_metrics_mut<R>(f: impl FnOnce(&mut UsageMetrics) -> R) -> R {
-    STATE.with(|s| f(&mut *s.usage_metrics.borrow_mut()))
+    STATE.with(|s| f(&mut s.usage_metrics.borrow_mut()))
 }
 
 pub fn inflight_challenges<R>(f: impl FnOnce(&HashMap<ChallengeKey, ChallengeInfo>) -> R) -> R {
-    STATE.with(|s| f(&*s.inflight_challenges.borrow()))
+    STATE.with(|s| f(&s.inflight_challenges.borrow()))
 }
 
 pub fn inflight_challenges_mut<R>(
     f: impl FnOnce(&mut HashMap<ChallengeKey, ChallengeInfo>) -> R,
 ) -> R {
-    STATE.with(|s| f(&mut *s.inflight_challenges.borrow_mut()))
+    STATE.with(|s| f(&mut s.inflight_challenges.borrow_mut()))
 }
 
 pub fn last_upgrade_timestamp() -> Timestamp {
@@ -313,11 +312,11 @@ pub fn last_upgrade_timestamp() -> Timestamp {
 }
 
 pub fn persistent_state<R>(f: impl FnOnce(&PersistentState) -> R) -> R {
-    STATE.with(|s| f(&*s.persistent_state.borrow()))
+    STATE.with(|s| f(&s.persistent_state.borrow()))
 }
 
 pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentState) -> R) -> R {
-    STATE.with(|s| f(&mut *s.persistent_state.borrow_mut()))
+    STATE.with(|s| f(&mut s.persistent_state.borrow_mut()))
 }
 
 pub fn cached_archive_status() -> Option<CanisterStatusResponse> {

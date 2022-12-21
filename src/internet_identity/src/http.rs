@@ -232,7 +232,7 @@ fn security_headers() -> Vec<HeaderField> {
 /// We deliver the CSP by header _and_ meta tag because the headers are not yet certified.
 fn content_security_policy_header() -> String {
     let meta_policy = content_security_policy_meta();
-    format!("{meta_policy}frame-ancestors 'none';").to_string()
+    format!("{meta_policy}frame-ancestors 'none';")
 }
 
 /// Stripped down content security policy for the HTML `meta` tag, where not all directives are supported.
@@ -300,7 +300,7 @@ fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
             format!(
                 "certificate=:{}:, tree=:{}:",
                 base64::encode(&certificate),
-                base64::encode(&serializer.into_inner())
+                base64::encode(serializer.into_inner())
             ),
         )
     })

@@ -37,7 +37,18 @@ jobs:
           token: ${{ secrets.GIX_BOT_PAT }}
       - uses: ./.github/actions/bootstrap
 
-      - name: Cargo clippy
+      - name: Create dummy assets
         run: |
-          rustup component add clippy
-          cargo clippy --tests --benches -- -D clippy::all
+          mkdir dist
+          touch dist/index.html
+          touch dist/about.html
+          touch dist/faq.html
+          touch dist/index.js.gz
+          touch dist/index.css
+          touch dist/loader.webp
+          touch dist/favicon.ico
+          touch dist/ic-badge.svg
+
+      - run: rustup component add clippy
+      - name: Cargo clippy
+        run: cargo clippy --tests --benches -- -D clippy::all

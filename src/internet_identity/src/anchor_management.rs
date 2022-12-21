@@ -89,7 +89,7 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
     let diff = device_diff(existing_device, &new_device);
 
     anchor
-        .modify_device(&device_key, new_device.clone())
+        .modify_device(&device_key, new_device)
         .unwrap_or_else(|err| {
             trap(&format!(
                 "failed to modify device of anchor {}: {}",

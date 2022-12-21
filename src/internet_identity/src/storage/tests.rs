@@ -30,7 +30,7 @@ fn should_report_max_number_of_entries_for_32gb() {
 fn should_serialize_header_v5() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
-    storage.update_salt([05u8; 32]);
+    storage.update_salt([5u8; 32]);
     storage.flush();
 
     let mut buf = vec![0; HEADER_SIZE];
@@ -54,7 +54,7 @@ fn should_recover_header_from_memory() {
 #[test]
 fn should_read_previous_write_v5() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((12345, 678910), memory.clone());
+    let mut storage = Storage::new((12345, 678910), memory);
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
 
     anchor.add_device(sample_device()).unwrap();
@@ -105,7 +105,7 @@ fn should_serialize_subsequent_record_to_expected_memory_location_v5() {
 #[test]
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), memory.clone());
+    let mut storage = Storage::new((123, 456), memory);
     let (_, anchor) = storage.allocate_anchor().unwrap();
 
     let result = storage.write(222, anchor);
@@ -156,7 +156,7 @@ fn should_deserialize_subsequent_record_at_expected_memory_location_v5() {
 #[test]
 fn should_not_read_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), memory.clone());
+    let mut storage = Storage::new((123, 456), memory);
     storage.allocate_anchor().unwrap();
 
     let result = storage.read(222);
@@ -166,7 +166,7 @@ fn should_not_read_using_anchor_number_outside_allocated_range() {
 #[test]
 fn should_save_and_restore_persistent_state() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), memory.clone());
+    let mut storage = Storage::new((123, 456), memory);
     storage.flush();
     storage.allocate_anchor().unwrap();
 
@@ -192,7 +192,7 @@ fn should_save_persistent_state_at_expected_memory_address() {
 #[test]
 fn should_not_find_persistent_state() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
     storage.flush();
 
     let result = storage.read_persistent_state();
@@ -255,7 +255,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
 #[test]
 fn should_not_panic_on_unallocated_persistent_state_mem_address() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
     storage.flush();
     for _ in 0..32 {
         storage.allocate_anchor();
@@ -288,17 +288,15 @@ fn should_overwrite_persistent_state_with_next_anchor() {
     let mut buf = vec![0u8; 4];
     memory.read(EXPECTED_ADDRESS, &mut buf);
     assert_ne!(buf, PERSISTENT_STATE_MAGIC);
-
-    assert!(matches!(
-        storage.read_persistent_state(),
-        Err(PersistentStateError::NotFound)
-    ));
+    let result = storage.read_persistent_state();
+    println!("{:?}", result);
+    assert!(matches!(result, Err(PersistentStateError::NotFound)));
 }
 
 #[test]
 fn should_read_previously_stored_persistent_state() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
-    const PERSISTENT_STATE_BYTES: &'static str = "4949505388000000000000004449444c066c02cbc282b70501f7f5cbfb07786c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b001018002e1df02000000";
+    const PERSISTENT_STATE_BYTES: &str = "4949505388000000000000004449444c066c02cbc282b70501f7f5cbfb07786c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b001018002e1df02000000";
 
     let memory = VectorMemory::default();
     // allocate space for the writes
@@ -331,7 +329,7 @@ fn sample_device() -> Device {
 }
 
 fn sample_persistent_state() -> PersistentState {
-    let persistent_state = PersistentState {
+    PersistentState {
         archive_info: ArchiveInfo {
             expected_module_hash: Some([99u8; 32]),
             state: ArchiveState::Created(ArchiveData {
@@ -340,6 +338,5 @@ fn sample_persistent_state() -> PersistentState {
             }),
         },
         canister_creation_cycles_cost: 12_346_000_000,
-    };
-    persistent_state
+    }
 }

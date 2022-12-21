@@ -135,7 +135,7 @@ where
 fn decode_body_to_sha256(body: &[u8], encoding: Option<&str>) -> Option<[u8; 32]> {
     let mut sha256 = Sha256::new();
     let mut decoded = [0u8; MAX_CHUNK_SIZE_TO_DECOMPRESS];
-    match encoding.as_deref() {
+    match encoding {
         Some("gzip") => {
             let mut decoder = GzDecoder::new(body);
             for _ in 0..MAX_CHUNKS_TO_DECOMPRESS {
