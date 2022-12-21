@@ -26,3 +26,18 @@ jobs:
           add: src
           default_author: github_actions
           message: "🤖 cargo-fmt auto-update"
+
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # set a PAT so that add-and-commit can trigger
+          # CI runs
+          token: ${{ secrets.GIX_BOT_PAT }}
+      - uses: ./.github/actions/bootstrap
+
+      - name: Cargo clippy
+        run: |
+          rustup component add clippy
+          cargo clippy --tests --benches -- -D clippy::all
