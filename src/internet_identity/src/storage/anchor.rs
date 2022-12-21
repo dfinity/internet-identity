@@ -81,8 +81,8 @@ impl Anchor {
                 device_key: device.pubkey,
             });
         }
-        check_device(&device)?;
-        check_invariants(&self.devices.iter().chain(iter::once(&device)).collect())?;
+        check_device_invariants(&device)?;
+        check_anchor_invariants(&self.devices.iter().chain(iter::once(&device)).collect())?;
         self.devices.push(device);
         Ok(())
     }
@@ -112,10 +112,10 @@ impl Anchor {
         if device_key != &modified_device.pubkey {
             return Err(AnchorError::CannotModifyDeviceKey);
         }
-        check_device(&modified_device)?;
+        check_device_invariants(&modified_device)?;
         let index = self.device_index(device_key)?;
         check_mutation_allowed(&self.devices[index])?;
-        check_invariants(
+        check_anchor_invariants(
             &self
                 .devices
                 .iter()
@@ -212,7 +212,7 @@ fn caller() -> Principal {
 /// In order to not break those anchors, they need to have a path back to satisfying the invariants.
 /// To allow that transition, [remove_device](Anchor::remove_device) does _not_ check the invariants based on the assumption
 /// that the state of an anchor cannot get worse by removing a device.
-fn check_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
+fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
     /// by only allowing 8 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
@@ -269,7 +269,7 @@ fn check_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
-fn check_device(device: &Device) -> Result<(), AnchorError> {
+fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
     check_device_limits(device)?;
 
     if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
