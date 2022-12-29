@@ -1,17 +1,13 @@
 #!/usr/bin/env node
 
 import { get } from "https";
-import { homedir, platform as osPlatform } from "os";
-import { promisify } from "util";
+import { platform as osPlatform } from "os";
 import { mkdirSync, createWriteStream } from "fs";
 import { stat, unlink } from "fs/promises";
-import stream from "node:stream";
 import extract from "extract-zip";
 import { unreachable } from "./src/utils/utils";
 
-const pipeline = promisify(stream.pipeline);
-
-const installPath = `${homedir()}/.local-chromium`;
+const installPath = `${nodeModulesPath()}/.local-chromium`;
 
 type Config = { platform: "linux" | "darwin"; revision: string };
 
@@ -51,10 +47,7 @@ export async function downloadChrome() {
   const folderPath = getFolderPath(config, installPath);
   const zipPath = `${folderPath}.zip`;
 
-  await pipeline(
-    await downloadFromURL(downloadURL(config)),
-    createWriteStream(zipPath)
-  );
+  await downloadToFile({ url: downloadURL(config), outfile: zipPath });
 
   // Now extract the zip and install it to the cache
   await extract(zipPath, { dir: folderPath });
@@ -113,21 +106,32 @@ function getExecutablePath(config: Config, root: string): string {
   return unreachable(config.platform);
 }
 
-/** Download a file from a URL */
-const downloadFromURL = (url: string): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    get(url, async (res) => {
-      if (res.statusCode !== undefined && [301, 302].includes(res.statusCode)) {
-        await downloadFromURL(res.headers.location!).then(resolve, reject);
-      }
+function downloadToFile({
+  url,
+  outfile,
+}: {
+  url: string;
+  outfile: string;
+}): Promise<void> {
+  const file = createWriteStream(outfile);
+  return new Promise((resolve) => {
+    get(url, (response) => {
+      response.pipe(file);
 
-      const data: any[] = [];
-
-      res.on("data", (chunk) => data.push(chunk));
-      res.on("end", () => {
-        resolve(Buffer.concat(data));
+      file.on("finish", () => {
+        file.close();
+        resolve();
       });
-      res.on("error", reject);
     });
   });
-};
+}
+
+function nodeModulesPath(): string {
+  const packageJsonPath = process.env.npm_package_json;
+  if (packageJsonPath === null || packageJsonPath === undefined) {
+    throw new Error("It's not there!!");
+  }
+  const needle = "package.json";
+  const endIx = packageJsonPath.indexOf(needle);
+  return packageJsonPath.substr(0, endIx) + "node_modules";
+}
