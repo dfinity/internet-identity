@@ -1,13 +1,13 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_state_machine_tests::StateMachine;
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
+use state_machine_client::CallError;
 
 #[test]
 fn should_migrate_anchors() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_V3_LAYOUT.clone());
 
     assert_eq!(api::stats(&env, canister_id)?.storage_layout_version, 3);
@@ -67,7 +67,7 @@ fn should_migrate_anchors() -> Result<(), CallError> {
 
 #[test]
 fn should_keep_anchors_intact_when_migrating() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_V3_LAYOUT.clone());
 
     let anchor0 = flows::register_anchor(&env, canister_id);
@@ -231,7 +231,7 @@ fn should_keep_anchors_intact_when_migrating() -> Result<(), CallError> {
 
 #[test]
 fn should_upgrade_during_migration() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_V3_LAYOUT.clone());
 
     for _ in 0..10 {
@@ -293,7 +293,7 @@ fn should_upgrade_during_migration() -> Result<(), CallError> {
 
 #[test]
 fn should_start_and_pause_migration() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_V3_LAYOUT.clone());
 
     for _ in 0..10 {
@@ -367,7 +367,7 @@ fn should_start_and_pause_migration() -> Result<(), CallError> {
 
 #[test]
 fn should_not_migrate_anchors_if_not_configured() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_V3_LAYOUT.clone());
 
     for _ in 0..10 {

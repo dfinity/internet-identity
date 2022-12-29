@@ -1,26 +1,27 @@
 use crate::api;
-use candid::utils::{decode_args, encode_args, ArgumentDecoder, ArgumentEncoder};
 use candid::Principal;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
+use ic_cdk::api::management_canister::main::CanisterId;
 use ic_crypto_iccsa::types::SignatureBytes;
 use ic_crypto_iccsa::{public_key_bytes_from_der, verify};
-use ic_state_machine_tests::{
-    CanisterId, ErrorCode, PrincipalId, StateMachine, UserError, WasmResult,
-};
+use ic_crypto_utils_threshold_sig_der::parse_threshold_sig_key_from_der;
 use ic_types::crypto::Signable;
 use ic_types::messages::Delegation;
 use ic_types::Time;
-use internet_identity_interface as types;
+use internet_identity_interface::archive::*;
+use internet_identity_interface::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use state_machine_client::{CallError, ErrorCode, StateMachine};
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path;
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 /* The first few lines deal with actually getting the Wasm module(s) to test */
@@ -99,7 +100,6 @@ lazy_static! {
         get_wasm_path("ARCHIVE_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
-
     /** Empty WASM module (without any pre- and post-upgrade hooks. Useful to initialize a canister before loading a stable memory backup. */
     pub static ref EMPTY_WASM: Vec<u8> = vec![0, 0x61, 0x73, 0x6D, 1, 0, 0, 0];
 }
@@ -135,27 +135,54 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
     }
 }
 
-/* Here are a few useful helpers for writing tests */
-pub fn install_empty_canister(env: &StateMachine) -> CanisterId {
-    env.install_canister(EMPTY_WASM.clone(), vec![], None)
-        .expect("failed to install empty canister.")
+/// The path to the state machine binary to run the tests with
+pub static STATE_MACHINE_BINARY: &str = "../../ic-test-state-machine";
+
+pub fn env() -> StateMachine {
+    let path = match env::var_os("STATE_MACHINE_BINARY") {
+        None => STATE_MACHINE_BINARY.to_string(),
+        Some(path) => path
+            .clone()
+            .into_string()
+            .expect(&format!("Invalid string path for {:?}", path)),
+    };
+
+    if !Path::new(&path).exists() {
+        println!("
+        Could not find state machine binary to run canister integration tests.
+
+        I looked for it at {:?}. You can specify another path with the environment variable STATE_MACHINE_BINARY (note that I run from {:?}).
+
+        In order to get the binary:
+            * Download:
+                * linux: curl -sLO https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-linux/ic-test-state-machine.gz
+                * mac:   curl -sLO https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-darwin/ic-test-state-machine.gz
+            * Make it executable:
+                gzip -d ic-test-state-machine.gz
+                chmod +x ic-test-state-machine
+        ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+    }
+
+    StateMachine::new(&path, false)
 }
 
 pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    install_ii_canister_with_arg(&env, wasm, None)
+    install_ii_canister_with_arg(env, wasm, None)
 }
 
 pub fn install_ii_canister_with_arg(
     env: &StateMachine,
     wasm: Vec<u8>,
-    arg: Option<types::InternetIdentityInit>,
+    arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
     let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
-    env.install_canister(wasm, byts, None).unwrap()
+    let canister_id = env.create_canister();
+    env.install_canister(canister_id, wasm, byts);
+    canister_id
 }
 
-pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<types::InternetIdentityInit> {
-    Some(types::InternetIdentityInit {
+pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
         assigned_user_number_range: None,
         archive_module_hash: Some(archive_wasm_hash(&wasm)),
         canister_creation_cycles_cost: Some(0),
@@ -177,8 +204,8 @@ pub fn upgrade_ii_canister_with_arg(
     env: &StateMachine,
     canister_id: CanisterId,
     wasm: Vec<u8>,
-    arg: Option<types::InternetIdentityInit>,
-) -> Result<(), UserError> {
+    arg: Option<InternetIdentityInit>,
+) -> Result<(), CallError> {
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, byts)
 }
@@ -209,7 +236,7 @@ pub fn restore_compressed_stable_memory(env: &StateMachine, canister_id: Caniste
     decoder
         .read_to_end(&mut buffer)
         .expect("error while decoding stable memory file");
-    env.set_stable_memory(canister_id, &buffer);
+    env.set_stable_memory(canister_id, ByteBuf::from(buffer));
 }
 
 pub const PUBKEY_1: &str = "test";
@@ -217,175 +244,73 @@ pub const PUBKEY_2: &str = "some other key";
 pub const RECOVERY_PUBKEY_1: &str = "recovery 1";
 pub const RECOVERY_PUBKEY_2: &str = "recovery 2";
 
-pub fn principal_1() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(PUBKEY_1))
+pub fn principal_1() -> Principal {
+    Principal::self_authenticating(PUBKEY_1)
 }
 
-pub fn principal_2() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(PUBKEY_2))
+pub fn principal_2() -> Principal {
+    Principal::self_authenticating(PUBKEY_2)
 }
-pub fn principal_recovery_1() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(RECOVERY_PUBKEY_1))
-}
-
-pub fn principal_recovery_2() -> PrincipalId {
-    PrincipalId(Principal::self_authenticating(RECOVERY_PUBKEY_2))
+pub fn principal_recovery_1() -> Principal {
+    Principal::self_authenticating(RECOVERY_PUBKEY_1)
 }
 
-pub fn device_data_1() -> types::DeviceData {
-    types::DeviceData {
+pub fn principal_recovery_2() -> Principal {
+    Principal::self_authenticating(RECOVERY_PUBKEY_2)
+}
+
+pub fn device_data_1() -> DeviceData {
+    DeviceData {
         pubkey: ByteBuf::from(PUBKEY_1),
         alias: "My Device".to_string(),
         credential_id: None,
-        purpose: types::Purpose::Authentication,
-        key_type: types::KeyType::Unknown,
-        protection: types::DeviceProtection::Unprotected,
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
     }
 }
 
-pub fn device_data_2() -> types::DeviceData {
-    types::DeviceData {
+pub fn device_data_2() -> DeviceData {
+    DeviceData {
         pubkey: ByteBuf::from(PUBKEY_2),
         alias: "My second device".to_string(),
         credential_id: None,
-        purpose: types::Purpose::Authentication,
-        key_type: types::KeyType::Unknown,
-        protection: types::DeviceProtection::Unprotected,
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
     }
 }
 
-pub fn max_size_device() -> types::DeviceData {
-    types::DeviceData {
+pub fn max_size_device() -> DeviceData {
+    DeviceData {
         pubkey: ByteBuf::from([255u8; 300]),
         alias: "a".repeat(64).to_string(),
         credential_id: Some(ByteBuf::from([7u8; 200])),
-        purpose: types::Purpose::Authentication,
-        key_type: types::KeyType::Unknown,
-        protection: types::DeviceProtection::Unprotected,
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
     }
 }
 
-pub fn recovery_device_data_1() -> types::DeviceData {
-    types::DeviceData {
+pub fn recovery_device_data_1() -> DeviceData {
+    DeviceData {
         pubkey: ByteBuf::from(RECOVERY_PUBKEY_1),
         alias: "Recovery Phrase 1".to_string(),
         credential_id: None,
-        purpose: types::Purpose::Recovery,
-        key_type: types::KeyType::SeedPhrase,
-        protection: types::DeviceProtection::Unprotected,
+        purpose: Purpose::Recovery,
+        key_type: KeyType::SeedPhrase,
+        protection: DeviceProtection::Unprotected,
     }
 }
 
-pub fn recovery_device_data_2() -> types::DeviceData {
-    types::DeviceData {
+pub fn recovery_device_data_2() -> DeviceData {
+    DeviceData {
         pubkey: ByteBuf::from(RECOVERY_PUBKEY_2),
         alias: "Recovery Phrase 2".to_string(),
         credential_id: None,
-        purpose: types::Purpose::Recovery,
-        key_type: types::KeyType::SeedPhrase,
-        protection: types::DeviceProtection::Unprotected,
-    }
-}
-
-/* Here are a few functions that are not directly related to II and could be upstreamed
- * (were actually stolen from somewhere else)
- */
-
-/// Call a canister candid query method, anonymous.
-pub fn query_candid<Input, Output>(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    method: &str,
-    input: Input,
-) -> Result<Output, CallError>
-where
-    Input: ArgumentEncoder,
-    Output: for<'a> ArgumentDecoder<'a>,
-{
-    with_candid(input, |bytes| env.query(canister_id, method, bytes))
-}
-
-/// Call a canister candid query method, authenticated.
-pub fn query_candid_as<Input, Output>(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    sender: PrincipalId,
-    method: &str,
-    input: Input,
-) -> Result<Output, CallError>
-where
-    Input: ArgumentEncoder,
-    Output: for<'a> ArgumentDecoder<'a>,
-{
-    with_candid(input, |bytes| {
-        env.query_as(sender, canister_id, method, bytes)
-    })
-}
-
-/// Call a canister candid method, authenticated.
-/// The state machine executes update calls synchronously, so there is no need to poll for the result.
-pub fn call_candid_as<Input, Output>(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    sender: PrincipalId,
-    method: &str,
-    input: Input,
-) -> Result<Output, CallError>
-where
-    Input: ArgumentEncoder,
-    Output: for<'a> ArgumentDecoder<'a>,
-{
-    with_candid(input, |bytes| {
-        env.execute_ingress_as(sender, canister_id, method, bytes)
-    })
-}
-
-/// Call a canister candid method, anonymous.
-/// The state machine executes update calls synchronously, so there is no need to poll for the result.
-pub fn call_candid<Input, Output>(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    method: &str,
-    input: Input,
-) -> Result<Output, CallError>
-where
-    Input: ArgumentEncoder,
-    Output: for<'a> ArgumentDecoder<'a>,
-{
-    with_candid(input, |bytes| {
-        env.execute_ingress(canister_id, method, bytes)
-    })
-}
-
-#[derive(Debug)]
-pub enum CallError {
-    Reject(String),
-    UserError(UserError),
-}
-
-/// A helper function that we use to implement both [`call_candid`] and
-/// [`query_candid`].
-pub fn with_candid<Input, Output>(
-    input: Input,
-    f: impl FnOnce(Vec<u8>) -> Result<WasmResult, UserError>,
-) -> Result<Output, CallError>
-where
-    Input: ArgumentEncoder,
-    Output: for<'a> ArgumentDecoder<'a>,
-{
-    let in_bytes = encode_args(input).expect("failed to encode args");
-    match f(in_bytes) {
-        Ok(WasmResult::Reply(out_bytes)) => Ok(decode_args(&out_bytes).unwrap_or_else(|e| {
-            panic!(
-                "Failed to decode response as candid type {}:\nerror: {}\nbytes: {:?}\nutf8: {}",
-                std::any::type_name::<Output>(),
-                e,
-                out_bytes,
-                String::from_utf8_lossy(&out_bytes),
-            )
-        })),
-        Ok(WasmResult::Reject(message)) => Err(CallError::Reject(message)),
-        Err(user_error) => Err(CallError::UserError(user_error)),
+        purpose: Purpose::Recovery,
+        key_type: KeyType::SeedPhrase,
+        protection: DeviceProtection::Unprotected,
     }
 }
 
@@ -398,25 +323,24 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
         Ok(_) => panic!("expected error, got {:?}", result),
         Err(CallError::Reject(_)) => panic!("expected user error, got {:?}", result),
         Err(CallError::UserError(ref user_error)) => {
-            if !(user_error.code() == error_code) {
+            if !(user_error.code == error_code) {
                 panic!(
                     "expected error code {:?}, got {:?}",
-                    error_code,
-                    user_error.code()
+                    error_code, user_error.code
                 );
             }
-            if !message_pattern.is_match(user_error.description()) {
+            if !message_pattern.is_match(&user_error.to_string()) {
                 panic!(
-                    "expected #{:?}, got {:?}",
+                    "expected #{:?}, got {}",
                     message_pattern,
-                    user_error.description()
+                    user_error.to_string()
                 );
             }
         }
     }
 }
 
-pub fn verify_security_headers(headers: &Vec<types::HeaderField>) {
+pub fn verify_security_headers(headers: &Vec<HeaderField>) {
     let expected_headers = vec![
         ("X-Frame-Options", "DENY"),
         ("X-Content-Type-Options", "nosniff"),
@@ -518,21 +442,17 @@ pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
 pub fn assert_devices_equal(
     env: &StateMachine,
     canister_id: CanisterId,
-    anchor: types::UserNumber,
-    mut expected_devices: Vec<types::DeviceData>,
+    anchor: AnchorNumber,
+    mut expected_devices: Vec<DeviceData>,
 ) {
     expected_devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
 
-    let mut devices = api::internet_identity::lookup(&env, canister_id, anchor).unwrap();
+    let mut devices = api::internet_identity::lookup(env, canister_id, anchor).unwrap();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, expected_devices, "expected devices to match");
 }
 
-pub fn verify_delegation(
-    env: &StateMachine,
-    user_key: types::UserKey,
-    signed_delegation: &types::SignedDelegation,
-) {
+pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation, root_key: &[u8]) {
     // transform delegation into ic typed delegation so that we have access to the signature domain separator
     // (via as_signed_bytes)
     let delegation = Delegation::new(
@@ -546,107 +466,107 @@ pub fn verify_delegation(
         &delegation.as_signed_bytes(),
         SignatureBytes(signed_delegation.signature.clone().into_vec()),
         public_key_bytes_from_der(user_key.as_ref()).unwrap(),
-        &env.root_key(),
+        &parse_threshold_sig_key_from_der(root_key).unwrap(),
     )
     .expect("signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
     match api::internet_identity::deploy_archive(
-        &env,
+        env,
         ii_canister,
         ByteBuf::from(ARCHIVE_WASM.clone()),
     ) {
-        Ok(types::DeployArchiveResult::Success(archive_principal)) => {
-            canister_id_from_principal(archive_principal)
-        }
-        err => {
-            panic!("archive deployment failed: {:?}", err)
-        }
+        Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
+        err => panic!("archive deployment failed: {:?}", err),
     }
 }
 
-pub fn canister_id_from_principal(principal: Principal) -> CanisterId {
-    CanisterId::new(PrincipalId(principal)).unwrap()
-}
-
 pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    env.install_canister(wasm, encode_config(principal_1().0), None)
-        .unwrap()
+    let canister_id = env.create_canister();
+    env.install_canister(canister_id, wasm, encode_config(principal_1()));
+    canister_id
 }
 
 pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
-    env.upgrade_canister(canister_id, wasm, encode_config(principal_1().0))
-        .unwrap()
+    env.upgrade_canister(canister_id, wasm, encode_config(principal_1()))
+        .unwrap();
 }
 
 fn encode_config(authorized_principal: Principal) -> Vec<u8> {
-    let config = types::ArchiveInit {
+    let config = ArchiveInit {
         ii_canister: authorized_principal,
         max_entries_per_call: 10,
     };
     candid::encode_one(config).expect("error encoding II installation arg as candid")
 }
 
-pub const USER_NUMBER_1: types::UserNumber = 100001;
-pub const USER_NUMBER_2: types::UserNumber = 100002;
-pub const USER_NUMBER_3: types::UserNumber = 100003;
+pub const ANCHOR_NUMBER_1: AnchorNumber = 100001;
+pub const ANCHOR_NUMBER_2: AnchorNumber = 100002;
+pub const ANCHOR_NUMBER_3: AnchorNumber = 100003;
 
-pub const TIMESTAMP_1: types::UserNumber = 999991;
-pub const TIMESTAMP_2: types::UserNumber = 999992;
-pub const TIMESTAMP_3: types::UserNumber = 999993;
+pub const TIMESTAMP_1: AnchorNumber = 999991;
+pub const TIMESTAMP_2: AnchorNumber = 999992;
+pub const TIMESTAMP_3: AnchorNumber = 999993;
 
-pub fn log_entry_1() -> types::Entry {
-    types::Entry {
+pub fn log_entry_1() -> Entry {
+    Entry {
         timestamp: TIMESTAMP_1,
-        anchor: USER_NUMBER_1,
-        caller: principal_1().0,
-        operation: types::Operation::RegisterAnchor {
-            device: types::DeviceDataWithoutAlias {
+        anchor: ANCHOR_NUMBER_1,
+        caller: principal_1(),
+        operation: Operation::RegisterAnchor {
+            device: DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
-                purpose: types::Purpose::Authentication,
-                key_type: types::KeyType::Unknown,
-                protection: types::DeviceProtection::Unprotected,
+                purpose: Purpose::Authentication,
+                key_type: KeyType::Unknown,
+                protection: DeviceProtection::Unprotected,
             },
         },
         sequence_number: 0,
     }
 }
 
-pub fn log_entry_2() -> types::Entry {
-    types::Entry {
+pub fn log_entry_2() -> Entry {
+    Entry {
         timestamp: TIMESTAMP_2,
-        anchor: USER_NUMBER_2,
-        caller: principal_1().0,
-        operation: types::Operation::AddDevice {
-            device: types::DeviceDataWithoutAlias {
+        anchor: ANCHOR_NUMBER_2,
+        caller: principal_1(),
+        operation: Operation::AddDevice {
+            device: DeviceDataWithoutAlias {
                 pubkey: ByteBuf::from(PUBKEY_1),
                 credential_id: None,
-                purpose: types::Purpose::Authentication,
-                key_type: types::KeyType::Unknown,
-                protection: types::DeviceProtection::Unprotected,
+                purpose: Purpose::Authentication,
+                key_type: KeyType::Unknown,
+                protection: DeviceProtection::Unprotected,
             },
         },
         sequence_number: 1,
     }
 }
 
-pub fn log_entry(idx: u64, timestamp: u64, anchor: types::Anchor) -> types::Entry {
-    types::Entry {
+pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
+    Entry {
         timestamp,
         anchor,
-        caller: PrincipalId::new_user_test_id(idx).0,
-        operation: types::Operation::UpdateDevice {
+        caller: test_principal(idx),
+        operation: Operation::UpdateDevice {
             device: ByteBuf::from(PUBKEY_1),
-            new_values: types::DeviceDataUpdate {
+            new_values: DeviceDataUpdate {
                 alias: None,
                 credential_id: None,
-                purpose: Some(types::Purpose::Authentication),
+                purpose: Some(Purpose::Authentication),
                 key_type: None,
-                protection: Some(types::DeviceProtection::Unprotected),
+                protection: Some(DeviceProtection::Unprotected),
             },
         },
         sequence_number: idx,
     }
+}
+
+/// adapted from `PrincipalId::new_user_test_id`
+pub fn test_principal(n: u64) -> Principal {
+    let mut bytes = n.to_le_bytes().to_vec();
+    bytes.push(0xfe); // internal marker for user test ids
+    Principal::from_slice(&bytes[..])
 }

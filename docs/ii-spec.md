@@ -18,7 +18,7 @@ This document describes and specifies Internet Identity from various angles and 
 
 The Internet Identity Service consists of
 
--   its backend, a canister on the IC. More precisely, a canister on the NNS subnet with a *well-known* canister id, and
+-   its backend, a canister on the IC. More precisely, a canister on a dedicated subnet with a *well-known* canister id, and
 
 -   its frontend, a web application served by the backend canister.
 
@@ -399,7 +399,7 @@ Since this cannot be done during `canister_init` (no calls from canister init), 
 
 ### Why we do not use `canister_inspect_message`
 
-The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see [the interface spec](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-inspect-message)). Because the Internet Identity canisters run on the NNS subnet, cycles are not actually charged, but we still want to avoid wasting resources.
+The system allows canisters to inspect ingress messages before they are actually ingressed, and decide if they want to pay for them (see [the interface spec](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-inspect-message)). Because the Internet Identity canisters run on a system subnet, cycles are not actually charged, but we still want to avoid wasting resources.
 
 It seems that this implies that we should use `canister_inspect_message` to reject messages that would, for example, not pass authentication.
 

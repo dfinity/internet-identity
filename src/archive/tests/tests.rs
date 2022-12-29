@@ -1,20 +1,18 @@
-use candid::Principal;
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
-use ic_state_machine_tests::ErrorCode::CanisterCalledTrap;
-use ic_state_machine_tests::{CanisterId, StateMachine};
-use internet_identity_interface::{
-    ArchiveInit, Cursor, DeviceDataUpdate, DeviceDataWithoutAlias, DeviceProtection, Entry,
-    HttpRequest, KeyType, Operation, Purpose, Timestamp, UserNumber,
-};
+use ic_cdk::api::management_canister::main::CanisterId;
+use internet_identity_interface::archive::*;
+use internet_identity_interface::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use state_machine_client::ErrorCode::CanisterCalledTrap;
+use state_machine_client::{CallError, StateMachine};
 use std::time::{Duration, SystemTime};
 
 /// Verifies that the canister can be installed successfully.
 #[test]
 fn should_install() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 0);
@@ -24,7 +22,7 @@ fn should_install() -> Result<(), CallError> {
 /// Verifies that log entries are not lost when upgrading.
 #[test]
 fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
     let entry = log_entry_1();
@@ -32,7 +30,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_1(),
-        USER_NUMBER_1,
+        ANCHOR_NUMBER_1,
         TIMESTAMP_1,
         candid::encode_one(entry.clone()).expect("failed to encode entry"),
     )?;
@@ -42,7 +40,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 1);
     assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
-    let user_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+    let user_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
     assert_eq!(user_logs.entries.len(), 1);
     Ok(())
 }
@@ -50,7 +48,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
 /// Should expose status to anonymous callers.
 #[test]
 fn should_expose_status() -> Result<(), CallError> {
-    let env = StateMachine::new();
+    let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
     assert_eq!(status.cycles, 0);
@@ -64,7 +62,7 @@ mod rollback_tests {
     /// Verifies that the archive can be rolled back
     #[test]
     fn should_rollback() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
 
         let entry = log_entry_1();
@@ -72,7 +70,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(entry.clone()).expect("failed to encode entry"),
         )?;
@@ -92,7 +90,7 @@ mod rollback_tests {
     /// Verifies that the archive keeps entries made with the newer version when doing a rollback.
     #[test]
     fn should_keep_entries_across_rollback() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         let entry1 = log_entry_1();
@@ -101,7 +99,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(entry1.clone()).expect("failed to encode entry"),
         )?;
@@ -109,7 +107,7 @@ mod rollback_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_2,
+            ANCHOR_NUMBER_2,
             TIMESTAMP_2,
             candid::encode_one(entry2.clone()).expect("failed to encode entry"),
         )?;
@@ -134,14 +132,14 @@ mod write_tests {
     /// The canister does intentionally not check the payload on write so that it will never reject a log entry for compatibility reasons.
     #[test]
     fn should_write_entry() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -149,7 +147,7 @@ mod write_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             vec![1, 2, 3, 4], // not candid
         )?;
@@ -166,7 +164,7 @@ mod write_tests {
     /// Verifies that only the configured ii_canister principal can write entries.
     #[test]
     fn should_reject_write_by_wrong_principal() {
-        let env = StateMachine::new();
+        let env = env();
 
         // Configures principal_1 as the allowed principal for writing.
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
@@ -175,7 +173,7 @@ mod write_tests {
             &env,
             canister_id,
             principal_2(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         );
@@ -195,14 +193,14 @@ mod read_tests {
     /// Verifies that a previously written entry can be read again.
     #[test]
     fn should_read_previously_written_entry() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -218,14 +216,14 @@ mod read_tests {
     /// Verifies that entries can be retrieved by user_number.
     #[test]
     fn should_return_logs_per_user() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -233,7 +231,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_2,
+            ANCHOR_NUMBER_2,
             TIMESTAMP_2,
             candid::encode_one(log_entry_2()).expect("failed to encode entry"),
         )?;
@@ -241,21 +239,21 @@ mod read_tests {
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
 
-        let user_1_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let user_1_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(user_1_logs.entries.len(), 1);
         assert_eq!(
             user_1_logs.entries.get(0).unwrap().as_ref().unwrap(),
             &log_entry_1()
         );
 
-        let user_2_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_2, None, None)?;
+        let user_2_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_2, None, None)?;
         assert_eq!(user_2_logs.entries.len(), 1);
         assert_eq!(
             user_2_logs.entries.get(0).unwrap().as_ref().unwrap(),
             &log_entry_2()
         );
 
-        let user_3_logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_3, None, None)?;
+        let user_3_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_3, None, None)?;
         assert!(user_3_logs.entries.is_empty());
 
         Ok(())
@@ -264,7 +262,7 @@ mod read_tests {
     /// Verifies that additional entries can be retrieved by supplying next_idx.
     #[test]
     fn should_return_only_limit_many_entries() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..=10 {
@@ -286,7 +284,7 @@ mod read_tests {
     /// Verifies that additional user specific entries can be retrieved by supplying the cursor.
     #[test]
     fn should_return_user_cursor() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..24 {
@@ -327,7 +325,7 @@ mod read_tests {
     /// Verifies that only entries belonging to the same anchor are returned (even if there are less than limit many).
     #[test]
     fn should_only_return_entries_belonging_to_anchor() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         for n in 0..22 {
@@ -357,14 +355,14 @@ mod read_tests {
     /// Verifies that entries can be retrieved filtered by timestamp.
     #[test]
     fn should_filter_by_timestamp() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -372,7 +370,7 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_2,
             candid::encode_one(log_entry_2()).expect("failed to encode entry"),
         )?;
@@ -380,16 +378,16 @@ mod read_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_3,
-            candid::encode_one(log_entry(3, TIMESTAMP_3, USER_NUMBER_1))
+            candid::encode_one(log_entry(3, TIMESTAMP_3, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
 
         let logs = api::get_anchor_entries(
             &env,
             canister_id,
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             Some(Cursor::Timestamp {
                 timestamp: TIMESTAMP_2,
             }),
@@ -402,7 +400,7 @@ mod read_tests {
         );
         assert_eq!(
             logs.entries.get(1).unwrap().as_ref().unwrap(),
-            &log_entry(3, TIMESTAMP_3, USER_NUMBER_1)
+            &log_entry(3, TIMESTAMP_3, ANCHOR_NUMBER_1)
         );
         Ok(())
     }
@@ -410,37 +408,37 @@ mod read_tests {
     /// Verifies that entries retrieved by anchor are correctly ordered by timestamp.
     #[test]
     fn should_order_by_timestamp() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64,
-            candid::encode_one(log_entry(0, 1, USER_NUMBER_1)).expect("failed to encode entry"),
+            candid::encode_one(log_entry(0, 1, ANCHOR_NUMBER_1)).expect("failed to encode entry"),
         )?;
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64 << 8,
-            candid::encode_one(log_entry(1, 1u64 << 8, USER_NUMBER_1))
+            candid::encode_one(log_entry(1, 1u64 << 8, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
         api::add_entry(
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             1u64 << 16,
-            candid::encode_one(log_entry(2, 1u64 << 16, USER_NUMBER_1))
+            candid::encode_one(log_entry(2, 1u64 << 16, ANCHOR_NUMBER_1))
                 .expect("failed to encode entry"),
         )?;
 
-        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(logs.entries.len(), 3);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap().timestamp, 1);
         assert_eq!(
@@ -453,16 +451,15 @@ mod read_tests {
     /// Verifies that entries retrieved by anchor are correctly ordered by index.
     #[test]
     fn should_order_by_index() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         // use high max_entries_per_call so that we get all the entries in one go
         let config = candid::encode_one(ArchiveInit {
-            ii_canister: principal_1().0,
+            ii_canister: principal_1(),
             max_entries_per_call: 1000,
         })
         .unwrap();
-        let canister_id = env
-            .install_canister(ARCHIVE_WASM.clone(), config, None)
-            .unwrap();
+        let canister_id = env.create_canister();
+        env.install_canister(canister_id, ARCHIVE_WASM.clone(), config);
 
         // 257 entries because we need the index to not fit in a single byte
         for i in 0..257 {
@@ -470,14 +467,14 @@ mod read_tests {
                 &env,
                 canister_id,
                 principal_1(),
-                USER_NUMBER_1,
+                ANCHOR_NUMBER_1,
                 TIMESTAMP_1,
-                candid::encode_one(log_entry(i, TIMESTAMP_1, USER_NUMBER_1))
+                candid::encode_one(log_entry(i, TIMESTAMP_1, ANCHOR_NUMBER_1))
                     .expect("failed to encode entry"),
             )?;
         }
 
-        let logs = api::get_anchor_entries(&env, canister_id, USER_NUMBER_1, None, None)?;
+        let logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(logs.entries.len(), 257);
 
         for i in 0..257 {
@@ -514,7 +511,7 @@ mod metrics_tests {
             "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             "ii_archive_stable_memory_pages",
         ];
-        let env = StateMachine::new();
+        let env = env();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -533,7 +530,7 @@ mod metrics_tests {
     /// Verifies that the last upgrade timestamp is updated correctly.
     #[test]
     fn should_update_upgrade_timestamp() -> Result<(), CallError> {
-        let env = StateMachine::new();
+        let env = env();
         env.advance_time(Duration::from_secs(300));
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
         assert_metric(
@@ -569,7 +566,7 @@ mod metrics_tests {
             "ii_archive_entries_count{source=\"anchor_index\"}",
         ];
 
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
         for metric in metrics.clone() {
             assert_metric(&get_metrics(&env, canister_id), metric, 0);
@@ -579,7 +576,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             candid::encode_one(log_entry_1()).expect("failed to encode entry"),
         )?;
@@ -596,7 +593,7 @@ mod metrics_tests {
         const INDEX_OVERHEAD: u64 = 40;
         const DATA_OVERHEAD: u64 = 32;
 
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         assert_metric(
@@ -616,7 +613,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             entry,
         )?;
@@ -640,7 +637,7 @@ mod metrics_tests {
     #[test]
     fn should_show_memory_metrics() -> Result<(), CallError> {
         const WASM_PAGE_SIZE: usize = 65536;
-        let env = StateMachine::new();
+        let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
         assert_metric(
@@ -668,7 +665,7 @@ mod metrics_tests {
             &env,
             canister_id,
             principal_1(),
-            USER_NUMBER_1,
+            ANCHOR_NUMBER_1,
             TIMESTAMP_1,
             vec![0; WASM_PAGE_SIZE], // large entry to ensure at least the data pages metric changes
         )?;
@@ -707,8 +704,8 @@ mod stable_memory_tests {
     #[test]
     fn should_restore_backup() {
         const TIMESTAMP: Timestamp = 1620328630000000000;
-        const ANCHOR: UserNumber = 10_000;
-        let env = StateMachine::new();
+        const ANCHOR: AnchorNumber = 10_000;
+        let env = env();
         let canister_id = install_archive_canister(&env, EMPTY_WASM.clone());
 
         restore_compressed_stable_memory(&env, canister_id, "stable_memory/archive_v1.bin.gz");
@@ -729,7 +726,7 @@ mod stable_memory_tests {
                 },
             },
             timestamp: TIMESTAMP,
-            caller: Principal::from(principal_1()),
+            caller: principal_1(),
             sequence_number: 0,
         };
         assert_eq!(
@@ -743,7 +740,7 @@ mod stable_memory_tests {
                 device: DeviceDataWithoutAlias::from(device_data_2()),
             },
             timestamp: TIMESTAMP,
-            caller: Principal::from(principal_1()),
+            caller: principal_1(),
             sequence_number: 1,
         };
         assert_eq!(
@@ -764,7 +761,7 @@ mod stable_memory_tests {
                 },
             },
             timestamp: TIMESTAMP,
-            caller: Principal::from(principal_1()),
+            caller: principal_1(),
             sequence_number: 2,
         };
         assert_eq!(
@@ -778,7 +775,7 @@ mod stable_memory_tests {
                 device: device_data_2().pubkey,
             },
             timestamp: TIMESTAMP,
-            caller: Principal::from(principal_1()),
+            caller: principal_1(),
             sequence_number: 3,
         };
         assert_eq!(
@@ -790,7 +787,7 @@ mod stable_memory_tests {
 
 pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
     let response = api::http_request(
-        &env,
+        env,
         canister_id,
         HttpRequest {
             method: "GET".to_string(),
