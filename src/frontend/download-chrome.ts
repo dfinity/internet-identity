@@ -1,18 +1,17 @@
 #!/usr/bin/env node
-import * as os from "os";
+
+import { get } from "https";
+import { homedir, platform as osPlatform } from "os";
 import { promisify } from "util";
-import * as fs from "fs";
-import got from "got";
+import { mkdirSync, createWriteStream } from "fs";
+import { stat, unlink } from "fs/promises";
 import stream from "node:stream";
 import extract from "extract-zip";
 import { unreachable } from "./src/utils/utils";
 
 const pipeline = promisify(stream.pipeline);
 
-const stat = promisify(fs.stat);
-const unlink = promisify(fs.unlink);
-
-const installPath = `${os.homedir()}/.local-chromium`;
+const installPath = `${homedir()}/.local-chromium`;
 
 type Config = { platform: "linux" | "darwin"; revision: string };
 
@@ -45,7 +44,7 @@ export async function downloadChrome() {
   // If not, create the cache and download
 
   try {
-    fs.mkdirSync(installPath);
+    mkdirSync(installPath);
   } catch (_) {
     /* noop */
   }
@@ -53,8 +52,8 @@ export async function downloadChrome() {
   const zipPath = `${folderPath}.zip`;
 
   await pipeline(
-    await got.stream(downloadURL(config)),
-    fs.createWriteStream(zipPath)
+    await downloadFromURL(downloadURL(config)),
+    createWriteStream(zipPath)
   );
 
   // Now extract the zip and install it to the cache
@@ -65,31 +64,34 @@ export async function downloadChrome() {
 }
 
 function getConfig(): Config {
-  const platform = os.platform();
+  const platform = osPlatform();
 
   if (platform !== "linux" && platform !== "darwin") {
     throw new Error(`Platform ${platform} is not supported`);
   }
 
   // Follow steps here to update: https://www.chromium.org/getting-involved/download-chromium/
+  // (or use the cypress helper: https://chromium.cypress.io)
+  // This corresponds to version 106
   const revision = platform === "darwin" ? "1036822" : "1036826";
 
   return { platform, revision };
 }
 
 /** The chromium download URL for the given platform and revision */
-function downloadURL(config: Config) {
+function downloadURL(config: Config): string {
   if (config.platform === "darwin") {
     return `https://www.googleapis.com/storage/v1/b/chromium-browser-snapshots/o/Mac%2F${config.revision}%2Fchrome-mac.zip?alt=media`;
   } else if (config.platform === "linux") {
     return `https://www.googleapis.com/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F${config.revision}%2Fchrome-linux.zip?alt=media`;
-  }
+  } else return unreachable(config.platform, "unexpected platform in config");
 }
 
 /** Name of the archive (depends on platform) */
-function archiveName(config: Config) {
+function archiveName(config: Config): string {
   if (config.platform === "linux") return "chrome-linux";
-  if (config.platform === "darwin") return "chrome-mac";
+  else if (config.platform === "darwin") return "chrome-mac";
+  else return unreachable(config.platform, "unexpected platform in config");
 }
 
 function getFolderPath(config: Config, root: string) {
@@ -110,3 +112,22 @@ function getExecutablePath(config: Config, root: string): string {
 
   return unreachable(config.platform);
 }
+
+/** Download a file from a URL */
+const downloadFromURL = (url: string): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    get(url, async (res) => {
+      if (res.statusCode !== undefined && [301, 302].includes(res.statusCode)) {
+        await downloadFromURL(res.headers.location!).then(resolve, reject);
+      }
+
+      const data: any[] = [];
+
+      res.on("data", (chunk) => data.push(chunk));
+      res.on("end", () => {
+        resolve(Buffer.concat(data));
+      });
+      res.on("error", reject);
+    });
+  });
+};
