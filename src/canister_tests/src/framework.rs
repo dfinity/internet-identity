@@ -37,7 +37,7 @@ lazy_static! {
 
         In order to build the Wasm module, please run the following command:
             II_DUMMY_CAPTCHA=1 ./scripts/build
-        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };
 
@@ -51,7 +51,7 @@ lazy_static! {
 
         In order to build the Wasm module, please run the following command:
             ./scripts/build --archive
-        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("ARCHIVE_WASM".to_string(), &def_path).expect(&err)
     };
 
@@ -66,7 +66,7 @@ lazy_static! {
 
         In order to get the Wasm module, please run the following command:
             curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
-        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
@@ -81,7 +81,7 @@ lazy_static! {
 
         In order to get the Wasm module, please run the following command:
             curl -SL https://github.com/dfinity/internet-identity/releases/download/release-2022-12-07/internet_identity_test.wasm -o internet_identity_v3_storage.wasm
-        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_V3_LAYOUT".to_string(), &def_path).expect(&err)
     };
 
@@ -96,7 +96,7 @@ lazy_static! {
 
         In order to get the Wasm module, please run the following command:
             curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm -o archive_previous.wasm
-        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("ARCHIVE_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
@@ -116,20 +116,20 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
             }
             Some(
                 std::fs::read(default_path)
-                    .expect(&format!("could not read Wasm module: {:?}", default_path)),
+                    .unwrap_or_else(|_| panic!("could not read Wasm module: {:?}", default_path)),
             )
         }
         Some(path) => {
             let pathname: String = path
                 .into_string()
-                .expect(&format!("Invalid string path for {}", env_var.clone()));
+                .unwrap_or_else(|_| panic!("Invalid string path for {}", env_var));
             let path = path::PathBuf::from(pathname.clone());
             if !path.exists() {
                 panic!("Could not find {}", pathname);
             }
             Some(
                 std::fs::read(path.clone())
-                    .expect(&format!("could not read Wasm module: {:?}", path)),
+                    .unwrap_or_else(|_| panic!("could not read Wasm module: {:?}", path)),
             )
         }
     }
@@ -144,7 +144,7 @@ pub fn env() -> StateMachine {
         Some(path) => path
             .clone()
             .into_string()
-            .expect(&format!("Invalid string path for {:?}", path)),
+            .unwrap_or_else(|_| panic!("Invalid string path for {:?}", path)),
     };
 
     if !Path::new(&path).exists() {
@@ -160,7 +160,7 @@ pub fn env() -> StateMachine {
             * Make it executable:
                 gzip -d ic-test-state-machine.gz
                 chmod +x ic-test-state-machine
-        ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or("an unknown directory".to_string()));
+        ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
     }
 
     StateMachine::new(&path, false)
@@ -191,7 +191,7 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
 
 pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(&wasm);
+    hasher.update(wasm);
     hasher.finalize().into()
 }
 
@@ -221,7 +221,7 @@ pub fn save_compressed_stable_memory(
         .filename(decompressed_name)
         .write(file, Compression::best());
     encoder
-        .write(env.stable_memory(canister_id).as_slice())
+        .write_all(env.stable_memory(canister_id).as_slice())
         .unwrap();
     encoder.flush().unwrap();
     let mut file = encoder.finish().unwrap();
@@ -283,7 +283,7 @@ pub fn device_data_2() -> DeviceData {
 pub fn max_size_device() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([255u8; 300]),
-        alias: "a".repeat(64).to_string(),
+        alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
@@ -329,17 +329,13 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
                 );
             }
             if !message_pattern.is_match(&user_error.to_string()) {
-                panic!(
-                    "expected #{:?}, got {}",
-                    message_pattern,
-                    user_error.to_string()
-                );
+                panic!("expected #{:?}, got {}", message_pattern, user_error);
             }
         }
     }
 }
 
-pub fn verify_security_headers(headers: &Vec<HeaderField>) {
+pub fn verify_security_headers(headers: &[HeaderField]) {
     let expected_headers = vec![
         ("X-Frame-Options", "DENY"),
         ("X-Content-Type-Options", "nosniff"),
@@ -394,14 +390,14 @@ xr-spatial-tracking=()",
         let (_, value) = headers
             .iter()
             .find(|(name, _)| name.to_lowercase() == header_name.to_lowercase())
-            .expect(&format!("header \"{}\" not found", header_name));
+            .unwrap_or_else(|| panic!("header \"{}\" not found", header_name));
         assert_eq!(value, expected_value);
     }
 
     let (_, csp) = headers
         .iter()
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
-        .expect("header \"Content-Security-Policy\" not found");
+        .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
     assert!(Regex::new(
         "^default-src 'none';\
@@ -421,11 +417,11 @@ frame-ancestors 'none';$"
 }
 
 pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
-    let metric = metric.replace("{", "\\{").replace("}", "\\}");
+    let metric = metric.replace('{', "\\{").replace('}', "\\}");
     let metric_capture = Regex::new(&format!("(?m)^{} (\\d+) (\\d+)$", metric))
         .unwrap()
         .captures(body)
-        .expect(&format!("metric {} not found", metric));
+        .unwrap_or_else(|| panic!("metric {} not found", metric));
 
     let metric: u64 = metric_capture.get(1).unwrap().as_str().parse().unwrap();
     let metric_timestamp = SystemTime::UNIX_EPOCH
@@ -434,7 +430,7 @@ pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
 }
 
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
-    let (value, _) = parse_metric(&metrics, metric_name);
+    let (value, _) = parse_metric(metrics, metric_name);
     assert_eq!(value, expected);
 }
 

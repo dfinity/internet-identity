@@ -47,5 +47,5 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
         },
     )
     .expect("HTTP request to /metrics failed");
-    String::from_utf8_lossy(&*response.body).to_string()
+    String::from_utf8_lossy(&response.body).to_string()
 }

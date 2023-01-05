@@ -37,9 +37,9 @@ pub fn hash_of_map<S: AsRef<str>>(map: HashMap<S, Value>) -> Hash {
 pub fn hash_with_domain(sep: &[u8], bytes: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     let buf = [sep.len() as u8];
-    hasher.update(&buf);
-    hasher.update(&sep);
-    hasher.update(&bytes);
+    hasher.update(buf);
+    hasher.update(sep);
+    hasher.update(bytes);
     hasher.finalize().into()
 }
 

@@ -89,8 +89,8 @@ fn test_random_modifications() {
                 let mut message_hash = Hash::default();
                 rng.fill_bytes(&mut message_hash);
 
-                pairs.push((seed_hash.clone(), message_hash.clone()));
-                map.put(seed_hash.clone(), message_hash, round);
+                pairs.push((seed_hash, message_hash));
+                map.put(seed_hash, message_hash, round);
             }
         }
 
