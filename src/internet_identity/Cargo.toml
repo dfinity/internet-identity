@@ -9,7 +9,7 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 hex = "0.4"
 lazy_static = "1.4"
-serde = "1"
+serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
 serde_cbor = "0.11"
 serde_with = "2.0"

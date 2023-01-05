@@ -175,8 +175,9 @@ pub struct HttpResponse {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
-    pub archive_module_hash: Option<[u8; 32]>,
+    pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
+    pub upgrade_persistent_state: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -192,7 +193,21 @@ pub struct InternetIdentityStats {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ArchiveInfo {
     pub archive_canister: Option<Principal>,
-    pub expected_wasm_hash: Option<[u8; 32]>,
+    pub archive_config: Option<ArchiveConfig>,
+}
+
+/// Configuration parameters of the archive to be used on the next deployment.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ArchiveConfig {
+    // Wasm module hash that is allowed to be deployed to the archive canister.
+    pub module_hash: [u8; 32],
+    // Buffered archive entries limit. If reached, II will stop accepting new anchor operations
+    // until the buffered operations are acknowledged by the archive.
+    pub entries_buffer_limit: u64,
+    // Polling interval at which the archive should fetch buffered archive entries from II (in nanoseconds).
+    pub polling_interval_ns: u64,
+    // Max number of archive entries to be fetched in a single call.
+    pub entries_fetch_limit: u16,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
