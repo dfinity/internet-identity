@@ -16,7 +16,12 @@ import {
 // when verifying the challenge
 export const badChallenge: unique symbol = Symbol("ii.bad_challenge");
 
-export const promptCaptchaTemplate = <T>(props: {
+export const promptCaptchaTemplate = <T>({
+  cancel,
+  requestChallenge,
+  verifyChallengeChars,
+  onContinue,
+}: {
   cancel: () => void;
   requestChallenge: () => Promise<Challenge>;
   verifyChallengeChars: (cr: {
@@ -53,7 +58,7 @@ export const promptCaptchaTemplate = <T>(props: {
   // On retry, request a new challenge
   const doRetry = async () => {
     update({ status: "requesting" });
-    const challenge = await props.requestChallenge();
+    const challenge = await requestChallenge();
     update({ status: "prompting", challenge });
   };
 
@@ -62,11 +67,11 @@ export const promptCaptchaTemplate = <T>(props: {
   const doVerify = async (challenge: Challenge) => {
     update({ status: "verifying" });
     withRef(input, async (input) => {
-      const res = await props.verifyChallengeChars({
+      const res = await verifyChallengeChars({
         chars: input.value,
         challenge,
       });
-      res === badChallenge ? update({ status: "bad" }) : props.onContinue(res);
+      res === badChallenge ? update({ status: "bad" }) : onContinue(res);
     });
   };
 
@@ -145,7 +150,7 @@ export const promptCaptchaTemplate = <T>(props: {
         <div class="c-button-group">
           <button
             type="button"
-            @click=${() => props.cancel()}
+            @click=${() => cancel()}
             class="c-button c-button--secondary"
           >
             Cancel
