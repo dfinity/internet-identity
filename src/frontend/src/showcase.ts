@@ -5,7 +5,7 @@ import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
-import { withRef } from "./utils/lit-html";
+import { withRef, mount } from "./utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
 import {
   Challenge,
@@ -13,10 +13,7 @@ import {
   CredentialId,
   Timestamp,
 } from "../generated/internet_identity_types";
-import {
-  IdentifiableIdentity,
-  AuthenticatedConnection,
-} from "./utils/iiConnection";
+import { AuthenticatedConnection } from "./utils/iiConnection";
 import { styleguide } from "./styleguide";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
@@ -30,7 +27,7 @@ import { authnPages } from "./components/authenticateBox";
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
-import { confirmRegister } from "./flows/register/captcha";
+import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
 import { displayUserNumber } from "./flows/register/finish";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
@@ -111,9 +108,6 @@ const dummyChallenge: Challenge = {
   challenge_key: "unimportant",
 };
 
-const dummyIdentity: IdentifiableIdentity =
-  undefined as unknown as IdentifiableIdentity;
-
 /* Various values used for showcasing both authz & manage authentication flows */
 
 const authnCnfg = {
@@ -193,13 +187,29 @@ const iiPages: Record<string, () => void> = {
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
   constructing: () => renderConstructing(),
-  confirmRegister: () =>
-    confirmRegister(
-      dummyConnection,
-      Promise.resolve(dummyChallenge),
-      dummyIdentity /* not used */,
-      "hello" /* not used */
-    ),
+  promptCaptcha: () =>
+    promptCaptchaPage({
+      cancel: () => console.log("canceled"),
+      requestChallenge: () =>
+        new Promise(() => {
+          /* noop */
+        }),
+      verifyChallengeChars: () =>
+        new Promise(() => {
+          /* noop */
+        }),
+      onContinue: () => console.log("Done"),
+    }),
+  promptCaptchaReady: () =>
+    promptCaptchaPage({
+      cancel: () => console.log("canceled"),
+      requestChallenge: () => Promise.resolve(dummyChallenge),
+      verifyChallengeChars: () =>
+        new Promise(() => {
+          /* noop */
+        }),
+      onContinue: () => console.log("Done"),
+    }),
   chooseRecoveryMechanism: () => chooseRecoveryMechanism([]),
   displaySingleDeviceWarning: () =>
     displaySingleDeviceWarning(userNumber, dummyConnection),
@@ -315,7 +325,30 @@ const components = (): TemplateResult => {
         <div>${asyncReplace(chan.recv())}</div>
     <div ${ref(
       showSelected
-    )} class="c-input c-input--readonly">Please select anchor</div></div>`;
+    )} class="c-input c-input--readonly">Please select anchor</div></div>
+    <div
+        ${mount((container) =>
+          container instanceof HTMLElement
+            ? promptCaptchaPage(
+                {
+                  cancel: () => console.log("canceled"),
+                  requestChallenge: () =>
+                    new Promise((resolve) => setTimeout(resolve, 1000)).then(
+                      () => dummyChallenge
+                    ),
+                  verifyChallengeChars: (cr) =>
+                    new Promise((resolve) => setTimeout(resolve, 1000)).then(
+                      () => (cr.chars === "8wJ6Q" ? "yes" : badChallenge)
+                    ),
+                  onContinue: () => console.log("Done"),
+                },
+                container
+              )
+            : ""
+        )}>
+                </div>
+
+    `;
 };
 
 // The showcase

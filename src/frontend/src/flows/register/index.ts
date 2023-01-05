@@ -1,12 +1,15 @@
 import { Connection } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
 import { setAnchorUsed } from "../../utils/userNumber";
-import { displayUserNumber } from "./finish";
-import { confirmRegister } from "./captcha";
-import { makeCaptcha } from "./captcha";
-import { LoginFlowResult, cancel } from "../../utils/flowResult";
+import { promptCaptcha } from "./captcha";
+import {
+  apiResultToLoginFlowResult,
+  LoginFlowResult,
+  cancel,
+} from "../../utils/flowResult";
 import { constructIdentity } from "./construct";
 import { promptDeviceAlias } from "./alias";
+import { displayUserNumber } from "./finish";
 
 /** Registration (anchor creation) flow for new users */
 export const register = async ({
@@ -21,26 +24,27 @@ export const register = async ({
     }
 
     const [captcha, identity] = await Promise.all([
-      makeCaptcha(connection),
+      connection.createChallenge(),
       constructIdentity(),
     ]);
 
-    const result = await confirmRegister(
+    const captchaResult = await promptCaptcha({
       connection,
-      Promise.resolve(captcha),
+      challenge: Promise.resolve(captcha),
       identity,
-      alias
-    );
+      alias,
+    });
 
-    if (result.tag === "ok") {
-      // Write user number to storage
-      setAnchorUsed(result.userNumber);
-
-      // Congratulate user
-      await displayUserNumber(result.userNumber);
+    if ("tag" in captchaResult) {
+      return captchaResult;
+    } else {
+      const result = apiResultToLoginFlowResult(captchaResult);
+      if (result.tag === "ok") {
+        await displayUserNumber(result.userNumber);
+        setAnchorUsed(result.userNumber);
+      }
+      return result;
     }
-
-    return result;
   } catch (e) {
     return {
       tag: "err",
