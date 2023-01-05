@@ -122,7 +122,11 @@ export const promptCaptchaTemplate = <T>(props: {
   return html`
     <article class="l-container c-card c-card--highlight">
       <h1 class="t-title t-title--main">Prove you're not a robot</h1>
-      <form @submit=${asyncReplace(next.recv())} class="l-stack t-centered">
+      <form
+        autocomplete="off"
+        @submit=${asyncReplace(next.recv())}
+        class="l-stack t-centered"
+      >
         ${asyncReplace(text.recv())}
         <div class="c-input c-input--icon">
           ${asyncReplace(img.recv())}
