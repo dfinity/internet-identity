@@ -248,7 +248,7 @@ fn should_enforce_caller_on_modification_of_protected_devices() {
 #[test]
 fn should_allow_removal_of_protected_device_with_matching_caller() {
     let mut device1 = recovery_phrase(1, DeviceProtection::Protected);
-    device1.pubkey = ByteBuf::from(TEST_CALLER_PUBKEY.clone());
+    device1.pubkey = ByteBuf::from(TEST_CALLER_PUBKEY);
 
     let mut anchor = Anchor::new();
     anchor.add_device(device1.clone()).unwrap();
@@ -261,7 +261,7 @@ fn should_allow_removal_of_protected_device_with_matching_caller() {
 #[test]
 fn should_allow_modification_of_protected_device_with_matching_caller() {
     let mut device1 = recovery_phrase(1, DeviceProtection::Protected);
-    device1.pubkey = ByteBuf::from(TEST_CALLER_PUBKEY.clone());
+    device1.pubkey = ByteBuf::from(TEST_CALLER_PUBKEY);
 
     let mut anchor = Anchor::new();
     anchor.add_device(device1.clone()).unwrap();
@@ -357,5 +357,5 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
 }
 
 pub fn test_caller() -> Principal {
-    Principal::self_authenticating(&TEST_CALLER_PUBKEY)
+    Principal::self_authenticating(TEST_CALLER_PUBKEY)
 }
