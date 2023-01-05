@@ -1013,7 +1013,7 @@ mod device_management_tests {
                 principal,
                 user_number,
                 original_pubkey,
-                device.clone(),
+                device,
             );
 
             expect_user_error_with_message(
@@ -1075,7 +1075,7 @@ mod device_management_tests {
                 principal_2(),
                 user_number,
                 device1.pubkey.clone(),
-                device1.clone(), // data here doesnt' actually matter
+                device1, // data here doesnt' actually matter
             );
 
             expect_user_error_with_message(
@@ -1101,7 +1101,7 @@ mod device_management_tests {
                 principal_1(),
                 user_number,
                 device1.pubkey.clone(),
-                device1.clone(), // data here doesnt' actually matter
+                device1, // data here doesnt' actually matter
             );
 
             expect_user_error_with_message(
@@ -1249,7 +1249,7 @@ mod device_management_tests {
             canister_id,
             principal_2(),
             user_number,
-            device1.pubkey.clone(),
+            device1.pubkey,
         );
 
         expect_user_error_with_message(
@@ -1611,7 +1611,7 @@ mod delegation_tests {
             principal_1(),
             user_number,
             frontend_hostname_2.to_string(),
-            pub_session_key.clone(),
+            pub_session_key,
             None,
         )?;
 
@@ -1647,7 +1647,7 @@ mod delegation_tests {
             principal_1(),
             user_number,
             frontend_hostname.to_string(),
-            pub_session_key.clone(),
+            pub_session_key,
             expiration,
         )? {
             GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
@@ -1694,7 +1694,7 @@ mod delegation_tests {
             principal_1(),
             user_number,
             frontend_hostname.to_string(),
-            pub_session_key.clone(),
+            pub_session_key,
             expiration,
         )? {
             GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
@@ -1751,7 +1751,7 @@ mod delegation_tests {
             principal_2(),
             user_number,
             frontend_hostname.to_string(),
-            pub_session_key.clone(),
+            pub_session_key,
             expiration,
         );
 
@@ -1778,7 +1778,7 @@ mod delegation_tests {
             principal_1(),
             user_number,
             frontend_hostname.to_string(),
-            pub_session_key.clone(),
+            pub_session_key,
             None,
         )?;
 
@@ -1943,7 +1943,7 @@ mod http_tests {
                 &env.root_key(),
                 env.time(),
             )
-            .expect(&format!("validation for asset \"{}\" failed", asset));
+            .unwrap_or_else(|_| panic!("validation for asset \"{}\" failed", asset));
             verify_security_headers(&http_response.headers);
         }
         Ok(())

@@ -26,3 +26,25 @@ jobs:
           add: src
           default_author: github_actions
           message: "🤖 cargo-fmt auto-update"
+
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/bootstrap
+
+      - name: Create dummy assets
+        run: |
+          mkdir dist
+          touch dist/index.html
+          touch dist/about.html
+          touch dist/faq.html
+          touch dist/index.js.gz
+          touch dist/index.css
+          touch dist/loader.webp
+          touch dist/favicon.ico
+          touch dist/ic-badge.svg
+
+      - run: rustup component add clippy
+      - name: Cargo clippy
+        run: cargo clippy --tests --benches -- -D clippy::all

@@ -539,7 +539,7 @@ mod metrics_tests {
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
         );
         println!("{}", get_metrics(&env, canister_id));
 
@@ -553,7 +553,7 @@ mod metrics_tests {
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
         );
         Ok(())
     }
@@ -797,5 +797,5 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
         },
     )
     .expect("HTTP request to /metrics failed");
-    String::from_utf8_lossy(&*response.body).to_string()
+    String::from_utf8_lossy(&response.body).to_string()
 }

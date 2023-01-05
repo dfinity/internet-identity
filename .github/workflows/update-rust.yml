@@ -4,8 +4,8 @@ name: Rust Update
 
 on:
   schedule:
-    # check for new rust versions daily at 7:30
-    - cron:  '30 7 * * *'
+    # check for new rust versions weekly
+    - cron:  '30 3 * * FRI'
 
 jobs:
   rust-update:
@@ -20,7 +20,18 @@ jobs:
         run: |
           current_rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
           echo "current rust version '$current_rust_version'"
-          latest_rust_version=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest | jq -cMr .tag_name)
+          release_data=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest)
+          latest_rust_version=$(echo -n "$release_data" | jq -cMr .tag_name)
+
+          # The GitHub API has some hiccups, so we check the value before going further
+          if [ -z "$latest_rust_version" ] || [ "$latest_rust_version" = "null" ]
+          then
+            echo "expected a rust version, got '$latest_rust_version'"
+            echo "data received from API:"
+            echo "$release_data"
+            exit 1
+          fi
+
           echo "latest rust version '$latest_rust_version'"
 
           if [ "$current_rust_version" != "$latest_rust_version" ]
