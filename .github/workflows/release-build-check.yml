@@ -22,7 +22,14 @@ jobs:
     steps:
       - name: Get latest release information
         run: |
-          latest_release_ref=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/internet-identity/releases/latest | jq -cMr .tag_name)
+          release_data=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/internet-identity/releases/latest)
+          latest_release_ref=$(echo -n "$release_data" | jq -cMr .tag_name)
+          # The GitHub API has some hiccups, so we check the value before going further
+          if [ -z "$latest_release_ref" ] || [ "$latest_release_ref" = "null" ]
+          then
+            echo "expected a release ref, got '$latest_release_ref'"
+            exit 1
+          fi
           curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm" -o internet_identity_previous.wasm
           latest_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
