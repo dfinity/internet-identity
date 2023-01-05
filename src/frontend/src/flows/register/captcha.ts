@@ -34,7 +34,7 @@ export const promptCaptchaTemplate = <T>({
   // reactive way; see template returned by this function
 
   // The text and image shown
-  const text = new Chan<TemplateResult>();
+  const text = new Chan<string>();
   const img = new Chan<TemplateResult>();
 
   // The text input where the chars can be typed
@@ -79,13 +79,13 @@ export const promptCaptchaTemplate = <T>({
   const update = (state: State) => {
     switch (state.status) {
       case "requesting":
-        text.send(html`<p>Generating new challenge...</p>`);
+        text.send("Generating new challenge...");
         img.send(html`<div class="c-spinner">${spinner}</div> `);
         next.send(undefined);
         retry.send(undefined);
         break;
       case "prompting":
-        text.send(html`<p>Type the characters you see</p>`);
+        text.send("Type the characters you see");
         img.send(
           html`<img
             src="data:image/png;base64,${state.challenge.png_base64}"
@@ -102,17 +102,14 @@ export const promptCaptchaTemplate = <T>({
         retry.send(doRetry);
         break;
       case "verifying":
-        text.send(html`<p>Verifying...</p>`);
+        text.send("Verifying...");
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
         next.send(undefined);
         retry.send(undefined);
         break;
       case "bad":
         text.send(
-          html`<p>
-            The value you entered is incorrect. Click "retry" to generate a new
-            value.
-          </p>`
+          'The value you entered is incorrect. Click "retry" to generate a new value.'
         );
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
         next.send(undefined);
@@ -132,7 +129,9 @@ export const promptCaptchaTemplate = <T>({
         @submit=${asyncReplace(next.recv())}
         class="l-stack t-centered"
       >
-        ${asyncReplace(text.recv())}
+        <p style="min-height: calc(2*var(--vs-line-height)*1em)">
+          ${asyncReplace(text.recv())}
+        </p>
         <div class="c-input c-input--icon">
           ${asyncReplace(img.recv())}
           <i
