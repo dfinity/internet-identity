@@ -240,7 +240,7 @@ async fn archive_status(archive_canister: Principal) -> CanisterStatusResponse {
                 canister_id: archive_canister,
             })
             .await
-            .expect(&format!("failed to retrieve archive status"));
+            .expect("failed to retrieve archive status");
 
             state::cache_archive_status(ArchiveStatusCache {
                 timestamp: time(),

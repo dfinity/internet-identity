@@ -25,7 +25,7 @@ pub async fn create_challenge() -> Challenge {
     delegation::prune_expired_signatures();
 
     state::inflight_challenges_mut(|inflight_challenges| {
-        let now = time() as u64;
+        let now = time();
 
         // Prune old challenges. This drops all challenges that are older than
         // CAPTCHA_CHALLENGE_LIFETIME
@@ -97,8 +97,8 @@ fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
     let mut chars: Vec<u8> = vec![];
 
     // The range
-    let a: u8 = 'a' as u8;
-    let z: u8 = 'z' as u8;
+    let a: u8 = b'a';
+    let z: u8 = b'z';
 
     // n times, get a random number as u32, then shrink to u8, and finally shrink to the size of
     // our range. Finally, offset by the start of our range.
@@ -137,7 +137,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
         None => trap("Could not get base64 of captcha"),
     };
 
-    return (resp, captcha.chars_as_string());
+    (resp, captcha.chars_as_string())
 }
 
 // Check whether the CAPTCHA challenge was solved
@@ -148,7 +148,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
                 if res.chars != challenge.chars {
                     return Err(());
                 }
-                return Ok(());
+                Ok(())
             }
             None => Err(()),
         }

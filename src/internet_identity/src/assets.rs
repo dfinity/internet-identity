@@ -14,6 +14,7 @@ pub enum ContentEncoding {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ContentType {
     HTML,
     JS,
@@ -31,8 +32,7 @@ fn fixup_html(html: &str) -> String {
     let setup_js: String = JS_SETUP_SCRIPT.to_string();
     let html = html.replace(
         r#"<script id="setupJs"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#)
-            .to_string(),
+        &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#),
     );
     let html = html.replace(
         "<meta replaceme-with-csp/>",

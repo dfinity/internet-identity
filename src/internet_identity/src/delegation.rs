@@ -38,7 +38,7 @@ pub async fn prepare_delegation(
         max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
         MAX_EXPIRATION_PERIOD_NS,
     );
-    let expiration = (time() as u64).saturating_add(delta);
+    let expiration = time().saturating_add(delta);
     let seed = calculate_seed(anchor_number, &frontend);
 
     state::signature_map_mut(|sigs| {
@@ -92,7 +92,7 @@ pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) ->
 
     let seed = calculate_seed(anchor_number, &frontend);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
-    Principal::self_authenticating(&public_key)
+    Principal::self_authenticating(public_key)
 }
 
 fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
@@ -177,8 +177,8 @@ fn get_signature(
     if witness_hash != root_hash {
         trap(&format!(
             "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(&witness_hash),
-            hex::encode(&root_hash)
+            hex::encode(witness_hash),
+            hex::encode(root_hash)
         ));
     }
 
@@ -187,7 +187,7 @@ fn get_signature(
             LABEL_ASSETS,
             &asset_hashes.root_hash(),
         )),
-        ic_certified_map::labeled(&LABEL_SIG[..], witness),
+        ic_certified_map::labeled(LABEL_SIG, witness),
     );
 
     #[derive(Serialize)]
@@ -213,7 +213,7 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
         expiration,
         targets: None,
     });
-    let expires_at = (time() as u64).saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
+    let expires_at = time().saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
 }
 
@@ -224,8 +224,7 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
 /// will prune at most MAX_SIGS_TO_PRUNE other signatures.
 pub fn prune_expired_signatures() {
     const MAX_SIGS_TO_PRUNE: usize = 10;
-    let num_pruned =
-        state::signature_map_mut(|sigs| sigs.prune_expired(time() as u64, MAX_SIGS_TO_PRUNE));
+    let num_pruned = state::signature_map_mut(|sigs| sigs.prune_expired(time(), MAX_SIGS_TO_PRUNE));
     if num_pruned > 0 {
         update_root_hash();
     }

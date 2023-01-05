@@ -110,22 +110,22 @@ fn managed_memory() -> Memory {
 
 /// A helper function to access the configuration.
 fn with_config<R>(f: impl FnOnce(&ArchiveConfig) -> R) -> R {
-    CONFIG.with(|cell| f(&cell.borrow().get().get()))
+    CONFIG.with(|cell| f(cell.borrow().get().get()))
 }
 
 /// A helper function to access the memory manager.
 fn with_memory_manager<R>(f: impl FnOnce(&MemoryManager<Memory>) -> R) -> R {
-    MEMORY_MANAGER.with(|cell| f(&*cell.borrow()))
+    MEMORY_MANAGER.with(|cell| f(&cell.borrow()))
 }
 
 /// A helper function to access the log.
 fn with_log<R>(f: impl FnOnce(&StableLog) -> R) -> R {
-    LOG.with(|cell| f(&*cell.borrow()))
+    LOG.with(|cell| f(&cell.borrow()))
 }
 
 /// A helper function to access the anchor-based index.
 fn with_anchor_index_mut<R>(f: impl FnOnce(&mut AnchorIndex) -> R) -> R {
-    ANCHOR_INDEX.with(|cell| f(&mut *cell.borrow_mut()))
+    ANCHOR_INDEX.with(|cell| f(&mut cell.borrow_mut()))
 }
 
 /// Configuration state of the archive.
@@ -166,7 +166,7 @@ impl Storable for ConfigState {
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        if bytes.len() == 0 {
+        if bytes.is_empty() {
             return ConfigState::Uninitialized;
         }
         ConfigState::Initialized(
@@ -190,8 +190,8 @@ impl AnchorIndexKey {
     fn to_anchor_offset(&self) -> Vec<u8> {
         let mut buf =
             Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<LogIndex>());
-        buf.extend(&self.timestamp.to_be_bytes());
-        buf.extend(&self.log_index.to_be_bytes());
+        buf.extend(self.timestamp.to_be_bytes());
+        buf.extend(self.log_index.to_be_bytes());
         buf
     }
 }
@@ -202,9 +202,9 @@ impl AnchorIndexKey {
 impl Storable for AnchorIndexKey {
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = Vec::with_capacity(std::mem::size_of::<AnchorIndexKey>());
-        buf.extend(&self.anchor.to_be_bytes());
-        buf.extend(&self.timestamp.to_be_bytes());
-        buf.extend(&self.log_index.to_be_bytes());
+        buf.extend(self.anchor.to_be_bytes());
+        buf.extend(self.timestamp.to_be_bytes());
+        buf.extend(self.log_index.to_be_bytes());
         Cow::Owned(buf)
     }
 
@@ -353,7 +353,7 @@ fn get_anchor_entries(
 
             let entries = entries
                 .iter()
-                .map(|(_, entry)| candid::decode_one(&entry).expect("failed to decode log entry"))
+                .map(|(_, entry)| candid::decode_one(entry).expect("failed to decode log entry"))
                 .collect();
 
             AnchorEntries { entries, cursor }
