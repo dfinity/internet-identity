@@ -126,8 +126,10 @@
   --rc-interaction-text: var(--vc-brand-blue--dark);
 
   --rc-button: var(--vc-brand-purple);
+  --rc-button--disabled: var(--vc-shadow);
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
   --rc-onButton: var(--rc-light);
+  --rc-onButton--disabled: var(--rc-light-transparent);
 
   --rc-warning: var(--vc-brand-pink);
   --rc-onWarning: var(--vc-snow);
@@ -670,8 +672,8 @@ a:hover,
   height: 100%;
 }
 
-.c-button__icon:focus,
-.c-button__icon:hover {
+.c-button__icon:not([disabled]):focus,
+.c-button__icon:not([disabled]):hover {
   fill: var(--rc-onButton);
   stroke-width: 0.5px;
   stroke: var(--rc-button);
@@ -706,6 +708,10 @@ a:hover,
 .c-button[disabled],
 .c-button--disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+.c-button__icon[disabled] {
+  color: var(--rc-onButton--disabled);
   cursor: not-allowed;
 }
 
@@ -804,7 +810,7 @@ a:hover,
   transition: 400ms transform cubic-bezier(0.3, 0.7, 0, 1);
 }
 
-.c-input__icon:hover {
+.c-input__icon:not([disabled]):hover {
   transform: translate(50%, 50%) scale(0.99);
 }
 

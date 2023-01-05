@@ -173,6 +173,10 @@ export class Chan<A> {
   // to the promise
   private buffer: A[] = [];
 
+  // A list of other channels to which we forward (`send()`) the values
+  // sent to us
+  private listeners: Chan<A>[] = [];
+
   send(a: A): void {
     if (this.snd !== undefined) {
       this.snd(a);
@@ -182,8 +186,16 @@ export class Chan<A> {
     } else {
       this.buffer.push(a);
     }
+
+    // Finally, broadcast
+    for (const listener of this.listeners) {
+      listener.send(a);
+    }
   }
 
+  // Receive all values sent to this `Chan`. Note that this effectively
+  // consumes the values: if you need to read the value from different
+  // places use `.map()` instead.
   async *recv(): AsyncIterable<A> {
     // Forever loop, yielding entire buffers and then blocking
     // on `snd` (which prevents hot looping)
@@ -201,6 +213,17 @@ export class Chan<A> {
       yield await new Promise((resolve: (value: A) => void) => {
         this.snd = resolve;
       });
+    }
+  }
+
+  // Return a new generator yielding the values or `.recv()`, mapped
+  // with `f`.
+  async *map<B>(f: (a: A) => B): AsyncIterable<B> {
+    const input = new Chan<A>();
+    this.listeners.push(input);
+
+    for await (const val of input.recv()) {
+      yield f(val);
     }
   }
 }
