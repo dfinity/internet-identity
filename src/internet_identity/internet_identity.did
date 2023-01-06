@@ -143,6 +143,8 @@ type InternetIdentityStats = record {
 // Configuration parameters related to the archive.
 type ArchiveConfig = record {
     // The allowed module hash of the archive canister.
+    // Changing this parameter does _not_ deploy the archive, but enable archive deployments with the
+    // corresponding wasm module.
     module_hash : blob;
     // Buffered archive entries limit. If reached, II will stop accepting new anchor operations
     // until the buffered operations are acknowledged by the archive.
@@ -154,6 +156,7 @@ type ArchiveConfig = record {
     // Configured value will be discarded for storage_layout_version < 6.
     entries_fetch_limit: nat16;
     // Polling interval to fetch new entries from II (in nanoseconds).
+    // Changes to this parameter will only take effect after an archive deployment.
     // Currently unused: in preparation of switching the archive integration to pull.
     // Configured value will be discarded for storage_layout_version < 6.
     polling_interval_ns: nat64;
@@ -163,7 +166,7 @@ type ArchiveConfig = record {
 type ArchiveInfo = record {
     // Canister id of the archive or empty if no archive has been deployed yet.
     archive_canister : opt principal;
-    // Archive config parameters to use for the next archive deployment.
+    // Configuration parameters related to the II archive.
     archive_config: opt ArchiveConfig;
 };
 
@@ -175,7 +178,9 @@ type InternetIdentityInit = record {
         nat64;
         nat64;
     };
-    // Archive config parameters to use for the next archive deployment.
+    // Configuration parameters related to the II archive.
+    // Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
+    // See ArchiveConfig for details.
     archive_config: opt ArchiveConfig;
     // Set the amounts of cycles sent with the create canister message.
     // This is configurable because in the staging environment cycles are required.

@@ -230,12 +230,10 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.canister_creation_cycles_cost = cost;
             })
         }
-        if let Some(flag) = arg.upgrade_persistent_state {
-            if flag {
-                state::storage_mut(|storage| {
-                    storage.migrate_persistent_state();
-                })
-            }
+        if let Some(true) = arg.upgrade_persistent_state {
+            state::storage_mut(|storage| {
+                storage.migrate_persistent_state();
+            })
         }
     }
 }
