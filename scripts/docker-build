@@ -78,8 +78,17 @@ function build() {
 
     tmp_outdir=$(mktemp -d)
 
+    local version=$(./scripts/version)
+    echo "The following version will be used:"
+    echo "---"
+    echo "$version"
+    echo "---"
+
     set -x
-    DOCKER_BUILDKIT=1 docker build "${docker_build_args[@]}" --output "$tmp_outdir"
+    DOCKER_BUILDKIT=1 docker build \
+        --build-arg II_VERSION="$version" \
+        "${docker_build_args[@]}" \
+        --output "$tmp_outdir"
     set +x
 
     echo "Copying build output from $tmp_outdir to $PWD"

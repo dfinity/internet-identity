@@ -65,6 +65,10 @@ FROM deps as build_internet_identity
 
 COPY . .
 
+# The version baked in
+ARG II_VERSION=
+
+# The features, see README
 ARG II_FETCH_ROOT_KEY=
 ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=

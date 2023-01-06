@@ -71,6 +71,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Infer version
+        id: version
+        run: |
+          version=$(./scripts/version)
+          echo "Inferred version: $version"
+          echo 'version<<EOF' >> "$GITHUB_OUTPUT"
+          echo "$version" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
 
@@ -84,6 +93,7 @@ jobs:
             II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
             II_INSECURE_REQUESTS=${{ matrix.II_INSECURE_REQUESTS }}
+            II_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out

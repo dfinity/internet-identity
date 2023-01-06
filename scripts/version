@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Infer the "version" of the codebase using the git state.
+# Prints three lines to stdout:
+#   1. the first line is the commit (script returns with 1 if no commit is found)
+#   2. the second line represent the release the commit is tagged with, possibly the empty
+#       string if none
+#   3. the third line is "dirty" if the workspace is dirty
+
+set -euo pipefail
+
+log() {
+    >&2 echo "version: $@"
+}
+
+# First, figure out the commit and error out if we can't
+commit=$(git rev-parse HEAD)
+if [[ -z $commit ]]
+then
+    log "no commit found"
+    exit 1
+else
+    log "found commit '$commit'"
+fi
+
+# Try to infer the release based on either local git setup or CI environment
+release=
+if [[ -n ${CI:-} && ${GITHUB_REF_TYPE:-} == "tag" && ${GITHUB_REF_NAME:-} == release-* ]]
+then
+    release=${GITHUB_REF_NAME:-}
+else
+    # grep may fail so we may just print an empty line (like 'true', really)
+    # NOTE: '|' has higher precedence than '||'
+    release=$(git tag --points-at "$commit" | grep '^release-' | head -n1 || echo -n "")
+fi
+
+if [[ -z $release ]]
+then
+    log "no release found for commit '$commit'"
+else
+    log "found release '$release'"
+fi
+
+# Figure out if the workspace is dirty
+dirty=
+if [ -n "$(git status --porcelain)" ]
+then
+    log "commit is dirty"
+    dirty="dirty"
+else
+    log "commit is clean"
+fi
+
+echo "$commit"
+echo "$release"
+echo "$dirty"

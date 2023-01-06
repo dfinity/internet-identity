@@ -151,6 +151,8 @@ const defaults = {
       II_FETCH_ROOT_KEY: "0",
       II_DUMMY_AUTH: "0",
       II_DUMMY_CAPTCHA: "0",
+
+      II_VERSION: "",
     }),
     new CompressionPlugin({
       test: /\.js(\?.*)?$/i,
