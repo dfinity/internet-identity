@@ -33,22 +33,26 @@ const readCanisterId = (): string => {
   return setupJs.dataset.canisterId;
 };
 
+// Show version information for the curious programmer
+const printVersion = () => {
+  console.log("Welcome to Internet Identity!");
+  console.log(
+    "The code can be found here: https://github.com/dfinity/internet-identity"
+  );
+  console.log(
+    `https://github.com/dfinity/internet-identity/commit/${version.commit}`
+  );
+  if (version.release !== undefined) {
+    console.log(`This is version ${version.release}`);
+  }
+  if (version.dirty) {
+    console.warn("This version is dirty");
+  }
+};
+
 const init = async () => {
-  // Show version information for the curious programmer
   try {
-    console.log("Welcome to Internet Identity!");
-    console.log(
-      "The code can be found here: https://github.com/dfinity/internet-identity"
-    );
-    console.log(
-      `https://github.com/dfinity/internet-identity/commit/${version.commit}`
-    );
-    if (version.release !== "") {
-      console.log(`This is version ${version.release}`);
-    }
-    if (version.dirty) {
-      console.warn("This version is dirty");
-    }
+    printVersion();
   } catch (e) {
     console.warn("Error when printing version information:", e);
   }
