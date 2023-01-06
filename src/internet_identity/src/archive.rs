@@ -14,27 +14,40 @@ use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use std::rc::Rc;
 use std::time::Duration;
-use ArchiveState::{Created, CreationInProgress, NotCreated};
+use ArchiveState::{Configured, Created, CreationInProgress, NotConfigured};
 use CanisterInstallMode::Upgrade;
-
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
-pub struct ArchiveInfo {
-    pub expected_module_hash: Option<[u8; 32]>,
-    pub state: ArchiveState,
-}
 
 /// State of the archive canister.
 #[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
 pub enum ArchiveState {
-    NotCreated,
-    CreationInProgress(Timestamp), // timestamp when creation was initiated
-    Created(ArchiveData),
+    /// Not configured and not created.
+    NotConfigured,
+    /// Configured but not created.
+    Configured {
+        /// Archive related configuration
+        config: ArchiveConfig,
+    },
+    /// Creation in progress implies an existing configuration.
+    CreationInProgress {
+        /// timestamp when creation was initiated
+        timestamp: Timestamp,
+        /// Archive related configuration
+        config: ArchiveConfig,
+    },
+    /// Created implies an existing configuration.
+    Created {
+        /// Archive related data.
+        data: ArchiveData,
+        /// Archive related configuration
+        config: ArchiveConfig,
+    },
 }
 
 impl Default for ArchiveState {
     fn default() -> Self {
-        NotCreated
+        NotConfigured
     }
 }
 
@@ -46,6 +59,14 @@ pub struct ArchiveData {
     pub sequence_number: u64,
     // Canister id of the archive canister
     pub archive_canister: Principal,
+    // Entries to be fetched by the archive canister sorted in ascending order by sequence_number.
+    // Once the limit has been reached, II will refuse further changes to anchors in stable memory
+    // until the archive acknowledges entries and they can safely be deleted from this buffer.
+    // The limit is configurable (entries_buffer_limit).
+    // This is an Rc to avoid unnecessary copies of (potentially) a lot of data when cloning.
+    // Currently unused: in preparation of switching the archive integration to pull.
+    // Anything stored here will be discarded for storage_layout_version < 6.
+    pub entries_buffer: Rc<Vec<BufferedEntry>>,
 }
 
 /// Cached archive status information
@@ -60,30 +81,31 @@ pub struct ArchiveStatusCache {
 struct VerifiedWasm(Vec<u8>);
 
 pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
-    // archive state without creation_in_progress
-    // if creation is in progress we exit early since we do not want to deploy the archive twice
+    // Archive state without not_configured and creation_in_progress because we can exit early in
+    // those cases.
     enum ReducedArchiveState {
-        NotCreated,
+        Configured,
         Created(ArchiveData),
     }
 
-    let Some(expected_hash) = state::expected_archive_hash() else {
-        return DeployArchiveResult::Failed("archive deployment disabled".to_string());
-    };
-
     unlock_archive_if_stuck();
-    // exit early if archive is being created by another call to deploy_archive
-    let reduced_state = match state::archive_state() {
-        NotCreated => ReducedArchiveState::NotCreated,
-        CreationInProgress(_) => return DeployArchiveResult::CreationInProgress,
-        Created(data) => ReducedArchiveState::Created(data),
+
+    // exit early if archive is not configured or is being created by another call to deploy_archive
+    // also unpacks the config from the other two states
+    let (reduced_state, config) = match state::archive_state() {
+        NotConfigured => {
+            return DeployArchiveResult::Failed("archive deployment disabled".to_string())
+        }
+        CreationInProgress { .. } => return DeployArchiveResult::CreationInProgress,
+        Configured { config } => (ReducedArchiveState::Configured, config),
+        Created { config, data } => (ReducedArchiveState::Created(data), config),
     };
 
     // exit early if the expected wasm module is already installed
     if let ReducedArchiveState::Created(ref data) = reduced_state {
         let status = archive_status(data.archive_canister).await;
         match status.module_hash {
-            Some(hash) if hash == expected_hash.to_vec() => {
+            Some(hash) if hash == config.module_hash.to_vec() => {
                 // we already have an archive with the expected module and don't need to do anything
                 return DeployArchiveResult::Success(data.archive_canister);
             }
@@ -92,15 +114,15 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     }
 
     // all early checks passed, we need to make changes to the archive --> verify wasm
-    let verified_wasm = match verify_wasm(wasm.into_vec()) {
+    let verified_wasm = match verify_wasm(wasm.into_vec(), &config.module_hash) {
         Ok(verified_wasm) => verified_wasm,
         Err(err) => return DeployArchiveResult::Failed(err),
     };
 
     // create if not exists and determine install mode
     let (archive_canister, install_mode) = match reduced_state {
-        ReducedArchiveState::NotCreated => {
-            let archive = match create_archive().await {
+        ReducedArchiveState::Configured => {
+            let archive = match create_archive(config.clone()).await {
                 Ok(archive) => archive,
                 Err(err) => return DeployArchiveResult::Failed(err),
             };
@@ -123,23 +145,26 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
 
 fn unlock_archive_if_stuck() {
     match state::archive_state() {
-        NotCreated | Created(_) => {}
-        CreationInProgress(timestamp) => {
+        NotConfigured | Configured { .. } | Created { .. } => {}
+        CreationInProgress { timestamp, config } => {
             // The archive has been in creation for more than a day and the creation process
             // has likely failed thus another attempt should be made.
             if time() - timestamp > Duration::from_secs(24 * 60 * 60).as_nanos() as u64 {
                 state::persistent_state_mut(|persistent_state| {
-                    persistent_state.archive_info.state = NotCreated
+                    persistent_state.archive_state = Configured { config }
                 })
             }
         }
     }
 }
 
-async fn create_archive() -> Result<Principal, String> {
+async fn create_archive(config: ArchiveConfig) -> Result<Principal, String> {
     // lock the archive
     state::persistent_state_mut(|persistent_state| {
-        persistent_state.archive_info.state = CreationInProgress(time());
+        persistent_state.archive_state = CreationInProgress {
+            timestamp: time(),
+            config: config.clone(),
+        };
     });
 
     let result = create_canister(CreateCanisterArgument { settings: None }).await;
@@ -148,17 +173,21 @@ async fn create_archive() -> Result<Principal, String> {
         Ok((CanisterIdRecord { canister_id },)) => {
             state::persistent_state_mut(|persistent_state| {
                 // save archive info permanently
-                persistent_state.archive_info.state = Created(ArchiveData {
-                    sequence_number: 0,
-                    archive_canister: canister_id,
-                })
+                persistent_state.archive_state = Created {
+                    data: ArchiveData {
+                        sequence_number: 0,
+                        archive_canister: canister_id,
+                        entries_buffer: Rc::new(vec![]),
+                    },
+                    config,
+                }
             });
             Ok(canister_id)
         }
         Err((reject_code, message)) => {
             // unlock archive creation again
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.archive_info.state = NotCreated
+                persistent_state.archive_state = Configured { config }
             });
             Err(format!(
                 "failed to create archive! error code: {:?}, message: {}",
@@ -215,17 +244,12 @@ async fn install_archive(
     })
 }
 
-fn verify_wasm(wasm: Vec<u8>) -> Result<VerifiedWasm, String> {
-    let expected_hash = match state::expected_archive_hash() {
-        None => return Err("archive deployment disabled".to_string()),
-        Some(hash) => hash,
-    };
-
+fn verify_wasm(wasm: Vec<u8>, expected_hash: &[u8; 32]) -> Result<VerifiedWasm, String> {
     let mut hasher = Sha256::new();
     hasher.update(&wasm);
     let actual_hash: [u8; 32] = hasher.finalize().into();
 
-    if actual_hash != expected_hash {
+    if &actual_hash != expected_hash {
         return Err("invalid wasm module".to_string());
     }
 
@@ -253,29 +277,32 @@ async fn archive_status(archive_canister: Principal) -> CanisterStatusResponse {
 }
 
 pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operation: Operation) {
-    let archive_data = match state::archive_data() {
-        Some(data) => data,
-        None => return,
+    let Created {data, ..} = state::archive_state() else {
+        // nothing to archive if the archive has not been deployed yet
+        return
     };
+
     let timestamp = time();
     let entry = Entry {
         anchor: anchor_number,
         operation,
         timestamp,
         caller,
-        sequence_number: archive_data.sequence_number,
+        sequence_number: data.sequence_number,
     };
     let encoded_entry = candid::encode_one(entry).expect("failed to encode archive entry");
 
     // Notify can still trap if the message cannot be enqueued rolling back the anchor operation.
     // Therefore we only increment the sequence number after notifying successfully.
     let () = notify(
-        archive_data.archive_canister,
+        data.archive_canister,
         "write_entry",
         (anchor_number, timestamp, encoded_entry),
     )
     .expect("failed to send archive entry notification");
-    state::increment_archive_seq_nr();
+    state::archive_data_mut(|data| {
+        data.sequence_number += 1;
+    })
 }
 
 pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {

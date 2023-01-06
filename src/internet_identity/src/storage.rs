@@ -77,15 +77,17 @@ use std::io::{Read, Write};
 use std::ops::RangeInclusive;
 
 pub mod anchor;
+mod persistent_state_compat;
 
 #[cfg(test)]
 mod tests;
 
 // version   0: invalid
 // version 1-4: no longer supported
-// version   5: 4KB anchors, candid anchor record layout
-// version  6+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 5..=5;
+// version   5: 4KB anchors, candid anchor record layout, persistent state with only archive hash config
+// version   6: persistent state with archive pull config
+// version  7+: invalid
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 5..=6;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
 
@@ -121,8 +123,9 @@ struct Header {
     magic: [u8; 3],
     // version   0: invalid
     // version 1-4: no longer supported
-    // version   5: 4KB anchors, candid anchor record layout
-    // version  6+: invalid
+    // version   5: 4KB anchors, candid anchor record layout, persistent state with only archive hash config
+    // version   6: persistent state with archive pull config
+    // version  7+: invalid
     version: u8,
     num_anchors: u32,
     id_range_lo: u64,
@@ -153,7 +156,7 @@ impl<M: Memory> Storage<M> {
         Self {
             header: Header {
                 magic: *b"IIC",
-                version: 5,
+                version: 6,
                 num_anchors: 0,
                 id_range_lo,
                 id_range_hi,
@@ -384,8 +387,14 @@ impl<M: Memory> Storage<M> {
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
-        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
-        let encoded_state = candid::encode_one(state).unwrap();
+        let encoded_state = if self.header.version < 6 {
+            let old_state = persistent_state_compat::PersistentState::from(state.clone());
+            // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
+            candid::encode_one(old_state).unwrap()
+        } else {
+            // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
+            candid::encode_one(state).unwrap()
+        };
 
         // In practice, for all reasonably sized persistent states (<800MB) the writes are
         // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
@@ -433,11 +442,23 @@ impl<M: Memory> Storage<M> {
             .read_exact(data_buf.as_mut_slice())
             .map_err(PersistentStateError::ReadError)?;
 
-        candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
+        if self.header.version < 6 {
+            let old_state =
+                candid::decode_one::<persistent_state_compat::PersistentState>(&data_buf)
+                    .map_err(PersistentStateError::CandidError)?;
+            Ok(PersistentState::from(old_state))
+        } else {
+            candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
+        }
     }
 
     pub fn version(&self) -> u8 {
         self.header.version
+    }
+
+    pub fn migrate_persistent_state(&mut self) {
+        self.header.version = 6;
+        self.flush();
     }
 }
 

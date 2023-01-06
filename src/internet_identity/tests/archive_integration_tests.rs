@@ -32,8 +32,14 @@ fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
         II_WASM.clone(),
         Some(InternetIdentityInit {
             assigned_user_number_range: None,
-            archive_module_hash: Some(archive_wasm_hash(&ARCHIVE_WASM)),
+            archive_config: Some(ArchiveConfig {
+                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                entries_buffer_limit: 0,
+                polling_interval_ns: 0,
+                entries_fetch_limit: 0,
+            }),
             canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
+            upgrade_persistent_state: None,
         }),
     );
     env.add_cycles(ii_canister, 150_000_000_000);

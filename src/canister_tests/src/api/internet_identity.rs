@@ -270,10 +270,20 @@ pub mod compat {
     use super::*;
     use candid::{CandidType, Deserialize};
 
-    #[derive(Clone, Debug, CandidType, Deserialize)]
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct InternetIdentityStats {
         pub assigned_user_number_range: (types::AnchorNumber, types::AnchorNumber),
         pub users_registered: u64,
+        pub archive_info: ArchiveInfo,
+        pub canister_creation_cycles_cost: u64,
+        pub storage_layout_version: u8,
+    }
+
+    /// Information about the archive.
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ArchiveInfo {
+        pub archive_canister: Option<Principal>,
+        pub expected_wasm_hash: Option<[u8; 32]>,
     }
 
     pub fn stats(

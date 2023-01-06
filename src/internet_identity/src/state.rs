@@ -1,4 +1,4 @@
-use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState, ArchiveStatusCache};
+use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
@@ -70,7 +70,7 @@ pub struct Challenge {
 #[derive(Clone, Default, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct PersistentState {
     // Information related to the archive
-    pub archive_info: ArchiveInfo,
+    pub archive_state: ArchiveState,
     // Amount of cycles that need to be attached when II creates a canister
     pub canister_creation_cycles_cost: u64,
 }
@@ -213,34 +213,15 @@ pub fn anchor(anchor: AnchorNumber) -> Anchor {
 }
 
 pub fn archive_state() -> ArchiveState {
-    STATE.with(|s| s.persistent_state.borrow().archive_info.state.clone())
+    STATE.with(|s| s.persistent_state.borrow().archive_state.clone())
 }
 
-pub fn expected_archive_hash() -> Option<[u8; 32]> {
+pub fn archive_data_mut<R>(f: impl FnOnce(&mut ArchiveData) -> R) -> R {
     STATE.with(|s| {
-        s.persistent_state
-            .borrow()
-            .archive_info
-            .expected_module_hash
-    })
-}
-
-pub fn archive_data() -> Option<ArchiveData> {
-    STATE.with(|s| {
-        if let ArchiveState::Created(ref data) = s.persistent_state.borrow().archive_info.state {
-            Some(data.clone())
-        } else {
-            None
-        }
-    })
-}
-
-pub fn increment_archive_seq_nr() {
-    STATE.with(|s| {
-        if let ArchiveState::Created(ref mut data) =
-            s.persistent_state.borrow_mut().archive_info.state
+        if let ArchiveState::Created { ref mut data, .. } =
+            s.persistent_state.borrow_mut().archive_state
         {
-            data.sequence_number += 1;
+            f(data)
         } else {
             trap("no archive deployed")
         }
