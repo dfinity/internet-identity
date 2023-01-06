@@ -60,8 +60,11 @@ function check_feature() {
 # build_canister CANISTER
 # CANISTER: possible values: [internet_identity, archive]
 function build() {
+    local canister="$1"
+
+    # image name and build args, made global because they're used in
+    # check_feature()
     image_name="ii-docker-build"
-    canister="$1"
     docker_build_args=( --target "scratch_$canister" )
 
     check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"

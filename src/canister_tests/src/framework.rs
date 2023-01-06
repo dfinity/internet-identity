@@ -70,19 +70,19 @@ lazy_static! {
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
-    /** The Wasm module for the last II build that still initializes storage as V3, which is used when testing
+    /** The Wasm module for the last II build that still initializes storage as V5, which is used when testing
      * the candid schema migration */
-    pub static ref II_WASM_V3_LAYOUT: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_v3_storage.wasm");
+    pub static ref II_WASM_V5_LAYOUT: Vec<u8> = {
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_v5_storage.wasm");
         let err = format!("
-        Could not find Internet Identity Wasm module for release with v3 storage layout.
+        Could not find Internet Identity Wasm module for release with v5 storage layout.
 
-        I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_V3_LAYOUT (note that I run from {:?}).
+        I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_V5_LAYOUT (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/download/release-2022-12-07/internet_identity_test.wasm -o internet_identity_v3_storage.wasm
+            curl -SL https://github.com/dfinity/internet-identity/releases/download/release-2022-12-15/internet_identity_test.wasm -o internet_identity_v5_storage.wasm
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
-        get_wasm_path("II_WASM_V3_LAYOUT".to_string(), &def_path).expect(&err)
+        get_wasm_path("II_WASM_V5_LAYOUT".to_string(), &def_path).expect(&err)
     };
 
         /** The Wasm module for the _previous_ archive build, or latest release, which is used when testing
@@ -184,8 +184,14 @@ pub fn install_ii_canister_with_arg(
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         assigned_user_number_range: None,
-        archive_module_hash: Some(archive_wasm_hash(&wasm)),
+        archive_config: Some(ArchiveConfig {
+            module_hash: archive_wasm_hash(&wasm),
+            entries_buffer_limit: 10_000,
+            polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+            entries_fetch_limit: 10,
+        }),
         canister_creation_cycles_cost: Some(0),
+        upgrade_persistent_state: None,
     })
 }
 

@@ -142,19 +142,22 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 
 #[query]
 fn stats() -> InternetIdentityStats {
-    let archive_info = state::persistent_state(|persistent_state| {
-        if let ArchiveState::Created(ref data) = persistent_state.archive_info.state {
-            ArchiveInfo {
-                archive_canister: Some(data.archive_canister),
-                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
-            }
-        } else {
+    let archive_info = match state::archive_state() {
+        ArchiveState::NotConfigured => ArchiveInfo {
+            archive_canister: None,
+            archive_config: None,
+        },
+        ArchiveState::Configured { config } | ArchiveState::CreationInProgress { config, .. } => {
             ArchiveInfo {
                 archive_canister: None,
-                expected_wasm_hash: persistent_state.archive_info.expected_module_hash,
+                archive_config: Some(config),
             }
         }
-    });
+        ArchiveState::Created { data, config } => ArchiveInfo {
+            archive_canister: Some(data.archive_canister),
+            archive_config: Some(config),
+        },
+    };
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
@@ -183,10 +186,8 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
                 storage.set_anchor_number_range(range);
             });
         }
-        if let Some(archive_hash) = arg.archive_module_hash {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
-            })
+        if let Some(new_config) = arg.archive_config {
+            update_archive_config(new_config);
         }
         if let Some(cost) = arg.canister_creation_cycles_cost {
             state::persistent_state_mut(|persistent_state| {
@@ -221,17 +222,33 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
                 ));
             }
         }
-        if let Some(archive_hash) = arg.archive_module_hash {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.archive_info.expected_module_hash = Some(archive_hash);
-            })
+        if let Some(new_config) = arg.archive_config {
+            update_archive_config(new_config);
         }
         if let Some(cost) = arg.canister_creation_cycles_cost {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.canister_creation_cycles_cost = cost;
             })
         }
+        if let Some(true) = arg.upgrade_persistent_state {
+            state::storage_mut(|storage| {
+                storage.migrate_persistent_state();
+            })
+        }
     }
+}
+
+fn update_archive_config(new_config: ArchiveConfig) {
+    state::persistent_state_mut(|persistent_state| match persistent_state.archive_state {
+        ArchiveState::NotConfigured => {
+            persistent_state.archive_state = ArchiveState::Configured { config: new_config }
+        }
+        ArchiveState::Configured { ref mut config }
+        | ArchiveState::CreationInProgress { ref mut config, .. }
+        | ArchiveState::Created { ref mut config, .. } => {
+            *config = new_config;
+        }
+    })
 }
 
 #[pre_upgrade]

@@ -100,3 +100,12 @@ pub struct ArchiveInit {
     pub ii_canister: Principal,
     pub max_entries_per_call: u16,
 }
+
+/// Encoded entry as buffered on the II side (until acknowledged by the archive).
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+pub struct BufferedEntry {
+    pub anchor_number: AnchorNumber,
+    pub timestamp: u64,
+    pub entry: ByteBuf,
+    pub sequence_number: u64,
+}

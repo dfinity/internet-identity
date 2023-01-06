@@ -140,14 +140,34 @@ type InternetIdentityStats = record {
     canister_creation_cycles_cost: nat64;
 };
 
+// Configuration parameters related to the archive.
+type ArchiveConfig = record {
+    // The allowed module hash of the archive canister.
+    // Changing this parameter does _not_ deploy the archive, but enable archive deployments with the
+    // corresponding wasm module.
+    module_hash : blob;
+    // Buffered archive entries limit. If reached, II will stop accepting new anchor operations
+    // until the buffered operations are acknowledged by the archive.
+    // Currently unused: in preparation of switching the archive integration to pull.
+    // Configured value will be discarded for storage_layout_version < 6.
+    entries_buffer_limit: nat64;
+    // The maximum number of entries to be transferred to the archive per call.
+    // Currently unused: in preparation of switching the archive integration to pull.
+    // Configured value will be discarded for storage_layout_version < 6.
+    entries_fetch_limit: nat16;
+    // Polling interval to fetch new entries from II (in nanoseconds).
+    // Changes to this parameter will only take effect after an archive deployment.
+    // Currently unused: in preparation of switching the archive integration to pull.
+    // Configured value will be discarded for storage_layout_version < 6.
+    polling_interval_ns: nat64;
+};
+
 // Information about the archive.
 type ArchiveInfo = record {
     // Canister id of the archive or empty if no archive has been deployed yet.
     archive_canister : opt principal;
-    // Expected hash of the archive wasm module. II will accept wasm modules hashing to this hash in the canister call
-    // deploy_archive. The actual installed archive wasm hash might be different if the archive has not yet been upgraded.
-    // When empty, deployment of the archive is disabled and II will not accept any wasm module.
-    expected_wasm_hash: opt blob;
+    // Configuration parameters related to the II archive.
+    archive_config: opt ArchiveConfig;
 };
 
 // Init arguments of II which can be supplied on install and upgrade.
@@ -158,13 +178,17 @@ type InternetIdentityInit = record {
         nat64;
         nat64;
     };
-    // Set the module hash of the archive canister
-    archive_module_hash : opt blob;
+    // Configuration parameters related to the II archive.
+    // Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
+    // See ArchiveConfig for details.
+    archive_config: opt ArchiveConfig;
     // Set the amounts of cycles sent with the create canister message.
     // This is configurable because in the staging environment cycles are required.
     // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
     // canister creation cost, the newly created canister will keep extra cycles.
     canister_creation_cycles_cost : opt nat64;
+    // Config flag to upgrade the persistent state. If set to opt true it will migrate the storage layout to version 6.
+    upgrade_persistent_state: opt bool;
 };
 
 type ChallengeKey = text;

@@ -1,12 +1,13 @@
-use crate::archive::{ArchiveData, ArchiveInfo, ArchiveState};
+use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
-use internet_identity_interface::{DeviceProtection, KeyType, Purpose};
+use internet_identity_interface::{ArchiveConfig, DeviceProtection, KeyType, Purpose};
 use serde_bytes::ByteBuf;
+use std::rc::Rc;
 
 const WASM_PAGE_SIZE: u64 = 1 << 16;
 const HEADER_SIZE: usize = 66;
@@ -27,7 +28,7 @@ fn should_report_max_number_of_entries_for_32gb() {
 }
 
 #[test]
-fn should_serialize_header_v5() {
+fn should_serialize_header() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
     storage.update_salt([5u8; 32]);
@@ -35,7 +36,7 @@ fn should_serialize_header_v5() {
 
     let mut buf = vec![0; HEADER_SIZE];
     memory.read(0, &mut buf);
-    assert_eq!(buf, hex::decode("494943050000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
+    assert_eq!(buf, hex::decode("494943060000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
 }
 
 #[test]
@@ -330,12 +331,19 @@ fn sample_device() -> Device {
 
 fn sample_persistent_state() -> PersistentState {
     PersistentState {
-        archive_info: ArchiveInfo {
-            expected_module_hash: Some([99u8; 32]),
-            state: ArchiveState::Created(ArchiveData {
+        archive_state: ArchiveState::Created {
+            data: ArchiveData {
                 sequence_number: 39,
                 archive_canister: Principal::from_text("2h5ob-7aaaa-aaaad-aacya-cai").unwrap(),
-            }),
+                entries_buffer: Rc::new(vec![]),
+            },
+            config: ArchiveConfig {
+                module_hash: [99u8; 32],
+                // these are the defaults when reading v5 persistent state
+                entries_buffer_limit: 10_000,
+                polling_interval_ns: 60_000_000_000,
+                entries_fetch_limit: 1_000,
+            },
         },
         canister_creation_cycles_cost: 12_346_000_000,
     }
