@@ -5,6 +5,7 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
+import { version } from "./version";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
@@ -33,6 +34,25 @@ const readCanisterId = (): string => {
 };
 
 const init = async () => {
+  // Show version information for the curious programmer
+  try {
+    console.log("Welcome to Internet Identity!");
+    console.log(
+      "The code can be found here: https://github.com/dfinity/internet-identity"
+    );
+    console.log(
+      `https://github.com/dfinity/internet-identity/commit/${version.commit}`
+    );
+    if (version.release !== "") {
+      console.log(`This is version ${version.release}`);
+    }
+    if (version.dirty) {
+      console.warn("This version is dirty");
+    }
+  } catch (e) {
+    console.warn("Error when printing version information:", e);
+  }
+
   const url = new URL(document.URL);
 
   // If the build is not "official", show a warning
