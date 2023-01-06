@@ -1,3 +1,5 @@
+/// Integration tests for the II <-> archive integration using the legacy push integration.
+/// This file will be deleted, once support for push integration has been removed.
 use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::flows;
@@ -15,7 +17,7 @@ fn should_deploy_archive() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     );
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
@@ -37,6 +39,7 @@ fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
                 entries_buffer_limit: 0,
                 polling_interval_ns: 0,
                 entries_fetch_limit: 0,
+                archive_integration: None,
             }),
             canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
             upgrade_persistent_state: None,
@@ -57,7 +60,7 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     );
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
@@ -99,7 +102,7 @@ fn should_keep_archive_module_hash_across_upgrades() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     );
     upgrade_ii_canister(&env, ii_canister, II_WASM.clone());
 
@@ -115,7 +118,7 @@ fn should_upgrade_the_archive() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(EMPTY_WASM.clone()),
+        arg_with_wasm_hash(EMPTY_WASM.clone(), None),
     );
 
     let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
@@ -125,7 +128,7 @@ fn should_upgrade_the_archive() -> Result<(), CallError> {
         &env,
         ii_canister,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     )
     .unwrap();
 
@@ -147,7 +150,7 @@ fn should_keep_archive_across_upgrades() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     );
 
     let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -169,7 +172,7 @@ fn should_record_anchor_operations() -> Result<(), CallError> {
     let ii_canister = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
     );
 
     let archive_canister = deploy_archive_via_ii(&env, ii_canister);

@@ -6,6 +6,7 @@ use candid::Principal;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
+use internet_identity_interface::archive::BufferedEntry;
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
@@ -174,6 +175,21 @@ fn stats() -> InternetIdentityStats {
 #[update]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     archive::deploy_archive(wasm).await
+}
+
+/// Returns a batch of entries to be archived.
+/// This is an update call because the archive information _must_ be certified.
+/// Only callable by this IIs archive canister.
+#[update]
+fn fetch_entries() -> Vec<BufferedEntry> {
+    archive::fetch_entries()
+}
+
+/// Removes all buffered archive entries up to sequence number.
+/// Only callable by this IIs archive canister.
+#[update]
+fn acknowledge_entries(sequence_number: u64) {
+    archive::acknowledge_entries(sequence_number)
 }
 
 #[init]

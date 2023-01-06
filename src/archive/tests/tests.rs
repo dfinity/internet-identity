@@ -49,7 +49,7 @@ fn should_expose_status() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
-    assert_eq!(status.cycles, 0);
+    assert_eq!(status.canister_status.cycles, 0);
     Ok(())
 }
 
@@ -454,6 +454,8 @@ mod read_tests {
         let config = candid::encode_one(ArchiveInit {
             ii_canister: principal_1(),
             max_entries_per_call: 1000,
+            polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+            error_buffer_limit: 1,
         })
         .unwrap();
         let canister_id = env.create_canister();
@@ -508,6 +510,11 @@ mod metrics_tests {
             "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             "ii_archive_stable_memory_pages",
+            // The metrics
+            //   * ii_archive_last_successful_fetch_timestamp_seconds
+            //   * ii_archive_last_successful_fetch_entries_count
+            // are only provided, if there is a successful fetch, which requires II to be deployed.
+            // These metrics are tested in src/internet_identity/tests/archive_integration_tests_pull.rs.
         ];
         let env = env();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint

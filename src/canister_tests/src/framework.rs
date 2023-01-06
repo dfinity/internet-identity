@@ -180,7 +180,10 @@ pub fn install_ii_canister_with_arg(
     canister_id
 }
 
-pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
+pub fn arg_with_wasm_hash(
+    wasm: Vec<u8>,
+    archive_integration: Option<ArchiveIntegration>,
+) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         assigned_user_number_range: None,
         archive_config: Some(ArchiveConfig {
@@ -188,6 +191,7 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_buffer_limit: 10_000,
             polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
             entries_fetch_limit: 10,
+            archive_integration,
         }),
         canister_creation_cycles_cost: Some(0),
         upgrade_persistent_state: None,
@@ -512,6 +516,8 @@ fn encode_config(authorized_principal: Principal) -> Vec<u8> {
     let config = ArchiveInit {
         ii_canister: authorized_principal,
         max_entries_per_call: 10,
+        polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+        error_buffer_limit: 2,
     };
     candid::encode_one(config).expect("error encoding II installation arg as candid")
 }
