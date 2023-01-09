@@ -16,15 +16,52 @@ function run() {
     fi
 }
 
-rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
-echo "using rust version '$rust_version'"
+# Ask user for confirmation for action "$1" before going further
+# (skipped on CI and non-interactive shells in general)
+function confirm() {
+    if [[ -n ${CI:-} || -z ${PS1:-} ]]; then return; fi
+    read -p "$1 [y/n]" -n 1 -r
+    if [[ ! $REPLY =~ ^[Yy]$ ]]
+    then
+        exit 1
+    fi
+}
 
+rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
+confirm "Install rustup with rust '$rust_version'?"
+
+echo "Installing rust '$rust_version'"
 # here we set the toolchain to 'none' and rustup will pick up on ./rust-toolchain.toml
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
 
 echo "looking for ic-cdk-optimizer 0.3.4"
 if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
 then
-    echo "installing ic-cdk-optimizer 0.3.4"
-    run cargo install ic-cdk-optimizer --version 0.3.4
+    bin_dir="$HOME/.local/bin"
+    confirm "Install ic-cdk-optimizer in '$bin_dir'?"
+
+    if [[ ! ":$PATH:" == *":$bin_dir:"* ]]; then
+      echo "PATH is missing '$bin_dir', please add '$bin_dir' to PATH"
+      echo "PATH: $PATH"
+      exit 1
+    fi
+
+    # At the time of writing, this is indeed 0.3.4 but packaged as 0.3.5 (sigh)
+    release_url="https://github.com/dfinity/cdk-rs/releases/download/0.3.5"
+    case "$(uname -s)" in
+        Darwin)
+            optimizer_url="$release_url/ic-cdk-optimizer-0.3.5-x86_64-apple-darwin.tar.gz"
+            ;;
+        Linux)
+            # At the time of writing, this is indeed 0.3.4 but packaged as 0.3.5 (sigh)
+            optimizer_url="$release_url/ic-cdk-optimizer-0.3.5-x86_64-unknown-linux-gnu.tar.gz"
+            ;;
+        *)
+            echo uknown system "$uname_sys, please install ic-cdk-optimizer manually"; exit 1
+            ;;
+    esac
+
+    echo "Extracting '$optimizer_url' to '$bin_dir'"
+    run mkdir -p "$bin_dir"
+    run curl --silent --location "$optimizer_url" | tar xzf - -C "$bin_dir" --strip-components=1
 fi

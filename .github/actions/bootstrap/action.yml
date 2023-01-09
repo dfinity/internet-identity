@@ -3,40 +3,7 @@ description: Bootstrap the Internet Identity build environment
 runs:
   using: "composite"
   steps:
-    - id: platform
+    - run: echo "$HOME/.local/bin" >> $GITHUB_PATH # needed by bootstrap script
       shell: bash
-      run: |
-        set -euo pipefail
-
-        # print include system info relevant for cache compatibility
-        uname_sys=$(uname -s)
-        case "$uname_sys" in
-            Darwin)
-                echo "system is darwin ($uname_sys)"
-                ver=$(uname -r | sed 's/\./_/g')
-                echo "darwin version is '$ver'"
-                echo "platform-id=darwin-$ver" >> "$GITHUB_OUTPUT"
-                ;;
-            Linux)
-                echo "system is linux ($uname_sys)"
-                glibc_version=$(ldd --version | head -n 1 | grep -oP 'ldd (.*) \K[[:digit:]]+\.[[:digit:]]+' | sed 's/\./_/g')
-                echo "glibc version is '$glibc_version'"
-                echo "platform-id=ubuntu-glibc-$glibc_version" >> "$GITHUB_OUTPUT"
-                ;;
-            *)
-                echo uknown system "$uname_sys"
-                ;;
-        esac
-
-    # cache ic-cdk-optimizer
-    # NOTE: here we make sure to only cache ic-cdk-optimizer and _not_ e.g. the cargo target, since in some cases
-    # (clean builds) we build from scratch
-    # NOTE: we include the output of uname to ensure binary compatibility (e.g. same glibc)
-    - uses: actions/cache@v3
-      with:
-        path: ~/.cargo/bin
-        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-2
-
-    - name: Bootstrap
+    - run: ./scripts/bootstrap
       shell: bash
-      run: ./scripts/bootstrap

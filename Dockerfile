@@ -35,6 +35,8 @@ RUN mkdir -p ./scripts
 COPY ./scripts/bootstrap ./scripts/bootstrap
 COPY ./rust-toolchain.toml ./rust-toolchain.toml
 
+# bootstrap needs ~/.local/bin on PATH
+ENV PATH="/root/.local/bin:${PATH}"
 RUN ./scripts/bootstrap
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
