@@ -17,14 +17,6 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
         call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
-pub fn http_request(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    http_request: types::HttpRequest,
-) -> Result<types::HttpResponse, CallError> {
-    query_candid(env, canister_id, "http_request", (http_request,)).map(|(x,)| x)
-}
-
 pub fn create_challenge(
     env: &StateMachine,
     canister_id: CanisterId,

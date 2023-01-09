@@ -1,4 +1,5 @@
 use candid::Principal;
+use canister_tests::api::http_request;
 use canister_tests::api::internet_identity as api;
 use canister_tests::certificate_validation::validate_certification;
 use canister_tests::flows;
@@ -1942,7 +1943,7 @@ mod http_tests {
 
         // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
         for (asset, encoding) in assets {
-            let http_response = api::http_request(
+            let http_response = http_request(
                 &env,
                 canister_id,
                 HttpRequest {
@@ -2007,7 +2008,7 @@ mod http_tests {
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-        let metrics_body = flows::get_metrics(&env, canister_id);
+        let metrics_body = get_metrics(&env, canister_id);
         for metric in metrics {
             let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
             assert_eq!(
@@ -2025,12 +2026,12 @@ mod http_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
 
         let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
         let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
-        assert_eq!(min_user_number, 10_000);
-        assert_eq!(max_user_number, 8_188_859);
+        assert_eq!(min_user_number, 10_000f64);
+        assert_eq!(max_user_number, 8_188_859f64);
         Ok(())
     }
 
@@ -2041,16 +2042,16 @@ mod http_tests {
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_user_count",
-            0,
+            0f64,
         );
         for count in 0..2 {
             flows::register_anchor(&env, canister_id);
             assert_metric(
-                &flows::get_metrics(&env, canister_id),
+                &get_metrics(&env, canister_id),
                 "internet_identity_user_count",
-                count + 1,
+                (count + 1) as f64,
             );
         }
         Ok(())
@@ -2065,9 +2066,9 @@ mod http_tests {
         let user_number = flows::register_anchor(&env, canister_id);
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_signature_count",
-            0,
+            0f64,
         );
         for count in 0..3 {
             api::prepare_delegation(
@@ -2081,14 +2082,14 @@ mod http_tests {
             )?;
 
             assert_metric(
-                &flows::get_metrics(&env, canister_id),
+                &get_metrics(&env, canister_id),
                 "internet_identity_signature_count",
-                count + 1,
+                (count + 1) as f64,
             );
             assert_metric(
-                &flows::get_metrics(&env, canister_id),
+                &get_metrics(&env, canister_id),
                 "internet_identity_delegation_counter",
-                count + 1,
+                (count + 1) as f64,
             );
         }
 
@@ -2106,14 +2107,14 @@ mod http_tests {
         )?;
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_signature_count",
-            1, // old ones pruned and a new one created
+            1f64, // old ones pruned and a new one created
         );
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_delegation_counter",
-            4, // delegation counter is not affected by pruning
+            4f64, // delegation counter is not affected by pruning
         );
         Ok(())
     }
@@ -2124,20 +2125,20 @@ mod http_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (stable_memory_pages, _) =
             parse_metric(&metrics, "internet_identity_stable_memory_pages");
         // empty II has some metadata in stable memory which requires at least one page
-        assert_eq!(stable_memory_pages, 1);
+        assert_eq!(stable_memory_pages, 1f64);
 
         // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage to
         // 3 pages
         flows::register_anchor(&env, canister_id);
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (stable_memory_pages, _) =
             parse_metric(&metrics, "internet_identity_stable_memory_pages");
-        assert_eq!(stable_memory_pages, 3);
+        assert_eq!(stable_memory_pages, 3f64);
         Ok(())
     }
 
@@ -2150,24 +2151,24 @@ mod http_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_last_upgrade_timestamp",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos() as u64,
+                .as_nanos() as f64,
         );
 
         env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_last_upgrade_timestamp",
             env.time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos() as u64,
+                .as_nanos() as f64,
         );
         Ok(())
     }
@@ -2178,16 +2179,16 @@ mod http_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
-        assert_eq!(challenge_count, 0);
+        assert_eq!(challenge_count, 0f64);
 
         let challenge_1 = api::create_challenge(&env, canister_id)?;
         api::create_challenge(&env, canister_id)?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
-        assert_eq!(challenge_count, 2);
+        assert_eq!(challenge_count, 2f64);
 
         // solving a challenge removes it from the inflight pool
         api::register(
@@ -2201,18 +2202,18 @@ mod http_tests {
             },
         )?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
-        assert_eq!(challenge_count, 1);
+        assert_eq!(challenge_count, 1f64);
 
         // long after expiry (we don't want this test to break, if we change the captcha expiration)
         env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
         // the only call that prunes expired captchas
         api::create_challenge(&env, canister_id)?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
-        assert_eq!(challenge_count, 1); // 1 pruned due to expiry, but also one created
+        assert_eq!(challenge_count, 1f64); // 1 pruned due to expiry, but also one created
 
         Ok(())
     }
@@ -2225,25 +2226,25 @@ mod http_tests {
         let user_number_1 = flows::register_anchor(&env, canister_id);
         let user_number_2 = flows::register_anchor(&env, canister_id);
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) =
             parse_metric(&metrics, "internet_identity_users_in_registration_mode");
-        assert_eq!(challenge_count, 0);
+        assert_eq!(challenge_count, 0f64);
 
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
         api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_2)?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) =
             parse_metric(&metrics, "internet_identity_users_in_registration_mode");
-        assert_eq!(challenge_count, 2);
+        assert_eq!(challenge_count, 2f64);
 
         api::exit_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) =
             parse_metric(&metrics, "internet_identity_users_in_registration_mode");
-        assert_eq!(challenge_count, 1);
+        assert_eq!(challenge_count, 1f64);
 
         // long after expiry (we don't want this test to break, if we change the registration mode expiration)
         env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
@@ -2256,10 +2257,10 @@ mod http_tests {
             device_data_2(),
         )?;
 
-        let metrics = flows::get_metrics(&env, canister_id);
+        let metrics = get_metrics(&env, canister_id);
         let (challenge_count, _) =
             parse_metric(&metrics, "internet_identity_users_in_registration_mode");
-        assert_eq!(challenge_count, 0);
+        assert_eq!(challenge_count, 0f64);
 
         Ok(())
     }
@@ -2271,16 +2272,16 @@ mod http_tests {
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
-            0,
+            0f64,
         );
 
         let user_number = flows::register_anchor(&env, canister_id);
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
-            1,
+            1f64,
         );
 
         api::add(
@@ -2291,9 +2292,9 @@ mod http_tests {
             device_data_2(),
         )?;
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
-            2,
+            2f64,
         );
 
         let mut device = device_data_2();
@@ -2307,9 +2308,9 @@ mod http_tests {
             device,
         )?;
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
-            3,
+            3f64,
         );
 
         api::remove(
@@ -2320,9 +2321,9 @@ mod http_tests {
             device_data_2().pubkey,
         )?;
         assert_metric(
-            &flows::get_metrics(&env, canister_id),
+            &get_metrics(&env, canister_id),
             "internet_identity_anchor_operations_counter",
-            4,
+            4f64,
         );
 
         Ok(())
