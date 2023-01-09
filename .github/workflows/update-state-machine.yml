@@ -45,8 +45,7 @@ jobs:
           fi
 
           # Compare the current and latest shas, and potentially update the relevant files
-          current_sha=$(sed <.github/workflows/canister-tests.yml -n \
-            's$.*curl.*https://download.dfinity.systems/ic/\([^/]*\)/binaries.*$\1$p')
+          current_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
 
           echo current sha is "$current_sha"
 
@@ -54,7 +53,7 @@ jobs:
             echo "updating $current_sha to $latest_sha"
             sed -i -e \
               "s/$current_sha/$latest_sha/g" \
-              ".github/workflows/canister-tests.yml"
+              ".ic-commit"
             
             # This updates the download hint when tests are run with a missing binary
             sed -i -e \
@@ -66,7 +65,7 @@ jobs:
             echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
-          cat ".github/workflows/canister-tests.yml"
+          cat ".ic-commit"
 
       # If the ic commit was updated, create a PR.
       - name: Create Pull Request
