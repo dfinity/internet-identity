@@ -74,8 +74,8 @@ jobs:
       - name: Infer version
         id: version
         run: |
-          version=$(./scripts/version)
-          echo "Inferred version: $version"
+          version="$(./scripts/version)"
+          echo "Inferred version: '$version'"
           echo 'version<<EOF' >> "$GITHUB_OUTPUT"
           echo "$version" >> "$GITHUB_OUTPUT"
           echo 'EOF' >> "$GITHUB_OUTPUT"
