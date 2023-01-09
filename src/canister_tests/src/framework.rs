@@ -153,13 +153,11 @@ pub fn env() -> StateMachine {
 
         I looked for it at {:?}. You can specify another path with the environment variable STATE_MACHINE_BINARY (note that I run from {:?}).
 
-        In order to get the binary:
-            * Download:
-                * linux: curl -sLO https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-linux/ic-test-state-machine.gz
-                * mac:   curl -sLO https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-darwin/ic-test-state-machine.gz
-            * Make it executable:
-                gzip -d ic-test-state-machine.gz
-                chmod +x ic-test-state-machine
+        Run the following command to get the binary:
+            curl -sLO https://download.dfinity.systems/ic/$commit/binaries/$platform/ic-test-state-machine.gz
+            gzip -d ic-test-state-machine.gz
+            chmod +x ic-test-state-machine
+        where $commit can be read from `.ic-commit` and $platform is 'x86_64-linux' for Linux and 'x86_64-darwin' for Intel/rosetta-enabled Darwin.
         ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
     }
 

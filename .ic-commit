@@ -1,0 +1,3 @@
+# the commit used to pull the state machine executable
+# see rust canister tests for more info
+a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb

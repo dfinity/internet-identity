@@ -343,7 +343,9 @@ jobs:
         run: |
           uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
           echo "uname_sys: $uname_sys"
-          curl -sLO "https://download.dfinity.systems/ic/a26b66d0bf5dea702e20da7218ceb6a5ee16fbbb/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
+          commit_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
+          echo "commit sha: $commit_sha"
+          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
           gzip -d ic-test-state-machine.gz
           chmod a+x ic-test-state-machine
           ./ic-test-state-machine --version
