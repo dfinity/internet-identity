@@ -31,7 +31,8 @@ ENV RUSTUP_HOME=/opt/rustup \
     CARGO_HOME=/cargo \
     PATH=/cargo/bin:$PATH
 
-COPY ./scripts ./scripts
+RUN mkdir -p ./scripts
+COPY ./scripts/bootstrap ./scripts/bootstrap
 COPY ./rust-toolchain.toml ./rust-toolchain.toml
 
 RUN ./scripts/bootstrap
@@ -48,6 +49,7 @@ COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
 COPY src/state_machine_client/Cargo.toml src/state_machine_client/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
+COPY ./scripts/build ./scripts/build
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \
