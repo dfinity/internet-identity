@@ -21,5 +21,7 @@ Dockerfile
 # except for the ones we really want
 !.node-version
 
-# Some scripts that aren't needed in the build
-scripts/version
+# Scripts are added explicitly as needed
+scripts/
+!scripts/build
+!scripts/bootstrap
