@@ -76,9 +76,7 @@ jobs:
         run: |
           version="$(./scripts/version)"
           echo "Inferred version: '$version'"
-          echo 'version<<EOF' >> "$GITHUB_OUTPUT"
-          echo "$version" >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2

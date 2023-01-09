@@ -72,10 +72,7 @@ do
 done
 
 export II_VERSION=${II_VERSION:-$(./scripts/version)}
-echo "The following version will be used:"
-echo "---"
-echo "$II_VERSION"
-echo "---"
+echo "The following version will be used: '$II_VERSION'"
 
 # build II by default
 if [ ${#CANISTERS[@]} -eq 0 ]; then
