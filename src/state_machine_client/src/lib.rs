@@ -25,6 +25,14 @@ pub enum Request {
     AddCycles(AddCyclesArg),
     SetStableMemory(SetStableMemoryArg),
     ReadStableMemory(RawCanisterId),
+    Tick,
+    RunUntilCompletion(RunUntilCompletionArg),
+}
+
+#[derive(Serialize)]
+pub struct RunUntilCompletionArg {
+    // max_ticks until completion must be reached
+    pub max_ticks: u64,
 }
 
 #[derive(Serialize)]
@@ -177,6 +185,33 @@ impl StateMachine {
         )
     }
 
+    pub fn start_canister(&self, canister_id: CanisterId) -> Result<(), CallError> {
+        call_candid::<(CanisterIdRecord,), ()>(
+            self,
+            Principal::management_canister(),
+            "start_canister",
+            (CanisterIdRecord { canister_id },),
+        )
+    }
+
+    pub fn stop_canister(&self, canister_id: CanisterId) -> Result<(), CallError> {
+        call_candid::<(CanisterIdRecord,), ()>(
+            self,
+            Principal::management_canister(),
+            "stop_canister",
+            (CanisterIdRecord { canister_id },),
+        )
+    }
+
+    pub fn delete_canister(&self, canister_id: CanisterId) -> Result<(), CallError> {
+        call_candid::<(CanisterIdRecord,), ()>(
+            self,
+            Principal::management_canister(),
+            "delete_canister",
+            (CanisterIdRecord { canister_id },),
+        )
+    }
+
     pub fn canister_exists(&self, canister_id: Principal) -> bool {
         self.call_state_machine(Request::CanisterExists(RawCanisterId::from(canister_id)))
     }
@@ -187,6 +222,16 @@ impl StateMachine {
 
     pub fn advance_time(&self, duration: Duration) {
         self.call_state_machine(Request::AdvanceTime(duration))
+    }
+
+    pub fn tick(&self) {
+        self.call_state_machine(Request::Tick)
+    }
+
+    pub fn run_until_completion(&self, max_ticks: u64) {
+        self.call_state_machine(Request::RunUntilCompletion(RunUntilCompletionArg {
+            max_ticks,
+        }))
     }
 
     pub fn stable_memory(&self, canister_id: Principal) -> Vec<u8> {
