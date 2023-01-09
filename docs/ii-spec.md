@@ -186,7 +186,7 @@ This section describes the Internet Identity Service from the point of view of a
 
     The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
-The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/auth-client) and the [`@dfinity/authentication`](https://www.npmjs.com/package/@dfinity/authentication) NPM packages provide helpful functionality here.
+The [`@dfinity/auth-client`](https://www.npmjs.com/package/@dfinity/auth-client) NPM package provides helpful functionality here.
 
 The client application frontend should support delegation chains of length more than one, and delegations with `targets`, even if the present version of this spec does not use them, to be compatible with possible future versions.
 
