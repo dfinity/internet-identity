@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Infer the "version" of the codebase using the git state.
-# Prints three lines to stdout:
+# Prints three comma-separated strings to stdout:
 #   1. the first line is the commit (script returns with 1 if no commit is found)
 #   2. the second line represent the release the commit is tagged with, possibly the empty
 #       string if none
@@ -51,6 +51,4 @@ else
     dirty="clean"
 fi
 
-echo "$commit"
-echo "$release"
-echo "$dirty"
+echo "$commit,$release,$dirty"
