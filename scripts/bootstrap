@@ -17,9 +17,9 @@ function run() {
 }
 
 # Ask user for confirmation for action "$1" before going further
-# (skipped on CI and non-interactive shells in general)
 function confirm() {
-    if [[ -n ${CI:-} || -z ${PS1:-} ]]; then return; fi
+    # if "$CI" is set or stdin is closed, assume it's automated
+    if [[ -n ${CI:-} || ! -t 0 ]]; then return; fi
     read -p "$1 [y/n]" -n 1 -r
     if [[ ! $REPLY =~ ^[Yy]$ ]]
     then
