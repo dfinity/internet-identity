@@ -265,8 +265,8 @@ fn write_entry(anchor_number: AnchorNumber, timestamp: Timestamp, entry: ByteBuf
 /// Fetches, archives and acknowledges a batch of entries.
 /// *Note:* Must be written in a way that nothing breaks on overlapping executions of [fetch_entries].
 async fn fetch_entries() {
-    const FETCH_ENTRIES_METHOD: &'static str = "fetch_entries";
-    const ACKNOWLEDGE_ENTRIES_METHOD: &'static str = "acknowledge_entries";
+    const FETCH_ENTRIES_METHOD: &str = "fetch_entries";
+    const ACKNOWLEDGE_ENTRIES_METHOD: &str = "acknowledge_entries";
 
     let ii_canister = with_config(|config| config.ii_canister);
     let call_time = time();
