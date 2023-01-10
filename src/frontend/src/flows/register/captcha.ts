@@ -1,4 +1,5 @@
 import { Challenge } from "../../../generated/internet_identity_types";
+import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { spinner } from "../../components/icons";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { html, render, TemplateResult } from "lit-html";
@@ -215,8 +216,10 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
+        const tempIdentity = Ed25519KeyIdentity.generate();
         const result = await connection.register({
           identity,
+          tempIdentity,
           alias,
           challengeResult: {
             key: challenge.challenge_key,

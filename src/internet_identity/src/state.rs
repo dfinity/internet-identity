@@ -74,9 +74,12 @@ pub struct PersistentState {
     pub canister_creation_cycles_cost: u64,
 }
 
+pub type TempKeys = HashMap<AnchorNumber, (Principal, Timestamp)>;
 struct State {
     storage: RefCell<Storage<DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
+    // timestamp is expiration
+    temp_keys: RefCell<HashMap<AnchorNumber, (Principal, Timestamp)>>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
@@ -108,6 +111,7 @@ impl Default for State {
                 DefaultMemoryImpl::default(),
             )),
             sigs: RefCell::new(SignatureMap::default()),
+            temp_keys: RefCell::new(HashMap::new()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
@@ -259,6 +263,14 @@ pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {
 
 pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
+}
+
+pub fn with_temp_keys<R>(f: impl FnOnce(&TempKeys) -> R) -> R {
+    STATE.with(|s| f(&s.temp_keys.borrow()))
+}
+
+pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
+    STATE.with(|s| f(&mut s.temp_keys.borrow_mut()))
 }
 
 pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {

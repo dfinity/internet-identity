@@ -155,7 +155,11 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
-pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+pub fn register(
+    device_data: DeviceData,
+    challenge_result: ChallengeAttempt,
+    temp_key: Principal,
+) -> RegisterResponse {
     delegation::prune_expired_signatures();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
@@ -163,7 +167,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
 
     let device = Device::from(device_data);
 
-    if caller() != Principal::self_authenticating(&device.pubkey) {
+    if caller() != temp_key {
         trap(&format!(
             "{} could not be authenticated against {:?}",
             caller(),
@@ -181,6 +185,10 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
                 ))
             });
             write_anchor(anchor_number, anchor);
+            let expiration = time().saturating_add(delegation::DEFAULT_EXPIRATION_PERIOD_NS);
+            state::with_temp_keys_mut(|temp_keys| {
+                temp_keys.insert(anchor_number, (temp_key, expiration));
+            });
             archive_operation(
                 anchor_number,
                 caller(),

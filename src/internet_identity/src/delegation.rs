@@ -21,7 +21,7 @@ const DAY: u64 = 24 * HOUR;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE;
+pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)

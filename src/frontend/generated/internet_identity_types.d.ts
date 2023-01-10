@@ -151,9 +151,11 @@ export interface _SERVICE {
       arg_2: SessionKey,
       arg_3: [] | [bigint],
     ) => Promise<[UserKey, Timestamp]>,
-  'register' : (arg_0: DeviceData, arg_1: ChallengeResult) => Promise<
-      RegisterResponse
-    >,
+  'register' : (
+      arg_0: DeviceData,
+      arg_1: ChallengeResult,
+      arg_2: Principal,
+    ) => Promise<RegisterResponse>,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'replace' : (
       arg_0: UserNumber,
