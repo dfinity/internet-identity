@@ -14,12 +14,22 @@ use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
-// 30 mins
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 60);
-// 30 days
-const MAX_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(30 * 24 * 60 * 60);
-// 1 min
-const DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS: u64 = secs_to_nanos(60);
+// Some time helpers
+const MINUTE: u64 = secs_to_nanos(60);
+const HOUR: u64 = 60 * MINUTE;
+const DAY: u64 = 24 * HOUR;
+
+// The expiration used for delegations if none is specified
+// (calculated as now() + this)
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE;
+
+// The maximum expiration time for delegation
+// (calculated as now() + this)
+const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY;
+
+// The expiration used for signatures
+#[allow(clippy::identity_op)]
+const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE;
 
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,
@@ -213,7 +223,7 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
         expiration,
         targets: None,
     });
-    let expires_at = time().saturating_add(DEFAULT_SIGNATURE_EXPIRATION_PERIOD_NS);
+    let expires_at = time().saturating_add(SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
 }
 
