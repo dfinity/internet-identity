@@ -127,11 +127,8 @@ export const promptCaptchaTemplate = <T>({
       <form
         autocomplete="off"
         @submit=${asyncReplace(next.recv())}
-        class="l-stack t-centered"
+        class="l-stack"
       >
-        <p style="min-height: calc(2*var(--vs-line-height)*1em)">
-          ${asyncReplace(text.recv())}
-        </p>
         <div class="c-input c-input--icon">
           ${asyncReplace(img.recv())}
           <i
@@ -144,7 +141,10 @@ export const promptCaptchaTemplate = <T>({
             <span>retry</span>
           </i>
         </div>
-        <input ${autofocus} ${ref(input)} id="captchaInput" class="c-input" />
+        <label>
+          <strong class="t-strong">${asyncReplace(text.recv())}</strong>
+          <input ${autofocus} ${ref(input)} id="captchaInput" class="c-input" />
+        </label>
         <p class="t-paragraph confirm-paragraph"></p>
         <div class="c-button-group">
           <button
