@@ -4,8 +4,10 @@ use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
+use regex::Regex;
 use serde_bytes::ByteBuf;
 use state_machine_client::CallError;
+use state_machine_client::ErrorCode::CanisterCalledTrap;
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -488,6 +490,54 @@ mod pull_entries_tests {
         let status = archive_api::status(&env, archive_canister)?;
         assert!(matches!(status.call_info.last_successful_fetch, Some(_)));
         Ok(())
+    }
+
+    /// Tests that only the archive canister can fetch entries.
+    #[test]
+    fn should_not_allow_wrong_caller_to_fetch_entries() {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let result = ii_api::fetch_entries(&env, ii_canister, principal_1());
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new(
+                "only the archive canister [a-z0-9-]+ is allowed to fetch and acknowledge entries",
+            )
+            .unwrap(),
+        );
+    }
+
+    /// Tests that only the archive canister can acknowledge entries.
+    #[test]
+    fn should_not_allow_wrong_caller_to_acknowledge_entries() {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let result = ii_api::acknowledge_entries(&env, ii_canister, principal_1(), 37);
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new(
+                "only the archive canister [a-z0-9-]+ is allowed to fetch and acknowledge entries",
+            )
+            .unwrap(),
+        );
     }
 }
 

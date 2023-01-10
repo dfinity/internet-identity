@@ -1,6 +1,7 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface as types;
+use internet_identity_interface::archive::BufferedEntry;
 use serde_bytes::ByteBuf;
 use state_machine_client::{
     call_candid, call_candid_as, query_candid, query_candid_as, CallError, StateMachine,
@@ -255,6 +256,29 @@ pub fn stats(
     canister_id: CanisterId,
 ) -> Result<types::InternetIdentityStats, CallError> {
     query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
+}
+
+pub fn fetch_entries(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Vec<BufferedEntry>, CallError> {
+    call_candid_as(env, canister_id, sender, "fetch_entries", ()).map(|(x,)| x)
+}
+
+pub fn acknowledge_entries(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    sequence_number: u64,
+) -> Result<(), CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "acknowledge_entries",
+        (sequence_number,),
+    )
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.
