@@ -265,18 +265,22 @@ fn write_entry(anchor_number: AnchorNumber, timestamp: Timestamp, entry: ByteBuf
 /// Fetches, archives and acknowledges a batch of entries.
 /// *Note:* Must be written in a way that nothing breaks on overlapping executions of [fetch_entries].
 async fn fetch_entries() {
-    let ii_canister = with_config(|config| config.ii_canister);
-    let fetch_result: CallResult<(Vec<BufferedEntry>,)> =
-        call(ii_canister, "fetch_entries", ()).await;
+    const FETCH_ENTRIES_METHOD: &'static str = "fetch_entries";
+    const ACKNOWLEDGE_ENTRIES_METHOD: &'static str = "acknowledge_entries";
 
-    let entries = match fetch_result {
+    let ii_canister = with_config(|config| config.ii_canister);
+    let call_time = time();
+    let fetch_result: CallResult<(Vec<BufferedEntry>,)> =
+        call(ii_canister, FETCH_ENTRIES_METHOD, ()).await;
+
+    let mut entries = match fetch_result {
         Ok((entries,)) => entries,
         Err((code, message)) => {
             // failed to fetch entries --> store failure information and exit early
             store_call_error(CallErrorInfo {
-                time: time(),
+                time: call_time,
                 canister: ii_canister,
-                method: "fetch_entries".to_string(),
+                method: FETCH_ENTRIES_METHOD.to_string(),
                 argument: ByteBuf::from(candid::encode_one(()).unwrap()),
                 rejection_code: code as i32,
                 message,
@@ -297,6 +301,7 @@ async fn fetch_entries() {
         return;
     }
 
+    entries.sort_by(|a, b| a.sequence_number.cmp(&b.sequence_number));
     let expected_seq_nr = with_log(|log| log.len() as u64);
     let entries_count = entries.len();
     let lowest_seq_nr = entries.first().unwrap().sequence_number;
@@ -312,10 +317,11 @@ async fn fetch_entries() {
             .for_each(|e| write_entry_internal(e.anchor_number, e.timestamp, e.entry));
     }
 
-    let fetch_result: CallResult<()> =
-        call(ii_canister, "acknowledge_entries", (highest_seq_nr,)).await;
+    let call_time = time();
+    let result: CallResult<()> =
+        call(ii_canister, ACKNOWLEDGE_ENTRIES_METHOD, (highest_seq_nr,)).await;
 
-    match fetch_result {
+    match result {
         Ok(_) => with_call_info_mut(|info| {
             info.last_successful_fetch = Some(FetchInfo {
                 timestamp: time(),
@@ -325,9 +331,9 @@ async fn fetch_entries() {
         Err((code, message)) => {
             // failed to acknowledge entries --> store failure information
             store_call_error(CallErrorInfo {
-                time: time(),
+                time: call_time,
                 canister: ii_canister,
-                method: "acknowledge_entries".to_string(),
+                method: ACKNOWLEDGE_ENTRIES_METHOD.to_string(),
                 argument: ByteBuf::from(candid::encode_one(highest_seq_nr).unwrap()),
                 rejection_code: code as i32,
                 message,
