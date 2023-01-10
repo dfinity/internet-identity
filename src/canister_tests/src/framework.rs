@@ -1,4 +1,5 @@
 use crate::api;
+use crate::api::http_request;
 use candid::Principal;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
@@ -420,20 +421,35 @@ frame-ancestors 'none';$"
     .is_match(csp));
 }
 
-pub fn parse_metric(body: &str, metric: &str) -> (u64, SystemTime) {
+pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
+    let response = http_request(
+        env,
+        canister_id,
+        HttpRequest {
+            method: "GET".to_string(),
+            url: "/metrics".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+        },
+    )
+    .expect("HTTP request to /metrics failed");
+    String::from_utf8_lossy(&response.body).to_string()
+}
+
+pub fn parse_metric(body: &str, metric: &str) -> (f64, SystemTime) {
     let metric = metric.replace('{', "\\{").replace('}', "\\}");
     let metric_capture = Regex::new(&format!("(?m)^{} (\\d+) (\\d+)$", metric))
         .unwrap()
         .captures(body)
         .unwrap_or_else(|| panic!("metric {} not found", metric));
 
-    let metric: u64 = metric_capture.get(1).unwrap().as_str().parse().unwrap();
+    let metric: f64 = metric_capture.get(1).unwrap().as_str().parse().unwrap();
     let metric_timestamp = SystemTime::UNIX_EPOCH
         + Duration::from_millis(metric_capture.get(2).unwrap().as_str().parse().unwrap());
     (metric, metric_timestamp)
 }
 
-pub fn assert_metric(metrics: &str, metric_name: &str, expected: u64) {
+pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert_eq!(value, expected);
 }
