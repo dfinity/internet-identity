@@ -1,6 +1,15 @@
 export const idlFactory = ({ IDL }) => {
+  const ArchiveConfig = IDL.Record({
+    'polling_interval_ns' : IDL.Nat64,
+    'entries_buffer_limit' : IDL.Nat64,
+    'module_hash' : IDL.Vec(IDL.Nat8),
+    'entries_fetch_limit' : IDL.Nat16,
+  });
   const InternetIdentityInit = IDL.Record({
-    'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
+    'upgrade_persistent_state' : IDL.Opt(IDL.Bool),
+    'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'archive_config' : IDL.Opt(ArchiveConfig),
+    'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
   });
   const UserNumber = IDL.Nat64;
   const DeviceProtection = IDL.Variant({
@@ -41,6 +50,11 @@ export const idlFactory = ({ IDL }) => {
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
+  });
+  const DeployArchiveResult = IDL.Variant({
+    'creation_in_progress' : IDL.Null,
+    'success' : IDL.Principal,
+    'failed' : IDL.Text,
   });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
@@ -103,9 +117,16 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
+  const ArchiveInfo = IDL.Record({
+    'archive_config' : IDL.Opt(ArchiveConfig),
+    'archive_canister' : IDL.Opt(IDL.Principal),
+  });
   const InternetIdentityStats = IDL.Record({
+    'storage_layout_version' : IDL.Nat8,
     'users_registered' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
+    'archive_info' : ArchiveInfo,
+    'canister_creation_cycles_cost' : IDL.Nat64,
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -121,6 +142,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
+    'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
@@ -158,8 +180,17 @@ export const idlFactory = ({ IDL }) => {
   });
 };
 export const init = ({ IDL }) => {
+  const ArchiveConfig = IDL.Record({
+    'polling_interval_ns' : IDL.Nat64,
+    'entries_buffer_limit' : IDL.Nat64,
+    'module_hash' : IDL.Vec(IDL.Nat8),
+    'entries_fetch_limit' : IDL.Nat16,
+  });
   const InternetIdentityInit = IDL.Record({
-    'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
+    'upgrade_persistent_state' : IDL.Opt(IDL.Bool),
+    'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'archive_config' : IDL.Opt(ArchiveConfig),
+    'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
   });
   return [IDL.Opt(InternetIdentityInit)];
 };

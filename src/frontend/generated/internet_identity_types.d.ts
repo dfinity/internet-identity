@@ -9,6 +9,16 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
+export interface ArchiveConfig {
+  'polling_interval_ns' : bigint,
+  'entries_buffer_limit' : bigint,
+  'module_hash' : Array<number>,
+  'entries_fetch_limit' : number,
+}
+export interface ArchiveInfo {
+  'archive_config' : [] | [ArchiveConfig],
+  'archive_canister' : [] | [Principal],
+}
 export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
@@ -21,6 +31,9 @@ export interface Delegation {
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
 }
+export type DeployArchiveResult = { 'creation_in_progress' : null } |
+  { 'success' : Principal } |
+  { 'failed' : string };
 export interface DeviceData {
   'alias' : string,
   'protection' : DeviceProtection,
@@ -57,11 +70,17 @@ export interface IdentityAnchorInfo {
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface InternetIdentityInit {
-  'assigned_user_number_range' : [bigint, bigint],
+  'upgrade_persistent_state' : [] | [boolean],
+  'assigned_user_number_range' : [] | [[bigint, bigint]],
+  'archive_config' : [] | [ArchiveConfig],
+  'canister_creation_cycles_cost' : [] | [bigint],
 }
 export interface InternetIdentityStats {
+  'storage_layout_version' : number,
   'users_registered' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
+  'archive_info' : ArchiveInfo,
+  'canister_creation_cycles_cost' : bigint,
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
@@ -101,6 +120,7 @@ export interface _SERVICE {
       AddTentativeDeviceResponse
     >,
   'create_challenge' : () => Promise<Challenge>,
+  'deploy_archive' : (arg_0: Array<number>) => Promise<DeployArchiveResult>,
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
