@@ -3,6 +3,7 @@ use crate::{
     Purpose, Timestamp,
 };
 use candid::{CandidType, Deserialize, Principal};
+use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use serde_bytes::ByteBuf;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -95,10 +96,12 @@ pub enum Cursor {
 }
 
 /// Init arguments of the archive canister.
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct ArchiveInit {
     pub ii_canister: Principal,
     pub max_entries_per_call: u16,
+    pub polling_interval_ns: u64,
+    pub error_buffer_limit: u16,
 }
 
 /// Encoded entry as buffered on the II side (until acknowledged by the archive).
@@ -108,4 +111,44 @@ pub struct BufferedEntry {
     pub timestamp: u64,
     pub entry: ByteBuf,
     pub sequence_number: u64,
+}
+
+/// Information about the archive canister (i.e. useful for debugging).
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct ArchiveStatus {
+    pub call_info: CallInfo,
+    pub init: ArchiveInit,
+    pub canister_status: CanisterStatusResponse,
+}
+
+/// Information about the calls the archive is making to II.
+#[derive(Clone, Debug, Default, CandidType, Deserialize)]
+pub struct CallInfo {
+    /// Timestamp of the last successful run of [fetch_entries], if any.
+    pub last_successful_fetch: Option<FetchInfo>,
+    /// A small buffer to keep the last call errors to help debugging in case of an incident.
+    /// Can be retrieved using the info query.
+    pub call_errors: Vec<CallErrorInfo>,
+}
+
+/// Information about the last successful fetch of II archive entries.
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct FetchInfo {
+    /// Timestamp when the last execution of the archive `fetch_entries` method finished.
+    pub timestamp: Timestamp,
+    /// The number of entries fetched (regardless of how many of those were actually archived).
+    pub number_of_entries: u16,
+}
+
+/// Struct to keep debug info about a call failure.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct CallErrorInfo {
+    /// Timestamp when the call was made (not when the error was received).
+    pub time: u64,
+    /// Target canister.
+    pub canister: Principal,
+    pub method: String,
+    pub argument: ByteBuf,
+    pub rejection_code: i32,
+    pub message: String,
 }

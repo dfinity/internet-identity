@@ -3,7 +3,6 @@ use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use ic_certified_map::{Hash, RbTree};
@@ -300,7 +299,7 @@ pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentState) -> R) -> R {
     STATE.with(|s| f(&mut s.persistent_state.borrow_mut()))
 }
 
-pub fn cached_archive_status() -> Option<CanisterStatusResponse> {
+pub fn cached_archive_status() -> Option<ArchiveStatusCache> {
     STATE.with(|s| match *s.archive_status_cache.borrow() {
         None => None,
         Some(ref cached_status) => {
@@ -308,7 +307,7 @@ pub fn cached_archive_status() -> Option<CanisterStatusResponse> {
             if time() - cached_status.timestamp > Duration::from_secs(60 * 60).as_nanos() as u64 {
                 return None;
             }
-            Some(cached_status.status.clone())
+            Some(cached_status.clone())
         }
     })
 }
@@ -316,5 +315,11 @@ pub fn cached_archive_status() -> Option<CanisterStatusResponse> {
 pub fn cache_archive_status(archive_status: ArchiveStatusCache) {
     STATE.with(|state| {
         *state.archive_status_cache.borrow_mut() = Some(archive_status);
+    })
+}
+
+pub fn invalidate_archive_status_cache() {
+    STATE.with(|state| {
+        *state.archive_status_cache.borrow_mut() = None;
     })
 }

@@ -37,12 +37,12 @@
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::management_canister::main::{
-    canister_status, CanisterIdRecord, CanisterStatusResponse,
-};
+use ic_cdk::api::call::CallResult;
+use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
-use ic_cdk::{caller, id, trap};
+use ic_cdk::timer::set_timer_interval;
+use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_metrics_encoder::MetricsEncoder;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -96,6 +96,9 @@ thread_local! {
     static ANCHOR_INDEX: RefCell<AnchorIndex> = with_memory_manager(|memory_manager| {
         RefCell::new(StableBTreeMap::init(memory_manager.get(ANCHOR_ACCESS_INDEX_MEMORY_ID)))
     });
+
+    /// Information about the calls the archive is making to II. Not persistent in stable memory.
+    static CALL_INFO: RefCell<CallInfo> = RefCell::new(CallInfo::default());
 }
 
 /// Reserve the first stable memory page for the configuration stable cell.
@@ -128,6 +131,16 @@ fn with_anchor_index_mut<R>(f: impl FnOnce(&mut AnchorIndex) -> R) -> R {
     ANCHOR_INDEX.with(|cell| f(&mut cell.borrow_mut()))
 }
 
+/// A helper function to access the call info.
+fn with_call_info<R>(f: impl FnOnce(&CallInfo) -> R) -> R {
+    CALL_INFO.with(|cell| f(&cell.borrow_mut()))
+}
+
+/// A helper function to mutate call info.
+fn with_call_info_mut<R>(f: impl FnOnce(&mut CallInfo) -> R) -> R {
+    CALL_INFO.with(|cell| f(&mut cell.borrow_mut()))
+}
+
 /// Configuration state of the archive.
 enum ConfigState {
     Uninitialized, // This state is only used between wasm module initialization and init().
@@ -152,6 +165,12 @@ struct ArchiveConfig {
     max_entries_per_call: u16,
     /// Timestamp of the last install / upgrade of this canister.
     last_upgrade_timestamp: Timestamp,
+    /// Polling interval to fetch new entries from II (in nanoseconds).
+    polling_interval_ns: Option<u64>,
+    /// Number of call errors to keep.
+    error_buffer_limit: Option<u16>,
+    /// Highest sequence number of any entry that was archived.
+    highest_sequence_number: Option<u64>,
 }
 
 impl Storable for ConfigState {
@@ -229,8 +248,11 @@ impl BoundedStorable for AnchorIndexKey {
     }
 }
 
+/// This method is kept for legacy compatibility and easier testability of the archive.
+/// I.e. this allows rolling back Internet Identity from pull to push without rolling back the
+/// archive.
 #[update]
-fn write_entry(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
+fn write_entry(anchor_number: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
     with_config(|config| {
         if config.ii_canister != caller() {
             trap(&format!(
@@ -239,6 +261,107 @@ fn write_entry(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
             ))
         }
     });
+    write_entry_internal(anchor_number, timestamp, entry)
+}
+
+/// Fetches, archives and acknowledges a batch of entries.
+/// *Note:* Must be written in a way that nothing breaks on overlapping executions of [fetch_entries].
+async fn fetch_entries() {
+    const FETCH_ENTRIES_METHOD: &str = "fetch_entries";
+    const ACKNOWLEDGE_ENTRIES_METHOD: &str = "acknowledge_entries";
+
+    let ii_canister = with_config(|config| config.ii_canister);
+    let call_time = time();
+    let fetch_result: CallResult<(Vec<BufferedEntry>,)> =
+        call(ii_canister, FETCH_ENTRIES_METHOD, ()).await;
+
+    let entries = match fetch_result {
+        Ok((entries,)) => entries,
+        Err((code, message)) => {
+            // failed to fetch entries --> store failure information and exit early
+            store_call_error(CallErrorInfo {
+                time: call_time,
+                canister: ii_canister,
+                method: FETCH_ENTRIES_METHOD.to_string(),
+                argument: ByteBuf::from(candid::encode_one(()).unwrap()),
+                rejection_code: code as i32,
+                message,
+            });
+            return;
+        }
+    };
+
+    if entries.is_empty() {
+        // empty fetch is considered successful
+        with_call_info_mut(|info| {
+            info.last_successful_fetch = Some(FetchInfo {
+                timestamp: time(),
+                number_of_entries: 0,
+            })
+        });
+        // nothing to do --> exit early
+        return;
+    }
+
+    let entries_count = entries.len();
+    let lowest_seq_nr = entries.first().unwrap().sequence_number;
+    let highest_seq_nr = entries.last().unwrap().sequence_number;
+    // For the very first fetch the sequence number is not known thus we default on the one we get back from II.
+    let expected_seq_nr = highest_archived_sequence_number()
+        .map(|seq_nr| seq_nr + 1)
+        .unwrap_or(lowest_seq_nr);
+
+    if lowest_seq_nr > expected_seq_nr {
+        // Unfortunately there is nothing further we can do as the missing entries have already been
+        // pruned on the II side.
+        print(format!(
+            "Gap in archive entries: entries {} to {} were never archived!",
+            expected_seq_nr,
+            lowest_seq_nr - 1
+        ))
+    }
+
+    // If this condition is false, all entries have already been archived by another invocation of fetch_entries.
+    // This can happen if the fetch interval is too short or on call failures, e.g. if the last acknowledge message got rejected.
+    // In such cases just the acknowledge is sent again.
+    if highest_seq_nr >= expected_seq_nr {
+        entries
+            .into_iter()
+            // due to the overlapping calls, also just parts of the entries could already have been archived
+            // --> filter those out
+            .filter(|e| e.sequence_number >= expected_seq_nr)
+            .for_each(|e| write_entry_internal(e.anchor_number, e.timestamp, e.entry));
+        set_highest_archived_sequence_number(highest_seq_nr);
+    }
+
+    let call_time = time();
+    let result: CallResult<()> =
+        call(ii_canister, ACKNOWLEDGE_ENTRIES_METHOD, (highest_seq_nr,)).await;
+
+    match result {
+        Ok(_) => {
+            with_call_info_mut(|info| {
+                info.last_successful_fetch = Some(FetchInfo {
+                    timestamp: time(),
+                    number_of_entries: entries_count as u16,
+                })
+            });
+        }
+        Err((code, message)) => {
+            // failed to acknowledge entries --> store failure information
+            store_call_error(CallErrorInfo {
+                time: call_time,
+                canister: ii_canister,
+                method: ACKNOWLEDGE_ENTRIES_METHOD.to_string(),
+                argument: ByteBuf::from(candid::encode_one(highest_seq_nr).unwrap()),
+                rejection_code: code as i32,
+                message,
+            });
+        }
+    };
+}
+
+fn write_entry_internal(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
     let idx = with_log(|log| {
         log.append(entry.as_ref())
             .expect("failed to append log entry")
@@ -254,6 +377,17 @@ fn write_entry(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
         // the only way this expect can trigger is when the key size is wrong.
         // On other failures (e.g. no more stable memory available) the underlying StableBTreeMap will panic directly.
         index.insert(key, ()).expect("bug: key size mismatch");
+    })
+}
+
+fn store_call_error(call_error: CallErrorInfo) {
+    let error_limit = with_config(|config| config.error_buffer_limit.unwrap()) as usize;
+
+    with_call_info_mut(|info| {
+        if info.call_errors.len() >= error_limit {
+            info.call_errors.remove(0);
+        }
+        info.call_errors.push(call_error);
     })
 }
 
@@ -369,6 +503,20 @@ fn limit_or_default(limit: Option<u16>) -> usize {
     })
 }
 
+fn highest_archived_sequence_number() -> Option<u64> {
+    CONFIG.with(|config| match config.borrow().get() {
+        ConfigState::Uninitialized => None,
+        ConfigState::Initialized(config) => config.highest_sequence_number,
+    })
+}
+
+fn set_highest_archived_sequence_number(sequence_number: u64) {
+    // stable cell does not allow modifying values in place --> copy and swap
+    let mut config = with_config(|config| config.clone());
+    config.highest_sequence_number = Some(sequence_number);
+    write_config(config);
+}
+
 #[init]
 #[post_upgrade]
 fn initialize(arg: ArchiveInit) {
@@ -376,6 +524,13 @@ fn initialize(arg: ArchiveInit) {
         ii_canister: arg.ii_canister,
         max_entries_per_call: arg.max_entries_per_call,
         last_upgrade_timestamp: time(),
+        polling_interval_ns: Some(arg.polling_interval_ns),
+        error_buffer_limit: Some(arg.error_buffer_limit),
+        highest_sequence_number: highest_archived_sequence_number(),
+    });
+
+    set_timer_interval(Duration::from_nanos(arg.polling_interval_ns), || {
+        ic_cdk::spawn(fetch_entries())
     });
 }
 
@@ -430,7 +585,15 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "ii_archive_last_upgrade_timestamp_seconds",
             Duration::from_nanos(config.last_upgrade_timestamp).as_secs_f64(),
             "Timestamp of the last upgrade of this canister.",
-        )
+        )?;
+        if let Some(sequence_number) = config.highest_sequence_number {
+            w.encode_gauge(
+                "ii_archive_highest_sequence_number",
+                sequence_number as f64,
+                "Highest sequence number of any archived entry.",
+            )?;
+        }
+        Ok::<(), std::io::Error>(())
     })?;
     with_log(|log| {
         with_anchor_index_mut(|index| {
@@ -476,18 +639,47 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         stable64_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
+    with_call_info(|call_info| {
+        if let Some(successful_fetch) = &call_info.last_successful_fetch {
+            w.encode_gauge(
+                "ii_archive_last_successful_fetch_timestamp_seconds",
+                Duration::from_nanos(successful_fetch.timestamp).as_secs_f64(),
+                "Timestamp of the last successful fetch of entries from the II canister.",
+            )?;
+            w.encode_gauge(
+                "ii_archive_last_successful_fetch_entries_count",
+                successful_fetch.number_of_entries as f64,
+                "Number of entries that were fetched  from the II canister with the last successful fetch.",
+            )?;
+        };
+        Ok::<(), std::io::Error>(())
+    })?;
     Ok(())
 }
 
 /// Publicly exposes the status of the archive canister.
-/// This is useful to check the cycles balance in testing environments.
+/// This is useful to check operations or for debugging purposes.
 #[update]
-async fn status() -> CanisterStatusResponse {
+async fn status() -> ArchiveStatus {
     let canister_id = id();
-    let (status,) = canister_status(CanisterIdRecord { canister_id })
+    let (canister_status,) = canister_status(CanisterIdRecord { canister_id })
         .await
         .expect("failed to retrieve canister status");
-    status
+    let config = with_config(|config| ArchiveInit {
+        ii_canister: config.ii_canister,
+        max_entries_per_call: config.max_entries_per_call,
+
+        // these config parameters are only opt for candid compatibility and will be initialized
+        // --> unwrap is safe to call
+        polling_interval_ns: config.polling_interval_ns.unwrap(),
+        error_buffer_limit: config.error_buffer_limit.unwrap(),
+    });
+    let call_info = with_call_info(|info| info.clone());
+    ArchiveStatus {
+        canister_status,
+        call_info,
+        init: config,
+    }
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other

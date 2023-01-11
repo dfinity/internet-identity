@@ -1,5 +1,5 @@
 use candid::Principal;
-use ic_cdk::api::management_canister::main::{CanisterId, CanisterStatusResponse};
+use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use state_machine_client::{call_candid, call_candid_as, query_candid, CallError, StateMachine};
@@ -46,9 +46,6 @@ pub fn get_anchor_entries(
     .map(|(x,)| x)
 }
 
-pub fn status(
-    env: &StateMachine,
-    canister_id: CanisterId,
-) -> Result<CanisterStatusResponse, CallError> {
+pub fn status(env: &StateMachine, canister_id: CanisterId) -> Result<ArchiveStatus, CallError> {
     call_candid(env, canister_id, "status", ()).map(|(x,)| x)
 }

@@ -2003,10 +2003,18 @@ mod http_tests {
             "internet_identity_last_upgrade_timestamp",
             "internet_identity_inflight_challenges",
             "internet_identity_users_in_registration_mode",
+            "internet_identity_buffered_archive_entries",
         ];
         let env = env();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        // spawn an archive so that we also get the archive related metrics
+        let canister_id = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+        deploy_archive_via_ii(&env, canister_id);
 
         let metrics_body = get_metrics(&env, canister_id);
         for metric in metrics {

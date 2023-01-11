@@ -8,8 +8,9 @@ use ic_cdk::api::management_canister::main::{
     InstallCodeArgument,
 };
 use ic_cdk::api::time;
-use ic_cdk::{id, notify};
+use ic_cdk::{call, caller, id, notify, trap};
 use internet_identity_interface::archive::*;
+use internet_identity_interface::ArchiveIntegration::Pull;
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -70,12 +71,15 @@ pub struct ArchiveData {
 }
 
 /// Cached archive status information
-#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+#[derive(Clone, CandidType, Debug, Deserialize)]
 pub struct ArchiveStatusCache {
     // Timestamp when the status was last obtained
     pub timestamp: Timestamp,
     // Status of the archive canister
-    pub status: CanisterStatusResponse,
+    pub canister_status: CanisterStatusResponse,
+    // Last used init arguments
+    // Empty if only created but never deployed
+    pub init: Option<ArchiveInit>,
 }
 
 struct VerifiedWasm(Vec<u8>);
@@ -101,15 +105,10 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
         Created { config, data } => (ReducedArchiveState::Created(data), config),
     };
 
-    // exit early if the expected wasm module is already installed
+    // exit early if the config has not been changed and the expected wasm module is already installed
     if let ReducedArchiveState::Created(ref data) = reduced_state {
-        let status = archive_status(data.archive_canister).await;
-        match status.module_hash {
-            Some(hash) if hash == config.module_hash.to_vec() => {
-                // we already have an archive with the expected module and don't need to do anything
-                return DeployArchiveResult::Success(data.archive_canister);
-            }
-            None | Some(_) => {}
+        if !archive_change_required(data.archive_canister, &config).await {
+            return DeployArchiveResult::Success(data.archive_canister);
         }
     }
 
@@ -130,14 +129,14 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
         }
         ReducedArchiveState::Created(data) => {
             let status = archive_status(data.archive_canister).await;
-            match status.module_hash {
+            match status.canister_status.module_hash {
                 None => (data.archive_canister, Install),
                 Some(_) => (data.archive_canister, Upgrade),
             }
         }
     };
 
-    match install_archive(archive_canister, verified_wasm, install_mode).await {
+    match install_archive(archive_canister, verified_wasm, install_mode, &config).await {
         Ok(()) => DeployArchiveResult::Success(archive_canister),
         Err(err) => DeployArchiveResult::Failed(err),
     }
@@ -156,6 +155,28 @@ fn unlock_archive_if_stuck() {
             }
         }
     }
+}
+
+async fn archive_change_required(archive_canister: Principal, config: &ArchiveConfig) -> bool {
+    let status = archive_status(archive_canister).await;
+
+    if !status
+        .init
+        .map_or(false, |init| init == config_to_init(config))
+    {
+        // the init arguments have changed --> deployment required regardless of wasm hash
+        return true;
+    }
+
+    if let Some(hash) = status.canister_status.module_hash {
+        if hash == config.module_hash {
+            // we already have an archive with the expected module and don't need to do anything
+            return false;
+        }
+    }
+
+    // no hash or different hash --> deployment required
+    true
 }
 
 async fn create_archive(config: ArchiveConfig) -> Result<Principal, String> {
@@ -221,12 +242,9 @@ async fn install_archive(
     archive_canister: Principal,
     wasm: VerifiedWasm,
     install_mode: CanisterInstallMode,
+    config: &ArchiveConfig,
 ) -> Result<(), String> {
-    let settings = ArchiveInit {
-        ii_canister: id(),
-        max_entries_per_call: 1000,
-    };
-    let encoded_arg = candid::encode_one(settings)
+    let encoded_arg = candid::encode_one(config_to_init(config))
         .map_err(|err| format!("failed to encode archive install argument: {:?}", err))?;
 
     install_code(InstallCodeArgument {
@@ -241,7 +259,23 @@ async fn install_archive(
             "failed to install archive canister! error code: {:?}, message: {}",
             code, message
         )
-    })
+    })?;
+
+    // the archive has changed --> the cached information is now invalid
+    state::invalidate_archive_status_cache();
+    Ok(())
+}
+
+fn config_to_init(config: &ArchiveConfig) -> ArchiveInit {
+    const ENTRIES_PER_CALL: u16 = 1000;
+    const CALL_ERROR_BUFFER_SIZE: u16 = 20;
+
+    ArchiveInit {
+        ii_canister: id(),
+        max_entries_per_call: ENTRIES_PER_CALL,
+        polling_interval_ns: config.polling_interval_ns,
+        error_buffer_limit: CALL_ERROR_BUFFER_SIZE,
+    }
 }
 
 fn verify_wasm(wasm: Vec<u8>, expected_hash: &[u8; 32]) -> Result<VerifiedWasm, String> {
@@ -256,31 +290,49 @@ fn verify_wasm(wasm: Vec<u8>, expected_hash: &[u8; 32]) -> Result<VerifiedWasm, 
     Ok(VerifiedWasm(wasm))
 }
 
-async fn archive_status(archive_canister: Principal) -> CanisterStatusResponse {
+async fn archive_status(archive_canister: Principal) -> ArchiveStatusCache {
     let status_opt = state::cached_archive_status();
     match status_opt {
         None => {
-            let (archive_status,) = canister_status(CanisterIdRecord {
+            let (canister_status,) = canister_status(CanisterIdRecord {
                 canister_id: archive_canister,
             })
             .await
-            .expect("failed to retrieve archive status");
+            .expect("failed to retrieve archive canister status");
 
-            state::cache_archive_status(ArchiveStatusCache {
+            let init = if canister_status.module_hash.is_some() {
+                // Only query the archive for its status if it has a module installed.
+                // Errors are ignored here to avoid compatibility issues on the archive interface.
+                call::<(), (ArchiveStatus,)>(archive_canister, "status", ())
+                    .await
+                    .map(|(status,)| status.init)
+                    .ok()
+            } else {
+                None
+            };
+
+            let status_cache = ArchiveStatusCache {
                 timestamp: time(),
-                status: archive_status.clone(),
-            });
-            archive_status
+                canister_status,
+                init,
+            };
+            state::cache_archive_status(status_cache.clone());
+            status_cache
         }
-        Some(status) => status,
+        Some(status_cache) => status_cache,
     }
 }
 
 pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operation: Operation) {
-    let Created {data, ..} = state::archive_state() else {
+    let Created {data, config} = state::archive_state() else {
         // nothing to archive if the archive has not been deployed yet
         return
     };
+
+    // For layout versions < 6 this will always be false because nothing is ever added to the buffer
+    if data.entries_buffer.len() as u64 >= config.entries_buffer_limit {
+        trap("cannot archive operation, archive entries buffer limit reached")
+    }
 
     let timestamp = time();
     let entry = Entry {
@@ -292,17 +344,67 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
     };
     let encoded_entry = candid::encode_one(entry).expect("failed to encode archive entry");
 
-    // Notify can still trap if the message cannot be enqueued rolling back the anchor operation.
-    // Therefore we only increment the sequence number after notifying successfully.
-    let () = notify(
-        data.archive_canister,
-        "write_entry",
-        (anchor_number, timestamp, encoded_entry),
-    )
-    .expect("failed to send archive entry notification");
+    // Depending on the II layout version and the config we need to either send out the entry or just buffer it.
+    if state::storage(|s| s.version()) >= 6 && config.archive_integration == Some(Pull) {
+        // add entry to buffer (which is emptied by the archive periodically, see fetch_entries and acknowledge entries)
+        state::archive_data_mut(|data| {
+            Rc::make_mut(&mut data.entries_buffer).push(BufferedEntry {
+                anchor_number,
+                timestamp,
+                entry: ByteBuf::from(encoded_entry),
+                sequence_number: data.sequence_number,
+            });
+        });
+    } else {
+        // Notify can still trap if the message cannot be enqueued rolling back the anchor operation.
+        // Therefore we only increment the sequence number after notifying successfully.
+        let () = notify(
+            data.archive_canister,
+            "write_entry",
+            (anchor_number, timestamp, encoded_entry),
+        )
+        .expect("failed to send archive entry notification");
+    }
+
     state::archive_data_mut(|data| {
         data.sequence_number += 1;
     })
+}
+
+pub fn fetch_entries() -> Vec<BufferedEntry> {
+    let Created{data, config} = state::archive_state() else {
+        trap("no archive deployed!");
+    };
+    trap_if_caller_not_archive(&data);
+
+    // buffered entries are ordered by sequence number
+    // i.e. this takes the lowest entries_fetch_limit many entries
+    data.entries_buffer
+        .iter()
+        .take(config.entries_fetch_limit as usize)
+        .cloned()
+        .collect()
+}
+
+pub fn acknowledge_entries(sequence_number: u64) {
+    state::persistent_state_mut(|ps| {
+        let Created{ref mut data, .. } = ps.archive_state else {
+            trap("no archive deployed!");
+        };
+        trap_if_caller_not_archive(data);
+
+        // Only keep entries with higher sequence number as the highest acknowledged.
+        Rc::make_mut(&mut data.entries_buffer).retain(|e| e.sequence_number > sequence_number)
+    });
+}
+
+fn trap_if_caller_not_archive(data: &ArchiveData) {
+    if caller() != data.archive_canister {
+        trap(&format!(
+            "only the archive canister {} is allowed to fetch and acknowledge entries",
+            data.archive_canister
+        ))
+    };
 }
 
 pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
