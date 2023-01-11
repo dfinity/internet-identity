@@ -560,7 +560,7 @@ jobs:
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
           sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument "(opt record {archive_module_hash = opt blob \"$sha\"; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
+            --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             --wasm internet_identity_production.wasm \
             internet_identity
 
