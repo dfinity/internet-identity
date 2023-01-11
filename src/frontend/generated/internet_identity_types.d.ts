@@ -1,4 +1,6 @@
 import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+
 export type AddTentativeDeviceResponse = {
     'device_registration_mode_off' : null
   } |
@@ -12,12 +14,19 @@ export type AddTentativeDeviceResponse = {
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
-  'module_hash' : Array<number>,
+  'archive_integration' : [] | [{ 'pull' : null } | { 'push' : null }],
+  'module_hash' : Uint8Array | number[],
   'entries_fetch_limit' : number,
 }
 export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
+}
+export interface BufferedArchiveEntry {
+  'sequence_number' : bigint,
+  'entry' : Uint8Array | number[],
+  'anchor_number' : UserNumber,
+  'timestamp' : Timestamp,
 }
 export interface Challenge {
   'png_base64' : string,
@@ -25,7 +34,7 @@ export interface Challenge {
 }
 export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
-export type CredentialId = Array<number>;
+export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
   'targets' : [] | [Array<Principal>],
@@ -56,11 +65,11 @@ export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
   'method' : string,
-  'body' : Array<number>,
+  'body' : Uint8Array | number[],
   'headers' : Array<HeaderField>,
 }
 export interface HttpResponse {
-  'body' : Array<number>,
+  'body' : Uint8Array | number[],
   'headers' : Array<HeaderField>,
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
@@ -86,7 +95,7 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export type PublicKey = Array<number>;
+export type PublicKey = Uint8Array | number[];
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
 export type RegisterResponse = { 'bad_challenge' : null } |
@@ -94,12 +103,12 @@ export type RegisterResponse = { 'bad_challenge' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
-  'signature' : Array<number>,
+  'signature' : Uint8Array | number[],
   'delegation' : Delegation,
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
-  'body' : Array<number>,
+  'body' : Uint8Array | number[],
 }
 export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
@@ -115,44 +124,36 @@ export type VerifyTentativeDeviceResponse = {
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
 export interface _SERVICE {
-  'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
-  'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<
-      AddTentativeDeviceResponse
-    >,
-  'create_challenge' : () => Promise<Challenge>,
-  'deploy_archive' : (arg_0: Array<number>) => Promise<DeployArchiveResult>,
-  'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
-  'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
-  'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
-  'get_delegation' : (
-      arg_0: UserNumber,
-      arg_1: FrontendHostname,
-      arg_2: SessionKey,
-      arg_3: Timestamp,
-    ) => Promise<GetDelegationResponse>,
-  'get_principal' : (arg_0: UserNumber, arg_1: FrontendHostname) => Promise<
-      Principal
-    >,
-  'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
-  'init_salt' : () => Promise<undefined>,
-  'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
-  'prepare_delegation' : (
-      arg_0: UserNumber,
-      arg_1: FrontendHostname,
-      arg_2: SessionKey,
-      arg_3: [] | [bigint],
-    ) => Promise<[UserKey, Timestamp]>,
-  'register' : (arg_0: DeviceData, arg_1: ChallengeResult) => Promise<
-      RegisterResponse
-    >,
-  'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
-  'stats' : () => Promise<InternetIdentityStats>,
-  'update' : (
-      arg_0: UserNumber,
-      arg_1: DeviceKey,
-      arg_2: DeviceData,
-    ) => Promise<undefined>,
-  'verify_tentative_device' : (arg_0: UserNumber, arg_1: string) => Promise<
-      VerifyTentativeDeviceResponse
-    >,
+  'acknowledge_entries' : ActorMethod<[bigint], undefined>,
+  'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
+  'add_tentative_device' : ActorMethod<
+    [UserNumber, DeviceData],
+    AddTentativeDeviceResponse
+  >,
+  'create_challenge' : ActorMethod<[], Challenge>,
+  'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
+  'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
+  'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
+  'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
+  'get_delegation' : ActorMethod<
+    [UserNumber, FrontendHostname, SessionKey, Timestamp],
+    GetDelegationResponse
+  >,
+  'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
+  'init_salt' : ActorMethod<[], undefined>,
+  'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
+  'prepare_delegation' : ActorMethod<
+    [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
+    [UserKey, Timestamp]
+  >,
+  'register' : ActorMethod<[DeviceData, ChallengeResult], RegisterResponse>,
+  'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
+  'stats' : ActorMethod<[], InternetIdentityStats>,
+  'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'verify_tentative_device' : ActorMethod<
+    [UserNumber, string],
+    VerifyTentativeDeviceResponse
+  >,
 }
