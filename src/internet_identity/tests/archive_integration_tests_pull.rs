@@ -402,6 +402,11 @@ mod pull_entries_tests {
             "ii_archive_last_successful_fetch_entries_count",
             3f64,
         );
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "ii_archive_highest_sequence_number",
+            2f64,
+        );
         Ok(())
     }
 

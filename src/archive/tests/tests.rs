@@ -513,6 +513,7 @@ mod metrics_tests {
             // The metrics
             //   * ii_archive_last_successful_fetch_timestamp_seconds
             //   * ii_archive_last_successful_fetch_entries_count
+            //   * ii_archive_highest_sequence_number
             // are only provided, if there is a successful fetch, which requires II to be deployed.
             // These metrics are tested in src/internet_identity/tests/archive_integration_tests_pull.rs.
         ];

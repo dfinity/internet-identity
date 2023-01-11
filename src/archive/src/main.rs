@@ -42,7 +42,7 @@ use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
 use ic_cdk::timer::set_timer_interval;
-use ic_cdk::{call, caller, id, trap};
+use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_metrics_encoder::MetricsEncoder;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -169,6 +169,8 @@ struct ArchiveConfig {
     polling_interval_ns: Option<u64>,
     /// Number of call errors to keep.
     error_buffer_limit: Option<u16>,
+    /// Highest sequence number of any entry that was archived.
+    highest_sequence_number: Option<u64>,
 }
 
 impl Storable for ConfigState {
@@ -273,7 +275,7 @@ async fn fetch_entries() {
     let fetch_result: CallResult<(Vec<BufferedEntry>,)> =
         call(ii_canister, FETCH_ENTRIES_METHOD, ()).await;
 
-    let mut entries = match fetch_result {
+    let entries = match fetch_result {
         Ok((entries,)) => entries,
         Err((code, message)) => {
             // failed to fetch entries --> store failure information and exit early
@@ -301,11 +303,23 @@ async fn fetch_entries() {
         return;
     }
 
-    entries.sort_by(|a, b| a.sequence_number.cmp(&b.sequence_number));
-    let expected_seq_nr = with_log(|log| log.len() as u64);
     let entries_count = entries.len();
     let lowest_seq_nr = entries.first().unwrap().sequence_number;
     let highest_seq_nr = entries.last().unwrap().sequence_number;
+    // For the very first fetch the sequence number is not known thus we default on the one we get back from II.
+    let expected_seq_nr = highest_archived_sequence_number()
+        .map(|seq_nr| seq_nr + 1)
+        .unwrap_or(lowest_seq_nr);
+
+    if lowest_seq_nr > expected_seq_nr {
+        // Unfortunately there is nothing further we can do as the missing entries have already been
+        // pruned on the II side in this case.
+        print(&format!(
+            "Gap in archive entries: entries {} to {} were never archived!",
+            expected_seq_nr,
+            lowest_seq_nr - 1
+        ))
+    }
 
     // If this condition is false, the fetched entries have already been archived (by an other invocation of fetch_entries).
     // This can happen if the fetch interval is too short or on call failures, e.g. if the last
@@ -322,12 +336,15 @@ async fn fetch_entries() {
         call(ii_canister, ACKNOWLEDGE_ENTRIES_METHOD, (highest_seq_nr,)).await;
 
     match result {
-        Ok(_) => with_call_info_mut(|info| {
-            info.last_successful_fetch = Some(FetchInfo {
-                timestamp: time(),
-                number_of_entries: entries_count as u16,
-            })
-        }),
+        Ok(_) => {
+            set_highest_archived_sequence_number(highest_seq_nr);
+            with_call_info_mut(|info| {
+                info.last_successful_fetch = Some(FetchInfo {
+                    timestamp: time(),
+                    number_of_entries: entries_count as u16,
+                })
+            });
+        }
         Err((code, message)) => {
             // failed to acknowledge entries --> store failure information
             store_call_error(CallErrorInfo {
@@ -484,6 +501,20 @@ fn limit_or_default(limit: Option<u16>) -> usize {
     })
 }
 
+fn highest_archived_sequence_number() -> Option<u64> {
+    CONFIG.with(|config| match config.borrow().get() {
+        ConfigState::Uninitialized => None,
+        ConfigState::Initialized(config) => config.highest_sequence_number,
+    })
+}
+
+fn set_highest_archived_sequence_number(sequence_number: u64) {
+    // stable cell does not allow modifying values in place --> copy and swap
+    let mut config = with_config(|config| config.clone());
+    config.highest_sequence_number = Some(sequence_number);
+    write_config(config);
+}
+
 #[init]
 #[post_upgrade]
 fn initialize(arg: ArchiveInit) {
@@ -493,6 +524,7 @@ fn initialize(arg: ArchiveInit) {
         last_upgrade_timestamp: time(),
         polling_interval_ns: Some(arg.polling_interval_ns),
         error_buffer_limit: Some(arg.error_buffer_limit),
+        highest_sequence_number: highest_archived_sequence_number(),
     });
 
     set_timer_interval(Duration::from_nanos(arg.polling_interval_ns), || {
@@ -551,7 +583,15 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "ii_archive_last_upgrade_timestamp_seconds",
             Duration::from_nanos(config.last_upgrade_timestamp).as_secs_f64(),
             "Timestamp of the last upgrade of this canister.",
-        )
+        )?;
+        if let Some(sequence_number) = config.highest_sequence_number {
+            w.encode_gauge(
+                "ii_archive_highest_sequence_number",
+                sequence_number as f64,
+                "Highest sequence number of any archived entry.",
+            )?;
+        }
+        Ok::<(), std::io::Error>(())
     })?;
     with_log(|log| {
         with_anchor_index_mut(|index| {
