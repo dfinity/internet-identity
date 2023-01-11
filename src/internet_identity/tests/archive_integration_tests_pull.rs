@@ -153,6 +153,54 @@ mod deployment_tests {
         assert_eq!(entries.entries.len(), 0);
         Ok(())
     }
+
+    /// Test to verify that II can spawn an archive canister when cycles are required.
+    #[test]
+    fn should_upgrade_archive_with_only_config_changed() -> Result<(), CallError> {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+
+        let result =
+            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let DeployArchiveResult::Success(archive_canister) = result else {
+            panic!("Unexpected result")
+        };
+
+        let status = archive_api::status(&env, archive_canister)?;
+        assert_eq!(status.init.polling_interval_ns, 1_000_000_000);
+
+        // change archive config
+        upgrade_ii_canister_with_arg(
+            &env,
+            ii_canister,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: None,
+                archive_config: Some(ArchiveConfig {
+                    module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                    entries_buffer_limit: 10,
+                    polling_interval_ns: 5_000,
+                    entries_fetch_limit: 10,
+                    archive_integration: Some(ArchiveIntegration::Pull),
+                }),
+                canister_creation_cycles_cost: None, // current cost in application subnets
+                upgrade_persistent_state: None,
+            }),
+        )
+        .unwrap();
+
+        let result =
+            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        assert!(matches!(result, DeployArchiveResult::Success(_)));
+
+        let status = archive_api::status(&env, archive_canister)?;
+        assert_eq!(status.init.polling_interval_ns, 5_000);
+        Ok(())
+    }
 }
 
 /// Test the functionality of pulling entries from II.
