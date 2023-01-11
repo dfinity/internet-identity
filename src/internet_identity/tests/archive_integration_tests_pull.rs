@@ -200,8 +200,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 4);
@@ -293,8 +291,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 1);
@@ -307,8 +303,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 4);
@@ -317,7 +311,7 @@ mod pull_entries_tests {
 
     /// Tests integration if II has no new messages to archive.
     #[test]
-    fn should_not_fail_on_empty_fetch_result() -> Result<(), CallError> {
+    fn should_succeed_on_empty_fetch_result() -> Result<(), CallError> {
         let env = env();
         let ii_canister = install_ii_canister_with_arg(
             &env,
@@ -332,8 +326,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(status.call_info.call_errors.is_empty());
@@ -372,8 +364,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(status.call_info.call_errors.is_empty());
@@ -403,7 +393,7 @@ mod pull_entries_tests {
             3f64,
         );
         assert_metric(
-            &get_metrics(&env, ii_canister),
+            &get_metrics(&env, archive_canister),
             "ii_archive_highest_sequence_number",
             2f64,
         );
@@ -430,8 +420,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let status = archive_api::status(&env, archive_canister)?;
         assert_eq!(status.call_info.call_errors.len(), 1);
@@ -476,8 +464,6 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let status = archive_api::status(&env, archive_canister)?;
         assert_eq!(status.call_info.call_errors.len(), 1);
@@ -489,11 +475,34 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(matches!(status.call_info.last_successful_fetch, Some(_)));
+        Ok(())
+    }
+
+    /// Tests that II provides the entries ordered by sequence number.
+    #[test]
+    fn should_return_entries_ordered() -> Result<(), CallError> {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        for _ in 0..3 {
+            flows::register_anchor(&env, ii_canister);
+        }
+
+        let entries = ii_api::fetch_entries(&env, ii_canister, archive_canister)?;
+        let mut entries_sorted = entries.clone();
+        entries_sorted.sort_by(|a, b| a.sequence_number.cmp(&b.sequence_number));
+
+        assert_eq!(entries, entries_sorted);
         Ok(())
     }
 
@@ -598,8 +607,6 @@ mod push_to_pull_transition_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         // buffer is empty again after the archive has pulled entries
         assert_metric(
@@ -639,8 +646,6 @@ mod push_to_pull_transition_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
-        // run until finished
-        env.run_until_completion(100);
 
         // one entry has been pulled
         assert_metric(

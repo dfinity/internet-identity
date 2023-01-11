@@ -177,7 +177,7 @@ async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     archive::deploy_archive(wasm).await
 }
 
-/// Returns a batch of entries to be archived.
+/// Returns a batch of entries _sorted by sequence number_ to be archived.
 /// This is an update call because the archive information _must_ be certified.
 /// Only callable by this IIs archive canister.
 #[update]

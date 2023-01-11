@@ -313,22 +313,25 @@ async fn fetch_entries() {
 
     if lowest_seq_nr > expected_seq_nr {
         // Unfortunately there is nothing further we can do as the missing entries have already been
-        // pruned on the II side in this case.
-        print(&format!(
+        // pruned on the II side.
+        print(format!(
             "Gap in archive entries: entries {} to {} were never archived!",
             expected_seq_nr,
             lowest_seq_nr - 1
         ))
     }
 
-    // If this condition is false, the fetched entries have already been archived (by an other invocation of fetch_entries).
-    // This can happen if the fetch interval is too short or on call failures, e.g. if the last
-    // acknowledge message got rejected.
+    // If this condition is false, all entries have already been archived by another invocation of fetch_entries.
+    // This can happen if the fetch interval is too short or on call failures, e.g. if the last acknowledge message got rejected.
     // In such cases just the acknowledge is sent again.
-    if lowest_seq_nr >= expected_seq_nr {
+    if highest_seq_nr >= expected_seq_nr {
         entries
             .into_iter()
+            // due to the overlapping calls, also just parts of the entries could already have been archived
+            // --> filter those out
+            .filter(|e| e.sequence_number >= expected_seq_nr)
             .for_each(|e| write_entry_internal(e.anchor_number, e.timestamp, e.entry));
+        set_highest_archived_sequence_number(highest_seq_nr);
     }
 
     let call_time = time();
@@ -337,7 +340,6 @@ async fn fetch_entries() {
 
     match result {
         Ok(_) => {
-            set_highest_archived_sequence_number(highest_seq_nr);
             with_call_info_mut(|info| {
                 info.last_successful_fetch = Some(FetchInfo {
                     timestamp: time(),

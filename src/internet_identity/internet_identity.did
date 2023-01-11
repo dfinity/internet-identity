@@ -261,6 +261,9 @@ service : (opt InternetIdentityInit) -> {
     http_request: (request: HttpRequest) -> (HttpResponse) query;
 
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
+    /// Returns a batch of entries _sorted by sequence number_ to be archived.
+    /// This is an update call because the archive information _must_ be certified.
+    /// Only callable by this IIs archive canister.
     fetch_entries: () -> (vec BufferedArchiveEntry);
     acknowledge_entries: (sequence_number: nat64) -> ();
 }

@@ -134,14 +134,18 @@ pub struct CallInfo {
 /// Information about the last successful fetch of II archive entries.
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct FetchInfo {
+    /// Timestamp when the last execution of the archive `fetch_entries` method finished.
     pub timestamp: Timestamp,
+    /// The number of entries fetched (regardless of how many of those were actually archived).
     pub number_of_entries: u16,
 }
 
 /// Struct to keep debug info about a call failure.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct CallErrorInfo {
+    /// Timestamp when the call was made (not when the error was received).
     pub time: u64,
+    /// Target canister.
     pub canister: Principal,
     pub method: String,
     pub argument: ByteBuf,
