@@ -32,6 +32,11 @@ type Operation = variant {
         device: PublicKey;
         new_values: DeviceDataUpdate;
     };
+    // Atomically replace device with new_device
+    swap_device: record {
+        device: PublicKey;
+        new_device: DeviceDataWithoutAlias;
+    };
     remove_device: record {
         device: PublicKey;
     };

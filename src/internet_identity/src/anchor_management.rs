@@ -109,6 +109,35 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
     );
 }
 
+pub fn swap(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    let mut anchor = state::anchor(anchor_number);
+    // must be called before the first await because it requires caller()
+    trap_if_not_authenticated(&anchor);
+
+    anchor.remove_device(&device_key).unwrap_or_else(|err| {
+        trap(&format!(
+            "failed to swap device of anchor {}: {}",
+            anchor_number, err
+        ))
+    });
+    let new_device = Device::from(device_data);
+    anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
+        trap(&format!(
+            "failed to swap device to anchor {}: {}",
+            anchor_number, err
+        ))
+    });
+    write_anchor(anchor_number, anchor);
+    archive_operation(
+        anchor_number,
+        caller(),
+        Operation::AddDevice {
+            device: DeviceDataWithoutAlias::from(new_device),
+        },
+    );
+    delegation::prune_expired_signatures();
+}
+
 pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     let mut anchor = state::anchor(anchor_number);
     // must be called before the first await because it requires caller()
