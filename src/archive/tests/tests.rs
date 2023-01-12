@@ -81,10 +81,7 @@ mod rollback_tests {
 
         let logs = api::compat::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
-        assert_eq!(
-            logs.entries.get(0).unwrap().as_ref().unwrap(),
-            &api::compat::log_entry_1()
-        );
+        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
         Ok(())
     }
 
