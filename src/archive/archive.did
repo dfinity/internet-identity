@@ -33,7 +33,7 @@ type Operation = variant {
         new_values: DeviceDataUpdate;
     };
     // Atomically replace device with new_device
-    swap_device: record {
+    replace_device: record {
         device: PublicKey;
         new_device: DeviceDataWithoutAlias;
     };
