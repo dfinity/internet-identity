@@ -51,11 +51,10 @@ const printDevMessage = () => {
   }
 
   if (anyFeatures()) {
-    const featuresRec: Record<string, boolean> = features;
     const message = `
 Some features are enabled:
-${Object.keys(featuresRec)
-  .map((k) => ` - ${k}: ${featuresRec[k]}`)
+${Object.entries(features)
+  .map(([k, v]) => ` - ${k}: ${v}`)
   .join("\n")}
 see more at https://github.com/dfinity/internet-identity#features
       `;
