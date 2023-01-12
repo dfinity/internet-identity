@@ -54,11 +54,11 @@ dependencies = [
  "ic-cdk-macros",
  "ic-metrics-encoder",
  "ic-stable-structures",
+ "ic-test-state-machine-client",
  "internet_identity_interface",
  "regex",
  "serde",
  "serde_bytes",
- "state_machine_client",
 ]
 
 [[package]]
@@ -282,6 +282,7 @@ dependencies = [
  "ic-certification 0.8.0",
  "ic-crypto-iccsa",
  "ic-crypto-utils-threshold-sig-der",
+ "ic-test-state-machine-client",
  "ic-types",
  "internet_identity_interface",
  "lazy_static",
@@ -290,7 +291,6 @@ dependencies = [
  "serde_bytes",
  "serde_cbor",
  "sha2 0.10.6",
- "state_machine_client",
 ]
 
 [[package]]
@@ -1350,6 +1350,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-test-state-machine-client"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae4ddf50287c60610fcdfe5514dba46a9a9ecc165bec07af6ac1c88b8b85b81"
+dependencies = [
+ "candid",
+ "ciborium",
+ "ic-cdk",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "ic-types"
 version = "0.8.0"
 source = "git+https://github.com/dfinity/ic#3635513e18c192b7e0c678458e41c85f54e4cdb9"
@@ -1485,6 +1498,7 @@ dependencies = [
  "ic-certified-map",
  "ic-metrics-encoder",
  "ic-stable-structures",
+ "ic-test-state-machine-client",
  "internet_identity_interface",
  "lazy_static",
  "lodepng",
@@ -1497,7 +1511,6 @@ dependencies = [
  "serde_cbor",
  "serde_with 2.1.0",
  "sha2 0.10.6",
- "state_machine_client",
 ]
 
 [[package]]
@@ -2306,17 +2319,6 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
-
-[[package]]
-name = "state_machine_client"
-version = "0.1.0"
-dependencies = [
- "candid",
- "ciborium",
- "ic-cdk",
- "serde",
- "serde_bytes",
-]
 
 [[package]]
 name = "string_cache"
