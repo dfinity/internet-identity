@@ -1,6 +1,6 @@
 use ic_cdk::api::management_canister::main::CanisterId;
+use ic_test_state_machine_client::{query_candid, CallError, StateMachine};
 use internet_identity_interface::{HttpRequest, HttpResponse};
-use state_machine_client::{query_candid, CallError, StateMachine};
 
 pub mod archive;
 pub mod internet_identity;

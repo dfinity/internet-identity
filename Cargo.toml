@@ -4,7 +4,6 @@ members = [
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",
-    "src/state_machine_client"
 ]
 
 [profile.release]
