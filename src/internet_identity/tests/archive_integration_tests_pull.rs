@@ -318,7 +318,7 @@ mod pull_entries_tests {
 
         let update_entry = Entry {
             anchor,
-            operation: Operation::SwapDevice {
+            operation: Operation::ReplaceDevice {
                 device: device_data_2().pubkey,
                 new_device: DeviceDataWithoutAlias::from(device_data_2()),
             },

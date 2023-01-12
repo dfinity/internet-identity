@@ -79,8 +79,8 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 }
 
 #[update]
-fn swap(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    anchor_management::swap(anchor_number, device_key, device_data)
+fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    anchor_management::replace(anchor_number, device_key, device_data)
 }
 
 #[update]
