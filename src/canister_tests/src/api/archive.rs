@@ -52,7 +52,9 @@ pub fn status(env: &StateMachine, canister_id: CanisterId) -> Result<ArchiveStat
     call_candid(env, canister_id, "status", ()).map(|(x,)| x)
 }
 
-/// A "compatibility" module for the previous version of II to handle API changes.
+/// A "compatibility" module for the previous version of the archive to handle API changes.
+/// Note: this is only required, because candid is being overly picky. Starting from the next
+/// candid release, additional operation variants will not require a compat module.
 pub mod compat {
     use super::*;
     use crate::framework::{
