@@ -291,23 +291,23 @@ fn update_root_hash() {
 /// Checks if the caller is authenticated against the anchor provided and traps if not.
 fn trap_if_not_authenticated(anchor: &Anchor) {
     let now = time();
-    state::with_temp_keys_mut(|temp_keys| temp_keys.retain(|_, (_, expiration)| *expiration > now));
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
             return;
         }
     }
 
-    let ok = state::with_temp_keys(|temp_keys| {
-        if let Some((principal, _)) = temp_keys.get(&anchor.anchor_number) {
-            let c = caller();
-            return principal == &c;
+    // Expire temporary keys, and if a principal is found for the anchor, compare against
+    // caller() and approve if matching
+    if let Some(principal) = state::with_temp_keys_mut(|temp_keys| {
+        temp_keys.retain(|_, (_, expiration)| *expiration > now);
+        temp_keys.get(&anchor.anchor_number).map(|x| x.0.clone())
+    }){
+        if principal == caller() {
+            return;
         }
-        return false;
-    });
-    if ok {
-        return;
-    }
+    };
+
     trap(&format!("{} could not be authenticated.", caller()))
 }
 

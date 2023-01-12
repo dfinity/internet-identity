@@ -265,10 +265,6 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
 }
 
-pub fn with_temp_keys<R>(f: impl FnOnce(&TempKeys) -> R) -> R {
-    STATE.with(|s| f(&s.temp_keys.borrow()))
-}
-
 pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
     STATE.with(|s| f(&mut s.temp_keys.borrow_mut()))
 }
