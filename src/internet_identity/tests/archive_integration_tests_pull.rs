@@ -237,7 +237,7 @@ mod pull_entries_tests {
             device,
         )?;
 
-        ii_api::swap(
+        ii_api::replace(
             &env,
             ii_canister,
             principal_1(),
@@ -316,7 +316,7 @@ mod pull_entries_tests {
             &update_entry
         );
 
-        let update_entry = Entry {
+        let replace_entry = Entry {
             anchor,
             operation: Operation::ReplaceDevice {
                 device: device_data_2().pubkey,
@@ -328,7 +328,7 @@ mod pull_entries_tests {
         };
         assert_eq!(
             entries.entries.get(3).unwrap().as_ref().unwrap(),
-            &update_entry
+            &replace_entry
         );
 
         let delete_entry = Entry {

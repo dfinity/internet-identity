@@ -146,7 +146,7 @@ pub fn update(
     )
 }
 
-pub fn swap(
+pub fn replace(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
@@ -158,7 +158,7 @@ pub fn swap(
         env,
         canister_id,
         sender,
-        "swap",
+        "replace",
         (anchor_number, device_key, device_data),
     )
 }

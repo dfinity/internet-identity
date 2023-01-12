@@ -1351,9 +1351,9 @@ mod device_management_tests {
         );
     }
 
-    /// Verifies that a device can be swapped with another device.
+    /// Verifies that a device can be replaced with another device.
     #[test]
-    fn should_swap_device() -> Result<(), CallError> {
+    fn should_replace_device() -> Result<(), CallError> {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
@@ -1361,7 +1361,7 @@ mod device_management_tests {
         let devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices, vec![device_data_1()]);
 
-        api::swap(
+        api::replace(
             &env,
             canister_id,
             principal_1(),
