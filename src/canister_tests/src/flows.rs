@@ -2,8 +2,8 @@ use crate::api::internet_identity::{create_challenge, register};
 use crate::framework::{device_data_1, principal_1};
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
+use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::{AnchorNumber, ChallengeAttempt, DeviceData, RegisterResponse};
-use state_machine_client::StateMachine;
 
 pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> AnchorNumber {
     register_anchor_with(env, canister_id, principal_1(), &device_data_1())

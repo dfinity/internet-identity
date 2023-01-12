@@ -1,10 +1,10 @@
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
+use ic_test_state_machine_client::CallError;
+use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use regex::Regex;
-use state_machine_client::CallError;
-use state_machine_client::ErrorCode::CanisterCalledTrap;
 use std::time::{Duration, SystemTime};
 
 /// Verifies that the canister can be installed successfully.

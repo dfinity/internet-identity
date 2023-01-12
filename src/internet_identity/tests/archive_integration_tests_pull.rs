@@ -2,12 +2,12 @@ use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use ic_test_state_machine_client::CallError;
+use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use state_machine_client::CallError;
-use state_machine_client::ErrorCode::CanisterCalledTrap;
 use std::time::Duration;
 use std::time::SystemTime;
 

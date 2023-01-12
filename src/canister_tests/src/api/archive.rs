@@ -1,8 +1,10 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
+use ic_test_state_machine_client::{
+    call_candid, call_candid_as, query_candid, CallError, StateMachine,
+};
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
-use state_machine_client::{call_candid, call_candid_as, query_candid, CallError, StateMachine};
 
 pub fn add_entry(
     env: &StateMachine,
