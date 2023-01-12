@@ -10,6 +10,7 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { Connection } from "./utils/iiConnection";
+import { anyFeatures, features } from "./features";
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -34,7 +35,7 @@ const readCanisterId = (): string => {
 };
 
 // Show version information for the curious programmer
-const printVersion = () => {
+const printDevMessage = () => {
   console.log("Welcome to Internet Identity!");
   console.log(
     "The code can be found here: https://github.com/dfinity/internet-identity"
@@ -48,11 +49,22 @@ const printVersion = () => {
   if (version.dirty) {
     console.warn("This version is dirty");
   }
+
+  if (anyFeatures()) {
+    const message = `
+Some features are enabled:
+${Object.entries(features)
+  .map(([k, v]) => ` - ${k}: ${v}`)
+  .join("\n")}
+see more at https://github.com/dfinity/internet-identity#features
+      `;
+    console.warn(message);
+  }
 };
 
 const init = async () => {
   try {
-    printVersion();
+    printDevMessage();
   } catch (e) {
     console.warn("Error when printing version information:", e);
   }
