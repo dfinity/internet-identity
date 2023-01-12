@@ -156,6 +156,9 @@ export interface _SERVICE {
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
+  'swap' : (arg_0: UserNumber, arg_1: DeviceKey, arg_2: DeviceData) => Promise<
+      undefined
+    >,
   'update' : (
       arg_0: UserNumber,
       arg_1: DeviceKey,
