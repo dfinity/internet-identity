@@ -155,10 +155,12 @@ export interface _SERVICE {
       RegisterResponse
     >,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
+  'replace' : (
+      arg_0: UserNumber,
+      arg_1: DeviceKey,
+      arg_2: DeviceData,
+    ) => Promise<undefined>,
   'stats' : () => Promise<InternetIdentityStats>,
-  'swap' : (arg_0: UserNumber, arg_1: DeviceKey, arg_2: DeviceData) => Promise<
-      undefined
-    >,
   'update' : (
       arg_0: UserNumber,
       arg_1: DeviceKey,
