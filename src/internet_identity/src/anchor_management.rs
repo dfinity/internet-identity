@@ -131,8 +131,9 @@ pub fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: 
     archive_operation(
         anchor_number,
         caller(),
-        Operation::AddDevice {
-            device: DeviceDataWithoutAlias::from(new_device),
+        Operation::ReplaceDevice {
+            device: device_key,
+            new_device: DeviceDataWithoutAlias::from(new_device),
         },
     );
     delegation::prune_expired_signatures();
