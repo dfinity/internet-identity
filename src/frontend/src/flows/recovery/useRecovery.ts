@@ -13,8 +13,10 @@ export const useRecovery = async (
   if (userNumber !== undefined) {
     return runRecovery(userNumber, connection);
   } else {
-    const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
-    if (pUserNumber !== null) {
+    const pUserNumber = await promptUserNumber({
+      title: "Recover Identity Anchor",
+    });
+    if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
     } else {
       return window.location.reload();

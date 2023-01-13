@@ -2,20 +2,21 @@ import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "../components/anchorInput";
 
-const pageContent = (
-  title: string,
-  userNumber: bigint | null,
-  callbacks: { onContinue: (ret: bigint) => void; onCancel: () => void }
-): { template: TemplateResult } => {
+const promptUserNumberTemplate = ({
+  title,
+  userNumber,
+  onContinue: onSubmit,
+  onCancel,
+}: {
+  title: string;
+  userNumber?: bigint;
+  onContinue: (ret: bigint) => void;
+  onCancel: () => void;
+}): TemplateResult => {
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
-  const anchorInput = mkAnchorInput({
-    userNumber: userNumber ?? undefined,
-    onSubmit: (userNumber: bigint) => {
-      callbacks.onContinue(userNumber);
-    },
-  });
+  const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
-  const template = html`
+  return html`
     <div class="l-container c-card c-card--highlight">
       <hgroup>
         <h1 class="t-title t-title--main">${title}</h1>
@@ -24,7 +25,7 @@ const pageContent = (
       ${anchorInput.template}
       <div class="c-button-group">
         <button
-          @click="${callbacks.onCancel}"
+          @click="${onCancel}"
           id="userNumberCancel"
           class="c-button c-button--secondary"
         >
@@ -41,19 +42,29 @@ const pageContent = (
       </div>
     </div>
   `;
-
-  return { template };
 };
 
-export const promptUserNumber = async (
-  title: string,
-  userNumber: bigint | null
-): Promise<bigint | null> =>
+export const promptUserNumberPage = (
+  props: Parameters<typeof promptUserNumberTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(promptUserNumberTemplate(props), contain);
+};
+
+export const promptUserNumber = async ({
+  title,
+  userNumber,
+}: {
+  title: string;
+  userNumber?: bigint;
+}): Promise<bigint | "canceled"> =>
   new Promise((resolve) => {
-    const container = document.getElementById("pageContent") as HTMLElement;
-    const content = pageContent(title, userNumber, {
+    promptUserNumberPage({
+      title,
+      userNumber,
       onContinue: resolve,
-      onCancel: () => resolve(null),
+      onCancel: () => resolve("canceled"),
     });
-    render(content.template, container);
   });

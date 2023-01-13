@@ -268,7 +268,7 @@ const iiPages: Record<string, () => void> = {
       detail: "oh my, so much to say. SO MUCH!",
       primaryButton: "Try again",
     }),
-  promptUserNumber: () => promptUserNumber("hello", null),
+  promptUserNumber: () => promptUserNumber({ title: "hello" }),
   banner: () => {
     manage.firstTime({ useExisting: () => console.log("Use existing") });
     showWarning(html`This is a test page, be very careful!`);
