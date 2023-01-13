@@ -4,16 +4,13 @@ import { mkAnchorInput } from "../../../components/anchorInput";
 import { Connection } from "../../../utils/iiConnection";
 
 const addRemoteDeviceTemplate = ({
-  onContinue,
+  onContinue: onSubmit,
   userNumber,
 }: {
   onContinue: (userNumber: bigint) => void;
   userNumber?: bigint;
 }) => {
-  const anchorInput = mkAnchorInput({
-    userNumber,
-    onSubmit: onContinue,
-  });
+  const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
   return html`
     <div class="l-container c-card c-card--highlight">
