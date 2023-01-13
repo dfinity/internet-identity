@@ -1,7 +1,7 @@
 import { displayError } from "../../components/displayError";
 import { Connection } from "../../utils/iiConnection";
 import { renderManage } from "../manage";
-import { promptUserNumber } from "../promptUserNumber";
+import { promptUserNumber } from "../../components/promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
