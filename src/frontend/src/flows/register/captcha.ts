@@ -43,6 +43,7 @@ export const promptCaptchaTemplate = <T>({
   // The "next" button behavior
   const next = new Chan<((e: SubmitEvent) => void) | undefined>();
   const nextDisabled = next.map((f) => f === undefined);
+  const nextCaption = new Chan<string>();
 
   // The "retry" button behavior
   const retry = new Chan<(() => void) | undefined>();
@@ -82,6 +83,7 @@ export const promptCaptchaTemplate = <T>({
         text.send("Generating new challenge...");
         img.send(html`<div class="c-spinner">${spinner}</div> `);
         next.send(undefined);
+        nextCaption.send("Generating...");
         retry.send(undefined);
         break;
       case "prompting":
@@ -99,12 +101,14 @@ export const promptCaptchaTemplate = <T>({
           e.stopPropagation();
           doVerify(state.challenge);
         });
+        nextCaption.send("Next");
         retry.send(doRetry);
         break;
       case "verifying":
         text.send("Verifying...");
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
         next.send(undefined);
+        nextCaption.send("Verifying...");
         retry.send(undefined);
         break;
       case "bad":
@@ -142,8 +146,11 @@ export const promptCaptchaTemplate = <T>({
           </i>
         </div>
         <label>
-          <strong class="t-strong">${asyncReplace(text.recv())}</strong>
-          <input ${autofocus} ${ref(input)} id="captchaInput" class="c-input" />
+          <strong class="t-strong">Type the characters you see</strong>
+          <input ${autofocus} ${ref(input)} id="captchaInput" class="c-input has-error" />
+          <strong class="c-input__message">
+            ${asyncReplace(text.recv())}
+          </strong>
         </label>
         <p class="t-paragraph confirm-paragraph"></p>
         <div class="c-button-group">
@@ -160,7 +167,7 @@ export const promptCaptchaTemplate = <T>({
             id="confirmRegisterButton"
             ?disabled=${asyncReplace(nextDisabled)}
           >
-            Next
+            ${asyncReplace(nextCaption.recv())}
           </button>
         </div>
       </form>
