@@ -109,18 +109,17 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
     );
 }
 
-pub fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: DeviceData) {
     let mut anchor = state::anchor(anchor_number);
-    // must be called before the first await because it requires caller()
     trap_if_not_authenticated(&anchor);
 
-    anchor.remove_device(&device_key).unwrap_or_else(|err| {
+    anchor.remove_device(&old_device).unwrap_or_else(|err| {
         trap(&format!(
             "failed to replace device of anchor {}: {}",
             anchor_number, err
         ))
     });
-    let new_device = Device::from(device_data);
+    let new_device = Device::from(new_device);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
         trap(&format!(
             "failed to replace device of anchor {}: {}",
@@ -132,7 +131,7 @@ pub fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: 
         anchor_number,
         caller(),
         Operation::ReplaceDevice {
-            device: device_key,
+            old_device,
             new_device: DeviceDataWithoutAlias::from(new_device),
         },
     );

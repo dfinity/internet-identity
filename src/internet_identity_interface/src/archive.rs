@@ -19,7 +19,7 @@ pub enum Operation {
     },
     #[serde(rename = "replace_device")]
     ReplaceDevice {
-        device: PublicKey,
+        old_device: PublicKey,
         new_device: DeviceDataWithoutAlias,
     },
     #[serde(rename = "remove_device")]

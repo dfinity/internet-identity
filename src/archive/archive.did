@@ -34,7 +34,7 @@ type Operation = variant {
     };
     // Atomically replace device with new_device
     replace_device: record {
-        device: PublicKey;
+        old_device: PublicKey;
         new_device: DeviceDataWithoutAlias;
     };
     remove_device: record {
