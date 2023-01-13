@@ -203,13 +203,18 @@ export const authenticate = async (
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
   const template = html`
-    <div class="l-container c-card c-card--highlight">
-      <!-- The title is hidden but used for accessibility -->
-      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+    <div class="l-container">
       <div class="c-logo">${icLogo}</div>
-      ${slot}
+      <div class="c-card c-card--background">
+        <div class="c-card c-card--highlight">
+          <!-- The title is hidden but used for accessibility -->
+          <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+          
+          ${slot}
+        </div>
+        ${footer}
+      </div>
     </div>
-    ${footer}
   `;
 
   const container = document.getElementById("pageContent") as HTMLElement;
