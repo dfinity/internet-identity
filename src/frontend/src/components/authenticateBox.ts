@@ -46,7 +46,7 @@ export const authenticateBox = async (
     new Promise<LoginFlowResult>((resolve) => {
       const pages = authnPages({
         ...templates,
-        addDevice: () => addRemoteDevice(connection),
+        addDevice: () => addRemoteDevice({ connection }),
         onSubmit: (userNumber) => {
           resolve(authenticate(connection, userNumber));
         },

@@ -35,7 +35,7 @@ import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { deviceSettings } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import { addRemoteDevice } from "./flows/addDevice/welcomeView";
+import { addRemoteDevicePage } from "./flows/addDevice/welcomeView";
 import {
   registerTentativeDevice,
   TentativeDeviceInfo,
@@ -227,7 +227,11 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
-  addRemoteDevice: () => addRemoteDevice(dummyConnection),
+  addRemoteDevice: () =>
+    addRemoteDevicePage({
+      onContinue: (userNumber: bigint) =>
+        console.log("picked anchor", userNumber),
+    }),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
