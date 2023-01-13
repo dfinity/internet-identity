@@ -28,7 +28,7 @@ import { authnTemplateAuthorize } from "./flows/authorize";
 import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
-import { displayUserNumber } from "./flows/register/finish";
+import { displayUserNumberPage } from "./flows/register/finish";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
@@ -132,7 +132,11 @@ const manageTemplates = authnTemplateManage();
 const manage = authnPages({ ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
-  displayUserNumber: () => displayUserNumber(userNumber),
+  displayUserNumber: () =>
+    displayUserNumberPage({
+      userNumber,
+      onContinue: () => console.log("done"),
+    }),
   faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
