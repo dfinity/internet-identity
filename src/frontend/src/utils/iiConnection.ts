@@ -105,11 +105,15 @@ export interface IdentifiableIdentity extends SignIdentity {
 export class Connection {
   public constructor(readonly canisterId: string) {}
 
-  register = async (
-    identity: IdentifiableIdentity,
-    alias: string,
-    challengeResult: ChallengeResult
-  ): Promise<RegisterResult> => {
+  register = async ({
+    identity,
+    alias,
+    challengeResult,
+  }: {
+    identity: IdentifiableIdentity;
+    alias: string;
+    challengeResult: ChallengeResult;
+  }): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await this.requestFEDelegation(identity);

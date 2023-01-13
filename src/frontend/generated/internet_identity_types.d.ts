@@ -12,12 +12,19 @@ export type AddTentativeDeviceResponse = {
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
+  'archive_integration' : [] | [{ 'pull' : null } | { 'push' : null }],
   'module_hash' : Array<number>,
   'entries_fetch_limit' : number,
 }
 export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
+}
+export interface BufferedArchiveEntry {
+  'sequence_number' : bigint,
+  'entry' : Array<number>,
+  'anchor_number' : UserNumber,
+  'timestamp' : Timestamp,
 }
 export interface Challenge {
   'png_base64' : string,
@@ -115,6 +122,7 @@ export type VerifyTentativeDeviceResponse = {
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
 export interface _SERVICE {
+  'acknowledge_entries' : (arg_0: bigint) => Promise<undefined>,
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
   'add_tentative_device' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<
       AddTentativeDeviceResponse
@@ -123,6 +131,7 @@ export interface _SERVICE {
   'deploy_archive' : (arg_0: Array<number>) => Promise<DeployArchiveResult>,
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
+  'fetch_entries' : () => Promise<Array<BufferedArchiveEntry>>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,

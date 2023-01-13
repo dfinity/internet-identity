@@ -4,11 +4,11 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::certificate_validation::validate_certification;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use ic_test_state_machine_client::CallError;
+use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use state_machine_client::CallError;
-use state_machine_client::ErrorCode::CanisterCalledTrap;
 use std::ops::Add;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -2003,10 +2003,18 @@ mod http_tests {
             "internet_identity_last_upgrade_timestamp",
             "internet_identity_inflight_challenges",
             "internet_identity_users_in_registration_mode",
+            "internet_identity_buffered_archive_entries",
         ];
         let env = env();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
-        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        // spawn an archive so that we also get the archive related metrics
+        let canister_id = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+        );
+        deploy_archive_via_ii(&env, canister_id);
 
         let metrics_body = get_metrics(&env, canister_id);
         for metric in metrics {

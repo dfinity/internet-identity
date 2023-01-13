@@ -208,9 +208,13 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
-        const result = await connection.register(identity, alias, {
-          key: challenge.challenge_key,
-          chars,
+        const result = await connection.register({
+          identity,
+          alias,
+          challengeResult: {
+            key: challenge.challenge_key,
+            chars,
+          },
         });
 
         switch (result.kind) {

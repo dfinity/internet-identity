@@ -3,8 +3,8 @@ use canister_tests::framework::{
     env, install_ii_canister, upgrade_ii_canister, upgrade_ii_canister_with_arg, II_WASM,
     II_WASM_V5_LAYOUT,
 };
+use ic_test_state_machine_client::CallError;
 use internet_identity_interface::InternetIdentityInit;
-use state_machine_client::CallError;
 
 #[test]
 fn should_upgrade_persistent_state() -> Result<(), CallError> {

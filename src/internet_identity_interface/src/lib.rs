@@ -208,6 +208,18 @@ pub struct ArchiveConfig {
     pub polling_interval_ns: u64,
     // Max number of archive entries to be fetched in a single call.
     pub entries_fetch_limit: u16,
+    // How the entries get transferred to the archive.
+    // This is opt, so that the config parameter can be removed after switching from push to pull.
+    // Defaults to Push (legacy mode).
+    pub archive_integration: Option<ArchiveIntegration>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ArchiveIntegration {
+    #[serde(rename = "push")]
+    Push,
+    #[serde(rename = "pull")]
+    Pull,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
