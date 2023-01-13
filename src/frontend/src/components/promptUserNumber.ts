@@ -1,14 +1,16 @@
 import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
-import { mkAnchorInput } from "../components/anchorInput";
+import { mkAnchorInput } from "./anchorInput";
 
 const promptUserNumberTemplate = ({
   title,
+  message,
   userNumber,
   onContinue: onSubmit,
   onCancel,
 }: {
   title: string;
+  message?: string;
   userNumber?: bigint;
   onContinue: (ret: bigint) => void;
   onCancel: () => void;
@@ -16,11 +18,13 @@ const promptUserNumberTemplate = ({
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
+  const defaultMessage = "Please provide an Identity Anchor.";
+
   return html`
     <div class="l-container c-card c-card--highlight">
       <hgroup>
         <h1 class="t-title t-title--main">${title}</h1>
-        <p class="t-lead">Please provide an Identity Anchor.</p>
+        <p class="t-lead">${message ?? defaultMessage}</p>
       </hgroup>
       ${anchorInput.template}
       <div class="c-button-group">
@@ -55,14 +59,17 @@ export const promptUserNumberPage = (
 
 export const promptUserNumber = async ({
   title,
+  message,
   userNumber,
 }: {
   title: string;
+  message?: string;
   userNumber?: bigint;
 }): Promise<bigint | "canceled"> =>
   new Promise((resolve) => {
     promptUserNumberPage({
       title,
+      message,
       userNumber,
       onContinue: resolve,
       onCancel: () => resolve("canceled"),

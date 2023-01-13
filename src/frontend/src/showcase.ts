@@ -35,7 +35,6 @@ import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { deviceSettings } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import { addRemoteDevicePage } from "./flows/addDevice/welcomeView";
 import {
   registerTentativeDevice,
   TentativeDeviceInfo,
@@ -47,7 +46,7 @@ import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
-import { promptUserNumber } from "./flows/promptUserNumber";
+import { promptUserNumber } from "./components/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
@@ -227,11 +226,6 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
-  addRemoteDevice: () =>
-    addRemoteDevicePage({
-      onContinue: (userNumber: bigint) =>
-        console.log("picked anchor", userNumber),
-    }),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
