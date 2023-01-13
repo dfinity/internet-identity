@@ -33,12 +33,15 @@ export const promptCaptchaTemplate = <T>({
   // We define a few Chans that are used to update the page in a
   // reactive way; see template returned by this function
 
-  // The text and image shown
-  const text = new Chan<string>();
+  // The image shown
   const img = new Chan<TemplateResult>();
 
   // The text input where the chars can be typed
   const input: Ref<HTMLInputElement> = createRef();
+
+  // The error shown on bad input
+  const errorText = new Chan<string | undefined>();
+  const hasError = errorText.map((e) => (e !== undefined ? "has-error" : ""));
 
   // The "next" button behavior
   const next = new Chan<((e: SubmitEvent) => void) | undefined>();
@@ -80,14 +83,13 @@ export const promptCaptchaTemplate = <T>({
   const update = (state: State) => {
     switch (state.status) {
       case "requesting":
-        text.send("Generating new challenge...");
         img.send(html`<div class="c-spinner">${spinner}</div> `);
+        errorText.send(undefined);
         next.send(undefined);
         nextCaption.send("Generating...");
         retry.send(undefined);
         break;
       case "prompting":
-        text.send("Type the characters you see");
         img.send(
           html`<img
             src="data:image/png;base64,${state.challenge.png_base64}"
@@ -96,6 +98,7 @@ export const promptCaptchaTemplate = <T>({
             alt="captcha image"
           /> `
         );
+        errorText.send(undefined);
         next.send((e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -105,18 +108,19 @@ export const promptCaptchaTemplate = <T>({
         retry.send(doRetry);
         break;
       case "verifying":
-        text.send("Verifying...");
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
+        errorText.send(undefined);
         next.send(undefined);
         nextCaption.send("Verifying...");
         retry.send(undefined);
         break;
       case "bad":
-        text.send(
+        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
+        errorText.send(
           'The value you entered is incorrect. Click "retry" to generate a new value.'
         );
-        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
         next.send(undefined);
+        nextCaption.send("Next");
         retry.send(doRetry);
         break;
     }
@@ -147,9 +151,14 @@ export const promptCaptchaTemplate = <T>({
         </div>
         <label>
           <strong class="t-strong">Type the characters you see</strong>
-          <input ${autofocus} ${ref(input)} id="captchaInput" class="c-input has-error" />
+          <input
+            ${autofocus}
+            ${ref(input)}
+            id="captchaInput"
+            class="c-input ${asyncReplace(hasError)}"
+          />
           <strong class="c-input__message">
-            ${asyncReplace(text.recv())}
+            ${asyncReplace(errorText.recv())}
           </strong>
         </label>
         <p class="t-paragraph confirm-paragraph"></p>
