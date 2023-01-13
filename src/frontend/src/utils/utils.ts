@@ -201,12 +201,7 @@ export class Chan<A> {
     // on `snd` (which prevents hot looping)
     while (true) {
       // Yield the buffer first
-      while (true) {
-        // Note: this cannot be implemented by just checking if buffer.shift() is undefined
-        // because some buffer values may actually be undefined
-        if (this.buffer.length < 1) {
-          break;
-        }
+      while (this.buffer.length >= 1) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         yield this.buffer.shift()!;
       }
