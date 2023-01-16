@@ -285,7 +285,7 @@ export function mkExternalLink(link: {
 // The FAQ page
 export const pageContent = mainWindow({
   isWideContainer: true,
-  additionalClasses: ['faq__container'],
+  additionalContainerClasses: ['faq__container'],
   slot: html`
   <style>
     /* briefly flash the question when redirected to a particular question */
