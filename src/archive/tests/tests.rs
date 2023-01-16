@@ -63,7 +63,7 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let entry = api::compat::log_entry_1();
+        let entry = log_entry_1();
         api::add_entry(
             &env,
             canister_id,
@@ -79,7 +79,7 @@ mod rollback_tests {
         // rollback
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let logs = api::compat::get_entries(&env, canister_id, None, None)?;
+        let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
         Ok(())
@@ -91,8 +91,8 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
-        let entry1 = api::compat::log_entry_1();
-        let entry2 = api::compat::log_entry_2();
+        let entry1 = log_entry_1();
+        let entry2 = log_entry_2();
         api::add_entry(
             &env,
             canister_id,
@@ -113,7 +113,7 @@ mod rollback_tests {
         // rollback
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let logs = api::compat::get_entries(&env, canister_id, None, None)?;
+        let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry1);
         assert_eq!(logs.entries.get(1).unwrap().as_ref().unwrap(), &entry2);
