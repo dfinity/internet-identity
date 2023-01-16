@@ -1,10 +1,12 @@
 import { html, render } from "lit-html";
 import { hydrate } from "lit-html/experimental-hydrate.js";
 import { compatibilityData } from "../../components/compatibilityChart";
+import { mainWindow } from "../../components/mainWindow";
 
 // The About page
-export const pageContent = html`
-  <div class="l-container l-container--wide c-card c-card--highlight">
+export const pageContent = mainWindow({
+  isWideContainer: true,
+  slot: html`
     <h1 class="t-title t-title--main">About</h1>
     <div class="l-stack">
       <h2 class="t-title">Internet Identity</h2>
@@ -41,8 +43,7 @@ export const pageContent = html`
         </div>
       </div>
     </div>
-  </div>
-`;
+`});
 
 export const aboutView = (): void => {
   document.title = "About | Internet Identity";
