@@ -146,6 +146,23 @@ pub fn update(
     )
 }
 
+pub fn replace(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: types::AnchorNumber,
+    device_key: types::PublicKey,
+    device_data: types::DeviceData,
+) -> Result<(), CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "replace",
+        (anchor_number, device_key, device_data),
+    )
+}
+
 pub fn remove(
     env: &StateMachine,
     canister_id: CanisterId,

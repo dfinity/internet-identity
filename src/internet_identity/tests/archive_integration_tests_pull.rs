@@ -237,6 +237,15 @@ mod pull_entries_tests {
             device,
         )?;
 
+        ii_api::replace(
+            &env,
+            ii_canister,
+            principal_1(),
+            anchor,
+            pubkey.clone(),
+            device_data_2(),
+        )?;
+
         ii_api::remove(&env, ii_canister, principal_1(), anchor, pubkey.clone())?;
         let timestamp = env
             .time()
@@ -250,7 +259,7 @@ mod pull_entries_tests {
         env.tick();
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 4);
+        assert_eq!(entries.entries.len(), 5);
 
         let register_entry = Entry {
             anchor,
@@ -307,15 +316,30 @@ mod pull_entries_tests {
             &update_entry
         );
 
-        let delete_entry = Entry {
+        let replace_entry = Entry {
             anchor,
-            operation: Operation::RemoveDevice { device: pubkey },
+            operation: Operation::ReplaceDevice {
+                old_device: device_data_2().pubkey,
+                new_device: DeviceDataWithoutAlias::from(device_data_2()),
+            },
             timestamp,
             caller: principal_1(),
             sequence_number: 3,
         };
         assert_eq!(
             entries.entries.get(3).unwrap().as_ref().unwrap(),
+            &replace_entry
+        );
+
+        let delete_entry = Entry {
+            anchor,
+            operation: Operation::RemoveDevice { device: pubkey },
+            timestamp,
+            caller: principal_1(),
+            sequence_number: 4,
+        };
+        assert_eq!(
+            entries.entries.get(4).unwrap().as_ref().unwrap(),
             &delete_entry
         );
         Ok(())

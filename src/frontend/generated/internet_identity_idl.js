@@ -181,6 +181,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'verify_tentative_device' : IDL.Func(

@@ -1350,6 +1350,30 @@ mod device_management_tests {
             Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
         );
     }
+
+    /// Verifies that a device can be replaced with another device.
+    #[test]
+    fn should_replace_device() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices, vec![device_data_1()]);
+
+        api::replace(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_1().pubkey,
+            device_data_2(),
+        )?;
+
+        let devices = api::lookup(&env, canister_id, user_number)?;
+        assert_eq!(devices, vec![device_data_2()]);
+        Ok(())
+    }
 }
 
 /// Tests related to prepare_delegation, get_delegation and get_principal II canister calls.

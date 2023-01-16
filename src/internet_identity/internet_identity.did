@@ -242,6 +242,8 @@ service : (opt InternetIdentityInit) -> {
     register : (DeviceData, ChallengeResult) -> (RegisterResponse);
     add : (UserNumber, DeviceData) -> ();
     update : (UserNumber, DeviceKey, DeviceData) -> ();
+    // Atomically replace device matching the device key with the new device data
+    replace : (UserNumber, DeviceKey, DeviceData) -> ();
     remove : (UserNumber, DeviceKey) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Will be changed in the future to be more consistent with get_anchor_info.
