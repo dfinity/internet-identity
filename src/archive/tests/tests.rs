@@ -1,10 +1,10 @@
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
+use ic_test_state_machine_client::CallError;
+use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::archive::*;
 use internet_identity_interface::*;
 use regex::Regex;
-use state_machine_client::CallError;
-use state_machine_client::ErrorCode::CanisterCalledTrap;
 use std::time::{Duration, SystemTime};
 
 /// Verifies that the canister can be installed successfully.
@@ -49,7 +49,7 @@ fn should_expose_status() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
-    assert_eq!(status.cycles, 0);
+    assert_eq!(status.canister_status.cycles, 0);
     Ok(())
 }
 
@@ -63,7 +63,7 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let entry = log_entry_1();
+        let entry = api::compat::log_entry_1();
         api::add_entry(
             &env,
             canister_id,
@@ -79,7 +79,7 @@ mod rollback_tests {
         // rollback
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let logs = api::get_entries(&env, canister_id, None, None)?;
+        let logs = api::compat::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
         Ok(())
@@ -91,8 +91,8 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
-        let entry1 = log_entry_1();
-        let entry2 = log_entry_2();
+        let entry1 = api::compat::log_entry_1();
+        let entry2 = api::compat::log_entry_2();
         api::add_entry(
             &env,
             canister_id,
@@ -113,7 +113,7 @@ mod rollback_tests {
         // rollback
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let logs = api::get_entries(&env, canister_id, None, None)?;
+        let logs = api::compat::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
         assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry1);
         assert_eq!(logs.entries.get(1).unwrap().as_ref().unwrap(), &entry2);
@@ -454,6 +454,8 @@ mod read_tests {
         let config = candid::encode_one(ArchiveInit {
             ii_canister: principal_1(),
             max_entries_per_call: 1000,
+            polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+            error_buffer_limit: 1,
         })
         .unwrap();
         let canister_id = env.create_canister();
@@ -508,6 +510,12 @@ mod metrics_tests {
             "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             "ii_archive_stable_memory_pages",
+            // The metrics
+            //   * ii_archive_last_successful_fetch_timestamp_seconds
+            //   * ii_archive_last_successful_fetch_entries_count
+            //   * ii_archive_highest_sequence_number
+            // are only provided, if there is a successful fetch, which requires II to be deployed.
+            // These metrics are tested in src/internet_identity/tests/archive_integration_tests_pull.rs.
         ];
         let env = env();
         env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint

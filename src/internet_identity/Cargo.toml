@@ -33,9 +33,9 @@ ic-metrics-encoder = "1"
 ic-stable-structures = "0.3"
 
 [dev-dependencies]
+ic-test-state-machine-client = "1"
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.3"
-state_machine_client = { path = "../state_machine_client" }
 regex = "1.5"
 
 [features]

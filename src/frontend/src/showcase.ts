@@ -28,14 +28,13 @@ import { authnTemplateAuthorize } from "./flows/authorize";
 import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
-import { displayUserNumber } from "./flows/register/finish";
+import { displayUserNumberPage } from "./flows/register/finish";
 import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { deviceSettings } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import { addRemoteDevice } from "./flows/addDevice/welcomeView";
 import {
   registerTentativeDevice,
   TentativeDeviceInfo,
@@ -47,7 +46,7 @@ import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
-import { promptUserNumber } from "./flows/promptUserNumber";
+import { promptUserNumber } from "./components/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
@@ -132,7 +131,11 @@ const manageTemplates = authnTemplateManage();
 const manage = authnPages({ ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
-  displayUserNumber: () => displayUserNumber(userNumber),
+  displayUserNumber: () =>
+    displayUserNumberPage({
+      userNumber,
+      onContinue: () => console.log("done"),
+    }),
   faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
@@ -223,7 +226,6 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
-  addRemoteDevice: () => addRemoteDevice(dummyConnection),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
@@ -260,7 +262,7 @@ const iiPages: Record<string, () => void> = {
       detail: "oh my, so much to say. SO MUCH!",
       primaryButton: "Try again",
     }),
-  promptUserNumber: () => promptUserNumber("hello", null),
+  promptUserNumber: () => promptUserNumber({ title: "hello" }),
   banner: () => {
     manage.firstTime({ useExisting: () => console.log("Use existing") });
     showWarning(html`This is a test page, be very careful!`);

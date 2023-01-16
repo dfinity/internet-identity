@@ -5,6 +5,7 @@ use crate::storage::persistent_state_compat::ArchiveState::{
 };
 use crate::{archive, state};
 use candid::{CandidType, Deserialize, Principal};
+use internet_identity_interface::ArchiveIntegration::Push;
 use internet_identity_interface::{ArchiveConfig, Timestamp};
 use std::rc::Rc;
 use std::time::Duration;
@@ -46,6 +47,8 @@ impl From<PersistentState> for state::PersistentState {
                 entries_buffer_limit: 10_000,
                 polling_interval_ns: Duration::from_secs(60).as_nanos() as u64,
                 entries_fetch_limit: 1_000,
+                // Push is the legacy mode (i.e. what the old persistent state supported).
+                archive_integration: Some(Push),
             });
 
         let Some(config) = config else {

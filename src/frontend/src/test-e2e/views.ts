@@ -379,7 +379,7 @@ export class AddIdentityAnchorView extends View {
     if (userNumber !== undefined) {
       await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
     }
-    await this.browser.$("#addDeviceUserNumberContinue").click();
+    await this.browser.$("#userNumberContinue").click();
   }
 }
 

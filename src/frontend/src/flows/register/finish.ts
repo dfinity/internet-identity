@@ -1,7 +1,13 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../../components/warnBox";
 
-const pageContent = (userNumber: bigint) => html`
+export const displayUserNumberTemplate = ({
+  onContinue,
+  userNumber,
+}: {
+  onContinue: () => void;
+  userNumber: bigint;
+}) => html`
   <div class="l-container c-card c-card--highlight">
     <hgroup>
       <h1 class="t-title t-title--main">Congratulations!</h1>
@@ -18,21 +24,28 @@ const pageContent = (userNumber: bigint) => html`
       ${userNumber}
     </div>
     <div class="l-stack">
-      <button id="displayUserContinue" class="c-button">Continue</button>
+      <button
+        @click=${() => onContinue()}
+        id="displayUserContinue"
+        class="c-button"
+      >
+        Continue
+      </button>
     </div>
   </div>
 `;
 
-export const displayUserNumber = async (userNumber: bigint): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber), container);
-  return init();
+export const displayUserNumberPage = (
+  props: Parameters<typeof displayUserNumberTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(displayUserNumberTemplate(props), contain);
 };
 
-const init = (): Promise<void> =>
-  new Promise((resolve) => {
-    const displayUserContinue = document.getElementById(
-      "displayUserContinue"
-    ) as HTMLButtonElement;
-    displayUserContinue.onclick = () => resolve();
-  });
+export const displayUserNumber = async (userNumber: bigint): Promise<void> => {
+  return new Promise((resolve) =>
+    displayUserNumberPage({ onContinue: () => resolve(), userNumber })
+  );
+};

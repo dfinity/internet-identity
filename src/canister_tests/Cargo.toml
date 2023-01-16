@@ -7,6 +7,7 @@ edition = "2021"
 base64 = "0.20"
 flate2 = "1.0"
 hex = "0.4.3"
+ic-test-state-machine-client = "1"
 lazy_static = "1.4"
 regex = "1.5"
 serde = "1"
@@ -15,7 +16,6 @@ serde_bytes = "0.11"
 sha2 = "0.10"
 
 internet_identity_interface = { path = "../internet_identity_interface" }
-state_machine_client = { path = "../state_machine_client" }
 
 # All IC deps
 candid = "0.8"

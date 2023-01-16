@@ -32,6 +32,11 @@ type Operation = variant {
         device: PublicKey;
         new_values: DeviceDataUpdate;
     };
+    // Atomically replace device with new_device
+    replace_device: record {
+        old_device: PublicKey;
+        new_device: DeviceDataWithoutAlias;
+    };
     remove_device: record {
         device: PublicKey;
     };
@@ -86,6 +91,45 @@ type ArchiveInit = record {
     ii_canister: principal;
     // The maximum number of entries to be returned per call.
     max_entries_per_call: nat16;
+    // Polling interval to fetch new entries from II (in nanoseconds).
+    polling_interval_ns: nat64;
+    // Number of call errors to keep.
+    error_buffer_limit: nat16;
+};
+
+// Information about the archive
+type ArchiveStatus = record {
+    // The init argument of the archive used for the last deployment.
+    init: ArchiveInit;
+    // Information about the calls that the archive canister makes (to retrieve archive entries).
+    call_info: CallInfo;
+    // The canister status of the archive as provided by the management canister.
+    canister_status: CanisterStatus
+};
+
+type CallInfo = record {
+    // Information about the last successful run of `fetch_entries`, if any.
+    last_successful_fetch: opt FetchInfo;
+    // A small buffer to keep the last call errors to help debugging in case of an incident.
+    // Can be retrieved using the status query.
+    call_errors: vec CallErrorInfo;
+};
+
+type FetchInfo = record {
+    /// Timestamp when the last execution of the archive `fetch_entries` method finished.
+    timestamp: Timestamp;
+    /// The number of entries fetched (regardless of how many of those were actually archived).
+    number_of_entries: nat16;
+};
+
+// Information about a call that the archive canister made to another canister that resulted in a rejection.
+type CallErrorInfo = record {
+    time: Timestamp;
+    canister: principal;
+    method: text;
+    argument: blob;
+    rejection_code: int32;
+    message: text;
 };
 
 // HTTP gateway types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
@@ -171,6 +215,6 @@ service : (ArchiveInit) -> {
     // HTTP endpoint to expose metrics for Prometheus.
     http_request: (request: HttpRequest) -> (HttpResponse) query;
 
-    // Exposes the canister status of this canister.
-    status : () -> (CanisterStatus);
+    // Exposes metadata about this canister.
+    status : () -> (ArchiveStatus);
 }

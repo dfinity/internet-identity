@@ -876,6 +876,11 @@ a:hover,
   margin-right: calc(var(--rs-input-bezel) * -0.25);
 }
 
+.c-input__message {
+  margin-top: var(--vs-stack);
+  color: var(--rc-warning);
+}
+
 /* hides and show icons based on a class */
 
 .c-input__icon svg + svg {

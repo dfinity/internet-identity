@@ -201,12 +201,9 @@ export class Chan<A> {
     // on `snd` (which prevents hot looping)
     while (true) {
       // Yield the buffer first
-      while (true) {
-        const val = this.buffer.shift();
-        if (val === undefined) {
-          break;
-        }
-        yield val;
+      while (this.buffer.length >= 1) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        yield this.buffer.shift()!;
       }
 
       // then block and yield a value when received
@@ -218,13 +215,17 @@ export class Chan<A> {
 
   // Return a new generator yielding the values or `.recv()`, mapped
   // with `f`.
-  async *map<B>(f: (a: A) => B): AsyncIterable<B> {
+  map<B>(f: (a: A) => B): AsyncIterable<B> {
     const input = new Chan<A>();
     this.listeners.push(input);
 
-    for await (const val of input.recv()) {
-      yield f(val);
-    }
+    return {
+      async *[Symbol.asyncIterator]() {
+        for await (const val of input.recv()) {
+          yield f(val);
+        }
+      },
+    };
   }
 }
 

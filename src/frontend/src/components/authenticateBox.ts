@@ -1,9 +1,10 @@
 import { html, render, TemplateResult } from "lit-html";
+import { promptUserNumber } from "./promptUserNumber";
+import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
 import { NonEmptyArray } from "../utils/utils";
 import { icLogo } from "./icons";
 import { footer } from "./footer";
 import { withLoader } from "./loader";
-import { addRemoteDevice } from "../flows/addDevice/welcomeView";
 import { mkAnchorPicker } from "./anchorPicker";
 import { mkAnchorInput } from "./anchorInput";
 import { getAnchors, setAnchorUsed } from "../utils/userNumber";
@@ -219,4 +220,21 @@ const page = (slot: TemplateResult) => {
 
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
+};
+
+// Start the "remote device" add flow by prompting for an anchor, and then
+// adding a device to that anchor.
+const addRemoteDevice = async (connection: Connection) => {
+  const userNumber = await promptUserNumber({
+    title: "New Device",
+    message:
+      "Please provide the Identity Anchor to which you want to add your device.",
+  });
+
+  if (userNumber === "canceled") {
+    // TODO L2-309: do this without reload
+    return window.location.reload();
+  }
+
+  return registerTentativeDevice(userNumber, connection);
 };

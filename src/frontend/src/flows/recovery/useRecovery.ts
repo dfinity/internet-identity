@@ -1,7 +1,7 @@
 import { displayError } from "../../components/displayError";
 import { Connection } from "../../utils/iiConnection";
 import { renderManage } from "../manage";
-import { promptUserNumber } from "../promptUserNumber";
+import { promptUserNumber } from "../../components/promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
@@ -13,8 +13,10 @@ export const useRecovery = async (
   if (userNumber !== undefined) {
     return runRecovery(userNumber, connection);
   } else {
-    const pUserNumber = await promptUserNumber("Recover Identity Anchor", null);
-    if (pUserNumber !== null) {
+    const pUserNumber = await promptUserNumber({
+      title: "Recover Identity Anchor",
+    });
+    if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
     } else {
       return window.location.reload();
