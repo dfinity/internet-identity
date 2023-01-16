@@ -1,5 +1,6 @@
 import { TemplateResult, html, render } from "lit-html";
 import { hydrate } from "lit-html/experimental-hydrate.js";
+import { mainWindow } from "../../components/mainWindow";
 
 export interface Link {
   name: string;
@@ -282,7 +283,10 @@ export function mkExternalLink(link: {
 }
 
 // The FAQ page
-export const pageContent = html`
+export const pageContent = mainWindow({
+  isWideContainer: true,
+  additionalClasses: ['faq__container'],
+  slot: html`
   <style>
     /* briefly flash the question when redirected to a particular question */
     @keyframes flash-question {
@@ -306,15 +310,12 @@ export const pageContent = html`
       animation-duration: 3000ms;
     }
   </style>
-  <div
-    class="faq__container l-container l-container--wide c-card c-card--highlight"
-  >
-    <h1 class="faq__title t-title t-title--main">FAQ</h1>
-    <ul class="faq__questions c-list l-stack">
-      ${questionsArray.map((faq) => renderQuestion(faq))}
-    </ul>
-  </div>
-`;
+  <h1 class="faq__title t-title t-title--main">FAQ</h1>
+  <ul class="faq__questions c-list l-stack">
+    ${questionsArray.map((faq) => renderQuestion(faq))}
+  </ul>
+`
+});
 
 // Open the anchor with id="foo" if the page hash is "#foo"
 const openAnchor = (): void => {
