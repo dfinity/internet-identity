@@ -212,7 +212,12 @@ impl<M: Memory> Storage<M> {
             ));
         }
         if &header.version < SUPPORTED_LAYOUT_VERSIONS.start() {
-            trap(&format!("stable memory layout version {} is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version", header.version));
+            trap(&format!(
+                "stable memory layout version {} is no longer supported:\n\
+            Either reinstall (wiping stable memory) or migrate using a previous II version\n\
+            See https://github.com/dfinity/internet-identity#stable-memory-compatibility for more information.",
+                header.version
+            ));
         }
         if !SUPPORTED_LAYOUT_VERSIONS.contains(&header.version) {
             trap(&format!("unsupported header version: {}", header.version));
