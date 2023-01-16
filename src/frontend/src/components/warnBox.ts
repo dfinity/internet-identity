@@ -11,6 +11,7 @@ interface warnBoxProps {
   message: string | TemplateResult;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";
+  additionalClasses?: string[];
 }
 
 export const warnBox = ({
@@ -18,7 +19,12 @@ export const warnBox = ({
   message,
   slot,
   htmlElement = "aside",
+  additionalClasses = [],
 }: warnBoxProps): TemplateResult => {
+  const cssClasses = ["c-card", "c-card--narrow", "c-card--warning"];
+  if (additionalClasses.length > 0) {
+    cssClasses.push(...additionalClasses);
+  }
   const contents: TemplateResult = html`
     <span class="c-card__icon" aria-hidden="true">${warningIcon}</span>
     <div class="c-card__content">
@@ -31,10 +37,10 @@ export const warnBox = ({
   `;
 
   return html`${htmlElement === "aside"
-    ? html` <aside class="c-card c-card--narrow c-card--warning">
+    ? html` <aside class="${cssClasses.join(' ')}">
         ${contents}
       </aside>`
     : html`
-        <div class="c-card c-card--narrow c-card--warning">${contents}</div>
+        <div class="${cssClasses.join(' ')}">${contents}</div>
       `}`;
 };
