@@ -1,4 +1,5 @@
 import { html, TemplateResult } from "lit-html";
+import { ifDefined } from "lit/directives/if-defined.js";
 import { icLogo } from "./icons";
 import { footer } from "./footer";
 
@@ -38,7 +39,10 @@ export const mainWindow = ({
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-    <div id="${uid}" class="${containerClasses.join(" ")}">
+    <div
+      id="${ifDefined(uid !== null ? uid : undefined)}"
+      class="${containerClasses.join(" ")}"
+    >
       ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
       <div class="c-card c-card--background">
         <div class="c-card c-card--highlight">${slot}</div>
