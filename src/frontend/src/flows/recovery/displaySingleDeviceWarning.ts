@@ -2,9 +2,13 @@ import { html, render } from "lit-html";
 import { warnBox } from "../../components/warnBox";
 import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = () => html`
-  <article id="warningContainer" class="l-container c-card c-card--highlight">
+const pageContent = () => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot: html`
+  <article id="warningContainer">
     ${warnBox({
       title: "Warning",
       message: "Only one device registered.",
@@ -37,7 +41,7 @@ const pageContent = () => html`
       </button>
     </div>
   </article>
-`;
+`});
 
 export const displaySingleDeviceWarning = async (
   userNumber: bigint,

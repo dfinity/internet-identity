@@ -9,9 +9,13 @@ import {
 } from "../../../utils/flowResult";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = (userNumber: bigint) => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot: html`
+  <article>
     <hgroup>
       <h1 class="t-title t-title--main">Recovery for ${userNumber}</h1>
       <p class="t-lead">
@@ -35,7 +39,7 @@ const pageContent = (userNumber: bigint) => html`
       </button>
     </div>
   </article>
-`;
+`});
 
 export const deviceRecoveryPage = async (
   userNumber: bigint,

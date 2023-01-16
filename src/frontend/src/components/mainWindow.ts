@@ -8,6 +8,7 @@ export type mainWindowProps = {
   showLogo?: boolean;
   isWideContainer?: boolean;
   additionalContainerClasses?: string[];
+  HTMLwrapperTag?: string;
 };
 
 /**

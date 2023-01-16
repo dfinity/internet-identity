@@ -1,8 +1,13 @@
 import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
+import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = (seedPhrase: string) => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = (seedPhrase: string) => 
+  mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: html`
+    <article>
     <hgroup>
       <h1 class="t-title t-title--lead">Seedphrase</h1>
       <p class="t-lead">
@@ -18,7 +23,6 @@ const pageContent = (seedPhrase: string) => html`
         to this Identity Anchor!
       </p>
     </aside>
-
     <h2 class="t-title l-stack">Your seed phrase</h2>
     <div>
       <output
@@ -47,7 +51,7 @@ const pageContent = (seedPhrase: string) => html`
       Continue
     </button>
   </article>
-`;
+`});
 
 export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;

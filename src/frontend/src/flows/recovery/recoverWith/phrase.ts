@@ -17,8 +17,12 @@ import {
 } from "../../../crypto/mnemonic";
 import { warningIcon } from "../../../components/icons";
 import { questions } from "../../faq";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint, message?: string) => html`
+const pageContent = (userNumber: bigint, message?: string) => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot: html`
   <style>
     /* Flash the warnings box if warnings were generated */
     @keyframes flash-warnings {
@@ -39,35 +43,33 @@ const pageContent = (userNumber: bigint, message?: string) => html`
       animation-duration: 600ms;
     }
   </style>
-  <article class="l-container c-card c-card--highlight">
-    <hgroup>
-      <h1 class="t-title t-title--main">Your seed phrase</h1>
-      <p class="t-lead">
-        ${message !== undefined ? message : "Please provide your seed phrase"}
-      </p>
-    </hgroup>
-    <textarea
-      id="inputSeedPhrase"
-      class="c-input"
-      placeholder="${userNumber + " above squirrel ..."}"
-    ></textarea>
-    <details
-      data-id="phrase-warnings"
-      class="c-card c-card--highlight is-hidden"
-    >
-      <summary>
-        <span class="warnings-box-summary">Phrase may not be valid</span>
-      </summary>
-      <div id="warnings"></div>
-    </details>
-    <div class="c-button-group">
-      <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">
-        Cancel
-      </button>
-      <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
-    </div>
-  </article>
-`;
+  <hgroup>
+    <h1 class="t-title t-title--main">Your seed phrase</h1>
+    <p class="t-lead">
+      ${message !== undefined ? message : "Please provide your seed phrase"}
+    </p>
+  </hgroup>
+  <textarea
+    id="inputSeedPhrase"
+    class="c-input"
+    placeholder="${userNumber + " above squirrel ..."}"
+  ></textarea>
+  <details
+    data-id="phrase-warnings"
+    class="c-card c-card--highlight is-hidden"
+  >
+    <summary>
+      <span class="warnings-box-summary">Phrase may not be valid</span>
+    </summary>
+    <div id="warnings"></div>
+  </details>
+  <div class="c-button-group">
+    <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">
+      Cancel
+    </button>
+    <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
+  </div>
+`});
 
 export const phraseRecoveryPage = async (
   userNumber: bigint,

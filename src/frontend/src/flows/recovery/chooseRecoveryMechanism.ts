@@ -1,9 +1,13 @@
 import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
+import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = (devices: DeviceData[]) => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = (devices: DeviceData[]) => mainWindow({
+  showFooter: false,
+  showLogo: false,
+  slot: html`
+  <article>
     <hgroup>
       <h1 class="t-title t-title--main">Recovery Mechanism</h1>
       <p class="t-lead">
@@ -36,7 +40,7 @@ const pageContent = (devices: DeviceData[]) => html`
       <button id="skipRecovery" class="c-button">Add recovery later</button>
     </div>
   </article>
-`;
+`});
 
 export type RecoveryMechanism = "securityKey" | "seedPhrase";
 

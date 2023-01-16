@@ -21,6 +21,7 @@ import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevi
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
+import { mainWindow } from "../../components/mainWindow";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -82,8 +83,9 @@ const pageContent = (
   devices: DeviceData[],
   onAddDevice: (next: "canceled" | "local" | "remote") => void,
   onAddRecovery: () => void
-): TemplateResult => html`
-  <section class="l-container c-card c-card--highlight">
+): TemplateResult => mainWindow({
+  slot: html`
+  <section>
     <hgroup>
       <h1 class="t-title t-title--main">Anchor Management</h1>
       <p class="t-lead">
@@ -93,9 +95,8 @@ const pageContent = (
     ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
     ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
     ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
-  </section>
-  ${footer}
-`;
+  </section>`
+});
 
 const anchorSection = (userNumber: bigint): TemplateResult => html`
   <aside class="l-stack">
@@ -187,6 +188,7 @@ const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({
     title: "Recovery Mechanism",
     message: "Add a recovery mechanism to help protect this Identity Anchor.",
+    additionalClasses: ["l-stack"],
     slot: html`<button
       @click="${onAddRecovery}"
       id="addRecovery"
