@@ -20,6 +20,7 @@ import {
 import { displayError } from "./displayError";
 import { useRecovery } from "../flows/recovery/useRecovery";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
+import { mainWindow } from "./mainWindow";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -203,21 +204,12 @@ export const authenticate = async (
 
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
-  const template = html`
-    <div class="l-container">
-      <div class="c-logo">${icLogo}</div>
-      <div class="c-card c-card--background">
-        <div class="c-card c-card--highlight">
-          <!-- The title is hidden but used for accessibility -->
-          <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-          
-          ${slot}
-        </div>
-        ${footer}
-      </div>
-    </div>
-  `;
-
+  const template = mainWindow({
+    slot: html`
+      <!-- The title is hidden but used for accessibility -->
+      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+      ${slot}`
+  });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
 };
