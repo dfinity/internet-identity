@@ -2,9 +2,13 @@ import { html, render } from "lit-html";
 import { warnBox } from "../../components/warnBox";
 import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = () => html`
-  <article id="warningContainer" class="l-container c-card c-card--highlight">
+const pageContent = () => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot:html`
+  <article id="warningContainer">
     ${warnBox({
       title: "Warning",
       message: "It looks like you are using Safari or iOS.",
@@ -34,8 +38,8 @@ const pageContent = () => html`
         Skip, I understand the risks
       </button>
     </div>
-  </article>
-`;
+  </article>`
+});
 
 export const displaySafariWarning = async (
   userNumber: bigint,

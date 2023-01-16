@@ -1,5 +1,6 @@
 import { html, render, TemplateResult } from "lit-html";
 import { warnBox } from "./warnBox";
+import { mainWindow } from "./mainWindow";
 
 export type ErrorOptions = {
   title: string;
@@ -8,8 +9,11 @@ export type ErrorOptions = {
   primaryButton: string;
 };
 
-const pageContent = (options: ErrorOptions) => html`
-  <div id="errorContainer" class="l-container c-card c-card--highlight">
+const pageContent = (options: ErrorOptions) => mainWindow({
+  uid: 'errorContainer',
+  showFooter: false,
+  showLogo: false,
+  slot: html`
     ${warnBox({
       title: options.title,
       message: options.message,
@@ -28,9 +32,8 @@ ${options.detail}</pre
       <button id="displayErrorPrimary" class="c-button c-button--primary">
         ${options.primaryButton}
       </button>
-    </div>
-  </div>
-`;
+    </div>`
+});
 
 export const displayError = async (options: ErrorOptions): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;

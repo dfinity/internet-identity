@@ -8,9 +8,9 @@ import {
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
-import { footer } from "../../components/footer";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
+import { mainWindow } from "../../components/mainWindow";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -23,8 +23,11 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean,
   back: () => void
-) => html`
-  <article id="deviceSettings" class="l-container c-card c-card--highlight">
+) => mainWindow({
+  showLogo: false,
+  showFooter: true,
+  slot: html`
+  <article id="deviceSettings">
     <h1 class="t-title">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
     </h1>
@@ -77,9 +80,8 @@ const pageContent = (
         : ""}
       <button @click="${back}" data-action="back" class="c-button">Back</button>
     </div>
-  </article>
-  ${footer}
-`;
+  </article>`
+});
 
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices

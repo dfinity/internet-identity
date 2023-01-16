@@ -14,7 +14,7 @@ const pageContent = (seedPhrase: string) =>
         Your seed phrase makes it easy to recover this Identity Anchor.
       </p>
     </hgroup>
-    <aside class="c-card c-card--icon c-card--warning" aria-label="Warning">
+    <aside class="c-card c-card--icon c-card--warning l-stack" aria-label="Warning">
       <span class="c-card__icon">${warningIcon}</span>
       <p class="c-card__content">
         Do <b class="t-strong">NOT</b> forget to save this seed phrase. Save a

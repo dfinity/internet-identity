@@ -4,9 +4,13 @@ import {
   addTentativeDevice,
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = (userNumber: bigint) => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot: html`
+  <article>
     <hgroup>
       <h1 class="t-title t-title--main">Device Registration Not Enabled</h1>
       <p class="t-lead">
@@ -44,8 +48,8 @@ const pageContent = (userNumber: bigint) => html`
         Cancel
       </button>
     </div>
-  </article>
-`;
+  </article>`
+});
 
 /**
  * Error page which is shown if the identy anchor does not have device registration mode enabled.

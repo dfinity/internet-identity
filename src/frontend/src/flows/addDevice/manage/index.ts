@@ -1,11 +1,16 @@
 import { html, render } from "lit-html";
 import { networkIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = () => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = () => mainWindow({
+  showFooter: false,
+  showLogo: false,
+  slot: html`
+  <article>
     <h1 class="t-title">Add New Device</h1>
     ${warnBox({
+      additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`You are in the process of adding a new device. Any device
         added here will have <strong>full control over your identity</strong>.
@@ -13,11 +18,12 @@ const pageContent = () => html`
         <em>personally own</em>.`,
     })}
     ${warnBox({
+      additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`Do not continue if you were prompted to do this by any
         website other than <strong>https://identity.ic0.app</strong>!`,
     })}
-    <p class="t-paragraph">
+    <p class="t-paragraph l-stack">
       Is the device you want to add available on this machine (local device) or
       on a different one (remote device)?
     </p>
@@ -40,8 +46,8 @@ const pageContent = () => html`
     <div class="l-stack">
       <button id="cancelAddDevice" class="c-button">Cancel</button>
     </div>
-  </article>
-`;
+  </article>`
+});
 
 export type DeviceAddFlow = "local" | "remote";
 

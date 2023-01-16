@@ -11,9 +11,13 @@ import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = () => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = () => mainWindow({
+  showLogo: false,
+  showFooter: false,
+  slot: html`
+  <article>
     <hgroup>
       <h1 class="t-title t-title--main">New Device</h1>
       <p class="t-lead">Please provide an alias for this device.</p>
@@ -43,8 +47,8 @@ const pageContent = () => html`
         Continue
       </button>
     </div>
-  </article>
-`;
+  </article>`
+});
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
