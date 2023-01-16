@@ -38,10 +38,7 @@ export const mainWindow = ({
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-    <div
-      ${uid !== null ? `id=${uid}` : ""}
-      class="${containerClasses.join(" ")}"
-    >
+    <div id="${uid}" class="${containerClasses.join(" ")}">
       ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
       <div class="c-card c-card--background">
         <div class="c-card c-card--highlight">${slot}</div>
