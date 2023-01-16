@@ -13,42 +13,42 @@ import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = () => mainWindow({
-  showLogo: false,
-  showFooter: false,
-  slot: html`
-  <article>
-    <hgroup>
-      <h1 class="t-title t-title--main">New Device</h1>
-      <p class="t-lead">Please provide an alias for this device.</p>
-      <p id="invalidAliasMessage" class="is-hidden">
-        The device alias must not be empty.
-      </p>
-    </hgroup>
-    <input
-      type="text"
-      id="tentativeDeviceAlias"
-      placeholder="Device Alias"
-      maxlength="64"
-      class="c-input"
-    />
-    <div class="c-button-group">
-      <button
-        class="c-button c-button--secondary"
-        id="registerTentativeDeviceCancel"
-      >
-        Cancel
-      </button>
-      <button
-        class="c-button"
-        id="registerTentativeDeviceContinue"
-        class="primary"
-      >
-        Continue
-      </button>
-    </div>
-  </article>`
-});
+const pageContent = () =>
+  mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: html` <article>
+      <hgroup>
+        <h1 class="t-title t-title--main">New Device</h1>
+        <p class="t-lead">Please provide an alias for this device.</p>
+        <p id="invalidAliasMessage" class="is-hidden">
+          The device alias must not be empty.
+        </p>
+      </hgroup>
+      <input
+        type="text"
+        id="tentativeDeviceAlias"
+        placeholder="Device Alias"
+        maxlength="64"
+        class="c-input"
+      />
+      <div class="c-button-group">
+        <button
+          class="c-button c-button--secondary"
+          id="registerTentativeDeviceCancel"
+        >
+          Cancel
+        </button>
+        <button
+          class="c-button"
+          id="registerTentativeDeviceContinue"
+          class="primary"
+        >
+          Continue
+        </button>
+      </div>
+    </article>`,
+  });
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.

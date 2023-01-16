@@ -203,10 +203,9 @@ export const authenticate = async (
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
   const template = mainWindow({
-    slot: html`
-      <!-- The title is hidden but used for accessibility -->
+    slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-      ${slot}`
+      ${slot}`,
   });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);

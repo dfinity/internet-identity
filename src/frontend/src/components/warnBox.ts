@@ -37,10 +37,6 @@ export const warnBox = ({
   `;
 
   return html`${htmlElement === "aside"
-    ? html` <aside class="${cssClasses.join(' ')}">
-        ${contents}
-      </aside>`
-    : html`
-        <div class="${cssClasses.join(' ')}">${contents}</div>
-      `}`;
+    ? html` <aside class="${cssClasses.join(" ")}">${contents}</aside>`
+    : html` <div class="${cssClasses.join(" ")}">${contents}</div> `}`;
 };

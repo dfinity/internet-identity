@@ -134,58 +134,59 @@ export const promptCaptchaTemplate = <T>({
     showFooter: false,
     showLogo: false,
     slot: html`
-    <article>
-      <h1 class="t-title t-title--main">Prove you're not a robot</h1>
-      <form
-        autocomplete="off"
-        @submit=${asyncReplace(next.recv())}
-        class="l-stack"
-      >
-        <div class="c-input c-input--icon">
-          ${asyncReplace(img.recv())}
-          <i
-            tabindex="0"
-            id="seedCopy"
-            class="c-button__icon c-input__icon"
-            @click=${asyncReplace(retry.recv())}
-            ?disabled=${asyncReplace(retryDisabled)}
-          >
-            <span>retry</span>
-          </i>
-        </div>
-        <label>
-          <strong class="t-strong">Type the characters you see</strong>
-          <input
-            ${autofocus}
-            ${ref(input)}
-            id="captchaInput"
-            class="c-input ${asyncReplace(hasError)}"
-          />
-          <strong class="c-input__message">
-            ${asyncReplace(errorText.recv())}
-          </strong>
-        </label>
-        <p class="t-paragraph confirm-paragraph"></p>
-        <div class="c-button-group">
-          <button
-            type="button"
-            @click=${() => cancel()}
-            class="c-button c-button--secondary"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="c-button"
-            id="confirmRegisterButton"
-            ?disabled=${asyncReplace(nextDisabled)}
-          >
-            ${asyncReplace(nextCaption.recv())}
-          </button>
-        </div>
-      </form>
-    </article>
-  `});
+      <article>
+        <h1 class="t-title t-title--main">Prove you're not a robot</h1>
+        <form
+          autocomplete="off"
+          @submit=${asyncReplace(next.recv())}
+          class="l-stack"
+        >
+          <div class="c-input c-input--icon">
+            ${asyncReplace(img.recv())}
+            <i
+              tabindex="0"
+              id="seedCopy"
+              class="c-button__icon c-input__icon"
+              @click=${asyncReplace(retry.recv())}
+              ?disabled=${asyncReplace(retryDisabled)}
+            >
+              <span>retry</span>
+            </i>
+          </div>
+          <label>
+            <strong class="t-strong">Type the characters you see</strong>
+            <input
+              ${autofocus}
+              ${ref(input)}
+              id="captchaInput"
+              class="c-input ${asyncReplace(hasError)}"
+            />
+            <strong class="c-input__message">
+              ${asyncReplace(errorText.recv())}
+            </strong>
+          </label>
+          <p class="t-paragraph confirm-paragraph"></p>
+          <div class="c-button-group">
+            <button
+              type="button"
+              @click=${() => cancel()}
+              class="c-button c-button--secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="c-button"
+              id="confirmRegisterButton"
+              ?disabled=${asyncReplace(nextDisabled)}
+            >
+              ${asyncReplace(nextCaption.recv())}
+            </button>
+          </div>
+        </form>
+      </article>
+    `,
+  });
 };
 
 export const promptCaptchaPage = <T>(

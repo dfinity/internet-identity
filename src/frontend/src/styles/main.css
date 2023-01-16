@@ -277,7 +277,8 @@ display:revert; revert to element instead of attribute */
  **/
 
 :root {
-  /* general styles */font-family: "Inter", sans-serif;
+  /* general styles */
+  font-family: "Inter", sans-serif;
   font-size: 62.5%; /* 10px */
   font-size: max(62.5%, calc(0.6vh + 0.25rem));
   font-weight: 350;
@@ -639,7 +640,7 @@ a:hover,
 .c-card--warning {
   position: relative;
   border: none;
-  border-radius: var(--vs-border-radius)
+  border-radius: var(--vs-border-radius);
 }
 
 .c-card--warning::before {
@@ -719,7 +720,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: var(--vs-border-radius)
+  border-radius: var(--vs-border-radius);
 }
 
 .c-button__icon svg {
@@ -784,7 +785,7 @@ a:hover,
   color: var(--rc-onInput);
   border: calc(var(--vs-line) * 2) solid var(--rc-line);
   word-break: break-word;
-  border-radius: var(--vs-border-radius)
+  border-radius: var(--vs-border-radius);
 }
 
 .c-button-group {
@@ -954,7 +955,7 @@ a:hover,
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .85em;
+  font-size: 0.85em;
 }
 
 .l-footer__elem {

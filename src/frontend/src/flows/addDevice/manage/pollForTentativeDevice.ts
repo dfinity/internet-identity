@@ -11,50 +11,52 @@ import {
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => mainWindow({
-  showLogo: false,
-  showFooter: false,
-  slot: html`
-  <hgroup>
-    <h1 class="t-title t-title--main">Add New Remote Device</h1>
-    <p class="t-lead">
-      Device registration mode enabled for Identity Anchor
-      <strong class="t-strong">${userNumber}</strong>. Please follow these
-      steps to add your new device:
-    </p>
-  </hgroup>
-  <ol class="c-list c-list--numbered l-stack">
-    <li>
-      On your <em>new</em> device:<br />
-      Open <strong class="t-strong">https://identity.ic0.app</strong>
-    </li>
-    <li>
-      On your <em>new</em> device:<br />
-      Chose <strong class="t-strong">Add a Device</strong> (if you don't see
-      the option, click on
-      <strong class="t-strong">Manage Existing</strong> and/or
-      <strong class="t-strong">More options</strong> first)
-    </li>
-    <li>
-      On your <em>new</em> device:<br />
-      Enter your Identity Anchor
-      <strong class="t-strong">${userNumber}</strong>
-    </li>
-    <li>
-      On your <em>new</em> device:<br />
-      Choose an alias for your new device
-    </li>
-  </ol>
-  <p class="t-paragraph">
-    This page will automatically refresh after completing the above steps.
-  </p>
-  <p class="t-paragraph">
-    Time remaining: <span id="timer" class="t-strong"></span>
-  </p>
-  <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">
-    Cancel
-  </button>
-`});
+const pageContent = (userNumber: bigint) =>
+  mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: html`
+      <hgroup>
+        <h1 class="t-title t-title--main">Add New Remote Device</h1>
+        <p class="t-lead">
+          Device registration mode enabled for Identity Anchor
+          <strong class="t-strong">${userNumber}</strong>. Please follow these
+          steps to add your new device:
+        </p>
+      </hgroup>
+      <ol class="c-list c-list--numbered l-stack">
+        <li>
+          On your <em>new</em> device:<br />
+          Open <strong class="t-strong">https://identity.ic0.app</strong>
+        </li>
+        <li>
+          On your <em>new</em> device:<br />
+          Chose <strong class="t-strong">Add a Device</strong> (if you don't see
+          the option, click on
+          <strong class="t-strong">Manage Existing</strong> and/or
+          <strong class="t-strong">More options</strong> first)
+        </li>
+        <li>
+          On your <em>new</em> device:<br />
+          Enter your Identity Anchor
+          <strong class="t-strong">${userNumber}</strong>
+        </li>
+        <li>
+          On your <em>new</em> device:<br />
+          Choose an alias for your new device
+        </li>
+      </ol>
+      <p class="t-paragraph">
+        This page will automatically refresh after completing the above steps.
+      </p>
+      <p class="t-paragraph">
+        Time remaining: <span id="timer" class="t-strong"></span>
+      </p>
+      <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">
+        Cancel
+      </button>
+    `,
+  });
 
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.

@@ -18,7 +18,7 @@ export type mainWindowProps = {
  * @argument showFooter - show footer or not
  * @argument showLogo - show logo or not
  * @argument isWideContainer - some pages need a wider container (FAQ, etc.)
- * @argument additionalContainerClasses - additional classes to add to the container 
+ * @argument additionalContainerClasses - additional classes to add to the container
  * @returns TemplateResult
  */
 
@@ -29,7 +29,7 @@ export const mainWindow = ({
   showLogo = true,
   isWideContainer = false,
   additionalContainerClasses = [],
-}:mainWindowProps):TemplateResult => {
+}: mainWindowProps): TemplateResult => {
   const containerClasses = ["l-container"];
   if (isWideContainer === true) {
     containerClasses.push("l-container--wide");
@@ -38,13 +38,15 @@ export const mainWindow = ({
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-  <div ${uid !== null ? `id=${uid}` : ''} class="${containerClasses.join(' ')}">
-    ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-    <div class="c-card c-card--background">
-      <div class="c-card c-card--highlight">
-        ${slot}
+    <div
+      ${uid !== null ? `id=${uid}` : ""}
+      class="${containerClasses.join(" ")}"
+    >
+      ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
+      <div class="c-card c-card--background">
+        <div class="c-card c-card--highlight">${slot}</div>
+        ${showFooter ? footer : ""}
       </div>
-      ${showFooter ? footer : ""}
     </div>
-  </div>
-`};
+  `;
+};

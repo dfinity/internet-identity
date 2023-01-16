@@ -15,8 +15,7 @@ const constructingContent = mainWindow({
   additionalContainerClasses: ["t-centered"],
   showFooter: false,
   showLogo: false,
-  slot: html`
-    <div class="c-spinner">${spinner}</div>
+  slot: html` <div class="c-spinner">${spinner}</div>
     <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
     <p><strong class="t-strong">Do not refresh the page</strong></p>`,
 });

@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = (seedPhrase: string) => 
+const pageContent = (seedPhrase: string) =>
   mainWindow({
     showLogo: false,
     showFooter: false,
@@ -51,7 +51,8 @@ const pageContent = (seedPhrase: string) =>
       Continue
     </button>
   </article>
-`});
+`,
+  });
 
 export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;

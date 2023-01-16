@@ -43,7 +43,8 @@ export const pageContent = mainWindow({
         </div>
       </div>
     </div>
-`});
+  `,
+});
 
 export const aboutView = (): void => {
   document.title = "About | Internet Identity";

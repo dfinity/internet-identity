@@ -285,36 +285,36 @@ export function mkExternalLink(link: {
 // The FAQ page
 export const pageContent = mainWindow({
   isWideContainer: true,
-  additionalContainerClasses: ['faq__container'],
+  additionalContainerClasses: ["faq__container"],
   slot: html`
-  <style>
-    /* briefly flash the question when redirected to a particular question */
-    @keyframes flash-question {
-      0% {
-        background-color: transparent;
+    <style>
+      /* briefly flash the question when redirected to a particular question */
+      @keyframes flash-question {
+        0% {
+          background-color: transparent;
+        }
+        50% {
+          background-color: var(--rainbow-orange);
+          border-radius: 0.3em;
+        }
+        100% {
+          background-color: transparent;
+        }
       }
-      50% {
-        background-color: var(--rainbow-orange);
-        border-radius: 0.3em;
+      :target {
+        animation-name: flash-question;
+        animation-duration: 3000ms;
       }
-      100% {
-        background-color: transparent;
+      .flash-question {
+        animation-name: flash-question;
+        animation-duration: 3000ms;
       }
-    }
-    :target {
-      animation-name: flash-question;
-      animation-duration: 3000ms;
-    }
-    .flash-question {
-      animation-name: flash-question;
-      animation-duration: 3000ms;
-    }
-  </style>
-  <h1 class="faq__title t-title t-title--main">FAQ</h1>
-  <ul class="faq__questions c-list l-stack">
-    ${questionsArray.map((faq) => renderQuestion(faq))}
-  </ul>
-`
+    </style>
+    <h1 class="faq__title t-title t-title--main">FAQ</h1>
+    <ul class="faq__questions c-list l-stack">
+      ${questionsArray.map((faq) => renderQuestion(faq))}
+    </ul>
+  `,
 });
 
 // Open the anchor with id="foo" if the page hash is "#foo"
