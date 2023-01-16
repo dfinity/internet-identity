@@ -2,8 +2,6 @@ import { html, render, TemplateResult } from "lit-html";
 import { promptUserNumber } from "./promptUserNumber";
 import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
 import { NonEmptyArray } from "../utils/utils";
-import { icLogo } from "./icons";
-import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { mkAnchorPicker } from "./anchorPicker";
 import { mkAnchorInput } from "./anchorInput";

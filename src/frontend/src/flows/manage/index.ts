@@ -3,7 +3,6 @@ import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { footer } from "../../components/footer";
 import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,

@@ -1,7 +1,6 @@
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { withRef } from "../../utils/lit-html";
 import { html, render, TemplateResult } from "lit-html";
-import { icLogo } from "../../components/icons";
 import { validateAlias } from "../addDevice/validateAlias";
 import { mainWindow } from "../../components/mainWindow";
 

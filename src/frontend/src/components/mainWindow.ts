@@ -1,4 +1,4 @@
-import { html, render, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit-html";
 import { icLogo } from "./icons";
 import { footer } from "./footer";
 
@@ -31,14 +31,14 @@ export const mainWindow = ({
   additionalContainerClasses = [],
 }:mainWindowProps):TemplateResult => {
   const containerClasses = ["l-container"];
-  if (isWideContainer) {
+  if (isWideContainer === true) {
     containerClasses.push("l-container--wide");
   }
   if (additionalContainerClasses.length > 0) {
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-  <div ${uid ? `id=${uid}` : ''} class="${containerClasses.join(' ')}">
+  <div ${uid !== null ? `id=${uid}` : ''} class="${containerClasses.join(' ')}">
     ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
     <div class="c-card c-card--background">
       <div class="c-card c-card--highlight">
