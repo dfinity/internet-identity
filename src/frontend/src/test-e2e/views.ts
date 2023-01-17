@@ -102,6 +102,7 @@ export class SingleDeviceWarningView extends View {
   }
 
   async remindLater(): Promise<void> {
+    
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
@@ -314,6 +315,9 @@ export class VerifyRemoteDeviceView extends View {
   }
 
   async continue(): Promise<void> {
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
     await this.browser.$("#verifyDevice").click();
   }
 }

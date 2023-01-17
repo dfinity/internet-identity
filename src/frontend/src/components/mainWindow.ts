@@ -3,16 +3,6 @@ import { ifDefined } from "lit/directives/if-defined.js";
 import { icLogo } from "./icons";
 import { footer } from "./footer";
 
-export type mainWindowProps = {
-  slot: TemplateResult;
-  uid?: string;
-  showFooter?: boolean;
-  showLogo?: boolean;
-  isWideContainer?: boolean;
-  additionalContainerClasses?: string[];
-  HTMLwrapperTag?: string;
-};
-
 /**
  * main window template
  * @argument slot - HTML content of the main window
@@ -22,15 +12,22 @@ export type mainWindowProps = {
  * @argument additionalContainerClasses - additional classes to add to the container
  * @returns TemplateResult
  */
-
 export const mainWindow = ({
   slot,
-  uid,
+  id,
   showFooter = true,
   showLogo = true,
   isWideContainer = false,
   additionalContainerClasses = [],
-}: mainWindowProps): TemplateResult => {
+}: {
+  slot: TemplateResult;
+  id?: string;
+  showFooter?: boolean;
+  showLogo?: boolean;
+  isWideContainer?: boolean;
+  additionalContainerClasses?: string[];
+  HTMLwrapperTag?: string;
+}): TemplateResult => {
   const containerClasses = ["l-container"];
   if (isWideContainer === true) {
     containerClasses.push("l-container--wide");
@@ -40,7 +37,7 @@ export const mainWindow = ({
   }
   return html`
     <div
-      id="${ifDefined(uid !== null ? uid : undefined)}"
+      id="${ifDefined(id !== null ? id : undefined)}"
       class="${containerClasses.join(" ")}"
     >
       ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}

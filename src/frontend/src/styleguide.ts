@@ -209,12 +209,12 @@ export const styleguide = html`
           <input
             type="text"
             placeholder="Rounded Input"
-            class="c-input c-input--rounded"
+            class="c-input"
           />
           <input
             type="text"
             placeholder="Spacious Input"
-            class="c-input c-input--rounded c-input--spacious"
+            class="c-input c-input--spacious"
           />
           <input
             type="text"

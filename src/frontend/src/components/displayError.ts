@@ -11,7 +11,7 @@ export type ErrorOptions = {
 
 const pageContent = (options: ErrorOptions) =>
   mainWindow({
-    uid: "errorContainer",
+    id: "errorContainer",
     showFooter: false,
     showLogo: false,
     slot: html` ${warnBox({
