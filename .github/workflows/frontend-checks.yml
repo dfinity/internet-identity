@@ -161,3 +161,37 @@ jobs:
           add: screenshots
           default_author: github_actions
           message: "🤖 Selenium screenshots auto-update"
+
+  # Deploy the showcase to GitHub Pages
+  showcase:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+
+      # Build the showcase with a special base URL (used in links and esp. routing)
+      # to match the deploy URL: https://dfinity.github.io/internet-identity/
+      - run: BASE_URL='/internet-identity' npm run build:showcase
+      # the showcase needs the same index.html served on all routes. In the devServer this is
+      # done by using `historyApiFallback`; on GH pages we just show a fake 404 page that is
+      # actually the index.
+      - run: cp dist/index.html dist/404.html
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: 'dist'
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/deploy-pages@v1
+        id: deployment

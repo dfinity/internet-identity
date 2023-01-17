@@ -220,6 +220,12 @@ export default [
   {
     ...defaults,
     name: "showcase",
+    plugins: [
+      ...defaults.plugins,
+      new webpack.EnvironmentPlugin({
+        BASE_URL: "",
+      }),
+    ],
     entry: {
       showcase: path.join(__dirname, "src", "frontend", "src", "showcase"),
     },
