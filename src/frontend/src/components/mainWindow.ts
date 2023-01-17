@@ -11,8 +11,7 @@ import { footer } from "./footer";
  * This way, we can change the structure of the main window
  * in one place.
  *
- * Before it was just a DIV with a class, but now its a more complex
- * component that includes the logo, the footer, and the container.
+ * It is a component that includes the logo, the footer, and the container.
  *
  */
 export const mainWindow = ({
