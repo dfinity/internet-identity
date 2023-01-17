@@ -11,7 +11,7 @@ const pageContent = () => {
     </div>
   `;
 
-  mainWindow({
+  return mainWindow({
     showFooter: false,
     showLogo: false,
     slot: pageContentSlot,
