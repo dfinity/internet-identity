@@ -164,6 +164,7 @@ jobs:
 
   # Deploy the showcase to GitHub Pages
   showcase:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -192,6 +193,5 @@ jobs:
         with:
           path: 'dist'
       - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v1
         id: deployment
