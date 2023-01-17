@@ -275,8 +275,8 @@ const showcase: TemplateResult = html`
   <div class="showcase-grid l-stack">
     ${Object.entries(iiPages).map(([key, _]) => {
       return html`<aside>
-        <a data-page-name="${key}" href="/${key}">
-          <iframe src="/${key}" title="${key}"></iframe>
+        <a data-page-name="${key}" href="${key}">
+          <iframe src="${key}" title="${key}"></iframe>
           <h2>${key}</h2>
         </a>
       </aside>`;
@@ -407,7 +407,9 @@ const init = async () => {
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
-  const route = window.location.pathname.substring(1);
+  const route = window.location.pathname
+    .replace(process.env.BASE_URL ?? "", "")
+    .substring(1);
   const page = iiPages[route] ?? defaultPage;
 
   page();
