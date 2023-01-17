@@ -283,38 +283,40 @@ export function mkExternalLink(link: {
 }
 
 // The FAQ page
+const pageContentSlot = html`
+  <style>
+    /* briefly flash the question when redirected to a particular question */
+    @keyframes flash-question {
+      0% {
+        background-color: transparent;
+      }
+      50% {
+        background-color: var(--rainbow-orange);
+        border-radius: 0.3em;
+      }
+      100% {
+        background-color: transparent;
+      }
+    }
+    :target {
+      animation-name: flash-question;
+      animation-duration: 3000ms;
+    }
+    .flash-question {
+      animation-name: flash-question;
+      animation-duration: 3000ms;
+    }
+  </style>
+  <h1 class="faq__title t-title t-title--main">FAQ</h1>
+  <ul class="faq__questions c-list l-stack">
+    ${questionsArray.map((faq) => renderQuestion(faq))}
+  </ul>
+`;
+
 export const pageContent = mainWindow({
   isWideContainer: true,
   additionalContainerClasses: ["faq__container"],
-  slot: html`
-    <style>
-      /* briefly flash the question when redirected to a particular question */
-      @keyframes flash-question {
-        0% {
-          background-color: transparent;
-        }
-        50% {
-          background-color: var(--rainbow-orange);
-          border-radius: 0.3em;
-        }
-        100% {
-          background-color: transparent;
-        }
-      }
-      :target {
-        animation-name: flash-question;
-        animation-duration: 3000ms;
-      }
-      .flash-question {
-        animation-name: flash-question;
-        animation-duration: 3000ms;
-      }
-    </style>
-    <h1 class="faq__title t-title t-title--main">FAQ</h1>
-    <ul class="faq__questions c-list l-stack">
-      ${questionsArray.map((faq) => renderQuestion(faq))}
-    </ul>
-  `,
+  slot: pageContentSlot,
 });
 
 // Open the anchor with id="foo" if the page hash is "#foo"

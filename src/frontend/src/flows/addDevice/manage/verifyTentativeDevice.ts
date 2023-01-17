@@ -9,54 +9,58 @@ import { setupCountdown } from "../../../utils/countdown";
 import { warnBox } from "../../../components/warnBox";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (alias: string) =>
-  mainWindow({
+const pageContent = (alias: string) => {
+  const pageContentSlot = html`<h1 class="t-title t-title--main">
+      Verify New Device
+    </h1>
+    ${warnBox({
+      additionalClasses: ["l-stack"],
+      title: "Security Warning",
+      message: html`Verifying will add the shown device to your Identity Anchor.
+        It will have <strong>full control over your identity</strong>. Only
+        enter a verification code here if you are sure that you
+        <em>personally own</em> this device.`,
+    })}
+    ${warnBox({
+      additionalClasses: ["l-stack"],
+      title: "Security Warning",
+      message: html`Enter only codes that were displayed on
+        <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
+        verification codes that you received any other way.`,
+    })}
+    <h2 class="t-title">Verify that this is your device:</h2>
+    <label class="l-stack">
+      <strong class="t-title">Alias</strong>
+      <div class="c-input c-input--readonly t-vip t-vip--small">${alias}</div>
+    </label>
+    <label class="l-stack">
+      <strong class="t-title">Device Verification Code</strong>
+      <p id="wrongCodeMessage" class="is-hidden t-paragraph">
+        The entered verification code was invalid. Please try again.
+      </p>
+      <input
+        id="tentativeDeviceCode"
+        class="c-input"
+        placeholder="Verification Code"
+      />
+    </label>
+    <p class="t-paragraph">
+      Time remaining: <span id="timer" class="t-strong"></span>
+    </p>
+
+    <div class="l-stack">
+      <button id="verifyDevice" class="c-button">Verify Device</button>
+      <button id="cancelVerifyDevice" class="c-button c-button--secondary">
+        Cancel
+      </button>
+    </div>`;
+
+  return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: html` <h1 class="t-title t-title--main">Verify New Device</h1>
-      ${warnBox({
-        additionalClasses: ["l-stack"],
-        title: "Security Warning",
-        message: html`Verifying will add the shown device to your Identity
-          Anchor. It will have <strong>full control over your identity</strong>.
-          Only enter a verification code here if you are sure that you
-          <em>personally own</em> this device.`,
-      })}
-      ${warnBox({
-        additionalClasses: ["l-stack"],
-        title: "Security Warning",
-        message: html`Enter only codes that were displayed on
-          <strong>https://identity.ic0.app</strong>. Do
-          <strong>not</strong> enter verification codes that you received any
-          other way.`,
-      })}
-      <h2 class="t-title">Verify that this is your device:</h2>
-      <label class="l-stack">
-        <strong class="t-title">Alias</strong>
-        <div class="c-input c-input--readonly t-vip t-vip--small">${alias}</div>
-      </label>
-      <label class="l-stack">
-        <strong class="t-title">Device Verification Code</strong>
-        <p id="wrongCodeMessage" class="is-hidden t-paragraph">
-          The entered verification code was invalid. Please try again.
-        </p>
-        <input
-          id="tentativeDeviceCode"
-          class="c-input"
-          placeholder="Verification Code"
-        />
-      </label>
-      <p class="t-paragraph">
-        Time remaining: <span id="timer" class="t-strong"></span>
-      </p>
-
-      <div class="l-stack">
-        <button id="verifyDevice" class="c-button">Verify Device</button>
-        <button id="cancelVerifyDevice" class="c-button c-button--secondary">
-          Cancel
-        </button>
-      </div>`,
+    slot: pageContentSlot,
   });
+};
 
 /**
  * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.

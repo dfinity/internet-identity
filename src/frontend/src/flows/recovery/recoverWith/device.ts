@@ -11,37 +11,40 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) =>
-  mainWindow({
+const pageContent = (userNumber: bigint) => {
+  const pageContentSlot = html`
+    <article>
+      <hgroup>
+        <h1 class="t-title t-title--main">Recovery for ${userNumber}</h1>
+        <p class="t-lead">
+          You are about to recover your anchor using a recovery device. Please
+          click "continue" and then follow your browser's instructions to
+          connect your device.
+        </p>
+      </hgroup>
+      <div class="c-button-group">
+        <button
+          id="recover-with-device__cancel"
+          class="c-button c-button--secondary"
+        >
+          Cancel
+        </button>
+        <button
+          id="recover-with-device__continue"
+          class="c-button c-button--primary"
+        >
+          Continue
+        </button>
+      </div>
+    </article>
+  `;
+
+  return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: html`
-      <article>
-        <hgroup>
-          <h1 class="t-title t-title--main">Recovery for ${userNumber}</h1>
-          <p class="t-lead">
-            You are about to recover your anchor using a recovery device. Please
-            click "continue" and then follow your browser's instructions to
-            connect your device.
-          </p>
-        </hgroup>
-        <div class="c-button-group">
-          <button
-            id="recover-with-device__cancel"
-            class="c-button c-button--secondary"
-          >
-            Cancel
-          </button>
-          <button
-            id="recover-with-device__continue"
-            class="c-button c-button--primary"
-          >
-            Continue
-          </button>
-        </div>
-      </article>
-    `,
+    slot: pageContentSlot,
   });
+};
 
 export const deviceRecoveryPage = async (
   userNumber: bigint,

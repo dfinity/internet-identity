@@ -23,73 +23,68 @@ const pageContent = (
   device: DeviceData,
   isOnlyDevice: boolean,
   back: () => void
-) =>
-  mainWindow({
-    showLogo: false,
-    showFooter: true,
-    slot: html` <article id="deviceSettings">
-      <h1 class="t-title">
-        ${isRecovery(device) ? "" : "Device"} ${device.alias}
-      </h1>
+) => {
+  const pageContentSlot = html` <article id="deviceSettings">
+    <h1 class="t-title">
+      ${isRecovery(device) ? "" : "Device"} ${device.alias}
+    </h1>
 
-      <div class="l-stack">
-        ${shouldOfferToProtect(device)
-          ? html` <p class="t-paragraph">
-                By making your recovery phrase protected, you will need to input
-                your recovery phrase to delete it.
-              </p>
-              <button
-                @click="${() =>
-                  protectDevice(
-                    userNumber,
-                    connection,
-                    device,
-                    isOnlyDevice,
-                    back
-                  )}"
-                data-action="protect"
-                class="c-button"
-              >
-                Protect
-              </button>
-              <hr />`
-          : ""}
-        ${!isOnlyDevice
-          ? html`<button
+    <div class="l-stack">
+      ${shouldOfferToProtect(device)
+        ? html` <p class="t-paragraph">
+              By making your recovery phrase protected, you will need to input
+              your recovery phrase to delete it.
+            </p>
+            <button
               @click="${() =>
-                deleteDevice(
+                protectDevice(
                   userNumber,
                   connection,
                   device,
                   isOnlyDevice,
                   back
                 )}"
-              data-action="remove"
-              class="c-button c-button--warning"
+              data-action="protect"
+              class="c-button"
             >
-              Delete ${isRecovery(device) ? "Recovery" : "Device"}
-            </button>`
-          : ""}
-        ${!isOnlyDevice && isProtected(device)
-          ? html`<p class="t-paragraph">
-              This ${isRecovery(device) ? device.alias : "device"} is protected
-              and you will be prompted to authenticate with it before removal.
+              Protect
+            </button>
+            <hr />`
+        : ""}
+      ${!isOnlyDevice
+        ? html`<button
+            @click="${() =>
+              deleteDevice(userNumber, connection, device, isOnlyDevice, back)}"
+            data-action="remove"
+            class="c-button c-button--warning"
+          >
+            Delete ${isRecovery(device) ? "Recovery" : "Device"}
+          </button>`
+        : ""}
+      ${!isOnlyDevice && isProtected(device)
+        ? html`<p class="t-paragraph">
+            This ${isRecovery(device) ? device.alias : "device"} is protected
+            and you will be prompted to authenticate with it before removal.
+          </p>`
+        : ""}
+      ${isOnlyDevice
+        ? html`<p class="t-paragraph">
+              This is your last device. You cannot remove it.
+            </p>
+            <p class="t-paragraph">
+              Without devices your anchor would be inaccessible.
             </p>`
-          : ""}
-        ${isOnlyDevice
-          ? html`<p class="t-paragraph">
-                This is your last device. You cannot remove it.
-              </p>
-              <p class="t-paragraph">
-                Without devices your anchor would be inaccessible.
-              </p>`
-          : ""}
-        <button @click="${back}" data-action="back" class="c-button">
-          Back
-        </button>
-      </div>
-    </article>`,
+        : ""}
+      <button @click="${back}" data-action="back" class="c-button">Back</button>
+    </div>
+  </article>`;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: true,
+    slot: pageContentSlot,
   });
+};
 
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices

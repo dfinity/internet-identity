@@ -82,23 +82,23 @@ const pageContent = (
   devices: DeviceData[],
   onAddDevice: (next: "canceled" | "local" | "remote") => void,
   onAddRecovery: () => void
-): TemplateResult =>
-  mainWindow({
-    slot: html` <section>
-      <hgroup>
-        <h1 class="t-title t-title--main">Anchor Management</h1>
-        <p class="t-lead">
-          You can view and manage this Identity Anchor and its added devices
-          here.
-        </p>
-      </hgroup>
-      ${!hasRecoveryDevice(devices)
-        ? recoveryNag({ onAddRecovery })
-        : undefined}
-      ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
-      ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
-    </section>`,
+): TemplateResult => {
+  const pageContentSlot = html` <section>
+    <hgroup>
+      <h1 class="t-title t-title--main">Anchor Management</h1>
+      <p class="t-lead">
+        You can view and manage this Identity Anchor and its added devices here.
+      </p>
+    </hgroup>
+    ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
+    ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
+    ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
+  </section>`;
+
+  return mainWindow({
+    slot: pageContentSlot,
   });
+};
 
 const anchorSection = (userNumber: bigint): TemplateResult => html`
   <aside class="l-stack">
