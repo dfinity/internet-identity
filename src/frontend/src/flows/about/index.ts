@@ -13,8 +13,7 @@ const aboutContentSlot = html`
     </p>
     <p class="t-paragraph">
       For frequently asked questions, check the
-      <a href="/faq" title="Go to the Internet Identity FAQ page">FAQ page</a
-      >.
+      <a href="/faq" title="Go to the Internet Identity FAQ page">FAQ page</a>.
     </p>
   </div>
   <div class="l-stack">
