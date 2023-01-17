@@ -5,12 +5,15 @@ import { footer } from "./footer";
 
 /**
  * main window template
- * @argument slot - HTML content of the main window
- * @argument showFooter - show footer or not
- * @argument showLogo - show logo or not
- * @argument isWideContainer - some pages need a wider container (FAQ, etc.)
- * @argument additionalContainerClasses - additional classes to add to the container
- * @returns TemplateResult
+ *
+ * To avoid having to repeat the same structure in every page,
+ * we use this component to wrap the content of each page.
+ * This way, we can change the structure of the main window
+ * in one place.
+ *
+ * Before it was just a DIV with a class, but now its a more complex
+ * component that includes the logo, the footer, and the container.
+ *
  */
 export const mainWindow = ({
   slot,
