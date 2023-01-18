@@ -177,7 +177,6 @@ pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
-    pub upgrade_persistent_state: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
