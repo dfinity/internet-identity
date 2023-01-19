@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
+import { checkmarkIcon, copyIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 
 const pageContent = (seedPhrase: string) => {
