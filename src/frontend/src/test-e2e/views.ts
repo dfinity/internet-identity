@@ -318,9 +318,6 @@ export class VerifyRemoteDeviceView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
     await this.browser.$("#verifyDevice").click();
   }
 }
