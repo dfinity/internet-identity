@@ -530,9 +530,7 @@ export class RecoverView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
-      .$(
-        `//h1[string()='Enter recovery phrase']`
-      )
+      .$(`//h1[string()='Enter recovery phrase']`)
       .waitForDisplayed({ timeout: 5_000 });
   }
 
