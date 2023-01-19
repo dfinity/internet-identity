@@ -7,29 +7,13 @@ import { mainWindow } from "../../components/mainWindow";
 const pageContent = () => {
   const pageContentSlot = html`
     <article id="warningContainer">
-      ${warnBox({
-        title: "Warning",
-        message: "Only one device registered.",
-        slot: html`
-          <p class="t-paragraph t-lead">
-            If you lose all the devices assigned to your Internet Identity
-            anchor, then you will <em>lose access</em> to the anchor, and all
-            associated resources and tokens, unless you have a recovery
-            mechanism setup. This can be an external key fob or a secure
-            seedphrase, which you must make sure is not stolen.
-          </p>
-
-          <p class="t-paragraph">
-            As a best practice, we recommend you assign multiple devices to an
-            Identity Anchor and add <em>at least</em> one recovery mechanism
-            such as an external key fob or a seedphrase.
-          </p>
-        `,
-        htmlElement: "div",
-      })}
+      <h1 class="t-title t-title--main">Add Another Device</h1>
+      <p class="t-paragraph">
+        We recommend that you have at least two devices (for example, your computer and your phone) in case you lose access to one.
+      </p>
       <div class="l-stack">
         <button id="displayWarningAddRecovery" class="c-button">
-          Add a recovery mechanism to an Identity Anchor
+          Add a recovery method
         </button>
         <button
           id="displayWarningRemindLater"

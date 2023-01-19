@@ -382,6 +382,7 @@ body {
 
 .t-paragraph {
   margin-top: 1em;
+  line-height: 1.5;
 }
 
 .t-paragraph:first-child {
