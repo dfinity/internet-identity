@@ -11,6 +11,7 @@ import {
   Connection,
   RegisterResult,
 } from "../../utils/iiConnection";
+import { mainWindow } from "../../components/mainWindow";
 
 // A symbol that we can differentiate from generic `T` types
 // when verifying the challenge
@@ -129,8 +130,8 @@ export const promptCaptchaTemplate = <T>({
   // Kickstart everything
   doRetry();
 
-  return html`
-    <article class="l-container c-card c-card--highlight">
+  const promptCaptchaSlot = html`
+    <article>
       <h1 class="t-title t-title--main">Prove you're not a robot</h1>
       <form
         autocomplete="off"
@@ -182,6 +183,12 @@ export const promptCaptchaTemplate = <T>({
       </form>
     </article>
   `;
+
+  return mainWindow({
+    showFooter: false,
+    showLogo: false,
+    slot: promptCaptchaSlot,
+  });
 };
 
 export const promptCaptchaPage = <T>(

@@ -4,9 +4,10 @@ import {
   addTentativeDevice,
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => html`
-  <article class="l-container c-card c-card--highlight">
+const pageContent = (userNumber: bigint) => {
+  const pageContentSlot = html` <article>
     <hgroup>
       <h1 class="t-title t-title--main">Device Registration Not Enabled</h1>
       <p class="t-lead">
@@ -18,8 +19,9 @@ const pageContent = (userNumber: bigint) => html`
     <ol class="c-list c-list--numbered l-stack">
       <li>
         On an <em>existing</em> device:<br />
-        Log into <strong class="t-strong">https://identity.ic0.app</strong> with
-        Identity Anchor
+        Log into
+        <strong class="t-strong">https://identity.ic0.app</strong> with Identity
+        Anchor
         <strong class="t-strong">${userNumber}</strong>
       </li>
       <li>
@@ -44,9 +46,14 @@ const pageContent = (userNumber: bigint) => html`
         Cancel
       </button>
     </div>
-  </article>
-`;
+  </article>`;
 
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
 /**
  * Error page which is shown if the identy anchor does not have device registration mode enabled.
  * It shows instructions to the user on how to continue.

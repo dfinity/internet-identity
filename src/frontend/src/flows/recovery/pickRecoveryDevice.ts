@@ -1,15 +1,22 @@
 import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
+import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = () => html`
-  <div class="l-container c-card c-card--highlight c-card--highlight">
+const pageContent = () => {
+  const pageContentSlot = html`
     <h1 class="t-title t-title--main">Choose a device</h1>
     <div class="l-stack">
       <h2 class="t-title">Recovery devices</h2>
       <ol class="c-list l-stack" id="deviceList"></ol>
     </div>
-  </div>
-`;
+  `;
+
+  return mainWindow({
+    showFooter: false,
+    showLogo: false,
+    slot: pageContentSlot,
+  });
+};
 
 export const pickRecoveryDevice = async (
   devices: DeviceData[]

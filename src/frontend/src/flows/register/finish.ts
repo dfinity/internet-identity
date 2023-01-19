@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../../components/warnBox";
+import { mainWindow } from "../../components/mainWindow";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -7,13 +8,13 @@ export const displayUserNumberTemplate = ({
 }: {
   onContinue: () => void;
   userNumber: bigint;
-}) => html`
-  <div class="l-container c-card c-card--highlight">
-    <hgroup>
+}) => {
+  const displayUserNumberSlot = html`<hgroup>
       <h1 class="t-title t-title--main">Congratulations!</h1>
       <p class="t-paragraph">Your new Identity Anchor has been created.</p>
     </hgroup>
     ${warnBox({
+      additionalClasses: ["l-stack"],
       title: "Record Your Identity Anchor",
       message:
         "Please record your new Identity Anchor. Keep a backup on a storage medium and write it down. You will need it later to use Internet Identity or to add additional devices. If you lose your Identity Anchor, you will no longer be able to use this identity to authenticate to dApps.",
@@ -31,9 +32,14 @@ export const displayUserNumberTemplate = ({
       >
         Continue
       </button>
-    </div>
-  </div>
-`;
+    </div> `;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: displayUserNumberSlot,
+  });
+};
 
 export const displayUserNumberPage = (
   props: Parameters<typeof displayUserNumberTemplate>[0],

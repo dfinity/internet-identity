@@ -9,9 +9,10 @@ import {
   IdentityAnchorInfo,
 } from "../../../../generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => html`
-  <div class="l-container c-card c-card--highlight">
+const pageContent = (userNumber: bigint) => {
+  const pageContentSlot = html`
     <hgroup>
       <h1 class="t-title t-title--main">Add New Remote Device</h1>
       <p class="t-lead">
@@ -51,8 +52,14 @@ const pageContent = (userNumber: bigint) => html`
     <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">
       Cancel
     </button>
-  </div>
-`;
+  `;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
 
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.

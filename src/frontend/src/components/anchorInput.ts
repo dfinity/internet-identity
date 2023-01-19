@@ -100,7 +100,7 @@ export const mkAnchorInput = ({
         ${mount(selectInput)}
         type="text"
         data-role="anchor-input"
-        class="c-input c-input--vip c-input--rounded c-input--centered c-input--spacious"
+        class="c-input c-input--vip c-input--centered c-input--spacious"
         placeholder="Enter anchor"
         value="${ifDefined(userNumber?.toString())}"
         @input=${inputFilter(isDigits, onBadInput)}
