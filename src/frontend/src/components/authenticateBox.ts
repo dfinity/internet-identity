@@ -215,9 +215,8 @@ const page = (slot: TemplateResult) => {
 // adding a device to that anchor.
 const addRemoteDevice = async (connection: Connection) => {
   const userNumber = await promptUserNumber({
-    title: "New Device",
-    message:
-      "Please provide the Identity Anchor to which you want to add your device.",
+    title: "Add a Trusted Device",
+    message: "What’s your Identity Anchor?",
   });
 
   if (userNumber === "canceled") {

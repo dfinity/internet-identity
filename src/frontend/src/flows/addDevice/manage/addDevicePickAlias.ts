@@ -9,15 +9,15 @@ import { validateAlias } from "../validateAlias";
 const pageContent = () => html`
   <article class="l-container c-card c-card--highlight">
     <hgroup>
-      <h1 class="t-title t-title--main">New Device</h1>
-      <p class="t-lead">Please provide a name for your new device</p>
+      <h1 class="t-title t-title--main">Add a Trusted Device</h1>
+      <p class="t-lead">What device are you using?</p>
     </hgroup>
     <form id="deviceAliasForm">
       <input
         class="c-input inputDeviceAlias"
         aria-label="device name"
         id="deviceAlias"
-        placeholder="Device alias"
+        placeholder="Example: My iPhone"
         type="text"
         required
         maxlength="30"
