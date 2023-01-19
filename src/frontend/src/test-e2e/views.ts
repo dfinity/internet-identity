@@ -534,7 +534,7 @@ export class RecoverView extends View {
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
       .$(
-        `//h1[string()='Provide your Recovery Phrase to recover your Internet Identity']`
+        `//h1[string()='Enter recovery phrase']`
       )
       .waitForDisplayed({ timeout: 5_000 });
   }
