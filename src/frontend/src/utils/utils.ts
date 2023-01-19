@@ -237,3 +237,10 @@ export class Chan<A> {
 export function randomString(): string {
   return (Math.random() + 1).toString(36).substring(2);
 }
+
+// Create a promise that will resolve _after_ this amount of milliseconds.
+export function delayMillis(millis: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => resolve(), millis);
+  });
+}

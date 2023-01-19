@@ -1,4 +1,5 @@
 import { render } from "lit-html";
+import { delayMillis } from "./utils";
 
 /**
  * Countdown implementation which calls the supplied update function approximately every second until the endTimestamp is reached.
@@ -100,3 +101,87 @@ const calculateTimeRemaining = (
       .padStart(2, "0"),
   ];
 };
+
+// Prettify the number into a string: "mm:ss"
+function prettifySeconds(a: number): string {
+  const mins = Math.floor(a / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = Math.floor(a % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
+/// A one shot countdown timer that emits the remaining time as a formatted string ("mm:ss")
+// through an AsyncIterable.
+//
+// The countdown cannot be restarted.
+export class AsyncCountdown {
+  // Create a countdown from nanoseconds
+  static fromNanos(nanos: bigint) {
+    return new AsyncCountdown(Number(nanos / BigInt(1e9)));
+  }
+
+  // The number of seconds elapsed since the epoch
+  static seconds() {
+    return new Date().getTime() / 1000;
+  }
+
+  // Whether the countdown was stopped explicitely.
+  // XXX: Some assumptions are made in the code that the countdown is never restarted.
+  private stopped;
+
+  // when it should stop (seconds since epoch)
+  constructor(private expirationSeconds: number) {
+    this.stopped = this.pastExpiration();
+  }
+
+  // Stop the countdown explicitly
+  stop() {
+    this.stopped = true;
+  }
+
+  // Number of seconds remaining
+  remainingSeconds() {
+    return Math.max(0, this.expirationSeconds - AsyncCountdown.seconds());
+  }
+
+  // The remaining time, formatted as "mm:ss". This will yield approximately
+  // once a second.
+  remainingFormattedAsync(): AsyncIterable<string> {
+    const remainingSeconds = this.remainingSeconds;
+    const hasStopped = this.hasStopped;
+
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (;;) {
+          const remaining = remainingSeconds();
+
+          // Yield the time, as long as the countdown has not stopped.
+          // NOTE: a '0' _will_ be yielded before the countdown stop.
+          yield prettifySeconds(remaining);
+          if (remaining <= 0 || hasStopped()) {
+            break;
+          }
+
+          // Wait for at least the delay until the next second
+          // (fractional part of remaining time in seconds)
+          await delayMillis((remaining % 1) * 1000);
+        }
+      },
+    };
+  }
+
+  // Returns true if the countdown has stopped, either because the time is up
+  // or because `.stop()` was called explicitly.
+  // can assume: if stopped, won't restart
+  hasStopped(): boolean {
+    return this.stopped || this.pastExpiration(); // assupmtion: don't go back in time
+  }
+
+  // Returns true if the time is past the countdown's expiration
+  pastExpiration() {
+    return AsyncCountdown.seconds() > this.expirationSeconds;
+  }
+}
