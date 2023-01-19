@@ -25,7 +25,7 @@ const pageContent = () => {
     <input
       type="text"
       id="tentativeDeviceAlias"
-      placeholder="Example: My iPhone"
+      placeholder="Example: my phone"
       maxlength="64"
       class="c-input"
     />

@@ -17,7 +17,7 @@ const pageContent = () => html`
         class="c-input inputDeviceAlias"
         aria-label="device name"
         id="deviceAlias"
-        placeholder="Example: My iPhone"
+        placeholder="Example: my phone"
         type="text"
         required
         maxlength="30"

@@ -78,22 +78,6 @@ const aboutContentSlot = html`
   </div>
   <div class="l-stack">
     <h2 class="t-title">Compatibility</h2>
-    <p class="t-paragraph">
-      Internet Identity leverages the widely used secure web2 authentication
-      framework known as WebAuthentication (WebAuthn). This way, you can use
-      your fingerprint sensor, YubiKey or device passcode to store highly-secure
-      secret keys on your devices and browsers without needing to create new
-      passwords.
-    </p>
-    <p class="t-paragraph">
-      However, WebAuthn is constantly evolving. Your preferred browser may not
-      support WebAuthentication, or may only support it using a security key. If
-      you run into issues, please try again with one of our recommended
-      browsers.
-    </p>
-  </div>
-  <div class="l-stack">
-    <h2 class="t-title">Compatibility</h2>
     <p class="t-paragraph">${compatibilityData.note}</p>
 
     <div class="l-horizontal l-stack">
