@@ -24,8 +24,9 @@ export const displayUserNumberTemplate = ({
     </div>
     ${warnBox({
       additionalClasses: ["l-stack"],
-      title:
-        "Write this number down. It’s not a secret, but you need to remember it.",
+      title: "Write this number down",
+      message:
+        "If you lose this number, you lose access to your Internet Identity.",
     })}
     <div class="l-stack">
       <button
