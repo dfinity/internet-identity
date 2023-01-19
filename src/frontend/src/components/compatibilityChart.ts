@@ -1,7 +1,7 @@
 import { html } from "lit-html";
 
 export const compatibilityData = {
-  note: "Browser support for WebAuthentication is constantly evolving. Your preferred browser may not support WebAuthentication, or may only support it using a security key. If you run into issues, please try again with one of our recommended browsers.",
+  note: "However, WebAuthn is constantly evolving. Your preferred browser may not support WebAuthentication, or may only support it using a security key. If you run into issues, please try again with one of our recommended browsers.",
 
   desktop: [
     "Chrome version 67 or newer",

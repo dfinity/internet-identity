@@ -1001,6 +1001,7 @@ a:hover,
 .c-list--bulleted li,
 .c-list--numbered li {
   margin-left: calc(var(--vs-inline) * 2);
+  margin-top: var(--vs-stack);
 }
 
 .c-list--numbered {
