@@ -6,38 +6,21 @@ import { displayError } from "../../../components/displayError";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { setupCountdown } from "../../../utils/countdown";
-import { warnBox } from "../../../components/warnBox";
 import { mainWindow } from "../../../components/mainWindow";
 
 const pageContent = (alias: string) => {
   const pageContentSlot = html`<h1 class="t-title t-title--main">
-      Verify New Device
+      Do you trust this device with your Identity Anchor?
     </h1>
-    ${warnBox({
-      additionalClasses: ["l-stack"],
-      title: "Security Warning",
-      message: html`Verifying will add the shown device to your Identity Anchor.
-        It will have <strong>full control over your identity</strong>. Only
-        enter a verification code here if you are sure that you
-        <em>personally own</em> this device.`,
-    })}
-    ${warnBox({
-      additionalClasses: ["l-stack"],
-      title: "Security Warning",
-      message: html`Enter only codes that were displayed on
-        <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
-        verification codes that you received any other way.`,
-    })}
-    <h2 class="t-title">Verify that this is your device:</h2>
-    <label class="l-stack">
-      <strong class="t-title">Alias</strong>
-      <div class="c-input c-input--readonly t-vip t-vip--small">${alias}</div>
-    </label>
-    <label class="l-stack">
-      <strong class="t-title">Device Verification Code</strong>
-      <p id="wrongCodeMessage" class="is-hidden t-paragraph">
-        The entered verification code was invalid. Please try again.
-      </p>
+    <output class="c-input c-input--readonly t-vip t-vip--small"
+      >${alias}</output
+    >
+    <p class="t-paragraph">
+      If you trust this device to use and manage your Internet Identity, enter
+      the <strong class="t-strong">Verification Code</strong> displayed on your
+      new device:
+    </p>
+    <label class="l-stack" aria-label="Verification Code">
       <input
         id="tentativeDeviceCode"
         class="c-input"
