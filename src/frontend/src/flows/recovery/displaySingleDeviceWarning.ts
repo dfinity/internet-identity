@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { warnBox } from "../../components/warnBox";
 import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
@@ -9,7 +8,8 @@ const pageContent = () => {
     <article id="warningContainer">
       <h1 class="t-title t-title--main">Add Another Device</h1>
       <p class="t-paragraph">
-        We recommend that you have at least two devices (for example, your computer and your phone) in case you lose access to one.
+        We recommend that you have at least two devices (for example, your
+        computer and your phone) in case you lose access to one.
       </p>
       <div class="l-stack">
         <button id="displayWarningAddRecovery" class="c-button">

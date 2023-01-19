@@ -85,13 +85,13 @@ const pageContent = (
 ): TemplateResult => {
   const pageContentSlot = html` <section>
     <hgroup>
-      <h1 class="t-title t-title--main">Anchor Management</h1>
+      <h1 class="t-title t-title--main">Manage your Anchor</h1>
       <p class="t-lead">
-        You can view and manage this Identity Anchor and its added devices here.
+        Add devices and recovery mechanisms to make your anchor more secure.
       </p>
     </hgroup>
-    ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
     ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
+    ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
     ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
   </section>`;
 

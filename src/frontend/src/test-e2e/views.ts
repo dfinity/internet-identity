@@ -149,7 +149,7 @@ export class RecoveryMethodSelectorView extends View {
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Anchor Management']")
+      .$("//h1[string()='Manage your Anchor']")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
