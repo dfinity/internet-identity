@@ -44,17 +44,17 @@ fn should_serialize_header() {
 fn should_recover_header_from_memory() {
     let memory = VectorMemory::default();
     memory.grow(1);
-    memory.write(0, &hex::decode("494943050500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+    memory.write(0, &hex::decode("494943060500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
 
     let storage = Storage::from_memory(memory).unwrap();
     assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.anchor_count(), 5);
-    assert_eq!(storage.version(), 5);
+    assert_eq!(storage.version(), 6);
 }
 
 #[test]
-fn should_read_previous_write_v5() {
+fn should_read_previous_write() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((12345, 678910), memory);
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
@@ -67,7 +67,7 @@ fn should_read_previous_write_v5() {
 }
 
 #[test]
-fn should_serialize_first_record_v5() {
+fn should_serialize_first_record() {
     const EXPECTED_LENGTH: usize = 191;
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
@@ -84,7 +84,7 @@ fn should_serialize_first_record_v5() {
 }
 
 #[test]
-fn should_serialize_subsequent_record_to_expected_memory_location_v5() {
+fn should_serialize_subsequent_record_to_expected_memory_location() {
     const EXPECTED_LENGTH: usize = 191;
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
@@ -115,7 +115,7 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
 }
 
 #[test]
-fn should_deserialize_first_record_v5() {
+fn should_deserialize_first_record() {
     let memory = VectorMemory::default();
     memory.grow(3);
     let mut storage = Storage::new((123, 456), memory.clone());
@@ -132,7 +132,7 @@ fn should_deserialize_first_record_v5() {
 }
 
 #[test]
-fn should_deserialize_subsequent_record_at_expected_memory_location_v5() {
+fn should_deserialize_subsequent_record_at_expected_memory_location() {
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
     memory.grow(9); // grow memory to accommodate a write to record 100
@@ -240,7 +240,7 @@ fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
 fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     let memory = VectorMemory::default();
     memory.grow(1);
-    memory.write(0, &hex::decode("4949430560E316001027000000000000a9c03900000000000010434343434343434343434343434343434343434343434343434343434343434300000200").unwrap());
+    memory.write(0, &hex::decode("4949430660E316001027000000000000a9c03900000000000010434343434343434343434343434343434343434343434343434343434343434300000200").unwrap());
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 1_500_000 * 4096; // number of anchors is 1_500_000
 
     let mut storage = Storage::from_memory(memory.clone()).unwrap();
@@ -298,14 +298,14 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 #[test]
 fn should_read_previously_stored_persistent_state() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
-    const PERSISTENT_STATE_BYTES: &str = "4949505388000000000000004449444c066c02cbc282b70501f7f5cbfb07786c02faafb5ac020291ecada008046e036d7b6b03d1d3dab70b78b5c2d2b70d7fc8bbeff50d056c02c7e8ccee037884fbf0820968010001206363636363636363636363636363636363636363636363636363636363636363022700000000000000010a00000000006000b001018002e1df02000000";
+    const PERSISTENT_STATE_BYTES: &str = "4949505308010000000000004449444c0c6c02949d879d0701f7f5cbfb07786b04dee7beb6080291a5fcf10a7fd1d3dab70b07c8bbeff50d086c01c2adc9be0c036c05c3f9fca002788beea8c5047897e7d4a4080481cfaef40a0687eb979d0d7a6e056b02c59784d3047fdaa384d3047f6d7b6c02d6a9bbae0a78c2adc9be0c036c02aaac8d930409c2adc9be0c036c03c7e8ccee037884fbf0820968cfd6ffea0f0a6d0b6c04c7e8ccee0378f2f099840706938da78c0a78d6a9bbae0a780100032700000000000000010a00000000006000b0010100005847f80d00000010270000000000000101206363636363636363636363636363636363636363636363636363636363636363e8038002e1df02000000";
 
     let memory = VectorMemory::default();
     // allocate space for the writes
     memory.grow(3);
 
     // write header so the number of users is set
-    memory.write(0, &hex::decode("494943050300000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430000020000000000").unwrap());
+    memory.write(0, &hex::decode("494943060300000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430000020000000000").unwrap());
     memory.write(
         EXPECTED_ADDRESS,
         &hex::decode(PERSISTENT_STATE_BYTES).unwrap(),
@@ -340,7 +340,6 @@ fn sample_persistent_state() -> PersistentState {
             },
             config: ArchiveConfig {
                 module_hash: [99u8; 32],
-                // these are the defaults when reading v5 persistent state
                 entries_buffer_limit: 10_000,
                 polling_interval_ns: 60_000_000_000,
                 entries_fetch_limit: 1_000,

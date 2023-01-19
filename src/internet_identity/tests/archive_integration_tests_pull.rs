@@ -49,7 +49,6 @@ mod deployment_tests {
                     archive_integration: Some(ArchiveIntegration::Pull),
                 }),
                 canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
-                upgrade_persistent_state: None,
             }),
         );
         env.add_cycles(ii_canister, 150_000_000_000);
@@ -188,7 +187,6 @@ mod deployment_tests {
                     archive_integration: Some(ArchiveIntegration::Pull),
                 }),
                 canister_creation_cycles_cost: None, // current cost in application subnets
-                upgrade_persistent_state: None,
             }),
         )
         .unwrap();
