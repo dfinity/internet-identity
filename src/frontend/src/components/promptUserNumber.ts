@@ -1,6 +1,7 @@
 import { html, render, TemplateResult } from "lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "./anchorInput";
+import { mainWindow } from "./mainWindow";
 
 const promptUserNumberTemplate = ({
   title,
@@ -19,33 +20,34 @@ const promptUserNumberTemplate = ({
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
   const defaultMessage = "Please provide an Identity Anchor.";
+  const promptUserNumberSlot = html` <hgroup>
+      <h1 class="t-title t-title--main">${title}</h1>
+      <p class="t-lead">${message ?? defaultMessage}</p>
+    </hgroup>
+    ${anchorInput.template}
+    <div class="c-button-group">
+      <button
+        @click="${onCancel}"
+        id="userNumberCancel"
+        class="c-button c-button--secondary"
+      >
+        Cancel
+      </button>
+      <button
+        ${ref(userNumberContinue)}
+        @click="${anchorInput.submit}"
+        id="userNumberContinue"
+        class="c-button"
+      >
+        Continue
+      </button>
+    </div>`;
 
-  return html`
-    <div class="l-container c-card c-card--highlight">
-      <hgroup>
-        <h1 class="t-title t-title--main">${title}</h1>
-        <p class="t-lead">${message ?? defaultMessage}</p>
-      </hgroup>
-      ${anchorInput.template}
-      <div class="c-button-group">
-        <button
-          @click="${onCancel}"
-          id="userNumberCancel"
-          class="c-button c-button--secondary"
-        >
-          Cancel
-        </button>
-        <button
-          ${ref(userNumberContinue)}
-          @click="${anchorInput.submit}"
-          id="userNumberContinue"
-          class="c-button"
-        >
-          Continue
-        </button>
-      </div>
-    </div>
-  `;
+  return mainWindow({
+    showFooter: false,
+    showLogo: false,
+    slot: promptUserNumberSlot,
+  });
 };
 
 export const promptUserNumberPage = (

@@ -7,11 +7,14 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { setupCountdown } from "../../../utils/countdown";
 import { warnBox } from "../../../components/warnBox";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (alias: string) => html`
-  <div class="l-container c-card c-card--highlight">
-    <h1 class="t-title t-title--main">Verify New Device</h1>
+const pageContent = (alias: string) => {
+  const pageContentSlot = html`<h1 class="t-title t-title--main">
+      Verify New Device
+    </h1>
     ${warnBox({
+      additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`Verifying will add the shown device to your Identity Anchor.
         It will have <strong>full control over your identity</strong>. Only
@@ -19,6 +22,7 @@ const pageContent = (alias: string) => html`
         <em>personally own</em> this device.`,
     })}
     ${warnBox({
+      additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`Enter only codes that were displayed on
         <strong>https://identity.ic0.app</strong>. Do <strong>not</strong> enter
@@ -49,9 +53,14 @@ const pageContent = (alias: string) => html`
       <button id="cancelVerifyDevice" class="c-button c-button--secondary">
         Cancel
       </button>
-    </div>
-  </div>
-`;
+    </div>`;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
 
 /**
  * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.

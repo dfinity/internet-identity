@@ -1,10 +1,10 @@
 import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 import { LoginFlowCanceled, cancel } from "../utils/flowResult";
+import { mainWindow } from "../components/mainWindow";
 
-const pageContent = (onCancel: () => void) => html`
-  <div class="l-container c-card c-card--highlight">
-    <hgroup>
+const pageContent = (onCancel: () => void) => {
+  const pageContentSlot = html` <hgroup>
       <h1 class="t-title t-title--main">
         Create a new Internet Identity Anchor
       </h1>
@@ -42,9 +42,14 @@ const pageContent = (onCancel: () => void) => html`
       <button class="c-button" @click="${onCancel}" id="deviceAliasCancel">
         Cancel
       </button>
-    </div>
-  </div>
-`;
+    </div>`;
+
+  return mainWindow({
+    showFooter: false,
+    showLogo: false,
+    slot: pageContentSlot,
+  });
+};
 
 export const registerDisabled = (): Promise<LoginFlowCanceled> => {
   return new Promise((resolve) => {

@@ -2,8 +2,6 @@ import { html, render, TemplateResult } from "lit-html";
 import { promptUserNumber } from "./promptUserNumber";
 import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
 import { NonEmptyArray } from "../utils/utils";
-import { icLogo } from "./icons";
-import { footer } from "./footer";
 import { withLoader } from "./loader";
 import { mkAnchorPicker } from "./anchorPicker";
 import { mkAnchorInput } from "./anchorInput";
@@ -20,6 +18,7 @@ import {
 import { displayError } from "./displayError";
 import { useRecovery } from "../flows/recovery/useRecovery";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
+import { mainWindow } from "./mainWindow";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -203,16 +202,11 @@ export const authenticate = async (
 
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
-  const template = html`
-    <div class="l-container c-card c-card--highlight">
-      <!-- The title is hidden but used for accessibility -->
+  const template = mainWindow({
+    slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-      <div class="c-logo">${icLogo}</div>
-      ${slot}
-    </div>
-    ${footer}
-  `;
-
+      ${slot}`,
+  });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
 };

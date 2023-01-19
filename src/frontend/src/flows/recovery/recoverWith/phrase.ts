@@ -17,29 +17,30 @@ import {
 } from "../../../crypto/mnemonic";
 import { warningIcon } from "../../../components/icons";
 import { questions } from "../../faq";
+import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint, message?: string) => html`
-  <style>
-    /* Flash the warnings box if warnings were generated */
-    @keyframes flash-warnings {
-      0% {
-        background-color: unset;
+const pageContent = (userNumber: bigint, message?: string) => {
+  const pageContentSlot = html`
+    <style>
+      /* Flash the warnings box if warnings were generated */
+      @keyframes flash-warnings {
+        0% {
+          background-color: unset;
+        }
+        50% {
+          background-color: #ed1e79;
+          border-color: #ed1e79;
+        }
+        100% {
+          background-color: unset;
+        }
       }
-      50% {
-        background-color: #ed1e79;
-        border-color: #ed1e79;
-      }
-      100% {
-        background-color: unset;
-      }
-    }
 
-    .is-visible {
-      animation-name: flash-warnings;
-      animation-duration: 600ms;
-    }
-  </style>
-  <article class="l-container c-card c-card--highlight">
+      .is-visible {
+        animation-name: flash-warnings;
+        animation-duration: 600ms;
+      }
+    </style>
     <hgroup>
       <h1 class="t-title t-title--main">Your seed phrase</h1>
       <p class="t-lead">
@@ -66,8 +67,14 @@ const pageContent = (userNumber: bigint, message?: string) => html`
       </button>
       <button id="inputSeedPhraseContinue" class="c-button">Continue</button>
     </div>
-  </article>
-`;
+  `;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
 
 export const phraseRecoveryPage = async (
   userNumber: bigint,

@@ -206,15 +206,11 @@ export const styleguide = html`
           <div class="c-input">DIV as c-input</div>
           <div class="c-input c-input--readonly">Readonly input</div>
           <div class="c-input c-input--vip">Important inputs</div>
-          <input
-            type="text"
-            placeholder="Rounded Input"
-            class="c-input c-input--rounded"
-          />
+          <input type="text" placeholder="Rounded Input" class="c-input" />
           <input
             type="text"
             placeholder="Spacious Input"
-            class="c-input c-input--rounded c-input--spacious"
+            class="c-input c-input--spacious"
           />
           <input
             type="text"

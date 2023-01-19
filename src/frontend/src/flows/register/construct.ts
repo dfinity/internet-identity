@@ -7,16 +7,20 @@ import {
 } from "../../utils/iiConnection";
 import { nextTick } from "process";
 import { spinner } from "../../components/icons";
+import { mainWindow } from "../../components/mainWindow";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
-const constructingContent = html`
-  <div class="l-container c-card c-card--highlight t-centered">
-    <div class="c-spinner">${spinner}</div>
-    <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
-    <p><strong class="t-strong">Do not refresh the page</strong></p>
-  </div>
-`;
+const constructingContentSlot = html` <div class="c-spinner">${spinner}</div>
+  <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
+  <p><strong class="t-strong">Do not refresh the page</strong></p>`;
+
+const constructingContent = mainWindow({
+  additionalContainerClasses: ["t-centered"],
+  showFooter: false,
+  showLogo: false,
+  slot: constructingContentSlot,
+});
 
 export const renderConstructing = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;

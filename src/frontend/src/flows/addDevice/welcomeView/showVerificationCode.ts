@@ -7,6 +7,7 @@ import {
 import { setAnchorUsed } from "../../../utils/userNumber";
 import { setupCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
+import { mainWindow } from "../../../components/mainWindow";
 
 export type TentativeRegistrationInfo = {
   verification_code: string;
@@ -16,9 +17,8 @@ const pageContent = (
   userNumber: bigint,
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo
-) => html`
-  <div class="l-container c-card c-card--highlight">
-    <hgroup>
+) => {
+  const pageContentSlot = html` <hgroup>
       <h1 class="t-title t-title--main">Device Verification Required</h1>
       <p class="t-lead">
         This device was added tentatively to the Identity Anchor
@@ -42,9 +42,14 @@ const pageContent = (
           Cancel
         </button>
       </div>
-    </div>
-  </div>
-`;
+    </div>`;
+
+  return mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
 
 /**
  * Page to display the verification code which is received after successfully registering a tentative device.
