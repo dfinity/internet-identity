@@ -2,13 +2,13 @@ import { html } from "lit-html";
 
 export const compatibilityData = {
   note: `Internet Identity leverages the widely used secure web2 authentication
-      framework known as WebAuthentication (WebAuthn). This way, you can use
+      framework known as Web Authentication (WebAuthn). This way, you can use
       your fingerprint sensor, YubiKey or device passcode to store highly-secure
       secret keys on your devices and browsers without needing to create new
       passwords.`,
 
   note2: `However, WebAuthn is constantly evolving. Your preferred
-    browser may not support WebAuthentication, or may only support it using a
+    browser may not support WebAuthn, or may only support it using a
     security key. If you run into issues, please try again with one of our
     recommended browsers.`,
 
@@ -27,9 +27,7 @@ export const compatibilityData = {
   ],
 };
 
-export const compatibilityChart = html` <p class="t-paragraph">
-    ${compatibilityData.note}
-  </p>
+export const compatibilityChart = html`
   <p class="t-paragraph">${compatibilityData.note2}</p>
   <h3 class="t-title">Recommended Desktop</h3>
   <ul class="c-list c-list--bulleted l-stack">
@@ -38,4 +36,7 @@ export const compatibilityChart = html` <p class="t-paragraph">
   <h3 class="t-title">Recommended Mobile</h3>
   <ul class="c-list c-list--bulleted l-stack">
     ${compatibilityData.mobile.map((browser) => html`<li>${browser}</li>`)}
-  </ul>`;
+  </ul>
+  <p class="t-paragraph">
+    ${compatibilityData.note}
+  </p>`;
