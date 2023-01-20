@@ -7,9 +7,9 @@ export const compatibilityData = {
       secret keys on your devices and browsers without needing to create new
       passwords.`,
 
-  note2: `However, WebAuthn is constantly evolving. Your preferred 
-    browser may not support WebAuthentication, or may only support it using a 
-    security key. If you run into issues, please try again with one of our 
+  note2: `However, WebAuthn is constantly evolving. Your preferred
+    browser may not support WebAuthentication, or may only support it using a
+    security key. If you run into issues, please try again with one of our
     recommended browsers.`,
 
   desktop: [
