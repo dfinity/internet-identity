@@ -149,28 +149,22 @@ export class AsyncCountdown {
 
   // The remaining time, formatted as "mm:ss". This will yield approximately
   // once a second.
-  remainingFormattedAsync(): AsyncIterable<string> {
-    const remainingSeconds = this.remainingSeconds;
-    const hasStopped = this.hasStopped;
+  async *remainingFormattedAsync(): AsyncIterable<string> {
+    for (;;) {
+      const remaining = this.remainingSeconds();
 
-    return {
-      async *[Symbol.asyncIterator]() {
-        for (;;) {
-          const remaining = remainingSeconds();
+      // Yield the time, as long as the countdown has not stopped.
+      // NOTE: a '0' _will_ be yielded before the countdown stop.
+      yield prettifySeconds(remaining);
+      console.log("yieleded");
+      if (remaining <= 0 || this.hasStopped()) {
+        break;
+      }
 
-          // Yield the time, as long as the countdown has not stopped.
-          // NOTE: a '0' _will_ be yielded before the countdown stop.
-          yield prettifySeconds(remaining);
-          if (remaining <= 0 || hasStopped()) {
-            break;
-          }
-
-          // Wait for at least the delay until the next second
-          // (fractional part of remaining time in seconds)
-          await delayMillis((remaining % 1) * 1000);
-        }
-      },
-    };
+      // Wait for at least the delay until the next second
+      // (fractional part of remaining time in seconds)
+      await delayMillis((remaining % 1) * 1000);
+    }
   }
 
   // Returns true if the countdown has stopped, either because the time is up
