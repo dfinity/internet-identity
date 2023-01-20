@@ -27,8 +27,9 @@ export const compatibilityData = {
   ],
 };
 
-export const compatibilityChart = html`
-  <p class="t-paragraph">${compatibilityData.note2}</p>
+export const compatibilityChart = html` <p class="t-paragraph">
+    ${compatibilityData.note2}
+  </p>
   <h3 class="t-title">Recommended Desktop</h3>
   <ul class="c-list c-list--bulleted l-stack">
     ${compatibilityData.desktop.map((browser) => html`<li>${browser}</li>`)}
@@ -37,6 +38,4 @@ export const compatibilityChart = html`
   <ul class="c-list c-list--bulleted l-stack">
     ${compatibilityData.mobile.map((browser) => html`<li>${browser}</li>`)}
   </ul>
-  <p class="t-paragraph">
-    ${compatibilityData.note}
-  </p>`;
+  <p class="t-paragraph">${compatibilityData.note}</p>`;
