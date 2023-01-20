@@ -42,7 +42,6 @@ fn should_deploy_archive_with_cycles() -> Result<(), CallError> {
                 archive_integration: None,
             }),
             canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
-            upgrade_persistent_state: None,
         }),
     );
     env.add_cycles(ii_canister, 150_000_000_000);

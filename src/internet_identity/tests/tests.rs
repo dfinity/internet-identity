@@ -67,7 +67,6 @@ mod upgrade_tests {
                 assigned_user_number_range: Some((2000, 4000)),
                 archive_config: None,
                 canister_creation_cycles_cost: None,
-                upgrade_persistent_state: None,
             }),
         );
 
@@ -95,7 +94,6 @@ mod upgrade_tests {
                 assigned_user_number_range: Some(stats.assigned_user_number_range),
                 archive_config: None,
                 canister_creation_cycles_cost: None,
-                upgrade_persistent_state: None,
             }),
         );
 
@@ -248,7 +246,6 @@ mod registration_tests {
                 assigned_user_number_range: Some((127, 129)),
                 archive_config: None,
                 canister_creation_cycles_cost: None,
-                upgrade_persistent_state: None,
             }),
         );
 
@@ -470,38 +467,6 @@ mod stable_memory_tests {
             protection: DeviceProtection::Unprotected,
         };
         (device1, device2, device3, device4, device5, device6)
-    }
-
-    /// Tests that some known anchors with their respective devices are available after stable memory restore.
-    /// Uses the same data initially created using the genesis layout and then later migrated to v3 and then to v5.    
-    #[test]
-    fn should_load_genesis_migrated_to_v5_backup() -> Result<(), CallError> {
-        let (device1, device2, device3, device4, device5, device6) = known_devices();
-
-        let env = env();
-        let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-        restore_compressed_stable_memory(
-            &env,
-            canister_id,
-            "stable_memory/genesis-layout-migrated-to-v5.bin.gz",
-        );
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-        // check known anchors in the backup
-        let devices = api::lookup(&env, canister_id, 10_000)?;
-        assert_eq!(devices, vec![device1]);
-
-        let mut devices = api::lookup(&env, canister_id, 10_002)?;
-        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-        assert_eq!(devices, vec![device2, device3]);
-
-        let devices = api::lookup(&env, canister_id, 10_029)?;
-        assert_eq!(devices, vec![device4]);
-
-        let devices = api::lookup(&env, canister_id, 10_030)?;
-        assert_eq!(devices, vec![device5, device6]);
-        Ok(())
     }
 
     /// Tests that some known anchors with their respective devices are available after stable memory restore.
