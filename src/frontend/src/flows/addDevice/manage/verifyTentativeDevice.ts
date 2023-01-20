@@ -21,6 +21,9 @@ const pageContent = (alias: string) => {
       new device:
     </p>
     <label class="l-stack" aria-label="Verification Code">
+      <p id="wrongCodeMessage" class="is-hidden t-paragraph">
+        The entered verification code was invalid. Please try again.
+      </p>
       <input
         id="tentativeDeviceCode"
         class="c-input"
