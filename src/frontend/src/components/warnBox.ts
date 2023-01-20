@@ -8,7 +8,7 @@ import { warningIcon } from "./icons";
 
 interface warnBoxProps {
   title: string;
-  message?: string | TemplateResult;
+  message: string | TemplateResult;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";
   additionalClasses?: string[];
@@ -29,14 +29,9 @@ export const warnBox = ({
     <span class="c-card__icon" aria-hidden="true">${warningIcon}</span>
     <div class="c-card__content">
       <h3 class="t-title c-card__title">${title}</h3>
-      ${typeof message !== null
-        ? html`<div
-            data-role="warning-message"
-            class="t-paragraph c-card__paragraph"
-          >
-            ${message}
-          </div>`
-        : ""}
+      <div data-role="warning-message" class="t-paragraph c-card__paragraph">
+        ${message}
+      </div>
       ${slot}
     </div>
   `;
