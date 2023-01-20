@@ -11,7 +11,7 @@ const pageContent = (seedPhrase: string) => {
          If you lose access to your devices, use your recovery phrase to access your Internet Identity.
       </p>
     </hgroup>
-    <h2 class="t-title l-stack">Your seed phrase</h2>
+    <h2 class="t-title l-stack">Your recovery phrase</h2>
     <div>
       <output
         class="c-input c-input--textarea c-input--readonly c-input--icon"
@@ -36,7 +36,7 @@ const pageContent = (seedPhrase: string) => {
 
     <div class="l-stack">
       <input type="checkbox" id="ack-checkbox" name="scales" />
-      <label for="ack-checkbox">I have stored my seed phrase</label>
+      <label for="ack-checkbox">I have stored my recovery phrase</label>
     </div>
     <div class="l-stack">
       <button id="displaySeedPhraseContinue" class="c-button" disabled>

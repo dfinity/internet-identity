@@ -6,9 +6,7 @@ import { mainWindow } from "../../components/mainWindow";
 const aboutContentSlot = html`
   <h1 class="t-title t-title--main">About</h1>
   <div class="l-stack">
-    <h2 class="t-title">
-      Anonymously connect to dapps on the Internet Computer
-    </h2>
+    <h2 class="t-title">Securely connect to dapps on the Internet Computer</h2>
     <p class="t-lead">
       Use Internet Identity to manage your accounts on the IC without being
       tracked.
@@ -78,11 +76,10 @@ const aboutContentSlot = html`
   </div>
   <div class="l-stack">
     <h2 class="t-title">Compatibility</h2>
-    <p class="t-paragraph">${compatibilityData.note}</p>
 
     <div class="l-horizontal l-stack">
       <div class="about__compatibility-flexchild">
-        <h3 class="t-title">For Desktop</h3>
+        <h3 class="t-title">Recommended Desktop</h3>
         <ul class="c-list c-list--bulleted l-stack">
           ${compatibilityData.desktop.map(
             (browser) => html`<li>${browser}</li>`
@@ -90,7 +87,7 @@ const aboutContentSlot = html`
         </ul>
       </div>
       <div class="about__compatibility-flexchild">
-        <h3 class="t-title">For Mobile</h3>
+        <h3 class="t-title">Recommended Mobile</h3>
         <ul class="c-list c-list--bulleted l-stack">
           ${compatibilityData.mobile.map(
             (browser) => html`<li>${browser}</li>`
@@ -98,6 +95,8 @@ const aboutContentSlot = html`
         </ul>
       </div>
     </div>
+    <p class="t-paragraph">${compatibilityData.note}</p>
+    <p class="t-paragraph">${compatibilityData.note2}</p>
   </div>
 `;
 
