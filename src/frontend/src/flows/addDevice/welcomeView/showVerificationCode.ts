@@ -186,16 +186,12 @@ const anchorHasCredentials = async ({
   connection: Connection;
 }) => {
   const devices = await connection.lookupAuthenticators(userNumber);
-  for (const device of devices) {
-    if (
+  const matching = devices.find(
+    (device) =>
       device.credential_id.length === 1 &&
       credentialIdEqual(device.credential_id[0], credential)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  );
+  return matching !== undefined;
 };
 
 function credentialIdEqual(
