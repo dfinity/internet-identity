@@ -130,7 +130,7 @@ export class AsyncCountdown {
 
   // Whether the countdown was stopped explicitely.
   // XXX: Some assumptions are made in the code that the countdown is never restarted.
-  private stopped;
+  private stopped: boolean;
 
   // when it should stop (seconds since epoch)
   constructor(private expirationSeconds: number) {
@@ -143,7 +143,7 @@ export class AsyncCountdown {
   }
 
   // Number of seconds remaining
-  remainingSeconds() {
+  remainingSeconds(): number {
     return Math.max(0, this.expirationSeconds - AsyncCountdown.seconds());
   }
 
