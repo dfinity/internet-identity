@@ -38,5 +38,4 @@ export const compatibilityChart = html`
   </ul>
   <p class="t-paragraph">${compatibilityData.note}</p>
   <p class="t-paragraph">${compatibilityData.note2}</p>
-
-  `;
+`;

@@ -150,7 +150,7 @@ export const questions = {
   },
   whatIsRecovery: {
     priority: 10,
-    question: "Should I add a recovery mechanism?",
+    question: "Should I add a recovery method?",
     anchor: "what-is-recovery",
     answer: html`
       <p class="t-paragraph">Yes!</p>
@@ -172,11 +172,11 @@ export const questions = {
       </p>
 
       <p class="t-paragraph">
-        Recovery mechanisms are meant to prevent you from losing access to your
+        Recovery methods are meant to prevent you from losing access to your
         anchor <em>even if</em> you lose the WebAuthn cryptographic material.
-        There are two types of recovery mechanisms: recovery phrases (also
-        called seed phrases) and recovery devices. They should be stored safely,
-        and only used in case you cannot use regular authentication devices!
+        There are two types of recovery methods: recovery phrases (also called
+        seed phrases) and recovery devices. They should be stored safely, and
+        only used in case you cannot use regular authentication devices!
       </p>
     `,
   },

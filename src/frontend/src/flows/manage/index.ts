@@ -29,7 +29,7 @@ export const authnTemplateManage = (): AuthnTemplates => {
   `;
   return {
     firstTime: {
-      slot: wrap(`Anonymously connect to dapps on the Internet Computer`),
+      slot: wrap(`Securely connect to dapps on the Internet Computer`),
       useExistingText: "Manage Existing",
       createAnchorText: "Create Identity Anchor",
     },
@@ -87,7 +87,7 @@ const pageContent = (
     <hgroup>
       <h1 class="t-title t-title--main">Manage your Anchor</h1>
       <p class="t-lead">
-        Add devices and recovery mechanisms to make your anchor more secure.
+        Add devices and recovery methods to make your anchor more secure.
       </p>
     </hgroup>
     ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
@@ -156,16 +156,14 @@ const recoverySection = (
         ? undefined
         : html`
             <div class="t-title t-title--complications">
-              <h2>Recovery mechanisms</h2>
+              <h2>Recovery methods</h2>
               <button
                 @click="${onAddRecovery}"
                 class="t-title__complication t-title__complication--end"
                 id="addRecovery"
               >
                 <i class="t-link__icon" aria-hidden="true">+</i>
-                <span class="t-link t-link--discreet"
-                  >Add recovery mechanism</span
-                >
+                <span class="t-link t-link--discreet">Add recovery method</span>
               </button>
             </div>
             <div id="recoveryList" class="c-action-list"></div>
@@ -188,8 +186,8 @@ const deviceListItem = (device: DeviceData) => html`
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({
-    title: "Recovery Mechanism",
-    message: "Add a recovery mechanism to help protect this Identity Anchor.",
+    title: "Recovery method",
+    message: "Add a recovery method to help protect this Identity Anchor.",
     additionalClasses: ["l-stack"],
     slot: html`<button
       @click="${onAddRecovery}"

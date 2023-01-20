@@ -20,7 +20,7 @@ const pageContent = (devices: DeviceData[]) => {
           id="seedPhrase"
         >
           <span aria-hidden="true">${seedPhraseIcon}</span>
-          <div class="t-strong">Seed Phrase</div>
+          <div class="t-strong">Recovery Phrase</div>
           <div class="t-weak">Use your own storage</div>
         </button>
         <button
