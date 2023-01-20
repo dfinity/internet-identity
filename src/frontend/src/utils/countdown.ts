@@ -156,7 +156,6 @@ export class AsyncCountdown {
       // Yield the time, as long as the countdown has not stopped.
       // NOTE: a '0' _will_ be yielded before the countdown stop.
       yield prettifySeconds(remaining);
-      console.log("yieleded");
       if (remaining <= 0 || this.hasStopped()) {
         break;
       }
