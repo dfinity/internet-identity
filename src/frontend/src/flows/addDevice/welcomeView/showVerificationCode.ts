@@ -107,7 +107,7 @@ export const showVerificationCode = async (
     shouldStop: () => countdown.hasStopped(),
   });
 
-  return await handlePollResult(userNumber, pollResult);
+  return await handlePollResult({ userNumber, pollResult });
 };
 
 // Poll until the user number (anchor) contains at least one device with
@@ -154,10 +154,13 @@ async function poll({
   return "timeout";
 }
 
-const handlePollResult = async (
-  userNumber: bigint,
-  pollResult: "match" | "timeout"
-) => {
+const handlePollResult = async ({
+  userNumber,
+  pollResult,
+}: {
+  userNumber: bigint;
+  pollResult: "match" | "timeout";
+}) => {
   if (pollResult === "match") {
     setAnchorUsed(userNumber);
     window.location.reload();
