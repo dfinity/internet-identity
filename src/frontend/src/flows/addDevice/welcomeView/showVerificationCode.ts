@@ -19,20 +19,25 @@ const pageContent = (
   tentativeRegistrationInfo: TentativeRegistrationInfo
 ) => {
   const pageContentSlot = html` <hgroup>
-      <h1 class="t-title t-title--main">Device Verification Required</h1>
-      <p class="t-lead">
-        This device was added tentatively to the Identity Anchor
-        <strong>${userNumber}</strong>. Log in on an existing device and verify
-        this device using the verification code below. After successful
-        verification this page will automatically refresh.
+      <h1 class="t-title t-title--main">
+        Do you trust this device with your Identity Anchor?
+      </h1>
+      <output
+        class="c-input c-input--readonly t-vip t-vip--small"
+        aria-label="Device Alias"
+        >${alias}</output
+      >
+      <p class="t-paragraph">
+        Confirm that you trust this device by logging into II from an existing
+        device and entering the
+        <strong class="t-strong">Verification Code</strong> below:
       </p>
     </hgroup>
-    <h2 class="t-title">Alias</h2>
-    <output class="c-input c-input--readonly t-vip t-vip--small"
-      >${alias}</output
+    <output
+      id="verificationCode"
+      class="c-input c-input--readonly t-vip"
+      aria-label="Verification Code"
     >
-    <h2 class="t-title">Device Verification Code</h2>
-    <output id="verificationCode" class="c-input c-input--readonly t-vip">
       ${tentativeRegistrationInfo.verification_code}
     </output>
     <div class="l-stack">

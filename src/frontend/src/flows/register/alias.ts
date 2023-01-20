@@ -45,7 +45,7 @@ export const promptDeviceAliasTemplate = (props: {
           );
           e.currentTarget.setCustomValidity(message);
         }}
-        placeholder="Example: My iPhone"
+        placeholder="Example: my phone"
         aria-label="device name"
         type="text"
         required

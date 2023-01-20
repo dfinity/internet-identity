@@ -1,25 +1,16 @@
 import { html, render } from "lit-html";
-import { checkmarkIcon, warningIcon, copyIcon } from "../../components/icons";
+import { checkmarkIcon, copyIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 
 const pageContent = (seedPhrase: string) => {
   const pageContentSlot = html`
     <article>
     <hgroup>
-      <h1 class="t-title t-title--lead">Seedphrase</h1>
+      <h1 class="t-title t-title--lead">Write down or copy & store your recovery phrase.</h1>
       <p class="t-lead">
-        Your seed phrase makes it easy to recover this Identity Anchor.
+         If you lose access to your devices, use your recovery phrase to access your Internet Identity.
       </p>
     </hgroup>
-    <aside class="c-card c-card--icon c-card--warning l-stack" aria-label="Warning">
-      <span class="c-card__icon">${warningIcon}</span>
-      <p class="c-card__content">
-        Do <b class="t-strong">NOT</b> forget to save this seed phrase. Save a
-        backup on a storage medium and write it down.<br />
-        Keep it secret &mdash; knowledge of the seed phrase will enable access
-        to this Identity Anchor!
-      </p>
-    </aside>
     <h2 class="t-title l-stack">Your seed phrase</h2>
     <div>
       <output
@@ -39,14 +30,19 @@ const pageContent = (seedPhrase: string) => {
       >
     </div>
 
-    <div style="margin: 2rem 0;">
+    <p class="t-paragraph">
+      Securely store your recovery phrase, and do not share it with anyone!
+    </p>
+
+    <div class="l-stack">
       <input type="checkbox" id="ack-checkbox" name="scales" />
       <label for="ack-checkbox">I have stored my seed phrase</label>
     </div>
-
-    <button id="displaySeedPhraseContinue" class="c-button" disabled>
-      Continue
-    </button>
+    <div class="l-stack">
+      <button id="displaySeedPhraseContinue" class="c-button" disabled>
+        Continue
+      </button>
+    </div>
   </article>
 `;
 

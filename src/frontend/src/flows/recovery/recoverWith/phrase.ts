@@ -42,9 +42,11 @@ const pageContent = (userNumber: bigint, message?: string) => {
       }
     </style>
     <hgroup>
-      <h1 class="t-title t-title--main">Your seed phrase</h1>
+      <h1 class="t-title t-title--main">Enter recovery phrase</h1>
       <p class="t-lead">
-        ${message !== undefined ? message : "Please provide your seed phrase"}
+        ${message !== undefined
+          ? message
+          : "Type your recovery phrase below to access your Internet Identity."}
       </p>
     </hgroup>
     <textarea

@@ -5,7 +5,11 @@ import { mainWindow } from "../../../components/mainWindow";
 
 const pageContent = () => {
   const pageContentSlot = html` <article>
-    <h1 class="t-title">Add New Device</h1>
+    <h1 class="t-title">Add a Trusted Device</h1>
+    <p class="t-lead">
+      What type of device do you want to add to your Internet Identity? Make
+      sure it’s a device that you own or trust!
+    </p>
     ${warnBox({
       additionalClasses: ["l-stack"],
       title: "Security Warning",

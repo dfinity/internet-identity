@@ -14,34 +14,28 @@ import { mainWindow } from "../../../components/mainWindow";
 const pageContent = (userNumber: bigint) => {
   const pageContentSlot = html`
     <hgroup>
-      <h1 class="t-title t-title--main">Add New Remote Device</h1>
+      <h1 class="t-title t-title--main">Add a Trusted Device</h1>
       <p class="t-lead">
-        Device registration mode enabled for Identity Anchor
-        <strong class="t-strong">${userNumber}</strong>. Please follow these
-        steps to add your new device:
+        Complete the steps below
+        <strong class="t-string"> on the device you want to add: </strong>
       </p>
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        On your <em>new</em> device:<br />
-        Open <strong class="t-strong">https://identity.ic0.app</strong>
+        Open
+        <em class="c-tooltip">
+          <strong class="t-strong">https://identity.ic0.app</strong>
+          <span class="c-tooltip__message c-card c-card--narrow">
+            Open this link on the device you want to add.
+          </span>
+        </em>
       </li>
+      <li>Select <strong class="t-strong">“Add a new device?”</strong></li>
       <li>
-        On your <em>new</em> device:<br />
-        Chose <strong class="t-strong">Add a Device</strong> (if you don't see
-        the option, click on
-        <strong class="t-strong">Manage Existing</strong> and/or
-        <strong class="t-strong">More options</strong> first)
-      </li>
-      <li>
-        On your <em>new</em> device:<br />
-        Enter your Identity Anchor
+        Enter your Identity Anchor:
         <strong class="t-strong">${userNumber}</strong>
       </li>
-      <li>
-        On your <em>new</em> device:<br />
-        Choose an alias for your new device
-      </li>
+      <li>Name your new device</li>
     </ol>
     <p class="t-paragraph">
       This page will automatically refresh after completing the above steps.

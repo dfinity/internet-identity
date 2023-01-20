@@ -9,34 +9,29 @@ import { mainWindow } from "../../../components/mainWindow";
 const pageContent = (userNumber: bigint) => {
   const pageContentSlot = html` <article>
     <hgroup>
-      <h1 class="t-title t-title--main">Device Registration Not Enabled</h1>
+      <h1 class="t-title t-title--main">
+        Enroll this device from a registered device
+      </h1>
       <p class="t-lead">
-        Device registration is not enabled for the Identity Anchor
-        <strong class="t-strong">${userNumber}</strong>. To enable device
-        registration do the following:
+        If you want to add this device, follow the instructions below
+        <strong class="t-strong"
+          >on a device that Internet Identity already trusts:</strong
+        >
       </p>
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        On an <em>existing</em> device:<br />
-        Log into
-        <strong class="t-strong">https://identity.ic0.app</strong> with Identity
-        Anchor
-        <strong class="t-strong">${userNumber}</strong>
+        Log into <strong class="t-strong">identity.ic0.app</strong> with your
+        Identity Anchor (<strong class="t-strong">${userNumber}</strong>)
       </li>
       <li>
-        On the <em>existing</em> device:<br />
-        Click <strong class="t-strong">Add new device</strong>
+        Once you are logged in, click “<strong class="t-string"
+          >Add new device</strong
+        >”
       </li>
-      <li>
-        On the <em>existing</em> device:<br />
-        Chose <strong class="t-strong">Remote Device</strong>
-      </li>
-      <li>
-        On <em>this</em> device:<br />
-        Press <strong class="t-strong">Retry</strong>
-      </li>
+      <li>Select “<strong class="t-string">New Device</strong>”</li>
     </ol>
+    <p class="t-paragraph t-strong">Then, press Retry below.</p>
     <div class="l-stack">
       <button id="deviceRegModeDisabledRetry" class="c-button">Retry</button>
       <button

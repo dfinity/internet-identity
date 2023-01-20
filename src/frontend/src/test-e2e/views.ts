@@ -121,7 +121,7 @@ export class RecoveryMethodSelectorView extends View {
 
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Seedphrase']")
+      .$("//h1[string()='Write down or copy & store your recovery phrase.']")
       .waitForDisplayed({ timeout: 15_000 });
   }
 
@@ -149,7 +149,7 @@ export class RecoveryMethodSelectorView extends View {
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Anchor Management']")
+      .$("//h1[string()='Manage your Anchor']")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
@@ -318,9 +318,6 @@ export class VerifyRemoteDeviceView extends View {
   }
 
   async continue(): Promise<void> {
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
     await this.browser.$("#verifyDevice").click();
   }
 }
@@ -533,7 +530,7 @@ export class RecoverView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
-      .$(`//h1[string()='Your seed phrase']`)
+      .$(`//h1[string()='Enter recovery phrase']`)
       .waitForDisplayed({ timeout: 5_000 });
   }
 

@@ -1,18 +1,19 @@
 import { html, render } from "lit-html";
 import { compatibilityChart } from "../components/compatibilityChart";
+import { warnBox } from "../components/warnBox";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = (reason: string) => html`
   <div class="l-container c-card c-card--highlight">
     <h1 class="t-title t-title--main" id="compatibilityNotice">
-      Your browser isn't supported for Internet Identity
+      Internet Identity does not support your browser
     </h1>
-    <p class="t-lead">
-      Unfortunately your browser doesn't support the necessary features that
-      power your Internet Identity.<br />
-    </p>
-    <p class="t-paragraph">${reason}</p>
-    ${compatibilityChart}
+    ${warnBox({
+      title: "Reason",
+      message: reason,
+      additionalClasses: ["l-stack"],
+    })}
+    <div class="l-stack">${compatibilityChart}</div>
   </div>
 `;
 
