@@ -17,13 +17,11 @@ export type TentativeRegistrationInfo = {
 };
 
 const showVerificationCodeTemplate = ({
-  userNumber,
   alias,
   tentativeRegistrationInfo,
   remaining,
   cancel,
 }: {
-  userNumber: bigint;
   alias: string;
   tentativeRegistrationInfo: TentativeRegistrationInfo;
   remaining: AsyncIterable<string>;
@@ -95,7 +93,6 @@ export const showVerificationCode = async (
   );
 
   showVerificationCodePage({
-    userNumber,
     alias,
     tentativeRegistrationInfo,
     remaining: countdown.remainingFormattedAsync(),

@@ -233,7 +233,6 @@ const iiPages: Record<string, () => void> = {
     ] as unknown as TentativeDeviceInfo),
   showVerificationCode: () =>
     showVerificationCodePage({
-      userNumber,
       alias: simpleDevices[0].alias,
       tentativeRegistrationInfo: {
         verification_code: "123456",
