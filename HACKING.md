@@ -10,7 +10,7 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.8.3 or later
+* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
 * [`ic-cdk-optimizer`](https://github.com/dfinity/cdk-rs/tree/main/src/ic-cdk-optimizer), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 * Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 * Node.js v16+
@@ -30,7 +30,7 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
 Then the canister can be used as
@@ -57,7 +57,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
 To serve the frontend locally via webpack (recommended during development), run

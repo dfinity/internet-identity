@@ -12,7 +12,7 @@ The following commands will start a replica, install the development Internet Id
 # After checking out dfinity/internet-identity, run this in `./demos/using-dev-build`:
 $ dfx start --background --clean
 $ npm ci
-$ dfx deploy --no-wallet --argument '(null)'
+$ dfx deploy --no-wallet
 ```
 
 At this point, the replica (for all practical matters, a local version of the Internet Computer) is running and three canisters have been deployed:
