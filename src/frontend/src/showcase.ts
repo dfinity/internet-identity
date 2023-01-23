@@ -10,7 +10,6 @@ import { TemplateResult, html, render } from "lit-html";
 import {
   Challenge,
   DeviceData,
-  CredentialId,
   Timestamp,
 } from "../generated/internet_identity_types";
 import { AuthenticatedConnection } from "./utils/iiConnection";
@@ -40,7 +39,7 @@ import {
   TentativeDeviceInfo,
 } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
-import { showVerificationCode } from "./flows/addDevice/welcomeView/showVerificationCode";
+import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
@@ -233,16 +232,19 @@ const iiPages: Record<string, () => void> = {
       userNumber,
     ] as unknown as TentativeDeviceInfo),
   showVerificationCode: () =>
-    showVerificationCode(
-      userNumber,
-      dummyConnection,
-      simpleDevices[0].alias,
-      {
+    showVerificationCodePage({
+      alias: simpleDevices[0].alias,
+      tentativeRegistrationInfo: {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
       },
-      undefined as unknown as CredentialId
-    ),
+      cancel: () => console.log("canceled"),
+      remaining: {
+        async *[Symbol.asyncIterator]() {
+          yield "00:34";
+        },
+      },
+    }),
   verifyDevice: () =>
     verifyDevice(
       userNumber,
