@@ -3,18 +3,18 @@ import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Connection } from "../../../utils/iiConnection";
 import { delayMillis } from "../../../utils/utils";
 import {
+  AddTentativeDeviceResponse,
   CredentialId,
-  Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { setAnchorUsed } from "../../../utils/userNumber";
 import { AsyncCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 
-export type TentativeRegistrationInfo = {
-  verification_code: string;
-  device_registration_timeout: Timestamp;
-};
+type TentativeRegistrationInfo = Extract<
+  AddTentativeDeviceResponse,
+  { added_tentatively: Record<string, unknown> }
+>["added_tentatively"];
 
 const showVerificationCodeTemplate = ({
   alias,
