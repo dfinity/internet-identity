@@ -3,7 +3,6 @@ import { Connection } from "../../../utils/iiConnection";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
-  Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { setAnchorUsed } from "../../../utils/userNumber";
 import { setupCountdown } from "../../../utils/countdown";
@@ -12,7 +11,7 @@ import { mainWindow } from "../../../components/mainWindow";
 
 type TentativeRegistrationInfo = Extract<
   AddTentativeDeviceResponse,
-  { added_tentatively: any }
+  { added_tentatively: Record<string, unknown> }
 >["added_tentatively"];
 
 const pageContent = (
