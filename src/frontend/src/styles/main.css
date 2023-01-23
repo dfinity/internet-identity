@@ -1307,7 +1307,7 @@ a:hover,
 .c-action-list__actions {
   display: flex;
   gap: var(--vs-gutter);
-  margin-top: calc(var(--rs-button-bezel) * 0.5);
+  margin-top: calc(var(--rs-button-bezel) * -0.5);
   padding: 0 calc(var(--rs-button-bezel) * 0.5)
     calc(var(--rs-button-bezel) * 0.5);
 }
