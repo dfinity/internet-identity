@@ -127,19 +127,23 @@ const devicesSection = (
           </span>
         </span>
       </div>
-      <div id="deviceList" class="c-action-list"></div>
-      <button 
-        ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-        class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
-        @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
-        id="addAdditionalDevice"
-      >
-        <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
-          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
-          Remove a device before you can add a new one.</span
-        >
-        <span>Add new device</span>
-      </button>
+      <div class="c-action-list">
+        <div id="deviceList"></div>
+        <div class="c-action-list__actions">
+          <button 
+            ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
+            @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
+            id="addAdditionalDevice"
+          >
+            <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
+              >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+              Remove a device before you can add a new one.</span
+            >
+            <span>Add new device</span>
+          </button>
+        </div>
+      </div>
     </aside>
 `;
 
@@ -155,14 +159,18 @@ const recoverySection = (
             <div class="t-title">
               <h2>Recovery methods</h2>
             </div>
-            <div id="recoveryList" class="c-action-list"></div>
-            <button
-              @click="${onAddRecovery}"
-              class="c-button c-button--primary"
-              id="addRecovery"
-            >
-              Add recovery method
-            </button>
+            <div class="c-action-list">
+              <div id="recoveryList"></div>
+              <div class="c-action-list__actions">
+                <button
+                  @click="${onAddRecovery}"
+                  class="c-button c-button--primary"
+                  id="addRecovery"
+                >
+                  Add recovery method
+                </button>
+              </div>
+            </div>
           `}
     </aside>
   `;
