@@ -10,7 +10,7 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.8.3 or later
+* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
 * [`ic-cdk-optimizer`](https://github.com/dfinity/cdk-rs/tree/main/src/ic-cdk-optimizer), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 * Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 * Node.js v16+
