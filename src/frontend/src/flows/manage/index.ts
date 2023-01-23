@@ -126,23 +126,20 @@ const devicesSection = (
             (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})
           </span>
         </span>
-        <button
-          ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-          class="t-title__complication t-title__complication--end c-tooltip c-tooltip--onDisabled"
-          @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
-          id="addAdditionalDevice"
-        >
-          <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
-            >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
-            Remove a device before you can add a new one.</span
-          >
-          <span class="t-link t-link--discreet">
-            <i class="t-link__icon" aria-hidden=true>+</i>
-            Add new device
-          </span>
-        </button>
       </div>
       <div id="deviceList" class="c-action-list"></div>
+      <button 
+        ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+        class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
+        @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
+        id="addAdditionalDevice"
+      >
+        <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
+          >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+          Remove a device before you can add a new one.</span
+        >
+        <span>Add new device</span>
+      </button>
     </aside>
 `;
 
@@ -155,18 +152,17 @@ const recoverySection = (
       ${!hasRecoveryDevice(devices)
         ? undefined
         : html`
-            <div class="t-title t-title--complications">
+            <div class="t-title">
               <h2>Recovery methods</h2>
-              <button
-                @click="${onAddRecovery}"
-                class="t-title__complication t-title__complication--end"
-                id="addRecovery"
-              >
-                <i class="t-link__icon" aria-hidden="true">+</i>
-                <span class="t-link t-link--discreet">Add recovery method</span>
-              </button>
             </div>
             <div id="recoveryList" class="c-action-list"></div>
+            <button
+              @click="${onAddRecovery}"
+              class="c-button c-button--primary"
+              id="addRecovery"
+            >
+              Add recovery method
+            </button>
           `}
     </aside>
   `;
