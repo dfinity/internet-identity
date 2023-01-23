@@ -301,7 +301,7 @@ fn trap_if_not_authenticated(anchor: &Anchor) {
     // caller() and approve if matching
     if let Some(principal) = state::with_temp_keys_mut(|temp_keys| {
         temp_keys.retain(|_, (_, expiration)| *expiration > now);
-        temp_keys.get(&anchor.anchor_number).map(|x| x.0.clone())
+        temp_keys.get(&anchor.anchor_number).map(|x| x.0)
     }) {
         if principal == caller() {
             return;
