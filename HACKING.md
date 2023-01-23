@@ -30,7 +30,7 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet --argument '(null)'
+II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
 Then the canister can be used as
