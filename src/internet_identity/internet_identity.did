@@ -89,6 +89,7 @@ type AddTentativeDeviceResponse = variant {
     // The device was tentatively added.
     added_tentatively: record {
         verification_code: text;
+        // Expiration date, in nanos since the epoch
         device_registration_timeout: Timestamp;
     };
     // Device registration mode is off, either due to timeout or because it was never enabled.

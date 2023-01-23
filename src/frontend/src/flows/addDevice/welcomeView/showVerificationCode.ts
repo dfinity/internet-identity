@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { Connection } from "../../../utils/iiConnection";
 import {
+  AddTentativeDeviceResponse,
   CredentialId,
   Timestamp,
 } from "../../../../generated/internet_identity_types";
@@ -9,10 +10,11 @@ import { setupCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 
-export type TentativeRegistrationInfo = {
-  verification_code: string;
-  device_registration_timeout: Timestamp;
-};
+type TentativeRegistrationInfo = Extract<
+  AddTentativeDeviceResponse,
+  { added_tentatively: any }
+>["added_tentatively"];
+
 const pageContent = (
   userNumber: bigint,
   alias: string,
