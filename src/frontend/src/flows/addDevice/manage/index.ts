@@ -5,24 +5,16 @@ import { mainWindow } from "../../../components/mainWindow";
 
 const pageContent = () => {
   const pageContentSlot = html` <article>
-    <h1 class="t-title">Add New Device</h1>
-    ${warnBox({
-      additionalClasses: ["l-stack"],
-      title: "Security Warning",
-      message: html`You are in the process of adding a new device. Any device
-        added here will have <strong>full control over your identity</strong>.
-        Only continue the process if you want to add a new device that you
-        <em>personally own</em>.`,
-    })}
+    <h1 class="t-title">Add a Trusted Device</h1>
     ${warnBox({
       additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`Do not continue if you were prompted to do this by any
         website other than <strong>https://identity.ic0.app</strong>!`,
     })}
-    <p class="t-paragraph l-stack">
-      Is the device you want to add available on this machine (local device) or
-      on a different one (remote device)?
+    <p class="t-lead l-stack">
+      What type of device do you want to add to your Internet Identity? Make
+      sure it’s a device that you own or trust!
     </p>
     <div class="l-horizontal l-stack">
       <button class="c-button c-button--secondary" id="local">

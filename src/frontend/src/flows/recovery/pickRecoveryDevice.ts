@@ -4,7 +4,10 @@ import { mainWindow } from "../../components/mainWindow";
 
 const pageContent = () => {
   const pageContentSlot = html`
-    <h1 class="t-title t-title--main">Choose a device</h1>
+    <h1 class="t-title t-title--main">Choose your Recovery Method</h1>
+    <p class="t-paragraph t-lead">
+      How do you want to recover your Internet Identity?
+    </p>
     <div class="l-stack">
       <h2 class="t-title">Recovery devices</h2>
       <ol class="c-list l-stack" id="deviceList"></ol>

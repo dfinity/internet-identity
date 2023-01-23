@@ -16,8 +16,8 @@ import { mainWindow } from "../../../components/mainWindow";
 const pageContent = () => {
   const pageContentSlot = html` <article>
     <hgroup>
-      <h1 class="t-title t-title--main">New Device</h1>
-      <p class="t-lead">Please provide an alias for this device.</p>
+      <h1 class="t-title t-title--main">Add a Trusted Device</h1>
+      <p class="t-lead">What device are you using?</p>
       <p id="invalidAliasMessage" class="is-hidden">
         The device alias must not be empty.
       </p>
@@ -25,7 +25,7 @@ const pageContent = () => {
     <input
       type="text"
       id="tentativeDeviceAlias"
-      placeholder="Device Alias"
+      placeholder="Example: my phone"
       maxlength="64"
       class="c-input"
     />

@@ -7,11 +7,10 @@ const pageContent = (devices: DeviceData[]) => {
   const pageContentSlot = html`
     <article>
       <hgroup>
-        <h1 class="t-title t-title--main">Recovery Mechanism</h1>
+        <h1 class="t-title t-title--main">Choose a Recovery Method</h1>
         <p class="t-lead">
-          You can use a recovery mechanism to recover your anchor if your other
-          device(s) are lost. We recommend adding one as a seed phrase or
-          portable backup now.
+          We recommend that you create at least one recovery method in case you
+          lose access to your devices.
         </p>
       </hgroup>
       <div class="l-horizontal l-stack">
@@ -21,7 +20,7 @@ const pageContent = (devices: DeviceData[]) => {
           id="seedPhrase"
         >
           <span aria-hidden="true">${seedPhraseIcon}</span>
-          <div class="t-strong">Seed Phrase</div>
+          <div class="t-strong">Recovery Phrase</div>
           <div class="t-weak">Use your own storage</div>
         </button>
         <button
@@ -30,12 +29,14 @@ const pageContent = (devices: DeviceData[]) => {
           id="securityKey"
         >
           <span aria-hidden="true">${securityKeyIcon}</span>
-          <div class="t-strong">Security Key</div>
+          <div class="t-strong">External Hardware</div>
           <div class="t-weak">Use an extra security key</div>
         </button>
       </div>
       <div class="l-stack">
-        <button id="skipRecovery" class="c-button">Add recovery later</button>
+        <button id="skipRecovery" class="c-button">
+          Skip, I understand the risks
+        </button>
       </div>
     </article>
   `;
