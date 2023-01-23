@@ -12,10 +12,9 @@ export const promptDeviceAliasTemplate = (props: {
 }): TemplateResult => {
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
-    <hgroup>
-      <p class="t-lead t-centered t-paragraph l-stack">
-        What device are you using?
-      </p>
+    <hgroup class="t-centered">
+      <h1 class="t-title t-title--main">Register this device</h1>
+      <p class="t-lead t-paragraph l-stack">What device are you using?</p>
     </hgroup>
     <form
       id="registerForm"

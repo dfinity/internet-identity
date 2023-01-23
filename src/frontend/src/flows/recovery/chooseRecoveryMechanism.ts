@@ -21,7 +21,7 @@ const pageContent = (devices: DeviceData[]) => {
         >
           <span aria-hidden="true">${seedPhraseIcon}</span>
           <div class="t-strong">Recovery Phrase</div>
-          <div class="t-weak">Use your own storage</div>
+          <div class="t-weak">Use secret phrase</div>
         </button>
         <button
           ?disabled=${hasRecoveryKey(devices)}
@@ -30,7 +30,7 @@ const pageContent = (devices: DeviceData[]) => {
         >
           <span aria-hidden="true">${securityKeyIcon}</span>
           <div class="t-strong">External Hardware</div>
-          <div class="t-weak">Use an extra security key</div>
+          <div class="t-weak">Use FIDO device</div>
         </button>
       </div>
       <div class="l-stack">

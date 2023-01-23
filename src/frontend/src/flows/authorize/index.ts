@@ -32,27 +32,26 @@ export const authnTemplateAuthorize = ({
         })
       : undefined;
 
-  const wrap = (slot: string) => html`
-    <div class="l-stack t-centered">
+  const wrap = (title: string) => html`
+    <div class="t-centered">
+      <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
-        ${slot}<br />
-        <span class="t-strong">${origin}</span><br />
+        to continue to <a href="${origin}" target="_blank">${origin}</a><br />
       </p>
       ${chasm}
     </div>
   `;
   return {
     firstTime: {
-      slot: wrap("Create an anchor to continue to"),
+      slot: wrap("Create an Anchor"),
       useExistingText: "Use Existing",
       createAnchorText: "Create an Anchor",
     },
     useExisting: {
-      slot: wrap("Enter your anchor to continue to"),
+      slot: wrap("Enter an Anchor"),
     },
-
     pick: {
-      slot: wrap("Choose an anchor to continue to"),
+      slot: wrap("Choose an Anchor"),
     },
   };
 };

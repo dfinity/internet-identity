@@ -136,7 +136,7 @@ export const authnPages = (
   useExisting: () => {
     const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
     page(html` ${props.useExisting.slot} ${anchorInput.template}
-      <ul class="c-list--flex">
+      <ul class="c-list--flex l-stack--tight">
         <li>
           <a
             @click="${() => props.addDevice()}"
@@ -151,7 +151,7 @@ export const authnPages = (
           >
         </li>
       </ul>
-      <div class="c-button-group">
+      <div class="l-stack c-button-group">
         <button
           @click=${() => props.register()}
           class="c-button c-button--secondary"
