@@ -1,7 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo } from "./components/icons";
+import { icLogo, settingsIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -293,6 +293,49 @@ export const styleguide = html`
           is expected to be used with the <code>.c-summary</code> class, since
           it relies on the <code>[open]</code> attribute.
         </p>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Actionable Lists</h2>
+        <section class="demo" aria-label="Details / Summary Demo">
+          <ul class="c-action-list">
+            <li class="c-action-list__item">
+              <span class="c-action-list__label">Actionable List Item</span>
+              <button class="c-action-list__action">${settingsIcon}</button>
+            </li>
+          </ul>
+
+          <ul class="c-action-list">
+            <li class="c-action-list__item">
+              <span class="c-action-list__label">Actionable List Item</span>
+              <button class="c-action-list__action">${settingsIcon}</button>
+            </li>
+            <li class="c-action-list__item">
+              <span class="c-action-list__label">Second List Item</span>
+              <button class="c-action-list__action">${settingsIcon}</button>
+            </li>
+            <li class="c-action-list__actions">
+              <button class="c-button c-button--primary">Some action</button>
+            </li>
+          </ul>
+
+          ${warnBox({
+            title: "Devices",
+            message:
+              "We recommend that you have at least two devices (for example, your computer and your phone).",
+            additionalClasses: ["l-stack"],
+            slot: html` <ul class="c-action-list">
+              <li class="c-action-list__item">
+                <span class="c-action-list__label">Single Device</span>
+                <button class="c-action-list__action">${settingsIcon}</button>
+              </li>
+              <li class="c-action-list__actions">
+                <button class="c-button c-button--primary">Some action</button>
+              </li>
+            </ul>`,
+          })}
+        </section>
+        <p class="t-lead"></p>
       </aside>
 
       <aside class="l-stack demo-section">
