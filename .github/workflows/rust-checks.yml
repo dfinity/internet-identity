@@ -1,4 +1,5 @@
-name: Cargo fmt
+# Rust specific tests like formatting, clippy, etc
+name: Rust checks
 
 on:
   push:
