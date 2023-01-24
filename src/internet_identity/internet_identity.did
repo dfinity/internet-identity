@@ -240,7 +240,7 @@ type BufferedArchiveEntry = record {
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
     create_challenge : () -> (Challenge);
-    register : (DeviceData, ChallengeResult, principal) -> (RegisterResponse);
+    register : (DeviceData, ChallengeResult, opt principal) -> (RegisterResponse);
     add : (UserNumber, DeviceData) -> ();
     update : (UserNumber, DeviceKey, DeviceData) -> ();
     // Atomically replace device matching the device key with the new device data

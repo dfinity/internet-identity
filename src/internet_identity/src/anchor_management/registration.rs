@@ -158,7 +158,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 pub fn register(
     device_data: DeviceData,
     challenge_result: ChallengeAttempt,
-    temp_key: Principal,
+    temp_key: Option<Principal>,
 ) -> RegisterResponse {
     delegation::prune_expired_signatures();
     if let Err(()) = check_challenge(challenge_result) {
@@ -167,11 +167,13 @@ pub fn register(
 
     let device = Device::from(device_data);
 
-    if caller() != temp_key {
+    let cllr = caller();
+
+    if cllr != Principal::self_authenticating(&device.pubkey) || Some(cllr) != temp_key {
         trap(&format!(
-            "{} could not be authenticated against {:?}",
+            "{} could not be authenticated against {:?} or {:?}",
             caller(),
-            device.pubkey
+            device.pubkey, temp_key
         ));
     }
 
@@ -186,12 +188,14 @@ pub fn register(
             });
             write_anchor(anchor_number, anchor);
             let expiration = time().saturating_add(delegation::DEFAULT_EXPIRATION_PERIOD_NS);
-            state::with_temp_keys_mut(|temp_keys| {
-                temp_keys.insert(anchor_number, (temp_key, expiration));
-            });
+            if let Some(temp_key) = temp_key {
+                state::with_temp_keys_mut(|temp_keys| {
+                    temp_keys.insert(anchor_number, (temp_key, expiration));
+                });
+            }
             archive_operation(
                 anchor_number,
-                caller(),
+                caller(), // TODO: is this correct?
                 Operation::RegisterAnchor {
                     device: DeviceDataWithoutAlias::from(device),
                 },

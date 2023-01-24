@@ -67,7 +67,7 @@ async fn create_challenge() -> Challenge {
 fn register(
     device_data: DeviceData,
     challenge_result: ChallengeAttempt,
-    temp_key: Principal,
+    temp_key: Option<Principal>,
 ) -> RegisterResponse {
     anchor_management::registration::register(device_data, challenge_result, temp_key)
 }

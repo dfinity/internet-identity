@@ -154,7 +154,7 @@ export interface _SERVICE {
   'register' : (
       arg_0: DeviceData,
       arg_1: ChallengeResult,
-      arg_2: Principal,
+      arg_2: [] | [Principal],
     ) => Promise<RegisterResponse>,
   'remove' : (arg_0: UserNumber, arg_1: DeviceKey) => Promise<undefined>,
   'replace' : (
