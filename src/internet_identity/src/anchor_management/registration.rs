@@ -2,7 +2,7 @@ use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping}
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
-use crate::{secs_to_nanos, state};
+use crate::{secs_to_nanos, state, MINUTE_NS};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, trap};
@@ -21,6 +21,8 @@ mod rate_limit;
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 // How many captcha challenges we keep in memory (at most)
 const MAX_INFLIGHT_CHALLENGES: usize = 500;
+// Expiration for temp keys, the same as the front-end delegation expiry
+const TEMP_KEY_EXPIRATION_NS: u64 = 10 * MINUTE_NS;
 
 pub async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
@@ -188,19 +190,39 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
-pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+pub fn register(
+    device_data: DeviceData,
+    challenge_result: ChallengeAttempt,
+    // A temporary key than can be used in lieu of 'device_data' for a brief period of time
+    // The key is optional for backwards compatibility
+    temp_key: Option<Principal>,
+) -> RegisterResponse {
     rate_limit::process_rate_limit();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
 
     let device = Device::from(device_data);
-    if caller() != Principal::self_authenticating(&device.pubkey) {
-        trap(&format!(
-            "{} could not be authenticated against {:?}",
-            caller(),
-            device.pubkey
-        ));
+    let device_principal = Principal::self_authenticating(&device.pubkey);
+    // Perform a sanity check. If the caller is neither the device nor the temporary key, then we
+    // could technically allow this to go through but it's most likely a mistake.
+    if caller() != device_principal {
+        if let Some(temp_key) = temp_key {
+            if caller() != temp_key {
+                trap(&format!(
+                    "caller {} could not be authenticated against device pubkey {} or temporary key {}",
+                    caller(),
+                    device_principal,
+                    temp_key
+                ));
+            }
+        } else {
+            trap(&format!(
+                "caller {} could not be authenticated against device pubkey {} and no temporary key was sent",
+                caller(),
+                device_principal,
+            ));
+        }
     }
 
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());
@@ -221,6 +243,15 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
             ))
         });
     });
+
+    // Save the 'temp_key' as a mean of authenticating for a short period of time, see
+    // `TempKeys`
+    let expiration = time().saturating_add(TEMP_KEY_EXPIRATION_NS);
+    if let Some(temp_key) = temp_key {
+        state::with_temp_keys_mut(|temp_keys| {
+            temp_keys.insert(device.pubkey.clone(), (temp_key, expiration));
+        });
+    }
 
     let operation = Operation::RegisterAnchor {
         device: DeviceDataWithoutAlias::from(device),

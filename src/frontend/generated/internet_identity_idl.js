@@ -243,7 +243,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'register' : IDL.Func(
-        [DeviceData, ChallengeResult],
+        [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
         [],
       ),

@@ -2,6 +2,7 @@ import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { Challenge } from "../../../generated/internet_identity_types";
+import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
@@ -231,8 +232,10 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
+        const tempIdentity = Ed25519KeyIdentity.generate();
         const result = await connection.register({
           identity,
+          tempIdentity,
           alias,
           challengeResult: {
             key: challenge.challenge_key,

@@ -142,5 +142,7 @@ pub fn remove(anchor: &mut Anchor, device_key: DeviceKey) -> Operation {
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
+    state::with_temp_keys_mut(|temp_keys| temp_keys.remove(&device_key));
+
     Operation::RemoveDevice { device: device_key }
 }

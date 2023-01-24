@@ -4,7 +4,7 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::{Anchor, Device};
 use candid::{candid_method, Principal};
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -92,8 +92,12 @@ async fn create_challenge() -> Challenge {
 
 #[update]
 #[candid_method]
-fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
-    anchor_management::registration::register(device_data, challenge_result)
+fn register(
+    device_data: DeviceData,
+    challenge_result: ChallengeAttempt,
+    temp_key: Option<Principal>,
+) -> RegisterResponse {
+    anchor_management::registration::register(device_data, challenge_result, temp_key)
 }
 
 #[update]
@@ -460,11 +464,30 @@ fn authenticated_anchor_operation<R>(
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Traps if the caller is not authenticated.
 fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
+    let now = time();
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
             return device;
         }
     }
+
+    // Expire temporary keys, and if a principal is found for the anchor, compare against
+    // caller() and approve if matching
+    if let Some((principal, device_key)) = state::with_temp_keys_mut(|temp_keys| {
+        temp_keys.retain(|_, (_, expiration)| *expiration > now);
+        for device in anchor.devices() {
+            if let Some((principal, _expiration)) = temp_keys.get(&device.pubkey) {
+                return Some((*principal, &device.pubkey));
+            }
+        }
+
+        None
+    }) {
+        if principal == caller() {
+            return anchor.device(&device_key).unwrap();
+        }
+    };
+
     trap(&format!("{} could not be authenticated.", caller()))
 }
 
