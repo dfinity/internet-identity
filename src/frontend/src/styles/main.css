@@ -1296,7 +1296,7 @@ a:hover,
   pointer-events: all;
 }
 
-.c-dropdown__item  + .c-dropdown__item {
+.c-dropdown__item + .c-dropdown__item {
   border-top: var(--vs-line) solid var(--rc-line);
 }
 

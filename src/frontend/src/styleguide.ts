@@ -313,7 +313,9 @@ export const styleguide = html`
                   class="c-dropdown__trigger"
                   aria-expanded="false"
                   aria-controls="dropdown-i"
-                >${settingsIcon}</button>
+                >
+                  ${settingsIcon}
+                </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
                     <button class="c-dropdown__button">Delete Anchor</button>
