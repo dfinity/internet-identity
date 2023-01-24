@@ -166,16 +166,26 @@ pub fn register(
     }
 
     let device = Device::from(device_data);
-
     let cllr = caller();
-
-    if cllr != Principal::self_authenticating(&device.pubkey) || Some(cllr) != temp_key {
-        trap(&format!(
-            "{} could not be authenticated against {:?} or {:?}",
-            caller(),
-            device.pubkey,
-            temp_key
-        ));
+    let device_principal = Principal::self_authenticating(&device.pubkey);
+    // TODO: do we even want this check?
+    if cllr != Principal::self_authenticating(&device.pubkey) {
+        if let Some(temp_key) = temp_key {
+            if caller() != temp_key {
+                trap(&format!(
+                    "caller {} could not be authenticated against device pubkey {} or temporary key {}",
+                        caller(),
+                        device_principal,
+                        temp_key
+                        ));
+            }
+        } else {
+            trap(&format!(
+                    "caller {} could not be authenticated against device pubkey {} and no temporary key was sent",
+                    caller(),
+                    device_principal,
+                    ));
+        }
     }
 
     let allocation = state::storage_mut(|storage| storage.allocate_anchor());
