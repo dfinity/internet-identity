@@ -144,10 +144,7 @@ const devicesSection = (
           </span>
         </div>
 
-
-        <div class="c-action-list ${
-          isWarning === true ? "l-stack" : undefined
-        }">
+        <div class="c-action-list">
           <div id="deviceList"></div>
           <div class="c-action-list__actions">
             <button 
