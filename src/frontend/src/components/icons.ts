@@ -313,3 +313,25 @@ export const spinner = html`
     ></circle>
   </svg>
 `;
+
+export const browserIcon = html` <svg
+  xmlns="http://www.w3.org/2000/svg"
+  fill="none"
+  width="53"
+  height="52"
+  viewBox="0 0 100 82"
+>
+  <path
+    fill="currentColor"
+    d="M0 4a4 4 0 0 1 4-4h92a4 4 0 0 1 4 4v74a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4Zm4 0v74h92V4H4Z"
+  />
+  <path fill="currentColor" d="M4 4h92v18H4V4Z" />
+  <path
+    fill="currentColor"
+    fill-rule="evenodd"
+    d="M31 55a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm0 4c6.075 0 11-4.925 11-11s-4.925-11-11-11-11 4.925-11 11 4.925 11 11 11Z"
+  />
+  <path fill="currentColor" d="M80 50H40v-4h40v4Z" />
+  <path fill="currentColor" d="M76 61V46h4v15h-4Z" />
+  <path fill="currentColor" d="M67 59V46h4v13h-4Z" />
+</svg>`;
