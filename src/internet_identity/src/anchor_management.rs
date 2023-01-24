@@ -13,7 +13,7 @@ pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let anchor = state::anchor(anchor_number);
-    trap_if_not_authenticated(&anchor,&anchor_number);
+    trap_if_not_authenticated(&anchor, &anchor_number);
 
     let devices = anchor
         .into_devices()
@@ -57,7 +57,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     let mut anchor = state::anchor(anchor_number);
     // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&anchor,&anchor_number);
+    trap_if_not_authenticated(&anchor, &anchor_number);
 
     let new_device = Device::from(device_data);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
@@ -79,7 +79,7 @@ pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 
 pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     let mut anchor = state::anchor(user_number);
-    trap_if_not_authenticated(&anchor,&user_number);
+    trap_if_not_authenticated(&anchor, &user_number);
 
     let Some(existing_device) = anchor.device(&device_key) else {
         trap("Could not find device to update, check device key")
@@ -111,7 +111,7 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
 
 pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: DeviceData) {
     let mut anchor = state::anchor(anchor_number);
-    trap_if_not_authenticated(&anchor,&anchor_number);
+    trap_if_not_authenticated(&anchor, &anchor_number);
 
     anchor.remove_device(&old_device).unwrap_or_else(|err| {
         trap(&format!(
@@ -141,7 +141,7 @@ pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: D
 pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     let mut anchor = state::anchor(anchor_number);
     // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&anchor,&anchor_number);
+    trap_if_not_authenticated(&anchor, &anchor_number);
 
     anchor.remove_device(&device_key).unwrap_or_else(|err| {
         trap(&format!(
