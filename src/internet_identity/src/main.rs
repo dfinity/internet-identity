@@ -303,7 +303,7 @@ fn trap_if_not_authenticated(anchor: &Anchor) {
         temp_keys.retain(|_, (_, expiration)| *expiration > now);
         for device in anchor.devices() {
             if let Some((principal, _expiration)) = temp_keys.get(&device.pubkey) {
-                return Some(principal.clone());
+                return Some(*principal);
             }
         }
 
