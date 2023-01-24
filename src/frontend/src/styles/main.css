@@ -1235,12 +1235,12 @@ a:hover,
 
 .c-dropdown__trigger {
   z-index: calc(var(--vz-tooltip) + 2);
-  transition: 300ms transform cubic-bezier(0.3, 0.7, 0, 1);
+  transition: 100ms color linear;
 }
 
 .c-dropdown:hover .c-dropdown__trigger,
 .c-dropdown:focus-within .c-dropdown__trigger {
-  transform: rotate(360deg);
+  color: var(--rc-interaction);
 }
 
 .c-dropdown::after {
@@ -1254,20 +1254,11 @@ a:hover,
   padding: var(--vs-bezel);
   right: calc(var(--vs-bezel) * -1);
   background: var(--rc-background);
-  border: var(--vs-line) solid var(--rc-line);
+  /*border: var(--vs-line) solid rgba(0, 0, 0, 0.1);*/
   border-bottom-color: var(--rc-background);
   z-index: calc(var(--vz-tooltip) + 1);
   box-sizing: content-box;
   pointer-events: none;
-}
-
-.c-dropdown:hover .c-dropdown__menu,
-.c-dropdown:focus-within .c-dropdown__menu,
-.c-dropdown:hover::after,
-.c-dropdown:focus-within::after {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: all;
 }
 
 .c-dropdown__menu {
@@ -1279,25 +1270,53 @@ a:hover,
   min-width: 100%;
   width: max-content;
   background-color: var(--rc-background);
-  border: var(--vs-line) solid var(--rc-line);
   border-radius: var(--border-radius);
-  box-shadow: var(--vs-shadow);
   padding: 0 var(--vs-bezel);
   margin-top: calc(-1 * var(--vs-line));
   text-align: right;
   pointer-events: none;
 }
 
+.c-dropdown:hover .c-dropdown__menu,
+.c-dropdown:focus-within .c-dropdown__menu,
+.c-dropdown:hover::after,
+.c-dropdown:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.c-dropdown__menu::before {
+  z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+}
+
 .c-dropdown__item {
   display: block;
-  padding: var(--vs-bezel) 0;
+  padding: calc(var(--vs-bezel) * 0.75) 0;
   color: var(--rc-text);
   text-decoration: none;
-  pointer-events: all;
 }
 
 .c-dropdown__item + .c-dropdown__item {
   border-top: var(--vs-line) solid var(--rc-line);
+}
+
+.c-dropdown__button {
+  display: block;
+  color: var(--rc-text);
+  padding: 0.1em calc(var(--vs-bezel) * 0.5) 0;
+  text-align: left;
+  width: 100%;
+  font-size: 0.75em;
+  transition: color 100ms linear;
+}
+
+.c-dropdown__button:hover {
+  color: var(--rc-interaction);
 }
 
 .c-tooltip__message--right {
