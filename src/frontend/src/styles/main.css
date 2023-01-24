@@ -1366,26 +1366,21 @@ a:hover,
   inset: 0;
   border-radius: 999999px;
   background-image: linear-gradient(270deg, var(--rg-brand));
-  filter: blur(20px);
+  filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
 .c-input--anchor__wrap:focus-within::before {
-  opacity: 1;
+  opacity: 0.8;
   transform: scale(1) translateZ(0);
 }
 
 .c-input--anchor:focus-within input {
-  border-style: double;
-  border-width: calc(var(--vs-line) * 2);
+  position: relative;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
   border-color: transparent;
-  background-image: linear-gradient(white, white),
-    linear-gradient(270deg, var(--rg-brand));
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow: none;
 }
 
 .c-input--anchor input {

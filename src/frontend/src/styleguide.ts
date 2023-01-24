@@ -202,6 +202,15 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title">Form Elements</h2>
         <section class="demo" aria-label="Form Elements Demo">
+          <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
+            <input
+              type="text"
+              data-role="anchor-input"
+              class="c-input c-input--vip c-input--spacious c-input--anchor"
+              placeholder="Enter anchor"
+            />
+          </label>
+
           <input type="text" placeholder="Text Input" class="c-input" />
           <div class="c-input">DIV as c-input</div>
           <div class="c-input c-input--readonly">Readonly input</div>
