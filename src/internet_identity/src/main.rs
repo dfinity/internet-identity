@@ -289,7 +289,7 @@ fn update_root_hash() {
 }
 
 /// Checks if the caller is authenticated against the anchor provided and traps if not.
-fn trap_if_not_authenticated(anchor: &Anchor, anchor_number: &AnchorNumber) {
+fn trap_if_not_authenticated(anchor: &Anchor) {
     let now = time();
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
@@ -301,7 +301,13 @@ fn trap_if_not_authenticated(anchor: &Anchor, anchor_number: &AnchorNumber) {
     // caller() and approve if matching
     if let Some(principal) = state::with_temp_keys_mut(|temp_keys| {
         temp_keys.retain(|_, (_, expiration)| *expiration > now);
-        temp_keys.get(anchor_number).map(|x| x.0)
+        for device in anchor.devices() {
+            if let Some((principal, _expiration)) = temp_keys.get(&device.pubkey) {
+                return Some(principal.clone())
+            }
+        }
+
+        None
     }) {
         if principal == caller() {
             return;

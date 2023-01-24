@@ -201,7 +201,7 @@ pub fn register(
             let expiration = time().saturating_add(delegation::DEFAULT_EXPIRATION_PERIOD_NS);
             if let Some(temp_key) = temp_key {
                 state::with_temp_keys_mut(|temp_keys| {
-                    temp_keys.insert(anchor_number, (temp_key, expiration));
+                    temp_keys.insert(device.pubkey.clone(), (temp_key, expiration));
                 });
             }
             archive_operation(

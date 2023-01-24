@@ -74,12 +74,12 @@ pub struct PersistentState {
     pub canister_creation_cycles_cost: u64,
 }
 
-pub type TempKeys = HashMap<AnchorNumber, (Principal, Timestamp)>;
+pub type TempKeys = HashMap<DeviceKey, (Principal, Timestamp)>;
 struct State {
     storage: RefCell<Storage<DefaultMemoryImpl>>,
     sigs: RefCell<SignatureMap>,
     // timestamp is expiration
-    temp_keys: RefCell<HashMap<AnchorNumber, (Principal, Timestamp)>>,
+    temp_keys: RefCell<TempKeys>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
