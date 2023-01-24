@@ -146,7 +146,7 @@ export class Connection {
           protection: { unprotected: null },
         },
         challengeResult,
-        tempIdentity.getPrincipal()
+        [tempIdentity.getPrincipal()]
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
