@@ -24,7 +24,7 @@ import { mainWindow } from "../../components/mainWindow";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
-  const wrap = (slot: string, title: string): TemplateResult => html`
+  const wrap = ({slot, title}: {slot: string, title: string}): TemplateResult => html`
     <header class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${slot}</p>
