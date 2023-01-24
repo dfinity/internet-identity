@@ -24,7 +24,13 @@ import { mainWindow } from "../../components/mainWindow";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
-  const wrap = ({slot, title}: {slot: string, title: string}): TemplateResult => html`
+  const wrap = ({
+    slot,
+    title,
+  }: {
+    slot: string;
+    title: string;
+  }): TemplateResult => html`
     <header class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${slot}</p>
@@ -32,16 +38,25 @@ export const authnTemplateManage = (): AuthnTemplates => {
   `;
   return {
     firstTime: {
-      slot: wrap(`to dapps on the Internet Computer`, "Securely Connect"),
+      slot: wrap({
+        slot: `to dapps on the Internet Computer`,
+        title: "Securely Connect",
+      }),
       useExistingText: "Manage Existing",
       createAnchorText: "Create Identity Anchor",
     },
     useExisting: {
-      slot: wrap(`to continue to Internet Identity`, "Enter your Anchor"),
+      slot: wrap({
+        slot: `to continue to Internet Identity`,
+        title: "Enter your Anchor",
+      }),
     },
 
     pick: {
-      slot: wrap("to continue to Internet Identity", "Choose an Anchor"),
+      slot: wrap({
+        slot: "to continue to Internet Identity",
+        title: "Choose an Anchor",
+      }),
     },
   };
 };
