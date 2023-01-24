@@ -173,7 +173,8 @@ pub fn register(
         trap(&format!(
             "{} could not be authenticated against {:?} or {:?}",
             caller(),
-            device.pubkey, temp_key
+            device.pubkey,
+            temp_key
         ));
     }
 
