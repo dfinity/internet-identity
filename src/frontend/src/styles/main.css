@@ -355,7 +355,7 @@ body {
 .t-title__complication {
   font-weight: 300;
   font-size: 0.8em;
-  flex-grow: 1;
+  flex-grow: 0;
 }
 
 .t-title__complication:disabled {
@@ -1221,6 +1221,8 @@ a:hover,
   opacity: 0;
   color: var(--rc-text);
   visibility: hidden;
+  font-size: 0.8em;
+  line-height: 1.4;
   z-index: var(--vz-tooltip);
   text-align: left;
   min-width: 15rem;
