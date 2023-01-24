@@ -234,7 +234,7 @@ impl<M: Memory> Storage<M> {
         }
         self.header.num_anchors += 1;
         self.flush();
-        Some((anchor_number, Anchor::new(anchor_number)))
+        Some((anchor_number, Anchor::new()))
     }
 
     /// Writes the data of the specified anchor to stable memory.
