@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { networkIcon, securityKeyIcon } from "../../../components/icons";
+import { browserIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
 import { mainWindow } from "../../../components/mainWindow";
 
@@ -19,17 +19,13 @@ const pageContent = () => {
     <div class="l-horizontal l-stack">
       <button class="c-button c-button--secondary" id="local">
         <span class="flowIcon">${securityKeyIcon}</span>
-        <div class="t-strong">Local Device</div>
-        <div class="t-weak">
-          Add a new device available on <em>this machine</em>.
-        </div>
+        <div class="t-strong">External Hardware</div>
+        <div class="t-weak">Use a FIDO device or connected phone</div>
       </button>
       <button class="c-button c-button--secondary" id="remote">
-        <span class="flowIcon">${networkIcon}</span>
-        <div class="t-strong">Remote Device</div>
-        <div class="t-weak">
-          Add a new device available on <em>another machine</em>.
-        </div>
+        <span class="flowIcon">${browserIcon}</span>
+        <div class="t-strong">New Browser</div>
+        <div class="t-weak">Add a browser on this device or a new device.</div>
       </button>
     </div>
     <div class="l-stack">
