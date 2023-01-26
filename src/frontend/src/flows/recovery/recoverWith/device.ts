@@ -18,7 +18,7 @@ const pageContent = () => {
         <h1 class="t-title t-title--main">Use Recovery Device</h1>
         <p class="t-lead">
           Click <strong class="t-strong">continue</strong> and follow your
-          browser’s instructions to recover your Internet Identity with external
+          browser's instructions to recover your Internet Identity with external
           hardware.
         </p>
       </hgroup>
