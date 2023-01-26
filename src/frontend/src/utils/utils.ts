@@ -156,6 +156,7 @@ export function wrapError(err: unknown): string {
  * Values can be sent (`send()`) and received (`recv()`) asynchronously
  * on the other end.
  */
+// TODO: check to make sure listeners are not leaked
 export class Chan<A> {
   /* The `recv` function will read values both from a blocking `snd` function
    * and from a buffer. We always _first_ write to `snd` and _then_ write
@@ -177,6 +178,15 @@ export class Chan<A> {
   // sent to us
   private listeners: Chan<A>[] = [];
 
+  private latest?: A;
+
+  // Constructor with latest which is "initial" and then latest
+  constructor(initial?: A) {
+    console.log("setting", initial);
+    this.latest = initial;
+    console.log("set:", this.latest);
+  }
+
   send(a: A): void {
     if (this.snd !== undefined) {
       this.snd(a);
@@ -191,12 +201,23 @@ export class Chan<A> {
     for (const listener of this.listeners) {
       listener.send(a);
     }
+
+    // and set as latest
+    this.latest = a;
   }
 
   // Receive all values sent to this `Chan`. Note that this effectively
   // consumes the values: if you need to read the value from different
   // places use `.map()` instead.
   async *recv(): AsyncIterable<A> {
+    // TODO: throw error if recv was called already?
+
+    console.log("recv", this.latest);
+    if (this.latest !== undefined) {
+      console.log("Sending latest:", this.latest);
+      yield this.latest;
+    }
+
     // Forever loop, yielding entire buffers and then blocking
     // on `snd` (which prevents hot looping)
     while (true) {
@@ -216,7 +237,7 @@ export class Chan<A> {
   // Return a new generator yielding the values or `.recv()`, mapped
   // with `f`.
   map<B>(f: (a: A) => B): AsyncIterable<B> {
-    const input = new Chan<A>();
+    const input = new Chan<A>(this.latest);
     this.listeners.push(input);
 
     return {
