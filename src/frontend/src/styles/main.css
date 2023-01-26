@@ -355,7 +355,7 @@ body {
 .t-title__complication {
   font-weight: 300;
   font-size: 0.8em;
-  flex-grow: 1;
+  flex-grow: 0;
 }
 
 .t-title__complication:disabled {
@@ -1213,6 +1213,8 @@ a:hover,
   opacity: 0;
   color: var(--rc-text);
   visibility: hidden;
+  font-size: 0.8em;
+  line-height: 1.4;
   z-index: var(--vz-tooltip);
   text-align: left;
   min-width: 15rem;
@@ -1274,15 +1276,34 @@ a:hover,
 
 .c-action-list {
   margin-top: 1rem;
+  background: var(--rc-background);
+  border: var(--vs-line) solid var(--rc-line);
 }
 
 .c-action-list__item {
   display: flex;
+  position: relative;
   gap: var(--vs-gutter);
+  padding: calc(var(--rs-button-bezel) * 0.7) var(--rs-button-bezel);
 }
 
-.c-action-list__item + .c-action-list__item {
-  margin-top: var(--vs-gutter);
+.c-action-list__item + .c-action-list__item::before {
+  content: "";
+  display: block;
+  height: var(--vs-line);
+  background: var(--rc-line);
+  position: absolute;
+  top: 0;
+  left: var(--rs-button-bezel);
+  right: var(--rs-button-bezel);
+}
+
+.c-action-list__actions {
+  display: flex;
+  gap: var(--vs-gutter);
+  margin-top: calc(var(--rs-button-bezel) * -0.5);
+  padding: 0 calc(var(--rs-button-bezel) * 0.5)
+    calc(var(--rs-button-bezel) * 0.5);
 }
 
 .c-action-list__label {
@@ -1293,11 +1314,6 @@ a:hover,
 .c-action-list__label {
   display: flex;
   align-items: center;
-  border: var(--vs-line) solid var(--rc-line);
-  border-radius: 4px;
-  padding: var(--rs-button-bezel);
-  background: var(--rc-background);
-  transition: 200ms border-color linear;
 }
 
 .c-action-list__action svg {
