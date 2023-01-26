@@ -1,6 +1,9 @@
 import { html, render } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { withRef } from "../../utils/lit-html";
 import { warnBox } from "../../components/warnBox";
 import { mainWindow } from "../../components/mainWindow";
+import { checkmarkIcon, copyIcon } from "../../components/icons";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -9,6 +12,8 @@ export const displayUserNumberTemplate = ({
   onContinue: () => void;
   userNumber: bigint;
 }) => {
+  const userNumberCopy: Ref<HTMLButtonElement> = createRef();
+
   const displayUserNumberSlot = html`<hgroup>
       <h1 class="t-title t-title--main">
         You successfully created your Identity Anchor!
@@ -19,9 +24,30 @@ export const displayUserNumberTemplate = ({
       </p>
     </hgroup>
     <h2 class="t-title">Identity Anchor:</h2>
-    <div class="c-input c-input--vip c-input--readonly t-vip" data-usernumber>
-      ${userNumber}
-    </div>
+    <output class="c-input c-input--textarea c-input--readonly c-input--icon" >
+      <div class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</div>
+      <button
+        ${ref(userNumberCopy)}
+        aria-label="Copy phrase to clipboard""
+        title="Copy phrase to clipboard"
+        tabindex="0"
+        class="c-button__icon c-input__icon"
+        @click=${async () => {
+          try {
+            await navigator.clipboard.writeText(userNumber.toString());
+            withRef(userNumberCopy, (elem) => {
+              elem.classList.add("is-copied");
+            });
+          } catch (e: unknown) {
+            console.error("Unable to copy Identity Anchor", e);
+          }
+        }}
+        >
+          <span>Copy</span>
+          ${copyIcon}
+          ${checkmarkIcon}
+        </button>
+    </output>
     ${warnBox({
       additionalClasses: ["l-stack"],
       title: "Write this number down",

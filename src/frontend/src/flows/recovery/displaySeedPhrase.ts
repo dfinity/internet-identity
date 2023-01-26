@@ -6,7 +6,7 @@ const pageContent = (seedPhrase: string) => {
   const pageContentSlot = html`
     <article>
     <hgroup>
-      <h1 class="t-title t-title--lead">Write down or copy & store your recovery phrase.</h1>
+      <h1 class="t-title t-title--main">Store Recovery Phrase</h1>
       <p class="t-lead">
          If you lose access to your devices, use your recovery phrase to access your Internet Identity.
       </p>
@@ -22,7 +22,7 @@ const pageContent = (seedPhrase: string) => {
           id="seedCopy"
           class="c-button__icon c-input__icon"
           >
-            <span>copy to clipboard</span>
+            <span>Copy</span>
             ${copyIcon}
             ${checkmarkIcon}
           </i
@@ -36,7 +36,7 @@ const pageContent = (seedPhrase: string) => {
 
     <div class="l-stack">
       <input type="checkbox" id="ack-checkbox" name="scales" />
-      <label for="ack-checkbox">I have stored my recovery phrase</label>
+      <label for="ack-checkbox" class="t-strong">I have stored my recovery phrase.</label>
     </div>
     <div class="l-stack">
       <button id="displaySeedPhraseContinue" class="c-button" disabled>
