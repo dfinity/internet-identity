@@ -1,5 +1,5 @@
-# Rust specific tests like formatting, clippy, etc
-name: Rust checks
+# Rust specific tests
+name: Rust
 
 on:
   push:
