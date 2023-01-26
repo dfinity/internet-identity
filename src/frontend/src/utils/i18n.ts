@@ -1,5 +1,4 @@
 import { TemplateResult, html } from "lit-html";
-import { until } from "lit-html/directives/until.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan } from "./utils";
 
