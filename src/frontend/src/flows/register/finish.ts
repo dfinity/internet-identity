@@ -12,7 +12,6 @@ export const displayUserNumberTemplate = ({
   onContinue: () => void;
   userNumber: bigint;
 }) => {
-  const userNumberElement: Ref<HTMLDivElement> = createRef();
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
 
   const displayUserNumberSlot = html`<hgroup>
@@ -26,9 +25,7 @@ export const displayUserNumberTemplate = ({
     </hgroup>
     <h2 class="t-title">Identity Anchor:</h2>
     <output class="c-input c-input--textarea c-input--readonly c-input--icon" >
-      <div ${ref(
-        userNumberElement
-      )} class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</div>
+      <div class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</div>
       <button
         ${ref(userNumberCopy)}
         aria-label="Copy phrase to clipboard""
