@@ -37,7 +37,7 @@ export const authnTemplateAuthorize = ({
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
         to continue to
-        <a href="${origin}" target="_blank" rel="“noopener" noreferrer“
+        <a href="${origin}" target="_blank" rel="noopener noreferrer"
           >${origin}</a
         ><br />
       </p>
