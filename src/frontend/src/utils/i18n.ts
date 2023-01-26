@@ -7,11 +7,10 @@ import { Chan } from "./utils";
 
 type Language = typeof languages[number];
 
-const languages = ["en", "fr"] as const; // TODO: remove this?
+const languages = ["en"] as const;
 
 type StringCopy<Keys extends string> = {
-  en: { [key in Keys]: string };
-  fr: { [key in Keys]: string };
+  [key in Language]: { [key in Keys]: string };
 };
 type DynamicCopy<Keys extends string> = { [key in Keys]: TemplateResult };
 

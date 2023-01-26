@@ -3,10 +3,5 @@
     "use_ii": "Use Internet Identity to manage your accounts on the IC without being tracked.",
     "create_an_anchor": "Create an Identity Anchor",
     "your_ii_is": "Your Identity Anchor is a number that connects you to your accounts on applications across the Internet Computer. Store your Anchor somewhere safe. If you lose it, you lose access to all of the accounts that you created with it. Internet Identity keeps your anchor private and does not share it with any applications. "
-  },
-  "fr": {
-    "use_ii": "Utilisez votre Internet Identity pour manager vos trucs",
-    "create_an_anchor": "Creez une Ancre d'Identite lol",
-    "your_ii_is": "Votre Internet Identity sert a cceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela ceci cela eci cela."
   }
 }

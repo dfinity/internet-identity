@@ -11,22 +11,6 @@ const aboutContentSlot = (i18n: I18n) => {
 
   return html`
     <h1 class="t-title t-title--main">About</h1>
-    <button
-      class="c-button"
-      @click=${() => {
-        i18n.setLanguage("en");
-      }}
-    >
-      en
-    </button>
-    <button
-      class="c-button"
-      @click=${() => {
-        i18n.setLanguage("fr");
-      }}
-    >
-      fr
-    </button>
     <div class="l-stack">
       <h2 class="t-title">
         Securely connect to dapps on the Internet Computer
@@ -35,7 +19,7 @@ const aboutContentSlot = (i18n: I18n) => {
     </div>
     <div class="l-stack">
       <h2 class="t-title"><a href="/">${copy.create_an_anchor}</a></h2>
-      <p class="t-paragraph">${copy.your_ii_is} </p>
+      <p class="t-paragraph">${copy.your_ii_is}</p>
     </div>
     <div class="l-stack">
       <h2 class="t-title">Easy and Secure Login</h2>
