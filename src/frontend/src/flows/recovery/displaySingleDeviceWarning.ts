@@ -13,7 +13,7 @@ const pageContent = () => {
       </p>
       <div class="l-stack">
         <button id="displayWarningAddRecovery" class="c-button">
-          Add a recovery method
+          Add another device
         </button>
         <button
           id="displayWarningRemindLater"

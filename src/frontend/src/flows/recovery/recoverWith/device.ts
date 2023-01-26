@@ -11,15 +11,15 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = (userNumber: bigint) => {
+const pageContent = () => {
   const pageContentSlot = html`
     <article>
       <hgroup>
-        <h1 class="t-title t-title--main">Recovery for ${userNumber}</h1>
+        <h1 class="t-title t-title--main">Use Recovery Device</h1>
         <p class="t-lead">
-          You are about to recover your anchor using a recovery device. Please
-          click "continue" and then follow your browser's instructions to
-          connect your device.
+          Click <strong class="t-strong">continue</strong> and follow your
+          browser's instructions to recover your Internet Identity with external
+          hardware.
         </p>
       </hgroup>
       <div class="c-button-group">
@@ -52,7 +52,7 @@ export const deviceRecoveryPage = async (
   device: DeviceData
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber), container);
+  render(pageContent(), container);
   return init(userNumber, connection, device);
 };
 
