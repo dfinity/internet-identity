@@ -52,3 +52,30 @@ export class LocalStorageI18n implements I18n {
     window.localStorage.setItem("lang", lang);
   }
 }
+
+export class DummyI18n implements I18n {
+  // TODO: support deregistering
+  private chan: Chan<Language> = new Chan("en");
+
+  i18n<Keys extends string>(copy: StringCopy<Keys>): DynamicCopy<Keys> {
+    type EnglishCopy = StringCopy<Keys>["en"];
+    const englishCopy: EnglishCopy = copy.en;
+    const keys: [Keys] = Object.keys(englishCopy) as [Keys];
+
+    const internationalized = keys.reduce((acc, k) => {
+      const value: AsyncIterable<string> = this.chan.map((lang) => {
+        return copy[lang][k];
+      });
+
+      acc[k] = html`${asyncReplace(value)}`;
+      return acc;
+    }, {} as DynamicCopy<Keys>);
+
+    return internationalized;
+  }
+
+  setLanguage(lang: Language) {
+    console.log("Set language:", lang);
+    this.chan.send(lang);
+  }
+}

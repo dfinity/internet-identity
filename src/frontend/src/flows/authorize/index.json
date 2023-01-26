@@ -1,0 +1,18 @@
+{
+  "en": {
+    "starting_authentication": "starting authentication",
+    "invalid_derivation_origin": "Invalid Derivation Origin",
+    "is_not_valid_origin_for": "is not a valid derivation origin for",
+    "continue": "Continue",
+    "waiting_for_auth_data": "Waiting for authentication data...",
+    "validating_auth_data": "validating authentication data...",
+    "finalizing_auth": "Finalizing authentication...",
+
+    "invalid_data": "Invalid Data",
+    "no_auth_data": "It looks like you were sent here for authentication, but no service requested authentication.",
+    "go_home": "Home",
+
+    "auth_failed": "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
+    "auth_success": "Authentication successful. You may close this page."
+  }
+}

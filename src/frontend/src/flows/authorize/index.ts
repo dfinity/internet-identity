@@ -8,18 +8,23 @@ import { displayError } from "../../components/displayError";
 import { spinner } from "../../components/icons";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { authenticationProtocol } from "./postMessageInterface";
+import { I18n, LocalStorageI18n } from "../../utils/i18n";
 import {
   authenticateBox,
   AuthnTemplates,
 } from "../../components/authenticateBox";
 
+import copyJson from "./index.json";
+
 /* Template for the authbox when authenticating to a dapp */
 export const authnTemplateAuthorize = ({
   origin,
   derivationOrigin,
+  i18n,
 }: {
   origin: string;
   derivationOrigin?: string;
+  i18n: I18n;
 }): AuthnTemplates => {
   const chasm =
     derivationOrigin !== undefined
@@ -65,9 +70,11 @@ export const authnTemplateAuthorize = ({
 export const authFlowAuthorize = async (
   connection: Connection
 ): Promise<void> => {
+  const i18n = new LocalStorageI18n();
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(html`<h1>starting authentication</h1>`, container);
-  const showMessage = (msg: string) =>
+  const copy = i18n.i18n(copyJson);
+  render(html`<h1>${copy.starting_authentication}</h1>`, container);
+  const showMessage = (msg: string | TemplateResult) =>
     render(
       html`
         <div class="l-container c-card c-card--highlight t-centered">
@@ -84,6 +91,7 @@ export const authFlowAuthorize = async (
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
+          i18n,
         })
       );
       await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
@@ -91,22 +99,22 @@ export const authFlowAuthorize = async (
     },
     onInvalidOrigin: (result) =>
       displayError({
-        title: "Invalid Derivation Origin",
-        message: `"${result.authContext.authRequest.derivationOrigin}" is not a valid derivation origin for "${result.authContext.requestOrigin}"`,
+        title: copy.invalid_derivation_origin,
+        message: `"${result.authContext.authRequest.derivationOrigin}" ${copy.is_not_valid_origin_for} "${result.authContext.requestOrigin}"`,
         detail: result.message,
-        primaryButton: "Continue",
+        primaryButton: copy.continue,
       }),
 
     onProgress: (status) => {
       switch (status) {
         case "waiting":
-          showMessage("Waiting for authentication data...");
+          showMessage(copy.waiting_for_auth_data);
           break;
         case "validating":
-          showMessage("validating authentication data...");
+          showMessage(copy.validating_auth_data);
           break;
         case "fetching delegation":
-          showMessage("Finalizing authentication...");
+          showMessage(copy.finalizing_auth);
           break;
         default:
           unreachable(status);
@@ -118,22 +126,16 @@ export const authFlowAuthorize = async (
   switch (result) {
     case "orphan":
       await displayError({
-        title: "Invalid Data",
-        message: `It looks like you were sent here for authentication, but no service requested authentication.`,
-        primaryButton: "Home",
+        title: copy.invalid_data,
+        message: copy.no_auth_data,
+        primaryButton: copy.go_home,
       });
 
       location.hash = "";
       window.location.reload();
       break;
     case "failure":
-      render(
-        html`<h1>
-          Something went wrong during authentication. Authenticating service was
-          notified and you may close this page.
-        </h1>`,
-        container
-      );
+      render(html`<h1>${copy.auth_failed}</h1>`, container);
       break;
     case "success":
       render(
@@ -141,7 +143,7 @@ export const authFlowAuthorize = async (
           style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
           data-role="notify-auth-success"
         >
-          Authentication successful. You may close this page.
+          ${copy.auth_success}
         </h1>`,
         container
       );

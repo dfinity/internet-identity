@@ -5,6 +5,7 @@ import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
+import { DummyI18n } from "./utils/i18n";
 import { withRef, mount } from "./utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
 import {
@@ -51,6 +52,8 @@ import { registerDisabled } from "./flows/registerDisabled";
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
 const userNumber = BigInt(10000);
+
+const i18n = new DummyI18n();
 
 const recoveryPhrase: DeviceData = {
   alias: "Recovery Phrase",
@@ -117,10 +120,12 @@ const authnCnfg = {
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
+  i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  i18n,
 });
 
 const authz = authnPages({ ...authnCnfg, ...authzTemplates });
