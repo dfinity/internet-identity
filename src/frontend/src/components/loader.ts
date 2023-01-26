@@ -22,7 +22,7 @@ const loader = () => html`<style>
     }
   </style>
   <picture id="loader">
-    <img src="/loader.webp" alt="loading" />
+    <img src=${process.env.BASER_URL ?? "" + "/loader.webp"} alt="loading" />
   </picture>`;
 
 const startLoader = () => {
