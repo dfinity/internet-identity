@@ -26,6 +26,8 @@ impl ContentType {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
+        // The FAQ used to live in '/faq' but we now use an external website. We redirect in order to not
+        // break existing links in the wild.
         "/faq" => HttpResponse {
             status_code: 301,
             headers: vec![(

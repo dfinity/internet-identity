@@ -75,8 +75,8 @@ const init = async () => {
   showWarningIfNecessary();
 
   // Redirect to the FAQ
-  // The canister should already be handling this, this is just a safety
-  // measure
+  // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
+  // measure.
   if (window.location.pathname === "/faq") {
     const faqUrl =
       "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity";
