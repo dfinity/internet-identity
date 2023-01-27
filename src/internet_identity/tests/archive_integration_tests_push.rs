@@ -67,7 +67,7 @@ fn should_not_deploy_wrong_wasm() -> Result<(), CallError> {
         DeployArchiveResult::Failed(msg) => {
             assert_eq!(msg, "invalid wasm module".to_string())
         }
-        unexpected => panic!("unexpected result: {:?}", unexpected),
+        unexpected => panic!("unexpected result: {unexpected:?}"),
     }
 
     let stats = ii_api::stats(&env, ii_canister)?;
@@ -86,7 +86,7 @@ fn should_not_deploy_archive_when_disabled() -> Result<(), CallError> {
         DeployArchiveResult::Failed(msg) => {
             assert_eq!(msg, "archive deployment disabled".to_string())
         }
-        unexpected => panic!("unexpected result: {:?}", unexpected),
+        unexpected => panic!("unexpected result: {unexpected:?}"),
     }
 
     let stats = ii_api::stats(&env, ii_canister)?;

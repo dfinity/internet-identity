@@ -27,7 +27,7 @@ pub fn register_anchor_with(
         },
     ) {
         Ok(RegisterResponse::Registered { user_number }) => user_number,
-        response => panic!("could not register: {:?}", response),
+        response => panic!("could not register: {response:?}"),
     };
     user_number
 }

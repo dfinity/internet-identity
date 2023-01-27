@@ -565,7 +565,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: vec![],
-                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {}", err))),
+                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
                     streaming_strategy: None,
                 },
             }
@@ -573,7 +573,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
         path => HttpResponse {
             status_code: 404,
             headers: vec![],
-            body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
+            body: Cow::Owned(ByteBuf::from(format!("Asset {path} not found."))),
             streaming_strategy: None,
         },
     }

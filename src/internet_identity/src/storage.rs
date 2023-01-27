@@ -138,15 +138,13 @@ impl<M: Memory> Storage<M> {
     pub fn new((id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber), memory: M) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
-                "improper Identity Anchor range: [{}, {})",
-                id_range_lo, id_range_hi,
+                "improper Identity Anchor range: [{id_range_lo}, {id_range_hi})",
             ));
         }
 
         if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
             trap(&format!(
-                "id range [{}, {}) is too large for a single canister (max {} entries)",
-                id_range_lo, id_range_hi, DEFAULT_RANGE_SIZE,
+                "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {DEFAULT_RANGE_SIZE} entries)",
             ));
         }
 
@@ -332,16 +330,14 @@ impl<M: Memory> Storage<M> {
     pub fn set_anchor_number_range(&mut self, (lo, hi): (AnchorNumber, AnchorNumber)) {
         if hi < lo {
             trap(&format!(
-                "set_anchor_number_range: improper Identity Anchor range [{}, {})",
-                lo, hi
+                "set_anchor_number_range: improper Identity Anchor range [{lo}, {hi})"
             ));
         }
         let max_entries = self.max_entries() as u64;
         if (hi - lo) > max_entries {
             trap(&format!(
-                "set_anchor_number_range: specified range [{}, {}) is too large for this canister \
-                 (max {} entries)",
-                lo, hi, max_entries
+                "set_anchor_number_range: specified range [{lo}, {hi}) is too large for this canister \
+                 (max {max_entries} entries)"
             ));
         }
         self.header.id_range_lo = lo;
@@ -476,18 +472,17 @@ impl fmt::Display for StorageError {
                 "Identity Anchor {} is out of range [{}, {})",
                 anchor_number, range.0, range.1
             ),
-            Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {}", n),
+            Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
             Self::DeserializationError(err) => {
-                write!(f, "failed to deserialize a Candid value: {}", err)
+                write!(f, "failed to deserialize a Candid value: {err}")
             }
             Self::SerializationError(err) => {
-                write!(f, "failed to serialize a Candid value: {}", err)
+                write!(f, "failed to serialize a Candid value: {err}")
             }
             Self::EntrySizeLimitExceeded(n) => write!(
                 f,
-                "attempted to store an entry of size {} \
-                 which is larger then the max allowed entry size",
-                n
+                "attempted to store an entry of size {n} \
+                 which is larger then the max allowed entry size"
             ),
         }
     }

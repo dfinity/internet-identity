@@ -238,8 +238,7 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
             let current_range = state::storage(|storage| storage.assigned_anchor_number_range());
             if range != current_range {
                 trap(&format!(
-                    "Anchor number range cannot be changed. Current value: {:?}",
-                    current_range
+                    "Anchor number range cannot be changed. Current value: {current_range:?}"
                 ));
             }
         }

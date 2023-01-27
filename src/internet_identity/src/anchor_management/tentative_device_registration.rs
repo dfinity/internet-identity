@@ -151,7 +151,7 @@ fn get_verified_device(
 async fn new_verification_code() -> DeviceVerificationCode {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get randomness: {}", err)),
+        Err((_, err)) => trap(&format!("failed to get randomness: {err}")),
     };
     let rand = u32::from_be_bytes(res[..4].try_into().unwrap_or_else(|_| {
         trap(&format!(

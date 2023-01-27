@@ -734,7 +734,7 @@ mod stable_memory_tests {
         assert!(result.is_err());
         let err = result.err().unwrap();
         match err {
-            CallError::Reject(err) => panic!("unexpected error {}", err),
+            CallError::Reject(err) => panic!("unexpected error {err}"),
             CallError::UserError(err) => {
                 assert_eq!(err.code, CanisterCalledTrap);
                 assert!(err.description.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version"));
@@ -759,7 +759,7 @@ mod stable_memory_tests {
         assert!(result.is_err());
         let err = result.err().unwrap();
         match err {
-            CallError::Reject(err) => panic!("unexpected error {}", err),
+            CallError::Reject(err) => panic!("unexpected error {err}"),
             CallError::UserError(err) => {
                 assert_eq!(err.code, CanisterCalledTrap);
                 assert!(err
@@ -1974,7 +1974,7 @@ mod http_tests {
                 &env.root_key(),
                 env.time(),
             )
-            .unwrap_or_else(|_| panic!("validation for asset \"{}\" failed", asset));
+            .unwrap_or_else(|_| panic!("validation for asset \"{asset}\" failed"));
             verify_security_headers(&http_response.headers);
         }
         Ok(())
@@ -2074,7 +2074,7 @@ mod http_tests {
                 principal_1(),
                 user_number,
                 frontend_hostname.to_string(),
-                ByteBuf::from(format!("session key {}", count)),
+                ByteBuf::from(format!("session key {count}")),
                 None,
             )?;
 
@@ -2397,7 +2397,7 @@ mod remote_device_registration_tests {
             AddTentativeDeviceResponse::AddedTentatively {
                 verification_code, ..
             } => verification_code,
-            err => panic!("failed to add tentative device: {:?}", err),
+            err => panic!("failed to add tentative device: {err:?}"),
         };
         let verification_response = api::verify_tentative_device(
             &env,
@@ -2433,7 +2433,7 @@ mod remote_device_registration_tests {
             AddTentativeDeviceResponse::AddedTentatively {
                 verification_code, ..
             } => verification_code,
-            err => panic!("failed to add tentative device: {:?}", err),
+            err => panic!("failed to add tentative device: {err:?}"),
         };
 
         assert!(matches!(

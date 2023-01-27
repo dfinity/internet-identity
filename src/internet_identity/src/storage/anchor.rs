@@ -340,8 +340,7 @@ impl fmt::Display for AnchorError {
         match self {
             AnchorError::TooManyDevices { num_devices, limit } => write!(
                 f,
-                "Anchor device limit exceeded: num devices {}, limit {}",
-                num_devices, limit
+                "Anchor device limit exceeded: num devices {num_devices}, limit {limit}"
             ),
             AnchorError::DeviceLimitExceeded {
                 field,
@@ -349,23 +348,19 @@ impl fmt::Display for AnchorError {
                 limit,
             } => write!(
                 f,
-                "{} limit exceeded: length {}, limit {}",
-                field, length, limit
+                "{field} limit exceeded: length {length}, limit {limit}"
             ),
             AnchorError::CumulativeDataLimitExceeded { length, limit } => write!(
                 f,
-                "Cumulative size of variable sized fields exceeds limit: length {}, limit {}. Either use shorter aliases or remove an existing device.",
-                length, limit
+                "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}. Either use shorter aliases or remove an existing device."
             ),
             AnchorError::InvalidDeviceProtection { key_type } => write!(
                 f,
-                "Only recovery phrases can be protected but key type is {:?}",
-                key_type
+                "Only recovery phrases can be protected but key type is {key_type:?}"
             ),
             AnchorError::MutationNotAllowed { actual_principal, authorized_principal } => write!(
                 f,
-                "Device is protected. Must be authenticated with this device to mutate: authorized principal {}, actual principal {}",
-                authorized_principal, actual_principal
+                "Device is protected. Must be authenticated with this device to mutate: authorized principal {authorized_principal}, actual principal {actual_principal}"
             ),
             AnchorError::MultipleRecoveryPhrases => write!(f, "There is already a recovery phrase and only one is allowed."),
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
