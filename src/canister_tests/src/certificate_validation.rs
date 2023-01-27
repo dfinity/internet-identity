@@ -44,7 +44,7 @@ pub fn validate_certification(
     // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
     let (encoded_cert, encoded_tree) = parse_header(ic_certificate)?;
     let cert_blob = base64::decode(encoded_cert).map_err(|err| MalformedCertificate {
-        message: format!("failed to decode base64 certificate: {:?}", err),
+        message: format!("failed to decode base64 certificate: {err:?}"),
     })?;
 
     // 4. The tree must be a hash tree as per Encoding of certificates.
@@ -125,10 +125,10 @@ where
     T: for<'a> Deserialize<'a>,
 {
     let blob = base64::decode(encoded_value).map_err(|err| MalformedCertificate {
-        message: format!("failed to decode base64 value: {:?}", err),
+        message: format!("failed to decode base64 value: {err:?}"),
     })?;
     serde_cbor::from_slice(&blob).map_err(|err| MalformedCertificate {
-        message: format!("failed to decode cbor value: {:?}", err),
+        message: format!("failed to decode cbor value: {err:?}"),
     })
 }
 

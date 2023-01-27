@@ -211,8 +211,7 @@ async fn create_archive(config: ArchiveConfig) -> Result<Principal, String> {
                 persistent_state.archive_state = Configured { config }
             });
             Err(format!(
-                "failed to create archive! error code: {:?}, message: {}",
-                reject_code, message
+                "failed to create archive! error code: {reject_code:?}, message: {message}"
             ))
         }
     }
@@ -245,7 +244,7 @@ async fn install_archive(
     config: &ArchiveConfig,
 ) -> Result<(), String> {
     let encoded_arg = candid::encode_one(config_to_init(config))
-        .map_err(|err| format!("failed to encode archive install argument: {:?}", err))?;
+        .map_err(|err| format!("failed to encode archive install argument: {err:?}"))?;
 
     install_code(InstallCodeArgument {
         mode: install_mode,
@@ -256,8 +255,7 @@ async fn install_archive(
     .await
     .map_err(|(code, message)| {
         format!(
-            "failed to install archive canister! error code: {:?}, message: {}",
-            code, message
+            "failed to install archive canister! error code: {code:?}, message: {message}"
         )
     })?;
 

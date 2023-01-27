@@ -62,8 +62,7 @@ pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     let new_device = Device::from(device_data);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
         trap(&format!(
-            "failed to add device to anchor {}: {}",
-            anchor_number, err
+            "failed to add device to anchor {anchor_number}: {err}"
         ))
     });
     write_anchor(anchor_number, anchor);
@@ -92,8 +91,7 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
         .modify_device(&device_key, new_device)
         .unwrap_or_else(|err| {
             trap(&format!(
-                "failed to modify device of anchor {}: {}",
-                user_number, err
+                "failed to modify device of anchor {user_number}: {err}"
             ))
         });
     write_anchor(user_number, anchor);
@@ -115,15 +113,13 @@ pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: D
 
     anchor.remove_device(&old_device).unwrap_or_else(|err| {
         trap(&format!(
-            "failed to replace device of anchor {}: {}",
-            anchor_number, err
+            "failed to replace device of anchor {anchor_number}: {err}"
         ))
     });
     let new_device = Device::from(new_device);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
         trap(&format!(
-            "failed to replace device of anchor {}: {}",
-            anchor_number, err
+            "failed to replace device of anchor {anchor_number}: {err}"
         ))
     });
     write_anchor(anchor_number, anchor);
@@ -145,8 +141,7 @@ pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 
     anchor.remove_device(&device_key).unwrap_or_else(|err| {
         trap(&format!(
-            "failed to remove device of anchor {}: {}",
-            anchor_number, err
+            "failed to remove device of anchor {anchor_number}: {err}"
         ))
     });
     write_anchor(anchor_number, anchor);
@@ -164,8 +159,7 @@ fn write_anchor(anchor_number: AnchorNumber, anchor: Anchor) {
     state::storage_mut(|storage| {
         storage.write(anchor_number, anchor).unwrap_or_else(|err| {
             trap(&format!(
-                "failed to write data of anchor {}: {}",
-                anchor_number, err
+                "failed to write data of anchor {anchor_number}: {err}"
             ))
         });
     });

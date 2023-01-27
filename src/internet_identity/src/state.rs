@@ -142,7 +142,7 @@ pub async fn init_salt() {
 
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get salt: {}", err)),
+        Err((_, err)) => trap(&format!("failed to get salt: {err}")),
     };
     let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
         trap(&format!(
@@ -191,8 +191,7 @@ pub fn load_persistent_state() {
         match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(err) => trap(&format!(
-                "failed to recover persistent state! Err: {:?}",
-                err
+                "failed to recover persistent state! Err: {err:?}"
             )),
         }
     })
@@ -204,8 +203,7 @@ pub fn anchor(anchor: AnchorNumber) -> Anchor {
     STATE.with(|s| {
         s.storage.borrow().read(anchor).unwrap_or_else(|err| {
             trap(&format!(
-                "failed to read device data of user {}: {}",
-                anchor, err
+                "failed to read device data of user {anchor}: {err}"
             ))
         })
     })
