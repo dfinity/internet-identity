@@ -325,7 +325,7 @@ fn sample_device() -> Device {
 fn device(n: u8) -> Device {
     Device {
         pubkey: ByteBuf::from([n; 100]),
-        alias: format!("test alias {}", n),
+        alias: format!("test alias {n}"),
         credential_id: Some(ByteBuf::from([n; 64])),
         purpose: Purpose::Authentication,
         key_type: KeyType::Platform,
@@ -348,7 +348,7 @@ fn large_device(n: u8) -> Device {
 fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
     Device {
         pubkey: ByteBuf::from(vec![n; 96]),
-        alias: format!("recovery phrase {}", n),
+        alias: format!("recovery phrase {n}"),
         credential_id: Some(ByteBuf::from(vec![n; 64])),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,

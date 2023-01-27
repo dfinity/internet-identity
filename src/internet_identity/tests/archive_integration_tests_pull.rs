@@ -75,7 +75,7 @@ mod deployment_tests {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "invalid wasm module".to_string())
             }
-            unexpected => panic!("unexpected result: {:?}", unexpected),
+            unexpected => panic!("unexpected result: {unexpected:?}"),
         }
 
         let stats = ii_api::stats(&env, ii_canister)?;
@@ -95,7 +95,7 @@ mod deployment_tests {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "archive deployment disabled".to_string())
             }
-            unexpected => panic!("unexpected result: {:?}", unexpected),
+            unexpected => panic!("unexpected result: {unexpected:?}"),
         }
 
         let stats = ii_api::stats(&env, ii_canister)?;

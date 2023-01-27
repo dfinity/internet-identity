@@ -101,8 +101,7 @@ fn test_random_modifications() {
                 assert_eq!(
                     witness.reconstruct(),
                     map.root_hash(),
-                    "produced a bad witness: {:?}",
-                    witness
+                    "produced a bad witness: {witness:?}"
                 );
             }
         }

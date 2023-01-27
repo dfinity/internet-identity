@@ -102,20 +102,20 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
             }
             Some(
                 std::fs::read(default_path)
-                    .unwrap_or_else(|_| panic!("could not read Wasm module: {:?}", default_path)),
+                    .unwrap_or_else(|_| panic!("could not read Wasm module: {default_path:?}")),
             )
         }
         Some(path) => {
             let pathname: String = path
                 .into_string()
-                .unwrap_or_else(|_| panic!("Invalid string path for {}", env_var));
+                .unwrap_or_else(|_| panic!("Invalid string path for {env_var}"));
             let path = path::PathBuf::from(pathname.clone());
             if !path.exists() {
-                panic!("Could not find {}", pathname);
+                panic!("Could not find {pathname}");
             }
             Some(
                 std::fs::read(path.clone())
-                    .unwrap_or_else(|_| panic!("could not read Wasm module: {:?}", path)),
+                    .unwrap_or_else(|_| panic!("could not read Wasm module: {path:?}")),
             )
         }
     }
@@ -130,7 +130,7 @@ pub fn env() -> StateMachine {
         Some(path) => path
             .clone()
             .into_string()
-            .unwrap_or_else(|_| panic!("Invalid string path for {:?}", path)),
+            .unwrap_or_else(|_| panic!("Invalid string path for {path:?}")),
     };
 
     if !Path::new(&path).exists() {
@@ -312,8 +312,8 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
     message_pattern: Regex,
 ) {
     match result {
-        Ok(_) => panic!("expected error, got {:?}", result),
-        Err(CallError::Reject(_)) => panic!("expected user error, got {:?}", result),
+        Ok(_) => panic!("expected error, got {result:?}"),
+        Err(CallError::Reject(_)) => panic!("expected user error, got {result:?}"),
         Err(CallError::UserError(ref user_error)) => {
             if !(user_error.code == error_code) {
                 panic!(
@@ -322,7 +322,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
                 );
             }
             if !message_pattern.is_match(&user_error.to_string()) {
-                panic!("expected #{:?}, got {}", message_pattern, user_error);
+                panic!("expected #{message_pattern:?}, got {user_error}");
             }
         }
     }
@@ -383,7 +383,7 @@ xr-spatial-tracking=()",
         let (_, value) = headers
             .iter()
             .find(|(name, _)| name.to_lowercase() == header_name.to_lowercase())
-            .unwrap_or_else(|| panic!("header \"{}\" not found", header_name));
+            .unwrap_or_else(|| panic!("header \"{header_name}\" not found"));
         assert_eq!(value, expected_value);
     }
 
@@ -426,10 +426,10 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
 
 pub fn parse_metric(body: &str, metric: &str) -> (f64, SystemTime) {
     let metric = metric.replace('{', "\\{").replace('}', "\\}");
-    let metric_capture = Regex::new(&format!("(?m)^{} (\\d+) (\\d+)$", metric))
+    let metric_capture = Regex::new(&format!("(?m)^{metric} (\\d+) (\\d+)$"))
         .unwrap()
         .captures(body)
-        .unwrap_or_else(|| panic!("metric {} not found", metric));
+        .unwrap_or_else(|| panic!("metric {metric} not found"));
 
     let metric: f64 = metric_capture.get(1).unwrap().as_str().parse().unwrap();
     let metric_timestamp = SystemTime::UNIX_EPOCH
@@ -481,7 +481,7 @@ pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> Can
         ByteBuf::from(ARCHIVE_WASM.clone()),
     ) {
         Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
-        err => panic!("archive deployment failed: {:?}", err),
+        err => panic!("archive deployment failed: {err:?}"),
     }
 }
 

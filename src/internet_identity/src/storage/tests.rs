@@ -291,7 +291,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
     memory.read(EXPECTED_ADDRESS, &mut buf);
     assert_ne!(buf, PERSISTENT_STATE_MAGIC);
     let result = storage.read_persistent_state();
-    println!("{:?}", result);
+    println!("{result:?}");
     assert!(matches!(result, Err(PersistentStateError::NotFound)));
 }
 

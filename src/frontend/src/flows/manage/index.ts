@@ -8,7 +8,7 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { settingsIcon } from "../../components/icons";
+import { settingsIcon, warningIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
@@ -135,36 +135,65 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
 const devicesSection = (
   devices: DeviceData[],
   onAddDevice: (next: "canceled" | "local" | "remote") => void
-): TemplateResult => html`
-    <aside class="l-stack">
-      <div class="t-title t-title--complications">
-        <h2 class="t-title">Added devices</h2>
-        <span class="t-title__complication c-tooltip">
-          <span class="c-tooltip__message c-card c-card--narrow">
-            You can register up to ${MAX_AUTHENTICATORS} authenticator
-            devices (recovery devices excluded)</span>
-            (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})
+): TemplateResult => {
+  const wrapClasses = ["l-stack"];
+  const isWarning = devices.length < 2;
+
+  if (isWarning === true) {
+    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
+  }
+
+  return html`
+    <aside class="${wrapClasses.join(" ")}">
+      ${
+        isWarning === true
+          ? html`<span class="c-card__icon" aria-hidden="true"
+              >${warningIcon}</span
+            >`
+          : undefined
+      }
+      <div class="${isWarning === true ? "c-card__content" : undefined}">
+        <div class="t-title t-title--complications">
+          <h2 class="t-title">Added devices</h2>
+          <span class="t-title__complication c-tooltip">
+            <span class="c-tooltip__message c-card c-card--narrow">
+              You can register up to ${MAX_AUTHENTICATORS} authenticator
+              devices (recovery devices excluded)</span>
+              (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})
+            </span>
           </span>
-        </span>
-        <button
-          ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
-          class="t-title__complication t-title__complication--end c-tooltip c-tooltip--onDisabled"
-          @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
-          id="addAdditionalDevice"
-        >
-          <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
-            >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
-            Remove a device before you can add a new one.</span
-          >
-          <span class="t-link t-link--discreet">
-            <i class="t-link__icon" aria-hidden=true>+</i>
-            Add new device
-          </span>
-        </button>
+        </div>
+
+        <div class="c-action-list">
+          <div id="deviceList"></div>
+          <div class="c-action-list__actions">
+            <button 
+              ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
+              @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
+              id="addAdditionalDevice"
+            >
+              <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
+                >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+                Remove a device before you can add a new one.</span
+              >
+              <span>Add new device</span>
+            </button>
+          </div>
+
+        </div>
+        ${
+          isWarning === true
+            ? html`<p class="warning-message t-paragraph t-lead">
+                <strong class="t-strong">Warning!</strong> We recommend that you
+                have at least two devices (for example, your computer and your
+                phone).
+              </p>`
+            : undefined
+        }
       </div>
-      <div id="deviceList" class="c-action-list"></div>
-    </aside>
-`;
+    </aside>`;
+};
 
 const recoverySection = (
   devices: DeviceData[],
@@ -175,18 +204,21 @@ const recoverySection = (
       ${!hasRecoveryDevice(devices)
         ? undefined
         : html`
-            <div class="t-title t-title--complications">
+            <div class="t-title">
               <h2>Recovery methods</h2>
-              <button
-                @click="${onAddRecovery}"
-                class="t-title__complication t-title__complication--end"
-                id="addRecovery"
-              >
-                <i class="t-link__icon" aria-hidden="true">+</i>
-                <span class="t-link t-link--discreet">Add recovery method</span>
-              </button>
             </div>
-            <div id="recoveryList" class="c-action-list"></div>
+            <div class="c-action-list">
+              <div id="recoveryList"></div>
+              <div class="c-action-list__actions">
+                <button
+                  @click="${onAddRecovery}"
+                  class="c-button c-button--primary"
+                  id="addRecovery"
+                >
+                  Add recovery method
+                </button>
+              </div>
+            </div>
           `}
     </aside>
   `;

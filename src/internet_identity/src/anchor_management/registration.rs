@@ -64,10 +64,7 @@ pub async fn create_challenge() -> Challenge {
             }
         }
 
-        trap(&format!(
-            "Could not find a new key after {} tries",
-            MAX_TRIES
-        ));
+        trap(&format!("Could not find a new key after {MAX_TRIES} tries"));
     })
 }
 
@@ -75,7 +72,7 @@ pub async fn create_challenge() -> Challenge {
 async fn make_rng() -> rand_chacha::ChaCha20Rng {
     let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get seed: {}", err)),
+        Err((_, err)) => trap(&format!("failed to get seed: {err}")),
     };
     let seed: Salt = raw_rand[..].try_into().unwrap_or_else(|_| {
         trap(&format!(
@@ -175,10 +172,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     match allocation {
         Some((anchor_number, mut anchor)) => {
             anchor.add_device(device.clone()).unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to register anchor {}: {}",
-                    anchor_number, err
-                ))
+                trap(&format!("failed to register anchor {anchor_number}: {err}"))
             });
             write_anchor(anchor_number, anchor);
             archive_operation(

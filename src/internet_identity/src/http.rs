@@ -49,7 +49,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: security_headers(),
-                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {}", err))),
+                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
                     streaming_strategy: None,
                 },
             }
@@ -74,8 +74,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     status_code: 404,
                     headers,
                     body: Cow::Owned(ByteBuf::from(format!(
-                        "Asset {} not found.",
-                        probably_an_asset
+                        "Asset {probably_an_asset} not found."
                     ))),
                     streaming_strategy: None,
                 },
@@ -295,7 +294,7 @@ fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
         let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
         serializer.self_describe().unwrap();
         tree.serialize(&mut serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {}", e)));
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
         (
             "IC-Certificate".to_string(),
             format!(

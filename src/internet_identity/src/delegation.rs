@@ -246,8 +246,7 @@ fn check_frontend_length(frontend: &FrontendHostname) {
     let n = frontend.len();
     if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
         trap(&format!(
-            "frontend hostname {} exceeds the limit of {} bytes",
-            n, FRONTEND_HOSTNAME_LIMIT,
+            "frontend hostname {n} exceeds the limit of {FRONTEND_HOSTNAME_LIMIT} bytes",
         ));
     }
 }
