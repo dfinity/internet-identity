@@ -64,9 +64,7 @@ pub async fn create_challenge() -> Challenge {
             }
         }
 
-        trap(&format!(
-            "Could not find a new key after {MAX_TRIES} tries"
-        ));
+        trap(&format!("Could not find a new key after {MAX_TRIES} tries"));
     })
 }
 
@@ -174,9 +172,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     match allocation {
         Some((anchor_number, mut anchor)) => {
             anchor.add_device(device.clone()).unwrap_or_else(|err| {
-                trap(&format!(
-                    "failed to register anchor {anchor_number}: {err}"
-                ))
+                trap(&format!("failed to register anchor {anchor_number}: {err}"))
             });
             write_anchor(anchor_number, anchor);
             archive_operation(

@@ -254,9 +254,7 @@ async fn install_archive(
     })
     .await
     .map_err(|(code, message)| {
-        format!(
-            "failed to install archive canister! error code: {code:?}, message: {message}"
-        )
+        format!("failed to install archive canister! error code: {code:?}, message: {message}")
     })?;
 
     // the archive has changed --> the cached information is now invalid

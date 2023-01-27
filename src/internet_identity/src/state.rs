@@ -190,9 +190,7 @@ pub fn load_persistent_state() {
         let storage = s.storage.borrow();
         match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
-            Err(err) => trap(&format!(
-                "failed to recover persistent state! Err: {err:?}"
-            )),
+            Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
         }
     })
 }
