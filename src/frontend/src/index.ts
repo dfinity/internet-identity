@@ -3,7 +3,6 @@ import { authFlowManage } from "./flows/manage";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
-import { faqView } from "./flows/faq";
 import { intentFromUrl } from "./utils/userIntent";
 import { version } from "./version";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -75,9 +74,13 @@ const init = async () => {
   // https://github.com/dfinity/internet-identity#build-features
   showWarningIfNecessary();
 
-  // Custom routing to the FAQ page
+  // Redirect to the FAQ
+  // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
+  // measure.
   if (window.location.pathname === "/faq") {
-    return faqView();
+    const faqUrl =
+      "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity";
+    window.location.replace(faqUrl);
   }
 
   if (window.location.pathname === "/about") {

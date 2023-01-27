@@ -36,7 +36,6 @@ const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
 const REPLICA_URL = "https://ic0.app";
 const II_URL = "https://identity.ic0.app";
-const FAQ_URL = `${II_URL}/faq`;
 const ABOUT_URL = `${II_URL}/about`;
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
