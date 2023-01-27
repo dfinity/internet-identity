@@ -12,7 +12,6 @@ import { config } from "dotenv";
 import { TemplateResult } from "lit-html";
 import { render } from "@lit-labs/ssr/lib/render-lit-html";
 import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
-import { pageContent as faqStaticContent } from "./src/frontend/src/flows/faq";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -100,7 +99,6 @@ const injectCanisterIdPlugin = () =>
 
 const staticAboutPlugin = () =>
   staticPagePlugin("about.html", aboutStaticContent);
-const staticFaqPlugin = () => staticPagePlugin("faq.html", faqStaticContent);
 
 const isProduction = process.env.NODE_ENV === "production";
 const devtool = isProduction ? undefined : "source-map";
@@ -177,7 +175,6 @@ const defaults = {
 
     htmlPlugin({ filename: "index.html" }),
     htmlPlugin({ filename: "about.html" }),
-    htmlPlugin({ filename: "faq.html" }),
   ],
 };
 
@@ -197,13 +194,10 @@ export default [
         "/api": "http://localhost:4943",
       },
       historyApiFallback: {
-        // Make sure that visiting links like `/faq` serves the correct HTML
+        // Make sure that visiting links like `/about` serves the correct HTML
         // (could also be `/index.html` since the content is the same in development, but it's
         // less confusing to show the correct file)
-        rewrites: [
-          { from: /\/about/, to: "/about.html" },
-          { from: /\/faq/, to: "/faq.html" },
-        ],
+        rewrites: [{ from: /\/about/, to: "/about.html" }],
       },
     },
     plugins: [
@@ -212,9 +206,7 @@ export default [
       // prefer hot-reloading dynamic pages);
       // in development, we inject canister ID when using the dev server, so that the local
       // file can be used (instead of the HTML served by the canister)
-      ...(isProduction
-        ? [staticAboutPlugin(), staticFaqPlugin()]
-        : [injectCanisterIdPlugin()]),
+      ...(isProduction ? [staticAboutPlugin()] : [injectCanisterIdPlugin()]),
     ],
   },
   {

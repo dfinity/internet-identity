@@ -40,12 +40,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
       continue;
     }
 
-    // In the case of the faq we modify the URL slightly to show an open entry
-    if (pageName === "faq") {
-      await visit(browser, `http://localhost:8080/${pageName}#lost-device`);
-    } else {
-      await visit(browser, `http://localhost:8080/${pageName}`);
-    }
+    await visit(browser, `http://localhost:8080/${pageName}`);
 
     // When authenticating with alternative origins, toggle the chasm
     if (pageName === "authorizePickAltOpen") {

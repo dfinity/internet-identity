@@ -62,10 +62,6 @@ lazy_static! {
     static ref ABOUT_HTML_STR: String = {
         fixup_html(include_str!("../../../dist/about.html"))
     };
-
-    static ref FAQ_HTML_STR: String = {
-        fixup_html(include_str!("../../../dist/faq.html"))
-    };
 }
 
 // used both in init and post_upgrade
@@ -90,20 +86,13 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
+fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 7] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     let about_html: &[u8] = ABOUT_HTML_STR.as_bytes();
-    let faq_html: &[u8] = FAQ_HTML_STR.as_bytes();
     [
         (
             "/",
             index_html,
-            ContentEncoding::Identity,
-            ContentType::HTML,
-        ),
-        (
-            "/faq",
-            faq_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),

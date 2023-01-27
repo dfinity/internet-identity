@@ -26,6 +26,16 @@ impl ContentType {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
+        "/faq" => HttpResponse {
+            status_code: 301,
+            headers: vec![(
+                "location".to_string(),
+                "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
+                    .to_string(),
+            )],
+            body: Cow::Owned(ByteBuf::new()),
+            streaming_strategy: None,
+        },
         "/metrics" => {
             let mut writer = MetricsEncoder::new(vec![], time() as i64 / 1_000_000);
             match encode_metrics(&mut writer) {

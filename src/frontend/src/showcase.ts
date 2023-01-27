@@ -16,7 +16,6 @@ import { AuthenticatedConnection } from "./utils/iiConnection";
 import { styleguide } from "./styleguide";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
-import { faqView } from "./flows/faq";
 import { showWarning } from "./banner";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
@@ -135,7 +134,6 @@ const iiPages: Record<string, () => void> = {
       userNumber,
       onContinue: () => console.log("done"),
     }),
-  faq: () => faqView(),
   about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   pickRecoveryDevice: () =>

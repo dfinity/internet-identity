@@ -34,7 +34,7 @@ export const footer = html`<footer class="l-footer">
   ${navigationLink({
     labelText: "FAQ",
     id: "faqLink",
-    url: "/faq",
+    url: "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity",
     classes: "t-link--discreet l-footer__elem",
   })}
 </footer>`;
