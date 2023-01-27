@@ -175,7 +175,9 @@ export class Chan<A> {
 
   // A list of other channels to which we forward (`send()`) the values
   // sent to us
-  private listeners: Chan<A>[] = [];
+  // We use weak references to the channels so that they do not need to deregister explicitely,
+  // but instead we simply drop them when they're gone.
+  private listeners: WeakRef<Chan<A>>[] = [];
 
   send(a: A): void {
     if (this.snd !== undefined) {
@@ -187,10 +189,18 @@ export class Chan<A> {
       this.buffer.push(a);
     }
 
-    // Finally, broadcast
-    for (const listener of this.listeners) {
-      listener.send(a);
-    }
+    // Finally, broadcast and prune listeners if they're gone
+    this.listeners = this.listeners.reduce<typeof this.listeners>(
+      (acc, ref) => {
+        const listener = ref.deref();
+        if (listener !== undefined) {
+          listener.send(a);
+          acc.push(ref);
+        }
+        return acc;
+      },
+      []
+    );
   }
 
   // Receive all values sent to this `Chan`. Note that this effectively
@@ -217,7 +227,7 @@ export class Chan<A> {
   // with `f`.
   map<B>(f: (a: A) => B): AsyncIterable<B> {
     const input = new Chan<A>();
-    this.listeners.push(input);
+    this.listeners.push(new WeakRef(input));
 
     return {
       async *[Symbol.asyncIterator]() {
