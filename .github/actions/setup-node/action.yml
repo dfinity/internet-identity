@@ -10,4 +10,4 @@ runs:
 
     - uses: actions/setup-node@v3
       with:
-        node-version: ${{ steps.read-node-version.version }}
+        node-version: ${{ steps.read-node-version.outputs.version }}
