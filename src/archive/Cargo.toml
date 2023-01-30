@@ -14,7 +14,7 @@ candid = "0.8"
 ic-cdk = { version = "0.6", features = ["timers"] }
 ic-cdk-macros = "0.6"
 ic-metrics-encoder = "1"
-ic-stable-structures = "0.3"
+ic-stable-structures = "0.5"
 # other
 serde = "1"
 serde_bytes = "0.11"
