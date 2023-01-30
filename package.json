@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@lit-labs/ssr": "^2.2.3",
-    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/jest-dom": "~5",
     "@trust/webcrypto": "^0.9.2",
     "@types/jest": "~29",
     "@types/selenium-standalone": "^7.0.1",
