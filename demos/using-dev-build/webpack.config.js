@@ -74,7 +74,7 @@ module.exports = {
     }),
   ],
 
-  // proxy /api to port 8000 during development
+  // proxy /api to port 4943 during development
   devServer: {
     proxy: {
       "/api": {

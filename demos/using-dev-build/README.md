@@ -1,8 +1,16 @@
+
+[comment]: # This document is mainly written to be viewed on https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/integrate-identity/
+
 # Integrating with Internet Identity
 
-This shows how to integrate and test a project with Internet Identity. This uses the development [build flavor](https://github.com/dfinity/internet-identity/blob/main/README.md#build-features-and-flavors) of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library.
+This guide shows how to integrate and test a project with Internet Identity. The complete code example can be found [here](https://github.com/dfinity/internet-identity/tree/main/demos/using-dev-build). It uses the development [build flavor](https://github.com/dfinity/internet-identity/blob/main/README.md#build-features-and-flavors) of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library.
 
 This is a standalone project that you can copy to your own project.
+
+## Prerequisites
+
+* [DFX](https://internetcomputer.org/docs/current/developer-docs/build/install-upgrade-remove)
+* Node.js v16+
 
 ## Usage
 
@@ -30,6 +38,28 @@ At this point, the replica (for all practical matters, a local version of the In
   On the IC, a principal is the identifier of someone performing a request or "call" (hence "caller"). Every call must have a valid principal. There is also a special principal for anonymous calls. When using Internet Identity you are using [self-authenticating principals](https://smartcontracts.org/docs/interface-spec/index.html#principal), which is a very fancy way of saying that you have a private key on your laptop (hidden behind TouchID, Windows Hello, etc) that your browser uses to sign and prove that you are indeed the person issuing the calls to the IC.
 
 If the IC actually lets the call (request) through to the `whoami` canister, it means that everything checked out, and the `whoami` canister just responds with the information the IC adds to requests, namely your identity (principal).
+
+### Adding Internet Identity to your Local Project
+
+Add the following snippet to the `canister` section in your `dfx.json` file (see full example [here](https://github.com/dfinity/internet-identity/blob/main/demos/using-dev-build/dfx.json)):
+```json
+"internet_identity": {
+  "type": "custom",
+  "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
+  "remote": {
+    "id": {
+      "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    }
+  }
+}
+```
+
+This adds the [dev build](https://github.com/dfinity/internet-identity#flavors) of Internet Identity to your (local) project. The `remote` property makes sure, that your project will _not_ create a copy of Internet Identity on the IC when deploying to production.
+
+Using the dev build locally makes test automation easy:
+* all generated captchas are just the single letter `a`
+* the WebAuthn interactions are replaced by signing with a dummy key
 
 ### Using the Auth-Client Library To Log In With Internet Identity
 
