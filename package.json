@@ -55,8 +55,6 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "4.9",
-    "url-loader": "^4.1.1",
-    "util": "0.12.4",
     "webdriverio": "7.25.1",
     "webpack": "5.45.1",
     "webpack-cli": "~5",
@@ -67,9 +65,7 @@
     "@dfinity/candid": "0.10.2",
     "@dfinity/identity": "0.10.2",
     "@dfinity/principal": "0.10.2",
-    "biguintle": "^1.0.3",
     "bip39": "^3.0.4",
-    "kjua": "^0.9.0",
     "lit-html": "^2.3.1",
     "text-encoding": "^0.7.0"
   }

@@ -21,7 +21,6 @@ module.exports = {
       buffer: require.resolve("buffer/"),
       events: require.resolve("events/"),
       stream: require.resolve("stream-browserify/"),
-      util: require.resolve("util/"),
     },
   },
   devtool: "source-map",
