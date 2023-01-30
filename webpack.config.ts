@@ -7,15 +7,12 @@ import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
 import { fileURLToPath } from "url";
-import { config } from "dotenv";
 
 import { TemplateResult } from "lit-html";
 import { render } from "@lit-labs/ssr/lib/render-lit-html";
 import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-
-config();
 
 /** Read the II canister ID from dfx's local state */
 function readCanisterId() {

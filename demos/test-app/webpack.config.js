@@ -17,9 +17,7 @@ module.exports = {
       process: "process/browser",
     },
     fallback: {
-      assert: require.resolve("assert/"),
       buffer: require.resolve("buffer/"),
-      events: require.resolve("events/"),
       stream: require.resolve("stream-browserify/"),
     },
   },
