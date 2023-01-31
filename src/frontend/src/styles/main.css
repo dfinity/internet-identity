@@ -522,6 +522,13 @@ a:hover,
   border-radius: var(--vs-border-radius);
 }
 
+/* c-cards pretty much fill up the screen on small devices so we disable rounding */
+@media (max-width: 512px) {
+  .c-card {
+    border-radius: 0;
+  }
+}
+
 .c-card--highlight,
 .c-card--background {
   padding: var(--rs-card-bezel);
@@ -547,6 +554,13 @@ a:hover,
   background: radial-gradient(circle at 50% 10%, var(--rg-brand));
   opacity: 0.1;
   filter: blur(8px);
+}
+
+/* c-cards pretty much fill up the screen on so disable the effect which causes scrolling issues */
+@media (max-width: 512px) {
+  .c-card--background::after {
+    inset: 0;
+  }
 }
 
 .c-card--background::before {
