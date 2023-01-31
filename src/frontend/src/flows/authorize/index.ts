@@ -101,7 +101,7 @@ export const authFlowAuthorize = async (
     onInvalidOrigin: (result) =>
       displayError({
         title: copy.invalid_derivation_origin,
-        message: `"${result.authContext.authRequest.derivationOrigin}" ${copy.is_not_valid_origin_for} "${result.authContext.requestOrigin}"`,
+        message: html`"${result.authContext.authRequest.derivationOrigin}" ${copy.is_not_valid_origin_for} "${result.authContext.requestOrigin}"`,
         detail: result.message,
         primaryButton: copy.continue,
       }),
