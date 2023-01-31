@@ -1,4 +1,4 @@
-/** The copy and internationalization used in Internet Identity, based on 
+/** The copy and internationalization used in Internet Identity, based on
  * the officially supported languages */
 
 import { I18n as BaseI18n } from "./utils/i18n";

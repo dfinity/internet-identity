@@ -1,7 +1,7 @@
 /** Internationalization (i18n) and copy support for Internet Identity.
-*
-* This module provides helper for loading multi-language copy definitions and updating the lit templates
-* depending on the user-selected language dynamically. */
+ *
+ * This module provides helper for loading multi-language copy definitions and updating the lit templates
+ * depending on the user-selected language dynamically. */
 
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -18,7 +18,6 @@ type DynamicCopy<Keys extends string> = { [key in Keys]: TemplateResult };
 /// A class that converts a string copy definition into dynamic lit templates dependent on the
 // currently selected language.
 export class I18n<Lang extends string> {
-
   // The 'Chan' used to propagate language updates
   private chan: Chan<Lang>;
 
@@ -31,8 +30,6 @@ export class I18n<Lang extends string> {
   }
 
   i18n<Keys extends string>(copy: StringCopy<Keys, Lang>): DynamicCopy<Keys> {
-
-
     // Use the default language as the definition for expected keys.
     // Missing keys in other languages are a type error.
     type DefaultCopy = StringCopy<Keys, Lang>[Lang];
