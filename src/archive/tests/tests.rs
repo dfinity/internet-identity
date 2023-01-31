@@ -664,7 +664,7 @@ mod metrics_tests {
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_stable_memory_pages",
-            3074f64, // the memory_manager pre-allocates a lot of memory (1000 page buckets per virtual memory and some overhead)
+            3074f64, // the memory_manager pre-allocates a lot of memory (1024 page buckets per virtual memory and some overhead)
         );
 
         api::add_entry(

@@ -4,6 +4,8 @@
 use crate::certificate_validation::ValidationError::{
     AssetHashMismatch, AssetPathLookupFailed, CertificateExpired, MalformedCertificate,
 };
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use flate2::read::GzDecoder;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_certification::{verify_certified_data, CertificateValidationError};
@@ -43,9 +45,11 @@ pub fn validate_certification(
     let root_key = parse_threshold_sig_key_from_der(root_key).unwrap();
     // 2. The value of the header must be a structured header according to RFC 8941 with fields certificate and tree, both being byte sequences.
     let (encoded_cert, encoded_tree) = parse_header(ic_certificate)?;
-    let cert_blob = base64::decode(encoded_cert).map_err(|err| MalformedCertificate {
-        message: format!("failed to decode base64 certificate: {err:?}"),
-    })?;
+    let cert_blob = BASE64
+        .decode(encoded_cert)
+        .map_err(|err| MalformedCertificate {
+            message: format!("failed to decode base64 certificate: {err:?}"),
+        })?;
 
     // 4. The tree must be a hash tree as per Encoding of certificates.
     // (Out of order because verify_certificate also checks certified_data.)
@@ -124,9 +128,11 @@ fn decode_base64_encoded_cbor<T>(encoded_value: &str) -> Result<T, ValidationErr
 where
     T: for<'a> Deserialize<'a>,
 {
-    let blob = base64::decode(encoded_value).map_err(|err| MalformedCertificate {
-        message: format!("failed to decode base64 value: {err:?}"),
-    })?;
+    let blob = BASE64
+        .decode(encoded_value)
+        .map_err(|err| MalformedCertificate {
+            message: format!("failed to decode base64 value: {err:?}"),
+        })?;
     serde_cbor::from_slice(&blob).map_err(|err| MalformedCertificate {
         message: format!("failed to decode cbor value: {err:?}"),
     })
