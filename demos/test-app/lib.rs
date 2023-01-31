@@ -1,4 +1,6 @@
 use crate::AlternativeOriginsMode::{CertifiedContent, Redirect};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api;
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -175,8 +177,8 @@ fn make_asset_certificate_header(
         "IC-Certificate".to_string(),
         format!(
             "certificate=:{}:, tree=:{}:",
-            base64::encode(&certificate),
-            base64::encode(&serializer.into_inner())
+            BASE64.encode(&certificate),
+            BASE64.encode(&serializer.into_inner())
         ),
     )
 }

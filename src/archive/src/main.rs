@@ -63,11 +63,11 @@ mod anchor_index_key_tests;
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
 /// and the managed memory for the archived data & indices.
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
-type StableLog = Log<VirtualMemory<Memory>, VirtualMemory<Memory>>;
+type StableLog = Log<Vec<u8>, VirtualMemory<Memory>, VirtualMemory<Memory>>;
 type ConfigCell = StableCell<ConfigState, Memory>;
 /// Type of the index to efficiently retrieve entries by anchor.
 type LogIndex = u64;
-type AnchorIndex = StableBTreeMap<VirtualMemory<Memory>, AnchorIndexKey, ()>;
+type AnchorIndex = StableBTreeMap<AnchorIndexKey, (), VirtualMemory<Memory>>;
 
 const GIB: u64 = 1 << 30;
 const WASM_PAGE_SIZE: u64 = 65536;
@@ -85,7 +85,8 @@ thread_local! {
     static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), ConfigState::Uninitialized).expect("failed to initialize stable cell"));
 
     /// Static memory manager to manage the memory available for blocks.
-    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init(managed_memory()));
+    /// To avoid a bug in the stable structures crate, we fix the bucket size to the previous default value (the new default would not have had an effect for the already deployed archive anyway).
+    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init_with_bucket_size(managed_memory(), 1024));
 
     /// Append-only list of candid encoded entries stored in stable memory.
     static LOG: RefCell<StableLog> = with_memory_manager(|memory_manager| {
@@ -184,7 +185,7 @@ impl Storable for ConfigState {
         }
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         if bytes.is_empty() {
             return ConfigState::Uninitialized;
         }
@@ -196,23 +197,12 @@ impl Storable for ConfigState {
 
 /// Index key for the anchor index.
 /// Changing the (serialized) size of this value requires a stable memory migration.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 struct AnchorIndexKey {
+    // Attention: order of fields MUST NOT be changed because Ord is derived!
     anchor: AnchorNumber,
     timestamp: Timestamp,
     log_index: LogIndex,
-}
-
-impl AnchorIndexKey {
-    /// Returns bytes corresponding only to the timestamp and log_index component of the anchor index key.
-    /// This is useful as an offset when doing a range scan with the anchor component.
-    fn to_anchor_offset(&self) -> Vec<u8> {
-        let mut buf =
-            Vec::with_capacity(std::mem::size_of::<Timestamp>() + std::mem::size_of::<LogIndex>());
-        buf.extend(self.timestamp.to_be_bytes());
-        buf.extend(self.log_index.to_be_bytes());
-        buf
-    }
 }
 
 /// Storable implementation for the index key.
@@ -227,7 +217,7 @@ impl Storable for AnchorIndexKey {
         Cow::Owned(buf)
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         AnchorIndexKey {
             anchor: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[0..8]).expect("failed to read anchor"),
@@ -243,9 +233,8 @@ impl Storable for AnchorIndexKey {
 }
 
 impl BoundedStorable for AnchorIndexKey {
-    fn max_size() -> u32 {
-        std::mem::size_of::<AnchorIndexKey>() as u32
-    }
+    const MAX_SIZE: u32 = std::mem::size_of::<AnchorIndexKey>() as u32;
+    const IS_FIXED_SIZE: bool = true;
 }
 
 /// This method is kept for legacy compatibility and easier testability of the archive.
@@ -363,7 +352,7 @@ async fn fetch_entries() {
 
 fn write_entry_internal(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
     let idx = with_log(|log| {
-        log.append(entry.as_ref())
+        log.append(&entry.into_vec())
             .expect("failed to append log entry")
     });
 
@@ -371,12 +360,10 @@ fn write_entry_internal(anchor: AnchorNumber, timestamp: Timestamp, entry: ByteB
         let key = AnchorIndexKey {
             anchor,
             timestamp,
-            log_index: idx as u64,
+            log_index: idx,
         };
 
-        // the only way this expect can trigger is when the key size is wrong.
-        // On other failures (e.g. no more stable memory available) the underlying StableBTreeMap will panic directly.
-        index.insert(key, ()).expect("bug: key size mismatch");
+        index.insert(key, ());
     })
 }
 
@@ -398,12 +385,12 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
     with_log(|log| {
         let length = log.len();
         let start_idx = match index {
-            None => length.saturating_sub(limit),
-            Some(idx) => idx as usize,
+            None => length.saturating_sub(limit as u64),
+            Some(idx) => idx,
         };
 
         let mut entries = Vec::with_capacity(limit);
-        for idx in start_idx..start_idx + limit {
+        for idx in start_idx..start_idx + limit as u64 {
             let entry = match log.get(idx) {
                 None => break,
                 Some(entry) => entry,
@@ -427,14 +414,6 @@ fn get_anchor_entries(
     with_anchor_index_mut(|index| {
         // Here we take advantage of the range scan and how the index keys are structured.
         // The index key is a concatenation of (anchor, timestamp, idx), ordered lexicographically.
-        // Note that the byte order is very important here: big endian is used so that the most
-        // significant bytes are compared first.
-        //
-        // Example:
-        // Anchor 10042 at time 123456, at index 1: 100421234561
-        //                       anchor (bytes 0-7) |   |
-        //                       timestamp (bytes 8-15) |     |
-        //                                index (bytes 16-23) ||
         //
         // When scanning through index entries, the log index can be recovered by deserializing the
         // key using the structure above.
@@ -448,30 +427,41 @@ fn get_anchor_entries(
         // - (anchor, 0, 0): given no cursor
         // - (anchor, timestamp, 0): given a Timestamp cursor
         // - (anchor, timestamp, idx): given a NextToken cursor
-        let prefix = anchor.to_be_bytes().to_vec();
-        let iterator = match cursor {
-            None => index.range(prefix, None),
+        let start_key = match cursor {
+            None => AnchorIndexKey {
+                anchor,
+                timestamp: 0,
+                log_index: 0,
+            },
             Some(Cursor::NextToken { next_token }) => {
-                let index_key = AnchorIndexKey::from_bytes(next_token.into_vec());
+                let index_key = AnchorIndexKey::from_bytes(Cow::from(next_token.into_vec()));
                 assert_eq!(
                     anchor, index_key.anchor,
                     "anchor does not match the next_token"
                 );
-                index.range(prefix, Some(index_key.to_anchor_offset()))
+                index_key
             }
-            Some(Cursor::Timestamp { timestamp }) => {
-                index.range(prefix, Some(timestamp.to_be_bytes().to_vec()))
-            }
+            Some(Cursor::Timestamp { timestamp }) => AnchorIndexKey {
+                anchor,
+                timestamp,
+                log_index: 0,
+            },
         };
-
+        // End of the range (exclusive) of applicable entries
+        let end_key = AnchorIndexKey {
+            anchor: anchor + 1,
+            timestamp: 0,
+            log_index: 0,
+        };
         with_log(|log| {
             // Take one too many from the iterator to extract the cursor. This avoids having to
             // iterate twice or use next explicitly.
-            let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = iterator
+            let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = index
+                .range(start_key..end_key)
                 .take(limit + 1)
                 .map(|(anchor_key, _)| {
                     let entry = log
-                        .get(anchor_key.log_index as usize)
+                        .get(anchor_key.log_index)
                         .expect("bug: index to non-existing entry");
                     (anchor_key, entry)
                 })
