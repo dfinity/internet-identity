@@ -163,6 +163,14 @@ const devicesSection = (
             </span>
           </span>
         </div>
+        ${
+          isWarning === true
+            ? html`<p class="warning-message t-paragraph t-lead">
+                We recommend that you have at least two devices (for example,
+                your computer and your phone).
+              </p>`
+            : undefined
+        }
 
         <div class="c-action-list">
           <div id="deviceList"></div>
@@ -182,15 +190,6 @@ const devicesSection = (
           </div>
 
         </div>
-        ${
-          isWarning === true
-            ? html`<p class="warning-message t-paragraph t-lead">
-                <strong class="t-strong">Warning!</strong> We recommend that you
-                have at least two devices (for example, your computer and your
-                phone).
-              </p>`
-            : undefined
-        }
       </div>
     </aside>`;
 };
