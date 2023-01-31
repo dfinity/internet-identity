@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2021", "DOM"],
-    "module": "es2020",
+    "module": "esnext",
     "strict": true,
     "target": "es2018",
     "skipLibCheck": true,
