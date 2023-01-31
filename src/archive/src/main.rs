@@ -85,7 +85,8 @@ thread_local! {
     static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), ConfigState::Uninitialized).expect("failed to initialize stable cell"));
 
     /// Static memory manager to manage the memory available for blocks.
-    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init(managed_memory()));
+    /// To avoid a bug in the stable structures crate, we fix the bucket size to the previous default value (the new default would not have had an effect for the already deployed archive anyway).
+    static MEMORY_MANAGER: RefCell<MemoryManager<Memory>> = RefCell::new(MemoryManager::init_with_bucket_size(managed_memory(), 1024));
 
     /// Append-only list of candid encoded entries stored in stable memory.
     static LOG: RefCell<StableLog> = with_memory_manager(|memory_manager| {
@@ -426,7 +427,7 @@ fn get_anchor_entries(
         // - (anchor, 0, 0): given no cursor
         // - (anchor, timestamp, 0): given a Timestamp cursor
         // - (anchor, timestamp, idx): given a NextToken cursor
-        let key = match cursor {
+        let start_key = match cursor {
             None => AnchorIndexKey {
                 anchor,
                 timestamp: 0,
@@ -446,11 +447,17 @@ fn get_anchor_entries(
                 log_index: 0,
             },
         };
+        // End of the range (exclusive) of applicable entries
+        let end_key = AnchorIndexKey {
+            anchor: anchor + 1,
+            timestamp: 0,
+            log_index: 0,
+        };
         with_log(|log| {
             // Take one too many from the iterator to extract the cursor. This avoids having to
             // iterate twice or use next explicitly.
             let mut entries: Vec<(AnchorIndexKey, Vec<u8>)> = index
-                .range(key..)
+                .range(start_key..end_key)
                 .take(limit + 1)
                 .map(|(anchor_key, _)| {
                     let entry = log
