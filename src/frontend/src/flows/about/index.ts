@@ -6,30 +6,32 @@ import { mainWindow } from "../../components/mainWindow";
 const aboutContentSlot = html`
   <h1 class="t-title t-title--main">About</h1>
   <div class="l-stack">
-    <h2 class="t-title">Securely connect to dapps on the Internet Computer</h2>
+    <h2 class="t-title">Securely Connect to dapps on the Internet Computer</h2>
     <p class="t-lead">
       Use Internet Identity to manage your accounts on the IC without being
       tracked.
     </p>
   </div>
   <div class="l-stack">
-    <h2 class="t-title"><a href="/">Create an Identity Anchor</a></h2>
+    <h2 class="t-title">Identity Anchors</h2>
     <p class="t-paragraph">
       Your Identity Anchor is a number that connects you to your accounts on
       applications across the Internet Computer. Store your Anchor somewhere
       safe. If you lose it, you lose access to all of the accounts that you
       created with it. Internet Identity keeps your anchor private and does not
-      share it with any applications.
+      share it with any applications.<br /><br />
+      <a href="/">Create an Identity Anchor now!</a>
     </p>
   </div>
   <div class="l-stack">
     <h2 class="t-title">Easy and Secure Login</h2>
     <p class="t-paragraph">
-      Get the privacy of many separate accounts, with the convenience of a
-      single sign-on. Internet Identity generates a new private key for every
-      dapp that you use, and stores the keys on your device. With just your
-      Identity Anchor and device, you can manage hundreds of private keys and
-      accounts.
+      Unlock authentication with your device via FaceID, fingerprint sensor or
+      use a YubiKey. This is as easy as unlocking your phone and does not
+      require managing passwords. At the same time it provides strong security,
+      as the cryptographic key never leaves your device. Remain pseudonymous
+      using the Internet Identity authentication framework, which prevents user
+      tracking across dapps and services.
     </p>
   </div>
   <div class="l-stack">
@@ -52,11 +54,8 @@ const aboutContentSlot = html`
         </p>
       </li>
       <li class="c-list__item">
-        <a
-          href="https://dscvr.ic0.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Discovr</a
+        <a href="https://dscvr.one/" target="_blank" rel="noopener noreferrer"
+          >DSCVR</a
         >
         <p>
           A decentralized social media platform that rewards users for their
