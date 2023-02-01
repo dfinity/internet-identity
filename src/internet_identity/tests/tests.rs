@@ -1349,7 +1349,7 @@ mod device_management_tests {
             device_data_2(),
         )?;
 
-        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
+        let devices = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?.devices;
         assert_eq!(devices, vec![device_data_2()]);
         Ok(())
     }
