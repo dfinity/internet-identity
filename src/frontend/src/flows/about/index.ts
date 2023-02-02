@@ -12,7 +12,9 @@ const aboutContentSlot = (i18n: I18n) => {
   return html`
     <div class="l-stack">
       <h2 class="t-title">${copy.anchors_title}</h2>
-      <p class="t-paragraph">${copy.anchors}<br/><br/><a href="/">${copy.anchors_cta}</a></p>
+      <p class="t-paragraph">
+        ${copy.anchors}<br /><br /><a href="/">${copy.anchors_cta}</a>
+      </p>
     </div>
     <div class="l-stack">
       <h2 class="t-title">${copy.privacy_convenience_title}</h2>
