@@ -187,6 +187,15 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
+    pub asset_requests: Vec<AssetRequestInfo>,
+}
+
+/// Information about how many time each asset has been loaded since the last deployment.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AssetRequestInfo {
+    pub asset: String,
+    pub status_code: u16,
+    pub num_request: u64,
 }
 
 /// Information about the archive.

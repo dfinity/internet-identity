@@ -2736,3 +2736,85 @@ mod remote_device_registration_tests {
         Ok(())
     }
 }
+
+/// Tests to validate that the II stats work correctly.
+#[cfg(test)]
+mod stats_tests {
+    use super::*;
+
+    /// Verifies that asset loads can be reported and that the metrics and stats are updated accordingly.
+    #[test]
+    fn should_show_page_loads_metrics_for_success_status_codes() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        assert!(
+            !get_metrics(&env, canister_id).contains("internet_identity_asset_requests{asset=\"")
+        );
+
+        api::notify_asset_load(&env, canister_id, "/", 200)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_asset_requests{asset=\"/\",status_code=\"200\"}",
+            1f64,
+        );
+        let stats = api::stats(&env, canister_id)?;
+        assert!(stats.asset_requests.contains(&AssetRequestInfo {
+            asset: "/".to_string(),
+            status_code: 200,
+            num_request: 1,
+        }));
+        Ok(())
+    }
+
+    /// Verifies that asset loads for error status codes can be reported (and will show up on the stats endpoint)
+    /// but not on /metrics.
+    #[test]
+    fn should_not_report_error_status_codes_on_metrics_endpoint() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        api::notify_asset_load(&env, canister_id, "/non-existent", 404)?;
+
+        assert!(
+            !get_metrics(&env, canister_id).contains("internet_identity_asset_requests{asset=\"")
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert!(stats.asset_requests.contains(&AssetRequestInfo {
+            asset: "/non-existent".to_string(),
+            status_code: 404,
+            num_request: 1,
+        }));
+        Ok(())
+    }
+
+    /// Verifies that asset loads for success status codes must match an existing asset.
+    #[test]
+    fn should_only_allow_valid_asset_with_success_status_code() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let result = api::notify_asset_load(&env, canister_id, "/non-existent", 200);
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Asset '[/\\-\\w]+' does not exist").unwrap(),
+        );
+    }
+
+    /// Verifies that asset loads for existing assets must match the possible status codes.
+    #[test]
+    fn should_check_status_code_for_existing_asset() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let result = api::notify_asset_load(&env, canister_id, "/", 201);
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("Invalid status code for asset '[/\\-\\w]+'").unwrap(),
+        );
+    }
+}

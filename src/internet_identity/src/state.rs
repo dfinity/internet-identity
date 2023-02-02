@@ -36,12 +36,18 @@ pub enum RegistrationState {
     },
 }
 
-#[derive(Default)]
+pub type AssetPath = String;
+pub type StatusCode = u16;
+
+#[derive(Default, Debug)]
 pub struct UsageMetrics {
     // number of prepare_delegation calls since last upgrade
     pub delegation_counter: u64,
     // number of anchor operations (register, add, remove, update) since last upgrade
     pub anchor_operation_counter: u64,
+    // Map to keep track of asset loads (reported using notify_asset_load).
+    // Maps from (path, status code) -> counter.
+    pub asset_loading_counters: HashMap<(AssetPath, StatusCode), u64>,
 }
 
 // The challenges we store and check against
@@ -271,6 +277,20 @@ pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
 
 pub fn usage_metrics_mut<R>(f: impl FnOnce(&mut UsageMetrics) -> R) -> R {
     STATE.with(|s| f(&mut s.usage_metrics.borrow_mut()))
+}
+
+pub fn asset_request_stats() -> Vec<AssetRequestInfo> {
+    usage_metrics(|metrics| {
+        metrics
+            .asset_loading_counters
+            .iter()
+            .map(|((path, status_code), counter)| AssetRequestInfo {
+                asset: path.clone(),
+                status_code: *status_code,
+                num_request: *counter,
+            })
+            .collect()
+    })
 }
 
 pub fn inflight_challenges<R>(f: impl FnOnce(&HashMap<ChallengeKey, ChallengeInfo>) -> R) -> R {

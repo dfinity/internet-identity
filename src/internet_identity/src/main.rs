@@ -162,6 +162,18 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
+#[update]
+fn notify_asset_load(path: String, status_code: u16) {
+    const PATH_LIMIT: usize = 1024;
+    if path.len() > PATH_LIMIT {
+        trap(&format!(
+            "path is too long: size {}, limit {PATH_LIMIT}",
+            path.len()
+        ))
+    }
+    assets::increase_asset_counter(path, status_code)
+}
+
 #[query]
 fn stats() -> InternetIdentityStats {
     let archive_info = match state::archive_state() {
@@ -183,6 +195,7 @@ fn stats() -> InternetIdentityStats {
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+    let asset_requests = state::asset_request_stats();
 
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -190,6 +203,7 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
+        asset_requests,
     })
 }
 

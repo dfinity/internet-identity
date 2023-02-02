@@ -2,10 +2,12 @@
 //
 // This file describes which assets are used and how (content, content type and content encoding).
 
+use crate::http::FAQ_PATH;
+use crate::state::{usage_metrics_mut, AssetPath, StatusCode, UsageMetrics};
 use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use ic_cdk::api;
+use ic_cdk::{api, trap};
 use lazy_static::lazy_static;
 use sha2::Digest;
 
@@ -87,6 +89,12 @@ pub fn init_assets() {
     });
 }
 
+pub fn trap_if_not_asset(path: &str) {
+    if !get_assets().iter().any(|(name, _, _, _)| *name == path) {
+        trap(&format!("Asset '{path}' does not exist"))
+    }
+}
+
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
 fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
@@ -144,4 +152,58 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             ContentType::OCTETSTREAM,
         ),
     ]
+}
+
+pub fn increase_asset_counter(asset: String, status_code: u16) {
+    const MAX_TRACKED_ASSETS: u8 = 30;
+
+    if (200..400).contains(&status_code) {
+        // prevent clients from recording successful status codes for non-existing assets
+        trap_if_not_asset(&asset);
+
+        // prevent clients from recording impossible status codes for existing assets
+        if asset == FAQ_PATH && status_code != 301 || asset != FAQ_PATH && status_code != 200 {
+            trap(&format!("Invalid status code for asset '{asset}'"));
+        }
+    }
+
+    usage_metrics_mut(|metrics| {
+        match metrics
+            .asset_loading_counters
+            .get_mut(&(asset.clone(), status_code))
+        {
+            None => {
+                if metrics.asset_loading_counters.len() >= MAX_TRACKED_ASSETS as usize {
+                    // This simple logic will cause churn on the least used asset.
+                    // However, given that we have far fewer assets than MAX_TRACKED_ASSETS it most
+                    // likely won't affect interesting data.
+                    drop_lowest_asset_counter(metrics);
+                }
+                metrics
+                    .asset_loading_counters
+                    .insert((asset, status_code), 1);
+            }
+            Some(assets_stats) => {
+                *assets_stats += 1;
+            }
+        };
+    })
+}
+
+fn drop_lowest_asset_counter(metrics: &mut UsageMetrics) {
+    if metrics.asset_loading_counters.is_empty() {
+        return;
+    }
+
+    let mut least_used_asset = None::<(AssetPath, StatusCode)>;
+    let mut lowest_asset_counter: u64 = u64::MAX;
+    for (asset, counter) in metrics.asset_loading_counters.iter() {
+        if *counter < lowest_asset_counter {
+            least_used_asset = Some(asset.clone());
+            lowest_asset_counter = *counter
+        }
+    }
+    if let Some(asset) = least_used_asset {
+        metrics.asset_loading_counters.remove(&asset);
+    }
 }

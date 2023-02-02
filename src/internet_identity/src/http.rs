@@ -26,12 +26,14 @@ impl ContentType {
     }
 }
 
+pub const FAQ_PATH: &str = "/faq";
+
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
-    match parts[0] {
+    let response = match parts[0] {
         // The FAQ used to live in '/faq' but we now use an external website. We redirect in order to not
         // break existing links in the wild.
-        "/faq" => HttpResponse {
+        FAQ_PATH => HttpResponse {
             status_code: 301,
             headers: vec![(
                 "location".to_string(),
@@ -95,7 +97,8 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 },
             })
         }
-    }
+    };
+    response
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
@@ -170,6 +173,22 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_buffered_archive_entries",
             data.entries_buffer.len() as f64,
             "The number of buffered archive entries.",
+        )?;
+    }
+    let mut asset_metrics_builder = w.counter_vec(
+        "internet_identity_asset_requests",
+        "The number of requests for the most requested assets (for status codes >=200 and <400)."
+    ).unwrap();
+    for request_info in state::asset_request_stats()
+        .iter()
+        .filter(|request_info| (200..400).contains(&request_info.status_code))
+    {
+        asset_metrics_builder = asset_metrics_builder.value(
+            &[
+                ("asset", &request_info.asset),
+                ("status_code", &request_info.status_code.to_string()),
+            ],
+            request_info.num_request as f64,
         )?;
     }
     Ok(())

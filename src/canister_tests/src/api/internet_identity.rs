@@ -298,5 +298,14 @@ pub fn acknowledge_entries(
     )
 }
 
+pub fn notify_asset_load(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    path: &str,
+    status_code: u16,
+) -> Result<(), CallError> {
+    call_candid(env, canister_id, "notify_asset_load", (path, status_code))
+}
+
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}

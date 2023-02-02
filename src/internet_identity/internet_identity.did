@@ -140,6 +140,13 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
+    asset_requests: vec AssetRequestInfo;
+};
+
+type AssetRequestInfo = record {
+    asset: text;
+    status_code: nat16;
+    num_request: nat64;
 };
 
 // Configuration parameters related to the archive.
@@ -235,6 +242,9 @@ service : (opt InternetIdentityInit) -> {
     lookup : (UserNumber) -> (vec DeviceData) query;
     get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
     get_principal : (UserNumber, FrontendHostname) -> (principal) query;
+
+    // Notify II backend that an asset has been loaded. Used to collect metrics on front-end usage.
+    notify_asset_load : (path: text, status_code: nat16) -> ();
     stats : () -> (InternetIdentityStats) query;
 
     enter_device_registration_mode : (UserNumber) -> (Timestamp);
