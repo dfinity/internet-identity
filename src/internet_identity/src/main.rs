@@ -99,6 +99,11 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
             .into_devices()
             .into_iter()
             .map(DeviceData::from)
+            .map(|mut d| {
+                // This hides the alias from unauthenticated callers.
+                d.alias = "".to_string();
+                d
+            })
             .collect()
     })
 }

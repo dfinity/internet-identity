@@ -43,7 +43,6 @@ jobs:
           touch dist/index.css
           touch dist/loader.webp
           touch dist/favicon.ico
-          touch dist/ic-badge.svg
 
       - run: rustup component add clippy
       - name: Cargo clippy

@@ -1,11 +1,12 @@
 {
   "en": {
-    "header": "Securely connect to dapps on the Internet Computer",
+    "header": "Securely Connect to dapps on the Internet Computer",
     "use_ii": "Use Internet Identity to manage your accounts on the IC without being tracked.",
-    "create_an_anchor": "Create an Identity Anchor",
-    "your_ii_is": "Your Identity Anchor is a number that connects you to your accounts on applications across the Internet Computer. Store your Anchor somewhere safe. If you lose it, you lose access to all of the accounts that you created with it. Internet Identity keeps your anchor private and does not share it with any applications.",
-    "easy_secure_login": "Easy and Secure Login",
-    "privacy_and_convenience": " Get the privacy of many separate accounts, with the convenience of a single sign-on. Internet Identity generates a new private key for every dapp that you use, and stores the keys on your device. With just your Identity Anchor and device, you can manage hundreds of private keys and accounts.",
+    "anchors_title": "Identity Anchors",
+    "anchors": "Your Identity Anchor is a number that connects you to your accounts on applications across the Internet Computer. Store your Anchor somewhere safe. If you lose it, you lose access to all of the accounts that you created with it. Internet Identity keeps your anchor private and does not share it with any applications.",
+    "anchors_cta": "Create an Identity Anchor now!",
+    "privacy_convenience_title": "Easy and Secure Login",
+    "privacy_convenience": "Unlock authentication with your device via FaceID, fingerprint sensor or use a YubiKey. This is as easy as unlocking your phone and does not require managing passwords. At the same time it provides strong security, as the cryptographic key never leaves your device. Remain pseudonymous using the Internet Identity authentication framework, which prevents user tracking across dapps and services.",
     "explore_dapps": "Explore dapps on the Internet Computer",
     "ic_dapps": "With an Identity Anchor, you can create accounts with dapps on the Internet Computer, like:",
 
@@ -13,8 +14,8 @@
     "distrikt_link": "https://distrikt.app/",
     "distrikt_desc": "A decentralized, professional social media network that empowers users to own and control their identity and data.",
 
-    "discover_name": "Discovr",
-    "discover_link": "https://dscvr.ic0.app/",
+    "discover_name": "DSCVR",
+    "discover_link": "https://dscvr.one",
     "discover_desc": "A decentralized social media platform that rewards users for their contributions.",
 
     "openchat_name": "OpenChat",

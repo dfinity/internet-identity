@@ -8,8 +8,6 @@
       "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
       "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
 
-      "__1": "Currently, dfx tries to shrink already optimized wasm modules. This is why we disable it here.",
-      "shrink": false,
       "__2": "The remote block indicates that this canister is only used locally and should not be deployed on the IC.",
       "remote": {
         "id": {
@@ -33,8 +31,7 @@
       "__4": "(which in this case populates 'dist/', see package.json).",
       "__5": "source must be a directory, otherwise we get a cryptic error.",
       "source": ["dist/"],
-
-      "__6": "NOTE: the 'frontend' value is needed otherwise HTTP calls are not proxied; value can be anything though.",
+      "__6": "NOTE: the 'frontend' signals dfx that it is useful to print out the front-end URL of this canister when deploying. It is not strictly required.",
       "frontend": {}
     }
   },

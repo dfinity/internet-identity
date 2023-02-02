@@ -48,9 +48,10 @@ mod upgrade_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         let retrieved_device_data =
-            api::lookup(&env, canister_id, user_number).expect("lookup failed");
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+                .expect("get_anchor_info failed");
 
-        assert_eq!(retrieved_device_data, vec![device_data_1()]);
+        assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
     }
 
     /// Test to verify that anchors number range cannot be changed on upgrade.
@@ -207,7 +208,7 @@ mod registration_tests {
         let user_number = flows::register_anchor(&env, canister_id);
 
         let devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices, vec![device_data_1()]);
+        assert_eq!(devices, vec![clear_alias(device_data_1())]);
         let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
         assert_eq!(anchor_info.devices, vec![device_data_1()]);
         let principal = api::get_principal(
@@ -398,14 +399,7 @@ mod stable_memory_tests {
     use super::*;
 
     /// Known devices that exist in the genesis memory backups.
-    fn known_devices() -> (
-        DeviceData,
-        DeviceData,
-        DeviceData,
-        DeviceData,
-        DeviceData,
-        DeviceData,
-    ) {
+    fn known_devices() -> [DeviceData; 6] {
         const CREDENTIAL_ID_1: &str = "63b8afb386dd757dfa5ba9550bca66936717766f395bafad9052a384edc446b11228bcb9cb684980bb5a81270b31d4b9561787296d40204d31e96c1b386b4984";
         const PUB_KEY_1: &str = "305e300c060a2b0601040183b8430101034e00a5010203262001215820ee6f212d1b94fcc014f050b087f06ad34157ff53c19981e3976842b1644b0a1c2258200d6bc5ee077bd2300b3c86df87aa5fdf90d256d0131efbe44424330de8b00471";
         const CREDENTIAL_ID_2: &str = "01bf2325d975f7b24c2d4bb6fef94a2e6dbbb35f490689f460a36f0f96717ac5487ad63899efd59fd01ef38aab8a228badaa1b94cd819572695c446e2c379792af7f";
@@ -466,14 +460,21 @@ mod stable_memory_tests {
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
         };
-        (device1, device2, device3, device4, device5, device6)
+        [device1, device2, device3, device4, device5, device6]
     }
 
     /// Tests that some known anchors with their respective devices are available after stable memory restore.
     /// Uses the same data initially created using the genesis layout and then migrated until v6.    
     #[test]
     fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
-        let (device1, device2, device3, device4, device5, device6) = known_devices();
+        // strip away the alias form the known devices, because lookup no longer reveals it
+        let [device1, device2, device3, device4, device5, device6]: [DeviceData; 6] =
+            known_devices()
+                .into_iter()
+                .map(clear_alias)
+                .collect::<Vec<DeviceData>>()
+                .try_into()
+                .unwrap();
 
         let env = env();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
@@ -792,16 +793,29 @@ mod device_management_tests {
             device_data_2(),
         )?;
         let mut devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices.len(), 2);
-        assert!(devices.iter().any(|device| device == &device_data_1()));
-        assert!(devices.iter().any(|device| device == &device_data_2()));
-
         let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
-
         // sort devices to not fail on different orderings
         devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
         anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-        assert_eq!(devices, anchor_info.devices);
+
+        assert_eq!(anchor_info.devices.len(), 2);
+        assert!(anchor_info
+            .devices
+            .iter()
+            .any(|device| device == &device_data_1()));
+        assert!(anchor_info
+            .devices
+            .iter()
+            .any(|device| device == &device_data_2()));
+
+        assert_eq!(
+            devices,
+            anchor_info
+                .devices
+                .into_iter()
+                .map(clear_alias)
+                .collect::<Vec<DeviceData>>()
+        );
         Ok(())
     }
 
@@ -898,7 +912,7 @@ mod device_management_tests {
             device_data_2(),
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices.len(), 2);
         assert!(devices.iter().any(|device| device == &device_data_2()));
         Ok(())
@@ -947,7 +961,7 @@ mod device_management_tests {
 
             let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
-            let devices = api::lookup(&env, canister_id, user_number)?;
+            let devices = api::get_anchor_info(&env, canister_id, principal, user_number)?.devices;
             assert_eq!(devices, vec![device.clone()]);
 
             device.alias.push_str("some suffix");
@@ -961,7 +975,7 @@ mod device_management_tests {
                 device.clone(),
             )?;
 
-            let devices = api::lookup(&env, canister_id, user_number)?;
+            let devices = api::get_anchor_info(&env, canister_id, principal, user_number)?.devices;
             assert_eq!(devices, vec![device]);
 
             Ok(())
@@ -979,7 +993,7 @@ mod device_management_tests {
 
             let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
-            let devices = api::lookup(&env, canister_id, user_number)?;
+            let devices = api::get_anchor_info(&env, canister_id, principal, user_number)?.devices;
             assert_eq!(devices, vec![device.clone()]);
 
             device.alias.push_str("some suffix");
@@ -993,7 +1007,7 @@ mod device_management_tests {
                 device.clone(),
             )?;
 
-            let devices = api::lookup(&env, canister_id, user_number)?;
+            let devices = api::get_anchor_info(&env, canister_id, principal, user_number)?.devices;
             assert_eq!(devices, vec![device]);
 
             Ok(())
@@ -1134,7 +1148,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         api::remove(
@@ -1145,7 +1159,7 @@ mod device_management_tests {
             device_data_2().pubkey,
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())
@@ -1169,7 +1183,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         api::remove(
@@ -1180,7 +1194,7 @@ mod device_management_tests {
             device_data_2().pubkey,
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())
@@ -1323,7 +1337,7 @@ mod device_management_tests {
         let canister_id = install_ii_canister(&env, II_WASM.clone());
         let user_number = flows::register_anchor(&env, canister_id);
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices, vec![device_data_1()]);
 
         api::replace(
@@ -1335,7 +1349,7 @@ mod device_management_tests {
             device_data_2(),
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?.devices;
         assert_eq!(devices, vec![device_data_2()]);
         Ok(())
     }

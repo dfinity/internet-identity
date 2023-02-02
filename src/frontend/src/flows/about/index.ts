@@ -10,18 +10,13 @@ const aboutContentSlot = (i18n: I18n) => {
   const copy = i18n.i18n(copyJson);
 
   return html`
-    <h1 class="t-title t-title--main">About</h1>
     <div class="l-stack">
-      <h2 class="t-title">${copy.header}</h2>
-      <p class="t-lead">${copy.use_ii}</p>
+      <h2 class="t-title">${copy.anchors_title}</h2>
+      <p class="t-paragraph">${copy.anchors}<br/><br/><a href="/">${copy.anchors_cta}</a></p>
     </div>
     <div class="l-stack">
-      <h2 class="t-title"><a href="/">${copy.create_an_anchor}</a></h2>
-      <p class="t-paragraph">${copy.your_ii_is}</p>
-    </div>
-    <div class="l-stack">
-      <h2 class="t-title">${copy.easy_secure_login}</h2>
-      <p class="t-paragraph">${copy.privacy_and_convenience}</p>
+      <h2 class="t-title">${copy.privacy_convenience_title}</h2>
+      <p class="t-paragraph">${copy.privacy_convenience}</p>
     </div>
     <div class="l-stack">
       <h2 class="t-title">${copy.explore_dapps}</h2>

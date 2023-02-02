@@ -54,7 +54,7 @@ jobs:
             sed -i -e \
               "s/$current_sha/$latest_sha/g" \
               ".ic-commit"
-            
+
             # This updates the download hint when tests are run with a missing binary
             sed -i -e \
                 "s/$current_sha/$latest_sha/g" \
@@ -74,7 +74,7 @@ jobs:
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
-          add-paths: .github/workflows/canister-tests.yml
+          add-paths: ./.ic-commit
           commit-message: Update commit of IC artefacts
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>
