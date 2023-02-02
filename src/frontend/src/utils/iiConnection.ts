@@ -270,40 +270,50 @@ export class Connection {
     authenticatedConnection: AuthenticatedConnection
   ) {
     // Find the device based on the credential_id
-    const device = devices.find((device) => {
-      const credentialId = device.credential_id[0];
-      if (credentialId === undefined) {
-        return false;
-      }
-      return bufferEqual(
-        Buffer.from(credentialId),
-        attachmentInfo.credentialId
-      );
-    });
+    const device = findDeviceByCredentialId(
+      devices,
+      attachmentInfo.credentialId
+    );
 
     // only update devices with key-type unknown
     if (device !== undefined && "unknown" in device.key_type) {
-      switch (attachmentInfo.authenticatorAttachment) {
-        case "cross-platform":
-          device.key_type = { cross_platform: null };
-          break;
-        case "platform":
-          device.key_type = { platform: null };
-          break;
-        default:
-          unreachable(
-            attachmentInfo.authenticatorAttachment,
-            `unexpected authenticator attachment: ${attachmentInfo.authenticatorAttachment}`
-          );
-          break;
-      }
       // we purposely do not await the promise as we just optimistically update
       // if it fails, no harm done
-      authenticatedConnection.update(device).catch((error) => {
-        console.warn(
-          `unable to update device ${JSON.stringify(device)}, error: ${error}`
-        );
-      });
+
+      authenticatedConnection
+        // We need to refetch the device using `getAnchorInfo` because the devices obtained by `lookup` no longer have an alias
+        .getAnchorInfo()
+        .then((info) => info.devices)
+        .then((devices) =>
+          findDeviceByCredentialId(devices, attachmentInfo.credentialId)
+        )
+        .then((device) => {
+          if (device === undefined) {
+            // this can happen if the device has been deleted between authentication and now
+            throw Error("device is undefined");
+          }
+          switch (attachmentInfo.authenticatorAttachment) {
+            case "cross-platform":
+              device.key_type = { cross_platform: null };
+              break;
+            case "platform":
+              device.key_type = { platform: null };
+              break;
+            default:
+              unreachable(
+                attachmentInfo.authenticatorAttachment,
+                `unexpected authenticator attachment: ${attachmentInfo.authenticatorAttachment}`
+              );
+              break;
+          }
+          return device;
+        })
+        .then((device) => authenticatedConnection.update(device))
+        .catch((error) => {
+          console.warn(
+            `unable to update device ${JSON.stringify(device)}, error: ${error}`
+          );
+        });
     }
   }
 
@@ -434,6 +444,7 @@ export class AuthenticatedConnection extends Connection {
   ) {
     super(canisterId);
   }
+
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
     for (const { delegation } of this.delegationIdentity.getDelegation()
       .delegations) {
@@ -611,3 +622,16 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   }
   return true;
 };
+
+function findDeviceByCredentialId(
+  devices: DeviceData[],
+  credentialId: ArrayBuffer
+) {
+  return devices.find((device) => {
+    const id = device.credential_id[0];
+    if (id === undefined) {
+      return false;
+    }
+    return bufferEqual(Buffer.from(id), credentialId);
+  });
+}
