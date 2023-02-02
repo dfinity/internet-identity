@@ -2,7 +2,7 @@
 
 <p align="center">
     <a href="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml/badge.svg" alt="Canister Tests"></a>
-    <a href="https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/cargo-tests.yml/badge.svg" alt="Cargo Tests"></a>
+    <a href="https://github.com/dfinity/internet-identity/actions/workflows/rust.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/rust.yml/badge.svg" alt="Rust"></a>
     <a href="https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/frontend-checks.yml/badge.svg" alt="Frontend checks and lints"></a>
     <a href="https://github.com/dfinity/internet-identity/releases"><img src="https://img.shields.io/github/downloads/dfinity/internet-identity/total?label=downloads&logo=github" alt="GitHub all releases"></a>
 </p>
