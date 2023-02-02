@@ -1,5 +1,7 @@
 {
   "en": {
+    "title": "About",
+
     "header": "Securely Connect to dapps on the Internet Computer",
     "use_ii": "Use Internet Identity to manage your accounts on the IC without being tracked.",
     "anchors_title": "Identity Anchors",
