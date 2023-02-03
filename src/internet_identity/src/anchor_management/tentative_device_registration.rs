@@ -1,6 +1,6 @@
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
-use crate::{add, secs_to_nanos, state, trap_if_not_authenticated};
+use crate::{add, secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
@@ -21,8 +21,6 @@ const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 /// Enables device registration mode for the given anchor and returns the expiration timestamp (when it will be disabled again).
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
-
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
         if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
@@ -47,8 +45,6 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
 }
 
 pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
-
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
         registrations.remove(&anchor_number)
@@ -109,8 +105,6 @@ fn get_verified_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
-
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
 

@@ -2,7 +2,7 @@ use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
-use crate::{delegation, state, trap_if_not_authenticated};
+use crate::{delegation, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
@@ -12,10 +12,7 @@ pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    let anchor = state::anchor(anchor_number);
-    trap_if_not_authenticated(&anchor);
-
-    let devices = anchor
+    let devices = state::anchor(anchor_number)
         .into_devices()
         .into_iter()
         .map(DeviceData::from)
@@ -56,8 +53,6 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 
 pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     let mut anchor = state::anchor(anchor_number);
-    // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&anchor);
 
     let new_device = Device::from(device_data);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
@@ -78,7 +73,6 @@ pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 
 pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     let mut anchor = state::anchor(user_number);
-    trap_if_not_authenticated(&anchor);
 
     let Some(existing_device) = anchor.device(&device_key) else {
         trap("Could not find device to update, check device key")
@@ -109,7 +103,6 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
 
 pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: DeviceData) {
     let mut anchor = state::anchor(anchor_number);
-    trap_if_not_authenticated(&anchor);
 
     anchor.remove_device(&old_device).unwrap_or_else(|err| {
         trap(&format!(
@@ -136,8 +129,6 @@ pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: D
 
 pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     let mut anchor = state::anchor(anchor_number);
-    // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&anchor);
 
     anchor.remove_device(&device_key).unwrap_or_else(|err| {
         trap(&format!(
