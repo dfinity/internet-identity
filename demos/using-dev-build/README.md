@@ -9,7 +9,7 @@ This is a standalone project that you can copy to your own project.
 
 ## Prerequisites
 
-* [dfx](https://internetcomputer.org/docs/current/developer-docs/build/install-upgrade-remove)
+* [dfx](https://internetcomputer.org/docs/current/developer-docs/setup/install/)
 * Node.js v16+
 
 This tutorial assumes that you are already familiar with the [basic concepts of the IC](https://internetcomputer.org/docs/current/developer-docs/ic-overview) (canisters, how to use `dfx`, etc.).
