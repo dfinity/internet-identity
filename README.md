@@ -158,4 +158,4 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 [releases]: https://github.com/dfinity/internet-identity/releases
 [Docker]: https://docker.io
 [links]: #links
-[candid]: https://internetcomputer.org/docs/current/developer-docs/build/languages/candid/candid-concepts/
+[candid]: https://internetcomputer.org/docs/current/developer-docs/backend/candid/candid-concepts/
