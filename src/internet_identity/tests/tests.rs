@@ -56,7 +56,7 @@ mod upgrade_tests {
 
     /// Test to verify that anchor numbers are unchanged by changing the user range.
     #[test]
-    fn should_retain_anchor_on_user_range_change() {
+    fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
@@ -73,10 +73,10 @@ mod upgrade_tests {
         )?;
 
         let retrieved_device_data =
-            api::get_anchor_info(&env, canister_id, principal_1(), user_number)
-                .expect("get_anchor_info failed");
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
 
         assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
+        Ok(())
     }
 
     /// Test to verify that anchors number range can be changed on upgrade.
