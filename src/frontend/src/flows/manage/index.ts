@@ -97,12 +97,17 @@ const numAuthenticators = (devices: DeviceData[]) =>
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-const pageContent = (
-  userNumber: bigint,
-  devices: DeviceData[],
-  onAddDevice: (next: "canceled" | "local" | "remote") => void,
-  onAddRecovery: () => void
-): TemplateResult => {
+const pageContent = ({
+  userNumber,
+  devices,
+  onAddDevice,
+  onAddRecovery,
+}: {
+  userNumber: bigint;
+  devices: DeviceData[];
+  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+  onAddRecovery: () => void;
+}): TemplateResult => {
   const pageContentSlot = html` <section>
     <hgroup>
       <h1 class="t-title t-title--main">Manage your Anchor</h1>
@@ -277,10 +282,10 @@ export const displayManage = (
   devices: DeviceData[]
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  const template = pageContent(
+  const template = pageContent({
     userNumber,
     devices,
-    async (nextAction) => {
+    onAddDevice: async (nextAction) => {
       switch (nextAction) {
         case "canceled": {
           await renderManage(userNumber, connection);
@@ -299,11 +304,11 @@ export const displayManage = (
           break;
       }
     },
-    async () => {
+    onAddRecovery: async () => {
       await setupRecovery(userNumber, connection);
       renderManage(userNumber, connection);
-    }
-  );
+    },
+  });
   render(template, container);
   renderDevices(userNumber, connection, devices);
 };

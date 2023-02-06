@@ -132,14 +132,22 @@ export class AsyncCountdown {
   // XXX: Some assumptions are made in the code that the countdown is never restarted.
   private stopped: boolean;
 
+  // A promise that resolves once the countdown has stopped
+  private promise: Promise<void>;
+  private resolve?: () => void;
+
   // when it should stop (seconds since epoch)
   constructor(private expirationSeconds: number) {
     this.stopped = this.pastExpiration();
+    this.promise = new Promise((resolve) => {
+      this.resolve = resolve;
+    });
   }
 
   // Stop the countdown explicitly
   stop() {
     this.stopped = true;
+    this.resolve?.();
   }
 
   // Number of seconds remaining
@@ -157,6 +165,7 @@ export class AsyncCountdown {
       // NOTE: a '0' _will_ be yielded before the countdown stop.
       yield prettifySeconds(remaining);
       if (remaining <= 0 || this.hasStopped()) {
+        this.stop();
         break;
       }
 
@@ -171,6 +180,10 @@ export class AsyncCountdown {
   // can assume: if stopped, won't restart
   hasStopped(): boolean {
     return this.stopped || this.pastExpiration(); // assupmtion: don't go back in time
+  }
+
+  wait(): Promise<void> {
+    return this.promise;
   }
 
   // Returns true if the time is past the countdown's expiration

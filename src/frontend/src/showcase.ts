@@ -40,7 +40,7 @@ import {
 } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
-import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
@@ -248,13 +248,18 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  verifyDevice: () =>
-    verifyDevice(
-      userNumber,
-      dummyConnection,
-      simpleDevices[0],
-      undefined as unknown as bigint
-    ),
+  verifyTentativeDevice: () =>
+    verifyTentativeDevicePage({
+      alias: simpleDevices[0].alias,
+      cancel: () => console.log("canceled"),
+      verify: () => Promise.resolve({ retry: null }),
+      doContinue: (v) => console.log("continue with:", v),
+      remaining: {
+        async *[Symbol.asyncIterator]() {
+          yield "00:34";
+        },
+      },
+    }),
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
