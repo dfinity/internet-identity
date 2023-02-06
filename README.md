@@ -112,7 +112,7 @@ frontend. -->
 | `II_FETCH_ROOT_KEY` | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |
 | `II_DUMMY_CAPTCHA` | When enabled, the CAPTCHA challenge (sent by the canister code to the frontend code) is always the known string `"a"`. This is useful for automated testing. |
 | `II_DUMMY_AUTH` | When enabled, the frontend code will use a known, stable private key for registering anchors and authenticating. This means that all anchors will have the same public key(s). In particular this bypasses the WebAuthn flows (TouchID, Windows Hello, etc), which simplifies automated testing. |
-| `II_INSECURE_REQUESTS` | When enabled, the 'upgrade-insecure-requests' directive is removed from the content security policy in oder to allow local development with Safari. |
+| `II_INSECURE_REQUESTS` | When enabled, the 'upgrade-insecure-requests' directive is removed from the content security policy in order to allow local development with Safari. |
 
 ### Flavors
 
