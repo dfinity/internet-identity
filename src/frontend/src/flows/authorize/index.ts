@@ -42,7 +42,7 @@ export const authnTemplateAuthorize = ({
     <div class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
-        to continue to
+        ${copy.to_continue_to}
         <a href="${origin}" target="_blank" rel="noopener noreferrer"
           >${origin}</a
         ><br />
@@ -57,10 +57,10 @@ export const authnTemplateAuthorize = ({
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap("Enter an Anchor"),
+      slot: wrap(copy.use_existing_enter_anchor),
     },
     pick: {
-      slot: wrap("Choose an Anchor"),
+      slot: wrap(copy.pick_choose_anchor),
     },
   };
 };
