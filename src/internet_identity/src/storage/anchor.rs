@@ -53,6 +53,18 @@ impl From<Device> for DeviceDataWithoutAlias {
     }
 }
 
+impl From<Anchor> for PublicAnchorInfo {
+    fn from(anchor: Anchor) -> Self {
+        Self {
+            devices: anchor
+                .devices
+                .into_iter()
+                .map(PublicDeviceData::from)
+                .collect(),
+        }
+    }
+}
+
 impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.

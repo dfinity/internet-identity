@@ -11,7 +11,7 @@ use internet_identity_interface::*;
 pub mod registration;
 pub mod tentative_device_registration;
 
-pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
+pub fn get_anchor_info(anchor_number: AnchorNumber) -> AnchorInfo {
     let devices = state::anchor(anchor_number)
         .into_devices()
         .into_iter()
@@ -27,7 +27,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     DeviceTentativelyAdded {
                         tentative_device, ..
                     },
-            }) if *expiration > now => IdentityAnchorInfo {
+            }) if *expiration > now => AnchorInfo {
                 devices,
                 device_registration: Some(DeviceRegistrationInfo {
                     expiration: *expiration,
@@ -35,7 +35,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                 }),
             },
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
-                IdentityAnchorInfo {
+                AnchorInfo {
                     devices,
                     device_registration: Some(DeviceRegistrationInfo {
                         expiration: *expiration,
@@ -43,7 +43,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     }),
                 }
             }
-            None | Some(_) => IdentityAnchorInfo {
+            None | Some(_) => AnchorInfo {
                 devices,
                 device_registration: None,
             },

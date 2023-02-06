@@ -30,6 +30,27 @@ pub struct DeviceData {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct PublicDeviceData {
+    pub pubkey: DeviceKey,
+    pub credential_id: Option<CredentialId>,
+    pub purpose: Purpose,
+    pub key_type: KeyType,
+    pub protection: DeviceProtection,
+}
+
+impl From<DeviceData> for PublicDeviceData {
+    fn from(device_data: DeviceData) -> Self {
+        Self {
+            pubkey: device_data.pubkey,
+            credential_id: device_data.credential_id,
+            purpose: device_data.purpose,
+            key_type: device_data.key_type,
+            protection: device_data.protection,
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Purpose {
     #[serde(rename = "recovery")]
     Recovery,
@@ -135,9 +156,14 @@ pub struct DeviceRegistrationInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct IdentityAnchorInfo {
+pub struct AnchorInfo {
     pub devices: Vec<DeviceData>,
     pub device_registration: Option<DeviceRegistrationInfo>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct PublicAnchorInfo {
+    pub devices: Vec<PublicDeviceData>,
 }
 
 pub type HeaderField = (String, String);

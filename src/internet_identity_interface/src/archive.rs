@@ -1,10 +1,12 @@
 use crate::{
-    AnchorNumber, CredentialId, DeviceData, DeviceKey, DeviceProtection, KeyType, PublicKey,
-    Purpose, Timestamp,
+    AnchorNumber, CredentialId, DeviceProtection, KeyType, PublicDeviceData, PublicKey, Purpose,
+    Timestamp,
 };
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::management_canister::main::CanisterStatusResponse;
 use serde_bytes::ByteBuf;
+
+pub type DeviceDataWithoutAlias = PublicDeviceData;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Operation {
@@ -35,27 +37,6 @@ pub struct Entry {
     pub caller: Principal,
     // global sequence number to detect lost messages (if any)
     pub sequence_number: u64,
-}
-
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub struct DeviceDataWithoutAlias {
-    pub pubkey: DeviceKey,
-    pub credential_id: Option<CredentialId>,
-    pub purpose: Purpose,
-    pub key_type: KeyType,
-    pub protection: DeviceProtection,
-}
-
-impl From<DeviceData> for DeviceDataWithoutAlias {
-    fn from(device_data: DeviceData) -> Self {
-        Self {
-            pubkey: device_data.pubkey,
-            credential_id: device_data.credential_id,
-            purpose: device_data.purpose,
-            key_type: device_data.key_type,
-            protection: device_data.protection,
-        }
-    }
 }
 
 // If present, the attribute has been changed to the value given.

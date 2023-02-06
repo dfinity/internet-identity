@@ -96,8 +96,9 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
-/// Note: Will be changed in the future to be more consistent with get_anchor_info.
+/// Deprecated: Use [get_anchor_info].instead
 #[query]
+#[deprecated(note = "use `get_public_anchor_info` instead")]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
         storage
@@ -115,8 +116,16 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     })
 }
 
+/// Returns _public_ information about the given anchor. Does not require authentication.
+#[query]
+fn get_public_anchor_info(anchor_number: AnchorNumber) -> PublicAnchorInfo {
+    let anchor = state::anchor(anchor_number);
+    PublicAnchorInfo::from(anchor)
+}
+
+/// Returns information about the given anchor. Requires authentication.
 #[update] // this is an update call because queries are not (yet) certified
-fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
+fn get_anchor_info(anchor_number: AnchorNumber) -> AnchorInfo {
     trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::get_anchor_info(anchor_number)
 }

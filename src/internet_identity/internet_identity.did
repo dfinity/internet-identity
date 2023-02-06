@@ -214,9 +214,21 @@ type DeviceRegistrationInfo = record {
     expiration: Timestamp;
 };
 
-type IdentityAnchorInfo = record {
+type AnchorInfo = record {
     devices : vec DeviceData;
     device_registration: opt DeviceRegistrationInfo;
+};
+
+type PublicAnchorInfo = record {
+    devices : vec PublicDeviceData;
+};
+
+type PublicDeviceData = record {
+    pubkey: DeviceKey;
+    credential_id: opt  CredentialId;
+    purpose: Purpose;
+    key_type: KeyType;
+    protection: DeviceProtection;
 };
 
 type DeployArchiveResult = variant {
@@ -248,9 +260,10 @@ service : (opt InternetIdentityInit) -> {
     remove : (UserNumber, DeviceKey) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
-    // Note: Will be changed in the future to be more consistent with get_anchor_info.
+    // Deprecated: Use get_anchor_info instead.
     lookup : (UserNumber) -> (vec DeviceData) query;
-    get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
+    get_public_anchor_info : (UserNumber) -> (PublicAnchorInfo);
+    get_anchor_info : (UserNumber) -> (AnchorInfo);
     get_principal : (UserNumber, FrontendHostname) -> (principal) query;
     stats : () -> (InternetIdentityStats) query;
 

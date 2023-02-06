@@ -184,7 +184,7 @@ pub fn get_anchor_info(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-) -> Result<types::IdentityAnchorInfo, CallError> {
+) -> Result<types::AnchorInfo, CallError> {
     call_candid_as(
         env,
         canister_id,
