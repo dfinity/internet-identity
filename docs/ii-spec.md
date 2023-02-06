@@ -409,13 +409,13 @@ But upon closer inspection (heh), this is not actually useful.
 
 -   Another is to protect against a malicious actor. But that is only useful if the malicious actor doesn't have an equally effective attack vector anyways, and in our case they do: If they want to flood the NNS with calls, they can use calls that do authenticate (e.g. keeping removing and adding devices, or preparing delegations); these calls would pass message inspection.
 
-On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular it increases the risk that some engineer might wrongly assume that the authentication check in `canister_inspect_message` is sufficient and will not do it again in the actual method, which could lead to a serious bug.
+On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular it increases the risk that some engineers might wrongly assume that the authentication check in `canister_inspect_message` is sufficient and will not do it again in the actual method, which could lead to a serious bug.
 
 Therefore the Internet Identity Canister intentionally does not implement `canister_inspect_message`.
 
 ### Internal data model and data structures used
 
-The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage for is limited to 2KiB bytes per user. With the stable memory size of 8GiB we can store around `4 * 10^6` user records in a single canister.
+The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage is limited to 2KiB bytes per user. With the stable memory size of 8GiB we can store around `4 * 10^6` user records in a single canister.
 
 #### Stable memory layout
 
