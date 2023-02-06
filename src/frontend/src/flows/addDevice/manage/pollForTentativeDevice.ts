@@ -2,7 +2,7 @@ import { html, render } from "lit-html";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
-import { verifyDevice } from "./verifyTentativeDevice";
+import { verifyTentativeDevice } from "./verifyTentativeDevice";
 import { setupCountdown } from "../../../utils/countdown";
 import {
   DeviceData,
@@ -72,7 +72,12 @@ export const pollForTentativeDevice = async (
     const tentativeDevice = getTentativeDevice(userInfo);
     if (tentativeDevice) {
       // directly show the verification screen if the tentative device already exists
-      await verifyDevice(userNumber, connection, tentativeDevice, timestamp);
+      await verifyTentativeDevice({
+        connection,
+        alias: tentativeDevice.alias,
+        endTimestamp: timestamp,
+      });
+      await renderManage(userNumber, connection);
     } else {
       renderPollForTentativeDevicePage(userNumber);
       init(userNumber, connection, timestamp);
@@ -125,7 +130,12 @@ const init = (
     async (device) => {
       if (!countdown.hasStopped() && device) {
         countdown.stop();
-        await verifyDevice(userNumber, connection, device, endTimestamp);
+        await verifyTentativeDevice({
+          connection,
+          alias: device.alias,
+          endTimestamp,
+        });
+        await renderManage(userNumber, connection);
       }
     }
   );

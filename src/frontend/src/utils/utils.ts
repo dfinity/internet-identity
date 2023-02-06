@@ -137,6 +137,11 @@ export function unreachable(_: never, reason?: string): never {
   throw new Error(`Unexpected error ${reason ?? ""}`);
 }
 
+/* A version of 'unreachable' that doesn't throw an error but allows execution to continue */
+export function unreachableLax(_: never) {
+  /* */
+}
+
 /* Wrap an unknown value as an error and try to extract a string from it */
 export function wrapError(err: unknown): string {
   const unknownError = "unknown error";
