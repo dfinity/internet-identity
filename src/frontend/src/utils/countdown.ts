@@ -165,7 +165,7 @@ export class AsyncCountdown {
       // NOTE: a '0' _will_ be yielded before the countdown stop.
       yield prettifySeconds(remaining);
       if (remaining <= 0 || this.hasStopped()) {
-        this.resolve?.();
+        this.stop();
         break;
       }
 

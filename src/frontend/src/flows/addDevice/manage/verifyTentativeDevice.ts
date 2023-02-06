@@ -40,8 +40,8 @@ const verifyTentativeDeviceTemplate = ({
   );
 
   // The error shown on bad input (e.g. "")
-  const badInput = new Chan<boolean>(false);
-  const hasError = badInput.map((e) => (e ? "has-error" : ""));
+  const badInput = new Chan<"ok" | "bad">("ok");
+  const hasError = badInput.map((e) => (e === "bad" ? "has-error" : ""));
 
   const pinInput = createRef<HTMLInputElement>();
 
@@ -52,10 +52,10 @@ const verifyTentativeDeviceTemplate = ({
     withRef(pinInput, async (pin) => {
       const value = pin.value;
       if (value === "") {
-        badInput.send(true);
+        badInput.send("bad");
       } else {
         showRetryPrompt.send(false);
-        badInput.send(false);
+        badInput.send("ok");
 
         const result = await verify(value);
         if ("retry" in result) {
