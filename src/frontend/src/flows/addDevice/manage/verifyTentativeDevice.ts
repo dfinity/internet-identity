@@ -1,15 +1,15 @@
 import { html, render } from "lit-html";
-import { unreachableLax, unknownToString } from "../../../utils/utils";
+import { unreachableLax, unknownToString } from "@utils/utils";
 import { createRef, ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { withRef } from "../../../utils/lit-html";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { withRef } from "@utils/lit-html";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { displayError } from "../../../components/displayError";
-import { Chan } from "../../../utils/utils";
-import { AsyncCountdown } from "../../../utils/countdown";
+import { Chan } from "@utils/utils";
+import { AsyncCountdown } from "@utils/countdown";
 import { mainWindow } from "../../../components/mainWindow";
-import { VerifyTentativeDeviceResponse } from "../../../../generated/internet_identity_types";
+import { VerifyTentativeDeviceResponse } from "@generated/internet_identity_types";
 
 // The type that we return, pretty much the result of the canister
 // except that all retries have been exhausted

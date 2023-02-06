@@ -1,5 +1,5 @@
 import { features } from "../features";
-import { wrapError } from "./utils";
+import { wrapError } from "@utils/utils";
 
 export const checkRequiredFeatures = async (
   url: URL

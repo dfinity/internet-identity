@@ -1,14 +1,14 @@
 import { html, render } from "lit-html";
 import { displayError } from "../../../components/displayError";
-import { unreachable } from "../../../utils/utils";
+import { unreachable } from "@utils/utils";
 import {
   apiResultToLoginFlowResult,
   cancel,
   LoginFlowSuccess,
   LoginFlowCanceled,
-} from "../../../utils/flowResult";
-import { DeviceData } from "../../../../generated/internet_identity_types";
-import { Connection } from "../../../utils/iiConnection";
+} from "@utils/flowResult";
+import { DeviceData } from "@generated/internet_identity_types";
+import { Connection } from "@utils/iiConnection";
 import { mainWindow } from "../../../components/mainWindow";
 
 const pageContent = () => {

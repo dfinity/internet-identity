@@ -1,16 +1,16 @@
-import { Challenge } from "../../../generated/internet_identity_types";
+import { Challenge } from "@generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { html, render, TemplateResult } from "lit-html";
-import { withRef, autofocus } from "../../utils/lit-html";
-import { Chan } from "../../utils/utils";
+import { withRef, autofocus } from "@utils/lit-html";
+import { Chan } from "@utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { LoginFlowCanceled, cancel } from "../../utils/flowResult";
+import { LoginFlowCanceled, cancel } from "@utils/flowResult";
 import {
   IdentifiableIdentity,
   Connection,
   RegisterResult,
-} from "../../utils/iiConnection";
+} from "@utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
 
 // A symbol that we can differentiate from generic `T` types

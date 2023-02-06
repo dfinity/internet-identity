@@ -117,6 +117,10 @@ const defaults = {
     fallback: {
       stream: "stream-browserify",
     },
+    alias: {
+      "@generated": path.resolve(__dirname, "src/frontend/generated/"),
+      "@utils": path.resolve(__dirname, "src/frontend/src/utils/"),
+    },
   },
   module: {
     rules: [

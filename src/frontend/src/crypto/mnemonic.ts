@@ -1,6 +1,6 @@
 import { entropyToMnemonic, wordlists, validateMnemonic } from "bip39";
 import { toHexString } from "@dfinity/identity/lib/cjs/buffer";
-import { isUserNumber } from "../utils/userNumber";
+import { isUserNumber } from "@utils/userNumber";
 
 /**
  * @returns A random BIP39 mnemonic with 256 bits of entropy (generates a list of 24 words)

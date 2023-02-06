@@ -8,7 +8,7 @@ import {
   HttpAgent,
   SignIdentity,
 } from "@dfinity/agent";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import { idlFactory as internet_identity_idl } from "@generated/internet_identity_idl";
 import {
   _SERVICE,
   AddTentativeDeviceResponse,
@@ -28,7 +28,7 @@ import {
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
-} from "../../generated/internet_identity_types";
+} from "@generated/internet_identity_types";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -36,7 +36,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { unreachable } from "./utils";
+import { unreachable } from "@utils/utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
@@ -96,7 +96,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type { ChallengeResult } from "@generated/internet_identity_types";
 
 export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;

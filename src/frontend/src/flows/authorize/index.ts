@@ -1,9 +1,9 @@
 import { html, render, TemplateResult } from "lit-html";
-import { withRef } from "../../utils/lit-html";
+import { withRef } from "@utils/lit-html";
 import { caretDownIcon } from "../../components/icons";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
-import { unreachable } from "../../utils/utils";
-import { Connection } from "../../utils/iiConnection";
+import { unreachable } from "@utils/utils";
+import { Connection } from "@utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { spinner } from "../../components/icons";
 import { recoveryWizard } from "../recovery/recoveryWizard";

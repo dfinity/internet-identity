@@ -4,16 +4,16 @@
 import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
-import { I18n } from "./utils/i18n";
-import { withRef, mount } from "./utils/lit-html";
+import { Chan, NonEmptyArray, asNonEmptyArray } from "@utils/utils";
+import { I18n } from "@utils/i18n";
+import { withRef, mount } from "@utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
 import {
   Challenge,
   DeviceData,
   Timestamp,
-} from "../generated/internet_identity_types";
-import { AuthenticatedConnection } from "./utils/iiConnection";
+} from "@generated/internet_identity_types";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { styleguide } from "./styleguide";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";

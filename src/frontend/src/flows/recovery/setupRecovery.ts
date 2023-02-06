@@ -7,8 +7,8 @@ import {
   creationOptions,
   IC_DERIVATION_PATH,
   AuthenticatedConnection,
-} from "../../utils/iiConnection";
-import { unknownToString } from "../../utils/utils";
+} from "@utils/iiConnection";
+import { unknownToString } from "@utils/utils";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 

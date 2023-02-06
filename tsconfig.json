@@ -15,7 +15,12 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["node", "jest", "webdriverio/async"]
+    "types": ["node", "jest", "webdriverio/async"],
+    "baseUrl": "./",
+    "paths": {
+      "@generated/*": ["src/frontend/generated/*"],
+      "@utils/*": ["src/frontend/src/utils/*"]
+    }
   },
   "exclude": [
     "src/**/*.test.ts",

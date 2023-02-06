@@ -1,5 +1,5 @@
 import { render } from "lit-html";
-import { delayMillis } from "./utils";
+import { delayMillis } from "@utils/utils";
 
 /**
  * Countdown implementation which calls the supplied update function approximately every second until the endTimestamp is reached.

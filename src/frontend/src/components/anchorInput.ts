@@ -1,8 +1,8 @@
 import { html, TemplateResult } from "lit-html";
-import { withRef, mount } from "../utils/lit-html";
+import { withRef, mount } from "@utils/lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { parseUserNumber } from "../utils/userNumber";
+import { parseUserNumber } from "@utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({

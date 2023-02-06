@@ -1,13 +1,13 @@
 import { html, render } from "lit-html";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
-import { setupCountdown } from "../../../utils/countdown";
+import { setupCountdown } from "@utils/countdown";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../../../generated/internet_identity_types";
+} from "@generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 

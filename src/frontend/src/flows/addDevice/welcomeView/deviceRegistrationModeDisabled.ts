@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { Connection } from "../../../utils/iiConnection";
+import { Connection } from "@utils/iiConnection";
 import {
   addTentativeDevice,
   TentativeDeviceInfo,

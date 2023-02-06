@@ -1,13 +1,13 @@
 import { TemplateResult, render, html } from "lit-html";
-import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
+import { Connection, AuthenticatedConnection } from "@utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { unreachable } from "../../utils/utils";
+import { unreachable } from "@utils/utils";
 import { logoutSection } from "../../components/logout";
 import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../../generated/internet_identity_types";
+} from "@generated/internet_identity_types";
 import { settingsIcon, warningIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {

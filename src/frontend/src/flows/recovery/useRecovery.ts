@@ -1,5 +1,5 @@
 import { displayError } from "../../components/displayError";
-import { Connection } from "../../utils/iiConnection";
+import { Connection } from "@utils/iiConnection";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../../components/promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";

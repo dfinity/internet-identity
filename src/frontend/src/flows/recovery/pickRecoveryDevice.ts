@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { DeviceData } from "@generated/internet_identity_types";
 import { mainWindow } from "../../components/mainWindow";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 

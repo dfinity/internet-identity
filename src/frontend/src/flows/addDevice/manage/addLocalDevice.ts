@@ -1,8 +1,5 @@
-import {
-  creationOptions,
-  AuthenticatedConnection,
-} from "../../../utils/iiConnection";
-import { DeviceData } from "../../../../generated/internet_identity_types";
+import { creationOptions, AuthenticatedConnection } from "@utils/iiConnection";
+import { DeviceData } from "@generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { pickDeviceAlias } from "./addDevicePickAlias";
 import { withLoader } from "../../../components/loader";

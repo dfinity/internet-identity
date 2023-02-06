@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { withRef } from "../../utils/lit-html";
+import { withRef } from "@utils/lit-html";
 import { warnBox } from "../../components/warnBox";
 import { mainWindow } from "../../components/mainWindow";
 import { checkmarkIcon, copyIcon } from "../../components/icons";

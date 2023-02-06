@@ -1,4 +1,4 @@
-import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { AuthContext, Delegation } from "./postMessageInterface";
 import {
   PublicKey,

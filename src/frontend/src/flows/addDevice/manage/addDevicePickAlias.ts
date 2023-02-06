@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { logoutSection } from "../../../components/logout";
-import { validateAlias } from "../../../utils/validateAlias";
+import { validateAlias } from "@utils/validateAlias";
 // Regex Pattern for input: All characters, must be alphabet or number
 // Can have hyphen(s), space(s) or underscore(s) in the middle.
 // Good examples: "2019_macbook", "2019-Macbook", "2019 Macbook"

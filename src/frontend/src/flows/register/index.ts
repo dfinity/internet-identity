@@ -1,12 +1,12 @@
-import { Connection } from "../../utils/iiConnection";
-import { unknownToString } from "../../utils/utils";
-import { setAnchorUsed } from "../../utils/userNumber";
+import { Connection } from "@utils/iiConnection";
+import { unknownToString } from "@utils/utils";
+import { setAnchorUsed } from "@utils/userNumber";
 import { promptCaptcha } from "./captcha";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
   cancel,
-} from "../../utils/flowResult";
+} from "@utils/flowResult";
 import { constructIdentity } from "./construct";
 import { promptDeviceAlias } from "./alias";
 import { displayUserNumber } from "./finish";

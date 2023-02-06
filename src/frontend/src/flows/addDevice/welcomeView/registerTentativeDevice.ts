@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import { creationOptions, Connection } from "../../../utils/iiConnection";
+import { creationOptions, Connection } from "@utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { DerEncodedPublicKey } from "@dfinity/agent";
@@ -9,7 +9,7 @@ import {
 } from "../../../../generated/internet_identity_types";
 import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
-import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { toggleErrorMessage } from "@utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 

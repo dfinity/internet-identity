@@ -1,4 +1,4 @@
-import { hasNumberProperty, unknownToRecord } from "./utils";
+import { hasNumberProperty, unknownToRecord } from "@utils/utils";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
  * at which the anchor is used.

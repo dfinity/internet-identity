@@ -4,7 +4,7 @@ import {
   IdentifiableIdentity,
   DummyIdentity,
   creationOptions,
-} from "../../utils/iiConnection";
+} from "@utils/iiConnection";
 import { nextTick } from "process";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";

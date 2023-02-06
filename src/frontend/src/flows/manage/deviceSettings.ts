@@ -4,11 +4,11 @@ import {
   bufferEqual,
   AuthenticatedConnection,
   Connection,
-} from "../../utils/iiConnection";
+} from "@utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
-import { unreachable } from "../../utils/utils";
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { unreachable } from "@utils/utils";
+import { DeviceData } from "@generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { mainWindow } from "../../components/mainWindow";
 

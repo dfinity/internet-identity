@@ -1,7 +1,7 @@
 /** The copy and internationalization used in Internet Identity, based on
  * the officially supported languages */
 
-import { I18n as BaseI18n } from "./utils/i18n";
+import { I18n as BaseI18n } from "@utils/i18n";
 
 const supportedLanguages = ["en"] as const;
 export type SupportedLanguage = typeof supportedLanguages[number];

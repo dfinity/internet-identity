@@ -1,15 +1,15 @@
 import { html, nothing, render, TemplateResult } from "lit-html";
-import { DeviceData } from "../../../../generated/internet_identity_types";
+import { DeviceData } from "@generated/internet_identity_types";
 import {
   apiResultToLoginFlowResult,
   LoginFlowCanceled,
   cancel,
   LoginFlowSuccess,
-} from "../../../utils/flowResult";
+} from "@utils/flowResult";
 import { dropLeadingUserNumber } from "../../../crypto/mnemonic";
-import { Connection } from "../../../utils/iiConnection";
+import { Connection } from "@utils/iiConnection";
 import { displayError } from "../../../components/displayError";
-import { unreachable } from "../../../utils/utils";
+import { unreachable } from "@utils/utils";
 import {
   Warning,
   RECOVERYPHRASE_WORDCOUNT,

@@ -1,23 +1,23 @@
 import { html, render, TemplateResult } from "lit-html";
 import { promptUserNumber } from "./promptUserNumber";
 import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
-import { NonEmptyArray } from "../utils/utils";
+import { NonEmptyArray } from "@utils/utils";
 import { withLoader } from "./loader";
 import { mkAnchorPicker } from "./anchorPicker";
 import { mkAnchorInput } from "./anchorInput";
-import { getAnchors, setAnchorUsed } from "../utils/userNumber";
-import { unreachable, isNonEmptyArray } from "../utils/utils";
-import { Connection } from "../utils/iiConnection";
+import { getAnchors, setAnchorUsed } from "@utils/userNumber";
+import { unreachable, isNonEmptyArray } from "@utils/utils";
+import { Connection } from "@utils/iiConnection";
 import {
   apiResultToLoginFlowResult,
   LoginFlowResult,
   LoginFlowSuccess,
   LoginFlowError,
   LoginData,
-} from "../utils/flowResult";
+} from "@utils/flowResult";
 import { displayError } from "./displayError";
 import { useRecovery } from "../flows/recovery/useRecovery";
-import { registerIfAllowed } from "../utils/registerAllowedCheck";
+import { registerIfAllowed } from "@utils/registerAllowedCheck";
 import { mainWindow } from "./mainWindow";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below

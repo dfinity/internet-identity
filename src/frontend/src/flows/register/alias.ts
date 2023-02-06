@@ -1,7 +1,7 @@
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { withRef } from "../../utils/lit-html";
+import { withRef } from "@utils/lit-html";
 import { html, render, TemplateResult } from "lit-html";
-import { validateAlias } from "../../utils/validateAlias";
+import { validateAlias } from "@utils/validateAlias";
 import { mainWindow } from "../../components/mainWindow";
 
 /* Everything (template, component, page) related to picking a device alias */

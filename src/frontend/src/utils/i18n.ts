@@ -5,7 +5,7 @@
 
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Chan } from "./utils";
+import { Chan } from "@utils/utils";
 
 // The type of raw copy, i.e. { lang: { some_key_title: "Welcome!" } }
 type StringCopy<Keys extends string, Lang extends string> = {

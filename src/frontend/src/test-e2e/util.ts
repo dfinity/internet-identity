@@ -1,6 +1,6 @@
 import { remote } from "webdriverio";
 import { command } from "webdriver";
-import { wrapError, randomString } from "../utils/utils";
+import { wrapError, randomString } from "@utils/utils";
 import { WebAuthnCredential } from "../../test-setup";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fsasync from "fs/promises";

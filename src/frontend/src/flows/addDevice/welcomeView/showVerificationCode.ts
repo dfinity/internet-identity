@@ -1,13 +1,13 @@
 import { html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Connection } from "../../../utils/iiConnection";
-import { delayMillis } from "../../../utils/utils";
+import { Connection } from "@utils/iiConnection";
+import { delayMillis } from "@utils/utils";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
 } from "../../../../generated/internet_identity_types";
-import { setAnchorUsed } from "../../../utils/userNumber";
-import { AsyncCountdown } from "../../../utils/countdown";
+import { setAnchorUsed } from "@utils/userNumber";
+import { AsyncCountdown } from "@utils/countdown";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 

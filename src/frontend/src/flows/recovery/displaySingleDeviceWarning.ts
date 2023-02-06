@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { setupRecovery } from "./setupRecovery";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
 
 const pageContent = () => {

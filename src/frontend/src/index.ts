@@ -3,12 +3,12 @@ import { authFlowManage } from "./flows/manage";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
-import { intentFromUrl } from "./utils/userIntent";
+import { intentFromUrl } from "@utils/userIntent";
 import { version } from "./version";
-import { checkRequiredFeatures } from "./utils/featureDetection";
+import { checkRequiredFeatures } from "@utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
-import { Connection } from "./utils/iiConnection";
+import { Connection } from "@utils/iiConnection";
 import { anyFeatures, features } from "./features";
 
 /** Reads the canister ID from the <script> tag.

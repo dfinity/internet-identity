@@ -1,8 +1,8 @@
-import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "@utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
 import { displaySafariWarning } from "./displaySafariWarning";
-import { iOSOrSafari } from "../../utils/utils";
+import { iOSOrSafari } from "@utils/utils";
 
 export const recoveryWizard = async (
   userNumber: bigint,

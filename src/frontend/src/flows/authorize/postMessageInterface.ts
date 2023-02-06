@@ -3,8 +3,8 @@
 import { Principal } from "@dfinity/principal";
 import { fetchDelegation } from "./fetchDelegation";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
-import { unknownToRecord } from "../../utils/utils";
-import { LoginData } from "../../utils/flowResult";
+import { unknownToRecord } from "@utils/utils";
+import { LoginData } from "@utils/flowResult";
 
 export interface Delegation {
   delegation: {
