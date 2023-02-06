@@ -5,6 +5,7 @@ import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
+import { I18n } from "./utils/i18n";
 import { withRef, mount } from "./utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
 import {
@@ -39,7 +40,7 @@ import {
 } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
-import { verifyDevice } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
 import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
@@ -50,6 +51,8 @@ import { registerDisabled } from "./flows/registerDisabled";
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
 const userNumber = BigInt(10000);
+
+const i18n = new I18n("en");
 
 const recoveryPhrase: DeviceData = {
   alias: "Recovery Phrase",
@@ -116,10 +119,12 @@ const authnCnfg = {
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
+  i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  i18n,
 });
 
 const authz = authnPages({ ...authnCnfg, ...authzTemplates });
@@ -243,13 +248,18 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  verifyDevice: () =>
-    verifyDevice(
-      userNumber,
-      dummyConnection,
-      simpleDevices[0],
-      undefined as unknown as bigint
-    ),
+  verifyTentativeDevice: () =>
+    verifyTentativeDevicePage({
+      alias: simpleDevices[0].alias,
+      cancel: () => console.log("canceled"),
+      verify: () => Promise.resolve({ retry: null }),
+      doContinue: (v) => console.log("continue with:", v),
+      remaining: {
+        async *[Symbol.asyncIterator]() {
+          yield "00:34";
+        },
+      },
+    }),
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
@@ -353,6 +363,56 @@ const components = (): TemplateResult => {
     `;
 };
 
+const i18nExample = () => {
+  type Lang = "en" | "fr";
+  const exampleI18n = new I18n<Lang>("en");
+
+  const copy = exampleI18n.i18n({
+    en: {
+      title: "i18n support",
+      paragraph:
+        "This is an example of internationalization support in Internet Identity. Click a button to change the language.",
+    },
+    fr: {
+      title: "support i18n",
+
+      paragraph:
+        "Ceci est un exemple de support multi-language dans Internet Identity. Cliquez un des boutons ci-dessous pour changer la langue.",
+    },
+  });
+
+  const langIs = (lang: Lang) =>
+    asyncReplace(exampleI18n.getLanguageAsync(), (x) => x == lang);
+  const langButton = (lang: Lang) => html`
+    <button
+      ?disabled=${langIs(lang)}
+      class="c-button"
+      @click=${() => exampleI18n.setLanguage(lang)}
+    >
+      ${lang}
+    </button>
+  `;
+
+  return html`
+    <style>
+      .i18n-example {
+        margin: 10rem auto;
+        max-width: 60rem;
+        padding: 0 2rem;
+      }
+    </style>
+    <section class="i18n-example">
+      <article class="l-statck c-card c-card--highlight">
+        <h2 class="t-title t-tile--main">${copy.title}</h2>
+        <p class="t-lead">${copy.paragraph}</p>
+        <div class="c-button-group">
+          ${langButton("en")} ${langButton("fr")}
+        </div>
+      </article>
+    </section>
+  `;
+};
+
 // The showcase
 const pageContent = html`
   <style>
@@ -399,7 +459,7 @@ const pageContent = html`
       font-size: 1.25rem;
     }
   </style>
-  ${showcase} ${components()} ${styleguide}
+  ${showcase} ${i18nExample()} ${components()} ${styleguide}
 `;
 
 const init = async () => {

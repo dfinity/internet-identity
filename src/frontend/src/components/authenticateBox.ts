@@ -25,8 +25,12 @@ import { mainWindow } from "./mainWindow";
 export type AuthnTemplates = {
   firstTime: {
     slot: TemplateResult;
-    useExistingText: string /** text shown on the button leading to "useExisting" */;
-    createAnchorText: string /** text shown on the button leading to anchor creation */;
+    useExistingText:
+      | string
+      | TemplateResult /** text shown on the button leading to "useExisting" */;
+    createAnchorText:
+      | string
+      | TemplateResult /** text shown on the button leading to anchor creation */;
   };
   useExisting: {
     slot: TemplateResult;

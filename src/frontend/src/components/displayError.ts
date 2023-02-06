@@ -3,10 +3,10 @@ import { warnBox } from "./warnBox";
 import { mainWindow } from "./mainWindow";
 
 export type ErrorOptions = {
-  title: string;
+  title: string | TemplateResult;
   message: string | TemplateResult;
-  detail?: string;
-  primaryButton: string;
+  detail?: string | TemplateResult;
+  primaryButton: string | TemplateResult;
 };
 
 const pageContent = (options: ErrorOptions) =>

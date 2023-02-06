@@ -415,7 +415,7 @@ Therefore the Internet Identity Canister intentionally does not implement `canis
 
 ### Internal data model and data structures used
 
-The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage for is limited to 2KiB bytes per user. With the stable memory size of 8GiB we can store around `4 * 10^6` user records in a single canister.
+The primary data structure used by the backend is a map from Identity Anchor to the list of user devices. Device lists are stored directly in canister stable memory. The total amount of storage is limited to 2KiB bytes per user. With the stable memory size of 8GiB we can store around `4 * 10^6` user records in a single canister.
 
 #### Stable memory layout
 

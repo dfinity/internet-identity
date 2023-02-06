@@ -137,6 +137,11 @@ export function unreachable(_: never, reason?: string): never {
   throw new Error(`Unexpected error ${reason ?? ""}`);
 }
 
+/* A version of 'unreachable' that doesn't throw an error but allows execution to continue */
+export function unreachableLax(_: never) {
+  /* */
+}
+
 /* Wrap an unknown value as an error and try to extract a string from it */
 export function wrapError(err: unknown): string {
   const unknownError = "unknown error";
@@ -179,6 +184,13 @@ export class Chan<A> {
   // but instead we simply drop them when they're gone.
   private listeners: WeakRef<Chan<A>>[] = [];
 
+  private latest?: A;
+
+  // Constructor with latest which is "initial" and then latest
+  constructor(initial?: A) {
+    this.latest = initial;
+  }
+
   send(a: A): void {
     if (this.snd !== undefined) {
       this.snd(a);
@@ -201,12 +213,19 @@ export class Chan<A> {
       },
       []
     );
+
+    // and set as latest
+    this.latest = a;
   }
 
   // Receive all values sent to this `Chan`. Note that this effectively
   // consumes the values: if you need to read the value from different
   // places use `.map()` instead.
   async *recv(): AsyncIterable<A> {
+    if (this.latest !== undefined) {
+      yield this.latest;
+    }
+
     // Forever loop, yielding entire buffers and then blocking
     // on `snd` (which prevents hot looping)
     while (true) {
@@ -226,7 +245,7 @@ export class Chan<A> {
   // Return a new generator yielding the values or `.recv()`, mapped
   // with `f`.
   map<B>(f: (a: A) => B): AsyncIterable<B> {
-    const input = new Chan<A>();
+    const input = new Chan<A>(this.latest);
     this.listeners.push(new WeakRef(input));
 
     return {

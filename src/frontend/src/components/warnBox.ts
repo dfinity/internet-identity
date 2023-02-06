@@ -7,7 +7,7 @@ import { warningIcon } from "./icons";
 // By default the component will be an <aside>. The other option is a <div> wrapper.
 
 interface warnBoxProps {
-  title: string;
+  title: string | TemplateResult;
   message: string | TemplateResult;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";

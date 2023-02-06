@@ -1,0 +1,27 @@
+{
+  "en": {
+    "title": "About",
+
+    "header": "Securely Connect to dapps on the Internet Computer",
+    "use_ii": "Use Internet Identity to manage your accounts on the IC without being tracked.",
+    "anchors_title": "Identity Anchors",
+    "anchors": "Your Identity Anchor is a number that connects you to your accounts on applications across the Internet Computer. Store your Anchor somewhere safe. If you lose it, you lose access to all of the accounts that you created with it. Internet Identity keeps your anchor private and does not share it with any applications.",
+    "anchors_cta": "Create an Identity Anchor now!",
+    "privacy_convenience_title": "Easy and Secure Login",
+    "privacy_convenience": "Unlock authentication with your device via FaceID, fingerprint sensor or use a YubiKey. This is as easy as unlocking your phone and does not require managing passwords. At the same time it provides strong security, as the cryptographic key never leaves your device. Remain pseudonymous using the Internet Identity authentication framework, which prevents user tracking across dapps and services.",
+    "explore_dapps": "Explore dapps on the Internet Computer",
+    "ic_dapps": "With an Identity Anchor, you can create accounts with dapps on the Internet Computer, like:",
+
+    "distrikt_name": "Distrikt",
+    "distrikt_link": "https://distrikt.app/",
+    "distrikt_desc": "A decentralized, professional social media network that empowers users to own and control their identity and data.",
+
+    "discover_name": "DSCVR",
+    "discover_link": "https://dscvr.one",
+    "discover_desc": "A decentralized social media platform that rewards users for their contributions.",
+
+    "openchat_name": "OpenChat",
+    "openchat_link": "https://oc.app/",
+    "openchat_desc": " OpenChat is a fully featured chat application running end-to-end on the Internet Computer blockchain."
+  }
+}
