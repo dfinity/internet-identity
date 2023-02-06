@@ -201,7 +201,7 @@ fn acknowledge_entries(sequence_number: u64) {
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
 
-    apply_init_arg(maybe_arg);
+    apply_install_arg(maybe_arg);
 
     // make sure the fully initialized storage configuration is written to stable memory
     state::storage_mut(|storage| storage.flush());
@@ -219,10 +219,10 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
     state::load_persistent_state();
 
-    apply_init_arg(maybe_arg);
+    apply_install_arg(maybe_arg);
 }
 
-fn apply_init_arg(maybe_arg: Option<InternetIdentityInit>) {
+fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
             state::storage_mut(|storage| {

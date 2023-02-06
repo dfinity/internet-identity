@@ -53,6 +53,31 @@ mod upgrade_tests {
         assert_eq!(retrieved_device_data, vec![device_data_1()]);
     }
 
+    /// Test to verify that anchor numbers are unchanged by changing the user range.
+    #[test]
+    fn should_retain_anchor_on_user_range_change() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((10_000, 11_000)),
+                archive_config: None,
+                canister_creation_cycles_cost: None,
+            }),
+        )?;
+
+        let retrieved_device_data =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+                .expect("get_anchor_info failed");
+
+        assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
+    }
+
     /// Test to verify that anchors number range can be changed on upgrade.
     #[test]
     fn should_allow_change_of_user_range_on_upgrade() -> Result<(), CallError> {
