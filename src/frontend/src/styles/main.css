@@ -1330,6 +1330,16 @@ a:hover,
   align-items: center;
 }
 
+.c-action-list__action {
+  cursor: pointer;
+  color: var(--rc-text);
+  transition: 100ms color linear;
+}
+
+.c-action-list__action:hover {
+  color: var(--rc-interaction);
+}
+
 .c-action-list__action svg {
   transition: 200ms opacity linear;
 }
