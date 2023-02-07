@@ -17,13 +17,19 @@ import { mainWindow } from "../../components/mainWindow";
 
 // Actual page content. We display options for protecting recovery phrases or
 // deleting general devices.
-const pageContent = (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData,
-  isOnlyDevice: boolean,
-  back: () => void
-) => {
+const deviceSettingsTemplate = ({
+  protectDevice,
+  deleteDevice,
+  device,
+  isOnlyDevice,
+  back,
+}: {
+  protectDevice: () => void;
+  deleteDevice: () => void;
+  device: DeviceData;
+  isOnlyDevice: boolean;
+  back: () => void;
+}) => {
   const pageContentSlot = html` <article id="deviceSettings">
     <h1 class="t-title">
       ${isRecovery(device) ? "" : "Device"} ${device.alias}
@@ -36,14 +42,7 @@ const pageContent = (
               your recovery phrase to delete it.
             </p>
             <button
-              @click="${() =>
-                protectDevice(
-                  userNumber,
-                  connection,
-                  device,
-                  isOnlyDevice,
-                  back
-                )}"
+              @click="${() => protectDevice()}"
               data-action="protect"
               class="c-button"
             >
@@ -53,8 +52,7 @@ const pageContent = (
         : ""}
       ${!isOnlyDevice
         ? html`<button
-            @click="${() =>
-              deleteDevice(userNumber, connection, device, isOnlyDevice, back)}"
+            @click="${() => deleteDevice()}"
             data-action="remove"
             class="c-button c-button--warning"
           >
@@ -99,6 +97,15 @@ const isProtected = (device: DeviceData): boolean =>
 const isRecovery = (device: DeviceData): boolean =>
   "recovery" in device.purpose;
 
+export const deviceSettingsPage = (
+  props: Parameters<typeof deviceSettingsTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(deviceSettingsTemplate(props), contain);
+};
+
 // Get the list of devices from canister and actually display the page
 export const deviceSettings = async (
   userNumber: bigint,
@@ -106,13 +113,16 @@ export const deviceSettings = async (
   device: DeviceData,
   isOnlyDevice: boolean
 ): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-
   return new Promise((resolve) => {
-    render(
-      pageContent(userNumber, connection, device, isOnlyDevice, resolve),
-      container
-    );
+    deviceSettingsPage({
+      device,
+      isOnlyDevice,
+      back: resolve,
+      protectDevice: () =>
+        protectDevice(userNumber, connection, device, isOnlyDevice, resolve),
+      deleteDevice: () =>
+        deleteDevice(userNumber, connection, device, isOnlyDevice, resolve),
+    });
   });
 };
 
