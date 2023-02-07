@@ -64,17 +64,20 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use crate::state::PersistentState;
-use crate::storage::anchor::Anchor;
-use ic_cdk::api::trap;
-use ic_stable_structures::reader::{BufferedReader, Reader};
-use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::Memory;
-use internet_identity_interface::*;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
+
+use ic_cdk::api::trap;
+use ic_stable_structures::reader::{BufferedReader, Reader};
+use ic_stable_structures::writer::{BufferedWriter, Writer};
+use ic_stable_structures::Memory;
+
+use internet_identity_interface::*;
+
+use crate::state::PersistentState;
+use crate::storage::anchor::Anchor;
 
 pub mod anchor;
 
@@ -340,6 +343,25 @@ impl<M: Memory> Storage<M> {
                  (max {max_entries} entries)"
             ));
         }
+
+        // restrict further if II has users to protect existing anchors
+        if self.header.num_anchors > 0 {
+            if self.header.id_range_lo != lo {
+                trap(&format!(
+                    "set_anchor_number_range: specified range [{lo}, {hi}) does not start from the same number ({}) \
+                     as the existing range thus would make existing anchors invalid"
+                    , {self.header.id_range_lo}));
+            }
+            // Check that all _existing_ anchors fit into the new range. I.e. making the range smaller
+            // is ok as long as the range reduction only affects _unused_ anchor number.
+            if (hi - lo) < self.header.num_anchors as u64 {
+                trap(&format!(
+                    "set_anchor_number_range: specified range [{lo}, {hi}) does not accommodate all {} anchors \
+                     thus would make existing anchors invalid"
+                    , {self.header.num_anchors}));
+            }
+        }
+
         self.header.id_range_lo = lo;
         self.header.id_range_hi = hi;
         self.flush();
