@@ -19,12 +19,14 @@ const pageContent = () => {
     <div class="l-horizontal l-stack">
       <button class="c-button c-button--secondary" id="local">
         <span class="flowIcon">${securityKeyIcon}</span>
-        <div class="t-strong">External Hardware</div>
-        <div class="t-weak">Use a FIDO device or connected phone</div>
+        <div class="t-strong">Hardware</div>
+        <div class="t-weak">
+          Add this device, a FIDO device, or a connected phone.
+        </div>
       </button>
       <button class="c-button c-button--secondary" id="remote">
         <span class="flowIcon">${browserIcon}</span>
-        <div class="t-strong">New Browser</div>
+        <div class="t-strong">Browser</div>
         <div class="t-weak">Add a browser on this device or a new device.</div>
       </button>
     </div>
