@@ -32,7 +32,7 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { deviceSettings } from "./flows/manage/deviceSettings";
+import { deviceSettingsPage } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
   registerTentativeDevice,
@@ -277,7 +277,13 @@ const iiPages: Record<string, () => void> = {
       },
     }),
   deviceSettings: () =>
-    deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
+    deviceSettingsPage({
+      device: simpleDevices[0],
+      isOnlyDevice: false,
+      protectDevice: () => console.log("protect"),
+      deleteDevice: () => console.log("delete"),
+      back: () => console.log("back"),
+    }),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
