@@ -11,7 +11,9 @@ import { mainWindow } from "../../components/mainWindow";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
-const constructingContentSlot = html` <div class="c-spinner">${spinner}</div>
+const constructingContentSlot = html` <div class="c-spinner-wrapper">
+    <div class="c-spinner">${spinner}</div>
+  </div>
   <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
   <p><strong class="t-strong">Do not refresh the page</strong></p>`;
 
