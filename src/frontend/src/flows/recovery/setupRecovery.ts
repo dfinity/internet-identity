@@ -9,15 +9,27 @@ import {
   AuthenticatedConnection,
 } from "../../utils/iiConnection";
 import { unknownToString } from "../../utils/utils";
+import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
-export const setupRecovery = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection
-): Promise<void> => {
+export const setupRecovery = async ({
+  userNumber,
+  connection,
+  title,
+  message,
+  cancelText,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+} & ChooseRecoveryProps): Promise<void> => {
   const devices = await connection.lookupAll(userNumber);
-  const recoveryMechanism = await chooseRecoveryMechanism(devices);
+  const recoveryMechanism = await chooseRecoveryMechanism({
+    devices,
+    title,
+    message,
+    cancelText,
+  });
   if (recoveryMechanism === null) {
     return;
   }
@@ -39,7 +51,13 @@ export const setupRecovery = async (
             detail: unknownToString(err, "Unknown error"),
             primaryButton: "Try a different method",
           });
-          return setupRecovery(userNumber, connection);
+          return setupRecovery({
+            userNumber,
+            connection,
+            title,
+            message,
+            cancelText,
+          });
         }
 
         return await withLoader(() =>
