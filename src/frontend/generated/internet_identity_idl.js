@@ -69,7 +69,7 @@ export const idlFactory = ({ IDL }) => {
     'tentative_device' : IDL.Opt(DeviceData),
     'expiration' : Timestamp,
   });
-  const IdentityAnchorInfo = IDL.Record({
+  const AnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceData),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
@@ -87,6 +87,16 @@ export const idlFactory = ({ IDL }) => {
   const GetDelegationResponse = IDL.Variant({
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
+  });
+  const PublicDeviceData = IDL.Record({
+    'protection' : DeviceProtection,
+    'pubkey' : DeviceKey,
+    'key_type' : KeyType,
+    'purpose' : Purpose,
+    'credential_id' : IDL.Opt(CredentialId),
+  });
+  const PublicAnchorInfo = IDL.Record({
+    'devices' : IDL.Vec(PublicDeviceData),
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -156,7 +166,7 @@ export const idlFactory = ({ IDL }) => {
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
-    'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
+    'get_anchor_info' : IDL.Func([UserNumber], [AnchorInfo], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
@@ -167,6 +177,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
+    'get_public_anchor_info' : IDL.Func([UserNumber], [PublicAnchorInfo], []),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),

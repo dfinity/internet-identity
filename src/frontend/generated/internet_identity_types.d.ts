@@ -9,6 +9,10 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
+export interface AnchorInfo {
+  'devices' : Array<DeviceData>,
+  'device_registration' : [] | [DeviceRegistrationInfo],
+}
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
@@ -72,10 +76,6 @@ export interface HttpResponse {
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
-export interface IdentityAnchorInfo {
-  'devices' : Array<DeviceData>,
-  'device_registration' : [] | [DeviceRegistrationInfo],
-}
 export interface InternetIdentityInit {
   'upgrade_persistent_state' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
@@ -93,6 +93,14 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
+export interface PublicAnchorInfo { 'devices' : Array<PublicDeviceData> }
+export interface PublicDeviceData {
+  'protection' : DeviceProtection,
+  'pubkey' : DeviceKey,
+  'key_type' : KeyType,
+  'purpose' : Purpose,
+  'credential_id' : [] | [CredentialId],
+}
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
@@ -132,7 +140,7 @@ export interface _SERVICE {
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'fetch_entries' : () => Promise<Array<BufferedArchiveEntry>>,
-  'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
+  'get_anchor_info' : (arg_0: UserNumber) => Promise<AnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
@@ -142,6 +150,7 @@ export interface _SERVICE {
   'get_principal' : (arg_0: UserNumber, arg_1: FrontendHostname) => Promise<
       Principal
     >,
+  'get_public_anchor_info' : (arg_0: UserNumber) => Promise<PublicAnchorInfo>,
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
   'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
