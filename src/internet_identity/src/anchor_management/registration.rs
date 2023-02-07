@@ -128,6 +128,8 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
         .apply_filter(Wave::new(2.0, 20.0).horizontal())
         .apply_filter(Wave::new(2.0, 20.0).vertical())
         .view(220, 120);
+        // if you ever change the size of the captcha, make sure to also change the
+        // CSS in the frontend to match the new size (.c-captcha-placeholder)
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
