@@ -6,7 +6,7 @@ import { logoutSection } from "../../components/logout";
 import { deviceSettings } from "./deviceSettings";
 import {
   DeviceData,
-  IdentityAnchorInfo,
+  AnchorInfo,
 } from "../../../generated/internet_identity_types";
 import { settingsIcon, warningIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
@@ -259,7 +259,7 @@ export const renderManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
-  let anchorInfo: IdentityAnchorInfo;
+  let anchorInfo: AnchorInfo;
   try {
     anchorInfo = await withLoader(() => connection.getAnchorInfo());
   } catch (error: unknown) {

@@ -6,7 +6,7 @@ import { verifyTentativeDevice } from "./verifyTentativeDevice";
 import { setupCountdown } from "../../../utils/countdown";
 import {
   DeviceData,
-  IdentityAnchorInfo,
+  AnchorInfo,
 } from "../../../../generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
@@ -150,9 +150,7 @@ const init = (
   };
 };
 
-const getTentativeDevice = (
-  userInfo: IdentityAnchorInfo
-): DeviceData | null => {
+const getTentativeDevice = (userInfo: AnchorInfo): DeviceData | null => {
   if (
     userInfo.device_registration.length === 1 &&
     userInfo.device_registration[0].tentative_device.length === 1

@@ -19,7 +19,7 @@ import {
   DeviceKey,
   FrontendHostname,
   GetDelegationResponse,
-  IdentityAnchorInfo,
+  AnchorInfo,
   KeyType,
   PublicKey,
   Purpose,
@@ -464,7 +464,7 @@ export class AuthenticatedConnection extends Connection {
     return this.actor;
   }
 
-  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
+  getAnchorInfo = async (): Promise<AnchorInfo> => {
     const actor = await this.getActor();
     return await actor.get_anchor_info(this.userNumber);
   };
