@@ -1,5 +1,4 @@
 import { html, render } from "lit-html";
-import { setupRecovery } from "./setupRecovery";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
 
@@ -34,16 +33,24 @@ const pageContent = () => {
 
 export const displaySingleDeviceWarning = async (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
+  setupRecovery: (
+    userNumber: bigint,
+    connection: AuthenticatedConnection
+  ) => Promise<void>
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
-  return init(userNumber, connection);
+  return init(userNumber, connection, setupRecovery);
 };
 
 const init = (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
+  setupRecovery: (
+    userNumber: bigint,
+    connection: AuthenticatedConnection
+  ) => Promise<void>
 ): Promise<void> =>
   new Promise((resolve) => {
     const displayWarningAddRecovery = document.getElementById(

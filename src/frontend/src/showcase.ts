@@ -28,7 +28,7 @@ import { promptDeviceAliasPage } from "./flows/register/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
 import { displayUserNumberPage } from "./flows/register/finish";
-import { chooseRecoveryMechanism } from "./flows/recovery/chooseRecoveryMechanism";
+import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
@@ -215,9 +215,25 @@ const iiPages: Record<string, () => void> = {
         }),
       onContinue: () => console.log("Done"),
     }),
-  chooseRecoveryMechanism: () => chooseRecoveryMechanism([]),
+  chooseRecoveryMechanism: () =>
+    chooseRecoveryMechanismPage({
+      disablePhrase: true,
+      disableKey: false,
+      pick: (recovery) => console.log("picked:", recovery),
+      cancel: () => console.log("canceled"),
+      title: html`Choose a Recovery Method`,
+      message: html`We recommend that you create at least one recovery method in
+      case you lose access to your devices.`,
+      cancelText: html`Skip, I understand the risks`,
+    }),
   displaySingleDeviceWarning: () =>
-    displaySingleDeviceWarning(userNumber, dummyConnection),
+    displaySingleDeviceWarning(
+      userNumber,
+      dummyConnection,
+      (_anchor, _conn) => {
+        return Promise.resolve();
+      }
+    ),
   displayManage: () =>
     displayManage(userNumber, dummyConnection, [
       ...simpleDevices,
@@ -263,7 +279,10 @@ const iiPages: Record<string, () => void> = {
   deviceSettings: () =>
     deviceSettings(userNumber, dummyConnection, simpleDevices[0], false),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
-  displaySafariWarning: () => displaySafariWarning(userNumber, dummyConnection),
+  displaySafariWarning: () =>
+    displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
+      return Promise.resolve();
+    }),
   displaySeedPhrase: () => displaySeedPhrase(recoveryPhraseText),
   displayError: () =>
     displayError({

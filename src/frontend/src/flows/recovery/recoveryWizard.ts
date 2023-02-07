@@ -3,6 +3,7 @@ import { setupRecovery } from "./setupRecovery";
 import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
 import { displaySafariWarning } from "./displaySafariWarning";
 import { iOSOrSafari } from "../../utils/utils";
+import { html } from "lit-html";
 
 export const recoveryWizard = async (
   userNumber: bigint,
@@ -19,7 +20,7 @@ const recoveryWizardSafari = async (
   // Here, we let the user know about the quirks of Safari. The menu will take
   // them to the device picker, if they choose to.
   if ((await connection.lookupRecovery(userNumber)).length === 0) {
-    await displaySafariWarning(userNumber, connection);
+    await displaySafariWarning(userNumber, connection, setupRecoveryWizard);
   }
 };
 
@@ -32,9 +33,27 @@ const recoveryWizardDefault = async (
   // we display a big warning with full explanation about the risks of having a
   // single authentication device and not having a recovery device.
   if ((await connection.lookupRecovery(userNumber)).length === 0) {
-    await setupRecovery(userNumber, connection);
+    await setupRecoveryWizard(userNumber, connection);
     if ((await connection.lookupRecovery(userNumber)).length === 0) {
-      await displaySingleDeviceWarning(userNumber, connection);
+      await displaySingleDeviceWarning(
+        userNumber,
+        connection,
+        setupRecoveryWizard
+      );
     }
   }
 };
+
+const setupRecoveryWizard = (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+) =>
+  setupRecovery({
+    userNumber,
+    connection,
+    title: html`Choose a Recovery Method`,
+
+    message: html`We recommend that you create at least one recovery method in
+    case you lose access to your devices.`,
+    cancelText: html`Skip, I understand the risks`,
+  });
