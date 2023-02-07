@@ -352,6 +352,8 @@ impl<M: Memory> Storage<M> {
                      as the existing range thus would make existing anchors invalid"
                     , {self.header.id_range_lo}));
             }
+            // Check that all _existing_ anchors fit into the new range. I.e. making the range smaller
+            // is ok as long as the range reduction only affects _unused_ anchor number.
             if (hi - lo) < self.header.num_anchors as u64 {
                 trap(&format!(
                     "set_anchor_number_range: specified range [{lo}, {hi}) does not accommodate all {} anchors \
