@@ -84,7 +84,13 @@ export const promptCaptchaTemplate = <T>({
   const update = (state: State) => {
     switch (state.status) {
       case "requesting":
-        img.send(html`<div class="c-spinner">${spinner}</div> `);
+        img.send(
+          html`
+            <div class="c-captcha-placeholder c-spinner-wrapper">
+              <div class="c-spinner">${spinner}</div>
+            </div>
+          `
+        );
         errorText.send(undefined);
         next.send(undefined);
         nextCaption.send("Generating...");
@@ -92,12 +98,14 @@ export const promptCaptchaTemplate = <T>({
         break;
       case "prompting":
         img.send(
-          html`<img
-            src="data:image/png;base64,${state.challenge.png_base64}"
-            id="captchaImg"
-            class="c-img-block l-stack"
-            alt="captcha image"
-          /> `
+          html`<div class="c-captcha-placeholder">
+            <img
+              src="data:image/png;base64,${state.challenge.png_base64}"
+              id="captchaImg"
+              class="c-img-block"
+              alt="captcha image"
+            />
+          </div>`
         );
         errorText.send(undefined);
         next.send((e) => {

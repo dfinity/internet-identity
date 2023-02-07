@@ -1,22 +1,40 @@
-import { html, render } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 
-const pageContent = (devices: DeviceData[]) => {
+export type RecoveryMechanism = "securityKey" | "seedPhrase";
+
+const chooseRecoveryMechanismTemplate = ({
+  title,
+  message,
+  cancelText,
+
+  disablePhrase,
+  disableKey,
+  pick,
+  cancel,
+}: {
+  title: TemplateResult;
+  message: TemplateResult;
+  cancelText: TemplateResult;
+
+  disablePhrase: boolean;
+  disableKey: boolean;
+  pick: (recovery: "securityKey" | "seedPhrase") => void;
+  cancel: () => void;
+}) => {
   const pageContentSlot = html`
     <article>
       <hgroup>
-        <h1 class="t-title t-title--main">Choose a Recovery Method</h1>
-        <p class="t-lead">
-          We recommend that you create at least one recovery method in case you
-          lose access to your devices.
-        </p>
+        <h1 class="t-title t-title--main">${title}</h1>
+        <p class="t-lead">${message}</p>
       </hgroup>
       <div class="l-horizontal l-stack">
         <button
-          ?disabled=${hasRecoveryPhrase(devices)}
+          ?disabled=${disablePhrase}
           class="c-button c-button--secondary"
+          @click=${() => pick("seedPhrase")}
           id="seedPhrase"
         >
           <span aria-hidden="true">${seedPhraseIcon}</span>
@@ -24,8 +42,9 @@ const pageContent = (devices: DeviceData[]) => {
           <div class="t-weak">Use secret phrase</div>
         </button>
         <button
-          ?disabled=${hasRecoveryKey(devices)}
+          ?disabled=${disableKey}
           class="c-button c-button--secondary"
+          @click=${() => pick("securityKey")}
           id="securityKey"
         >
           <span aria-hidden="true">${securityKeyIcon}</span>
@@ -34,8 +53,8 @@ const pageContent = (devices: DeviceData[]) => {
         </button>
       </div>
       <div class="l-stack">
-        <button id="skipRecovery" class="c-button">
-          Skip, I understand the risks
+        <button @click=${() => cancel()} id="skipRecovery" class="c-button">
+          ${cancelText}
         </button>
       </div>
     </article>
@@ -48,31 +67,42 @@ const pageContent = (devices: DeviceData[]) => {
   });
 };
 
-export type RecoveryMechanism = "securityKey" | "seedPhrase";
+type TemplateProps = Parameters<typeof chooseRecoveryMechanismTemplate>[0];
+export type ChooseRecoveryProps = Pick<
+  TemplateProps,
+  "title" | "message" | "cancelText"
+>;
 
-export const chooseRecoveryMechanism = async (
-  devices: DeviceData[]
-): Promise<RecoveryMechanism | null> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(devices), container);
-  return init();
+export const chooseRecoveryMechanismPage = (
+  props: TemplateProps,
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(chooseRecoveryMechanismTemplate(props), contain);
 };
 
-const init = (): Promise<RecoveryMechanism | null> =>
-  new Promise((resolve) => {
-    const securityKey = document.getElementById(
-      "securityKey"
-    ) as HTMLButtonElement;
-    const seedPhrase = document.getElementById(
-      "seedPhrase"
-    ) as HTMLButtonElement;
-    const skipRecovery = document.getElementById(
-      "skipRecovery"
-    ) as HTMLButtonElement;
-    securityKey.onclick = () => resolve("securityKey");
-    seedPhrase.onclick = () => resolve("seedPhrase");
-    skipRecovery.onclick = () => resolve(null);
+export const chooseRecoveryMechanism = async ({
+  devices,
+  title,
+  message,
+  cancelText,
+}: {
+  devices: DeviceData[];
+} & ChooseRecoveryProps): Promise<RecoveryMechanism | null> => {
+  return new Promise((resolve) => {
+    return chooseRecoveryMechanismPage({
+      disablePhrase: hasRecoveryPhrase(devices),
+      disableKey: hasRecoveryKey(devices),
+      pick: resolve,
+      cancel: () => resolve(null),
+
+      title,
+      message,
+      cancelText,
+    });
   });
+};
 
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
   devices.some((device) => device.alias === "Recovery phrase");
