@@ -305,7 +305,7 @@ export const displayManage = (
       }
     },
     onAddRecovery: async () => {
-      await setupRecovery(userNumber, connection);
+      await addNewRecovery(userNumber, connection);
       renderManage(userNumber, connection);
     },
   });
@@ -373,3 +373,16 @@ const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
 const unknownError = (): Error => {
   return new Error("Unknown error");
 };
+
+const addNewRecovery = (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+) =>
+  setupRecovery({
+    userNumber,
+    connection,
+    title: html`Add a Recovery Method`,
+    message: html`Use a FIDO device or connected phone to create an additional
+    recovery method.`,
+    cancelText: html`Back`,
+  });
