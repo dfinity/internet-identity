@@ -79,7 +79,9 @@ export const authFlowAuthorize = async (
     render(
       html`
         <div class="l-container c-card c-card--highlight t-centered">
-          <div class="c-spinner">${spinner}</div>
+          <div class="c-spinner-wrapper">
+            <div class="c-spinner">${spinner}</div>
+          </div>
           <p class="t-lead t-paragraph l-stack">${msg}</p>
         </div>
       `,
