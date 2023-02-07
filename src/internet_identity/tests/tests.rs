@@ -54,11 +54,60 @@ mod upgrade_tests {
         assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
     }
 
-    /// Test to verify that anchors number range cannot be changed on upgrade.
+    /// Test to verify that anchor numbers are unchanged by changing the user range.
     #[test]
-    fn ii_upgrade_should_not_allow_change_of_user_ranges() {
+    fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((10_000, 11_000)),
+                archive_config: None,
+                canister_creation_cycles_cost: None,
+            }),
+        )?;
+
+        let retrieved_device_data =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
+
+        assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
+        Ok(())
+    }
+
+    /// Test to verify that anchors number range can be changed on upgrade.
+    #[test]
+    fn should_allow_change_of_user_range_on_upgrade() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((2000, 4000)),
+                archive_config: None,
+                canister_creation_cycles_cost: None,
+            }),
+        )?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(stats.assigned_user_number_range, (2000, 4000));
+        Ok(())
+    }
+
+    /// Test to verify that the user range cannot be changed to modify anchor numbers of existing anchors.
+    #[test]
+    fn should_not_affect_existing_anchors_on_user_range_change() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        flows::register_anchor(&env, canister_id);
 
         let result = upgrade_ii_canister_with_arg(
             &env,
@@ -74,7 +123,61 @@ mod upgrade_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Anchor number range cannot be changed. Current value: \\(\\d+, \\d+\\)")
+            Regex::new("specified range \\[\\d+, \\d+\\) does not start from the same number \\(\\d+\\) as the existing range thus would make existing anchors invalid")
+                .unwrap(),
+        );
+    }
+
+    /// Test to verify that the user range cannot be changed to allow fewer anchors than are already registered.
+    #[test]
+    fn should_not_allow_fewer_users_than_existing_on_user_range_change() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        flows::register_anchor(&env, canister_id);
+
+        let result = upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((10_000, 10_000)),
+                archive_config: None,
+                canister_creation_cycles_cost: None,
+            }),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("specified range \\[\\d+, \\d+\\) does not accommodate all \\d+ anchors thus would make existing anchors invalid")
+                .unwrap(),
+        );
+    }
+
+    /// Test to verify that the user range cannot be changed to exceed the max capacity of the II canister.
+    #[test]
+    fn should_not_allow_user_range_exceeding_capacity() {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        flows::register_anchor(&env, canister_id);
+
+        let result = upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                assigned_user_number_range: Some((10_000, 10_000_000_000_000)),
+                archive_config: None,
+                canister_creation_cycles_cost: None,
+            }),
+        );
+
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("specified range \\[\\d+, \\d+\\) is too large for this canister \\(max \\d+ entries\\)")
                 .unwrap(),
         );
     }

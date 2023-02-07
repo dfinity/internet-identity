@@ -34,11 +34,13 @@ async fn init_salt() {
 
 #[update]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -55,6 +57,7 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
 }
 
@@ -70,21 +73,25 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::add(anchor_number, device_data)
 }
 
 #[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::update(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::replace(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::remove(anchor_number, device_key)
 }
 
@@ -110,12 +117,14 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
-fn get_principal(anchor: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    delegation::get_principal(anchor, frontend)
+fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
+    delegation::get_principal(anchor_number, frontend)
 }
 
 /// This makes this Candid service self-describing, so that for example Candid UI, but also other
@@ -133,6 +142,7 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
 }
 
@@ -143,6 +153,7 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
+    trap_if_not_authenticated(&state::anchor(anchor_number));
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
 }
 
@@ -206,21 +217,7 @@ fn acknowledge_entries(sequence_number: u64) {
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
 
-    if let Some(arg) = maybe_arg {
-        if let Some(range) = arg.assigned_user_number_range {
-            state::storage_mut(|storage| {
-                storage.set_anchor_number_range(range);
-            });
-        }
-        if let Some(new_config) = arg.archive_config {
-            update_archive_config(new_config);
-        }
-        if let Some(cost) = arg.canister_creation_cycles_cost {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.canister_creation_cycles_cost = cost;
-            })
-        }
-    }
+    apply_install_arg(maybe_arg);
 
     // make sure the fully initialized storage configuration is written to stable memory
     state::storage_mut(|storage| storage.flush());
@@ -238,14 +235,15 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
     state::load_persistent_state();
 
+    apply_install_arg(maybe_arg);
+}
+
+fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
-            let current_range = state::storage(|storage| storage.assigned_anchor_number_range());
-            if range != current_range {
-                trap(&format!(
-                    "Anchor number range cannot be changed. Current value: {current_range:?}"
-                ));
-            }
+            state::storage_mut(|storage| {
+                storage.set_anchor_number_range(range);
+            });
         }
         if let Some(new_config) = arg.archive_config {
             update_archive_config(new_config);

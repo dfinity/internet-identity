@@ -1,8 +1,5 @@
 use crate::state::AssetHashes;
-use crate::{
-    hash, secs_to_nanos, state, trap_if_not_authenticated, update_root_hash, LABEL_ASSETS,
-    LABEL_SIG,
-};
+use crate::{hash, secs_to_nanos, state, update_root_hash, LABEL_ASSETS, LABEL_SIG};
 use candid::Principal;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
@@ -37,9 +34,6 @@ pub async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    // must be called before the first await because it requires caller()
-    trap_if_not_authenticated(&state::anchor(anchor_number));
-
     state::ensure_salt_set().await;
     prune_expired_signatures();
     check_frontend_length(&frontend);
@@ -72,7 +66,6 @@ pub fn get_delegation(
     expiration: Timestamp,
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
-    trap_if_not_authenticated(&state::anchor(anchor_number));
 
     state::asset_hashes_and_sigs(|asset_hashes, sigs| {
         match get_signature(
@@ -97,8 +90,6 @@ pub fn get_delegation(
 
 pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
-
-    trap_if_not_authenticated(&state::anchor(anchor_number));
 
     let seed = calculate_seed(anchor_number, &frontend);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
