@@ -15,31 +15,11 @@ import {
   RECOVERYPHRASE_WORDCOUNT,
   getWarnings,
 } from "../../../crypto/mnemonic";
-import { warningIcon } from "../../../components/icons";
 import { mainWindow } from "../../../components/mainWindow";
+import { warnBox } from "../../../components/warnBox";
 
 const pageContent = (userNumber: bigint, message?: string) => {
   const pageContentSlot = html`
-    <style>
-      /* Flash the warnings box if warnings were generated */
-      @keyframes flash-warnings {
-        0% {
-          background-color: unset;
-        }
-        50% {
-          background-color: #ed1e79;
-          border-color: #ed1e79;
-        }
-        100% {
-          background-color: unset;
-        }
-      }
-
-      .is-visible {
-        animation-name: flash-warnings;
-        animation-duration: 600ms;
-      }
-    </style>
     <hgroup>
       <h1 class="t-title t-title--main">Enter recovery phrase</h1>
       <p class="t-lead">
@@ -53,15 +33,17 @@ const pageContent = (userNumber: bigint, message?: string) => {
       class="c-input"
       placeholder="${userNumber + " above squirrel ..."}"
     ></textarea>
-    <details
-      data-id="phrase-warnings"
-      class="c-card c-card--highlight is-hidden"
-    >
-      <summary>
-        <span class="warnings-box-summary">Phrase may not be valid</span>
-      </summary>
-      <div id="warnings"></div>
-    </details>
+    <div data-id="phrase-warnings" class="is-hidden">
+      ${warnBox({
+        title: "Phrase may not be valid",
+        message: html`<ul
+          class="c-list c-list--bulleted l-stack"
+          id="warnings"
+        ></ul>`,
+        htmlElement: "div",
+        additionalClasses: ["l-stack"],
+      })}
+    </div>
     <div class="c-button-group">
       <button id="inputSeedPhraseCancel" class="c-button c-button--secondary">
         Cancel
@@ -106,7 +88,7 @@ const init = (
     // time and the user may have left the page; we may effectively pick up the wrong element.
     const warningsDiv = document.getElementById("warnings") as HTMLDivElement;
     const warningsBox = document.querySelector(
-      "details[data-id=phrase-warnings]"
+      "[data-id=phrase-warnings]"
     ) as HTMLDetailsElement;
 
     // Debounce the warning generation as not to spam the user
@@ -127,9 +109,10 @@ const init = (
 
           // Actually generate the warnings
           for (const warning of warnings) {
-            const div = document.createElement("div");
-            render(mkWarningDiv(warning), div);
-            warningsDiv.appendChild(div);
+            const li = document.createElement("li");
+            li.classList.add("c-list__item");
+            render(html`${warning}`, li);
+            warningsDiv.appendChild(li);
           }
         } else {
           warningsBox.classList.add("is-hidden");
@@ -250,12 +233,3 @@ export const warningMessage = (
     }
   }
 };
-
-const mkWarningDiv = (warningMessage: string | TemplateResult) => html` <div
-  class="c-card c-card--highlight c-card--warning c-card--icon"
->
-  <span class="c-card__icon">${warningIcon}</span>
-  <div class="c-card__content">
-    <p class="t-paragraph">${warningMessage}</p>
-  </div>
-</div>`;
