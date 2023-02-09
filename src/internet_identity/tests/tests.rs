@@ -922,6 +922,33 @@ mod device_management_tests {
         Ok(())
     }
 
+    /// Verifies that the get_public_anchor_info endpoint returns the expected results.
+    #[test]
+    fn should_give_public_anchor_info() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let user_number = flows::register_anchor(&env, canister_id);
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            recovery_device_data_1(),
+        )?;
+
+        let public_info = api::get_public_anchor_info(&env, canister_id, user_number)?;
+        assert_eq!(public_info.devices.len(), 2);
+        assert!(public_info
+            .devices
+            .iter()
+            .any(|device| device == &PublicDeviceData::from(device_data_1())));
+        assert!(public_info
+            .devices
+            .iter()
+            .any(|device| device == &PublicDeviceData::from(recovery_device_data_1())));
+        Ok(())
+    }
+
     /// Verifies that the same device cannot be added twice.
     #[test]
     fn should_not_add_existing_device() -> Result<(), CallError> {

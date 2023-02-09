@@ -179,6 +179,14 @@ pub fn remove(
     )
 }
 
+pub fn get_public_anchor_info(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    anchor_number: types::AnchorNumber,
+) -> Result<types::PublicAnchorInfo, CallError> {
+    call_candid(env, canister_id, "get_public_anchor_info", (anchor_number,)).map(|(x,)| x)
+}
+
 pub fn get_anchor_info(
     env: &StateMachine,
     canister_id: CanisterId,
