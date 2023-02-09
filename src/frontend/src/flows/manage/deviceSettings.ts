@@ -11,6 +11,7 @@ import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { mainWindow } from "../../components/mainWindow";
+import { warnBox } from "../../components/warnBox";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -31,33 +32,45 @@ const deviceSettingsTemplate = ({
   back: () => void;
 }) => {
   const pageContentSlot = html` <article id="deviceSettings">
-    <h1 class="t-title">
-      ${isRecovery(device) ? "" : "Device"} ${device.alias}
-    </h1>
-
-    <div class="l-stack">
+    <div>
       ${shouldOfferToProtect(device)
-        ? html` <p class="t-paragraph">
-              By making your recovery phrase protected, you will need to input
-              your recovery phrase to delete it.
-            </p>
-            <button
-              @click="${() => protectDevice()}"
-              data-action="protect"
-              class="c-button"
-            >
-              Protect
-            </button>
-            <hr />`
+        ? html`
+            <h1 class="t-title">
+              ${isRecovery(device) ? "" : "Device"} ${device.alias} Settings
+            </h1>
+            ${warnBox({
+              title: `Protect ${isRecovery(device) ? "Recovery" : "Device"}`,
+              message:
+                "Protect this phrase by requiring that you enter it before it can be deleted. If you lose a protected phrase, you will not be able to create a new one.",
+              additionalClasses: ["l-stack"],
+              slot: html`<button
+                @click="${() => protectDevice()}"
+                data-action="protect"
+                class="c-button l-stack"
+              >
+                Protect ${isRecovery(device) ? "Recovery" : "Device"}
+              </button>`,
+            })}
+            <hr class="c-hr l-stack" />
+          `
         : ""}
       ${!isOnlyDevice
-        ? html`<button
-            @click="${() => deleteDevice()}"
-            data-action="remove"
-            class="c-button c-button--warning"
-          >
-            Delete ${isRecovery(device) ? "Recovery" : "Device"}
-          </button>`
+        ? html` <h1 class="t-title">
+              Delete ${isRecovery(device) ? "" : "Device"} ${device.alias}
+            </h1>
+            <p class="t-paragraph l-stack">
+              Are you sure you want to delete
+              <strong class="t-strong">${device.alias}</strong>? If you delete
+              this device, you will no longer be able to access your Internet
+              Identity from this device.
+            </p>
+            <button
+              @click="${() => deleteDevice()}"
+              data-action="remove"
+              class="c-button c-button--warning l-stack"
+            >
+              Delete ${isRecovery(device) ? "Recovery" : "Device"}
+            </button>`
         : ""}
       ${!isOnlyDevice && isProtected(device)
         ? html`<p class="t-paragraph">
@@ -73,7 +86,13 @@ const deviceSettingsTemplate = ({
               Without devices your anchor would be inaccessible.
             </p>`
         : ""}
-      <button @click="${back}" data-action="back" class="c-button">Back</button>
+      <button
+        @click="${back}"
+        data-action="back"
+        class="c-button c-button--secondary"
+      >
+        Back
+      </button>
     </div>
   </article>`;
 

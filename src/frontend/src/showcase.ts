@@ -284,6 +284,14 @@ const iiPages: Record<string, () => void> = {
       deleteDevice: () => console.log("delete"),
       back: () => console.log("back"),
     }),
+  recoveryPhraseSettings: () =>
+    deviceSettingsPage({
+      device: recoveryPhrase,
+      isOnlyDevice: false,
+      protectDevice: () => console.log("protect"),
+      deleteDevice: () => console.log("delete"),
+      back: () => console.log("back"),
+    }),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
