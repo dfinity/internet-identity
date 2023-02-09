@@ -456,6 +456,26 @@ pub fn assert_devices_equal(
     assert_eq!(devices, expected_devices, "expected devices to match");
 }
 
+pub fn assert_device_last_used(
+    anchor_info: &IdentityAnchorInfo,
+    device_key: &DeviceKey,
+    expected_timestamp: u64,
+) {
+    let device = anchor_info
+        .devices
+        .iter()
+        .find(|d| d.pubkey == device_key)
+        .unwrap();
+    assert_eq!(device.last_usage_timestamp, Some(expected_timestamp));
+}
+
+pub fn time(env: &StateMachine) -> u64 {
+    env.time()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64
+}
+
 pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation, root_key: &[u8]) {
     // transform delegation into ic typed delegation so that we have access to the signature domain separator
     // (via as_signed_bytes)

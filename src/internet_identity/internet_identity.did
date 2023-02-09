@@ -75,6 +75,16 @@ type DeviceData = record {
     origin: opt text;
 };
 
+type ReadOnlyDeviceData = record {
+    pubkey : DeviceKey;
+    alias : text;
+    credential_id : opt CredentialId;
+    purpose: Purpose;
+    key_type: KeyType;
+    protection: DeviceProtection;
+    last_usage_timestamp: opt Timestamp;
+};
+
 type RegisterResponse = variant {
     // A new user was successfully registered.
     registered: record {
@@ -198,7 +208,7 @@ type DeviceRegistrationInfo = record {
 };
 
 type IdentityAnchorInfo = record {
-    devices : vec DeviceData;
+    devices : vec ReadOnlyDeviceData;
     device_registration: opt DeviceRegistrationInfo;
 };
 

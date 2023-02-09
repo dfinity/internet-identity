@@ -30,6 +30,44 @@ pub struct DeviceData {
     pub origin: Option<String>,
 }
 
+impl From<ReadOnlyDeviceData> for DeviceData {
+    fn from(device: ReadOnlyDeviceData) -> Self {
+        Self {
+            pubkey: device.pubkey,
+            alias: device.alias,
+            credential_id: device.credential_id,
+            purpose: device.purpose,
+            key_type: device.key_type,
+            protection: device.protection,
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub struct ReadOnlyDeviceData {
+    pub pubkey: DeviceKey,
+    pub alias: String,
+    pub credential_id: Option<CredentialId>,
+    pub purpose: Purpose,
+    pub key_type: KeyType,
+    pub protection: DeviceProtection,
+    pub last_usage_timestamp: Option<Timestamp>,
+}
+
+impl From<DeviceData> for ReadOnlyDeviceData {
+    fn from(device: DeviceData) -> Self {
+        Self {
+            pubkey: device.pubkey,
+            alias: device.alias,
+            credential_id: device.credential_id,
+            purpose: device.purpose,
+            key_type: device.key_type,
+            protection: device.protection,
+            last_usage_timestamp: None,
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Purpose {
     #[serde(rename = "recovery")]
@@ -137,8 +175,14 @@ pub struct DeviceRegistrationInfo {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct IdentityAnchorInfo {
-    pub devices: Vec<DeviceData>,
+    pub devices: Vec<ReadOnlyDeviceData>,
     pub device_registration: Option<DeviceRegistrationInfo>,
+}
+
+impl IdentityAnchorInfo {
+    pub fn into_device_data(self) -> Vec<DeviceData> {
+        self.devices.into_iter().map(DeviceData::from).collect()
+    }
 }
 
 pub type HeaderField = (String, String);
