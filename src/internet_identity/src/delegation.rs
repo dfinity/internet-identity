@@ -1,5 +1,5 @@
 use crate::state::AssetHashes;
-use crate::{hash, secs_to_nanos, state, update_root_hash, LABEL_ASSETS, LABEL_SIG};
+use crate::{hash, state, update_root_hash, DAY, LABEL_ASSETS, LABEL_SIG, MINUTE};
 use candid::Principal;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
@@ -10,11 +10,6 @@ use internet_identity_interface::*;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-
-// Some time helpers
-const MINUTE: u64 = secs_to_nanos(60);
-const HOUR: u64 = 60 * MINUTE;
-const DAY: u64 = 24 * HOUR;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)

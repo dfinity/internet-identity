@@ -3090,3 +3090,293 @@ mod remote_device_registration_tests {
         Ok(())
     }
 }
+
+/// Tests related to the daily and monthly active users statistics.
+mod active_anchors_tests {
+    use super::*;
+
+    /// Tests that daily active anchors are counted correctly.
+    #[test]
+    fn should_report_daily_active_anchors() -> Result<(), CallError> {
+        const DAY: u64 = 24 * 60 * 60;
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            2
+        );
+
+        // repeated activity within the 24h collection period should not increase the counter
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            2
+        );
+
+        env.advance_time(Duration::from_secs(DAY));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_daily_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .daily_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+        Ok(())
+    }
+
+    /// Tests that monthly active anchors are counted correctly.
+    #[test]
+    fn should_report_monthly_active_anchors() -> Result<(), CallError> {
+        const MONTH: u64 = 30 * 24 * 60 * 60;
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // repeated activity within the 30 day collection period should not increase the counter
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        env.advance_time(Duration::from_secs(MONTH));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+        Ok(())
+    }
+
+    /// Tests that monthly active anchors are updated every 24h.
+    #[test]
+    fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
+        const DAY: u64 = 24 * 60 * 60;
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // advance by 24h to record in the shifted 30 day period
+        env.advance_time(Duration::from_secs(DAY));
+
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .get(1)
+                .unwrap()
+                .counter,
+            1
+        );
+
+        // advance time to complete the first 30 day collection period
+        env.advance_time(Duration::from_secs(29 * DAY));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // advance by 24h to complete the next 30 day period
+        env.advance_time(Duration::from_secs(DAY));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            1f64,
+        );
+
+        Ok(())
+    }
+
+    /// Tests that active anchor stats are kept across upgrades.
+    #[test]
+    fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+
+        Ok(())
+    }
+}

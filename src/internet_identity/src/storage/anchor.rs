@@ -184,6 +184,17 @@ impl Anchor {
         device.last_usage_timestamp = Some(time);
         Ok(())
     }
+
+    /// Returns the timestamp of the last known activity, if any.
+    pub fn last_activity(&self) -> Option<Timestamp> {
+        let mut timestamps: Vec<Option<Timestamp>> = self
+            .devices
+            .iter()
+            .map(|d| d.last_usage_timestamp)
+            .collect();
+        timestamps.sort_unstable();
+        timestamps.pop().unwrap_or_default()
+    }
 }
 
 /// This is an internal version of `DeviceData` useful to provide a

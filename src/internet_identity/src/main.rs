@@ -11,6 +11,7 @@ use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
 
+mod active_anchor_stats;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -20,9 +21,13 @@ mod http;
 mod state;
 mod storage;
 
+// Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+const MINUTE: u64 = secs_to_nanos(60);
+const HOUR: u64 = 60 * MINUTE;
+const DAY: u64 = 24 * HOUR;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
@@ -34,13 +39,13 @@ async fn init_salt() {
 
 #[update]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -57,7 +62,7 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
 }
 
@@ -73,25 +78,25 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::add(anchor_number, device_data)
 }
 
 #[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::update(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::replace(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::remove(anchor_number, device_key)
 }
 
@@ -117,7 +122,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::get_anchor_info(anchor_number)
 }
 
@@ -142,7 +147,7 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
 }
 
@@ -183,6 +188,8 @@ fn stats() -> InternetIdentityStats {
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+    let active_anchor_stats =
+        state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
 
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -190,6 +197,7 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
+        active_anchor_stats,
     })
 }
 
@@ -287,11 +295,13 @@ fn update_root_hash() {
 }
 
 /// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
-/// reflecting the current usage.
-fn authenticate_and_update_device_usage(anchor_number: AnchorNumber) {
+/// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
+fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
     let anchor = state::anchor(anchor_number);
     let device_key = trap_if_not_authenticated(&anchor);
+    let previous_activity = anchor.last_activity();
     anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
+    active_anchor_stats::update_active_anchors_stats(previous_activity);
 }
 
 /// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.

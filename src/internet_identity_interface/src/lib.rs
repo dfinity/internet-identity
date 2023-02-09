@@ -234,6 +234,7 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
+    pub active_anchor_stats: Option<ActiveAnchorStatistics>,
 }
 
 /// Information about the archive.
@@ -255,6 +256,61 @@ pub struct ArchiveConfig {
     pub polling_interval_ns: u64,
     // Max number of archive entries to be fetched in a single call.
     pub entries_fetch_limit: u16,
+}
+
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+pub struct ActiveAnchorStatistics {
+    // Stats for the last completed collection period for daily and monthly active anchors
+    pub completed: CompletedActiveAnchorStats,
+    // ongoing periods for daily and monthly active anchors
+    pub ongoing: OngoingActiveAnchorStats,
+}
+
+impl ActiveAnchorStatistics {
+    pub fn new(time: Timestamp) -> Self {
+        Self {
+            completed: CompletedActiveAnchorStats {
+                daily_active_anchors: None,
+                monthly_active_anchors: None,
+            },
+            ongoing: OngoingActiveAnchorStats {
+                daily_active_anchors: ActiveAnchorCounter::new(time),
+                monthly_active_anchors: vec![ActiveAnchorCounter::new(time)],
+            },
+        }
+    }
+}
+
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+pub struct CompletedActiveAnchorStats {
+    pub daily_active_anchors: Option<ActiveAnchorCounter>,
+    pub monthly_active_anchors: Option<ActiveAnchorCounter>,
+}
+
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+pub struct OngoingActiveAnchorStats {
+    // Ongoing active anchor counter for
+    pub daily_active_anchors: ActiveAnchorCounter,
+    // Monthly active users are collected using 30 day sliding windows.
+    // This vec contains up to 29 30-day active windows each offset by one day.
+    // The vec is sorted with the first element being the next window to reach the end of the
+    // 30 day collection period.
+    pub monthly_active_anchors: Vec<ActiveAnchorCounter>,
+}
+
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+pub struct ActiveAnchorCounter {
+    pub start_timestamp: Timestamp,
+    pub counter: u64,
+}
+
+impl ActiveAnchorCounter {
+    pub fn new(time: Timestamp) -> Self {
+        Self {
+            start_timestamp: time,
+            counter: 0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

@@ -12,6 +12,7 @@ use internet_identity_interface::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
+use std::time::Duration;
 
 impl ContentType {
     pub fn to_mime_type_string(&self) -> String {
@@ -172,6 +173,39 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "The number of buffered archive entries.",
         )?;
     }
+
+    state::persistent_state(|persistent_state| {
+        let Some(ref stats) = persistent_state.active_anchor_stats else {
+            // skip if not existing
+            return Ok::<(), std::io::Error>(())
+        };
+        if let Some(ref daily_active_anchor_stats) = stats.completed.daily_active_anchors {
+            w.encode_gauge(
+                "internet_identity_daily_active_anchors",
+                daily_active_anchor_stats.counter as f64,
+                "The number of unique active anchors in the last completed 24h collection window.",
+            )?;
+            w.encode_gauge(
+                "internet_identity_daily_active_anchors_start_timestamp_seconds",
+                Duration::from_nanos(daily_active_anchor_stats.start_timestamp).as_secs() as f64,
+                "Timestamp of the last completed 24h collection window for unique active anchors.",
+            )?;
+        }
+
+        if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_active_anchors {
+            w.encode_gauge(
+                "internet_identity_monthly_active_anchors",
+                monthly_active_anchor_stats.counter as f64,
+                "The number of unique active anchors in the last completed 30 day collection window.",
+            )?;
+            w.encode_gauge(
+                "internet_identity_monthly_active_anchors_start_timestamp_seconds",
+                Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
+                "Timestamp of the last completed 30 day collection window for unique active anchors.",
+            )?;
+        }
+        Ok::<(), std::io::Error>(())
+    })?;
     Ok(())
 }
 
