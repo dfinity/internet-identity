@@ -41,9 +41,9 @@ use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
-use ic_cdk::timer::set_timer_interval;
 use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
+use ic_cdk_timers::set_timer_interval;
 use ic_metrics_encoder::MetricsEncoder;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{
