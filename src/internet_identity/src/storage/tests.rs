@@ -5,7 +5,6 @@ use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
-use internet_identity_interface::ArchiveIntegration::Push;
 use internet_identity_interface::{ArchiveConfig, DeviceProtection, KeyType, Purpose};
 use serde_bytes::ByteBuf;
 use std::rc::Rc;
@@ -343,7 +342,6 @@ fn sample_persistent_state() -> PersistentState {
                 entries_buffer_limit: 10_000,
                 polling_interval_ns: 60_000_000_000,
                 entries_fetch_limit: 1_000,
-                archive_integration: Some(Push),
             },
         },
         canister_creation_cycles_cost: 12_346_000_000,
