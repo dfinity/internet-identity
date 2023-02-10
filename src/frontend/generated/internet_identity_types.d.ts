@@ -19,6 +19,11 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
+export interface AssetRequestInfo {
+  'asset' : string,
+  'num_request' : bigint,
+  'status_code' : number,
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Array<number>,
@@ -87,6 +92,7 @@ export interface InternetIdentityStats {
   'assigned_user_number_range' : [bigint, bigint],
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,
+  'asset_requests' : Array<AssetRequestInfo>,
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
@@ -144,6 +150,7 @@ export interface _SERVICE {
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
   'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
+  'notify_asset_load' : (arg_0: string, arg_1: number) => Promise<undefined>,
   'prepare_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,

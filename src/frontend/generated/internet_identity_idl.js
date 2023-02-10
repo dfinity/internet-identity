@@ -127,12 +127,18 @@ export const idlFactory = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'archive_canister' : IDL.Opt(IDL.Principal),
   });
+  const AssetRequestInfo = IDL.Record({
+    'asset' : IDL.Text,
+    'num_request' : IDL.Nat64,
+    'status_code' : IDL.Nat16,
+  });
   const InternetIdentityStats = IDL.Record({
     'storage_layout_version' : IDL.Nat8,
     'users_registered' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
+    'asset_requests' : IDL.Vec(AssetRequestInfo),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -167,6 +173,7 @@ export const idlFactory = ({ IDL }) => {
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'notify_asset_load' : IDL.Func([IDL.Text, IDL.Nat16], [], []),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
