@@ -39,6 +39,7 @@ const pageContent = (userNumber: bigint, message?: string) => {
         message: html`<ul
           class="c-list c-list--bulleted l-stack"
           id="warnings"
+          aria-live="polite"
         ></ul>`,
         htmlElement: "div",
         additionalClasses: ["l-stack"],
