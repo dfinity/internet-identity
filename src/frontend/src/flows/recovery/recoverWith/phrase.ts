@@ -89,7 +89,7 @@ const init = (
     const warningsDiv = document.getElementById("warnings") as HTMLDivElement;
     const warningsBox = document.querySelector(
       "[data-id=phrase-warnings]"
-    ) as HTMLDetailsElement;
+    ) as HTMLDivElement;
 
     // Debounce the warning generation as not to spam the user
     let handle: number;
