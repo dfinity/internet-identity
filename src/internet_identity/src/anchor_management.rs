@@ -1,8 +1,8 @@
 use crate::archive::{archive_operation, device_diff};
+use crate::state;
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
-use crate::{delegation, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
@@ -68,7 +68,6 @@ pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
             device: DeviceDataWithoutAlias::from(new_device),
         },
     );
-    delegation::prune_expired_signatures();
 }
 
 pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
@@ -90,7 +89,6 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
         });
     write_anchor(user_number, anchor);
 
-    delegation::prune_expired_signatures();
     archive_operation(
         user_number,
         caller(),
@@ -124,7 +122,6 @@ pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: D
             new_device: DeviceDataWithoutAlias::from(new_device),
         },
     );
-    delegation::prune_expired_signatures();
 }
 
 pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
@@ -142,7 +139,6 @@ pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
         caller(),
         Operation::RemoveDevice { device: device_key },
     );
-    delegation::prune_expired_signatures();
 }
 
 /// Writes the supplied entries to stable memory and updates the anchor operation metric.
