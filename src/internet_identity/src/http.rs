@@ -1,6 +1,8 @@
 use crate::archive::ArchiveState;
 use crate::assets::ContentType;
 use crate::{assets, state, LABEL_ASSETS, LABEL_SIG};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
@@ -311,8 +313,8 @@ fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
             "IC-Certificate".to_string(),
             format!(
                 "certificate=:{}:, tree=:{}:",
-                base64::encode(&certificate),
-                base64::encode(serializer.into_inner())
+                BASE64.encode(&certificate),
+                BASE64.encode(serializer.into_inner())
             ),
         )
     })
