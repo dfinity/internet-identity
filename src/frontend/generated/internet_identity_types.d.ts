@@ -12,7 +12,6 @@ export type AddTentativeDeviceResponse = {
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
-  'archive_integration' : [] | [{ 'pull' : null } | { 'push' : null }],
   'module_hash' : Array<number>,
   'entries_fetch_limit' : number,
 }
@@ -77,7 +76,6 @@ export interface IdentityAnchorInfo {
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface InternetIdentityInit {
-  'upgrade_persistent_state' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],

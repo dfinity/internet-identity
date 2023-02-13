@@ -2118,7 +2118,7 @@ mod http_tests {
         let canister_id = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
         deploy_archive_via_ii(&env, canister_id);
 
