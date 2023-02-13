@@ -3,6 +3,8 @@
 // This file describes which assets are used and how (content, content type and content encoding).
 
 use crate::{http, state};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use ic_cdk::api;
 use lazy_static::lazy_static;
 use sha2::Digest;
@@ -49,7 +51,7 @@ lazy_static! {
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
     pub static ref JS_SETUP_SCRIPT_SRI_HASH: String = {
         let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT.as_bytes());
-        let hash = base64::encode(hash);
+        let hash = BASE64.encode(hash);
         format!("sha256-{hash}")
     };
 

@@ -26,7 +26,7 @@ captcha = "0.0.9"
 
 # All IC deps
 candid = "0.8"
-ic-cdk = "0.6"
+ic-cdk = "0.7"
 ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
 ic-metrics-encoder = "1"
