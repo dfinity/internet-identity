@@ -19,7 +19,7 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.8"
-ic-cdk = "0.6"
+ic-cdk = "0.7"
 ic-types = { git = "https://github.com/dfinity/ic" }
 ic-sdk-certification = { package="ic-certification", version="0.23" }
 ic-certification = { git = "https://github.com/dfinity/ic" }
