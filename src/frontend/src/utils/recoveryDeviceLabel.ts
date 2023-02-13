@@ -10,5 +10,5 @@ export const recoveryDeviceToLabel = (
   if ("seed_phrase" in device.key_type) {
     return "Recovery phrase";
   }
-  return "Recovery key";
+  return "External Hardware";
 };
