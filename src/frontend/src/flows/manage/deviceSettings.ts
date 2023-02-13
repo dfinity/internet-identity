@@ -11,6 +11,7 @@ import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { mainWindow } from "../../components/mainWindow";
+import { recoveryDeviceToLabel } from "../../utils/recoveryDeviceLabel";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -32,7 +33,9 @@ const deviceSettingsTemplate = ({
 }) => {
   const pageContentSlot = html` <article id="deviceSettings">
     <h1 class="t-title">
-      ${isRecovery(device) ? "" : "Device"} ${device.alias}
+      ${isRecovery(device)
+        ? recoveryDeviceToLabel(device)
+        : `Device ${device.alias}`}
     </h1>
 
     <div class="l-stack">

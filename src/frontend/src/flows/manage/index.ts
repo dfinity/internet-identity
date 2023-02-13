@@ -21,6 +21,7 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
 import { mainWindow } from "../../components/mainWindow";
+import { recoveryDeviceToLabel } from "../../utils/recoveryDeviceLabel";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -228,17 +229,21 @@ const recoverySection = (
   `;
 };
 
-const deviceListItem = (device: DeviceData) => html`
-  <div class="c-action-list__label">${device.alias}</div>
-  <button
-    type="button"
-    aria-label="settings"
-    data-action="settings"
-    class="c-action-list__action"
-  >
-    ${settingsIcon}
-  </button>
-`;
+const deviceListItem = (device: DeviceData) => {
+  const label =
+    "recovery" in device.purpose ? recoveryDeviceToLabel(device) : device.alias;
+  return html`
+    <div class="c-action-list__label">${label}</div>
+    <button
+      type="button"
+      aria-label="settings"
+      data-action="settings"
+      class="c-action-list__action"
+    >
+      ${settingsIcon}
+    </button>
+  `;
+};
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({

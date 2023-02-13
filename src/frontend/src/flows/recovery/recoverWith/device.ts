@@ -49,7 +49,7 @@ const pageContent = () => {
 export const deviceRecoveryPage = async (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData
+  device: Omit<DeviceData, "alias">
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
@@ -59,7 +59,7 @@ export const deviceRecoveryPage = async (
 const init = (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData
+  device: Omit<DeviceData, "alias">
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const buttonContinue = document.getElementById(

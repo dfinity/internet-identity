@@ -80,7 +80,7 @@ const pageContent = (userNumber: bigint, message?: string) => {
 export const phraseRecoveryPage = async (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData,
+  device: Omit<DeviceData, "alias">,
   prefilledPhrase?: string,
   message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
@@ -92,7 +92,7 @@ export const phraseRecoveryPage = async (
 const init = (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData,
+  device: Omit<DeviceData, "alias">,
   prefilledPhrase?: string /* if set, prefilled as input */,
   message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
