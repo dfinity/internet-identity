@@ -12,6 +12,9 @@ import {
   RegisterResult,
 } from "../../utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
+import { I18n } from "../../i18n";
+
+import copyJson from "./captcha.json";
 
 // A symbol that we can differentiate from generic `T` types
 // when verifying the challenge
@@ -22,6 +25,7 @@ export const promptCaptchaTemplate = <T>({
   requestChallenge,
   verifyChallengeChars,
   onContinue,
+  i18n,
 }: {
   cancel: () => void;
   requestChallenge: () => Promise<Challenge>;
@@ -30,7 +34,10 @@ export const promptCaptchaTemplate = <T>({
     challenge: Challenge;
   }) => Promise<T | typeof badChallenge>;
   onContinue: (result: T) => void;
+  i18n: I18n;
 }) => {
+  const copy = i18n.i18n(copyJson);
+
   // We define a few Chans that are used to update the page in a
   // reactive way; see template returned by this function
 
@@ -41,13 +48,13 @@ export const promptCaptchaTemplate = <T>({
   const input: Ref<HTMLInputElement> = createRef();
 
   // The error shown on bad input
-  const errorText = new Chan<string | undefined>();
+  const errorText = new Chan<TemplateResult | undefined>();
   const hasError = errorText.map((e) => (e !== undefined ? "has-error" : ""));
 
   // The "next" button behavior
   const next = new Chan<((e: SubmitEvent) => void) | undefined>();
   const nextDisabled = next.map((f) => f === undefined);
-  const nextCaption = new Chan<string>();
+  const nextCaption = new Chan<TemplateResult>();
 
   // The "retry" button behavior
   const retry = new Chan<(() => void) | undefined>();
@@ -93,7 +100,7 @@ export const promptCaptchaTemplate = <T>({
         );
         errorText.send(undefined);
         next.send(undefined);
-        nextCaption.send("Generating...");
+        nextCaption.send(copy.generating);
         retry.send(undefined);
         break;
       case "prompting":
@@ -113,23 +120,21 @@ export const promptCaptchaTemplate = <T>({
           e.stopPropagation();
           doVerify(state.challenge);
         });
-        nextCaption.send("Next");
+        nextCaption.send(copy.next);
         retry.send(doRetry);
         break;
       case "verifying":
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
         errorText.send(undefined);
         next.send(undefined);
-        nextCaption.send("Verifying...");
+        nextCaption.send(copy.verifying);
         retry.send(undefined);
         break;
       case "bad":
         // omit updating `img` on purpose; we just leave whatever is shown (captcha)
-        errorText.send(
-          'The value you entered is incorrect. Click "retry" to generate a new value.'
-        );
+        errorText.send(copy.incorrect);
         next.send(undefined);
-        nextCaption.send("Next");
+        nextCaption.send(copy.next);
         retry.send(doRetry);
         break;
     }
@@ -140,7 +145,7 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article>
-      <h1 class="t-title t-title--main">Prove you're not a robot</h1>
+      <h1 class="t-title t-title--main">${copy.title}</h1>
       <form
         autocomplete="off"
         @submit=${asyncReplace(next.recv())}
@@ -155,11 +160,11 @@ export const promptCaptchaTemplate = <T>({
             @click=${asyncReplace(retry.recv())}
             ?disabled=${asyncReplace(retryDisabled)}
           >
-            <span>retry</span>
+            <span>${copy.retry}</span>
           </i>
         </div>
         <label>
-          <strong class="t-strong">Type the characters you see</strong>
+          <strong class="t-strong">${copy.instructions}</strong>
           <input
             ${autofocus}
             ${ref(input)}
@@ -177,7 +182,7 @@ export const promptCaptchaTemplate = <T>({
             @click=${() => cancel()}
             class="c-button c-button--secondary"
           >
-            Cancel
+            ${copy.cancel}
           </button>
           <button
             type="submit"
@@ -220,6 +225,7 @@ export const promptCaptcha = ({
   challenge?: Promise<Challenge>;
 }): Promise<RegisterResult | LoginFlowCanceled> => {
   return new Promise((resolve) => {
+    const i18n = new I18n();
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
@@ -248,6 +254,7 @@ export const promptCaptcha = ({
       ),
 
       onContinue: resolve,
+      i18n,
     });
   });
 };
