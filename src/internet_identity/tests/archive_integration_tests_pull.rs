@@ -23,7 +23,7 @@ mod deployment_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let result =
@@ -46,7 +46,6 @@ mod deployment_tests {
                     entries_buffer_limit: 0,
                     polling_interval_ns: 0,
                     entries_fetch_limit: 0,
-                    archive_integration: Some(ArchiveIntegration::Pull),
                 }),
                 canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
             }),
@@ -67,7 +66,7 @@ mod deployment_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
@@ -110,7 +109,7 @@ mod deployment_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
         upgrade_ii_canister(&env, ii_canister, II_WASM.clone());
 
@@ -127,7 +126,7 @@ mod deployment_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(EMPTY_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(EMPTY_WASM.clone()),
         );
 
         let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
@@ -137,7 +136,7 @@ mod deployment_tests {
             &env,
             ii_canister,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         )
         .unwrap();
 
@@ -160,7 +159,7 @@ mod deployment_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let result =
@@ -184,7 +183,6 @@ mod deployment_tests {
                     entries_buffer_limit: 10,
                     polling_interval_ns: 5_000,
                     entries_fetch_limit: 10,
-                    archive_integration: Some(ArchiveIntegration::Pull),
                 }),
                 canister_creation_cycles_cost: None, // current cost in application subnets
             }),
@@ -213,7 +211,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -350,7 +348,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -386,7 +384,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -420,7 +418,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -477,7 +475,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -521,7 +519,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -558,7 +556,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -583,7 +581,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -607,7 +605,7 @@ mod pull_entries_tests {
         let ii_canister = install_ii_canister_with_arg(
             &env,
             II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -622,130 +620,5 @@ mod pull_entries_tests {
             )
             .unwrap(),
         );
-    }
-}
-
-/// Tests the migration from push to pull end to end.
-#[cfg(test)]
-mod push_to_pull_transition_tests {
-    use super::*;
-
-    /// Tests the migration from push to pull.
-    #[test]
-    fn should_switch_from_push_to_pull() -> Result<(), CallError> {
-        let env = env();
-        let ii_canister = install_ii_canister_with_arg(
-            &env,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), None),
-        );
-
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-        assert!(env.canister_exists(archive_canister));
-
-        flows::register_anchor(&env, ii_canister);
-
-        // buffer is unused due to push integration
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            0f64,
-        );
-
-        // one entry has been pushed
-        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 1);
-
-        upgrade_ii_canister_with_arg(
-            &env,
-            ii_canister,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
-        )?;
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-
-        flows::register_anchor(&env, ii_canister);
-
-        // entry is now buffered
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            1f64,
-        );
-
-        // the archive polls for entries once per second
-        env.advance_time(Duration::from_secs(2));
-        // execute the timer
-        env.tick();
-
-        // buffer is empty again after the archive has pulled entries
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            0f64,
-        );
-
-        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 2);
-        Ok(())
-    }
-
-    /// Tests that II can also go back from pull to push.
-    #[test]
-    fn should_switch_from_pull_to_push() -> Result<(), CallError> {
-        let env = env();
-        let ii_canister = install_ii_canister_with_arg(
-            &env,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Pull)),
-        );
-
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-        assert!(env.canister_exists(archive_canister));
-
-        flows::register_anchor(&env, ii_canister);
-
-        // buffer has one entry
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            1f64,
-        );
-
-        // the archive polls for entries once per second
-        env.advance_time(Duration::from_secs(2));
-        // execute the timer
-        env.tick();
-
-        // one entry has been pulled
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            0f64,
-        );
-        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 1);
-
-        upgrade_ii_canister_with_arg(
-            &env,
-            ii_canister,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone(), Some(ArchiveIntegration::Push)),
-        )?;
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-
-        flows::register_anchor(&env, ii_canister);
-
-        // entry is no longer buffered
-        assert_metric(
-            &get_metrics(&env, ii_canister),
-            "internet_identity_buffered_archive_entries",
-            0f64,
-        );
-
-        // entry was pushed to the archive directly
-        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 2);
-        Ok(())
     }
 }

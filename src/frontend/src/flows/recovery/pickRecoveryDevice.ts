@@ -1,7 +1,10 @@
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { mainWindow } from "../../components/mainWindow";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
+import {
+  RecoveryDevice,
+  recoveryDeviceToLabel,
+} from "../../utils/recoveryDevice";
 
 const pageContent = () => {
   const pageContentSlot = html`
@@ -22,14 +25,14 @@ const pageContent = () => {
 };
 
 export const pickRecoveryDevice = async (
-  devices: DeviceData[]
-): Promise<DeviceData> => {
+  devices: RecoveryDevice[]
+): Promise<RecoveryDevice> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init(devices);
 };
 
-export const init = (devices: DeviceData[]): Promise<DeviceData> =>
+export const init = (devices: RecoveryDevice[]): Promise<RecoveryDevice> =>
   new Promise((resolve) => {
     const deviceList = document.getElementById("deviceList") as HTMLElement;
     deviceList.innerHTML = ``;
@@ -44,11 +47,11 @@ export const init = (devices: DeviceData[]): Promise<DeviceData> =>
         html`<div class="deviceItemAlias">
           <button class="c-button c-button--secondary">
             <span aria-hidden="true"
-              >${device.alias === "Recovery Phrase"
+              >${"seed_phrase" in device.key_type
                 ? seedPhraseIcon
                 : securityKeyIcon}</span
             >
-            <div class="t-strong">${device.alias}</div>
+            <div class="t-strong">${recoveryDeviceToLabel(device)}</div>
           </button>
         </div>`,
         identityElement

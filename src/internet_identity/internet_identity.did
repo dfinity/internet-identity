@@ -149,28 +149,12 @@ type ArchiveConfig = record {
     module_hash : blob;
     // Buffered archive entries limit. If reached, II will stop accepting new anchor operations
     // until the buffered operations are acknowledged by the archive.
-    // Currently unused: in preparation of switching the archive integration to pull.
-    // Configured value will be discarded for storage_layout_version < 6.
     entries_buffer_limit: nat64;
     // The maximum number of entries to be transferred to the archive per call.
-    // Currently unused: in preparation of switching the archive integration to pull.
-    // Configured value will be discarded for storage_layout_version < 6.
     entries_fetch_limit: nat16;
     // Polling interval to fetch new entries from II (in nanoseconds).
     // Changes to this parameter will only take effect after an archive deployment.
-    // Currently unused: in preparation of switching the archive integration to pull.
-    // Configured value will be discarded for storage_layout_version < 6.
     polling_interval_ns: nat64;
-
-    // How the entries get transferred to the archive.
-    // This is opt, so that the config parameter can be removed after switching from push to pull.
-    // Configured value will be discarded for storage_layout_version < 6.
-    archive_integration: opt variant {
-        // II pushes the entries to the archive (legacy variant).
-        push;
-        // The archive pulls the entries from II.
-        pull;
-    }
 };
 
 // Information about the archive.
@@ -198,8 +182,6 @@ type InternetIdentityInit = record {
     // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
     // canister creation cost, the newly created canister will keep extra cycles.
     canister_creation_cycles_cost : opt nat64;
-    // Config flag to upgrade the persistent state. If set to opt true it will migrate the storage layout to version 6.
-    upgrade_persistent_state: opt bool;
 };
 
 type ChallengeKey = text;

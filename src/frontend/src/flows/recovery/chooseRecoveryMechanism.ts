@@ -88,7 +88,7 @@ export const chooseRecoveryMechanism = async ({
   message,
   cancelText,
 }: {
-  devices: DeviceData[];
+  devices: Omit<DeviceData, "alias">[];
 } & ChooseRecoveryProps): Promise<RecoveryMechanism | null> => {
   return new Promise((resolve) => {
     return chooseRecoveryMechanismPage({
@@ -104,7 +104,12 @@ export const chooseRecoveryMechanism = async ({
   });
 };
 
-const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
-  devices.some((device) => device.alias === "Recovery phrase");
-const hasRecoveryKey = (devices: DeviceData[]): boolean =>
-  devices.some((device) => device.alias === "Recovery key");
+const hasRecoveryPhrase = (devices: Omit<DeviceData, "alias">[]): boolean =>
+  devices.some(
+    (device) => "seed_phrase" in device.key_type && "recovery" in device.purpose
+  );
+const hasRecoveryKey = (devices: Omit<DeviceData, "alias">[]): boolean =>
+  devices.some(
+    (device) =>
+      !("seed_phrase" in device.key_type) && "recovery" in device.purpose
+  );

@@ -8,9 +8,8 @@ use ic_cdk::api::management_canister::main::{
     InstallCodeArgument,
 };
 use ic_cdk::api::time;
-use ic_cdk::{call, caller, id, notify, trap};
+use ic_cdk::{call, caller, id, trap};
 use internet_identity_interface::archive::*;
-use internet_identity_interface::ArchiveIntegration::Pull;
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -65,8 +64,6 @@ pub struct ArchiveData {
     // until the archive acknowledges entries and they can safely be deleted from this buffer.
     // The limit is configurable (entries_buffer_limit).
     // This is an Rc to avoid unnecessary copies of (potentially) a lot of data when cloning.
-    // Currently unused: in preparation of switching the archive integration to pull.
-    // Anything stored here will be discarded for storage_layout_version < 6.
     pub entries_buffer: Rc<Vec<BufferedEntry>>,
 }
 
@@ -340,27 +337,15 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
     };
     let encoded_entry = candid::encode_one(entry).expect("failed to encode archive entry");
 
-    // Depending on the II layout version and the config we need to either send out the entry or just buffer it.
-    if state::storage(|s| s.version()) >= 6 && config.archive_integration == Some(Pull) {
-        // add entry to buffer (which is emptied by the archive periodically, see fetch_entries and acknowledge entries)
-        state::archive_data_mut(|data| {
-            Rc::make_mut(&mut data.entries_buffer).push(BufferedEntry {
-                anchor_number,
-                timestamp,
-                entry: ByteBuf::from(encoded_entry),
-                sequence_number: data.sequence_number,
-            });
+    // add entry to buffer (which is emptied by the archive periodically, see fetch_entries and acknowledge entries)
+    state::archive_data_mut(|data| {
+        Rc::make_mut(&mut data.entries_buffer).push(BufferedEntry {
+            anchor_number,
+            timestamp,
+            entry: ByteBuf::from(encoded_entry),
+            sequence_number: data.sequence_number,
         });
-    } else {
-        // Notify can still trap if the message cannot be enqueued rolling back the anchor operation.
-        // Therefore we only increment the sequence number after notifying successfully.
-        let () = notify(
-            data.archive_canister,
-            "write_entry",
-            (anchor_number, timestamp, encoded_entry),
-        )
-        .expect("failed to send archive entry notification");
-    }
+    });
 
     state::archive_data_mut(|data| {
         data.sequence_number += 1;

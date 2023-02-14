@@ -11,6 +11,11 @@ import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { mainWindow } from "../../components/mainWindow";
+import {
+  isRecoveryDevice,
+  RecoveryDevice,
+  recoveryDeviceToLabel,
+} from "../../utils/recoveryDevice";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -24,7 +29,7 @@ const deviceSettingsTemplate = ({
   isOnlyDevice,
   back,
 }: {
-  protectDevice: () => void;
+  protectDevice: (device: DeviceData & RecoveryDevice) => void;
   deleteDevice: () => void;
   device: DeviceData;
   isOnlyDevice: boolean;
@@ -32,7 +37,9 @@ const deviceSettingsTemplate = ({
 }) => {
   const pageContentSlot = html` <article id="deviceSettings">
     <h1 class="t-title">
-      ${isRecovery(device) ? "" : "Device"} ${device.alias}
+      ${isRecoveryDevice(device)
+        ? recoveryDeviceToLabel(device)
+        : `Device ${device.alias}`}
     </h1>
 
     <div class="l-stack">
@@ -42,7 +49,7 @@ const deviceSettingsTemplate = ({
               your recovery phrase to delete it.
             </p>
             <button
-              @click="${() => protectDevice()}"
+              @click="${() => protectDevice(device)}"
               data-action="protect"
               class="c-button"
             >
@@ -56,13 +63,17 @@ const deviceSettingsTemplate = ({
             data-action="remove"
             class="c-button c-button--warning"
           >
-            Delete ${isRecovery(device) ? "Recovery" : "Device"}
+            Delete ${isRecoveryDevice(device) ? "Recovery" : "Device"}
           </button>`
         : ""}
       ${!isOnlyDevice && isProtected(device)
         ? html`<p class="t-paragraph">
-            This ${isRecovery(device) ? device.alias : "device"} is protected
-            and you will be prompted to authenticate with it before removal.
+            This
+            ${isRecoveryDevice(device)
+              ? recoveryDeviceToLabel(device).toLowerCase()
+              : "device"}
+            is protected and you will be prompted to authenticate with it before
+            removal.
           </p>`
         : ""}
       ${isOnlyDevice
@@ -86,16 +97,15 @@ const deviceSettingsTemplate = ({
 
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices
-const shouldOfferToProtect = (device: DeviceData): boolean =>
+const shouldOfferToProtect = (
+  device: DeviceData
+): device is RecoveryDevice & DeviceData =>
   "recovery" in device.purpose &&
   "seed_phrase" in device.key_type &&
   !isProtected(device);
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
-
-const isRecovery = (device: DeviceData): boolean =>
-  "recovery" in device.purpose;
 
 export const deviceSettingsPage = (
   props: Parameters<typeof deviceSettingsTemplate>[0],
@@ -118,8 +128,14 @@ export const deviceSettings = async (
       device,
       isOnlyDevice,
       back: resolve,
-      protectDevice: () =>
-        protectDevice(userNumber, connection, device, isOnlyDevice, resolve),
+      protectDevice: (recoveryDevice: DeviceData & RecoveryDevice) =>
+        protectDevice(
+          userNumber,
+          connection,
+          recoveryDevice,
+          isOnlyDevice,
+          resolve
+        ),
       deleteDevice: () =>
         deleteDevice(userNumber, connection, device, isOnlyDevice, resolve),
     });
@@ -131,7 +147,7 @@ export const deviceSettings = async (
 const deviceConnection = async (
   connection: Connection,
   userNumber: bigint,
-  device: DeviceData,
+  device: DeviceData & RecoveryDevice,
   recoveryPhraseMessage: string
 ): Promise<AuthenticatedConnection | null> => {
   try {
@@ -193,14 +209,15 @@ const deleteDevice = async (
 
   // If the device is protected then we need to be authenticated with the device to remove it
   // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
-  const removalConnection = isProtected(device)
-    ? await deviceConnection(
-        connection,
-        userNumber,
-        device,
-        "Please input your recovery phrase to remove it."
-      )
-    : connection;
+  const removalConnection =
+    isRecoveryDevice(device) && isProtected(device)
+      ? await deviceConnection(
+          connection,
+          userNumber,
+          device,
+          "Please input your recovery phrase to remove it."
+        )
+      : connection;
 
   await withLoader(async () => {
     // if null then user canceled so we just redraw the manage page
@@ -226,7 +243,7 @@ const deleteDevice = async (
 const protectDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  device: DeviceData,
+  device: DeviceData & RecoveryDevice,
   isOnlyDevice: boolean,
   back: () => void
 ) => {
