@@ -2,19 +2,24 @@ import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { withRef } from "../../utils/lit-html";
 import { html, render, TemplateResult } from "lit-html";
 import { validateAlias } from "../../utils/validateAlias";
+import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
+
+import copyJson from "./alias.json";
 
 /* Everything (template, component, page) related to picking a device alias */
 
 export const promptDeviceAliasTemplate = (props: {
   continue: (alias: string) => void;
   cancel: () => void;
+  i18n: I18n;
 }): TemplateResult => {
+  const copy = props.i18n.i18n(copyJson);
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
     <hgroup class="t-centered">
-      <h1 class="t-title t-title--main">Register this device</h1>
-      <p class="t-lead t-paragraph l-stack">What device are you using?</p>
+      <h1 class="t-title t-title--main">${copy.title}</h1>
+      <p class="t-lead t-paragraph l-stack">${copy.specify_alias}</p>
     </hgroup>
     <form
       id="registerForm"
@@ -44,7 +49,7 @@ export const promptDeviceAliasTemplate = (props: {
           );
           e.currentTarget.setCustomValidity(message);
         }}
-        placeholder="Example: my phone"
+        placeholder=${copy.placeholder}
         aria-label="device name"
         type="text"
         required
@@ -60,9 +65,11 @@ export const promptDeviceAliasTemplate = (props: {
           class="c-button c-button--secondary"
           @click="${() => props.cancel()}"
         >
-          Cancel
+          ${copy.cancel}
         </button>
-        <button id="registerButton" type="submit" class="c-button">Next</button>
+        <button id="registerButton" type="submit" class="c-button">
+          ${copy.next}
+        </button>
       </div>
     </form>
   `;
@@ -77,6 +84,7 @@ export const promptDeviceAliasPage = (props: {
   cancel: () => void;
   continue: (alias: string) => void;
   container?: HTMLElement;
+  i18n: I18n;
 }): void => {
   const container =
     props.container ?? (document.getElementById("pageContent") as HTMLElement);
@@ -85,5 +93,10 @@ export const promptDeviceAliasPage = (props: {
 
 export const promptDeviceAlias = (): Promise<string | null> =>
   new Promise((resolve) => {
-    promptDeviceAliasPage({ cancel: () => resolve(null), continue: resolve });
+    const i18n = new I18n();
+    promptDeviceAliasPage({
+      cancel: () => resolve(null),
+      continue: resolve,
+      i18n,
+    });
   });
