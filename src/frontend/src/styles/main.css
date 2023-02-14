@@ -1516,8 +1516,17 @@ a:hover,
   text-align: right;
   pointer-events: none;
   transform: translateY(-2rem);
-  transition: 100ms opacity linear, 100ms visibility linear,
-    0ms transform cubic-bezier(0.7, 0.3, 0, 1) 100ms;
+  transition: 0ms opacity linear, 0ms visibility linear, 0ms transform;
+}
+
+.c-dropdown__menu::before {
+  z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+  transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
+    0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
 }
 
 .c-dropdown:hover .c-dropdown__menu,
@@ -1530,14 +1539,6 @@ a:hover,
   transform: translateY(0rem);
   transition: 200ms opacity linear, 200ms visibility linear,
     300ms transform cubic-bezier(0.7, 0.3, 0, 1);
-}
-
-.c-dropdown__menu::before {
-  z-index: -1;
-  content: "";
-  position: absolute;
-  inset: 0;
-  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
 }
 
 .c-dropdown__item {
