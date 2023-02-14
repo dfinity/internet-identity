@@ -404,8 +404,6 @@ export class Connection {
       userNumber
     );
     return allDevices.filter(isRecoveryDevice);
-      isRecoveryDevice(device)
-    );
   };
 
   // Create an actor representing the backend
