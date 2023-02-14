@@ -403,7 +403,7 @@ export class Connection {
     const allDevices: Omit<DeviceData, "alias">[] = await actor.lookup(
       userNumber
     );
-    return allDevices.filter((device): device is RecoveryDevice =>
+    return allDevices.filter(isRecoveryDevice);
       isRecoveryDevice(device)
     );
   };
