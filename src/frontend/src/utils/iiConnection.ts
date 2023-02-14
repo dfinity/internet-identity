@@ -400,6 +400,7 @@ export class Connection {
     userNumber: UserNumber
   ): Promise<RecoveryDevice[]> => {
     const actor = await this.createActor();
+    // lookup blanks out the alias for privacy reasons -> omit alias from DeviceData
     const allDevices: Omit<DeviceData, "alias">[] = await actor.lookup(
       userNumber
     );
