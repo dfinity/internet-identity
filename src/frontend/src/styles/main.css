@@ -1459,7 +1459,8 @@ a:hover,
 
 /* dropdown menus */
 
-.c-action-list__item:has(.c-dropdown):hover {
+.c-action-list__item:has(.c-dropdown):hover,
+.c-action-list__item:has(.c-dropdown:hover) {
   position: relative;
   z-index: calc(var(--vz-tooltip) + 3);
 }
@@ -1493,7 +1494,6 @@ a:hover,
   padding: var(--vs-bezel);
   right: calc(var(--vs-bezel) * -1);
   background: var(--rc-background);
-  /*border: var(--vs-line) solid rgba(0, 0, 0, 0.1);*/
   border-bottom-color: var(--rc-background);
   z-index: calc(var(--vz-tooltip) + 1);
   box-sizing: content-box;
@@ -1502,6 +1502,7 @@ a:hover,
 
 .c-dropdown__menu {
   opacity: 0;
+  visibility: hidden;
   position: absolute;
   top: 100%;
   right: calc(var(--vs-bezel) * -1);
@@ -1514,6 +1515,9 @@ a:hover,
   margin-top: calc(-1 * var(--vs-line));
   text-align: right;
   pointer-events: none;
+  transform: translateY(-2rem);
+  transition: 100ms opacity linear, 100ms visibility linear,
+    0ms transform cubic-bezier(0.7, 0.3, 0, 1) 100ms;
 }
 
 .c-dropdown:hover .c-dropdown__menu,
@@ -1523,6 +1527,9 @@ a:hover,
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transform: translateY(0rem);
+  transition: 200ms opacity linear, 200ms visibility linear,
+    300ms transform cubic-bezier(0.7, 0.3, 0, 1);
 }
 
 .c-dropdown__menu::before {
