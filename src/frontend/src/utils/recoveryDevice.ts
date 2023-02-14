@@ -8,7 +8,7 @@ export const recoveryDeviceToLabel = (
   device: Omit<DeviceData, "alias"> & RecoveryDevice
 ): string => {
   if ("seed_phrase" in device.key_type) {
-    return "Recovery phrase";
+    return "Recovery Phrase";
   }
   return "External Hardware";
 };
