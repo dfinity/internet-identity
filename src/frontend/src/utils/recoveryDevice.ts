@@ -1,12 +1,10 @@
-import { DeviceData, Purpose } from "../../generated/internet_identity_types";
+import { DeviceData } from "../../generated/internet_identity_types";
 
 export type RecoveryDevice = Omit<DeviceData, "alias"> & {
-  purpose: Extract<Purpose, { recovery: null }>;
+  purpose: { recovery: null };
 };
 
-export const recoveryDeviceToLabel = (
-  device: Omit<DeviceData, "alias"> & RecoveryDevice
-): string => {
+export const recoveryDeviceToLabel = (device: RecoveryDevice): string => {
   if ("seed_phrase" in device.key_type) {
     return "Recovery Phrase";
   }

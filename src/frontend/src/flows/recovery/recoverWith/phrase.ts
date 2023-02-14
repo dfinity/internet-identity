@@ -1,5 +1,4 @@
 import { html, nothing, render, TemplateResult } from "lit-html";
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import {
   apiResultToLoginFlowResult,
   LoginFlowCanceled,
@@ -17,6 +16,7 @@ import {
 } from "../../../crypto/mnemonic";
 import { warningIcon } from "../../../components/icons";
 import { mainWindow } from "../../../components/mainWindow";
+import { RecoveryDevice } from "../../../utils/recoveryDevice";
 
 const pageContent = (userNumber: bigint, message?: string) => {
   const pageContentSlot = html`
@@ -80,7 +80,7 @@ const pageContent = (userNumber: bigint, message?: string) => {
 export const phraseRecoveryPage = async (
   userNumber: bigint,
   connection: Connection,
-  device: Omit<DeviceData, "alias">,
+  device: RecoveryDevice,
   prefilledPhrase?: string,
   message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
@@ -92,7 +92,7 @@ export const phraseRecoveryPage = async (
 const init = (
   userNumber: bigint,
   connection: Connection,
-  device: Omit<DeviceData, "alias">,
+  device: RecoveryDevice,
   prefilledPhrase?: string /* if set, prefilled as input */,
   message?: string
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
