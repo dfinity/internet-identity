@@ -1,8 +1,10 @@
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { mainWindow } from "../../components/mainWindow";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
-import { recoveryDeviceToLabel } from "../../utils/recoveryDeviceLabel";
+import {
+  RecoveryDevice,
+  recoveryDeviceToLabel,
+} from "../../utils/recoveryDevice";
 
 const pageContent = () => {
   const pageContentSlot = html`
@@ -23,16 +25,14 @@ const pageContent = () => {
 };
 
 export const pickRecoveryDevice = async (
-  devices: Omit<DeviceData, "alias">[]
-): Promise<Omit<DeviceData, "alias">> => {
+  devices: RecoveryDevice[]
+): Promise<RecoveryDevice> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
   return init(devices);
 };
 
-export const init = (
-  devices: Omit<DeviceData, "alias">[]
-): Promise<Omit<DeviceData, "alias">> =>
+export const init = (devices: RecoveryDevice[]): Promise<RecoveryDevice> =>
   new Promise((resolve) => {
     const deviceList = document.getElementById("deviceList") as HTMLElement;
     deviceList.innerHTML = ``;

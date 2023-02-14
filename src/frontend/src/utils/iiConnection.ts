@@ -40,6 +40,7 @@ import { unreachable } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
+import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -397,10 +398,14 @@ export class Connection {
 
   lookupRecovery = async (
     userNumber: UserNumber
-  ): Promise<Omit<DeviceData, "alias">[]> => {
+  ): Promise<RecoveryDevice[]> => {
     const actor = await this.createActor();
-    const allDevices = await actor.lookup(userNumber);
-    return allDevices.filter((device) => "recovery" in device.purpose);
+    const allDevices: Omit<DeviceData, "alias">[] = await actor.lookup(
+      userNumber
+    );
+    return allDevices.filter((device): device is RecoveryDevice =>
+      isRecoveryDevice(device)
+    );
   };
 
   // Create an actor representing the backend

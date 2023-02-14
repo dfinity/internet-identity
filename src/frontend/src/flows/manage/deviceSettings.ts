@@ -11,7 +11,10 @@ import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { mainWindow } from "../../components/mainWindow";
-import { recoveryDeviceToLabel } from "../../utils/recoveryDeviceLabel";
+import {
+  isRecoveryDevice,
+  recoveryDeviceToLabel,
+} from "../../utils/recoveryDevice";
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
@@ -33,7 +36,7 @@ const deviceSettingsTemplate = ({
 }) => {
   const pageContentSlot = html` <article id="deviceSettings">
     <h1 class="t-title">
-      ${isRecovery(device)
+      ${isRecoveryDevice(device)
         ? recoveryDeviceToLabel(device)
         : `Device ${device.alias}`}
     </h1>
@@ -59,13 +62,17 @@ const deviceSettingsTemplate = ({
             data-action="remove"
             class="c-button c-button--warning"
           >
-            Delete ${isRecovery(device) ? "Recovery" : "Device"}
+            Delete ${isRecoveryDevice(device) ? "Recovery" : "Device"}
           </button>`
         : ""}
       ${!isOnlyDevice && isProtected(device)
         ? html`<p class="t-paragraph">
-            This ${isRecovery(device) ? device.alias : "device"} is protected
-            and you will be prompted to authenticate with it before removal.
+            This
+            ${isRecoveryDevice(device)
+              ? recoveryDeviceToLabel(device).toLowerCase()
+              : "device"}
+            is protected and you will be prompted to authenticate with it before
+            removal.
           </p>`
         : ""}
       ${isOnlyDevice
@@ -96,9 +103,6 @@ const shouldOfferToProtect = (device: DeviceData): boolean =>
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
-
-const isRecovery = (device: DeviceData): boolean =>
-  "recovery" in device.purpose;
 
 export const deviceSettingsPage = (
   props: Parameters<typeof deviceSettingsTemplate>[0],

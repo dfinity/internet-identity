@@ -47,6 +47,7 @@ import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
 import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./components/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
+import { RecoveryDevice } from "./utils/recoveryDevice";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -54,7 +55,7 @@ const userNumber = BigInt(10000);
 
 const i18n = new I18n("en");
 
-const recoveryPhrase: DeviceData = {
+const recoveryPhrase: RecoveryDevice & DeviceData = {
   alias: "Recovery Phrase",
   protection: { unprotected: null },
   pubkey: [1, 2, 3, 4],
@@ -66,7 +67,7 @@ const recoveryPhrase: DeviceData = {
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
-const recoveryDevice: DeviceData = {
+const recoveryDevice: RecoveryDevice & DeviceData = {
   alias: "Recovery Device",
   protection: { unprotected: null },
   pubkey: [1, 2, 3, 4],
