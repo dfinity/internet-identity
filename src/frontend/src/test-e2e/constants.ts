@@ -11,3 +11,4 @@ export const ABOUT_URL = `${II_URL}/about`;
 
 export const DEVICE_NAME1 = "Virtual WebAuthn device";
 export const DEVICE_NAME2 = "Other WebAuthn device";
+export const RECOVERY_PHRASE_NAME = "Recovery Phrase";

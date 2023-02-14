@@ -40,6 +40,7 @@ import { unreachable } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
+import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -181,7 +182,7 @@ export class Connection {
   };
 
   login = async (userNumber: bigint): Promise<LoginResult> => {
-    let devices: DeviceData[];
+    let devices: Omit<DeviceData, "alias">[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
     } catch (e: unknown) {
@@ -204,7 +205,7 @@ export class Connection {
 
   fromWebauthnDevices = async (
     userNumber: bigint,
-    devices: DeviceData[]
+    devices: Omit<DeviceData, "alias">[]
   ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
@@ -262,7 +263,7 @@ export class Connection {
   };
 
   private updateKeyTypeIfNecessary(
-    devices: DeviceData[],
+    devices: Omit<DeviceData, "alias">[],
     attachmentInfo: {
       credentialId: ArrayBuffer;
       authenticatorAttachment: AuthenticatorAttachment;
@@ -320,7 +321,7 @@ export class Connection {
   fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string,
-    expected: DeviceData
+    expected: Omit<DeviceData, "alias">
   ): Promise<LoginResult> => {
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
@@ -352,7 +353,9 @@ export class Connection {
     };
   };
 
-  lookupAll = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+  lookupAll = async (
+    userNumber: UserNumber
+  ): Promise<Omit<DeviceData, "alias">[]> => {
     const actor = await this.createActor();
     return await actor.lookup(userNumber);
   };
@@ -366,7 +369,7 @@ export class Connection {
 
   lookupAuthenticators = async (
     userNumber: UserNumber
-  ): Promise<DeviceData[]> => {
+  ): Promise<Omit<DeviceData, "alias">[]> => {
     const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) => "authentication" in device.purpose);
@@ -393,10 +396,15 @@ export class Connection {
     });
   };
 
-  lookupRecovery = async (userNumber: UserNumber): Promise<DeviceData[]> => {
+  lookupRecovery = async (
+    userNumber: UserNumber
+  ): Promise<RecoveryDevice[]> => {
     const actor = await this.createActor();
-    const allDevices = await actor.lookup(userNumber);
-    return allDevices.filter((device) => "recovery" in device.purpose);
+    // lookup blanks out the alias for privacy reasons -> omit alias from DeviceData
+    const allDevices: Omit<DeviceData, "alias">[] = await actor.lookup(
+      userNumber
+    );
+    return allDevices.filter(isRecoveryDevice);
   };
 
   // Create an actor representing the backend
@@ -570,7 +578,7 @@ export class AuthenticatedConnection extends Connection {
 // credentials.get), see
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
-  exclude: DeviceData[] = [],
+  exclude: Omit<DeviceData, "alias">[] = [],
   authenticatorAttachment?: AuthenticatorAttachment
 ): PublicKeyCredentialCreationOptions => {
   return {
@@ -623,10 +631,10 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   return true;
 };
 
-function findDeviceByCredentialId(
-  devices: DeviceData[],
+function findDeviceByCredentialId<T extends Omit<DeviceData, "alias">>(
+  devices: T[],
   credentialId: ArrayBuffer
-) {
+): T | undefined {
   return devices.find((device) => {
     const id = device.credential_id[0];
     if (id === undefined) {

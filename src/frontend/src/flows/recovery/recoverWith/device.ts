@@ -7,9 +7,9 @@ import {
   LoginFlowSuccess,
   LoginFlowCanceled,
 } from "../../../utils/flowResult";
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import { Connection } from "../../../utils/iiConnection";
 import { mainWindow } from "../../../components/mainWindow";
+import { RecoveryDevice } from "../../../utils/recoveryDevice";
 
 const pageContent = () => {
   const pageContentSlot = html`
@@ -49,7 +49,7 @@ const pageContent = () => {
 export const deviceRecoveryPage = async (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData
+  device: RecoveryDevice
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(), container);
@@ -59,7 +59,7 @@ export const deviceRecoveryPage = async (
 const init = (
   userNumber: bigint,
   connection: Connection,
-  device: DeviceData
+  device: RecoveryDevice
 ): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
   new Promise((resolve) => {
     const buttonContinue = document.getElementById(

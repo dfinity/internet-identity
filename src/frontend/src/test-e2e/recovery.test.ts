@@ -7,7 +7,7 @@ import {
 import { FLOWS } from "./flows";
 import { addVirtualAuthenticator, runInBrowser } from "./util";
 
-import { II_URL, DEVICE_NAME1 } from "./constants";
+import { II_URL, DEVICE_NAME1, RECOVERY_PHRASE_NAME } from "./constants";
 
 test("Recover access, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -46,16 +46,15 @@ test("Remove unprotected recovery phrase", async () => {
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    const recoveryAlias = "Recovery phrase";
-    await mainView.waitForDeviceDisplay(recoveryAlias);
-    await mainView.deviceSettings(recoveryAlias);
+    await mainView.waitForDeviceDisplay(RECOVERY_PHRASE_NAME);
+    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
 
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
     await settingsView.remove();
     await browser.acceptAlert();
 
-    await mainView.waitForDeviceNotDisplay(recoveryAlias);
+    await mainView.waitForDeviceNotDisplay(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
 
@@ -69,8 +68,7 @@ test("Make recovery protected", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    const recoveryAlias = "Recovery phrase";
-    await mainView.deviceSettings(recoveryAlias);
+    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
 
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
@@ -88,8 +86,7 @@ test("Remove protected recovery phrase", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    const recoveryAlias = "Recovery phrase";
-    await mainView.deviceSettings(recoveryAlias);
+    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
 
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
@@ -104,7 +101,7 @@ test("Remove protected recovery phrase", async () => {
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
     await mainView.waitForDisplay();
-    await mainView.waitForDeviceNotDisplay(recoveryAlias);
+    await mainView.waitForDeviceNotDisplay(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
 
@@ -118,8 +115,7 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    const recoveryAlias = "Recovery phrase";
-    await mainView.deviceSettings(recoveryAlias);
+    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
 
     const settingsView = new DeviceSettingsView(browser);
     await settingsView.waitForDisplay();
