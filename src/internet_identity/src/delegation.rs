@@ -220,11 +220,11 @@ fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration:
 
 /// Removes a batch of expired signatures from the signature map.
 ///
-/// This function is supposed to piggy back on update calls to
-/// amortize the cost of tree pruning.  Each operation on the signature map
+/// This function piggy-backs on update calls that create new signatures to
+/// amortize the cost of tree pruning. Each operation on the signature map
 /// will prune at most MAX_SIGS_TO_PRUNE other signatures.
 pub fn prune_expired_signatures() {
-    const MAX_SIGS_TO_PRUNE: usize = 10;
+    const MAX_SIGS_TO_PRUNE: usize = 50;
     let num_pruned = state::signature_map_mut(|sigs| sigs.prune_expired(time(), MAX_SIGS_TO_PRUNE));
     if num_pruned > 0 {
         update_root_hash();

@@ -3,7 +3,7 @@ use crate::archive::archive_operation;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
-use crate::{delegation, secs_to_nanos, state};
+use crate::{secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, trap};
@@ -21,8 +21,6 @@ const MAX_INFLIGHT_CHALLENGES: usize = 500;
 
 pub async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
-
-    delegation::prune_expired_signatures();
 
     state::inflight_challenges_mut(|inflight_challenges| {
         let now = time();
@@ -155,7 +153,6 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 }
 
 pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
-    delegation::prune_expired_signatures();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
