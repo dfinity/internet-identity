@@ -1457,6 +1457,107 @@ a:hover,
   opacity: 1;
 }
 
+/* dropdown menus */
+
+.c-action-list__item:has(.c-dropdown):hover {
+  position: relative;
+  z-index: calc(var(--vz-tooltip) + 3);
+}
+
+.c-dropdown {
+  position: relative;
+}
+
+.c-dropdown__trigger {
+  z-index: calc(var(--vz-tooltip) + 2);
+  transition: 100ms color linear;
+}
+
+.c-dropdown:hover {
+  z-index: var(--vz-tooltip);
+}
+
+.c-dropdown:hover .c-dropdown__trigger,
+.c-dropdown:focus-within .c-dropdown__trigger {
+  color: var(--rc-interaction);
+}
+
+.c-dropdown::after {
+  opacity: 0;
+  content: "";
+  position: absolute;
+  top: calc(var(--vs-bezel) * -1);
+  bottom: 0;
+  height: calc(100% - var(--vs-bezel));
+  width: 100%;
+  padding: var(--vs-bezel);
+  right: calc(var(--vs-bezel) * -1);
+  background: var(--rc-background);
+  /*border: var(--vs-line) solid rgba(0, 0, 0, 0.1);*/
+  border-bottom-color: var(--rc-background);
+  z-index: calc(var(--vz-tooltip) + 1);
+  box-sizing: content-box;
+  pointer-events: none;
+}
+
+.c-dropdown__menu {
+  opacity: 0;
+  position: absolute;
+  top: 100%;
+  right: calc(var(--vs-bezel) * -1);
+  z-index: var(--vz-tooltip);
+  min-width: 100%;
+  width: max-content;
+  background-color: var(--rc-background);
+  border-radius: var(--border-radius);
+  padding: 0 var(--vs-bezel);
+  margin-top: calc(-1 * var(--vs-line));
+  text-align: right;
+  pointer-events: none;
+}
+
+.c-dropdown:hover .c-dropdown__menu,
+.c-dropdown:focus-within .c-dropdown__menu,
+.c-dropdown:hover::after,
+.c-dropdown:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.c-dropdown__menu::before {
+  z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+}
+
+.c-dropdown__item {
+  display: block;
+  padding: calc(var(--vs-bezel) * 0.75) 0;
+  color: var(--rc-text);
+  text-decoration: none;
+}
+
+.c-dropdown__item + .c-dropdown__item {
+  border-top: var(--vs-line) solid var(--rc-line);
+}
+
+.c-dropdown__button {
+  display: block;
+  color: var(--rc-text);
+  padding: 0.1em calc(var(--vs-bezel) * 0.5) 0;
+  text-align: left;
+  width: 100%;
+  font-size: 0.75em;
+  transition: color 100ms linear;
+}
+
+.c-dropdown__button:hover {
+  color: var(--rc-interaction);
+}
+
 /* Needed to override the "reset" rules */
 /* Without this, the checkbox is simply not shown */
 input[type="checkbox"] {
