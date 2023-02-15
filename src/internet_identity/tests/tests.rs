@@ -2818,6 +2818,24 @@ mod stats_tests {
         );
     }
 
+    /// Verifies that asset loads for existing assets with failure status code (i.e. not 2xx and 3xx)
+    /// are tracked.
+    #[test]
+    fn should_allow_failure_status_code_for_existing_assets() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        api::notify_asset_load(&env, canister_id, "/about", 501)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert!(stats.asset_requests.contains(&AssetRequestInfo {
+            asset: "/about".to_string(),
+            status_code: 501,
+            num_request: 1,
+        }));
+        Ok(())
+    }
+
     /// Verifies that asset loads for the least used asset is pruned when adding a new one.
     #[test]
     fn should_prune_least_used_asset_when_limit_reached() -> Result<(), CallError> {
