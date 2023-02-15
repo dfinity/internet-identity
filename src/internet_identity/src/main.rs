@@ -171,7 +171,7 @@ fn notify_asset_load(path: String, status_code: u16) {
             path.len()
         ))
     }
-    assets::increase_asset_counter(path, status_code)
+    assets::increment_asset_counter(path, status_code)
 }
 
 #[query]

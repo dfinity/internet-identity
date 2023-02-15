@@ -27,6 +27,8 @@ impl ContentType {
 }
 
 pub const FAQ_PATH: &str = "/faq";
+pub const FAQ_STATUS: u16 = 301;
+pub const ASSET_STATUS: u16 = 200;
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
@@ -34,7 +36,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         // The FAQ used to live in '/faq' but we now use an external website. We redirect in order to not
         // break existing links in the wild.
         FAQ_PATH => HttpResponse {
-            status_code: 301,
+            status_code: FAQ_STATUS,
             headers: vec![(
                 "location".to_string(),
                 "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
@@ -81,7 +83,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     headers.append(&mut asset_headers.clone());
 
                     HttpResponse {
-                        status_code: 200,
+                        status_code: ASSET_STATUS,
                         headers,
                         body: Cow::Borrowed(Bytes::new(value)),
                         streaming_strategy: None,

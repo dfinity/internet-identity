@@ -2,8 +2,8 @@
 //
 // This file describes which assets are used and how (content, content type and content encoding).
 
-use crate::http::FAQ_PATH;
-use crate::state::{usage_metrics_mut, AssetPath, StatusCode, UsageMetrics};
+use crate::http::{ASSET_STATUS, FAQ_PATH, FAQ_STATUS};
+use crate::state::{usage_metrics_mut, UsageMetrics};
 use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
@@ -95,6 +95,14 @@ pub fn trap_if_not_asset(path: &str) {
     }
 }
 
+fn trap_if_invalid_success_status_code(asset: &String, status_code: u16) {
+    if asset == FAQ_PATH && status_code != FAQ_STATUS
+        || asset != FAQ_PATH && status_code != ASSET_STATUS
+    {
+        trap(&format!("Invalid status code for asset '{asset}'"));
+    }
+}
+
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
 fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
@@ -154,17 +162,15 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
     ]
 }
 
-pub fn increase_asset_counter(asset: String, status_code: u16) {
+pub fn increment_asset_counter(asset: String, status_code: u16) {
     const MAX_TRACKED_ASSETS: u8 = 30;
 
-    if (200..400).contains(&status_code) {
+    if status_code >= 200 && status_code < 400 {
         // prevent clients from recording successful status codes for non-existing assets
         trap_if_not_asset(&asset);
 
-        // prevent clients from recording impossible status codes for existing assets
-        if asset == FAQ_PATH && status_code != 301 || asset != FAQ_PATH && status_code != 200 {
-            trap(&format!("Invalid status code for asset '{asset}'"));
-        }
+        // prevent clients from recording impossible success status codes for existing assets
+        trap_if_invalid_success_status_code(&asset, status_code);
     }
 
     usage_metrics_mut(|metrics| {
@@ -195,15 +201,9 @@ fn drop_lowest_asset_counter(metrics: &mut UsageMetrics) {
         return;
     }
 
-    let mut least_used_asset = None::<(AssetPath, StatusCode)>;
-    let mut lowest_asset_counter: u64 = u64::MAX;
-    for (asset, counter) in metrics.asset_loading_counters.iter() {
-        if *counter < lowest_asset_counter {
-            least_used_asset = Some(asset.clone());
-            lowest_asset_counter = *counter
-        }
-    }
-    if let Some(asset) = least_used_asset {
-        metrics.asset_loading_counters.remove(&asset);
-    }
+    let mut entries: Vec<_> = metrics.asset_loading_counters.clone().into_iter().collect();
+    entries.sort_unstable_by_key(|(_, counter)| *counter);
+    metrics
+        .asset_loading_counters
+        .remove(&entries.first().unwrap().0);
 }
