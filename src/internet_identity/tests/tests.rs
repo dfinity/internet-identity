@@ -2817,4 +2817,31 @@ mod stats_tests {
             Regex::new("Invalid status code for asset '[/\\-\\w]+'").unwrap(),
         );
     }
+
+    /// Verifies that asset loads for the least used asset is pruned when adding a new one.
+    #[test]
+    fn should_prune_least_used_asset_when_limit_reached() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        for i in 0..29 {
+            // increment counter twice to make sure they are not the least used
+            api::notify_asset_load(&env, canister_id, "/not-pruned", 400 + i)?;
+            api::notify_asset_load(&env, canister_id, "/not-pruned", 400 + i)?;
+        }
+        api::notify_asset_load(&env, canister_id, "/will-be-pruned", 400)?;
+        api::notify_asset_load(&env, canister_id, "/will-cause-pruning", 400)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert!(stats.asset_requests.contains(&AssetRequestInfo {
+            asset: "/will-cause-pruning".to_string(),
+            status_code: 400,
+            num_request: 1,
+        }));
+        assert!(!stats
+            .asset_requests
+            .iter()
+            .any(|request_info| request_info.asset == "/will-be-pruned"));
+        Ok(())
+    }
 }
