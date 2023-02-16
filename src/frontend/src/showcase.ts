@@ -211,6 +211,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   promptCaptchaReady: () =>
     promptCaptchaPage({
@@ -221,6 +222,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   chooseRecoveryMechanism: () =>
     chooseRecoveryMechanismPage({
@@ -385,6 +387,7 @@ const components = (): TemplateResult => {
                       () => (cr.chars === "8wJ6Q" ? "yes" : badChallenge)
                     ),
                   onContinue: () => console.log("Done"),
+                  i18n,
                 },
                 container
               )
