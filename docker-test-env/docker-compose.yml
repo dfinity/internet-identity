@@ -15,7 +15,7 @@ services:
         aliases:
           - ic0.app
           # internet identity
-          - identity.ic0.app
+          - identity.internetcomputer.org
           # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
           - TEST_APP_CANISTER_ID.ic0.app
           - nice-name.com
