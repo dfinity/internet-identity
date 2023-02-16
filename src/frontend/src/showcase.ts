@@ -32,6 +32,7 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
+import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
 import { deviceSettingsPage } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
@@ -148,6 +149,11 @@ const iiPages: Record<string, () => void> = {
     promptDeviceAliasPage({
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
+    }),
+  pickDeviceAlias: () =>
+    pickDeviceAliasPage({
+      cancel: () => console.log("canceled"),
+      pick: (alias) => console.log("device alias:", alias),
     }),
 
   // Authorize screens
