@@ -14,15 +14,12 @@ services:
       ic:
         aliases:
           - ic0.app
-          # internet identity, II_CANISTER_ID is substituted by the start-selenium-env script
-          - II_CANISTER_ID.ic0.app
+          # internet identity
           - identity.ic0.app
           # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
           - TEST_APP_CANISTER_ID.ic0.app
           - nice-name.com
           # also handle the *.raw origins, but nginx will just respond with status 400
-          - identity.raw.ic0.app
-          - II_CANISTER_ID.raw.ic0.app
           - TEST_APP_CANISTER_ID.raw.ic0.app
 
   # Selenium container with chromedriver and chrome
