@@ -1,7 +1,13 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon } from "./components/icons";
+import {
+  icLogo,
+  settingsIcon,
+  dscvrIcon,
+  distriktIcon,
+  openChatIcon,
+} from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -334,6 +340,46 @@ export const styleguide = html`
               </li>
             </ul>`,
           })}
+        </section>
+        <p class="t-lead"></p>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Link Teaser</h2>
+        <p class="t-lead">
+          A link teaser is a section that contains a series of links, usually
+          with a title and a description. It is used to group related links
+          together.
+        </p>
+
+        <section class="demo" aria-label="Link Teaser Demo">
+          <article class="c-card c-card--narrow">
+            <h3 class="t-title t-title--sub">Explore dapps</h3>
+            <p class="t-lead">
+              Use your Identity Anchor to create independent accounts with dapps
+              on the Internet Computer.
+            </p>
+            <ul class="c-list c-list--logos l-stack">
+              <li>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  ${dscvrIcon}
+                  <span class="l-stack--tight t-strong">DSCVR</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  ${distriktIcon}
+                  <span class="l-stack--tight t-strong">Distrikt</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  ${openChatIcon}
+                  <span class="l-stack--tight t-strong">OpenChat</span>
+                </a>
+              </li>
+            </ul>
+          </article>
         </section>
         <p class="t-lead"></p>
       </aside>

@@ -1007,7 +1007,8 @@ a:hover,
   background: var(--grey-050);
 }
 
-.c-list--flex {
+.c-list--flex,
+.c-list--logos {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -1016,6 +1017,18 @@ a:hover,
 
 .c-list--flex li {
   margin: 0.5rem;
+}
+
+.c-list--logos li {
+  flex: 0 0 33.3%;
+  width: 33.3%;
+  padding: var(--rs-input-bezel);
+  text-align: center;
+}
+
+.c-list--logos svg {
+  display: block;
+  width: 100%;
 }
 
 .c-list--bulleted {
