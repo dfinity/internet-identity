@@ -1,7 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon } from "./components/icons";
+import { icLogo, settingsIcon, indetityQRCode } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -342,6 +342,23 @@ export const styleguide = html`
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
           <div class="c-logo">${icLogo}</div>
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">QR Link</h2>
+        <p class="t-lead">
+          A QR code that can be scanned to open the current page on a mobile.
+          The QR code is static for now, but we can make it dynamic in the
+          future to open a specific page.
+        </p>
+        <section class="demo" aria-label="QR Demo">
+          <aside class="c-card c-card--narrow">
+            <div class="c-qr">
+              ${indetityQRCode}
+              <div class="c-qr__shine">${indetityQRCode}</div>
+            </div>
+          </aside>
         </section>
       </aside>
     </article>

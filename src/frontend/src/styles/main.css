@@ -133,6 +133,8 @@
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
+  --rc-qr: var(--vc-brand-purple);
+
   --rc-warning: var(--vc-brand-pink);
   --rc-onWarning: var(--vc-snow);
 
@@ -699,6 +701,46 @@ a:hover,
 .t-action:hover {
   color: var(--vc-brand-blue);
 }
+
+.c-qr {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.c-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.c-qr svg * {
+  fill: var(--rc-qr);
+}
+
+.c-qr__shine {
+  position: absolute;
+  inset: 0;
+  filter: blur(10px);
+  opacity: 0.5;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%. 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.1;
+  }
+}
+
+/*
+.c-qr__shine svg * {
+  fill: rgba(255, 255, 255, 0.8);
+}*/
 
 .c-spinner-wrapper {
   position: relative;
