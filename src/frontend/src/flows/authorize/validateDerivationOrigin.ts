@@ -7,6 +7,7 @@ type ValidationResult =
   | { result: "valid" }
   | { result: "invalid"; message: string };
 
+const NNS_DAPP_CANISTER_ID = Principal.fromText("qoctq-giaaa-aaaaa-aaaea-cai");
 /**
  * Function to validate the derivationOrigin. The derivationOrigin allows an application to request principals of a
  * different origin, given that origin allows this by listing the requesting application origin in the
@@ -46,10 +47,14 @@ export const validateDerivationOrigin = async (
         message: "invalid regex match result. No value for capture group 1.",
       };
     }
-    // verifies that a valid principal id was matched
+    const subdomain = matches[1];
+    // verifies that a valid principal id or the nns dapp was matched
     // (canister ids must be valid principal ids)
-    const canisterId = Principal.fromText(matches[1]);
-    const alternativeOriginsUrl = `https://${canisterId.toText()}.ic0.app/.well-known/ii-alternative-origins`;
+    const canisterId =
+      subdomain === "nns"
+        ? NNS_DAPP_CANISTER_ID
+        : Principal.fromText(subdomain);
+    const alternativeOriginsUrl = `https://${canisterId.toText()}.icp0.io/.well-known/ii-alternative-origins`;
     const response = await fetch(
       // always fetch non-raw
       alternativeOriginsUrl,

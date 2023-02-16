@@ -18,6 +18,7 @@ services:
           - identity.internetcomputer.org
           # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
           - TEST_APP_CANISTER_ID.ic0.app
+          - TEST_APP_CANISTER_ID.icp0.io
           - nice-name.com
           # also handle the *.raw origins, but nginx will just respond with status 400
           - TEST_APP_CANISTER_ID.raw.ic0.app
