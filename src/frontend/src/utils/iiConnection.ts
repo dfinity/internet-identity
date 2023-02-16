@@ -393,7 +393,10 @@ export class Connection {
   createActor = async (
     delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
-    const agent = new HttpAgent({ identity: delegationIdentity });
+    const agent = new HttpAgent({
+      identity: delegationIdentity,
+      host: inferHost(),
+    });
 
     // Only fetch the root key when we're not in prod
     if (features.FETCH_ROOT_KEY) {
@@ -610,4 +613,31 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
     if (dv1[i] != dv2[i]) return false;
   }
   return true;
+};
+
+// Infer the host for the IC's HTTP api. II lives on a custom domain that may be different
+// from the domain where the api is served (agent-js otherwise infers the IC's HTTP URL from
+// the current window location)
+export const inferHost = (): string => {
+  // The domain used for the http api
+  const IC_API_DOMAIN = "ic0.app";
+
+  const location = window?.location;
+  if (location === undefined) {
+    // If there is no location, then most likely this is a non-browser environment. All bets
+    // are off but we return something valid just in case.
+    return "https://" + IC_API_DOMAIN;
+  }
+
+  if (
+    location.host === "127.0.0.1" ||
+    location.hostname.endsWith("localhost")
+  ) {
+    // If this is a local deployment, then assume the api and assets are collocated
+    // and use this asset (page)'s URL.
+    return location.protocol + "//" + location.host;
+  }
+
+  // In general, use the official IC HTTP domain.
+  return location.protocol + "//" + IC_API_DOMAIN;
 };
