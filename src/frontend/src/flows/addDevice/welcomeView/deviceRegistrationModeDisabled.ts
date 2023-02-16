@@ -5,6 +5,7 @@ import {
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
 import { mainWindow } from "../../../components/mainWindow";
+import { OFFICIAL_II_URL } from "../../../config";
 
 const pageContent = (userNumber: bigint) => {
   const pageContentSlot = html` <article>
@@ -21,7 +22,7 @@ const pageContent = (userNumber: bigint) => {
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        Log into <strong class="t-strong">identity.ic0.app</strong> with your
+        Log into <strong class="t-strong">${OFFICIAL_II_URL}</strong> with your
         Identity Anchor (<strong class="t-strong">${userNumber}</strong>)
       </li>
       <li>
