@@ -1036,6 +1036,7 @@ a:hover,
   flex-wrap: wrap;
   counter-reset: recovery;
   padding: 0;
+  list-style: none;
 }
 
 .c-list--recovery li {
@@ -1055,6 +1056,11 @@ a:hover,
   z-index: 1;
 
   --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
+}
+
+.c-list--recovery li::selection {
+  background-color: var(--current-color);
+  color: hsl(calc(150 + var(--i) * -180), 100%, 33%);
 }
 
 .c-list--recovery li::before {
