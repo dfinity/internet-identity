@@ -21,6 +21,7 @@ pub enum ContentType {
     ICO,
     WEBP,
     CSS,
+    OCTETSTREAM,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -86,7 +87,7 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 7] {
+fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     let about_html: &[u8] = ABOUT_HTML_STR.as_bytes();
     [
@@ -131,6 +132,14 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType);
             include_bytes!("../../../dist/favicon.ico"),
             ContentEncoding::Identity,
             ContentType::ICO,
+        ),
+        // Required to make II available on the identity.internetcomputer.org domain.
+        // See https://github.com/r-birkner/portal/blob/rjb/custom-domains-docs-v2/docs/developer-docs/production/custom-domain/custom-domain.md#custom-domains-on-the-boundary-nodes
+        (
+            "/.well-known/ic-domains",
+            b"identity.internetcomputer.org",
+            ContentEncoding::Identity,
+            ContentType::OCTETSTREAM,
         ),
     ]
 }
