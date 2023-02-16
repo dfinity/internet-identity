@@ -21,6 +21,7 @@ impl ContentType {
             ContentType::CSS => "text/css".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
+            ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
         }
     }
 }
