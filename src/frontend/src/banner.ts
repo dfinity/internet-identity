@@ -29,7 +29,7 @@ export const showWarningIfNecessary = (): void => {
   }
 };
 
-export const showWarning = (message: TemplateResult): void => {
+export const showWarning = (message: TemplateResult): HTMLDivElement => {
   const container = document.createElement("div");
   container.className = "features-warning-container";
   container.setAttribute("role", "alert");
@@ -72,4 +72,5 @@ export const showWarning = (message: TemplateResult): void => {
 
   render(warning, container);
   document.body.prepend(container);
+  return container;
 };
