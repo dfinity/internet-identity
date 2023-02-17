@@ -255,6 +255,7 @@ pub fn device_data_1() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://identity.internetcomputer.org".to_string()),
     }
 }
 
@@ -266,6 +267,7 @@ pub fn device_data_2() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://identity.ic0.app".to_string()),
     }
 }
 
@@ -277,6 +279,7 @@ pub fn max_size_device() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
     }
 }
 
@@ -288,6 +291,7 @@ pub fn recovery_device_data_1() -> DeviceData {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }
 
@@ -299,6 +303,7 @@ pub fn recovery_device_data_2() -> DeviceData {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }
 
@@ -522,6 +527,7 @@ pub fn log_entry_1() -> Entry {
                 purpose: Purpose::Authentication,
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
+                origin: None,
             },
         },
         sequence_number: 0,
@@ -540,6 +546,7 @@ pub fn log_entry_2() -> Entry {
                 purpose: Purpose::Authentication,
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
+                origin: Some("foo.bar".to_string()),
             },
         },
         sequence_number: 1,
@@ -559,6 +566,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 purpose: Some(Purpose::Authentication),
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
+                origin: Some(Some("foo.bar".to_string())),
             },
         },
         sequence_number: idx,

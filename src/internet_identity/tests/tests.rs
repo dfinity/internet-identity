@@ -52,6 +52,10 @@ mod upgrade_tests {
                 .expect("get_anchor_info failed");
 
         assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
+
+        let mut device_no_origin = device_data_1();
+        device_no_origin.origin = None;
+        assert_eq!(retrieved_device_data.devices, vec![device_no_origin]);
     }
 
     /// Test to verify that anchor numbers are unchanged by changing the user range.
@@ -270,7 +274,9 @@ mod rollback_tests {
 
         // use anchor
         let devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices, [device_data_1()]);
+        let mut device_without_origin = device_data_1();
+        device_without_origin.origin = None;
+        assert_eq!(devices, [device_without_origin]);
 
         let (user_key, _) = api::prepare_delegation(
             &env,
@@ -522,6 +528,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device2 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
@@ -530,6 +537,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device3 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
@@ -538,6 +546,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device4 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
@@ -546,6 +555,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device5 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
@@ -554,6 +564,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device6 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
@@ -562,6 +573,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         [device1, device2, device3, device4, device5, device6]
     }
@@ -1390,6 +1402,8 @@ mod device_management_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
+        let mut device_no_origin = device_data_2();
+        device_no_origin.origin = None;
 
         api::add(
             &env,
@@ -1399,7 +1413,7 @@ mod device_management_tests {
             device_data_2(),
         )?;
         let devices = api::lookup(&env, canister_id, user_number)?;
-        assert!(devices.iter().any(|device| device == &device_data_2()));
+        assert!(devices.iter().any(|device| device == &device_no_origin));
 
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -1413,7 +1427,7 @@ mod device_management_tests {
 
         let devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices.len(), 1);
-        assert!(!devices.iter().any(|device| device == &device_data_2()));
+        assert!(!devices.iter().any(|device| device == &device_no_origin));
         Ok(())
     }
 
