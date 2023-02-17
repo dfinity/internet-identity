@@ -623,7 +623,7 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
 // the current window location)
 export const inferHost = (): string => {
   // The domain used for the http api
-  const IC_API_DOMAIN = "ic0.app";
+  const IC_API_DOMAIN = "icp-api.io";
 
   const location = window?.location;
   if (location === undefined) {
