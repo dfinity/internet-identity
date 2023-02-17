@@ -54,22 +54,7 @@ export const setupRecovery = async (
         );
       }
       case "seedPhrase": {
-        const name = "Recovery phrase";
-        const seedPhrase = generate().trim();
-        const recoverIdentity = await fromMnemonicWithoutValidation(
-          seedPhrase,
-          IC_DERIVATION_PATH
-        );
-        await withLoader(() =>
-          connection.add(
-            name,
-            { seed_phrase: null },
-            { recovery: null },
-            recoverIdentity.getPublicKey().toDer(),
-            { unprotected: null }
-          )
-        );
-        await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
+        await setupPhrase(userNumber, connection);
         break;
       }
     }
@@ -81,4 +66,26 @@ export const setupRecovery = async (
       primaryButton: "Continue",
     });
   }
+};
+
+export const setupPhrase = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+) => {
+  const name = "Recovery phrase";
+  const seedPhrase = generate().trim();
+  const recoverIdentity = await fromMnemonicWithoutValidation(
+    seedPhrase,
+    IC_DERIVATION_PATH
+  );
+  await withLoader(() =>
+    connection.add(
+      name,
+      { seed_phrase: null },
+      { recovery: null },
+      recoverIdentity.getPublicKey().toDer(),
+      { unprotected: null }
+    )
+  );
+  await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
 };
