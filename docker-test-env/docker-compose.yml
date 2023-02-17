@@ -13,7 +13,7 @@ services:
     networks:
       ic:
         aliases:
-          - ic0.app
+          - icp-api.io
           # internet identity
           - identity.internetcomputer.org
           # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
