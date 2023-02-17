@@ -34,6 +34,7 @@ export const idlFactory = ({ IDL }) => {
   const CredentialId = IDL.Vec(IDL.Nat8);
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
+    'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,

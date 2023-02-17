@@ -43,6 +43,7 @@ export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'failed' : string };
 export interface DeviceData {
   'alias' : string,
+  'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
