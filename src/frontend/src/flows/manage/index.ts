@@ -310,7 +310,7 @@ export const displayManage = (
   // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
   // if they don't have one already. We lead them straight to recovery phrase creation, because
   // recovery _device_ would be tied to the domain (which we want to avoid).
-  if (window.location.origin === LEGACY_II_URL && !hasRecoveryDevice(devices)) {
+  if (window.location.origin === LEGACY_II_URL && !hasRecoveryPhrase(devices)) {
     const elem = showWarning(html`<strong class="t-strong">Important!</strong>
       Create a recovery phrase.
       <button
@@ -384,6 +384,10 @@ const renderDevices = async (
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
   devices.some((device) => "recovery" in device.purpose);
+
+// Whether the user has a recovery phrase or not
+const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
+  devices.some((device) => device.alias === "Recovery phrase");
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
