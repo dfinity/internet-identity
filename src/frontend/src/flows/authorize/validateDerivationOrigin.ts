@@ -11,7 +11,6 @@ type ValidationResult =
   | { result: "valid" }
   | { result: "invalid"; message: string };
 
-
 /**
  * Function to validate the derivationOrigin. The derivationOrigin allows an application to request principals of a
  * different origin, given that origin allows this by listing the requesting application origin in the
@@ -56,7 +55,9 @@ export const validateDerivationOrigin = async (
     // We only allow alternative origins of the form <canister-id>.(ic0.app|icp0.io), but the nns dapp
     // has always been on a custom domain (nns.ic0.app). This means instead of failing because the subdomain
     // is not a canister id (when the subdomain is 'nns'), we instead swap it for the nns-dapp's canister ID.
-    const NNS_DAPP_CANISTER_ID = Principal.fromText("qoctq-giaaa-aaaaa-aaaea-cai");
+    const NNS_DAPP_CANISTER_ID = Principal.fromText(
+      "qoctq-giaaa-aaaaa-aaaea-cai"
+    );
 
     // verifies that a valid principal id or the nns dapp was matched
     // (canister ids must be valid principal ids), throw an error (caught above) otherwise
@@ -66,7 +67,7 @@ export const validateDerivationOrigin = async (
         : Principal.fromText(subdomain);
 
     // Regardless of whether the _origin_ (from which principals are derived) is on ic0.app or icp0.io, we always
-        // query the list of alternative origins from icp0.io (official domain)
+    // query the list of alternative origins from icp0.io (official domain)
     const alternativeOriginsUrl = `https://${canisterId.toText()}.icp0.io/.well-known/ii-alternative-origins`;
     const response = await fetch(
       // always fetch non-raw
