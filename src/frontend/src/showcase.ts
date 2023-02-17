@@ -58,6 +58,7 @@ const recoveryPhrase: DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const recoveryPhraseText =
@@ -70,6 +71,7 @@ const recoveryDevice: DeviceData = {
   key_type: { unknown: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const simpleDevices: [DeviceData, DeviceData] = [
@@ -80,6 +82,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 
   {
@@ -89,6 +92,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 ];
 

@@ -142,6 +142,7 @@ export class Connection {
           key_type: { unknown: null },
           purpose: { authentication: null },
           protection: { unprotected: null },
+          origin: window?.origin === undefined ? [] : [window.origin],
         },
         challengeResult
       );
@@ -380,6 +381,7 @@ export class Connection {
       key_type: keyType,
       purpose,
       protection: { unprotected: null },
+      origin: window?.origin === undefined ? [] : [window.origin],
     });
   };
 
@@ -496,6 +498,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
+      origin: window?.origin === undefined ? [] : [window.origin],
     });
   };
 

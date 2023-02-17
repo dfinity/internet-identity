@@ -24,6 +24,7 @@ impl From<DeviceData> for Device {
             purpose: device_data.purpose,
             key_type: device_data.key_type,
             protection: device_data.protection,
+            origin: device_data.origin,
         }
     }
 }
@@ -37,6 +38,7 @@ impl From<Device> for DeviceData {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
+            origin: device.origin,
         }
     }
 }
@@ -49,6 +51,7 @@ impl From<Device> for DeviceDataWithoutAlias {
             purpose: device_data.purpose,
             key_type: device_data.key_type,
             protection: device_data.protection,
+            origin: device_data.origin,
         }
     }
 }
@@ -150,6 +153,7 @@ pub struct Device {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+    pub origin: Option<String>,
 }
 
 impl Device {
@@ -157,6 +161,7 @@ impl Device {
         self.alias.len()
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
+            + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
     }
 }
 
@@ -211,9 +216,9 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
     /// or change anchors in the future.
     /// The value 2048 was chosen because it is the max anchor size before the stable memory migration.
     /// This means that all pre-existing anchors are below this limit. And after the migration, the
-    /// candid encoded `vec devices` will stay far below 4KB in size (testing showed anchors of up to
-    /// 2259 bytes).
-    const VARIABLE_FIELDS_LIMIT: usize = 2048;
+    /// candid encoded `vec devices` will stay far below 4KB in size (testing showed anchors of
+    /// ~2500 bytes).
+    const VARIABLE_FIELDS_LIMIT: usize = 2348;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {
@@ -266,6 +271,7 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
 }
 
 fn check_device_limits(device: &Device) -> Result<(), AnchorError> {
+    const ORIGIN_LEN_LIMIT: usize = 50;
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;
     const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
@@ -298,6 +304,19 @@ fn check_device_limits(device: &Device) -> Result<(), AnchorError> {
             field: "credential_id".to_string(),
             length: n,
             limit: CREDENTIAL_ID_LEN_LIMIT,
+        });
+    }
+
+    let n = device
+        .origin
+        .as_ref()
+        .map(|bytes| bytes.len())
+        .unwrap_or_default();
+    if n > ORIGIN_LEN_LIMIT {
+        return Err(AnchorError::DeviceLimitExceeded {
+            field: "origin".to_string(),
+            length: n,
+            limit: ORIGIN_LEN_LIMIT,
         });
     }
     Ok(())

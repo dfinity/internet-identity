@@ -27,6 +27,7 @@ pub struct DeviceData {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+    pub origin: Option<String>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
