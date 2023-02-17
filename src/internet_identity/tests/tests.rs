@@ -50,7 +50,9 @@ mod upgrade_tests {
         let retrieved_device_data =
             api::lookup(&env, canister_id, user_number).expect("lookup failed");
 
-        assert_eq!(retrieved_device_data, vec![device_data_1()]);
+        let mut device_no_origin = device_data_1();
+        device_no_origin.origin = None;
+        assert_eq!(retrieved_device_data, vec![device_no_origin]);
     }
 
     /// Test to verify that anchors number range cannot be changed on upgrade.
@@ -166,7 +168,9 @@ mod rollback_tests {
 
         // use anchor
         let devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices, [device_data_1()]);
+        let mut device_without_origin = device_data_1();
+        device_without_origin.origin = None;
+        assert_eq!(devices, [device_without_origin]);
 
         let (user_key, _) = api::prepare_delegation(
             &env,

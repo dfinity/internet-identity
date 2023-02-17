@@ -116,7 +116,7 @@ fn should_enforce_cumulative_device_limit() {
     }
     let device = Device {
         pubkey: Default::default(),
-        alias: "a".repeat(64).to_string(),
+        alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([0; 100])),
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
