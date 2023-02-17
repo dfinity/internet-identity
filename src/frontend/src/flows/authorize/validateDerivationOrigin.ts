@@ -1,7 +1,8 @@
 import { Principal } from "@dfinity/principal";
 import { wrapError } from "../../utils/utils";
 
-const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
+const ORIGIN_VALIDATION_REGEX =
+  /^https:\/\/([\w-]+)(?:\.raw)?\.(?:ic0\.app|icp0\.io)$/;
 const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
   | { result: "valid" }
