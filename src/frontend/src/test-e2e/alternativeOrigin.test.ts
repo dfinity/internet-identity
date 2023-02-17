@@ -95,7 +95,7 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
       '"https://some-random-disallowed-url.com" is not a valid derivation origin for "https://nice-name.com"'
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      "derivationOrigin does not match regex /^https:\\/\\/([\\w-]+)(?:\\.raw)?\\.ic0\\.app$/"
+      "derivationOrigin does not match regex /^https:\\/\\/([\\w-]+)(?:\\.raw)?\\.(?:ic0\\.app|icp0\\.io)$/"
     );
   });
 }, 300_000);
@@ -202,7 +202,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       "certified"
     );
     await niceDemoAppView.setDerivationOrigin(
-      `https://${TEST_APP_CANISTER_ID}.raw.ic0.app`
+      `https://${TEST_APP_CANISTER_ID}.raw.icp0.io`
     );
     expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
     await niceDemoAppView.signin();
@@ -217,11 +217,11 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
 
     // Selenium has _no_ connectivity to the raw url
     await browser.execute(
-      `console.log(await fetch("https://${TEST_APP_CANISTER_ID}.raw.ic0.app/.well-known/ii-alternative-origins"))`
+      `console.log(await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins"))`
     );
     let logs = (await browser.getLogs("browser")) as { message: string }[];
     expect(logs[logs.length - 1].message).toEqual(
-      `https://${TEST_APP_CANISTER_ID}.raw.ic0.app/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 400 (Bad Request)`
+      `https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 400 (Bad Request)`
     );
 
     // This works anyway --> fetched using non-raw
