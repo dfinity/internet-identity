@@ -1,6 +1,6 @@
 import { render, html, TemplateResult } from "lit-html";
 import { anyFeatures } from "./features";
-import { OFFICIAL_II_URL } from "./config";
+import { OFFICIAL_II_URL, LEGACY_II_URL } from "./config";
 
 // Show a warning banner if the build is not "official". This happens if either the build
 // is a flavored build, or if the origin is not the official II URL.
@@ -14,7 +14,10 @@ export const showWarningIfNecessary = (): void => {
         href="https://github.com/dfinity/internet-identity#build-features"
         >more</a
       >`);
-  } else if (window.location.origin !== OFFICIAL_II_URL) {
+  } else if (
+    window.location.origin !== OFFICIAL_II_URL &&
+    window.location.origin !== LEGACY_II_URL
+  ) {
     showWarning(html`This is not the official Internet Identity.
       <a
         class="features-warning-btn"
