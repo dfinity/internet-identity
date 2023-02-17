@@ -113,10 +113,16 @@ mod rollback_tests {
         // rollback
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let logs = api::get_entries(&env, canister_id, None, None)?;
+        let logs = api::compat::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
-        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry1);
-        assert_eq!(logs.entries.get(1).unwrap().as_ref().unwrap(), &entry2);
+        assert_eq!(
+            logs.entries.get(0).unwrap().as_ref().unwrap(),
+            &api::compat::Entry::from(entry1)
+        );
+        assert_eq!(
+            logs.entries.get(1).unwrap().as_ref().unwrap(),
+            &api::compat::Entry::from(entry2)
+        );
         Ok(())
     }
 }
@@ -729,6 +735,7 @@ mod stable_memory_tests {
                     purpose: Purpose::Authentication,
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
+                    origin: None,
                 },
             },
             timestamp: TIMESTAMP,
@@ -764,6 +771,7 @@ mod stable_memory_tests {
                     purpose: Some(Purpose::Recovery),
                     key_type: None,
                     protection: None,
+                    origin: None,
                 },
             },
             timestamp: TIMESTAMP,

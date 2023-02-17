@@ -430,5 +430,10 @@ pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
         } else {
             Some(new.protection.clone())
         },
+        origin: if old.origin == new.origin {
+            None
+        } else {
+            Some(new.origin.clone())
+        },
     }
 }
