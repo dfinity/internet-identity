@@ -51,11 +51,9 @@ mod upgrade_tests {
             api::get_anchor_info(&env, canister_id, principal_1(), user_number)
                 .expect("get_anchor_info failed");
 
-        assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
-
         let mut device_no_origin = device_data_1();
         device_no_origin.origin = None;
-        assert_eq!(retrieved_device_data.devices, vec![device_no_origin]);
+        assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
     }
 
     /// Test to verify that anchor numbers are unchanged by changing the user range.
@@ -192,7 +190,7 @@ mod upgrade_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-        let stats = api::compat::stats(&env, canister_id)?;
+        let stats = api::stats(&env, canister_id)?;
 
         let result = upgrade_ii_canister_with_arg(
             &env,
@@ -274,9 +272,7 @@ mod rollback_tests {
 
         // use anchor
         let devices = api::lookup(&env, canister_id, user_number)?;
-        let mut device_without_origin = device_data_1();
-        device_without_origin.origin = None;
-        assert_eq!(devices, [device_without_origin]);
+        assert_eq!(devices, [device_data_1()]);
 
         let (user_key, _) = api::prepare_delegation(
             &env,
@@ -1402,8 +1398,6 @@ mod device_management_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
-        let mut device_no_origin = device_data_2();
-        device_no_origin.origin = None;
 
         api::add(
             &env,
@@ -1413,7 +1407,7 @@ mod device_management_tests {
             device_data_2(),
         )?;
         let devices = api::lookup(&env, canister_id, user_number)?;
-        assert!(devices.iter().any(|device| device == &device_no_origin));
+        assert!(devices.iter().any(|device| device == &device_data_2()));
 
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -1427,7 +1421,7 @@ mod device_management_tests {
 
         let devices = api::lookup(&env, canister_id, user_number)?;
         assert_eq!(devices.len(), 1);
-        assert!(!devices.iter().any(|device| device == &device_no_origin));
+        assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())
     }
 
