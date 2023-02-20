@@ -6,7 +6,7 @@ export const linkTeaser = ({
 }: {
   additionalClasses?: string[];
 }): TemplateResult => html`<article
-  class="c-card c-card--narrow${additionalClasses.length > 0
+  class="c-card c-card--narrow c-card--embossed${additionalClasses.length > 0
     ? " " + additionalClasses.join(" ")
     : ""}"
 >
@@ -15,23 +15,23 @@ export const linkTeaser = ({
     Use your Identity Anchor to create independent accounts with dapps on the
     Internet Computer.
   </p>
-  <ul class="c-list c-list--logos l-stack">
+  <ul class="c-list c-list--logos">
     <li>
       <a href="https://dscvr.one/" target="_blank" rel="noopener noreferrer">
         ${dscvrIcon}
-        <span class="l-stack--tight t-strong">DSCVR</span>
+        <span class="l-stack--tight">DSCVR</span>
       </a>
     </li>
     <li>
       <a href="https://distrikt.app/" target="_blank" rel="noopener noreferrer">
         ${distriktIcon}
-        <span class="l-stack--tight t-strong">Distrikt</span>
+        <span class="l-stack--tight">Distrikt</span>
       </a>
     </li>
     <li>
       <a href="https://oc.app/" target="_blank" rel="noopener noreferrer">
         ${openChatIcon}
-        <span class="l-stack--tight t-strong">OpenChat</span>
+        <span class="l-stack--tight">OpenChat</span>
       </a>
     </li>
   </ul>
