@@ -25,6 +25,7 @@ import {
   isRecoveryDevice,
   recoveryDeviceToLabel,
 } from "../../utils/recoveryDevice";
+import { linkTeaser } from "../../components/linkTeaser";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -119,6 +120,7 @@ const pageContent = ({
         Add devices and recovery methods to make your anchor more secure.
       </p>
     </hgroup>
+    ${linkTeaser({ additionalClasses: ["l-stack"] })}
     ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
     ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
     ${recoverySection(devices, onAddRecovery)} ${logoutSection()}

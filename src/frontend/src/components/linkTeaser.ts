@@ -1,8 +1,14 @@
 import { html, TemplateResult } from "lit-html";
 import { dscvrIcon, distriktIcon, openChatIcon } from "./icons";
 
-export const linkTeaser: TemplateResult = html`<article
-  class="c-card c-card--narrow"
+export const linkTeaser = ({
+  additionalClasses = [],
+}: {
+  additionalClasses?: string[];
+}): TemplateResult => html`<article
+  class="c-card c-card--narrow${additionalClasses.length > 0
+    ? " " + additionalClasses.join(" ")
+    : ""}"
 >
   <h3 class="t-title t-title--sub">Explore dapps</h3>
   <p class="t-lead">

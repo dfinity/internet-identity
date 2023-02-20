@@ -1,10 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import {
-  icLogo,
-  settingsIcon,
-} from "./components/icons";
+import { icLogo, settingsIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { linkTeaser } from "./components/linkTeaser";
 
@@ -349,9 +346,8 @@ export const styleguide = html`
           with a title and a description. It is used to group related links
           together.
         </p>
-
         <section class="demo" aria-label="Link Teaser Demo">
-          ${linkTeaser}
+          ${linkTeaser({})}
         </section>
         <p class="t-lead"></p>
       </aside>
