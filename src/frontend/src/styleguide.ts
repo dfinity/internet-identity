@@ -4,9 +4,6 @@ import { html } from "lit-html";
 import {
   icLogo,
   settingsIcon,
-  dscvrIcon,
-  distriktIcon,
-  openChatIcon,
 } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { linkTeaser } from "./components/linkTeaser";
