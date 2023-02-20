@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { browserIcon, securityKeyIcon } from "../../../components/icons";
 import { warnBox } from "../../../components/warnBox";
 import { mainWindow } from "../../../components/mainWindow";
+import { LEGACY_II_URL } from "../../../config";
 
 const pageContent = () => {
   const pageContentSlot = html` <article>
@@ -10,7 +11,7 @@ const pageContent = () => {
       additionalClasses: ["l-stack"],
       title: "Security Warning",
       message: html`Do not continue if you were prompted to do this by any
-        website other than <strong>https://identity.ic0.app</strong>!`,
+        website other than <strong>${LEGACY_II_URL}</strong>!`,
     })}
     <p class="t-lead l-stack">
       What type of device do you want to add to your Internet Identity? Make

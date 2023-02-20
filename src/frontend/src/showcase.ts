@@ -32,6 +32,7 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
+import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
 import { deviceSettingsPage } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
@@ -62,6 +63,7 @@ const recoveryPhrase: RecoveryDevice & DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const recoveryPhraseText =
@@ -74,6 +76,7 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   key_type: { unknown: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const simpleDevices: [DeviceData, DeviceData] = [
@@ -84,6 +87,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 
   {
@@ -93,6 +97,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 ];
 
@@ -148,6 +153,11 @@ const iiPages: Record<string, () => void> = {
     promptDeviceAliasPage({
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
+    }),
+  pickDeviceAlias: () =>
+    pickDeviceAliasPage({
+      cancel: () => console.log("canceled"),
+      pick: (alias) => console.log("device alias:", alias),
     }),
 
   // Authorize screens
@@ -205,6 +215,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   promptCaptchaReady: () =>
     promptCaptchaPage({
@@ -215,6 +226,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   chooseRecoveryMechanism: () =>
     chooseRecoveryMechanismPage({
@@ -379,6 +391,7 @@ const components = (): TemplateResult => {
                       () => (cr.chars === "8wJ6Q" ? "yes" : badChallenge)
                     ),
                   onContinue: () => console.log("Done"),
+                  i18n,
                 },
                 container
               )

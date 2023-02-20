@@ -5,6 +5,7 @@ import {
   TentativeDeviceInfo,
 } from "./registerTentativeDevice";
 import { mainWindow } from "../../../components/mainWindow";
+import { LEGACY_II_URL_NO_PROTOCOL } from "../../../config";
 
 const pageContent = (userNumber: bigint) => {
   const pageContentSlot = html` <article>
@@ -21,7 +22,8 @@ const pageContent = (userNumber: bigint) => {
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        Log into <strong class="t-strong">identity.ic0.app</strong> with your
+        Log into
+        <strong class="t-strong">${LEGACY_II_URL_NO_PROTOCOL}</strong> with your
         Identity Anchor (<strong class="t-strong">${userNumber}</strong>)
       </li>
       <li>

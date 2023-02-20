@@ -1,7 +1,11 @@
 import { Principal } from "@dfinity/principal";
 import { wrapError } from "../../utils/utils";
 
-const ORIGIN_VALIDATION_REGEX = /^https:\/\/([\w-]+)(?:\.raw)?\.ic0\.app$/;
+// Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
+// Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
+const ORIGIN_VALIDATION_REGEX =
+  /^https:\/\/([\w-]+)(?:\.raw)?\.(?:ic0\.app|icp0\.io)$/;
+
 const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
   | { result: "valid" }
@@ -46,10 +50,25 @@ export const validateDerivationOrigin = async (
         message: "invalid regex match result. No value for capture group 1.",
       };
     }
-    // verifies that a valid principal id was matched
-    // (canister ids must be valid principal ids)
-    const canisterId = Principal.fromText(matches[1]);
-    const alternativeOriginsUrl = `https://${canisterId.toText()}.ic0.app/.well-known/ii-alternative-origins`;
+    const subdomain = matches[1];
+
+    // We only allow alternative origins of the form <canister-id>.(ic0.app|icp0.io), but the nns dapp
+    // has always been on a custom domain (nns.ic0.app). This means instead of failing because the subdomain
+    // is not a canister id (when the subdomain is 'nns'), we instead swap it for the nns-dapp's canister ID.
+    const NNS_DAPP_CANISTER_ID = Principal.fromText(
+      "qoctq-giaaa-aaaaa-aaaea-cai"
+    );
+
+    // verifies that a valid principal id or the nns dapp was matched
+    // (canister ids must be valid principal ids), throw an error (caught above) otherwise
+    const canisterId =
+      subdomain === "nns"
+        ? NNS_DAPP_CANISTER_ID
+        : Principal.fromText(subdomain);
+
+    // Regardless of whether the _origin_ (from which principals are derived) is on ic0.app or icp0.io, we always
+    // query the list of alternative origins from icp0.io (official domain)
+    const alternativeOriginsUrl = `https://${canisterId.toText()}.icp0.io/.well-known/ii-alternative-origins`;
     const response = await fetch(
       // always fetch non-raw
       alternativeOriginsUrl,

@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { warnBox } from "../components/warnBox";
 import { LoginFlowCanceled, cancel } from "../utils/flowResult";
 import { mainWindow } from "../components/mainWindow";
+import { LEGACY_II_URL } from "../config";
 
 const pageContent = (onCancel: () => void) => {
   const pageContentSlot = html` <hgroup>
@@ -13,9 +14,7 @@ const pageContent = (onCancel: () => void) => {
         message: html`<p class="t-paragraph t-lead">
             To keep you safe, we disabled registration from this address. If you
             want to securely create a new Internet Identity, visit:
-            <a class="t-link" href="https://identity.ic0.app"
-              >https://identity.ic0.app</a
-            >.
+            <a class="t-link" href=${LEGACY_II_URL}>${LEGACY_II_URL}</a>.
           </p>
           <p class="t-paragraph">
             If you were redirected here by another website, please inform the

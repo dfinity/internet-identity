@@ -67,7 +67,7 @@ fn should_read_previous_write() {
 
 #[test]
 fn should_serialize_first_record() {
-    const EXPECTED_LENGTH: usize = 191;
+    const EXPECTED_LENGTH: usize = 200;
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
@@ -84,7 +84,7 @@ fn should_serialize_first_record() {
 
 #[test]
 fn should_serialize_subsequent_record_to_expected_memory_location() {
-    const EXPECTED_LENGTH: usize = 191;
+    const EXPECTED_LENGTH: usize = 200;
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
@@ -326,6 +326,7 @@ fn sample_device() -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }
 
