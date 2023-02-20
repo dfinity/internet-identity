@@ -51,6 +51,8 @@ mod upgrade_tests {
             api::get_anchor_info(&env, canister_id, principal_1(), user_number)
                 .expect("get_anchor_info failed");
 
+        let mut device_no_origin = device_data_1();
+        device_no_origin.origin = None;
         assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
     }
 
@@ -188,7 +190,7 @@ mod upgrade_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-        let stats = api::compat::stats(&env, canister_id)?;
+        let stats = api::stats(&env, canister_id)?;
 
         let result = upgrade_ii_canister_with_arg(
             &env,
@@ -522,6 +524,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device2 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
@@ -530,6 +533,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device3 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
@@ -538,6 +542,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device4 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
@@ -546,6 +551,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device5 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
@@ -554,6 +560,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device6 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
@@ -562,6 +569,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         [device1, device2, device3, device4, device5, device6]
     }

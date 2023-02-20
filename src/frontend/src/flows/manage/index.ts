@@ -1,9 +1,11 @@
 import { TemplateResult, render, html } from "lit-html";
+import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { deviceSettings } from "./deviceSettings";
+import { showWarning } from "../../banner";
 import {
   DeviceData,
   IdentityAnchorInfo,
@@ -14,7 +16,7 @@ import {
   authenticateBox,
   AuthnTemplates,
 } from "../../components/authenticateBox";
-import { setupRecovery } from "../recovery/setupRecovery";
+import { setupRecovery, setupPhrase } from "../recovery/setupRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
@@ -320,6 +322,25 @@ export const displayManage = (
       renderManage(userNumber, connection);
     },
   });
+
+  // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
+  // if they don't have one already. We lead them straight to recovery phrase creation, because
+  // recovery _device_ would be tied to the domain (which we want to avoid).
+  if (window.location.origin === LEGACY_II_URL && !hasRecoveryPhrase(devices)) {
+    const elem = showWarning(html`<strong class="t-strong">Important!</strong>
+      Create a recovery phrase.
+      <button
+        class="features-warning-btn"
+        @click=${async () => {
+          await setupPhrase(userNumber, connection);
+          elem.remove();
+          renderManage(userNumber, connection);
+        }}
+      >
+        Create
+      </button> `);
+  }
+
   render(template, container);
   renderDevices(userNumber, connection, devices);
 };
@@ -380,6 +401,10 @@ const renderDevices = async (
 // Whether or the user has registered a device as recovery
 const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
   devices.some((device) => "recovery" in device.purpose);
+
+// Whether the user has a recovery phrase or not
+const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
+  devices.some((device) => device.alias === "Recovery phrase");
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
