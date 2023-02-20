@@ -335,3 +335,11 @@ export const browserIcon = html` <svg
   <path fill="currentColor" d="M76 61V46h4v15h-4Z" />
   <path fill="currentColor" d="M67 59V46h4v13h-4Z" />
 </svg>`;
+
+export const dropdownIcon = html`<i
+  class="c-icon c-icon--more c-icon--outlined"
+>
+  <i class="c-icon--more__dot"></i>
+  <i class="c-icon--more__dot"></i>
+  <i class="c-icon--more__dot"></i>
+</i>`;

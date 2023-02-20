@@ -510,6 +510,64 @@ a:hover,
  */
 
 /**
+ * Icon
+ */
+
+.c-icon--more {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: inline-block;
+  --rotate: 0;
+  --offsetY: 0;
+  --bgc: currentColor;
+}
+
+:is(button, a, link, .c-dropdown):hover .c-icon--more {
+  --rotate: -90deg;
+  --bgc: var(--rc-interaction-text);
+}
+
+.c-icon--more__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--bgc);
+  width: 0.3rem;
+  height: 0.3rem;
+  transform: translate(-50%, -50%) rotate(var(--rotate, 0deg))
+    translateY(var(--offsetY, 0));
+  transition: 200ms transform cubic-bezier(0.3, 0.7, 0, 1),
+    250ms background-color linear;
+  border-radius: 50%;
+}
+
+.c-icon--more__dot:nth-child(1) {
+  --offsetY: -0.4rem;
+  transition-delay: 50ms, 50ms;
+}
+
+.c-icon--more__dot:nth-child(3) {
+  --offsetY: 0.4rem;
+  transition-delay: 100ms, 100ms;
+}
+
+.c-icon--outlined {
+  box-shadow: 0 0 0 1px var(--rc-line);
+  border-radius: 1px;
+  transition: box-shadow 200ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+:is(button, a, link, .c-dropdown) .c-icon--outlined,
+.c-icon--outlined:is(button, a, link, .c-dropdown) {
+  box-shadow: 0 0 0 1px var(--rc-button), 0 0 1em var(--rc-line);
+}
+
+:is(button, a, link, .c-dropdown):hover .c-icon--outlined {
+  box-shadow: 0 0 0 1px var(--rc-line), 0 0 0.3em var(--rc-line);
+}
+
+/**
  * Card components
  */
 

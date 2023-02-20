@@ -1,7 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon } from "./components/icons";
+import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -330,7 +330,7 @@ export const styleguide = html`
                   aria-expanded="false"
                   aria-controls="dropdown-i"
                 >
-                  ${settingsIcon}
+                  ${dropdownIcon}
                 </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
@@ -350,7 +350,7 @@ export const styleguide = html`
                   aria-expanded="false"
                   aria-controls="dropdown-i"
                 >
-                  ${settingsIcon}
+                  ${dropdownIcon}
                 </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
