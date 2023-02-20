@@ -2,7 +2,7 @@ import { TemplateResult, render, html } from "lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { unreachable } from "../../utils/utils";
+import { unreachable, unknownToString } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
@@ -27,6 +27,16 @@ import {
   isRecoveryDevice,
   recoveryDeviceToLabel,
 } from "../../utils/recoveryDevice";
+
+// A simple representation of "device"s used on the manage page.
+export type Device = {
+  // Open the settings screen for that particular device
+  openSettings: () => Promise<void>;
+  // The displayed name of a device (not exactly the "alias") because
+  // recovery devices handle aliases differently.
+  label: string;
+  isRecovery: boolean;
+};
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -94,8 +104,6 @@ const displayFailedToListDevices = (error: Error) =>
 // and we (the frontend) only allow user one recovery device per type (phrase, fob),
 // which leaves room for 8 authenticator devices.
 const MAX_AUTHENTICATORS = 8;
-const numAuthenticators = (devices: DeviceData[]) =>
-  devices.filter((device) => "authentication" in device.purpose).length;
 
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
@@ -105,12 +113,14 @@ const numAuthenticators = (devices: DeviceData[]) =>
 // recovery devices.
 const pageContent = ({
   userNumber,
-  devices,
+  authenticators,
+  recoveries,
   onAddDevice,
   onAddRecovery,
 }: {
   userNumber: bigint;
-  devices: DeviceData[];
+  authenticators: Device[];
+  recoveries: Device[];
   onAddDevice: (next: "canceled" | "local" | "remote") => void;
   onAddRecovery: () => void;
 }): TemplateResult => {
@@ -121,9 +131,10 @@ const pageContent = ({
         Add devices and recovery methods to make your anchor more secure.
       </p>
     </hgroup>
-    ${anchorSection(userNumber)} ${devicesSection(devices, onAddDevice)}
-    ${!hasRecoveryDevice(devices) ? recoveryNag({ onAddRecovery }) : undefined}
-    ${recoverySection(devices, onAddRecovery)} ${logoutSection()}
+    ${anchorSection(userNumber)}
+    ${devicesSection({ authenticators, onAddDevice })}
+    ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
+    ${recoverySection({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
   return mainWindow({
@@ -143,12 +154,16 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
-const devicesSection = (
-  devices: DeviceData[],
-  onAddDevice: (next: "canceled" | "local" | "remote") => void
-): TemplateResult => {
+// The regular, "authenticator" devices
+const devicesSection = ({
+  authenticators,
+  onAddDevice,
+}: {
+  authenticators: Device[];
+  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+}): TemplateResult => {
   const wrapClasses = ["l-stack"];
-  const isWarning = devices.length < 2;
+  const isWarning = authenticators.length < 2;
 
   if (isWarning === true) {
     wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
@@ -170,7 +185,7 @@ const devicesSection = (
             <span class="c-tooltip__message c-card c-card--narrow">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
-              (${numAuthenticators(devices)}/${MAX_AUTHENTICATORS})
+              (${authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
         </div>
@@ -184,10 +199,21 @@ const devicesSection = (
         }
 
         <div class="c-action-list">
-          <div id="deviceList"></div>
+          <div id="deviceList">
+          <ul>
+          ${authenticators.map((device) => {
+            return html`
+              <li class="c-action-list__item">
+                ${deviceListItem({
+                  device,
+                })}
+              </li>
+            `;
+          })}</ul>
+          </div>
           <div class="c-action-list__actions">
-            <button 
-              ?disabled=${numAuthenticators(devices) >= MAX_AUTHENTICATORS}
+            <button
+              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
               @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
               id="addAdditionalDevice"
@@ -205,20 +231,35 @@ const devicesSection = (
     </aside>`;
 };
 
-const recoverySection = (
-  devices: DeviceData[],
-  onAddRecovery: () => void
-): TemplateResult => {
+// The list of recovery devices
+const recoverySection = ({
+  recoveries,
+  onAddRecovery,
+}: {
+  recoveries: Device[];
+  onAddRecovery: () => void;
+}): TemplateResult => {
   return html`
     <aside class="l-stack">
-      ${!hasRecoveryDevice(devices)
+      ${recoveries.length === 0
         ? undefined
         : html`
             <div class="t-title">
               <h2>Recovery methods</h2>
             </div>
             <div class="c-action-list">
-              <div id="recoveryList"></div>
+              <div id="recoveryList">
+                <ul>
+                  ${recoveries.map(
+                    (device) =>
+                      html`
+                        <li class="c-action-list__item">
+                          ${deviceListItem({ device })}
+                        </li>
+                      `
+                  )}
+                </ul>
+              </div>
               <div class="c-action-list__actions">
                 <button
                   @click="${onAddRecovery}"
@@ -234,17 +275,15 @@ const recoverySection = (
   `;
 };
 
-const deviceListItem = (device: DeviceData) => {
-  const label = isRecoveryDevice(device)
-    ? recoveryDeviceToLabel(device)
-    : device.alias;
+const deviceListItem = ({ device }: { device: Device }) => {
   return html`
-    <div class="c-action-list__label">${label}</div>
+    <div class="c-action-list__label">${device.label}</div>
     <button
       type="button"
       aria-label="settings"
       data-action="settings"
       class="c-action-list__action"
+      @click=${() => device.openSettings()}
     >
       ${settingsIcon}
     </button>
@@ -293,9 +332,33 @@ export const displayManage = (
   devices: DeviceData[]
 ): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
+  const hasSingleDevice = devices.length <= 1;
+
+  const _devices = devices.map((device) => ({
+    openSettings: async () => {
+      try {
+        await deviceSettings(userNumber, connection, device, hasSingleDevice);
+      } catch (e: unknown) {
+        await displayError({
+          title: "Could not edit device",
+          message: "An error happened on the settings page.",
+          detail: unknownToString(e, "unknown error"),
+          primaryButton: "Ok",
+        });
+      }
+
+      await renderManage(userNumber, connection);
+    },
+    label: isRecoveryDevice(device)
+      ? recoveryDeviceToLabel(device)
+      : device.alias,
+    isRecovery: isRecoveryDevice(device),
+  }));
+
   const template = pageContent({
     userNumber,
-    devices,
+    authenticators: _devices.filter((device) => !device.isRecovery),
+    recoveries: _devices.filter((device) => device.isRecovery),
     onAddDevice: async (nextAction) => {
       switch (nextAction) {
         case "canceled": {
@@ -340,65 +403,7 @@ export const displayManage = (
   }
 
   render(template, container);
-  renderDevices(userNumber, connection, devices);
 };
-
-const renderDevices = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  devices: DeviceData[]
-) => {
-  const list = document.createElement("ul");
-  const recoveryList = document.createElement("ul");
-  const isOnlyDevice = devices.length < 2;
-
-  devices.forEach((device) => {
-    const identityElement = document.createElement("li");
-    identityElement.className = "c-action-list__item";
-
-    render(deviceListItem(device), identityElement);
-    const buttonSettings = identityElement.querySelector(
-      "button[data-action=settings]"
-    ) as HTMLButtonElement;
-    if (buttonSettings !== null) {
-      buttonSettings.onclick = async () => {
-        await deviceSettings(
-          userNumber,
-          connection,
-          device,
-          isOnlyDevice
-        ).catch((e) =>
-          displayError({
-            title: "Could not edit device",
-            message: "An error happened on the settings page.",
-            detail: e.toString(),
-            primaryButton: "Ok",
-          })
-        );
-        await renderManage(userNumber, connection);
-      };
-    }
-    "recovery" in device.purpose
-      ? recoveryList.appendChild(identityElement)
-      : list.appendChild(identityElement);
-  });
-  const deviceList = document.getElementById("deviceList") as HTMLElement;
-  deviceList.innerHTML = ``;
-  deviceList.appendChild(list);
-
-  const recoveryDevices = document.getElementById(
-    "recoveryList"
-  ) as HTMLElement;
-
-  if (recoveryDevices !== null) {
-    recoveryDevices.innerHTML = ``;
-    recoveryDevices.appendChild(recoveryList);
-  }
-};
-
-// Whether or the user has registered a device as recovery
-const hasRecoveryDevice = (devices: DeviceData[]): boolean =>
-  devices.some((device) => "recovery" in device.purpose);
 
 // Whether the user has a recovery phrase or not
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
