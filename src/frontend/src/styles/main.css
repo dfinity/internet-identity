@@ -565,6 +565,8 @@ a:hover,
 
 :is(button, a, link, .c-dropdown):hover .c-icon--outlined {
   box-shadow: 0 0 0 1px var(--rc-line), 0 0 0.3em var(--rc-line);
+  background-color: var(--rc-button);
+  --bgc: var(--rc-onButton);
 }
 
 /**
