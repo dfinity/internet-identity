@@ -9,6 +9,7 @@ import {
   openChatIcon,
 } from "./components/icons";
 import { warnBox } from "./components/warnBox";
+import { linkTeaser } from "./components/linkTeaser";
 
 export const styleguide = html`
   <style>
@@ -353,33 +354,7 @@ export const styleguide = html`
         </p>
 
         <section class="demo" aria-label="Link Teaser Demo">
-          <article class="c-card c-card--narrow">
-            <h3 class="t-title t-title--sub">Explore dapps</h3>
-            <p class="t-lead">
-              Use your Identity Anchor to create independent accounts with dapps
-              on the Internet Computer.
-            </p>
-            <ul class="c-list c-list--logos l-stack">
-              <li>
-                <a href="#" target="_blank" rel="noopener noreferrer">
-                  ${dscvrIcon}
-                  <span class="l-stack--tight t-strong">DSCVR</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" target="_blank" rel="noopener noreferrer">
-                  ${distriktIcon}
-                  <span class="l-stack--tight t-strong">Distrikt</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" target="_blank" rel="noopener noreferrer">
-                  ${openChatIcon}
-                  <span class="l-stack--tight t-strong">OpenChat</span>
-                </a>
-              </li>
-            </ul>
-          </article>
+          ${linkTeaser}
         </section>
         <p class="t-lead"></p>
       </aside>
