@@ -510,6 +510,35 @@ a:hover,
  */
 
 /**
+ * Icon components
+ */
+.c-icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--vs-line-height));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.c-icon--block {
+  display: block;
+  height: auto;
+  aspect-ratio: none;
+}
+
+.c-icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.c-icon--warning [fill] {
+  fill: var(--rc-warning);
+}
+
+/**
  * Card components
  */
 

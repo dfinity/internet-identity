@@ -300,9 +300,14 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
       ${device.dupCount ? /* TODO: */ html`(${device.dupCount})` : undefined}
     </div>
     ${device.warn !== undefined
-      ? /* TODO: */ html`<span
-          >!!!<span style="display: none;">${device.warn}</span></span
-        >`
+      ? html`<div class="c-action-list__action">
+          <span class="c-tooltip c-icon c-icon--warning" tabindex="0"
+            >${warningIcon}<span
+              class="c-tooltip__message c-card c-card--narrow"
+              >${device.warn}</span
+            ></span
+          >
+        </div>`
       : undefined}
     <button
       type="button"
