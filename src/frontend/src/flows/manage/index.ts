@@ -111,7 +111,7 @@ const MAX_AUTHENTICATORS = 8;
 // that they add a recovery device. If the user _does_ have at least one
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
-const pageContent = ({
+const displayManageTemplate = ({
   userNumber,
   authenticators,
   recoveries,
@@ -326,12 +326,20 @@ export const renderManage = async (
   }
 };
 
+export const displayManagePage = (
+  props: Parameters<typeof displayManageTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(displayManageTemplate(props), contain);
+};
+
 export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
 ): void => {
-  const container = document.getElementById("pageContent") as HTMLElement;
   const hasSingleDevice = devices.length <= 1;
 
   const _devices = devices.map((device) => ({
@@ -355,7 +363,7 @@ export const displayManage = (
     isRecovery: isRecoveryDevice(device),
   }));
 
-  const template = pageContent({
+  displayManagePage({
     userNumber,
     authenticators: _devices.filter((device) => !device.isRecovery),
     recoveries: _devices.filter((device) => device.isRecovery),
@@ -401,8 +409,6 @@ export const displayManage = (
         Create
       </button> `);
   }
-
-  render(template, container);
 };
 
 // Whether the user has a recovery phrase or not
