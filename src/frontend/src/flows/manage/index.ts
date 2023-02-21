@@ -465,22 +465,22 @@ const domainWarning = (device: DeviceData): TemplateResult | undefined => {
     return undefined;
   }
 
-  // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore
+  // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
   if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
-    return html`This device seems to have been migrated to another domain
-    (${deviceOrigin}) and might not work on this domain (${window.origin})`;
+    return html`This device may not usable on the current URL (${window.origin})`;
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
   if (deviceOrigin === undefined) {
-    return html`This device does not have domain information attached and might
-    not work as expected.`;
+    return html`This device may not be usable on the current URL. If you have
+    not done so already, add the device to make it available on this URL
+    (${window.origin})`;
   }
 
   // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
   if (deviceOrigin !== window.origin) {
-    return html`This device seems to have been added to another domain
-    (${deviceOrigin}) and might need to be migrated to this domain
+    return html`This device may not be usable on the current URL. If you have
+    not done so already, add the device to make it available on this URL
     (${window.origin})`;
   }
 
