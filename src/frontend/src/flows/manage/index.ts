@@ -316,6 +316,7 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
       : undefined}
     <button
       type="button"
+      device=${device.label}
       aria-label="settings"
       data-action="settings"
       class="c-action-list__action"
