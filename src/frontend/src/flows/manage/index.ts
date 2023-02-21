@@ -36,8 +36,10 @@ export type Device = {
   // recovery devices handle aliases differently.
   label: string;
   isRecovery: boolean;
-  badOrigin?: boolean;
+  warn?: TemplateResult;
 };
+
+export type DedupDevice = Device & { dupCount?: number };
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -155,12 +157,12 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
-const dedupLabels = (authenticators: Device[]): Device[] => {
+const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
   return authenticators.reduce<Device[]>((acc, authenticator) => {
-    const _authenticator = { ...authenticator };
+    const _authenticator: DedupDevice = { ...authenticator };
     const sameName = acc.filter((a) => a.label === _authenticator.label);
     if (sameName.length >= 1) {
-      _authenticator.label = _authenticator.label + ` (${sameName.length + 1})`;
+      _authenticator.dupCount = sameName.length + 1;
     }
 
     acc.push(_authenticator);
@@ -291,10 +293,17 @@ const recoverySection = ({
   `;
 };
 
-const deviceListItem = ({ device }: { device: Device }) => {
+const deviceListItem = ({ device }: { device: DedupDevice }) => {
   return html`
-    <div class="c-action-list__label">${device.label}</div>
-    ${device.badOrigin === true ? html`<span>warn</span>` : undefined}
+    <div class="c-action-list__label">
+      ${device.label}
+      ${device.dupCount ? /* TODO: */ html`(${device.dupCount})` : undefined}
+    </div>
+    ${device.warn !== undefined
+      ? /* TODO: */ html`<span
+          >!!!<span style="display: none;">${device.warn}</span></span
+        >`
+      : undefined}
     <button
       type="button"
       aria-label="settings"
@@ -378,6 +387,13 @@ export const displayManage = (
       ? recoveryDeviceToLabel(device)
       : device.alias,
     isRecovery: isRecoveryDevice(device),
+    warn:
+      device.origin.length === 1 &&
+      device.origin[0] !== window.origin &&
+      "platform" in device.key_type
+        ? html`This device was registered on another domain
+          $(${device.origin[0]}).`
+        : undefined,
   }));
 
   displayManagePage({

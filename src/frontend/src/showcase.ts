@@ -265,7 +265,7 @@ const iiPages: Record<string, () => void> = {
           label: "Yubikey Blue",
           isRecovery: false,
           openSettings: () => Promise.resolve(),
-          badOrigin: true,
+          warn: html`Something is rotten in the state of Device`,
         },
       ],
       recoveries: [
