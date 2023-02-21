@@ -261,6 +261,12 @@ const iiPages: Record<string, () => void> = {
           isRecovery: false,
           openSettings: () => Promise.resolve(),
         },
+        {
+          label: "Yubikey Blue",
+          isRecovery: false,
+          openSettings: () => Promise.resolve(),
+          badOrigin: true,
+        },
       ],
       recoveries: [
         {

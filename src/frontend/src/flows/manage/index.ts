@@ -36,6 +36,7 @@ export type Device = {
   // recovery devices handle aliases differently.
   label: string;
   isRecovery: boolean;
+  badOrigin?: boolean;
 };
 
 /* Template for the authbox when authenticating to II */
@@ -154,6 +155,19 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
+const dedupLabels = (authenticators: Device[]): Device[] => {
+  return authenticators.reduce<Device[]>((acc, authenticator) => {
+    const _authenticator = { ...authenticator };
+    const sameName = acc.filter((a) => a.label === _authenticator.label);
+    if (sameName.length >= 1) {
+      _authenticator.label = _authenticator.label + ` (${sameName.length + 1})`;
+    }
+
+    acc.push(_authenticator);
+    return acc;
+  }, []);
+};
+
 // The regular, "authenticator" devices
 const devicesSection = ({
   authenticators,
@@ -168,6 +182,8 @@ const devicesSection = ({
   if (isWarning === true) {
     wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
   }
+
+  const _authenticators = dedupLabels(authenticators);
 
   return html`
     <aside class="${wrapClasses.join(" ")}">
@@ -185,7 +201,7 @@ const devicesSection = ({
             <span class="c-tooltip__message c-card c-card--narrow">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
-              (${authenticators.length}/${MAX_AUTHENTICATORS})
+              (${_authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
         </div>
@@ -201,7 +217,7 @@ const devicesSection = ({
         <div class="c-action-list">
           <div id="deviceList">
           <ul>
-          ${authenticators.map((device) => {
+          ${_authenticators.map((device) => {
             return html`
               <li class="c-action-list__item">
                 ${deviceListItem({
@@ -213,7 +229,7 @@ const devicesSection = ({
           </div>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+              ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
               @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
               id="addAdditionalDevice"
@@ -278,6 +294,7 @@ const recoverySection = ({
 const deviceListItem = ({ device }: { device: Device }) => {
   return html`
     <div class="c-action-list__label">${device.label}</div>
+    ${device.badOrigin === true ? html`<span>warn</span>` : undefined}
     <button
       type="button"
       aria-label="settings"
