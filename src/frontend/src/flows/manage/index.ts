@@ -39,6 +39,8 @@ export type Device = {
   warn?: TemplateResult;
 };
 
+// A device with extra information about whether another device (earlier in the list)
+// has the same name.
 export type DedupDevice = Device & { dupCount?: number };
 
 /* Template for the authbox when authenticating to II */
@@ -157,6 +159,7 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
+// Deduplicate devices with same (duplicated) labels
 const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
   return authenticators.reduce<Device[]>((acc, authenticator) => {
     const _authenticator: DedupDevice = { ...authenticator };
@@ -297,7 +300,7 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
   return html`
     <div class="c-action-list__label">
       ${device.label}
-      ${device.dupCount
+      ${device.dupCount !== undefined && device.dupCount > 0
         ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
         : undefined}
     </div>
@@ -394,13 +397,7 @@ export const displayManage = (
       ? recoveryDeviceToLabel(device)
       : device.alias,
     isRecovery: isRecoveryDevice(device),
-    warn:
-      device.origin.length === 1 &&
-      device.origin[0] !== window.origin &&
-      "platform" in device.key_type
-        ? html`This device was registered on another domain
-          $(${device.origin[0]}).`
-        : undefined,
+    warn: domainWarning(device),
   }));
 
   displayManagePage({
@@ -451,9 +448,50 @@ export const displayManage = (
   }
 };
 
+// Show a domain-related warning, if necessary.
+const domainWarning = (device: DeviceData): TemplateResult | undefined => {
+  // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
+  if (isRecoveryPhrase(device)) {
+    return undefined;
+  }
+
+  // XXX: work around didc-generated oddities in types
+  const deviceOrigin =
+    device.origin.length === 0 ? undefined : device.origin[0];
+
+  // If this is the _old_ II (ic0.app) and no origin was recorded, then we can't infer much and don't show a warning.
+  if (window.origin === LEGACY_II_URL && deviceOrigin === undefined) {
+    return undefined;
+  }
+
+  // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore
+  if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
+    return html`This device seems to have been migrated to another domain
+    (${deviceOrigin}) and might not work on this domain (${window.origin})`;
+  }
+
+  // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
+  if (deviceOrigin === undefined) {
+    return html`This device does not have domain information attached and might
+    not work as expected.`;
+  }
+
+  // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
+  if (deviceOrigin !== window.origin) {
+    return html`This device seems to have been added to another domain
+    (${deviceOrigin}) and might need to be migrated to this domain
+    (${window.origin})`;
+  }
+
+  return undefined;
+};
+
 // Whether the user has a recovery phrase or not
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
   devices.some((device) => device.alias === "Recovery phrase");
+
+const isRecoveryPhrase = (device: DeviceData): boolean =>
+  "seed_phrase" in device.key_type;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
