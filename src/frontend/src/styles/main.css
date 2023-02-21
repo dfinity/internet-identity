@@ -398,8 +398,14 @@ body {
   font-size: 1.5rem;
 }
 
+.t-muted {
+  color: var(--rc-text--disabled);
+  font-size: 0.8em;
+}
+
 .t-discreet {
   font-size: 0.8em;
+  vertical-align: baseline;
 }
 
 a,

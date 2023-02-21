@@ -297,7 +297,9 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
   return html`
     <div class="c-action-list__label">
       ${device.label}
-      ${device.dupCount ? /* TODO: */ html`(${device.dupCount})` : undefined}
+      ${device.dupCount
+        ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
+        : undefined}
     </div>
     ${device.warn !== undefined
       ? html`<div class="c-action-list__action">
