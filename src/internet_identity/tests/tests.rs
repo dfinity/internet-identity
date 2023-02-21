@@ -230,7 +230,10 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
-        let mut devices_before = api::lookup(&env, canister_id, user_number).unwrap();
+        let mut devices_before =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+                .unwrap()
+                .devices;
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
         api::health_check(&env, canister_id);
         upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
@@ -271,7 +274,7 @@ mod rollback_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
 
         // use anchor
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices, [device_data_1()]);
 
         let (user_key, _) = api::prepare_delegation(
@@ -1406,7 +1409,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -1419,7 +1422,7 @@ mod device_management_tests {
             device_data_2().pubkey,
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())
