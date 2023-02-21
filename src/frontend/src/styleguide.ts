@@ -305,19 +305,34 @@ export const styleguide = html`
             </li>
           </ul>
 
-          <ul class="c-action-list">
-            <li class="c-action-list__item">
-              <span class="c-action-list__label">Actionable List Item</span>
-              <button class="c-action-list__action">${settingsIcon}</button>
-            </li>
-            <li class="c-action-list__item">
-              <span class="c-action-list__label">Second List Item</span>
-              <button class="c-action-list__action">${settingsIcon}</button>
-            </li>
-            <li class="c-action-list__actions">
+          <div class="c-action-list">
+            <ul>
+              <li class="c-action-list__item">
+                <span class="c-action-list__label">Actionable List Item</span>
+                <button class="c-action-list__action">${settingsIcon}</button>
+              </li>
+              <li class="c-action-list__item">
+                <span class="c-action-list__label">Second List Item</span>
+                <button class="c-action-list__action">${settingsIcon}</button>
+              </li>
+            </ul>
+            <div class="l-divider l-divider--text">
+              <h2 class="l-divider__text t-strong">some-other-origin.cc</h2>
+            </div>
+            <ul>
+              <li class="c-action-list__item">
+                <span class="c-action-list__label">Actionable List Item</span>
+                <button class="c-action-list__action">${settingsIcon}</button>
+              </li>
+              <li class="c-action-list__item">
+                <span class="c-action-list__label">Actionable List Item</span>
+                <button class="c-action-list__action">${settingsIcon}</button>
+              </li>
+            </ul>
+            <div class="c-action-list__actions">
               <button class="c-button c-button--primary">Some action</button>
-            </li>
-          </ul>
+            </div>
+          </div>
 
           ${warnBox({
             title: "Devices",
