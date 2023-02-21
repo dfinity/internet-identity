@@ -30,7 +30,7 @@ import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
 import { displayUserNumberPage } from "./flows/register/finish";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
-import { displayManage, authnTemplateManage } from "./flows/manage";
+import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
 import { deviceSettingsPage } from "./flows/manage/deviceSettings";
@@ -248,12 +248,52 @@ const iiPages: Record<string, () => void> = {
       }
     ),
   displayManage: () =>
-    displayManage(userNumber, dummyConnection, [
-      ...simpleDevices,
-      recoveryPhrase,
-    ]),
+    displayManagePage({
+      userNumber,
+      authenticators: [
+        {
+          label: "Chrome on iPhone",
+          isRecovery: false,
+          openSettings: () => Promise.resolve(),
+        },
+        {
+          label: "Yubikey Blue",
+          isRecovery: false,
+          openSettings: () => Promise.resolve(),
+        },
+      ],
+      recoveries: [
+        {
+          label: "Recovery Phrase",
+          isRecovery: true,
+          openSettings: () => Promise.resolve(),
+        },
+      ],
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      onAddRecovery: () => {
+        console.log("add recovery requested");
+      },
+    }),
   displayManageSingle: () =>
-    displayManage(userNumber, dummyConnection, [simpleDevices[0]]),
+    displayManagePage({
+      userNumber,
+      authenticators: [
+        {
+          label: "Chrome on iPhone",
+          isRecovery: false,
+          openSettings: () => Promise.resolve(),
+        },
+      ],
+      recoveries: [],
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      onAddRecovery: () => {
+        console.log("add recovery requested");
+      },
+    }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
