@@ -25,7 +25,8 @@ const pageContent = (userNumber: bigint, message?: string) => {
       <p class="t-lead">
         ${message !== undefined
           ? message
-          : "Type your recovery phrase below to access your Internet Identity."}
+          : html`Type your recovery phrase below to access your anchor
+              <strong class="t-strong">${userNumber}</strong>.`}
       </p>
     </hgroup>
     <textarea
