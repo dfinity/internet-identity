@@ -199,7 +199,7 @@ const devicesSection = ({
       <div class="${isWarning === true ? "c-card__content" : undefined}">
         <div class="t-title t-title--complications">
           <h2 class="t-title">Added devices</h2>
-          <span class="t-title__complication c-tooltip">
+          <span class="t-title__complication c-tooltip" tabindex="0">
             <span class="c-tooltip__message c-card c-card--narrow">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>

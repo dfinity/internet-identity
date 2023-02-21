@@ -1223,12 +1223,20 @@ a:hover,
   position: relative;
 }
 
-.c-tooltip:hover .c-tooltip__message {
+.c-tooltip:focus {
+  outline: 1px solid var(--rc-button);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.c-tooltip:hover .c-tooltip__message,
+.c-tooltip:focus .c-tooltip__message {
   visibility: visible;
   opacity: 1;
 }
 
-.c-tooltip--onDisabled:hover .c-tooltip__message {
+.c-tooltip--onDisabled:hover .c-tooltip__message,
+.c-tooltip--onDisabled:focus .c-tooltip__message {
   visibility: hidden;
   opacity: 0;
 }
@@ -1241,7 +1249,7 @@ a:hover,
 .c-tooltip__message {
   position: absolute;
   left: 0;
-
+  top: 100%;
   opacity: 0;
   color: var(--rc-text);
   visibility: hidden;
