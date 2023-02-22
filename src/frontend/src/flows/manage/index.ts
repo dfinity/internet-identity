@@ -28,15 +28,19 @@ import {
   recoveryDeviceToLabel,
 } from "../../utils/recoveryDevice";
 
+export type DeviceSetting = () => Promise<void>;
+
 // A simple representation of "device"s used on the manage page.
 export type Device = {
   // Open the settings screen for that particular device
-  openSettings: () => Promise<void>;
+  openSettings: DeviceSetting;
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
+  settings?: Map<string, DeviceSetting>;
   label: string;
   isRecovery: boolean;
 };
+
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -287,7 +291,29 @@ const deviceListItem = ({ device }: { device: Device }) => {
     >
       ${settingsIcon}
     </button>
-  `;
+    ${device.settings && `
+    <div class="c-action-list__action c-dropdown">
+      <button
+        class="c-dropdown__trigger"
+        aria-expanded="false"
+        aria-controls="dropdown-i"
+        >
+        ${settingsIcon}
+        </button>
+        <ul class="c-dropdown__menu" id="dropdown-i">
+          ${Array.from(device.settings.keys()).map((key) => {
+            return html`
+              <li class="c-dropdown__item">
+                <button
+                  class="c-dropdown__link"
+                  @click=${() => device.settings?.get(key)?.()}
+                >
+                  ${key}
+                </button>
+              </li>`;
+          })}
+        </ul>
+    </div>`;
 };
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
@@ -357,6 +383,14 @@ export const displayManage = (
 
       await renderManage(userNumber, connection);
     },
+    settings: new Map([
+      ['Protect Device',async () => {
+        console.log(`Protect Device ${device.alias}`);
+      }],
+      ['Delete Device',async () => {
+        console.log(`Delete Device ${device.alias}`);
+      }],
+    ]),
     label: isRecoveryDevice(device)
       ? recoveryDeviceToLabel(device)
       : device.alias,
