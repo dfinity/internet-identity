@@ -155,13 +155,13 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[string()='${deviceName}']`)
+      .$(`//div[@device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[string()='${deviceName}']`)
+      .$(`//div[@device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
@@ -182,9 +182,7 @@ export class MainView extends View {
   }
 
   async deviceSettings(deviceName: string): Promise<void> {
-    await this.browser
-      .$(`//div[string()='${deviceName}']/following-sibling::button`)
-      .click();
+    await this.browser.$(`//button[@device="${deviceName}"]`).click();
   }
 }
 
