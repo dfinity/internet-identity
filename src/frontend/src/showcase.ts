@@ -153,6 +153,7 @@ const iiPages: Record<string, () => void> = {
     promptDeviceAliasPage({
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
+      i18n,
     }),
   pickDeviceAlias: () =>
     pickDeviceAliasPage({
