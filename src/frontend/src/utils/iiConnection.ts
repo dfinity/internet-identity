@@ -143,7 +143,7 @@ export class Connection {
           key_type: { unknown: null },
           purpose: { authentication: null },
           protection: { unprotected: null },
-          origin: window?.origin === undefined ? [] : [window.origin],
+          origin: readDeviceOrigin(),
         },
         challengeResult
       );
@@ -517,7 +517,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
-      origin: window?.origin === undefined ? [] : [window.origin],
+      origin: readDeviceOrigin(),
     });
   };
 
@@ -565,6 +565,19 @@ export class AuthenticatedConnection extends Connection {
     );
   };
 }
+
+// Reads the "origin" used to infer what domain a FIDO device is available on.
+// The canister only allow for 50 characters, so for long domains we don't attach an origin
+// (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
+//
+// The return type is odd but that's what our didc version expects.
+export const readDeviceOrigin = (): [] | [string] => {
+  if (window?.origin === undefined || window.origin.length > 50) {
+    return [];
+  }
+
+  return [window.origin];
+};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
