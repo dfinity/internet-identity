@@ -153,6 +153,7 @@ const iiPages: Record<string, () => void> = {
     promptDeviceAliasPage({
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
+      i18n,
     }),
   pickDeviceAlias: () =>
     pickDeviceAliasPage({
@@ -272,6 +273,12 @@ const iiPages: Record<string, () => void> = {
               fn: () => Promise.resolve(),
             },
           ],
+        },
+        {
+          label: "Yubikey Blue",
+          isRecovery: false,
+          openSettings: () => Promise.resolve(),
+          warn: html`Something is rotten in the state of Device`,
         },
       ],
       recoveries: [

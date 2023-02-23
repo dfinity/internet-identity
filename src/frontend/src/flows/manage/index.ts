@@ -39,7 +39,12 @@ export type Device = {
   settings?: { label: string; fn: DeviceSetting }[];
   label: string;
   isRecovery: boolean;
+  warn?: TemplateResult;
 };
+
+// A device with extra information about whether another device (earlier in the list)
+// has the same name.
+export type DedupDevice = Device & { dupCount?: number };
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -124,7 +129,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   authenticators: Device[];
   recoveries: Device[];
-  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+  onAddDevice: () => void;
   onAddRecovery: () => void;
 }): TemplateResult => {
   const pageContentSlot = html` <section>
@@ -157,13 +162,27 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
+// Deduplicate devices with same (duplicated) labels
+const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
+  return authenticators.reduce<Device[]>((acc, authenticator) => {
+    const _authenticator: DedupDevice = { ...authenticator };
+    const sameName = acc.filter((a) => a.label === _authenticator.label);
+    if (sameName.length >= 1) {
+      _authenticator.dupCount = sameName.length + 1;
+    }
+
+    acc.push(_authenticator);
+    return acc;
+  }, []);
+};
+
 // The regular, "authenticator" devices
 const devicesSection = ({
   authenticators,
   onAddDevice,
 }: {
   authenticators: Device[];
-  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+  onAddDevice: () => void;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
   const isWarning = authenticators.length < 2;
@@ -171,6 +190,8 @@ const devicesSection = ({
   if (isWarning === true) {
     wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
   }
+
+  const _authenticators = dedupLabels(authenticators);
 
   return html`
     <aside class="${wrapClasses.join(" ")}">
@@ -184,11 +205,11 @@ const devicesSection = ({
       <div class="${isWarning === true ? "c-card__content" : undefined}">
         <div class="t-title t-title--complications">
           <h2 class="t-title">Added devices</h2>
-          <span class="t-title__complication c-tooltip">
-            <span class="c-tooltip__message c-card c-card--narrow">
+          <span class="t-title__complication c-tooltip" tabindex="0">
+            <span class="c-tooltip__message c-card c-card--tight">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
-              (${authenticators.length}/${MAX_AUTHENTICATORS})
+              (${_authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
         </div>
@@ -204,7 +225,7 @@ const devicesSection = ({
         <div class="c-action-list">
           <div id="deviceList">
           <ul>
-          ${authenticators.map((device) => {
+          ${_authenticators.map((device) => {
             return html`
               <li class="c-action-list__item">
                 ${deviceListItem({
@@ -216,12 +237,12 @@ const devicesSection = ({
           </div>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
-              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
-              @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
+              ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
+              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+              @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
             >
-              <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
+              <span class="c-tooltip__message c-card c-card--tight"
                 >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
               >
@@ -278,12 +299,29 @@ const recoverySection = ({
   `;
 };
 
-const deviceListItem = ({ device }: { device: Device }) => {
+const deviceListItem = ({ device }: { device: DedupDevice }) => {
   return html`
-    <div class="c-action-list__label">${device.label}</div>
+    <div class="c-action-list__label" device=${device.label}>
+      ${device.label}
+      ${device.dupCount !== undefined && device.dupCount > 0
+        ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
+        : undefined}
+    </div>
+    ${device.warn !== undefined
+      ? html`<div class="c-action-list__action">
+        <span
+          class="c-tooltip c-tooltip--left c-icon c-icon--warning"
+          tabindex="0"
+          >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
+            >${device.warn}</span
+          ></span
+        >
+      </div>`
+    : undefined}
     <div class="c-action-list__action">
       <button
         type="button"
+        device=${device.label}
         aria-label="settings"
         data-action="settings"
         class="c-action-list__action"
@@ -399,13 +437,15 @@ export const displayManage = (
       ? recoveryDeviceToLabel(device)
       : device.alias,
     isRecovery: isRecoveryDevice(device),
+    warn: domainWarning(device),
   }));
 
   displayManagePage({
     userNumber,
     authenticators: _devices.filter((device) => !device.isRecovery),
     recoveries: _devices.filter((device) => device.isRecovery),
-    onAddDevice: async (nextAction) => {
+    onAddDevice: async () => {
+      const nextAction = await chooseDeviceAddFlow();
       switch (nextAction) {
         case "canceled": {
           await renderManage(userNumber, connection);
@@ -449,9 +489,49 @@ export const displayManage = (
   }
 };
 
+// Show a domain-related warning, if necessary.
+const domainWarning = (device: DeviceData): TemplateResult | undefined => {
+  // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
+  if (isRecoveryPhrase(device)) {
+    return undefined;
+  }
+
+  // XXX: work around didc-generated oddities in types
+  const deviceOrigin =
+    device.origin.length === 0 ? undefined : device.origin[0];
+
+  // If this is the _old_ II (ic0.app) and no origin was recorded, then we can't infer much and don't show a warning.
+  if (window.origin === LEGACY_II_URL && deviceOrigin === undefined) {
+    return undefined;
+  }
+
+  // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
+  if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
+    return html`This device may not be usable on the current URL
+    (${window.origin})`;
+  }
+
+  // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
+  if (deviceOrigin === undefined) {
+    return html`This device may not be usable on the current URL
+    (${window.origin})`;
+  }
+
+  // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
+  if (deviceOrigin !== window.origin) {
+    return html`This device may not be usable on the current URL
+    (${window.origin})`;
+  }
+
+  return undefined;
+};
+
 // Whether the user has a recovery phrase or not
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
   devices.some((device) => device.alias === "Recovery phrase");
+
+const isRecoveryPhrase = (device: DeviceData): boolean =>
+  "seed_phrase" in device.key_type;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");

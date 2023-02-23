@@ -398,8 +398,14 @@ body {
   font-size: 1.5rem;
 }
 
+.t-muted {
+  color: var(--rc-text--disabled);
+  font-size: 0.8em;
+}
+
 .t-discreet {
   font-size: 0.8em;
+  vertical-align: baseline;
 }
 
 a,
@@ -510,8 +516,33 @@ a:hover,
  */
 
 /**
- * Icon
+ * Icon components
  */
+.c-icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--vs-line-height));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.c-icon--block {
+  display: block;
+  height: auto;
+  aspect-ratio: none;
+}
+
+.c-icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.c-icon--warning [fill] {
+  fill: var(--rc-warning);
+}
 
 .c-icon--more {
   position: relative;
@@ -598,6 +629,11 @@ a:hover,
 
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
+}
+
+.c-card--tight {
+  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
+    calc(var(--rs-card-bezel-narrow) * 0.6);
 }
 
 .c-card--background {
@@ -1283,12 +1319,20 @@ a:hover,
   position: relative;
 }
 
-.c-tooltip:hover .c-tooltip__message {
+.c-tooltip:focus {
+  outline: 1px solid var(--rc-button);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.c-tooltip:hover .c-tooltip__message,
+.c-tooltip:focus .c-tooltip__message {
   visibility: visible;
   opacity: 1;
 }
 
-.c-tooltip--onDisabled:hover .c-tooltip__message {
+.c-tooltip--onDisabled:hover .c-tooltip__message,
+.c-tooltip--onDisabled:focus .c-tooltip__message {
   visibility: hidden;
   opacity: 0;
 }
@@ -1301,7 +1345,7 @@ a:hover,
 .c-tooltip__message {
   position: absolute;
   left: 0;
-
+  top: 100%;
   opacity: 0;
   color: var(--rc-text);
   visibility: hidden;
@@ -1313,11 +1357,15 @@ a:hover,
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
   background-color: var(--rc-background);
+
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
-.c-tooltip__message--right {
-  right: 0;
+.c-tooltip--left .c-tooltip__message {
   left: auto;
+  right: 0;
 }
 
 /* chasm: alternative to tooltips, where the card opens to reveal details */

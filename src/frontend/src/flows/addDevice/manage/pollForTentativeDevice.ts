@@ -26,7 +26,7 @@ const pageContent = (userNumber: bigint) => {
         Open
         <em class="c-tooltip">
           <strong class="t-strong">${LEGACY_II_URL}</strong>
-          <span class="c-tooltip__message c-card c-card--narrow">
+          <span class="c-tooltip__message c-card c-card--tight">
             Open this link on the device you want to add.
           </span>
         </em>
