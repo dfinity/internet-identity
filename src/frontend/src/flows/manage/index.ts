@@ -309,15 +309,15 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
     </div>
     ${device.warn !== undefined
       ? html`<div class="c-action-list__action">
-        <span
-          class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-          tabindex="0"
-          >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
-            >${device.warn}</span
-          ></span
-        >
-      </div>`
-    : undefined}
+          <span
+            class="c-tooltip c-tooltip--left c-icon c-icon--warning"
+            tabindex="0"
+            >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
+              >${device.warn}</span
+            ></span
+          >
+        </div>`
+      : undefined}
     <div class="c-action-list__action">
       <button
         type="button"
