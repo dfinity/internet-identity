@@ -1301,6 +1301,10 @@ a:hover,
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
   background-color: var(--rc-background);
+
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
 .c-tooltip--left .c-tooltip__message {
