@@ -255,11 +255,23 @@ const iiPages: Record<string, () => void> = {
           label: "Chrome on iPhone",
           isRecovery: false,
           openSettings: () => Promise.resolve(),
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
         {
           label: "Yubikey Blue",
           isRecovery: false,
           openSettings: () => Promise.resolve(),
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
       ],
       recoveries: [
@@ -267,6 +279,16 @@ const iiPages: Record<string, () => void> = {
           label: "Recovery Phrase",
           isRecovery: true,
           openSettings: () => Promise.resolve(),
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+            {
+              label: "Protect",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
       ],
       onAddDevice: () => {

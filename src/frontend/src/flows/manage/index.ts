@@ -10,7 +10,7 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { settingsIcon, warningIcon } from "../../components/icons";
+import { warningIcon, dropdownIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
@@ -36,11 +36,10 @@ export type Device = {
   openSettings: DeviceSetting;
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
-  settings?: Map<string, DeviceSetting>;
+  settings?: { label: string; fn: DeviceSetting }[];
   label: string;
   isRecovery: boolean;
 };
-
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -282,38 +281,37 @@ const recoverySection = ({
 const deviceListItem = ({ device }: { device: Device }) => {
   return html`
     <div class="c-action-list__label">${device.label}</div>
-    <button
-      type="button"
-      aria-label="settings"
-      data-action="settings"
-      class="c-action-list__action"
-      @click=${() => device.openSettings()}
-    >
-      ${settingsIcon}
-    </button>
-    ${device.settings && `
-    <div class="c-action-list__action c-dropdown">
+    <div class="c-action-list__action">
       <button
-        class="c-dropdown__trigger"
+        type="button"
+        aria-label="settings"
+        data-action="settings"
+        class="c-action-list__action"
+        @click=${() => device.openSettings()}
+      >
+        ${dropdownIcon}
+      </button>
+    </div>
+    ${device?.settings &&
+    html` <div class="c-action-list__action c-dropdown">
+      <button
+        class="c-dropdown__trigger c-action-list__action"
         aria-expanded="false"
-        aria-controls="dropdown-i"
-        >
-        ${settingsIcon}
-        </button>
-        <ul class="c-dropdown__menu" id="dropdown-i">
-          ${Array.from(device.settings.keys()).map((key) => {
-            return html`
-              <li class="c-dropdown__item">
-                <button
-                  class="c-dropdown__link"
-                  @click=${() => device.settings?.get(key)?.()}
-                >
-                  ${key}
-                </button>
-              </li>`;
-          })}
-        </ul>
-    </div>`;
+        aria-controls="dropdown-${device.label}"
+      >
+        ${dropdownIcon}
+      </button>
+      <ul class="c-dropdown__menu" id="dropdown-${device.label}">
+        ${device.settings.map((setting) => {
+          return html` <li class="c-dropdown__item">
+            <button class="c-dropdown__link" @click=${() => setting.fn()}>
+              ${setting.label}
+            </button>
+          </li>`;
+        })}
+      </ul>
+    </div>`}
+  `;
 };
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
@@ -383,14 +381,20 @@ export const displayManage = (
 
       await renderManage(userNumber, connection);
     },
-    settings: new Map([
-      ['Protect Device',async () => {
-        console.log(`Protect Device ${device.alias}`);
-      }],
-      ['Delete Device',async () => {
-        console.log(`Delete Device ${device.alias}`);
-      }],
-    ]),
+    settings: [
+      {
+        label: "Protect Device",
+        fn: async () => {
+          console.log(`Protect Device ${device.alias}`);
+        },
+      },
+      {
+        label: "Delete Device",
+        fn: async () => {
+          console.log(`Delete Device ${device.alias}`);
+        },
+      },
+    ],
     label: isRecoveryDevice(device)
       ? recoveryDeviceToLabel(device)
       : device.alias,

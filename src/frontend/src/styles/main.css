@@ -1608,6 +1608,20 @@ a:hover,
   text-decoration: none;
 }
 
+.c-dropdown__link {
+  display: block;
+  color: var(--rc-text);
+  font-size: 0.8em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 100ms color linear;
+}
+
+.c-dropdown__link:hover,
+.c-dropdown__link:focus {
+  color: var(--rc-interaction);
+}
+
 .c-dropdown__item + .c-dropdown__item {
   border-top: var(--vs-line) solid var(--rc-line);
 }
