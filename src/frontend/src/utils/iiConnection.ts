@@ -665,8 +665,12 @@ export const inferHost = (): string => {
   }
 
   if (
-    location.host === "127.0.0.1" ||
-    location.hostname.endsWith("localhost")
+    location.host === "127.0.0.1" /* typical development */ ||
+    location.host ===
+      "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
+    location.hostname.endsWith(
+      "localhost"
+    ) /* local canisters from icx-proxy like rdmx6-....-foo.localhost */
   ) {
     // If this is a local deployment, then assume the api and assets are collocated
     // and use this asset (page)'s URL.
