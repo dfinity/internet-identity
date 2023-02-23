@@ -126,7 +126,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   authenticators: Device[];
   recoveries: Device[];
-  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+  onAddDevice: () => void;
   onAddRecovery: () => void;
 }): TemplateResult => {
   const pageContentSlot = html` <section>
@@ -179,7 +179,7 @@ const devicesSection = ({
   onAddDevice,
 }: {
   authenticators: Device[];
-  onAddDevice: (next: "canceled" | "local" | "remote") => void;
+  onAddDevice: () => void;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
   const isWarning = authenticators.length < 2;
@@ -236,7 +236,7 @@ const devicesSection = ({
             <button
               ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
-              @click="${async () => onAddDevice(await chooseDeviceAddFlow())}"
+              @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
             >
               <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
@@ -405,7 +405,8 @@ export const displayManage = (
     userNumber,
     authenticators: _devices.filter((device) => !device.isRecovery),
     recoveries: _devices.filter((device) => device.isRecovery),
-    onAddDevice: async (nextAction) => {
+    onAddDevice: async () => {
+      const nextAction = await chooseDeviceAddFlow();
       switch (nextAction) {
         case "canceled": {
           await renderManage(userNumber, connection);
