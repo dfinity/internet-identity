@@ -203,7 +203,7 @@ const devicesSection = ({
         <div class="t-title t-title--complications">
           <h2 class="t-title">Added devices</h2>
           <span class="t-title__complication c-tooltip" tabindex="0">
-            <span class="c-tooltip__message c-card c-card--narrow">
+            <span class="c-tooltip__message c-card c-card--tight">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
               (${_authenticators.length}/${MAX_AUTHENTICATORS})
@@ -235,11 +235,11 @@ const devicesSection = ({
           <div class="c-action-list__actions">
             <button
               ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
-              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled"
+              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
               @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
             >
-              <span class="c-tooltip__message c-tooltip__message--right c-card c-card--narrow"
+              <span class="c-tooltip__message c-card c-card--tight"
                 >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
               >
@@ -306,9 +306,10 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
     </div>
     ${device.warn !== undefined
       ? html`<div class="c-action-list__action">
-          <span class="c-tooltip c-icon c-icon--warning" tabindex="0"
-            >${warningIcon}<span
-              class="c-tooltip__message c-card c-card--narrow"
+          <span
+            class="c-tooltip c-tooltip--left c-icon c-icon--warning"
+            tabindex="0"
+            >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
               >${device.warn}</span
             ></span
           >
