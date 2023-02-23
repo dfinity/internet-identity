@@ -575,6 +575,11 @@ a:hover,
   padding: var(--rs-card-bezel-narrow);
 }
 
+.c-card--tight {
+  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
+    calc(var(--rs-card-bezel-narrow) * 0.6);
+}
+
 .c-card--background {
   padding: calc(var(--rs-card-bezel) * 0.3);
   background: rgba(255, 255, 255, 0.2);
@@ -1296,11 +1301,15 @@ a:hover,
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
   background-color: var(--rc-background);
+
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
-.c-tooltip__message--right {
-  right: 0;
+.c-tooltip--left .c-tooltip__message {
   left: auto;
+  right: 0;
 }
 
 /* chasm: alternative to tooltips, where the card opens to reveal details */
