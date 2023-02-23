@@ -49,6 +49,14 @@ export class I18n<Lang extends string> {
     return internationalized;
   }
 
+  // A "static" (i.e. "string" instead of "TemplateResult") version of the copy, for cases that require
+  // strings (under the assumption that the language won't change)
+  staticLang<Keys extends string>(
+    copy: StringCopy<Keys, Lang>
+  ): { [key in Keys]: string } {
+    return copy[this.lang];
+  }
+
   // Set the language, causing all templates to update
   setLanguage(lang: Lang) {
     this.chan.send(lang);
