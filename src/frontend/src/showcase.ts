@@ -33,7 +33,6 @@ import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDevice
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
-import { deviceSettingsPage } from "./flows/manage/deviceSettings";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
   registerTentativeDevice,
@@ -255,25 +254,53 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Chrome on iPhone",
           isRecovery: false,
-          openSettings: () => Promise.resolve(),
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
         {
           label: "Yubikey Blue",
           isRecovery: false,
-          openSettings: () => Promise.resolve(),
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
         {
           label: "Yubikey Blue",
           isRecovery: false,
-          openSettings: () => Promise.resolve(),
+          isProtected: false,
           warn: html`Something is rotten in the state of Device`,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
       ],
       recoveries: [
         {
           label: "Recovery Phrase",
           isRecovery: true,
-          openSettings: () => Promise.resolve(),
+          isProtected: true,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+            {
+              label: "Protect",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
       ],
       onAddDevice: () => {
@@ -290,7 +317,13 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Chrome on iPhone",
           isRecovery: false,
-          openSettings: () => Promise.resolve(),
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
         },
       ],
       recoveries: [],
@@ -335,14 +368,6 @@ const iiPages: Record<string, () => void> = {
           yield "00:34";
         },
       },
-    }),
-  deviceSettings: () =>
-    deviceSettingsPage({
-      device: simpleDevices[0],
-      isOnlyDevice: false,
-      protectDevice: () => console.log("protect"),
-      deleteDevice: () => console.log("delete"),
-      back: () => console.log("back"),
     }),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () =>

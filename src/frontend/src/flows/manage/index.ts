@@ -2,15 +2,15 @@ import { TemplateResult, render, html } from "lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { unreachable, unknownToString } from "../../utils/utils";
+import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { deviceSettings } from "./deviceSettings";
+import { Setting, deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { settingsIcon, warningIcon } from "../../components/icons";
+import { warningIcon, dropdownIcon, lockIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
@@ -30,12 +30,13 @@ import {
 
 // A simple representation of "device"s used on the manage page.
 export type Device = {
-  // Open the settings screen for that particular device
-  openSettings: () => Promise<void>;
+  // All the settings allowed for a particular device
+  settings: Setting[];
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
   label: string;
   isRecovery: boolean;
+  isProtected: boolean;
   warn?: TemplateResult;
 };
 
@@ -222,11 +223,12 @@ const devicesSection = ({
         <div class="c-action-list">
           <div id="deviceList">
           <ul>
-          ${_authenticators.map((device) => {
+          ${_authenticators.map((device, index) => {
             return html`
               <li class="c-action-list__item">
                 ${deviceListItem({
                   device,
+                  index: `authenticator-${index}`,
                 })}
               </li>
             `;
@@ -272,10 +274,13 @@ const recoverySection = ({
               <div id="recoveryList">
                 <ul>
                   ${recoveries.map(
-                    (device) =>
+                    (device, index) =>
                       html`
                         <li class="c-action-list__item">
-                          ${deviceListItem({ device })}
+                          ${deviceListItem({
+                            device,
+                            index: `recovery-${index}`,
+                          })}
                         </li>
                       `
                   )}
@@ -296,7 +301,13 @@ const recoverySection = ({
   `;
 };
 
-const deviceListItem = ({ device }: { device: DedupDevice }) => {
+const deviceListItem = ({
+  device,
+  index,
+}: {
+  device: DedupDevice;
+  index: string;
+}) => {
   return html`
     <div class="c-action-list__label" device=${device.label}>
       ${device.label}
@@ -304,6 +315,15 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
         ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
         : undefined}
     </div>
+    ${device.isProtected
+      ? html`<div class="c-action-list__action">
+          <span class="c-tooltip c-tooltip--left c-icon c-icon--lock"
+            >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
+              >Your device is protected</span
+            ></span
+          >
+        </div>`
+      : undefined}
     ${device.warn !== undefined
       ? html`<div class="c-action-list__action">
           <span
@@ -315,16 +335,31 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
           >
         </div>`
       : undefined}
-    <button
-      type="button"
-      device=${device.label}
-      aria-label="settings"
-      data-action="settings"
-      class="c-action-list__action"
-      @click=${() => device.openSettings()}
-    >
-      ${settingsIcon}
-    </button>
+    ${device.settings.length > 0 &&
+    html` <div class="c-action-list__action c-dropdown">
+      <button
+        class="c-dropdown__trigger c-action-list__action"
+        aria-expanded="false"
+        aria-controls="dropdown-${index}"
+        data-device=${device.label}
+      >
+        ${dropdownIcon}
+      </button>
+      <ul class="c-dropdown__menu" id="dropdown-${index}">
+        ${device.settings.map((setting) => {
+          return html` <li class="c-dropdown__item">
+            <button
+              class="c-dropdown__link"
+              data-device=${device.label}
+              data-action=${setting.label}
+              @click=${() => setting.fn()}
+            >
+              ${setting.label}
+            </button>
+          </li>`;
+        })}
+      </ul>
+    </div>`}
   `;
 };
 
@@ -380,27 +415,23 @@ export const displayManage = (
 ): void => {
   const hasSingleDevice = devices.length <= 1;
 
-  const _devices = devices.map((device) => ({
-    openSettings: async () => {
-      try {
-        await deviceSettings(userNumber, connection, device, hasSingleDevice);
-      } catch (e: unknown) {
-        await displayError({
-          title: "Could not edit device",
-          message: "An error happened on the settings page.",
-          detail: unknownToString(e, "unknown error"),
-          primaryButton: "Ok",
-        });
-      }
-
-      await renderManage(userNumber, connection);
-    },
-    label: isRecoveryDevice(device)
-      ? recoveryDeviceToLabel(device)
-      : device.alias,
-    isRecovery: isRecoveryDevice(device),
-    warn: domainWarning(device),
-  }));
+  const _devices: Device[] = devices.map((device) => {
+    return {
+      settings: deviceSettings({
+        userNumber,
+        connection,
+        device,
+        isOnlyDevice: hasSingleDevice,
+        reload: () => renderManage(userNumber, connection),
+      }),
+      label: isRecoveryDevice(device)
+        ? recoveryDeviceToLabel(device)
+        : device.alias,
+      isRecovery: isRecoveryDevice(device),
+      isProtected: isProtected(device),
+      warn: domainWarning(device),
+    };
+  });
 
   displayManagePage({
     userNumber,
@@ -491,6 +522,9 @@ const domainWarning = (device: DeviceData): TemplateResult | undefined => {
 // Whether the user has a recovery phrase or not
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
   devices.some((device) => device.alias === "Recovery phrase");
+
+const isProtected = (device: DeviceData): boolean =>
+  "protected" in device.protection;
 
 const isRecoveryPhrase = (device: DeviceData): boolean =>
   "seed_phrase" in device.key_type;
