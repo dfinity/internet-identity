@@ -182,6 +182,7 @@ export class MainView extends View {
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
@@ -199,6 +200,7 @@ export class MainView extends View {
   }
 
   async remove(deviceName: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();

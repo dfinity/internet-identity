@@ -4,7 +4,7 @@ import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { deviceSettings } from "./deviceSettings";
+import { Setting, deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
 import {
   DeviceData,
@@ -28,12 +28,10 @@ import {
   recoveryDeviceToLabel,
 } from "../../utils/recoveryDevice";
 
-export type DeviceSetting = () => Promise<void>;
-
 // A simple representation of "device"s used on the manage page.
 export type Device = {
-  // TODO
-  settings: { label: string; fn: () => void }[];
+  // All the settings allowed for a particular device
+  settings: Setting[];
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
   label: string;
@@ -306,7 +304,10 @@ const recoverySection = ({
 const deviceListItem = ({
   device,
   index,
-}: { device: DedupDevice } & { index: string }) => {
+}: {
+  device: DedupDevice;
+  index: string;
+}) => {
   return html`
     <div class="c-action-list__label" device=${device.label}>
       ${device.label}

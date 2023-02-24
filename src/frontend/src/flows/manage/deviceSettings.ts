@@ -11,9 +11,10 @@ import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { isRecoveryDevice, RecoveryDevice } from "../../utils/recoveryDevice";
 
-export type Settings = { label: string; fn: () => void }[];
+// A particular device setting, e.g. remove, protect, etc
+export type Setting = { label: string; fn: () => void };
 
-export type DeviceSetting = () => Promise<void>;
+// Generate possible settings based on the device
 export const deviceSettings = ({
   userNumber,
   connection,
@@ -25,18 +26,12 @@ export const deviceSettings = ({
   connection: AuthenticatedConnection;
   device: DeviceData;
   isOnlyDevice: boolean;
+  /* Reload the page after the new settings were applied */
   reload: () => void;
-}): Settings => {
-  const settings: Settings = [];
+}): Setting[] => {
+  const settings: Setting[] = [];
 
-  if (!isOnlyDevice) {
-    settings.push({
-      label: "remove",
-      fn: () =>
-        deleteDevice(userNumber, connection, device, isOnlyDevice, reload),
-    });
-  }
-
+  // Whether the device can be protected or not
   if (shouldOfferToProtect(device)) {
     settings.push({
       label: "protect",
@@ -45,11 +40,17 @@ export const deviceSettings = ({
     });
   }
 
+  // If this is _not_ the only device, then we allow removing it
+  if (!isOnlyDevice) {
+    settings.push({
+      label: "remove",
+      fn: () =>
+        deleteDevice(userNumber, connection, device, isOnlyDevice, reload),
+    });
+  }
+
   return settings;
 };
-
-// The "device settings" page where users can view information about a device,
-// remove a device, make a recovery phrase protected, etc.
 
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices
