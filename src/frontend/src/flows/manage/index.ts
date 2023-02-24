@@ -225,11 +225,12 @@ const devicesSection = ({
         <div class="c-action-list">
           <div id="deviceList">
           <ul>
-          ${_authenticators.map((device) => {
+          ${_authenticators.map((device, index) => {
             return html`
               <li class="c-action-list__item">
                 ${deviceListItem({
                   device,
+                  index: `authenticator-${index}`,
                 })}
               </li>
             `;
@@ -275,10 +276,13 @@ const recoverySection = ({
               <div id="recoveryList">
                 <ul>
                   ${recoveries.map(
-                    (device) =>
+                    (device, index) =>
                       html`
                         <li class="c-action-list__item">
-                          ${deviceListItem({ device })}
+                          ${deviceListItem({
+                            device,
+                            index: `recovery-${index}`,
+                          })}
                         </li>
                       `
                   )}
@@ -299,7 +303,10 @@ const recoverySection = ({
   `;
 };
 
-const deviceListItem = ({ device }: { device: DedupDevice }) => {
+const deviceListItem = ({
+  device,
+  index,
+}: { device: DedupDevice } & { index: string }) => {
   return html`
     <div class="c-action-list__label" device=${device.label}>
       ${device.label}
@@ -334,12 +341,12 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
       <button
         class="c-dropdown__trigger c-action-list__action"
         aria-expanded="false"
-        aria-controls="dropdown-${device.label}"
+        aria-controls="dropdown-${index}"
         data-device=${device.label}
       >
         ${dropdownIcon}
       </button>
-      <ul class="c-dropdown__menu" id="dropdown-${device.label}">
+      <ul class="c-dropdown__menu" id="dropdown-${index}">
         ${device.settings.map((setting) => {
           return html` <li class="c-dropdown__item">
             <button
