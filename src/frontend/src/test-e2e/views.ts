@@ -184,7 +184,7 @@ export class MainView extends View {
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .moveTo();
+      .click();
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='protect']`)
       .waitForClickable();
@@ -201,7 +201,7 @@ export class MainView extends View {
   async remove(deviceName: string): Promise<void> {
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .moveTo();
+      .click();
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='remove']`)
       .waitForClickable();
@@ -211,7 +211,7 @@ export class MainView extends View {
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {
-    await this.browser.$(`button[data-device="${deviceName}"]`).moveTo();
+    await this.browser.$(`button[data-device="${deviceName}"]`).click();
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
