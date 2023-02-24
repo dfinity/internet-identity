@@ -1,9 +1,4 @@
-import {
-  DeviceSettingsView,
-  MainView,
-  RecoverView,
-  WelcomeView,
-} from "./views";
+import { MainView, RecoverView, WelcomeView } from "./views";
 import { FLOWS } from "./flows";
 import { addVirtualAuthenticator, runInBrowser } from "./util";
 
@@ -47,13 +42,12 @@ test("Remove unprotected recovery phrase", async () => {
     await mainView.waitForDisplay();
 
     await mainView.waitForDeviceDisplay(RECOVERY_PHRASE_NAME);
-    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
 
-    const settingsView = new DeviceSettingsView(browser);
-    await settingsView.waitForDisplay();
-    await settingsView.remove();
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.remove(RECOVERY_PHRASE_NAME);
     await browser.acceptAlert();
 
+    await mainView.waitForDisplay();
     await mainView.waitForDeviceNotDisplay(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
@@ -67,12 +61,8 @@ test("Make recovery protected", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
-
-    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
-
-    const settingsView = new DeviceSettingsView(browser);
-    await settingsView.waitForDisplay();
-    await settingsView.protect(seedPhrase);
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
   });
 }, 300_000);
 
@@ -86,14 +76,12 @@ test("Remove protected recovery phrase", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
 
-    const settingsView = new DeviceSettingsView(browser);
-    await settingsView.waitForDisplay();
-    await settingsView.protect(seedPhrase);
-    await settingsView.waitForDisplay();
-
-    await settingsView.remove();
+    await mainView.waitForDisplay();
+    await mainView.remove(RECOVERY_PHRASE_NAME);
+    //await settingsView.remove();
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
@@ -115,13 +103,11 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    await mainView.deviceSettings(RECOVERY_PHRASE_NAME);
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
+    await mainView.waitForDisplay();
+    await mainView.remove(RECOVERY_PHRASE_NAME);
 
-    const settingsView = new DeviceSettingsView(browser);
-    await settingsView.waitForDisplay();
-    await settingsView.protect(seedPhrase);
-
-    await settingsView.remove();
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);

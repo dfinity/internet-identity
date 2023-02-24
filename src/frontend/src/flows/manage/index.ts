@@ -2,7 +2,7 @@ import { TemplateResult, render, html } from "lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
-import { unreachable, unknownToString } from "../../utils/utils";
+import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import { deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
@@ -32,11 +32,10 @@ export type DeviceSetting = () => Promise<void>;
 
 // A simple representation of "device"s used on the manage page.
 export type Device = {
-  // Open the settings screen for that particular device
-  openSettings: DeviceSetting;
+  // TODO
+  settings: { label: string; fn: () => void }[];
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
-  settings?: { label: string; fn: DeviceSetting }[];
   label: string;
   isRecovery: boolean;
   warn?: TemplateResult;
@@ -318,31 +317,25 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
           >
         </div>`
       : undefined}
-    <div class="c-action-list__action">
-      <button
-        type="button"
-        device=${device.label}
-        aria-label="settings"
-        data-action="settings"
-        class="c-action-list__action"
-        @click=${() => device.openSettings()}
-      >
-        ${dropdownIcon}
-      </button>
-    </div>
-    ${device?.settings &&
+    ${device.settings.length > 0 &&
     html` <div class="c-action-list__action c-dropdown">
       <button
         class="c-dropdown__trigger c-action-list__action"
         aria-expanded="false"
         aria-controls="dropdown-${device.label}"
+        data-device=${device.label}
       >
         ${dropdownIcon}
       </button>
       <ul class="c-dropdown__menu" id="dropdown-${device.label}">
         ${device.settings.map((setting) => {
           return html` <li class="c-dropdown__item">
-            <button class="c-dropdown__link" @click=${() => setting.fn()}>
+            <button
+              class="c-dropdown__link"
+              data-device=${device.label}
+              data-action=${setting.label}
+              @click=${() => setting.fn()}
+            >
               ${setting.label}
             </button>
           </li>`;
@@ -404,41 +397,22 @@ export const displayManage = (
 ): void => {
   const hasSingleDevice = devices.length <= 1;
 
-  const _devices = devices.map((device) => ({
-    openSettings: async () => {
-      try {
-        await deviceSettings(userNumber, connection, device, hasSingleDevice);
-      } catch (e: unknown) {
-        await displayError({
-          title: "Could not edit device",
-          message: "An error happened on the settings page.",
-          detail: unknownToString(e, "unknown error"),
-          primaryButton: "Ok",
-        });
-      }
-
-      await renderManage(userNumber, connection);
-    },
-    settings: [
-      {
-        label: "Protect Device",
-        fn: async () => {
-          console.log(`Protect Device ${device.alias}`);
-        },
-      },
-      {
-        label: "Delete Device",
-        fn: async () => {
-          console.log(`Delete Device ${device.alias}`);
-        },
-      },
-    ],
-    label: isRecoveryDevice(device)
-      ? recoveryDeviceToLabel(device)
-      : device.alias,
-    isRecovery: isRecoveryDevice(device),
-    warn: domainWarning(device),
-  }));
+  const _devices: Device[] = devices.map((device) => {
+    return {
+      settings: deviceSettings({
+        userNumber,
+        connection,
+        device,
+        isOnlyDevice: hasSingleDevice,
+        reload: () => renderManage(userNumber, connection),
+      }),
+      label: isRecoveryDevice(device)
+        ? recoveryDeviceToLabel(device)
+        : device.alias,
+      isRecovery: isRecoveryDevice(device),
+      warn: domainWarning(device),
+    };
+  });
 
   displayManagePage({
     userNumber,

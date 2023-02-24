@@ -1,4 +1,3 @@
-import { render, html } from "lit-html";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import {
   bufferEqual,
@@ -10,90 +9,47 @@ import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
-import { mainWindow } from "../../components/mainWindow";
-import {
-  isRecoveryDevice,
-  RecoveryDevice,
-  recoveryDeviceToLabel,
-} from "../../utils/recoveryDevice";
+import { isRecoveryDevice, RecoveryDevice } from "../../utils/recoveryDevice";
+
+export type Settings = { label: string; fn: () => void }[];
+
+export type DeviceSetting = () => Promise<void>;
+export const deviceSettings = ({
+  userNumber,
+  connection,
+  device,
+  isOnlyDevice,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData;
+  isOnlyDevice: boolean;
+  reload: () => void;
+}): Settings => {
+  const settings: Settings = [];
+
+  if (!isOnlyDevice) {
+    settings.push({
+      label: "remove",
+      fn: () =>
+        deleteDevice(userNumber, connection, device, isOnlyDevice, reload),
+    });
+  }
+
+  if (shouldOfferToProtect(device)) {
+    settings.push({
+      label: "protect",
+      fn: () =>
+        protectDevice(userNumber, connection, device, isOnlyDevice, reload),
+    });
+  }
+
+  return settings;
+};
 
 // The "device settings" page where users can view information about a device,
 // remove a device, make a recovery phrase protected, etc.
-
-// Actual page content. We display options for protecting recovery phrases or
-// deleting general devices.
-const deviceSettingsTemplate = ({
-  protectDevice,
-  deleteDevice,
-  device,
-  isOnlyDevice,
-  back,
-}: {
-  protectDevice: (device: DeviceData & RecoveryDevice) => void;
-  deleteDevice: () => void;
-  device: DeviceData;
-  isOnlyDevice: boolean;
-  back: () => void;
-}) => {
-  const pageContentSlot = html` <article id="deviceSettings">
-    <h1 class="t-title">
-      ${isRecoveryDevice(device)
-        ? recoveryDeviceToLabel(device)
-        : `Device ${device.alias}`}
-    </h1>
-
-    <div class="l-stack">
-      ${shouldOfferToProtect(device)
-        ? html` <p class="t-paragraph">
-              By making your recovery phrase protected, you will need to input
-              your recovery phrase to delete it.
-            </p>
-            <button
-              @click="${() => protectDevice(device)}"
-              data-action="protect"
-              class="c-button"
-            >
-              Protect
-            </button>
-            <hr />`
-        : ""}
-      ${!isOnlyDevice
-        ? html`<button
-            @click="${() => deleteDevice()}"
-            data-action="remove"
-            class="c-button c-button--warning"
-          >
-            Delete ${isRecoveryDevice(device) ? "Recovery" : "Device"}
-          </button>`
-        : ""}
-      ${!isOnlyDevice && isProtected(device)
-        ? html`<p class="t-paragraph">
-            This
-            ${isRecoveryDevice(device)
-              ? recoveryDeviceToLabel(device).toLowerCase()
-              : "device"}
-            is protected and you will be prompted to authenticate with it before
-            removal.
-          </p>`
-        : ""}
-      ${isOnlyDevice
-        ? html`<p class="t-paragraph">
-              This is your last device. You cannot remove it.
-            </p>
-            <p class="t-paragraph">
-              Without devices your anchor would be inaccessible.
-            </p>`
-        : ""}
-      <button @click="${back}" data-action="back" class="c-button">Back</button>
-    </div>
-  </article>`;
-
-  return mainWindow({
-    showLogo: false,
-    showFooter: true,
-    slot: pageContentSlot,
-  });
-};
 
 // We offer to protect unprotected recovery phrases only, although in the
 // future we may offer to protect all devices
@@ -106,41 +62,6 @@ const shouldOfferToProtect = (
 
 const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
-
-export const deviceSettingsPage = (
-  props: Parameters<typeof deviceSettingsTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(deviceSettingsTemplate(props), contain);
-};
-
-// Get the list of devices from canister and actually display the page
-export const deviceSettings = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData,
-  isOnlyDevice: boolean
-): Promise<void> => {
-  return new Promise((resolve) => {
-    deviceSettingsPage({
-      device,
-      isOnlyDevice,
-      back: resolve,
-      protectDevice: (recoveryDevice: DeviceData & RecoveryDevice) =>
-        protectDevice(
-          userNumber,
-          connection,
-          recoveryDevice,
-          isOnlyDevice,
-          resolve
-        ),
-      deleteDevice: () =>
-        deleteDevice(userNumber, connection, device, isOnlyDevice, resolve),
-    });
-  });
-};
 
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
@@ -268,6 +189,5 @@ const protectDevice = async (
 
     await newConnection.update(device);
   });
-  await deviceSettings(userNumber, connection, device, isOnlyDevice);
   back();
 };

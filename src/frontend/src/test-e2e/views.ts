@@ -181,26 +181,13 @@ export class MainView extends View {
     await this.browser.$("#addRecovery").click();
   }
 
-  async deviceSettings(deviceName: string): Promise<void> {
-    await this.browser.$(`//button[@device="${deviceName}"]`).click();
-  }
-}
-
-export class DeviceSettingsView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser.$("#deviceSettings").waitForDisplayed();
-  }
-
-  async remove(): Promise<void> {
-    await this.browser.$("button[data-action='remove']").click();
-  }
-
-  async back(): Promise<void> {
-    await this.browser.$("button[data-action='back']").click();
-  }
-
-  async protect(seedPhrase: string): Promise<void> {
-    await this.browser.$("button[data-action='protect']").click();
+  async protect(deviceName: string, seedPhrase: string): Promise<void> {
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .moveTo();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .click();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -208,7 +195,17 @@ export class DeviceSettingsView extends View {
     await recoveryView.enterSeedPhraseContinue();
   }
 
-  async removeNotDisplayed(): Promise<void> {
+  async remove(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .moveTo();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .click();
+  }
+
+  async removeNotDisplayed(deviceName: string): Promise<void> {
+    await this.browser.$(`button[data-device="${deviceName}"]`).moveTo();
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
