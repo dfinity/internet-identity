@@ -254,6 +254,7 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Chrome on iPhone",
           isRecovery: false,
+          isProtected: false,
           settings: [
             {
               label: "Remove",
@@ -264,6 +265,7 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Yubikey Blue",
           isRecovery: false,
+          isProtected: false,
           settings: [
             {
               label: "Remove",
@@ -274,6 +276,7 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Yubikey Blue",
           isRecovery: false,
+          isProtected: false,
           warn: html`Something is rotten in the state of Device`,
           settings: [
             {
@@ -287,6 +290,7 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Recovery Phrase",
           isRecovery: true,
+          isProtected: true,
           settings: [
             {
               label: "Remove",
@@ -313,6 +317,7 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Chrome on iPhone",
           isRecovery: false,
+          isProtected: false,
           settings: [
             {
               label: "Remove",

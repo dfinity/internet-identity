@@ -38,6 +38,7 @@ export type Device = {
   // recovery devices handle aliases differently.
   label: string;
   isRecovery: boolean;
+  isProtected: boolean;
   warn?: TemplateResult;
 };
 
@@ -306,6 +307,17 @@ const deviceListItem = ({ device }: { device: DedupDevice }) => {
         ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
         : undefined}
     </div>
+    ${device.isProtected
+      ? html`<div class="c-action-list__action">
+          <span
+            class="c-tooltip c-tooltip--left c-icon c-icon--warning"
+            tabindex="0"
+            >🔒<span class="c-tooltip__message c-card c-card--tight"
+              >Your device is protected</span
+            ></span
+          >
+        </div>`
+      : undefined}
     ${device.warn !== undefined
       ? html`<div class="c-action-list__action">
           <span
@@ -410,6 +422,7 @@ export const displayManage = (
         ? recoveryDeviceToLabel(device)
         : device.alias,
       isRecovery: isRecoveryDevice(device),
+      isProtected: isProtected(device),
       warn: domainWarning(device),
     };
   });
@@ -503,6 +516,9 @@ const domainWarning = (device: DeviceData): TemplateResult | undefined => {
 // Whether the user has a recovery phrase or not
 const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
   devices.some((device) => device.alias === "Recovery phrase");
+
+const isProtected = (device: DeviceData): boolean =>
+  "protected" in device.protection;
 
 const isRecoveryPhrase = (device: DeviceData): boolean =>
   "seed_phrase" in device.key_type;
