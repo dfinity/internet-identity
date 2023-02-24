@@ -187,6 +187,9 @@ export class MainView extends View {
       .moveTo();
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
       .click();
 
     const recoveryView = new RecoverView(this.browser);
@@ -199,6 +202,9 @@ export class MainView extends View {
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .moveTo();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .waitForClickable();
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='remove']`)
       .click();
