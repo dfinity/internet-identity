@@ -343,3 +343,17 @@ export const dropdownIcon = html`<i
   <i class="c-icon--more__dot"></i>
   <i class="c-icon--more__dot"></i>
 </i>`;
+
+export const lockIcon = html`<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 21 21"
+>
+  <g fill="none" fill-rule="evenodd" transform="translate(4 1)">
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="m2.5 8.5-.006-1.995C2.487 2.502 3.822.5 6.5.5s4.011 2.002 4 6.005V8.5m-8 0h8.023a2 2 0 0 1 1.994 1.85l.006.156-.017 6a2 2 0 0 1-2 1.994H2.5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z"
+    />
+  </g>
+</svg>`;

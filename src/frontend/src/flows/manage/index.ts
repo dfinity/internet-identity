@@ -10,7 +10,7 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { warningIcon, dropdownIcon } from "../../components/icons";
+import { warningIcon, dropdownIcon, lockIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
@@ -316,10 +316,8 @@ const deviceListItem = ({
     </div>
     ${device.isProtected
       ? html`<div class="c-action-list__action">
-          <span
-            class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-            tabindex="0"
-            >🔒<span class="c-tooltip__message c-card c-card--tight"
+          <span class="c-tooltip c-tooltip--left c-icon c-icon--lock"
+            >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
               >Your device is protected</span
             ></span
           >
