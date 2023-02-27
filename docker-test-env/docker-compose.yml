@@ -16,6 +16,7 @@ services:
           - icp-api.io
           # internet identity
           - identity.internetcomputer.org
+          - identity.ic0.app
           # test app, TEST_APP_CANISTER_ID is substituted by the start-selenium-env script
           - TEST_APP_CANISTER_ID.icp0.io
           # test app as above, but on legacy domain

@@ -380,6 +380,7 @@ jobs:
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
+        domain: [ 'https://identity.internetcomputer.org', 'https://identity.ic0.app' ]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
@@ -435,7 +436,7 @@ jobs:
 
       - run: npm ci
       - run: npm test
-      - run: "SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
+      - run: "II_URL=${{ matrix.domain }} SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
       - name: Collect docker logs
         working-directory: docker-test-env
         if: ${{ always() }}
