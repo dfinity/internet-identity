@@ -1,6 +1,6 @@
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
-use internet_identity_interface::{DeviceProtection, KeyType, Purpose, Timestamp};
+use internet_identity_interface::{DeviceData, DeviceProtection, KeyType, Purpose, Timestamp};
 use serde_bytes::ByteBuf;
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -336,6 +336,23 @@ fn should_update_timestamp() {
         anchor.device(&device.pubkey).unwrap().last_usage_timestamp,
         Some(TIMESTAMP)
     );
+}
+
+/// Tests that `apply_data` actually applies all the writeable fields.
+#[test]
+fn should_apply_all_fields() {
+    let device_data = DeviceData {
+        pubkey: ByteBuf::from("some different public key"),
+        alias: "some different alias".to_string(),
+        credential_id: Some(ByteBuf::from("some different credential id")),
+        purpose: Purpose::Recovery,
+        key_type: KeyType::CrossPlatform,
+        protection: DeviceProtection::Protected,
+    };
+    let mut device = sample_device();
+    device.apply_device_data(device_data.clone());
+
+    assert_eq!(DeviceData::from(device), device_data);
 }
 
 fn sample_device() -> Device {

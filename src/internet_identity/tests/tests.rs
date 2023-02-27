@@ -655,7 +655,7 @@ mod last_usage_timestamp_tests {
             .devices
             .clone()
             .into_iter()
-            .map(|d| DeviceData::from(d))
+            .map(DeviceData::from)
             .any(|d| d == device_to_be_updated));
 
         assert_device_last_used(&anchor_info, &device_data_2().pubkey, expected_timestamp_1);

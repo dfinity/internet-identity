@@ -108,7 +108,6 @@ pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: D
             "failed to replace device of anchor {anchor_number}: {err}"
         ))
     });
-
     let new_device = Device::from(new_device);
     anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
         trap(&format!(
