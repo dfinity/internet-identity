@@ -317,7 +317,9 @@ const deviceListItem = ({
     </div>
     ${device.isProtected
       ? html`<div class="c-action-list__action">
-          <span class="c-tooltip c-tooltip--left c-icon c-icon--lock"
+          <span
+            class="c-tooltip c-tooltip--left c-icon c-icon--lock"
+            tabindex="0"
             >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
               >Your device is protected</span
             ></span
