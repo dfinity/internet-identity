@@ -16,6 +16,7 @@ pub struct Anchor {
 }
 
 impl Device {
+    /// Applies the values of `device_data` to self while leaving the other fields intact.
     pub fn apply_device_data(&mut self, device_data: DeviceData) {
         self.pubkey = device_data.pubkey;
         self.alias = device_data.alias;
@@ -23,7 +24,6 @@ impl Device {
         self.purpose = device_data.purpose;
         self.key_type = device_data.key_type;
         self.protection = device_data.protection;
-        self.last_usage_timestamp = None;
     }
 }
 
@@ -56,7 +56,7 @@ impl From<Device> for DeviceData {
     }
 }
 
-impl From<Device> for ReadOnlyDeviceData {
+impl From<Device> for DeviceWithUsage {
     fn from(device: Device) -> Self {
         Self {
             pubkey: device.pubkey,
@@ -65,7 +65,7 @@ impl From<Device> for ReadOnlyDeviceData {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
-            last_usage_timestamp: device.last_usage_timestamp,
+            last_usage: device.last_usage_timestamp,
         }
     }
 }

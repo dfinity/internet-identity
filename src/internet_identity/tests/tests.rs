@@ -549,7 +549,7 @@ mod last_usage_timestamp_tests {
 
         assert!(anchor_info
             .devices
-            .contains(&ReadOnlyDeviceData::from(device_data_2()))); // without last usage timestamp
+            .contains(&DeviceWithUsage::from(device_data_2()))); // without last usage timestamp
 
         assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp);
 
@@ -624,9 +624,18 @@ mod last_usage_timestamp_tests {
         )?;
 
         env.advance_time(Duration::from_secs(1));
-        let expected_timestamp = time(&env);
+        let expected_timestamp_1 = time(&env);
+
+        // use the device_to_be_updated to create a last usage timestamp
+        api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
+
+        env.advance_time(Duration::from_secs(1));
+        let expected_timestamp_2 = time(&env);
 
         device_to_be_updated.alias = "changed value".to_string();
+
+        // this update is should keep the last usage timestamp of device_to_be_updated and update
+        // the last usage of device_1
         api::update(
             &env,
             canister_id,
@@ -644,9 +653,13 @@ mod last_usage_timestamp_tests {
 
         assert!(anchor_info
             .devices
-            .contains(&ReadOnlyDeviceData::from(device_to_be_updated))); // without last usage timestamp
+            .clone()
+            .into_iter()
+            .map(|d| DeviceData::from(d))
+            .any(|d| d == device_to_be_updated));
 
-        assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp);
+        assert_device_last_used(&anchor_info, &device_data_2().pubkey, expected_timestamp_1);
+        assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp_2);
 
         Ok(())
     }
@@ -693,7 +706,7 @@ mod last_usage_timestamp_tests {
 
         assert!(anchor_info
             .devices
-            .contains(&ReadOnlyDeviceData::from(max_size_device()))); // without last usage timestamp
+            .contains(&DeviceWithUsage::from(max_size_device()))); // without last usage timestamp
 
         assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp);
 

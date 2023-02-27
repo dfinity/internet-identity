@@ -466,7 +466,7 @@ pub fn assert_device_last_used(
         .iter()
         .find(|d| d.pubkey == device_key)
         .unwrap();
-    assert_eq!(device.last_usage_timestamp, Some(expected_timestamp));
+    assert_eq!(device.last_usage, Some(expected_timestamp));
 }
 
 pub fn time(env: &StateMachine) -> u64 {

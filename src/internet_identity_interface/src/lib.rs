@@ -30,8 +30,8 @@ pub struct DeviceData {
     pub origin: Option<String>,
 }
 
-impl From<ReadOnlyDeviceData> for DeviceData {
-    fn from(device: ReadOnlyDeviceData) -> Self {
+impl From<DeviceWithUsage> for DeviceData {
+    fn from(device: DeviceWithUsage) -> Self {
         Self {
             pubkey: device.pubkey,
             alias: device.alias,
@@ -44,17 +44,17 @@ impl From<ReadOnlyDeviceData> for DeviceData {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub struct ReadOnlyDeviceData {
+pub struct DeviceWithUsage {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
-    pub last_usage_timestamp: Option<Timestamp>,
+    pub last_usage: Option<Timestamp>,
 }
 
-impl From<DeviceData> for ReadOnlyDeviceData {
+impl From<DeviceData> for DeviceWithUsage {
     fn from(device: DeviceData) -> Self {
         Self {
             pubkey: device.pubkey,
@@ -63,7 +63,7 @@ impl From<DeviceData> for ReadOnlyDeviceData {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
-            last_usage_timestamp: None,
+            last_usage: None,
         }
     }
 }
@@ -175,7 +175,7 @@ pub struct DeviceRegistrationInfo {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct IdentityAnchorInfo {
-    pub devices: Vec<ReadOnlyDeviceData>,
+    pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
 }
 

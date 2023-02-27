@@ -15,7 +15,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let devices = state::anchor(anchor_number)
         .into_devices()
         .into_iter()
-        .map(ReadOnlyDeviceData::from)
+        .map(DeviceWithUsage::from)
         .collect();
     let now = time();
 

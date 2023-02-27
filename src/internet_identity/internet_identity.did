@@ -75,14 +75,16 @@ type DeviceData = record {
     origin: opt text;
 };
 
-type ReadOnlyDeviceData = record {
+// The same as `DeviceData` but with the `last_usage` field.
+// This field cannot be written, hence the separate type.
+type DeviceWithUsage = record {
     pubkey : DeviceKey;
     alias : text;
     credential_id : opt CredentialId;
     purpose: Purpose;
     key_type: KeyType;
     protection: DeviceProtection;
-    last_usage_timestamp: opt Timestamp;
+    last_usage: opt Timestamp;
 };
 
 type RegisterResponse = variant {
@@ -208,7 +210,7 @@ type DeviceRegistrationInfo = record {
 };
 
 type IdentityAnchorInfo = record {
-    devices : vec ReadOnlyDeviceData;
+    devices : vec DeviceWithUsage;
     device_registration: opt DeviceRegistrationInfo;
 };
 
