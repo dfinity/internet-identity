@@ -4,6 +4,7 @@ import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 import {
   RecoveryDevice,
   recoveryDeviceToLabel,
+  isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
 
 const pageContent = () => {
@@ -47,7 +48,7 @@ export const init = (devices: RecoveryDevice[]): Promise<RecoveryDevice> =>
         html`<div class="deviceItemAlias">
           <button class="c-button c-button--secondary">
             <span aria-hidden="true"
-              >${"seed_phrase" in device.key_type
+              >${isRecoveryPhrase(device)
                 ? seedPhraseIcon
                 : securityKeyIcon}</span
             >

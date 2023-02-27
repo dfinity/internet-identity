@@ -9,7 +9,12 @@ import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
-import { isRecoveryDevice, RecoveryDevice } from "../../utils/recoveryDevice";
+import {
+  isRecoveryDevice,
+  isRecoveryPhrase,
+  isProtected,
+  RecoveryDevice,
+} from "../../utils/recoveryDevice";
 
 // A particular device setting, e.g. remove, protect, etc
 export type Setting = { label: string; fn: () => void };
@@ -57,12 +62,7 @@ export const deviceSettings = ({
 const shouldOfferToProtect = (
   device: DeviceData
 ): device is RecoveryDevice & DeviceData =>
-  "recovery" in device.purpose &&
-  "seed_phrase" in device.key_type &&
-  !isProtected(device);
-
-const isProtected = (device: DeviceData): boolean =>
-  "protected" in device.protection;
+  isRecoveryPhrase(device) && !isProtected(device);
 
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
@@ -122,7 +122,7 @@ const deleteDevice = async (
       )
     : confirm(
         `Do you really want to remove the ${
-          "recovery" in device.purpose ? "" : "device "
+          isRecoveryDevice(device) ? "" : "device "
         }"${device.alias}"?`
       );
   if (!shouldProceed) {

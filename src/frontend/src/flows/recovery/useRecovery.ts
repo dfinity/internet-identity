@@ -5,6 +5,7 @@ import { promptUserNumber } from "../../components/promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 
 export const useRecovery = async (
   connection: Connection,
@@ -43,10 +44,9 @@ const runRecovery = async (
       ? recoveryDevices[0]
       : await pickRecoveryDevice(recoveryDevices);
 
-  const res =
-    "seed_phrase" in device.key_type
-      ? await phraseRecoveryPage(userNumber, connection, device)
-      : await deviceRecoveryPage(userNumber, connection, device);
+  const res = isRecoveryPhrase(device)
+    ? await phraseRecoveryPage(userNumber, connection, device)
+    : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {

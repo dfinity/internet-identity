@@ -26,6 +26,9 @@ import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
   recoveryDeviceToLabel,
+  isProtected,
+  hasRecoveryPhrase,
+  isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
 
 // A simple representation of "device"s used on the manage page.
@@ -518,16 +521,6 @@ const domainWarning = (device: DeviceData): TemplateResult | undefined => {
 
   return undefined;
 };
-
-// Whether the user has a recovery phrase or not
-const hasRecoveryPhrase = (devices: DeviceData[]): boolean =>
-  devices.some((device) => device.alias === "Recovery phrase");
-
-const isProtected = (device: DeviceData): boolean =>
-  "protected" in device.protection;
-
-const isRecoveryPhrase = (device: DeviceData): boolean =>
-  "seed_phrase" in device.key_type;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
