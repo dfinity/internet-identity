@@ -252,7 +252,7 @@ pub fn device_data_1() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(PUBKEY_1),
         alias: "My Device".to_string(),
-        credential_id: None,
+        credential_id: Some(ByteBuf::from("credential id 1")),
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
@@ -264,7 +264,7 @@ pub fn device_data_2() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(PUBKEY_2),
         alias: "My second device".to_string(),
-        credential_id: None,
+        credential_id: Some(ByteBuf::from("credential id 2")),
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,

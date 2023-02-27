@@ -5,6 +5,7 @@ use ic_test_state_machine_client::{
 };
 use internet_identity_interface as types;
 use internet_identity_interface::archive::BufferedEntry;
+use internet_identity_interface::GetCredentialsResponse;
 use serde_bytes::ByteBuf;
 
 /** The functions here are derived (manually) from Internet Identity's Candid file */
@@ -111,6 +112,14 @@ pub fn lookup(
     anchor_number: types::AnchorNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
     query_candid(env, canister_id, "lookup", (anchor_number,)).map(|(x,)| x)
+}
+
+pub fn get_credentials(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    anchor_number: types::AnchorNumber,
+) -> Result<GetCredentialsResponse, CallError> {
+    query_candid(env, canister_id, "get_credentials", (anchor_number,)).map(|(x,)| x)
 }
 
 pub fn add(

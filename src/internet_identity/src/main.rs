@@ -97,7 +97,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
-/// Note: Will be changed in the future to be more consistent with get_anchor_info.
+/// Deprecated: use `get_credentials` instead
 #[query]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
@@ -114,6 +114,24 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
             })
             .collect()
     })
+}
+
+#[query]
+fn get_credentials(anchor_number: AnchorNumber) -> GetCredentialsResponse {
+    let anchor = state::anchor(anchor_number);
+
+    let credentials = anchor.get_credentials(|d| d.purpose == Purpose::Authentication);
+    let recovery_credentials = anchor.get_credentials(|d| d.purpose == Purpose::Recovery);
+    let recovery_phrase = anchor
+        .devices()
+        .iter()
+        .any(|d| d.key_type == KeyType::SeedPhrase);
+
+    GetCredentialsResponse {
+        credentials,
+        recovery_credentials,
+        recovery_phrase,
+    }
 }
 
 #[update] // this is an update call because queries are not (yet) certified

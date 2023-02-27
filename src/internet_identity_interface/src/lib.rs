@@ -190,6 +190,19 @@ impl IdentityAnchorInfo {
     }
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Credential {
+    pub pubkey: DeviceKey,
+    pub credential_id: CredentialId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct GetCredentialsResponse {
+    pub credentials: Vec<Credential>,
+    pub recovery_credentials: Vec<Credential>,
+    pub recovery_phrase: bool,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,

@@ -164,6 +164,23 @@ impl Anchor {
         &self.devices
     }
 
+    /// Returns matching [Credential]s.
+    pub fn get_credentials<P>(&self, filter: P) -> Vec<Credential>
+    where
+        P: Fn(&&Device) -> bool,
+    {
+        self.devices()
+            .iter()
+            .filter(filter)
+            .flat_map(|d| {
+                d.credential_id.clone().map(|credential_id| Credential {
+                    pubkey: d.pubkey.clone(),
+                    credential_id,
+                })
+            })
+            .collect()
+    }
+
     /// Consumes self and exposes the devices.
     pub fn into_devices(self) -> Vec<Device> {
         self.devices
