@@ -485,7 +485,9 @@ export const displayManage = (
 };
 
 // Show a domain-related warning, if necessary.
-const domainWarning = (device: DeviceData): TemplateResult | undefined => {
+export const domainWarning = (
+  device: DeviceData
+): TemplateResult | undefined => {
   // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
   if (isRecoveryPhrase(device)) {
     return undefined;
