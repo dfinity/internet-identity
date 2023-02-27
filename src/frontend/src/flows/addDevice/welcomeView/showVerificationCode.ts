@@ -28,18 +28,17 @@ const showVerificationCodeTemplate = ({
   cancel: () => void;
 }) => {
   const pageContentSlot = html` <hgroup>
-      <h1 class="t-title t-title--main">
-        Do you trust this device with your Identity Anchor?
-      </h1>
+      <h1 class="t-title t-title--main">Verify New Device</h1>
+      <p class="t-paragraph">Your new device:</p>
       <output
         class="c-input c-input--readonly t-vip t-vip--small"
         aria-label="Device Alias"
         >${alias}</output
       >
       <p class="t-paragraph">
-        Confirm that you trust this device by logging into II from an existing
-        device and entering the
-        <strong class="t-strong">Verification Code</strong> below:
+        In your other Internet Identity window, confirm that you trust this
+        device by entering the
+        <strong class="t-strong">Verification Code</strong>:
       </p>
     </hgroup>
     <output

@@ -114,16 +114,17 @@ fn should_enforce_cumulative_device_limit() {
     for i in 0..4 {
         anchor.add_device(large_device(i)).unwrap();
     }
-    let minimal_device = Device {
+    let device = Device {
         pubkey: Default::default(),
-        alias: "a".to_string(),
-        credential_id: None,
+        alias: "a".repeat(64),
+        credential_id: Some(ByteBuf::from([0; 100])),
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     };
 
-    let result = anchor.add_device(minimal_device);
+    let result = anchor.add_device(device);
 
     assert!(matches!(
         result,
@@ -159,6 +160,7 @@ fn should_allow_protection_only_on_recovery_phrases() {
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Protected,
+        origin: None,
     });
 
     assert!(matches!(
@@ -319,6 +321,7 @@ fn sample_device() -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Platform,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://fooo.bar".to_string()),
     }
 }
 
@@ -330,6 +333,7 @@ fn device(n: u8) -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Platform,
         protection: DeviceProtection::Unprotected,
+        origin: Some(format!("https://foo{n}.bar")),
     }
 }
 
@@ -342,6 +346,7 @@ fn large_device(n: u8) -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
     }
 }
 
@@ -353,6 +358,7 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection,
+        origin: None,
     }
 }
 

@@ -1,4 +1,5 @@
 import { promptDeviceAliasPage } from "./alias";
+import { I18n } from "../../i18n";
 
 test("can be canceled", async () => {
   const cancel = jest.fn();
@@ -7,6 +8,7 @@ test("can be canceled", async () => {
     continue: ctn,
     cancel,
     container: document.body,
+    i18n: new I18n(),
   });
 
   const elem = document.querySelector("#registerCancel") as HTMLElement;
@@ -22,6 +24,7 @@ test("can be picked", async () => {
     continue: ctn,
     cancel,
     container: document.body,
+    i18n: new I18n(),
   });
 
   const input = document.querySelector("#registerAlias") as HTMLInputElement;

@@ -32,8 +32,7 @@ const runRecovery = async (
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
-      message:
-        "You do not have any recovery devices configured. Did you mean to authenticate with one of your devices instead?",
+      message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
     return window.location.reload();

@@ -51,6 +51,8 @@ mod upgrade_tests {
             api::get_anchor_info(&env, canister_id, principal_1(), user_number)
                 .expect("get_anchor_info failed");
 
+        let mut device_no_origin = device_data_1();
+        device_no_origin.origin = None;
         assert_eq!(retrieved_device_data.devices, vec![device_data_1()]);
     }
 
@@ -188,7 +190,7 @@ mod upgrade_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-        let stats = api::compat::stats(&env, canister_id)?;
+        let stats = api::stats(&env, canister_id)?;
 
         let result = upgrade_ii_canister_with_arg(
             &env,
@@ -228,7 +230,10 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
         let user_number = flows::register_anchor(&env, canister_id);
-        let mut devices_before = api::lookup(&env, canister_id, user_number).unwrap();
+        let mut devices_before =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+                .unwrap()
+                .devices;
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
         api::health_check(&env, canister_id);
         upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
@@ -269,7 +274,7 @@ mod rollback_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
 
         // use anchor
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices, [device_data_1()]);
 
         let (user_key, _) = api::prepare_delegation(
@@ -522,6 +527,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device2 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
@@ -530,6 +536,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device3 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
@@ -538,6 +545,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device4 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
@@ -546,6 +554,7 @@ mod stable_memory_tests {
             credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device5 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
@@ -554,6 +563,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         let device6 = DeviceData {
             pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
@@ -562,6 +572,7 @@ mod stable_memory_tests {
             credential_id: None,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
+            origin: None,
         };
         [device1, device2, device3, device4, device5, device6]
     }
@@ -1398,7 +1409,7 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -1411,7 +1422,7 @@ mod device_management_tests {
             device_data_2().pubkey,
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
+        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())

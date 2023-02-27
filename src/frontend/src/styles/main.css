@@ -398,8 +398,14 @@ body {
   font-size: 1.5rem;
 }
 
+.t-muted {
+  color: var(--rc-text--disabled);
+  font-size: 0.8em;
+}
+
 .t-discreet {
   font-size: 0.8em;
+  vertical-align: baseline;
 }
 
 a,
@@ -510,6 +516,119 @@ a:hover,
  */
 
 /**
+ * Icon components
+ */
+.c-icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--vs-line-height));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.c-icon--block {
+  display: block;
+  height: auto;
+  aspect-ratio: none;
+}
+
+.c-icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.c-icon--warning [fill] {
+  fill: var(--rc-warning);
+}
+
+.c-icon--lock svg {
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.c-icon--lock:hover svg {
+  animation: shakeup 0.6s ease;
+}
+
+@keyframes shakeup {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.8) rotate(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translate(-50%, -50%) translateY(-2px) scale(0.8) rotate(-6deg);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translate(-50%, -50%) translateY(-4px) scale(0.8) rotate(10deg);
+  }
+}
+
+.c-icon--more {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: inline-block;
+  --rotate: 0;
+  --offsetY: 0;
+  --bgc: currentColor;
+}
+
+:is(button, a, link, .c-dropdown):hover .c-icon--more {
+  --rotate: -90deg;
+  --bgc: var(--rc-interaction-text);
+}
+
+.c-icon--more__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--bgc);
+  width: 0.3rem;
+  height: 0.3rem;
+  transform: translate(-50%, -50%) rotate(var(--rotate, 0deg))
+    translateY(var(--offsetY, 0));
+  transition: 200ms transform cubic-bezier(0.3, 0.7, 0, 1),
+    250ms background-color linear;
+  border-radius: 50%;
+}
+
+.c-icon--more__dot:nth-child(1) {
+  --offsetY: -0.4rem;
+  transition-delay: 50ms, 50ms;
+}
+
+.c-icon--more__dot:nth-child(3) {
+  --offsetY: 0.4rem;
+  transition-delay: 100ms, 100ms;
+}
+
+.c-icon--outlined {
+  box-shadow: 0 0 0 1px var(--rc-line);
+  border-radius: 1px;
+  transition: box-shadow 200ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+:is(button, a, link, .c-dropdown) .c-icon--outlined,
+.c-icon--outlined:is(button, a, link, .c-dropdown) {
+  box-shadow: 0 0 0 1px var(--rc-button), 0 0 1em var(--rc-line);
+}
+
+:is(button, a, link, .c-dropdown):hover .c-icon--outlined {
+  box-shadow: 0 0 0 1px var(--rc-line), 0 0 0.3em var(--rc-line);
+  background-color: var(--rc-button);
+  --bgc: var(--rc-onButton);
+}
+
+/**
  * Card components
  */
 
@@ -538,6 +657,11 @@ a:hover,
 
 .c-card--narrow {
   padding: var(--rs-card-bezel-narrow);
+}
+
+.c-card--tight {
+  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
+    calc(var(--rs-card-bezel-narrow) * 0.6);
 }
 
 .c-card--background {
@@ -1223,12 +1347,20 @@ a:hover,
   position: relative;
 }
 
-.c-tooltip:hover .c-tooltip__message {
+.c-tooltip:focus {
+  outline: 1px solid var(--rc-button);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.c-tooltip:hover .c-tooltip__message,
+.c-tooltip:focus .c-tooltip__message {
   visibility: visible;
   opacity: 1;
 }
 
-.c-tooltip--onDisabled:hover .c-tooltip__message {
+.c-tooltip--onDisabled:hover .c-tooltip__message,
+.c-tooltip--onDisabled:focus .c-tooltip__message {
   visibility: hidden;
   opacity: 0;
 }
@@ -1241,7 +1373,7 @@ a:hover,
 .c-tooltip__message {
   position: absolute;
   left: 0;
-
+  top: 100%;
   opacity: 0;
   color: var(--rc-text);
   visibility: hidden;
@@ -1253,11 +1385,15 @@ a:hover,
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
   background-color: var(--rc-background);
+
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
-.c-tooltip__message--right {
-  right: 0;
+.c-tooltip--left .c-tooltip__message {
   left: auto;
+  right: 0;
 }
 
 /* chasm: alternative to tooltips, where the card opens to reveal details */
@@ -1455,6 +1591,129 @@ a:hover,
 
 .c-input__error--errored {
   opacity: 1;
+}
+
+/* dropdown menus */
+
+.c-action-list__item:has(.c-dropdown):hover,
+.c-action-list__item:has(.c-dropdown:hover) {
+  position: relative;
+  z-index: calc(var(--vz-tooltip) + 3);
+}
+
+.c-dropdown {
+  position: relative;
+}
+
+.c-dropdown__trigger {
+  z-index: calc(var(--vz-tooltip) + 2);
+  transition: 100ms color linear;
+}
+
+.c-dropdown:hover {
+  z-index: var(--vz-tooltip);
+}
+
+.c-dropdown:hover .c-dropdown__trigger,
+.c-dropdown:focus-within .c-dropdown__trigger {
+  color: var(--rc-interaction);
+}
+
+.c-dropdown::after {
+  opacity: 0;
+  content: "";
+  position: absolute;
+  top: calc(var(--vs-bezel) * -1);
+  bottom: 0;
+  height: calc(100% - var(--vs-bezel));
+  width: 100%;
+  padding: var(--vs-bezel);
+  right: calc(var(--vs-bezel) * -1);
+  background: var(--rc-background);
+  border-bottom-color: var(--rc-background);
+  z-index: calc(var(--vz-tooltip) + 1);
+  box-sizing: content-box;
+  pointer-events: none;
+}
+
+.c-dropdown__menu {
+  opacity: 0;
+  visibility: hidden;
+  position: absolute;
+  top: 100%;
+  right: calc(var(--vs-bezel) * -1);
+  z-index: var(--vz-tooltip);
+  min-width: 100%;
+  width: max-content;
+  background-color: var(--rc-background);
+  border-radius: var(--border-radius);
+  padding: 0 var(--vs-bezel);
+  margin-top: calc(-1 * var(--vs-line));
+  text-align: right;
+  pointer-events: none;
+  transform: translateY(-2rem);
+  transition: 0ms opacity linear, 0ms visibility linear, 0ms transform;
+}
+
+.c-dropdown__menu::before {
+  z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+  transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
+    0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
+}
+
+.c-dropdown:hover .c-dropdown__menu,
+.c-dropdown:focus-within .c-dropdown__menu,
+.c-dropdown:hover::after,
+.c-dropdown:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0rem);
+  transition: 200ms opacity linear, 200ms visibility linear,
+    300ms transform cubic-bezier(0.7, 0.3, 0, 1);
+}
+
+.c-dropdown__item {
+  display: block;
+  padding: calc(var(--vs-bezel) * 0.75) 0;
+  color: var(--rc-text);
+  text-decoration: none;
+}
+
+.c-dropdown__link {
+  display: block;
+  color: var(--rc-text);
+  font-size: 0.8em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 100ms color linear;
+}
+
+.c-dropdown__link:hover,
+.c-dropdown__link:focus {
+  color: var(--rc-interaction);
+}
+
+.c-dropdown__item + .c-dropdown__item {
+  border-top: var(--vs-line) solid var(--rc-line);
+}
+
+.c-dropdown__button {
+  display: block;
+  color: var(--rc-text);
+  padding: 0.1em calc(var(--vs-bezel) * 0.5) 0;
+  text-align: left;
+  width: 100%;
+  font-size: 0.75em;
+  transition: color 100ms linear;
+}
+
+.c-dropdown__button:hover {
+  color: var(--rc-interaction);
 }
 
 /* Needed to override the "reset" rules */

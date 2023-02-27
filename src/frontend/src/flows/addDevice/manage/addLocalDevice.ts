@@ -8,6 +8,7 @@ import { pickDeviceAlias } from "./addDevicePickAlias";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { displayError } from "../../../components/displayError";
+import { setAnchorUsed } from "../../../utils/userNumber";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({
@@ -63,6 +64,8 @@ export const addLocalDevice = async (
       error instanceof Error ? error : unknownError()
     );
   }
+
+  setAnchorUsed(userNumber);
   await renderManage(userNumber, connection);
 };
 

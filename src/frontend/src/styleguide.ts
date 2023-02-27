@@ -1,7 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon } from "./components/icons";
+import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -301,18 +301,66 @@ export const styleguide = html`
           <ul class="c-action-list">
             <li class="c-action-list__item">
               <span class="c-action-list__label">Actionable List Item</span>
-              <button class="c-action-list__action">${settingsIcon}</button>
+              <span class="c-action-list__action c-dropdown">
+                <button
+                  class="c-dropdown__trigger"
+                  aria-expanded="false"
+                  aria-controls="dropdown-i"
+                >
+                  ${settingsIcon}
+                </button>
+                <ul class="c-dropdown__menu" id="dropdown-i">
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Delete Anchor</button>
+                  </li>
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Lock Anchor</button>
+                  </li>
+                </ul>
+              </span>
             </li>
           </ul>
 
           <ul class="c-action-list">
             <li class="c-action-list__item">
               <span class="c-action-list__label">Actionable List Item</span>
-              <button class="c-action-list__action">${settingsIcon}</button>
+              <span class="c-action-list__action c-dropdown">
+                <button
+                  class="c-dropdown__trigger"
+                  aria-expanded="false"
+                  aria-controls="dropdown-i"
+                >
+                  ${dropdownIcon}
+                </button>
+                <ul class="c-dropdown__menu" id="dropdown-i">
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Delete Anchor</button>
+                  </li>
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Lock Anchor</button>
+                  </li>
+                </ul>
+              </span>
             </li>
             <li class="c-action-list__item">
-              <span class="c-action-list__label">Second List Item</span>
-              <button class="c-action-list__action">${settingsIcon}</button>
+              <span class="c-action-list__label">Actionable List Item</span>
+              <span class="c-action-list__action c-dropdown">
+                <button
+                  class="c-dropdown__trigger"
+                  aria-expanded="false"
+                  aria-controls="dropdown-i"
+                >
+                  ${dropdownIcon}
+                </button>
+                <ul class="c-dropdown__menu" id="dropdown-i">
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Delete Anchor</button>
+                  </li>
+                  <li class="c-dropdown__item">
+                    <button class="c-dropdown__button">Lock Anchor</button>
+                  </li>
+                </ul>
+              </span>
             </li>
             <li class="c-action-list__actions">
               <button class="c-button c-button--primary">Some action</button>

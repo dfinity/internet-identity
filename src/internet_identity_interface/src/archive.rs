@@ -44,6 +44,7 @@ pub struct DeviceDataWithoutAlias {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+    pub origin: Option<String>,
 }
 
 impl From<DeviceData> for DeviceDataWithoutAlias {
@@ -54,6 +55,7 @@ impl From<DeviceData> for DeviceDataWithoutAlias {
             purpose: device_data.purpose,
             key_type: device_data.key_type,
             protection: device_data.protection,
+            origin: device_data.origin,
         }
     }
 }
@@ -67,6 +69,7 @@ pub struct DeviceDataUpdate {
     pub purpose: Option<Purpose>,
     pub key_type: Option<KeyType>,
     pub protection: Option<DeviceProtection>,
+    pub origin: Option<Option<String>>,
 }
 
 // Placeholder for information that has been hidden for privacy reasons.

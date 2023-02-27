@@ -30,9 +30,9 @@ import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
 import { displayUserNumberPage } from "./flows/register/finish";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
-import { displayManage, authnTemplateManage } from "./flows/manage";
+import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { deviceSettingsPage } from "./flows/manage/deviceSettings";
+import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
   registerTentativeDevice,
@@ -62,6 +62,7 @@ const recoveryPhrase: RecoveryDevice & DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const recoveryPhraseText =
@@ -74,6 +75,7 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   key_type: { unknown: null },
   purpose: { recovery: null },
   credential_id: [],
+  origin: [],
 };
 
 const simpleDevices: [DeviceData, DeviceData] = [
@@ -84,6 +86,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 
   {
@@ -93,6 +96,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     key_type: { unknown: null },
     purpose: { authentication: null },
     credential_id: [],
+    origin: [],
   },
 ];
 
@@ -148,6 +152,12 @@ const iiPages: Record<string, () => void> = {
     promptDeviceAliasPage({
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
+      i18n,
+    }),
+  pickDeviceAlias: () =>
+    pickDeviceAliasPage({
+      cancel: () => console.log("canceled"),
+      pick: (alias) => console.log("device alias:", alias),
     }),
 
   // Authorize screens
@@ -205,6 +215,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   promptCaptchaReady: () =>
     promptCaptchaPage({
@@ -215,6 +226,7 @@ const iiPages: Record<string, () => void> = {
           /* noop */
         }),
       onContinue: () => console.log("Done"),
+      i18n,
     }),
   chooseRecoveryMechanism: () =>
     chooseRecoveryMechanismPage({
@@ -236,12 +248,92 @@ const iiPages: Record<string, () => void> = {
       }
     ),
   displayManage: () =>
-    displayManage(userNumber, dummyConnection, [
-      ...simpleDevices,
-      recoveryPhrase,
-    ]),
+    displayManagePage({
+      userNumber,
+      authenticators: [
+        {
+          label: "Chrome on iPhone",
+          isRecovery: false,
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+        {
+          label: "Yubikey Blue",
+          isRecovery: false,
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+        {
+          label: "Yubikey Blue",
+          isRecovery: false,
+          isProtected: false,
+          warn: html`Something is rotten in the state of Device`,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+      ],
+      recoveries: [
+        {
+          label: "Recovery Phrase",
+          isRecovery: true,
+          isProtected: true,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+            {
+              label: "Protect",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+      ],
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      onAddRecovery: () => {
+        console.log("add recovery requested");
+      },
+    }),
   displayManageSingle: () =>
-    displayManage(userNumber, dummyConnection, [simpleDevices[0]]),
+    displayManagePage({
+      userNumber,
+      authenticators: [
+        {
+          label: "Chrome on iPhone",
+          isRecovery: false,
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+      ],
+      recoveries: [],
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      onAddRecovery: () => {
+        console.log("add recovery requested");
+      },
+    }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   renderPollForTentativeDevicePage: () =>
     renderPollForTentativeDevicePage(userNumber),
@@ -276,14 +368,6 @@ const iiPages: Record<string, () => void> = {
           yield "00:34";
         },
       },
-    }),
-  deviceSettings: () =>
-    deviceSettingsPage({
-      device: simpleDevices[0],
-      isOnlyDevice: false,
-      protectDevice: () => console.log("protect"),
-      deleteDevice: () => console.log("delete"),
-      back: () => console.log("back"),
     }),
   loader: () => withLoader(() => new Promise(() => renderConstructing())),
   displaySafariWarning: () =>
@@ -379,6 +463,7 @@ const components = (): TemplateResult => {
                       () => (cr.chars === "8wJ6Q" ? "yes" : badChallenge)
                     ),
                   onContinue: () => console.log("Done"),
+                  i18n,
                 },
                 container
               )
