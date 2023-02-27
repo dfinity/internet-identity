@@ -2,6 +2,7 @@ import { html, render, TemplateResult } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
+import { hasRecoveryPhrase, hasRecoveryKey } from "../../utils/recoveryDevice";
 
 export type RecoveryMechanism = "securityKey" | "seedPhrase";
 
@@ -103,13 +104,3 @@ export const chooseRecoveryMechanism = async ({
     });
   });
 };
-
-const hasRecoveryPhrase = (devices: Omit<DeviceData, "alias">[]): boolean =>
-  devices.some(
-    (device) => "seed_phrase" in device.key_type && "recovery" in device.purpose
-  );
-const hasRecoveryKey = (devices: Omit<DeviceData, "alias">[]): boolean =>
-  devices.some(
-    (device) =>
-      !("seed_phrase" in device.key_type) && "recovery" in device.purpose
-  );
