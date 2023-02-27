@@ -155,13 +155,13 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[@device="${deviceName}"]`)
+      .$(`//div[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[@device="${deviceName}"]`)
+      .$(`//div[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
