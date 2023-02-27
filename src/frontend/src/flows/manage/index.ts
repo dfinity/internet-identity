@@ -309,7 +309,7 @@ const deviceListItem = ({
   index: string;
 }) => {
   return html`
-    <div class="c-action-list__label" device=${device.label}>
+    <div class="c-action-list__label" data-device=${device.label}>
       ${device.label}
       ${device.dupCount !== undefined && device.dupCount > 0
         ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
