@@ -131,7 +131,7 @@ export const authnTemplates = (
       <p class="t-paragraph t-centered l-stack">
         <a
           class="t-link"
-          href="https://medium.com/dfinity/internet-identity-the-end-of-usernames-and-passwords-ff45e4861bf7"
+          href="https://internetcomputer.org/internet-identity"
           target="_blank"
           rel="noopener noreferrer"
           >Learn More</a
