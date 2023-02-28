@@ -2,6 +2,12 @@ import { TemplateResult, html } from "lit-html";
 import { deviceListItem, Device } from "./deviceListItem";
 import { warningIcon } from "./icons";
 
+// The maximum number of authenticator (non-recovery) devices we allow.
+// The canister limits the _total_ number of devices (recovery included) to 10,
+// and we (the frontend) only allow user one recovery device per type (phrase, fob),
+// which leaves room for 8 authenticator devices.
+const MAX_AUTHENTICATORS = 8;
+
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
 export type DedupDevice = Device & { dupCount?: number };
@@ -23,11 +29,9 @@ const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
 export const devicesSection = ({
   authenticators,
   onAddDevice,
-  maxAuthenticators,
 }: {
   authenticators: Device[];
   onAddDevice: () => void;
-  maxAuthenticators: number;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
   const isWarning = authenticators.length < 2;
@@ -52,9 +56,9 @@ export const devicesSection = ({
           <h2 class="t-title">Added devices</h2>
           <span class="t-title__complication c-tooltip" tabindex="0">
             <span class="c-tooltip__message c-card c-card--tight">
-              You can register up to ${maxAuthenticators} authenticator
+              You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
-              (${_authenticators.length}/${maxAuthenticators})
+              (${_authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
         </div>
@@ -83,13 +87,13 @@ export const devicesSection = ({
           </div>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${_authenticators.length >= maxAuthenticators}
+              ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
               @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
             >
               <span class="c-tooltip__message c-card c-card--tight"
-                >You can register up to ${maxAuthenticators} authenticator devices.
+                >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
               >
               <span>Add new device</span>

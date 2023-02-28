@@ -94,12 +94,6 @@ const displayFailedToListDevices = (error: Error) =>
     primaryButton: "Try again",
   });
 
-// The maximum number of authenticator (non-recovery) devices we allow.
-// The canister limits the _total_ number of devices (recovery included) to 10,
-// and we (the frontend) only allow user one recovery device per type (phrase, fob),
-// which leaves room for 8 authenticator devices.
-const MAX_AUTHENTICATORS = 8;
-
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
 // recovery devices, we display a warning "nag box" and suggest to the user
@@ -130,7 +124,6 @@ const displayManageTemplate = ({
     ${devicesSection({
       authenticators,
       onAddDevice,
-      maxAuthenticators: MAX_AUTHENTICATORS,
     })}
     ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
     ${recoveryMethods({ recoveries, onAddRecovery })} ${logoutSection()}
