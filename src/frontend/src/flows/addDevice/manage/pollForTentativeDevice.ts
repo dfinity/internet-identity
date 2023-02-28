@@ -127,7 +127,7 @@ const init = (
     }
   );
 
-  poll(userNumber, connection, () => countdown.hasStopped()).then(
+  void poll(userNumber, connection, () => countdown.hasStopped()).then(
     async (device) => {
       if (!countdown.hasStopped() && device) {
         countdown.stop();
