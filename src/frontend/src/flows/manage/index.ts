@@ -4,13 +4,12 @@ import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { Setting, deviceSettings } from "./deviceSettings";
+import { deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { warningIcon, dropdownIcon, lockIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
@@ -22,6 +21,9 @@ import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevi
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
+import { Device } from "../../components/deviceListItem";
+import { recoveryMethodsSection } from "../../components/recoveryMethodsSection";
+import { devicesSection } from "../../components/devicesSection";
 import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
@@ -30,22 +32,6 @@ import {
   hasRecoveryPhrase,
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
-
-// A simple representation of "device"s used on the manage page.
-export type Device = {
-  // All the settings allowed for a particular device
-  settings: Setting[];
-  // The displayed name of a device (not exactly the "alias") because
-  // recovery devices handle aliases differently.
-  label: string;
-  isRecovery: boolean;
-  isProtected: boolean;
-  warn?: TemplateResult;
-};
-
-// A device with extra information about whether another device (earlier in the list)
-// has the same name.
-export type DedupDevice = Device & { dupCount?: number };
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -108,12 +94,6 @@ const displayFailedToListDevices = (error: Error) =>
     primaryButton: "Try again",
   });
 
-// The maximum number of authenticator (non-recovery) devices we allow.
-// The canister limits the _total_ number of devices (recovery included) to 10,
-// and we (the frontend) only allow user one recovery device per type (phrase, fob),
-// which leaves room for 8 authenticator devices.
-const MAX_AUTHENTICATORS = 8;
-
 // Actual page content. We display the Identity Anchor and the list of
 // (non-recovery) devices. Additionally, if the user does _not_ have any
 // recovery devices, we display a warning "nag box" and suggest to the user
@@ -141,9 +121,12 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
-    ${devicesSection({ authenticators, onAddDevice })}
+    ${devicesSection({
+      authenticators,
+      onAddDevice,
+    })}
     ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
-    ${recoverySection({ recoveries, onAddRecovery })} ${logoutSection()}
+    ${recoveryMethodsSection({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
   return mainWindow({
@@ -162,199 +145,6 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
     >
   </aside>
 `;
-
-// Deduplicate devices with same (duplicated) labels
-const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
-  return authenticators.reduce<Device[]>((acc, authenticator) => {
-    const _authenticator: DedupDevice = { ...authenticator };
-    const sameName = acc.filter((a) => a.label === _authenticator.label);
-    if (sameName.length >= 1) {
-      _authenticator.dupCount = sameName.length + 1;
-    }
-
-    acc.push(_authenticator);
-    return acc;
-  }, []);
-};
-
-// The regular, "authenticator" devices
-const devicesSection = ({
-  authenticators,
-  onAddDevice,
-}: {
-  authenticators: Device[];
-  onAddDevice: () => void;
-}): TemplateResult => {
-  const wrapClasses = ["l-stack"];
-  const isWarning = authenticators.length < 2;
-
-  if (isWarning === true) {
-    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
-  }
-
-  const _authenticators = dedupLabels(authenticators);
-
-  return html`
-    <aside class="${wrapClasses.join(" ")}">
-      ${
-        isWarning === true
-          ? html`<span class="c-card__icon" aria-hidden="true"
-              >${warningIcon}</span
-            >`
-          : undefined
-      }
-      <div class="${isWarning === true ? "c-card__content" : undefined}">
-        <div class="t-title t-title--complications">
-          <h2 class="t-title">Added devices</h2>
-          <span class="t-title__complication c-tooltip" tabindex="0">
-            <span class="c-tooltip__message c-card c-card--tight">
-              You can register up to ${MAX_AUTHENTICATORS} authenticator
-              devices (recovery devices excluded)</span>
-              (${_authenticators.length}/${MAX_AUTHENTICATORS})
-            </span>
-          </span>
-        </div>
-        ${
-          isWarning === true
-            ? html`<p class="warning-message t-paragraph t-lead">
-                We recommend that you have at least two devices (for example,
-                your computer and your phone).
-              </p>`
-            : undefined
-        }
-
-        <div class="c-action-list">
-          <ul>
-          ${_authenticators.map((device, index) =>
-            deviceListItem({ device, index: `authenticator-${index}` })
-          )}</ul>
-          <div class="c-action-list__actions">
-            <button
-              ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
-              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
-              @click="${() => onAddDevice()}"
-              id="addAdditionalDevice"
-            >
-              <span class="c-tooltip__message c-card c-card--tight"
-                >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
-                Remove a device before you can add a new one.</span
-              >
-              <span>Add new device</span>
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </aside>`;
-};
-
-// The list of recovery devices
-const recoverySection = ({
-  recoveries,
-  onAddRecovery,
-}: {
-  recoveries: Device[];
-  onAddRecovery: () => void;
-}): TemplateResult => {
-  return html`
-    <aside class="l-stack">
-      ${recoveries.length === 0
-        ? undefined
-        : html`
-            <div class="t-title">
-              <h2>Recovery methods</h2>
-            </div>
-            <div class="c-action-list">
-              <ul>
-                ${recoveries.map((device, index) =>
-                  deviceListItem({
-                    device,
-                    index: `recovery-${index}`,
-                  })
-                )}
-              </ul>
-              <div class="c-action-list__actions">
-                <button
-                  @click="${onAddRecovery}"
-                  class="c-button c-button--primary"
-                  id="addRecovery"
-                >
-                  Add recovery method
-                </button>
-              </div>
-            </div>
-          `}
-    </aside>
-  `;
-};
-
-const deviceListItem = ({
-  device,
-  index,
-}: {
-  device: DedupDevice;
-  index: string;
-}) => {
-  return html`
-    <li class="c-action-list__item" data-device=${device.label}>
-      <div class="c-action-list__label">
-        ${device.label}
-        ${device.dupCount !== undefined && device.dupCount > 0
-          ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
-          : undefined}
-      </div>
-      ${device.isProtected
-        ? html`<div class="c-action-list__action" data-role="protected">
-            <span
-              class="c-tooltip c-tooltip--left c-icon c-icon--lock"
-              tabindex="0"
-              >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
-                >Your device is protected</span
-              ></span
-            >
-          </div>`
-        : undefined}
-      ${device.warn !== undefined
-        ? html`<div class="c-action-list__action">
-            <span
-              class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-              tabindex="0"
-              >${warningIcon}<span
-                class="c-tooltip__message c-card c-card--tight"
-                >${device.warn}</span
-              ></span
-            >
-          </div>`
-        : undefined}
-      ${device.settings.length > 0
-        ? html` <div class="c-action-list__action c-dropdown">
-            <button
-              class="c-dropdown__trigger c-action-list__action"
-              aria-expanded="false"
-              aria-controls="dropdown-${index}"
-              data-device=${device.label}
-            >
-              ${dropdownIcon}
-            </button>
-            <ul class="c-dropdown__menu" id="dropdown-${index}">
-              ${device.settings.map((setting) => {
-                return html` <li class="c-dropdown__item">
-                  <button
-                    class="c-dropdown__link"
-                    data-device=${device.label}
-                    data-action=${setting.label}
-                    @click=${() => setting.fn()}
-                  >
-                    ${setting.label}
-                  </button>
-                </li>`;
-              })}
-            </ul>
-          </div>`
-        : undefined}
-    </li>
-  `;
-};
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({
