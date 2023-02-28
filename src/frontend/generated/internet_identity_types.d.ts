@@ -42,6 +42,7 @@ export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'failed' : string };
 export interface DeviceData {
   'alias' : string,
+  'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
@@ -54,6 +55,16 @@ export type DeviceProtection = { 'unprotected' : null } |
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
+}
+export interface DeviceWithUsage {
+  'alias' : string,
+  'last_usage' : [] | [Timestamp],
+  'origin' : [] | [string],
+  'protection' : DeviceProtection,
+  'pubkey' : DeviceKey,
+  'key_type' : KeyType,
+  'purpose' : Purpose,
+  'credential_id' : [] | [CredentialId],
 }
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
@@ -72,7 +83,7 @@ export interface HttpResponse {
   'status_code' : number,
 }
 export interface IdentityAnchorInfo {
-  'devices' : Array<DeviceData>,
+  'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface InternetIdentityInit {

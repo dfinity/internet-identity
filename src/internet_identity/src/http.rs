@@ -21,6 +21,7 @@ impl ContentType {
             ContentType::CSS => "text/css".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
+            ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
         }
     }
 }
@@ -263,8 +264,12 @@ fn content_security_policy_header() -> String {
 /// script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
 /// by modern browsers.
 ///
-/// connect-src https://*.ic0.app is required in order for II to be able to fetch the
-/// /.well-known/ii-alternative-origins path of authenticating canisters setting a derivationOrigin.
+/// connect-src is used to ensure fetch requests can only be made against known domains:
+///     * 'self': used fetch the JS bundles
+///     * https://icp-api.io: the official IC HTTP API domain for canister calls to the canister
+///     * https://*.icp0.io: HTTP fetches for checking /.well-known/ii-alternative-origins on
+///     other canisters (authenticating canisters setting a derivationOrigin)
+///     * https://*.ic0.app: same as above, but legacy
 ///
 /// style-src 'unsafe-inline' is currently required due to the way styles are handled by the
 /// application. Adding hashes would require a big restructuring of the application and build
@@ -281,7 +286,7 @@ pub fn content_security_policy_meta() -> String {
     let hash = assets::JS_SETUP_SCRIPT_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
-         connect-src 'self' https://ic0.app https://*.ic0.app;\
+         connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
          img-src 'self' data:;\
          script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
          base-uri 'none';\

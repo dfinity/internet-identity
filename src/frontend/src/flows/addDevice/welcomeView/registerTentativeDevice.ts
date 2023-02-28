@@ -13,11 +13,14 @@ import { toggleErrorMessage } from "../../../utils/errorHelper";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = () => {
+const pageContent = ({ userNumber }: { userNumber: bigint }) => {
   const pageContentSlot = html` <article>
     <hgroup>
       <h1 class="t-title t-title--main">Add a Trusted Device</h1>
-      <p class="t-lead">What device are you using?</p>
+      <p class="t-lead">
+        What device do you want to add to anchor
+        <strong class="t-strong">${userNumber}</strong>?
+      </p>
       <p id="invalidAliasMessage" class="is-hidden">
         The device alias must not be empty.
       </p>
@@ -61,7 +64,7 @@ export const registerTentativeDevice = async (
   connection: Connection
 ): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
+  render(pageContent({ userNumber }), container);
   return init(userNumber, connection);
 };
 

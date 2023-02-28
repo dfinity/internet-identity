@@ -71,7 +71,7 @@ Just for background: At launch this meant we relied on the trustworthiness of th
 ## Identity design and data model
 
 
-The Internet Computer serves this frontend under hostname `https://identity.ic0.app`.
+The Internet Computer serves this frontend under hostnames `https://identity.ic0.app` (official) and `https://identity.internetcomputer.org` (experimental).
 
 The canister maintains a salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer's source of secure randomness.
 
@@ -97,6 +97,10 @@ where the `seed` is derived as follows
     seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 
 where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the Identity Anchor as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend's hostname (at most 255 bytes).
+
+:::note
+A `frontend_host` of the form `<canister id>.icp0.io` will be rewritten to `<canister id>.ic0.app` before being used in the seed. This ensures transparent pseudonym transfer between apps hosted on `ic0.app` and `icp0.io` domains.
+:::
 
 The Internet Identity Service Backend stores the following data in user accounts, indexed by the respective Identity Anchor:
 
@@ -153,12 +157,12 @@ This section describes the Internet Identity Service from the point of view of a
 
     -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a one larger.
 
-    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.ic0\.app$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.(ic0\.app|icp0\.io)$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 
 
 6.  Now the client application window expects a message back, with data `event`.
 
-7.  If `event.origin !== "https://identity.ic0.app"`, ignore this message.
+7.  If `event.origin` is not either `"https://identity.ic0.app"` or `"https://identity.internetcomputer.org"` (depending on which endpoint you are using), ignore this message.
 
 8.  The `event.data` value is a JS object with the following type:
 
@@ -196,6 +200,7 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 
 -   Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
     - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
+    - Frontend URLs on `icp0.io` are mapped to `ic0.app` automatically, see [Identity design and data model](#identity-design-and-data-model).
 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that hostname. Be careful when implementing a JavaScript playground on the Internet Computer.
 :::
@@ -205,12 +210,20 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
 
+:::note
+This feature is also available for `https://<canister id>.icp0.io` (resp. `https://<canister id>.raw.icp0.io`).
+:::
+
 :::caution
 This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
 :::
 
 :::note
 `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
+:::
+
+:::note
+In general, Internet Identity only allows alternative origins of the form `<canister id>.ic0.app` or `<canister id>.icp0.io`. There is one exception: `nns.ic0.app`, which is treated as `<nns-dapp canister id>.icp0.io`.
 :::
 
 In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).

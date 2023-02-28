@@ -56,6 +56,7 @@ type DeviceDataWithoutAlias = record {
     purpose: Purpose;
     key_type: KeyType;
     protection: DeviceProtection;
+    origin: opt text;
 };
 
 type DeviceDataUpdate = record {
@@ -64,6 +65,7 @@ type DeviceDataUpdate = record {
     purpose: opt Purpose;
     key_type: opt KeyType;
     protection: opt DeviceProtection;
+    origin: opt opt text;
 };
 
 type Private = variant {

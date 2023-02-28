@@ -21,10 +21,20 @@ export const fetchDelegation = async (
   const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
 
   // at this point, derivationOrigin is either validated or undefined
-  const derivationOrigin =
+  let derivationOrigin =
     authContext.authRequest.derivationOrigin !== undefined
       ? authContext.authRequest.derivationOrigin
       : authContext.requestOrigin;
+
+  // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
+  // we map back the derivation origin to the ic0.app domain.
+  const ORIGIN_MAPPING_REGEX =
+    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
+  const match = derivationOrigin.match(ORIGIN_MAPPING_REGEX);
+  const subdomain = match?.groups?.subdomain;
+  if (subdomain !== undefined && subdomain !== null) {
+    derivationOrigin = `https://${subdomain}.ic0.app`;
+  }
 
   const [userKey, timestamp] = await connection.prepareDelegation(
     derivationOrigin,

@@ -5,6 +5,7 @@ import { promptUserNumber } from "../../components/promptUserNumber";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 
 export const useRecovery = async (
   connection: Connection,
@@ -32,8 +33,7 @@ const runRecovery = async (
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
-      message:
-        "You do not have any recovery devices configured. Did you mean to authenticate with one of your devices instead?",
+      message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
     return window.location.reload();
@@ -44,10 +44,9 @@ const runRecovery = async (
       ? recoveryDevices[0]
       : await pickRecoveryDevice(recoveryDevices);
 
-  const res =
-    "seed_phrase" in device.key_type
-      ? await phraseRecoveryPage(userNumber, connection, device)
-      : await deviceRecoveryPage(userNumber, connection, device);
+  const res = isRecoveryPhrase(device)
+    ? await phraseRecoveryPage(userNumber, connection, device)
+    : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {

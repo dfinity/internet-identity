@@ -255,6 +255,7 @@ pub fn device_data_1() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://identity.internetcomputer.org".to_string()),
     }
 }
 
@@ -266,6 +267,7 @@ pub fn device_data_2() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://identity.ic0.app".to_string()),
     }
 }
 
@@ -277,6 +279,7 @@ pub fn max_size_device() -> DeviceData {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
     }
 }
 
@@ -288,6 +291,7 @@ pub fn recovery_device_data_1() -> DeviceData {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }
 
@@ -299,6 +303,7 @@ pub fn recovery_device_data_2() -> DeviceData {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }
 
@@ -390,7 +395,7 @@ xr-spatial-tracking=()",
 
     assert!(Regex::new(
         "^default-src 'none';\
-connect-src 'self' https://ic0.app https://\\*\\.ic0.app;\
+connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://\\*\\.icp0.io https://\\*\\.ic0.app;\
 img-src 'self' data:;\
 script-src 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
 base-uri 'none';\
@@ -449,6 +454,26 @@ pub fn assert_devices_equal(
     let mut devices = api::internet_identity::lookup(env, canister_id, anchor).unwrap();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, expected_devices, "expected devices to match");
+}
+
+pub fn assert_device_last_used(
+    anchor_info: &IdentityAnchorInfo,
+    device_key: &DeviceKey,
+    expected_timestamp: u64,
+) {
+    let device = anchor_info
+        .devices
+        .iter()
+        .find(|d| d.pubkey == device_key)
+        .unwrap();
+    assert_eq!(device.last_usage, Some(expected_timestamp));
+}
+
+pub fn time(env: &StateMachine) -> u64 {
+    env.time()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64
 }
 
 pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation, root_key: &[u8]) {
@@ -522,6 +547,7 @@ pub fn log_entry_1() -> Entry {
                 purpose: Purpose::Authentication,
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
+                origin: None,
             },
         },
         sequence_number: 0,
@@ -540,6 +566,7 @@ pub fn log_entry_2() -> Entry {
                 purpose: Purpose::Authentication,
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
+                origin: Some("foo.bar".to_string()),
             },
         },
         sequence_number: 1,
@@ -559,6 +586,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 purpose: Some(Purpose::Authentication),
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
+                origin: Some(Some("foo.bar".to_string())),
             },
         },
         sequence_number: idx,

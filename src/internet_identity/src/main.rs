@@ -34,13 +34,13 @@ async fn init_salt() {
 
 #[update]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -57,7 +57,7 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
 }
 
@@ -73,25 +73,25 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     anchor_management::add(anchor_number, device_data)
 }
 
 #[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     anchor_management::update(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     anchor_management::replace(anchor_number, device_key, device_data)
 }
 
 #[update]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     anchor_management::remove(anchor_number, device_key)
 }
 
@@ -107,7 +107,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
             .into_iter()
             .map(DeviceData::from)
             .map(|mut d| {
-                // This hides the alias from unauthenticated callers.
+                // Remove non-public fields.
                 d.alias = "".to_string();
                 d
             })
@@ -117,7 +117,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     anchor_management::get_anchor_info(anchor_number)
 }
 
@@ -142,7 +142,7 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    authenticate_and_update_device_usage(anchor_number);
     delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
 }
 
@@ -286,11 +286,20 @@ fn update_root_hash() {
     })
 }
 
-/// Checks if the caller is authenticated against the anchor provided and traps if not.
-fn trap_if_not_authenticated(anchor: &Anchor) {
+/// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
+/// reflecting the current usage.
+fn authenticate_and_update_device_usage(anchor_number: AnchorNumber) {
+    let anchor = state::anchor(anchor_number);
+    let device_key = trap_if_not_authenticated(&anchor);
+    anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
+}
+
+/// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.
+/// Traps if the caller is not authenticated.
+fn trap_if_not_authenticated(anchor: &Anchor) -> DeviceKey {
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
-            return;
+            return device.pubkey.clone();
         }
     }
     trap(&format!("{} could not be authenticated.", caller()))

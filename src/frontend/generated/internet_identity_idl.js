@@ -30,6 +30,7 @@ export const idlFactory = ({ IDL }) => {
   const CredentialId = IDL.Vec(IDL.Nat8);
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
+    'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
@@ -61,12 +62,22 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const DeviceWithUsage = IDL.Record({
+    'alias' : IDL.Text,
+    'last_usage' : IDL.Opt(Timestamp),
+    'origin' : IDL.Opt(IDL.Text),
+    'protection' : DeviceProtection,
+    'pubkey' : DeviceKey,
+    'key_type' : KeyType,
+    'purpose' : Purpose,
+    'credential_id' : IDL.Opt(CredentialId),
+  });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
     'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
-    'devices' : IDL.Vec(DeviceData),
+    'devices' : IDL.Vec(DeviceWithUsage),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;

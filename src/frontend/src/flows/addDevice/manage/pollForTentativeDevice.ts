@@ -10,6 +10,7 @@ import {
 } from "../../../../generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
+import { LEGACY_II_URL } from "../../../config";
 
 const pageContent = (userNumber: bigint) => {
   const pageContentSlot = html`
@@ -24,8 +25,8 @@ const pageContent = (userNumber: bigint) => {
       <li>
         Open
         <em class="c-tooltip">
-          <strong class="t-strong">https://identity.ic0.app</strong>
-          <span class="c-tooltip__message c-card c-card--narrow">
+          <strong class="t-strong">${LEGACY_II_URL}</strong>
+          <span class="c-tooltip__message c-card c-card--tight">
             Open this link on the device you want to add.
           </span>
         </em>

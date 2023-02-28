@@ -35,16 +35,16 @@ export class WelcomeView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#registerAlias")
+      .$("#pickAliasInput")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async enterAlias(alias: string): Promise<void> {
-    await this.browser.$("#registerAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async create(): Promise<void> {
-    await this.browser.$("#registerButton").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 
   // View: Register confirmation
@@ -155,13 +155,13 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[string()='${deviceName}']`)
+      .$(`//li[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//div[string()='${deviceName}']`)
+      .$(`//li[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
@@ -181,28 +181,17 @@ export class MainView extends View {
     await this.browser.$("#addRecovery").click();
   }
 
-  async deviceSettings(deviceName: string): Promise<void> {
+  async protect(deviceName: string, seedPhrase: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-      .$(`//div[string()='${deviceName}']/following-sibling::button`)
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
-  }
-}
-
-export class DeviceSettingsView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser.$("#deviceSettings").waitForDisplayed();
-  }
-
-  async remove(): Promise<void> {
-    await this.browser.$("button[data-action='remove']").click();
-  }
-
-  async back(): Promise<void> {
-    await this.browser.$("button[data-action='back']").click();
-  }
-
-  async protect(seedPhrase: string): Promise<void> {
-    await this.browser.$("button[data-action='protect']").click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .click();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -210,7 +199,33 @@ export class DeviceSettingsView extends View {
     await recoveryView.enterSeedPhraseContinue();
   }
 
-  async removeNotDisplayed(): Promise<void> {
+  async assertDeviceProtected(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async assertDeviceUnprotected(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
+      .waitForDisplayed({ timeout: 10_000, reverse: true });
+  }
+
+  async remove(deviceName: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .click();
+  }
+
+  async removeNotDisplayed(deviceName: string): Promise<void> {
+    await this.browser.$(`button[data-device="${deviceName}"]`).click();
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
@@ -220,16 +235,16 @@ export class DeviceSettingsView extends View {
 export class AddDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#deviceAliasContinue")
+      .$("#pickAliasSubmit")
       .waitForDisplayed({ timeout: 3_000 });
   }
 
   async addAdditionalDevice(alias: string): Promise<void> {
-    await this.browser.$("#deviceAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#deviceAliasContinue").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 

@@ -2,19 +2,30 @@ import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { withRef } from "../../utils/lit-html";
 import { html, render, TemplateResult } from "lit-html";
 import { validateAlias } from "../../utils/validateAlias";
+import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
+
+import copyJson from "./index.json";
 
 /* Everything (template, component, page) related to picking a device alias */
 
 export const promptDeviceAliasTemplate = (props: {
+  title: string;
   continue: (alias: string) => void;
   cancel: () => void;
+  i18n: I18n;
 }): TemplateResult => {
+  const copy = props.i18n.i18n(copyJson);
+
+  // static copy required because lit doesn't support template attributes (placeholder)
+  // https://github.com/lit/lit/issues/1862
+  const staticCopy = props.i18n.staticLang(copyJson);
+
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
     <hgroup class="t-centered">
-      <h1 class="t-title t-title--main">Register this device</h1>
-      <p class="t-lead t-paragraph l-stack">What device are you using?</p>
+      <h1 class="t-title t-title--main">${props.title}</h1>
+      <p class="t-lead t-paragraph l-stack">${copy.specify_alias}</p>
     </hgroup>
     <form
       id="registerForm"
@@ -25,7 +36,7 @@ export const promptDeviceAliasTemplate = (props: {
       }}
     >
       <input
-        id="registerAlias"
+        id="pickAliasInput"
         ${ref(aliasInput)}
         @input=${(e: InputEvent) => {
           if (!(e.currentTarget instanceof HTMLInputElement)) {
@@ -44,7 +55,7 @@ export const promptDeviceAliasTemplate = (props: {
           );
           e.currentTarget.setCustomValidity(message);
         }}
-        placeholder="Example: my phone"
+        placeholder=${staticCopy.placeholder}
         aria-label="device name"
         type="text"
         required
@@ -55,14 +66,16 @@ export const promptDeviceAliasTemplate = (props: {
       />
       <div class="c-button-group">
         <button
-          id="registerCancel"
+          id="pickAliasCancel"
           type="button"
           class="c-button c-button--secondary"
           @click="${() => props.cancel()}"
         >
-          Cancel
+          ${copy.cancel}
         </button>
-        <button id="registerButton" type="submit" class="c-button">Next</button>
+        <button id="pickAliasSubmit" type="submit" class="c-button">
+          ${copy.next}
+        </button>
       </div>
     </form>
   `;
@@ -74,16 +87,28 @@ export const promptDeviceAliasTemplate = (props: {
 };
 
 export const promptDeviceAliasPage = (props: {
+  title: string;
   cancel: () => void;
   continue: (alias: string) => void;
   container?: HTMLElement;
+  i18n: I18n;
 }): void => {
   const container =
     props.container ?? (document.getElementById("pageContent") as HTMLElement);
   render(promptDeviceAliasTemplate(props), container);
 };
 
-export const promptDeviceAlias = (): Promise<string | null> =>
+export const promptDeviceAlias = ({
+  title,
+}: {
+  title: string;
+}): Promise<string | null> =>
   new Promise((resolve) => {
-    promptDeviceAliasPage({ cancel: () => resolve(null), continue: resolve });
+    const i18n = new I18n();
+    promptDeviceAliasPage({
+      title,
+      cancel: () => resolve(null),
+      continue: resolve,
+      i18n,
+    });
   });

@@ -157,7 +157,8 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         return RegisterResponse::BadChallenge;
     }
 
-    let device = Device::from(device_data);
+    let mut device = Device::from(device_data);
+    device.last_usage_timestamp = Some(time());
 
     if caller() != Principal::self_authenticating(&device.pubkey) {
         trap(&format!(

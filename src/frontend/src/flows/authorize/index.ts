@@ -28,7 +28,7 @@ export const authnTemplateAuthorize = ({
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
   const chasm =
-    derivationOrigin !== undefined
+    derivationOrigin !== undefined && derivationOrigin !== origin
       ? mkChasm({
           info: "shared identity",
           message: html`<span class="t-strong">${origin}</span>

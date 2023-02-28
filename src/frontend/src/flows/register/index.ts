@@ -8,7 +8,7 @@ import {
   cancel,
 } from "../../utils/flowResult";
 import { constructIdentity } from "./construct";
-import { promptDeviceAlias } from "./alias";
+import { promptDeviceAlias } from "../../components/alias";
 import { displayUserNumber } from "./finish";
 
 /** Registration (anchor creation) flow for new users */
@@ -18,7 +18,7 @@ export const register = async ({
   connection: Connection;
 }): Promise<LoginFlowResult> => {
   try {
-    const alias = await promptDeviceAlias();
+    const alias = await promptDeviceAlias({ title: "Register this device" });
     if (alias === null) {
       return cancel;
     }

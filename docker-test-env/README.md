@@ -6,7 +6,7 @@ Docker compose setup to run selenium tests with. The setup consists of the follo
   * Forwards requests to the test app to `dfx` running on host.
   * Forwards requests to the internet identity to the dev server running on host.
   * Translates domains `<canister_id>.ic0.app` to the corresponding `<canister_id>.localhost` domains.
-  * Translates mapped domains (i.e. `identity.ic0.app`) to the corresponding `<canister_id>.localhost` domain.
+  * Translates mapped domains (i.e. `identity.internetcomputer.org`) to the corresponding `<canister_id>.localhost` domain.
 * selenium container
   * Runs chromium browser.
   * Connects to nginx to access pages of the canister hosted on `dfx` or the dev server

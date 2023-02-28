@@ -1,6 +1,6 @@
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
-use internet_identity_interface::{DeviceProtection, KeyType, Purpose};
+use internet_identity_interface::{DeviceData, DeviceProtection, KeyType, Purpose, Timestamp};
 use serde_bytes::ByteBuf;
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -114,16 +114,18 @@ fn should_enforce_cumulative_device_limit() {
     for i in 0..4 {
         anchor.add_device(large_device(i)).unwrap();
     }
-    let minimal_device = Device {
+    let device = Device {
         pubkey: Default::default(),
-        alias: "a".to_string(),
-        credential_id: None,
+        alias: "a".repeat(64),
+        credential_id: Some(ByteBuf::from([0; 100])),
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: None,
+        last_usage_timestamp: None,
     };
 
-    let result = anchor.add_device(minimal_device);
+    let result = anchor.add_device(device);
 
     assert!(matches!(
         result,
@@ -159,6 +161,8 @@ fn should_allow_protection_only_on_recovery_phrases() {
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Protected,
+        origin: None,
+        last_usage_timestamp: None,
     });
 
     assert!(matches!(
@@ -311,6 +315,41 @@ fn should_not_allow_modification_of_device_key() {
     assert_eq!(anchor.devices()[0], sample_device());
 }
 
+#[test]
+fn should_update_timestamp() {
+    let mut anchor = Anchor::new();
+    let device = sample_device();
+    const TIMESTAMP: Timestamp = 7896546556;
+    anchor.add_device(device.clone()).unwrap();
+
+    anchor
+        .set_device_usage_timestamp(&device.pubkey, TIMESTAMP)
+        .unwrap();
+
+    assert_eq!(
+        anchor.device(&device.pubkey).unwrap().last_usage_timestamp,
+        Some(TIMESTAMP)
+    );
+}
+
+/// Tests that `apply_data` actually applies all the writeable fields.
+#[test]
+fn should_apply_all_fields() {
+    let device_data = DeviceData {
+        pubkey: ByteBuf::from("some different public key"),
+        alias: "some different alias".to_string(),
+        credential_id: Some(ByteBuf::from("some different credential id")),
+        purpose: Purpose::Recovery,
+        key_type: KeyType::CrossPlatform,
+        protection: DeviceProtection::Protected,
+        origin: Some("https://some.other.origin".to_string()),
+    };
+    let mut device = sample_device();
+    device.apply_device_data(device_data.clone());
+
+    assert_eq!(DeviceData::from(device), device_data);
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("public key of some sample device"),
@@ -319,6 +358,8 @@ fn sample_device() -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Platform,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://fooo.bar".to_string()),
+        last_usage_timestamp: Some(465789),
     }
 }
 
@@ -330,6 +371,8 @@ fn device(n: u8) -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Platform,
         protection: DeviceProtection::Unprotected,
+        origin: Some(format!("https://foo{n}.bar")),
+        last_usage_timestamp: Some(n as u64),
     }
 }
 
@@ -342,6 +385,8 @@ fn large_device(n: u8) -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
+        origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
+        last_usage_timestamp: Some(12345679),
     }
 }
 
@@ -353,6 +398,8 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection,
+        origin: None,
+        last_usage_timestamp: None,
     }
 }
 
