@@ -72,19 +72,10 @@ export const devicesSection = ({
         }
 
         <div class="c-action-list">
-          <div id="deviceList">
           <ul>
-          ${_authenticators.map((device, index) => {
-            return html`
-              <li class="c-action-list__item">
-                ${deviceListItem({
-                  device,
-                  index: `authenticator-${index}`,
-                })}
-              </li>
-            `;
-          })}</ul>
-          </div>
+          ${_authenticators.map((device, index) =>
+            deviceListItem({ device, index: `authenticator-${index}` })
+          )}</ul>
           <div class="c-action-list__actions">
             <button
               ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}

@@ -18,21 +18,14 @@ export const recoveryMethodsSection = ({
               <h2>Recovery methods</h2>
             </div>
             <div class="c-action-list">
-              <div id="recoveryList">
-                <ul>
-                  ${recoveries.map(
-                    (device, index) =>
-                      html`
-                        <li class="c-action-list__item">
-                          ${deviceListItem({
-                            device,
-                            index: `recovery-${index}`,
-                          })}
-                        </li>
-                      `
-                  )}
-                </ul>
-              </div>
+              <ul>
+                ${recoveries.map((device, index) =>
+                  deviceListItem({
+                    device,
+                    index: `recovery-${index}`,
+                  })
+                )}
+              </ul>
               <div class="c-action-list__actions">
                 <button
                   @click="${onAddRecovery}"
