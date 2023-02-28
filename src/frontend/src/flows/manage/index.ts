@@ -146,8 +146,6 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
-// The regular, "authenticator" devices
-
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
   warnBox({
     title: "Recovery method",
