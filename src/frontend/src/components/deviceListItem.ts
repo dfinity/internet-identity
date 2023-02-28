@@ -1,5 +1,5 @@
 import { TemplateResult, html } from "lit-html";
-import { Setting, deviceSettings } from "../flows/manage/deviceSettings";
+import { Setting } from "../flows/manage/deviceSettings";
 import { warningIcon, dropdownIcon, lockIcon } from "./icons";
 
 // A simple representation of "device"s used on the manage page.

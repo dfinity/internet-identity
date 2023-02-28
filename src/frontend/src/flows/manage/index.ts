@@ -4,13 +4,13 @@ import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { Setting, deviceSettings } from "./deviceSettings";
+import { deviceSettings } from "./deviceSettings";
 import { showWarning } from "../../banner";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { warningIcon, dropdownIcon, lockIcon } from "../../components/icons";
+import { warningIcon } from "../../components/icons";
 import { displayError } from "../../components/displayError";
 import {
   authenticateBox,
