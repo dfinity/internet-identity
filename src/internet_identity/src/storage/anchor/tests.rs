@@ -121,11 +121,8 @@ fn should_enforce_cumulative_device_limit() {
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
-<<<<<<< HEAD
         origin: None,
-=======
         last_usage_timestamp: None,
->>>>>>> 2157e4b3 (Add last usage timestamp to devices)
     };
 
     let result = anchor.add_device(device);
@@ -164,11 +161,8 @@ fn should_allow_protection_only_on_recovery_phrases() {
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Protected,
-<<<<<<< HEAD
         origin: None,
-=======
         last_usage_timestamp: None,
->>>>>>> 2157e4b3 (Add last usage timestamp to devices)
     });
 
     assert!(matches!(
@@ -348,6 +342,7 @@ fn should_apply_all_fields() {
         purpose: Purpose::Recovery,
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Protected,
+        origin: Some("https://some.other.origin".to_string()),
     };
     let mut device = sample_device();
     device.apply_device_data(device_data.clone());

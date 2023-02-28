@@ -24,6 +24,7 @@ impl Device {
         self.purpose = device_data.purpose;
         self.key_type = device_data.key_type;
         self.protection = device_data.protection;
+        self.origin = device_data.origin;
     }
 }
 
@@ -65,6 +66,7 @@ impl From<Device> for DeviceWithUsage {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
+            origin: device.origin,
             last_usage: device.last_usage_timestamp,
         }
     }
@@ -196,11 +198,8 @@ pub struct Device {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
-<<<<<<< HEAD
     pub origin: Option<String>,
-=======
     pub last_usage_timestamp: Option<Timestamp>,
->>>>>>> 2157e4b3 (Add last usage timestamp to devices)
 }
 
 impl Device {

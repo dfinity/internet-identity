@@ -39,6 +39,7 @@ impl From<DeviceWithUsage> for DeviceData {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
+            origin: device.origin,
         }
     }
 }
@@ -51,6 +52,7 @@ pub struct DeviceWithUsage {
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
+    pub origin: Option<String>,
     pub last_usage: Option<Timestamp>,
 }
 
@@ -63,6 +65,7 @@ impl From<DeviceData> for DeviceWithUsage {
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
+            origin: device.origin,
             last_usage: None,
         }
     }

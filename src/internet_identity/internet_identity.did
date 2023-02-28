@@ -84,6 +84,7 @@ type DeviceWithUsage = record {
     purpose: Purpose;
     key_type: KeyType;
     protection: DeviceProtection;
+    origin: opt text;
     last_usage: opt Timestamp;
 };
 

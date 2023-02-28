@@ -269,8 +269,9 @@ mod rollback_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
 
         // use anchor
-        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
-        assert_eq!(devices, [device_data_1()]);
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
+        assert_eq!(devices, vec![device_data_1()]);
 
         let (user_key, _) = api::prepare_delegation(
             &env,
@@ -1760,7 +1761,8 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
         assert!(devices.iter().any(|device| device == &device_data_2()));
 
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -1773,7 +1775,8 @@ mod device_management_tests {
             device_data_2().pubkey,
         )?;
 
-        let devices = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.devices;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
         assert_eq!(devices.len(), 1);
         assert!(!devices.iter().any(|device| device == &device_data_2()));
         Ok(())
