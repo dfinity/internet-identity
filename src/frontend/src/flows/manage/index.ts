@@ -22,6 +22,8 @@ import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevi
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
+import { deviceListItem, Device } from "../../components/deviceListItem";
+import { recoveryMethods } from "../../components/recoveryMethods";
 import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
@@ -30,18 +32,6 @@ import {
   hasRecoveryPhrase,
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
-
-// A simple representation of "device"s used on the manage page.
-export type Device = {
-  // All the settings allowed for a particular device
-  settings: Setting[];
-  // The displayed name of a device (not exactly the "alias") because
-  // recovery devices handle aliases differently.
-  label: string;
-  isRecovery: boolean;
-  isProtected: boolean;
-  warn?: TemplateResult;
-};
 
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
@@ -143,7 +133,7 @@ const displayManageTemplate = ({
     ${anchorSection(userNumber)}
     ${devicesSection({ authenticators, onAddDevice })}
     ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
-    ${recoverySection({ recoveries, onAddRecovery })} ${logoutSection()}
+    ${recoveryMethods({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
   return mainWindow({
@@ -255,118 +245,6 @@ const devicesSection = ({
         </div>
       </div>
     </aside>`;
-};
-
-// The list of recovery devices
-const recoverySection = ({
-  recoveries,
-  onAddRecovery,
-}: {
-  recoveries: Device[];
-  onAddRecovery: () => void;
-}): TemplateResult => {
-  return html`
-    <aside class="l-stack">
-      ${recoveries.length === 0
-        ? undefined
-        : html`
-            <div class="t-title">
-              <h2>Recovery methods</h2>
-            </div>
-            <div class="c-action-list">
-              <div id="recoveryList">
-                <ul>
-                  ${recoveries.map(
-                    (device, index) =>
-                      html`
-                        <li class="c-action-list__item">
-                          ${deviceListItem({
-                            device,
-                            index: `recovery-${index}`,
-                          })}
-                        </li>
-                      `
-                  )}
-                </ul>
-              </div>
-              <div class="c-action-list__actions">
-                <button
-                  @click="${onAddRecovery}"
-                  class="c-button c-button--primary"
-                  id="addRecovery"
-                >
-                  Add recovery method
-                </button>
-              </div>
-            </div>
-          `}
-    </aside>
-  `;
-};
-
-const deviceListItem = ({
-  device,
-  index,
-}: {
-  device: DedupDevice;
-  index: string;
-}) => {
-  return html`
-    <div class="c-action-list__label" data-device=${device.label}>
-      ${device.label}
-      ${device.dupCount !== undefined && device.dupCount > 0
-        ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
-        : undefined}
-    </div>
-    ${device.isProtected
-      ? html`<div class="c-action-list__action">
-          <span
-            class="c-tooltip c-tooltip--left c-icon c-icon--lock"
-            tabindex="0"
-            >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
-              >Your device is protected</span
-            ></span
-          >
-        </div>`
-      : undefined}
-    ${device.warn !== undefined
-      ? html`<div class="c-action-list__action">
-          <span
-            class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-            tabindex="0"
-            >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
-              >${device.warn}</span
-            ></span
-          >
-        </div>`
-      : undefined}
-    ${device.settings.length > 0
-      ? html` <div class="c-action-list__action c-dropdown">
-          <button
-            class="c-dropdown__trigger c-action-list__action"
-            aria-expanded="false"
-            aria-controls="dropdown-${index}"
-            data-device=${device.label}
-          >
-            ${dropdownIcon}
-          </button>
-          <ul class="c-dropdown__menu" id="dropdown-${index}">
-            ${device.settings.map((setting) => {
-              return html` <li class="c-dropdown__item">
-                <button
-                  class="c-dropdown__link"
-                  data-device=${device.label}
-                  data-action=${setting.label}
-                  @click=${() => setting.fn()}
-                >
-                  ${setting.label}
-                </button>
-              </li>`;
-            })}
-          </ul>
-        </div>`
-      : undefined}
-  `;
 };
 
 const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
