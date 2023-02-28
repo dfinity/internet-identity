@@ -5,12 +5,12 @@ import { warningIcon, dropdownIcon, lockIcon } from "./icons";
 // A simple representation of "device"s used on the manage page.
 export type Device = {
   // All the settings allowed for a particular device
-  settings: Setting[];
+  settings?: Setting[];
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
   label: string;
   recovery?: "phrase" | "device";
-  isProtected: boolean;
+  isProtected?: boolean;
   warn?: TemplateResult;
 };
 
@@ -21,9 +21,11 @@ export type DedupDevice = Device & { dupCount?: number };
 export const deviceListItem = ({
   device,
   index,
+  block,
 }: {
   device: DedupDevice;
   index: string;
+  block?: TemplateResult;
 }) => {
   return html`
     <li class="c-action-list__item" data-device=${device.label}>
@@ -33,7 +35,7 @@ export const deviceListItem = ({
           ? html`<i class="t-muted">&nbsp;(${device.dupCount})</i>`
           : undefined}
       </div>
-      ${device.isProtected
+      ${device.isProtected !== undefined && device.isProtected
         ? html`<div class="c-action-list__action" data-role="protected">
             <span
               class="c-tooltip c-tooltip--left c-icon c-icon--lock"
@@ -56,7 +58,8 @@ export const deviceListItem = ({
             >
           </div>`
         : undefined}
-      ${device.settings.length > 0
+      ${block !== undefined ? block : undefined}
+      ${device.settings && device.settings.length > 0
         ? html` <div class="c-action-list__action c-dropdown">
             <button
               class="c-dropdown__trigger c-action-list__action"

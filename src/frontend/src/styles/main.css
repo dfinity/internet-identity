@@ -871,6 +871,14 @@ a:hover,
   border-radius: var(--vs-border-radius);
 }
 
+.c-button--minimal {
+  width: min-content;
+  flex-grow: 0;
+  flex-shrink: 1;
+  margin-top: 0;
+  padding: calc(0.3 * var(--rs-button-bezel)) calc(0.6 * var(--rs-button-bezel));
+}
+
 .c-button__icon svg {
   height: 100%;
 }
