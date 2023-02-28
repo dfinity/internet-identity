@@ -31,7 +31,7 @@ const pageContent = () => {
   });
 };
 
-export const displaySingleDeviceWarning = async (
+export const displaySingleDeviceWarning = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   setupRecovery: (

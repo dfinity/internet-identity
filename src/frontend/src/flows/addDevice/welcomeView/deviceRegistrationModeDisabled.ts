@@ -56,19 +56,19 @@ const pageContent = (userNumber: bigint) => {
  * It shows instructions to the user on how to continue.
  * @param tentativeDeviceInfo Information about the device to be added so that the user does not have to enter everything again after enabling device registration mode.
  */
-export const deviceRegistrationDisabledInfo = async (
+export const deviceRegistrationDisabledInfo = (
   connection: Connection,
   tentativeDeviceInfo: TentativeDeviceInfo
-): Promise<void> => {
+): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(tentativeDeviceInfo[0]), container);
   return init(connection, tentativeDeviceInfo);
 };
 
-const init = async (
+const init = (
   connection: Connection,
   tentativeDeviceInfo: TentativeDeviceInfo
-): Promise<void> => {
+): void => {
   const cancelButton = document.getElementById(
     "deviceRegModeDisabledCancel"
   ) as HTMLButtonElement;

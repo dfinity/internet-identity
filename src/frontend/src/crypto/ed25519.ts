@@ -39,7 +39,7 @@ export async function fromSeedWithSlip0010(
  * @param derivationPath an array that is always interpreted as a hardened path.
  * e.g. to generate m/44'/223’/0’/0’/0' the derivation path should be [44, 223, 0, 0, 0]
  */
-export async function fromMnemonicWithoutValidation(
+export function fromMnemonicWithoutValidation(
   mnemonic: string,
   derivationPath: number[] = []
 ): Promise<Ed25519KeyIdentity> {

@@ -25,7 +25,7 @@ const pageContent = () => {
   });
 };
 
-export const pickRecoveryDevice = async (
+export const pickRecoveryDevice = (
   devices: RecoveryDevice[]
 ): Promise<RecoveryDevice> => {
   const container = document.getElementById("pageContent") as HTMLElement;

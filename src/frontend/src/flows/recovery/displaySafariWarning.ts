@@ -36,7 +36,7 @@ const pageContent = () => {
   });
 };
 
-export const displaySafariWarning = async (
+export const displaySafariWarning = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   setupRecovery: (
