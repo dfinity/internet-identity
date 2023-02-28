@@ -15,6 +15,19 @@ pub struct Anchor {
     devices: Vec<Device>,
 }
 
+impl Device {
+    /// Applies the values of `device_data` to self while leaving the other fields intact.
+    pub fn apply_device_data(&mut self, device_data: DeviceData) {
+        self.pubkey = device_data.pubkey;
+        self.alias = device_data.alias;
+        self.credential_id = device_data.credential_id;
+        self.purpose = device_data.purpose;
+        self.key_type = device_data.key_type;
+        self.protection = device_data.protection;
+        self.origin = device_data.origin;
+    }
+}
+
 impl From<DeviceData> for Device {
     fn from(device_data: DeviceData) -> Self {
         Self {
@@ -25,6 +38,7 @@ impl From<DeviceData> for Device {
             key_type: device_data.key_type,
             protection: device_data.protection,
             origin: device_data.origin,
+            last_usage_timestamp: None,
         }
     }
 }
@@ -39,6 +53,21 @@ impl From<Device> for DeviceData {
             key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
+        }
+    }
+}
+
+impl From<Device> for DeviceWithUsage {
+    fn from(device: Device) -> Self {
+        Self {
+            pubkey: device.pubkey,
+            alias: device.alias,
+            credential_id: device.credential_id,
+            purpose: device.purpose,
+            key_type: device.key_type,
+            protection: device.protection,
+            origin: device.origin,
+            last_usage: device.last_usage_timestamp,
         }
     }
 }
@@ -139,6 +168,22 @@ impl Anchor {
     pub fn into_devices(self) -> Vec<Device> {
         self.devices
     }
+
+    /// Sets the timestamp on the given device.
+    /// **Note:** Does not check invariants, based on the assumption that no invariant can be
+    /// violated by changing the last usage timestamp on a device. See also the documentation on
+    /// [check_invariants](Anchor::check_invariants).
+    pub fn set_device_usage_timestamp(
+        &mut self,
+        device_key: &DeviceKey,
+        time: Timestamp,
+    ) -> Result<(), AnchorError> {
+        let Some(device) = self.devices.iter_mut().find(|d| d.pubkey == device_key) else {
+            return Err(AnchorError::NotFound { device_key: device_key.clone() })
+        };
+        device.last_usage_timestamp = Some(time);
+        Ok(())
+    }
 }
 
 /// This is an internal version of `DeviceData` useful to provide a
@@ -154,6 +199,7 @@ pub struct Device {
     pub key_type: KeyType,
     pub protection: DeviceProtection,
     pub origin: Option<String>,
+    pub last_usage_timestamp: Option<Timestamp>,
 }
 
 impl Device {

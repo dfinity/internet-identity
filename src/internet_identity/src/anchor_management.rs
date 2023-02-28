@@ -15,7 +15,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let devices = state::anchor(anchor_number)
         .into_devices()
         .into_iter()
-        .map(DeviceData::from)
+        .map(DeviceWithUsage::from)
         .collect();
     let now = time();
 
@@ -77,7 +77,8 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
         trap("Could not find device to update, check device key")
     };
 
-    let new_device = Device::from(device_data);
+    let mut new_device = existing_device.clone();
+    new_device.apply_device_data(device_data);
     let diff = device_diff(existing_device, &new_device);
 
     anchor
@@ -154,4 +155,19 @@ fn write_anchor(anchor_number: AnchorNumber, anchor: Anchor) {
     state::usage_metrics_mut(|metrics| {
         metrics.anchor_operation_counter += 1;
     });
+}
+
+/// Updates the device on the anchor to reflect the current usage.
+/// Note: This is considered internal bookkeeping and is not recorded in the archive and does not increase anchor operation counter.
+pub fn update_last_device_usage(
+    anchor_number: AnchorNumber,
+    mut anchor: Anchor,
+    device_key: &DeviceKey,
+) {
+    anchor
+        .set_device_usage_timestamp(device_key, time())
+        .expect("last_usage_timestamp update: unable to update last usage timestamp");
+    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
+        panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
+    })
 }
