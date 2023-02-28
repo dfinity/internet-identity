@@ -98,9 +98,8 @@ const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
-/// In practice, II has 32 GB of stable memory available. But we want to keep the default
-/// anchor range until the stable memory migration is complete. Thus we keep this value for anchor
-/// range checking for the time being.
+/// In practice, II has 48 GB of stable memory available.
+/// This limit has last been raised when it was still 32 GB.
 const STABLE_MEMORY_SIZE: u64 = 32 * GB;
 /// We reserve the last ~800 MB of stable memory for later new features.
 const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
