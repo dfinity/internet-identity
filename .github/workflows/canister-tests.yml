@@ -380,6 +380,8 @@ jobs:
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
+        # We run the integration tests on both the official and legacy domains, to make sure
+        # the webapp (routes, csp, etc) works on both.
         domain: [ 'https://identity.internetcomputer.org', 'https://identity.ic0.app' ]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)
