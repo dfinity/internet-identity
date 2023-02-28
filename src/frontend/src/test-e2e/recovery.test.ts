@@ -62,9 +62,11 @@ test("Make recovery protected", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
+    await mainView.assertDeviceUnprotected(RECOVERY_PHRASE_NAME);
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
+    await mainView.assertDeviceProtected(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
 
