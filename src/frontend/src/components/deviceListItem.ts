@@ -9,7 +9,7 @@ export type Device = {
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
   label: string;
-  isRecovery: boolean;
+  recovery?: "phrase" | "device";
   isProtected: boolean;
   warn?: TemplateResult;
 };

@@ -217,8 +217,8 @@ export const displayManage = (
 
   displayManagePage({
     userNumber,
-    authenticators: _devices.filter((device) => !device.isRecovery),
-    recoveries: _devices.filter((device) => device.isRecovery),
+    authenticators: _devices.filter((device) => device.recovery === undefined),
+    recoveries: _devices.filter((device) => device.recovery),
     onAddDevice: async () => {
       const nextAction = await chooseDeviceAddFlow();
       switch (nextAction) {

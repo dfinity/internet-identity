@@ -248,7 +248,6 @@ const iiPages: Record<string, () => void> = {
       authenticators: [
         {
           label: "Chrome on iPhone",
-          isRecovery: false,
           isProtected: false,
           settings: [
             {
@@ -259,7 +258,6 @@ const iiPages: Record<string, () => void> = {
         },
         {
           label: "Yubikey Blue",
-          isRecovery: false,
           isProtected: false,
           settings: [
             {
@@ -270,7 +268,6 @@ const iiPages: Record<string, () => void> = {
         },
         {
           label: "Yubikey Blue",
-          isRecovery: false,
           isProtected: false,
           warn: html`Something is rotten in the state of Device`,
           settings: [
@@ -284,7 +281,7 @@ const iiPages: Record<string, () => void> = {
       recoveries: [
         {
           label: "Recovery Phrase",
-          isRecovery: true,
+          recovery: "phrase",
           isProtected: true,
           settings: [
             {
@@ -311,7 +308,6 @@ const iiPages: Record<string, () => void> = {
       authenticators: [
         {
           label: "Chrome on iPhone",
-          isRecovery: false,
           isProtected: false,
           settings: [],
         },
