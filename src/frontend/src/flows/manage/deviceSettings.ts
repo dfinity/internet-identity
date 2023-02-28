@@ -45,6 +45,15 @@ export const deviceSettings = ({
     });
   }
 
+  // Whether the device can be unprotected or not
+  if (shouldOfferToUnprotect(device)) {
+    settings.push({
+      label: "unprotect",
+      fn: () =>
+        unprotectDevice(userNumber, connection, device, isOnlyDevice, reload),
+    });
+  }
+
   // If this is _not_ the only device, then we allow removing it
   if (!isOnlyDevice) {
     settings.push({
@@ -63,6 +72,12 @@ const shouldOfferToProtect = (
   device: DeviceData
 ): device is RecoveryDevice & DeviceData =>
   isRecoveryPhrase(device) && !isProtected(device);
+
+// We offer to unprotect protected recovery phrases only
+const shouldOfferToUnprotect = (
+  device: DeviceData
+): device is RecoveryDevice & DeviceData =>
+  isRecoveryPhrase(device) && isProtected(device);
 
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
@@ -179,6 +194,36 @@ const protectDevice = async (
     userNumber,
     device,
     "Please input your recovery phrase to protect it."
+  );
+
+  await withLoader(async () => {
+    // if null then user canceled so we just redraw the manage page
+    if (newConnection == null) {
+      await back();
+      return;
+    }
+
+    await newConnection.update(device);
+  });
+  back();
+};
+
+/* Protect the device and re-render the device settings (with the updated device) */
+const unprotectDevice = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
+  device: DeviceData & RecoveryDevice,
+  isOnlyDevice: boolean,
+  back: () => void
+) => {
+  device.protection = { unprotected: null };
+
+  // NOTE: we do need to be authenticated with the device in order to unprotect it
+  const newConnection = await deviceConnection(
+    connection,
+    userNumber,
+    device,
+    "Please input your recovery phrase to unprotect it."
   );
 
   await withLoader(async () => {

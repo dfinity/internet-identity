@@ -205,6 +205,24 @@ export class MainView extends View {
       .waitForDisplayed({ timeout: 10_000 });
   }
 
+  async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
+      .click();
+
+    const recoveryView = new RecoverView(this.browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+  }
+
   async assertDeviceUnprotected(deviceName: string): Promise<void> {
     await this.browser
       .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
