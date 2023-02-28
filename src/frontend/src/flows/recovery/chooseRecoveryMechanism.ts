@@ -83,7 +83,7 @@ export const chooseRecoveryMechanismPage = (
   render(chooseRecoveryMechanismTemplate(props), contain);
 };
 
-export const chooseRecoveryMechanism = async ({
+export const chooseRecoveryMechanism = ({
   devices,
   title,
   message,

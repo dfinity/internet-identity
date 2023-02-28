@@ -61,7 +61,7 @@ const pageContent = (userNumber: bigint, message?: string) => {
   });
 };
 
-export const phraseRecoveryPage = async (
+export const phraseRecoveryPage = (
   userNumber: bigint,
   connection: Connection,
   device: RecoveryDevice,

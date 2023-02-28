@@ -176,7 +176,7 @@ export async function authenticationProtocol({
  */
 const waitForAuthRequest = (): Promise<AuthContext> =>
   new Promise<AuthContext>((resolve) => {
-    const eventHandler = async (event: MessageEvent) => {
+    const eventHandler = (event: MessageEvent) => {
       const message: unknown = event.data; // Drop assumptions about event.data (an 'any')
       const authRequest = asAuthRequest(message);
       if (typeof authRequest !== "string") {

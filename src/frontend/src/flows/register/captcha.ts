@@ -76,7 +76,7 @@ export const promptCaptchaTemplate = <T>({
 
   // On verification, check the chars and either continue (on good challenge)
   // or go to "bad" state
-  const doVerify = async (challenge: Challenge) => {
+  const doVerify = (challenge: Challenge) => {
     update({ status: "verifying" });
     withRef(input, async (input) => {
       const res = await verifyChallengeChars({

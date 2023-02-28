@@ -53,7 +53,7 @@ const pageContent = (seedPhrase: string) => {
   });
 };
 
-export const displaySeedPhrase = async (seedPhrase: string): Promise<void> => {
+export const displaySeedPhrase = (seedPhrase: string): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(seedPhrase), container);
   return init();

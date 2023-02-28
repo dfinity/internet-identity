@@ -80,7 +80,7 @@ export const displayUserNumberPage = (
   render(displayUserNumberTemplate(props), contain);
 };
 
-export const displayUserNumber = async (userNumber: bigint): Promise<void> => {
+export const displayUserNumber = (userNumber: bigint): Promise<void> => {
   return new Promise((resolve) =>
     displayUserNumberPage({ onContinue: () => resolve(), userNumber })
   );
