@@ -35,16 +35,16 @@ export class WelcomeView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#registerAlias")
+      .$("#pickAliasInput")
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async enterAlias(alias: string): Promise<void> {
-    await this.browser.$("#registerAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async create(): Promise<void> {
-    await this.browser.$("#registerButton").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 
   // View: Register confirmation
@@ -223,16 +223,16 @@ export class MainView extends View {
 export class AddDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#deviceAliasContinue")
+      .$("#pickAliasSubmit")
       .waitForDisplayed({ timeout: 3_000 });
   }
 
   async addAdditionalDevice(alias: string): Promise<void> {
-    await this.browser.$("#deviceAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async continue(): Promise<void> {
-    await this.browser.$("#deviceAliasContinue").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 

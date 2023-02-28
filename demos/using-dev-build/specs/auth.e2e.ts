@@ -8,7 +8,7 @@ describe("authentication", () => {
     await browser.$("#registerButton").click();
 
     // Set the name of the device and submit
-    const registerAlias = await browser.$("#registerAlias");
+    const registerAlias = await browser.$("#pickAliasInput");
     await registerAlias.waitForExist();
     await registerAlias.setValue("My Device");
 

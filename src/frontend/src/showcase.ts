@@ -24,7 +24,7 @@ import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authnPages } from "./components/authenticateBox";
 import { authnTemplateAuthorize } from "./flows/authorize";
-import { promptDeviceAliasPage } from "./flows/register/alias";
+import { promptDeviceAliasPage } from "./components/alias";
 import { renderConstructing } from "./flows/register/construct";
 import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
 import { displayUserNumberPage } from "./flows/register/finish";
@@ -32,7 +32,6 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { pickDeviceAliasPage } from "./flows/addDevice/manage/addDevicePickAlias";
 import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
   registerTentativeDevice,
@@ -150,14 +149,10 @@ const iiPages: Record<string, () => void> = {
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   promptDeviceAlias: () =>
     promptDeviceAliasPage({
+      title: "Register this device",
       cancel: () => console.log("canceled"),
       continue: (alias) => console.log("device alias:", alias),
       i18n,
-    }),
-  pickDeviceAlias: () =>
-    pickDeviceAliasPage({
-      cancel: () => console.log("canceled"),
-      pick: (alias) => console.log("device alias:", alias),
     }),
 
   // Authorize screens

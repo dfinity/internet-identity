@@ -4,7 +4,7 @@ import {
 } from "../../../utils/iiConnection";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { pickDeviceAlias } from "./addDevicePickAlias";
+import { promptDeviceAlias } from "../../../components/alias";
 import { withLoader } from "../../../components/loader";
 import { renderManage } from "../../manage";
 import { displayError } from "../../../components/displayError";
@@ -43,7 +43,7 @@ export const addLocalDevice = async (
     );
     return renderManage(userNumber, connection);
   }
-  const deviceName = await pickDeviceAlias();
+  const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });
   if (deviceName === null) {
     // user clicked "cancel", so we go back to "manage"
     return await renderManage(userNumber, connection);
