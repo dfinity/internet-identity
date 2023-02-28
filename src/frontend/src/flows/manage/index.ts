@@ -340,31 +340,32 @@ const deviceListItem = ({
           >
         </div>`
       : undefined}
-    ${device.settings.length > 0 &&
-    html` <div class="c-action-list__action c-dropdown">
-      <button
-        class="c-dropdown__trigger c-action-list__action"
-        aria-expanded="false"
-        aria-controls="dropdown-${index}"
-        data-device=${device.label}
-      >
-        ${dropdownIcon}
-      </button>
-      <ul class="c-dropdown__menu" id="dropdown-${index}">
-        ${device.settings.map((setting) => {
-          return html` <li class="c-dropdown__item">
-            <button
-              class="c-dropdown__link"
-              data-device=${device.label}
-              data-action=${setting.label}
-              @click=${() => setting.fn()}
-            >
-              ${setting.label}
-            </button>
-          </li>`;
-        })}
-      </ul>
-    </div>`}
+    ${device.settings.length > 0
+      ? html` <div class="c-action-list__action c-dropdown">
+          <button
+            class="c-dropdown__trigger c-action-list__action"
+            aria-expanded="false"
+            aria-controls="dropdown-${index}"
+            data-device=${device.label}
+          >
+            ${dropdownIcon}
+          </button>
+          <ul class="c-dropdown__menu" id="dropdown-${index}">
+            ${device.settings.map((setting) => {
+              return html` <li class="c-dropdown__item">
+                <button
+                  class="c-dropdown__link"
+                  data-device=${device.label}
+                  data-action=${setting.label}
+                  @click=${() => setting.fn()}
+                >
+                  ${setting.label}
+                </button>
+              </li>`;
+            })}
+          </ul>
+        </div>`
+      : undefined}
   `;
 };
 

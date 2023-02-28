@@ -318,12 +318,7 @@ const iiPages: Record<string, () => void> = {
           label: "Chrome on iPhone",
           isRecovery: false,
           isProtected: false,
-          settings: [
-            {
-              label: "Remove",
-              fn: () => Promise.resolve(),
-            },
-          ],
+          settings: [],
         },
       ],
       recoveries: [],
