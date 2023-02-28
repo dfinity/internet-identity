@@ -2,7 +2,7 @@ import { TemplateResult, html } from "lit-html";
 import { deviceListItem, Device } from "./deviceListItem";
 
 // The list of recovery devices
-export const recoveryMethods = ({
+export const recoveryMethodsSection = ({
   recoveries,
   onAddRecovery,
 }: {

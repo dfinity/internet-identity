@@ -22,7 +22,7 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { warnBox } from "../../components/warnBox";
 import { Device } from "../../components/deviceListItem";
-import { recoveryMethods } from "../../components/recoveryMethods";
+import { recoveryMethodsSection } from "../../components/recoveryMethodsSection";
 import { devicesSection } from "../../components/devicesSection";
 import { mainWindow } from "../../components/mainWindow";
 import {
@@ -126,7 +126,7 @@ const displayManageTemplate = ({
       onAddDevice,
     })}
     ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
-    ${recoveryMethods({ recoveries, onAddRecovery })} ${logoutSection()}
+    ${recoveryMethodsSection({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
   return mainWindow({
