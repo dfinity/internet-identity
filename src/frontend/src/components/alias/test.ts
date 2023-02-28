@@ -1,7 +1,7 @@
 import { promptDeviceAliasPage } from "../alias";
 import { I18n } from "../../i18n";
 
-test("can be canceled", async () => {
+test("can be canceled", () => {
   const cancel = jest.fn();
   const ctn = jest.fn((_str) => {
     /* */
@@ -20,7 +20,7 @@ test("can be canceled", async () => {
   expect(cancel.mock.calls.length).toBe(1);
 });
 
-test("can be picked", async () => {
+test("can be picked", () => {
   const cancel = jest.fn();
   const ctn = jest.fn((_str) => {
     /* */

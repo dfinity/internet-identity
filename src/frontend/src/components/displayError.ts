@@ -35,7 +35,7 @@ ${options.detail}</pre
       </div>`,
   });
 
-export const displayError = async (options: ErrorOptions): Promise<void> => {
+export const displayError = (options: ErrorOptions): Promise<void> => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent(options), container);
   return init();

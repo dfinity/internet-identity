@@ -46,7 +46,7 @@ const pageContent = () => {
   });
 };
 
-export const deviceRecoveryPage = async (
+export const deviceRecoveryPage = (
   userNumber: bigint,
   connection: Connection,
   device: RecoveryDevice
@@ -92,7 +92,7 @@ const init = (
       "recover-with-device__cancel"
     ) as HTMLButtonElement | null;
     if (buttonCancel !== null) {
-      buttonCancel.onclick = async () => {
+      buttonCancel.onclick = () => {
         resolve(cancel);
       };
     }
