@@ -56,6 +56,16 @@ export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
 }
+export interface DeviceWithUsage {
+  'alias' : string,
+  'last_usage' : [] | [Timestamp],
+  'origin' : [] | [string],
+  'protection' : DeviceProtection,
+  'pubkey' : DeviceKey,
+  'key_type' : KeyType,
+  'purpose' : Purpose,
+  'credential_id' : [] | [CredentialId],
+}
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
@@ -73,7 +83,7 @@ export interface HttpResponse {
   'status_code' : number,
 }
 export interface IdentityAnchorInfo {
-  'devices' : Array<ReadOnlyDeviceData>,
+  'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface InternetIdentityInit {
@@ -95,15 +105,6 @@ export type KeyType = { 'platform' : null } |
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
-export interface ReadOnlyDeviceData {
-  'alias' : string,
-  'protection' : DeviceProtection,
-  'pubkey' : DeviceKey,
-  'key_type' : KeyType,
-  'last_usage_timestamp' : [] | [Timestamp],
-  'purpose' : Purpose,
-  'credential_id' : [] | [CredentialId],
-}
 export type RegisterResponse = { 'bad_challenge' : null } |
   { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
