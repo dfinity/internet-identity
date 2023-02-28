@@ -125,7 +125,6 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
     })}
-    ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
     ${recoveryMethodsSection({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
