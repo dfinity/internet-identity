@@ -40,8 +40,7 @@ export const deviceSettings = ({
   if (shouldOfferToProtect(device)) {
     settings.push({
       label: "protect",
-      fn: () =>
-        protectDevice(userNumber, connection, device, isOnlyDevice, reload),
+      fn: () => protectDevice({ userNumber, connection, device, reload }),
     });
   }
 
@@ -49,8 +48,7 @@ export const deviceSettings = ({
   if (!isOnlyDevice) {
     settings.push({
       label: "remove",
-      fn: () =>
-        deleteDevice(userNumber, connection, device, isOnlyDevice, reload),
+      fn: () => deleteDevice({ userNumber, connection, device, reload }),
     });
   }
 
@@ -102,13 +100,17 @@ const deviceConnection = async (
 };
 
 /* Remove the device and return */
-const deleteDevice = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData,
-  isOnlyDevice: boolean,
-  back: () => void
-) => {
+const deleteDevice = async ({
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData;
+  reload: () => void;
+}) => {
   const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
     .buffer as DerEncodedPublicKey;
   const sameDevice = bufferEqual(
@@ -144,7 +146,7 @@ const deleteDevice = async (
   await withLoader(async () => {
     // if null then user canceled so we just redraw the manage page
     if (removalConnection == null) {
-      await back();
+      await reload();
       return;
     }
     await removalConnection.remove(device.pubkey);
@@ -152,23 +154,27 @@ const deleteDevice = async (
 
   if (sameDevice) {
     // clear anchor and reload the page.
-    // do not call "back", otherwise the management page will try to reload the list of devices which will cause an error
+    // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
     localStorage.clear();
     location.reload();
     return;
   } else {
-    back();
+    reload();
   }
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */
-const protectDevice = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData & RecoveryDevice,
-  isOnlyDevice: boolean,
-  back: () => void
-) => {
+const protectDevice = async ({
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData & RecoveryDevice;
+  reload: () => void;
+}) => {
   device.protection = { protected: null };
 
   // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
@@ -184,11 +190,11 @@ const protectDevice = async (
   await withLoader(async () => {
     // if null then user canceled so we just redraw the manage page
     if (newConnection == null) {
-      await back();
+      await reload();
       return;
     }
 
     await newConnection.update(device);
   });
-  back();
+  reload();
 };
