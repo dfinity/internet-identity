@@ -256,7 +256,7 @@ service : (opt InternetIdentityInit) -> {
     remove : (UserNumber, DeviceKey) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
-    // Deprecated: Use 'get_credentials' instead.
+    // Deprecated: Use 'get_device_credentials' instead.
     lookup : (UserNumber) -> (vec DeviceData) query;
     get_device_credentials : (UserNumber) -> (GetDeviceCredentialsResponse) query;
     get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);

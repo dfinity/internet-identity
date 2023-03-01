@@ -97,7 +97,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
-/// Deprecated: use `get_credentials` instead
+/// Deprecated: use [get_device_credentials] instead
 #[query]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
