@@ -31,10 +31,6 @@ export interface Challenge {
 }
 export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
-export interface Credential {
-  'pubkey' : PublicKey,
-  'credentialId' : CredentialId,
-}
 export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -44,6 +40,10 @@ export interface Delegation {
 export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'success' : Principal } |
   { 'failed' : string };
+export interface DeviceCredential {
+  'pubkey' : PublicKey,
+  'credentialId' : CredentialId,
+}
 export interface DeviceData {
   'alias' : string,
   'origin' : [] | [string],
@@ -71,13 +71,13 @@ export interface DeviceWithUsage {
   'credential_id' : [] | [CredentialId],
 }
 export type FrontendHostname = string;
-export interface GetCredentialsResponse {
-  'recovery_phrase' : boolean,
-  'credentials' : Array<Credential>,
-  'recovery_credentials' : Array<Credential>,
-}
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export interface GetDeviceCredentialsResponse {
+  'recovery_phrase' : boolean,
+  'credentials' : Array<DeviceCredential>,
+  'recovery_credentials' : Array<DeviceCredential>,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -152,13 +152,15 @@ export interface _SERVICE {
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'fetch_entries' : () => Promise<Array<BufferedArchiveEntry>>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
-  'get_credentials' : (arg_0: UserNumber) => Promise<GetCredentialsResponse>,
   'get_delegation' : (
       arg_0: UserNumber,
       arg_1: FrontendHostname,
       arg_2: SessionKey,
       arg_3: Timestamp,
     ) => Promise<GetDelegationResponse>,
+  'get_device_credentials' : (arg_0: UserNumber) => Promise<
+      GetDeviceCredentialsResponse
+    >,
   'get_principal' : (arg_0: UserNumber, arg_1: FrontendHostname) => Promise<
       Principal
     >,

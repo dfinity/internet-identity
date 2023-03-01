@@ -80,15 +80,6 @@ export const idlFactory = ({ IDL }) => {
     'devices' : IDL.Vec(DeviceWithUsage),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
-  const Credential = IDL.Record({
-    'pubkey' : PublicKey,
-    'credentialId' : CredentialId,
-  });
-  const GetCredentialsResponse = IDL.Record({
-    'recovery_phrase' : IDL.Bool,
-    'credentials' : IDL.Vec(Credential),
-    'recovery_credentials' : IDL.Vec(Credential),
-  });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
   const Delegation = IDL.Record({
@@ -103,6 +94,15 @@ export const idlFactory = ({ IDL }) => {
   const GetDelegationResponse = IDL.Variant({
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
+  });
+  const DeviceCredential = IDL.Record({
+    'pubkey' : PublicKey,
+    'credentialId' : CredentialId,
+  });
+  const GetDeviceCredentialsResponse = IDL.Record({
+    'recovery_phrase' : IDL.Bool,
+    'credentials' : IDL.Vec(DeviceCredential),
+    'recovery_credentials' : IDL.Vec(DeviceCredential),
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -174,14 +174,14 @@ export const idlFactory = ({ IDL }) => {
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
-    'get_credentials' : IDL.Func(
-        [UserNumber],
-        [GetCredentialsResponse],
-        ['query'],
-      ),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
+        ['query'],
+      ),
+    'get_device_credentials' : IDL.Func(
+        [UserNumber],
+        [GetDeviceCredentialsResponse],
         ['query'],
       ),
     'get_principal' : IDL.Func(
