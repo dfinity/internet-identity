@@ -1,3 +1,6 @@
+//! Types as defined by the HTTP gateway spec.
+//! See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
+
 use candid::{CandidType, Deserialize, Func};
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
