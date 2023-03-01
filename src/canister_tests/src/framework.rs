@@ -12,6 +12,7 @@ use ic_types::crypto::Signable;
 use ic_types::messages::Delegation;
 use ic_types::Time;
 use internet_identity_interface::archive::*;
+use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
 use internet_identity_interface::*;
 use lazy_static::lazy_static;
 use regex::Regex;

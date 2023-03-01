@@ -6,6 +6,7 @@ use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
+use internet_identity_interface::http_gateway::HttpRequest;
 use internet_identity_interface::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
