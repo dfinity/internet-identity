@@ -120,6 +120,7 @@ export const idlFactory = ({ IDL }) => {
   const HttpResponse = IDL.Record({
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HeaderField),
+    'upgrade' : IDL.Opt(IDL.Bool),
     'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
