@@ -216,13 +216,13 @@ type IdentityAnchorInfo = record {
     device_registration: opt DeviceRegistrationInfo;
 };
 
-type GetCredentialsResponse = record {
-    credentials : vec Credential;
-    recovery_credentials : vec Credential;
+type GetDeviceCredentialsResponse = record {
+    credentials : vec DeviceCredential;
+    recovery_credentials : vec DeviceCredential;
     recovery_phrase: bool;
 };
 
-type Credential = record {
+type DeviceCredential = record {
     credentialId : CredentialId;
     pubkey: PublicKey;
 };
@@ -258,7 +258,7 @@ service : (opt InternetIdentityInit) -> {
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
     // Deprecated: Use 'get_credentials' instead.
     lookup : (UserNumber) -> (vec DeviceData) query;
-    get_credentials : (UserNumber) -> (GetCredentialsResponse) query;
+    get_device_credentials : (UserNumber) -> (GetDeviceCredentialsResponse) query;
     get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
     get_principal : (UserNumber, FrontendHostname) -> (principal) query;
     stats : () -> (InternetIdentityStats) query;

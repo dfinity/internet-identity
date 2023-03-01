@@ -164,8 +164,8 @@ impl Anchor {
         &self.devices
     }
 
-    /// Returns matching [Credential]s.
-    pub fn get_credentials<P>(&self, filter: P) -> Vec<Credential>
+    /// Returns matching [DeviceCredential]s.
+    pub fn get_device_credentials<P>(&self, filter: P) -> Vec<DeviceCredential>
     where
         P: Fn(&&Device) -> bool,
     {
@@ -173,10 +173,12 @@ impl Anchor {
             .iter()
             .filter(filter)
             .flat_map(|d| {
-                d.credential_id.clone().map(|credential_id| Credential {
-                    pubkey: d.pubkey.clone(),
-                    credential_id,
-                })
+                d.credential_id
+                    .clone()
+                    .map(|credential_id| DeviceCredential {
+                        pubkey: d.pubkey.clone(),
+                        credential_id,
+                    })
             })
             .collect()
     }

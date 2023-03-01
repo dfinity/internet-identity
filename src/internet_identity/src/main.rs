@@ -117,17 +117,17 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 }
 
 #[query]
-fn get_credentials(anchor_number: AnchorNumber) -> GetCredentialsResponse {
+fn get_device_credentials(anchor_number: AnchorNumber) -> GetDeviceCredentialsResponse {
     let anchor = state::anchor(anchor_number);
 
-    let credentials = anchor.get_credentials(|d| d.purpose == Purpose::Authentication);
-    let recovery_credentials = anchor.get_credentials(|d| d.purpose == Purpose::Recovery);
+    let credentials = anchor.get_device_credentials(|d| d.purpose == Purpose::Authentication);
+    let recovery_credentials = anchor.get_device_credentials(|d| d.purpose == Purpose::Recovery);
     let recovery_phrase = anchor
         .devices()
         .iter()
         .any(|d| d.key_type == KeyType::SeedPhrase);
 
-    GetCredentialsResponse {
+    GetDeviceCredentialsResponse {
         credentials,
         recovery_credentials,
         recovery_phrase,
