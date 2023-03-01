@@ -114,12 +114,12 @@ pub fn lookup(
     query_candid(env, canister_id, "lookup", (anchor_number,)).map(|(x,)| x)
 }
 
-pub fn get_credentials(
+pub fn get_device_credentials(
     env: &StateMachine,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
 ) -> Result<GetDeviceCredentialsResponse, CallError> {
-    query_candid(env, canister_id, "get_credentials", (anchor_number,)).map(|(x,)| x)
+    query_candid(env, canister_id, "get_device_credentials", (anchor_number,)).map(|(x,)| x)
 }
 
 pub fn add(

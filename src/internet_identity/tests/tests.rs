@@ -1631,7 +1631,7 @@ mod device_management_tests {
                 recovery_webauthn_device.clone(),
             )?;
 
-            let response = api::get_credentials(&env, canister_id, user_number)?;
+            let response = api::get_device_credentials(&env, canister_id, user_number)?;
 
             assert_eq!(response.credentials.len(), 2);
             assert!(response.credentials.contains(&DeviceCredential {
@@ -1663,7 +1663,7 @@ mod device_management_tests {
             let canister_id = install_ii_canister(&env, II_WASM.clone());
             let user_number = flows::register_anchor(&env, canister_id);
 
-            let response = api::get_credentials(&env, canister_id, user_number)?;
+            let response = api::get_device_credentials(&env, canister_id, user_number)?;
 
             assert_eq!(
                 response.credentials,
