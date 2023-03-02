@@ -21,6 +21,17 @@ pub fn update_active_anchors_stats(previous_activity_timestamp: Option<Timestamp
     )
 }
 
+/// This method updates the active anchor counters if an ongoing collection bucket has completed.
+///
+/// For the daily (24h) active user counter:
+/// If the ongoing daily active users bucket was started 24h ago (or earlier), it replaces the current
+/// completed daily active user counter and a new ongoing 24h counter is created
+/// (starting from the end of the now completed counter).
+///
+/// For the monthly (30 day) active user counters:
+/// if the oldest ongoing 30 day bucket was started 30 days ago (or earlier), it replaces the current
+/// completed monthly active user counter and a new ongoing 30 day counter is created
+/// (starting from the end of the now completed counter).
 #[allow(clippy::identity_op)]
 fn rotate_active_anchor_stats_if_necessary(stats: &mut ActiveAnchorStatistics) {
     let now = time();
@@ -41,7 +52,7 @@ fn rotate_active_anchor_stats_if_necessary(stats: &mut ActiveAnchorStatistics) {
                 .push(new_active_anchor_counter(new_start_timestamp));
         }
     }
-    if let Some(monthly_stats) = stats.ongoing.monthly_active_anchors.first() {
+    if let Some(monthly_stats) = stats.ongoing.monthly_active_anchors.last() {
         // start a new 30 day time window if the last one starts more than 24h in the past.
         if monthly_stats.start_timestamp + 1 * DAY <= now {
             stats

@@ -3096,10 +3096,12 @@ mod remote_device_registration_tests {
 mod active_anchors_tests {
     use super::*;
 
+    const DAY: u64 = 24 * 60 * 60;
+    const MONTH: u64 = 30 * 24 * 60 * 60;
+
     /// Tests that daily active anchors are counted correctly.
     #[test]
     fn should_report_daily_active_anchors() -> Result<(), CallError> {
-        const DAY: u64 = 24 * 60 * 60;
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -3169,7 +3171,6 @@ mod active_anchors_tests {
     /// Tests that monthly active anchors are counted correctly.
     #[test]
     fn should_report_monthly_active_anchors() -> Result<(), CallError> {
-        const MONTH: u64 = 30 * 24 * 60 * 60;
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -3245,7 +3246,6 @@ mod active_anchors_tests {
     /// Tests that monthly active anchors are updated every 24h.
     #[test]
     fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
-        const DAY: u64 = 24 * 60 * 60;
         let env = env();
         let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -3374,6 +3374,59 @@ mod active_anchors_tests {
                 .unwrap()
                 .ongoing
                 .daily_active_anchors
+                .counter,
+            1
+        );
+
+        Ok(())
+    }
+
+    /// Tests that the ongoing monthly collection periods are rolled over correctly.
+    #[test]
+    fn should_have_30_parallel_monthly_collection_windows() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let anchor_number = flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .len(),
+            1
+        );
+
+        for _ in 0..30 {
+            // advance time to trigger the next ongoing 30 day collection period
+            env.advance_time(Duration::from_secs(DAY));
+            // some activity is required to update the stats
+            api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+        }
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .len(),
+            30
+        );
+
+        // after 30 days the first monthly collection period should be completed
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .as_ref()
+                .unwrap()
                 .counter,
             1
         );
