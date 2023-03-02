@@ -319,6 +319,22 @@ export class Connection {
     }
   }
 
+  fromIdentity = async (
+    userNumber: bigint,
+    identity: SignIdentity
+  ): Promise<AuthenticatedConnection> => {
+    const delegationIdentity = await this.requestFEDelegation(identity);
+    const actor = await this.createActor(delegationIdentity);
+
+    return new AuthenticatedConnection(
+      this.canisterId,
+      identity,
+      delegationIdentity,
+      userNumber,
+      actor
+    );
+  };
+
   fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string,
@@ -524,6 +540,11 @@ export class AuthenticatedConnection extends Connection {
   update = async (device: DeviceData): Promise<void> => {
     const actor = await this.getActor();
     return await actor.update(this.userNumber, device.pubkey, device);
+  };
+
+  replace = async (pubkey: DeviceKey, device: DeviceData): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.replace(this.userNumber, pubkey, device);
   };
 
   remove = async (publicKey: PublicKey): Promise<void> => {
