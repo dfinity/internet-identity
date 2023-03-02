@@ -100,24 +100,24 @@ export const recoveryMethodsSection = ({
   }
   return html`
     <aside class="l-stack">
-        ${
-          recoveries.length === 0
-            ? undefined
-            : html`
-                <div class="t-title">
-                  <h2>
-                    Recovery
-                    methods${recoveries.length > 1
-                      ? html`<i
-                          class="c-icon c-icon--success c-icon--inline-after"
-                          >${checkmarkIcon}</i
-                        >`
-                      : null}
-                  </h2>
-                </div>
-                ${sectionList({ recoveries, onAddRecovery })}
-              `
-        }
+      <details class="c-details" .open="${recoveries.length < 2}">
+        ${recoveries.length === 0
+          ? undefined
+          : html`
+              <summary class="t-title c-summary">
+                <h2>
+                  Recovery
+                  methods${recoveries.length > 1
+                    ? html`<i
+                        class="c-icon c-icon--success c-icon--inline-after"
+                        >${checkmarkIcon}</i
+                      >`
+                    : null}
+                </h2>
+                <span class="c-summary__link c-summary__link--end"></span>
+              </summary>
+              ${sectionList({ recoveries, onAddRecovery })}
+            `}
       </details>
     </aside>
   `;
