@@ -51,6 +51,7 @@ use ic_stable_structures::{
     RestrictedMemory, StableBTreeMap, Storable,
 };
 use internet_identity_interface::archive::*;
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
@@ -549,6 +550,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                         status_code: 200,
                         headers,
                         body: Cow::Owned(ByteBuf::from(body)),
+                        upgrade: None,
                         streaming_strategy: None,
                     }
                 }
@@ -556,6 +558,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     status_code: 500,
                     headers: vec![],
                     body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
+                    upgrade: None,
                     streaming_strategy: None,
                 },
             }
@@ -564,6 +567,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 404,
             headers: vec![],
             body: Cow::Owned(ByteBuf::from(format!("Asset {path} not found."))),
+            upgrade: None,
             streaming_strategy: None,
         },
     }
