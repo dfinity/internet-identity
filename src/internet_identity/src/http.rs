@@ -39,6 +39,9 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     .to_string(),
             )],
             body: Cow::Owned(ByteBuf::new()),
+            // Redirects are not allowed as query because certification V1 does not cover headers.
+            // Upgrading to update fixes this. This flag can be removed when switching to
+            // certification V2.
             upgrade: Some(true),
             streaming_strategy: None,
         },
