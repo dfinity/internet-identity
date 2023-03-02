@@ -526,6 +526,11 @@ export class AuthenticatedConnection extends Connection {
     return await actor.update(this.userNumber, device.pubkey, device);
   };
 
+  replace = async (pubkey: DeviceKey, device: DeviceData): Promise<void> => {
+    const actor = await this.getActor();
+    return await actor.replace(this.userNumber, pubkey, device);
+  };
+
   remove = async (publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
     await actor.remove(this.userNumber, publicKey);

@@ -31,7 +31,7 @@ test("Recover access, after registration", async () => {
   });
 }, 300_000);
 
-test("Remove unprotected recovery phrase", async () => {
+test("Reset unprotected recovery phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -45,11 +45,10 @@ test("Remove unprotected recovery phrase", async () => {
 
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
-    await mainView.remove(RECOVERY_PHRASE_NAME);
+    await mainView.reset(RECOVERY_PHRASE_NAME);
     await browser.acceptAlert();
-
+    const _seedPhrase = await FLOWS.readSeedPhrase(browser);
     await mainView.waitForDisplay();
-    await mainView.waitForDeviceNotDisplay(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
 
@@ -90,7 +89,7 @@ test("Make recovery unprotected", async () => {
   });
 }, 300_000);
 
-test("Remove protected recovery phrase", async () => {
+test("Reset protected recovery phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -105,19 +104,21 @@ test("Remove protected recovery phrase", async () => {
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
 
     await mainView.waitForDisplay();
-    await mainView.remove(RECOVERY_PHRASE_NAME);
+    await mainView.reset(RECOVERY_PHRASE_NAME);
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
+
+    const _seedPhrase = await FLOWS.readSeedPhrase(browser);
+
     await mainView.waitForDisplay();
-    await mainView.waitForDeviceNotDisplay(RECOVERY_PHRASE_NAME);
   });
 }, 300_000);
 
-test("Remove protected recovery phrase, confirm with empty seed phrase", async () => {
+test("Reset protected recovery phrase, confirm with empty seed phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -131,7 +132,7 @@ test("Remove protected recovery phrase, confirm with empty seed phrase", async (
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
     await mainView.waitForDisplay();
-    await mainView.remove(RECOVERY_PHRASE_NAME);
+    await mainView.reset(RECOVERY_PHRASE_NAME);
 
     await browser.acceptAlert();
 

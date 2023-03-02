@@ -242,6 +242,19 @@ export class MainView extends View {
       .click();
   }
 
+  async reset(deviceName: string): Promise<void> {
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='reset']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='reset']`)
+      .click();
+  }
+
   async removeNotDisplayed(deviceName: string): Promise<void> {
     await this.browser.$(`button[data-device="${deviceName}"]`).click();
     await this.browser
