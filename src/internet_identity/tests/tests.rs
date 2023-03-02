@@ -1631,21 +1631,21 @@ mod device_management_tests {
                 recovery_webauthn_device.clone(),
             )?;
 
-            let response = api::get_device_credentials(&env, canister_id, user_number)?;
+            let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
 
             assert_eq!(response.credentials.len(), 2);
-            assert!(response.credentials.contains(&DeviceCredential {
+            assert!(response.credentials.contains(&WebauthnCredential {
                 pubkey: device_data_1().pubkey,
                 credential_id: device_data_1().credential_id.unwrap()
             }));
-            assert!(response.credentials.contains(&DeviceCredential {
+            assert!(response.credentials.contains(&WebauthnCredential {
                 pubkey: device_data_2().pubkey,
                 credential_id: device_data_2().credential_id.unwrap()
             }));
 
             assert_eq!(
                 response.recovery_credentials,
-                vec![DeviceCredential {
+                vec![WebauthnCredential {
                     pubkey: recovery_webauthn_device.pubkey.clone(),
                     credential_id: recovery_webauthn_device.credential_id.unwrap()
                 }]
@@ -1663,11 +1663,11 @@ mod device_management_tests {
             let canister_id = install_ii_canister(&env, II_WASM.clone());
             let user_number = flows::register_anchor(&env, canister_id);
 
-            let response = api::get_device_credentials(&env, canister_id, user_number)?;
+            let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
 
             assert_eq!(
                 response.credentials,
-                vec![DeviceCredential {
+                vec![WebauthnCredential {
                     pubkey: device_data_1().pubkey,
                     credential_id: device_data_1().credential_id.unwrap()
                 }]

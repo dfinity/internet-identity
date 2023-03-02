@@ -164,25 +164,6 @@ impl Anchor {
         &self.devices
     }
 
-    /// Returns matching [DeviceCredential]s.
-    pub fn get_device_credentials<P>(&self, filter: P) -> Vec<DeviceCredential>
-    where
-        P: Fn(&&Device) -> bool,
-    {
-        self.devices()
-            .iter()
-            .filter(filter)
-            .flat_map(|d| {
-                d.credential_id
-                    .clone()
-                    .map(|credential_id| DeviceCredential {
-                        pubkey: d.pubkey.clone(),
-                        credential_id,
-                    })
-            })
-            .collect()
-    }
-
     /// Consumes self and exposes the devices.
     pub fn into_devices(self) -> Vec<Device> {
         self.devices
@@ -227,6 +208,20 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
+    }
+}
+
+impl TryFrom<Device> for WebauthnCredential {
+    type Error = ();
+
+    fn try_from(device: Device) -> Result<Self, Self::Error> {
+        let Some(credential_id) = device.credential_id else {
+            return Err(());
+        };
+        Ok(Self {
+            pubkey: device.pubkey,
+            credential_id,
+        })
     }
 }
 

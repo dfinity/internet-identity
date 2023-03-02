@@ -97,7 +97,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
-/// Deprecated: use [get_device_credentials] instead
+/// Deprecated: use [get_anchor_credentials] instead
 #[query]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
@@ -117,19 +117,30 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 }
 
 #[query]
-fn get_device_credentials(anchor_number: AnchorNumber) -> GetDeviceCredentialsResponse {
+fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     let anchor = state::anchor(anchor_number);
 
-    let credentials = anchor.get_device_credentials(|d| d.purpose == Purpose::Authentication);
-    let recovery_credentials = anchor.get_device_credentials(|d| d.purpose == Purpose::Recovery);
     let recovery_phrase = anchor
         .devices()
         .iter()
         .any(|d| d.key_type == KeyType::SeedPhrase);
 
-    GetDeviceCredentialsResponse {
-        credentials,
-        recovery_credentials,
+    let (auth_devices, recovery_devices): (Vec<_>, Vec<_>) = anchor
+        .into_devices()
+        .into_iter()
+        .partition(|d| d.purpose != Purpose::Recovery);
+
+    AnchorCredentials {
+        credentials: auth_devices
+            .into_iter()
+            .map(WebauthnCredential::try_from)
+            .flatten()
+            .collect(),
+        recovery_credentials: recovery_devices
+            .into_iter()
+            .map(WebauthnCredential::try_from)
+            .flatten()
+            .collect(),
         recovery_phrase,
     }
 }
