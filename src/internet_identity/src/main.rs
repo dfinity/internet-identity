@@ -120,27 +120,29 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     let anchor = state::anchor(anchor_number);
 
-    let recovery_phrase = anchor
-        .devices()
-        .iter()
-        .any(|d| d.key_type == KeyType::SeedPhrase);
-
-    let (auth_devices, recovery_devices): (Vec<_>, Vec<_>) = anchor
-        .into_devices()
-        .into_iter()
-        .partition(|d| d.purpose != Purpose::Recovery);
-
-    AnchorCredentials {
-        credentials: auth_devices
-            .into_iter()
-            .flat_map(WebauthnCredential::try_from)
-            .collect(),
-        recovery_credentials: recovery_devices
-            .into_iter()
-            .flat_map(WebauthnCredential::try_from)
-            .collect(),
-        recovery_phrase,
-    }
+    anchor.into_devices().into_iter().fold(
+        AnchorCredentials {
+            credentials: vec![],
+            recovery_credentials: vec![],
+            recovery_phrases: vec![],
+        },
+        |mut credentials, device| {
+            if device.key_type == KeyType::SeedPhrase {
+                credentials.recovery_phrases.push(device.pubkey);
+            } else if let Some(credential_id) = device.credential_id {
+                let credential = WebauthnCredential {
+                    pubkey: device.pubkey,
+                    credential_id,
+                };
+                if device.purpose == Purpose::Recovery {
+                    credentials.recovery_credentials.push(credential);
+                } else {
+                    credentials.credentials.push(credential);
+                }
+            }
+            credentials
+        },
+    )
 }
 
 #[update] // this is an update call because queries are not (yet) certified

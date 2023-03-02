@@ -200,7 +200,7 @@ pub struct WebauthnCredential {
 pub struct AnchorCredentials {
     pub credentials: Vec<WebauthnCredential>,
     pub recovery_credentials: Vec<WebauthnCredential>,
-    pub recovery_phrase: bool,
+    pub recovery_phrases: Vec<PublicKey>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

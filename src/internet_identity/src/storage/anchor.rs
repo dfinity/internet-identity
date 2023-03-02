@@ -211,20 +211,6 @@ impl Device {
     }
 }
 
-impl TryFrom<Device> for WebauthnCredential {
-    type Error = ();
-
-    fn try_from(device: Device) -> Result<Self, Self::Error> {
-        let Some(credential_id) = device.credential_id else {
-            return Err(());
-        };
-        Ok(Self {
-            pubkey: device.pubkey,
-            credential_id,
-        })
-    }
-}
-
 fn check_mutation_allowed(device: &Device) -> Result<(), AnchorError> {
     match device.protection {
         DeviceProtection::Unprotected => (),

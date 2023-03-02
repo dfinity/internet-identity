@@ -1589,10 +1589,10 @@ mod device_management_tests {
     }
 
     #[cfg(test)]
-    mod get_credentials {
+    mod get_anchor_credentials {
         use super::*;
 
-        /// Verifies that get_credentials returns the expected credentials.
+        /// Verifies that get_anchor_credentials returns the expected credentials.
         #[test]
         fn should_get_credentials() -> Result<(), CallError> {
             let env = env();
@@ -1651,12 +1651,15 @@ mod device_management_tests {
                 }]
             );
 
-            assert!(response.recovery_phrase);
+            assert_eq!(
+                response.recovery_phrases,
+                vec![recovery_device_data_1().pubkey]
+            );
 
             Ok(())
         }
 
-        /// Verifies that get_credentials returns the expected credentials (i.e. no recovery credentials if there are none).
+        /// Verifies that get_anchor_credentials returns the expected credentials (i.e. no recovery credentials if there are none).
         #[test]
         fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallError> {
             let env = env();
@@ -1673,7 +1676,7 @@ mod device_management_tests {
                 }]
             );
             assert_eq!(response.recovery_credentials, vec![]);
-            assert!(!response.recovery_phrase);
+            assert_eq!(response.recovery_phrases, Vec::<PublicKey>::new());
 
             Ok(())
         }

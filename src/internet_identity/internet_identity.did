@@ -219,7 +219,7 @@ type IdentityAnchorInfo = record {
 type AnchorCredentials = record {
     credentials : vec WebauthnCredential;
     recovery_credentials : vec WebauthnCredential;
-    recovery_phrase: bool;
+    recovery_phrase: vec PublicKey;
 };
 
 type WebauthnCredential = record {
