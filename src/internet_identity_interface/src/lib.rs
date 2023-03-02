@@ -1,9 +1,11 @@
-use candid::{CandidType, Deserialize, Func, Principal};
-use serde_bytes::{ByteBuf, Bytes};
-use std::borrow::Cow;
+use candid::{CandidType, Deserialize, Principal};
+use serde_bytes::ByteBuf;
 
 /// types related to the archive
 pub mod archive;
+/// types as specified by the HTTP gateway protocol.
+/// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
+pub mod http_gateway;
 
 pub type AnchorNumber = u64;
 pub type CredentialId = ByteBuf;
@@ -186,38 +188,6 @@ impl IdentityAnchorInfo {
     pub fn into_device_data(self) -> Vec<DeviceData> {
         self.devices.into_iter().map(DeviceData::from).collect()
     }
-}
-
-pub type HeaderField = (String, String);
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct Token {}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub enum StreamingStrategy {
-    Callback { callback: Func, token: Token },
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct StreamingCallbackHttpResponse {
-    pub body: ByteBuf,
-    pub token: Option<Token>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpRequest {
-    pub method: String,
-    pub url: String,
-    pub headers: Vec<(String, String)>,
-    pub body: ByteBuf,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpResponse {
-    pub status_code: u16,
-    pub headers: Vec<HeaderField>,
-    pub body: Cow<'static, Bytes>,
-    pub streaming_strategy: Option<StreamingStrategy>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

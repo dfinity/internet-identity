@@ -7,6 +7,7 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::BufferedEntry;
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
@@ -159,6 +160,11 @@ fn get_delegation(
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
+    http::http_request(req)
+}
+
+#[update]
+fn http_request_update(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 

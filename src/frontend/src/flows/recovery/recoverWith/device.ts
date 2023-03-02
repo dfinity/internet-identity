@@ -77,8 +77,8 @@ const init = (
             break;
           case "err":
             await displayError({ ...result, primaryButton: "Try again" });
-            deviceRecoveryPage(userNumber, connection, device).then((res) =>
-              resolve(res)
+            void deviceRecoveryPage(userNumber, connection, device).then(
+              (res) => resolve(res)
             );
             break;
           default:
