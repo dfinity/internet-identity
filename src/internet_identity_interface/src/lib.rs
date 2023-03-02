@@ -236,21 +236,6 @@ pub struct ActiveAnchorStatistics {
     pub ongoing: OngoingActiveAnchorStats,
 }
 
-impl ActiveAnchorStatistics {
-    pub fn new(time: Timestamp) -> Self {
-        Self {
-            completed: CompletedActiveAnchorStats {
-                daily_active_anchors: None,
-                monthly_active_anchors: None,
-            },
-            ongoing: OngoingActiveAnchorStats {
-                daily_active_anchors: ActiveAnchorCounter::new(time),
-                monthly_active_anchors: vec![ActiveAnchorCounter::new(time)],
-            },
-        }
-    }
-}
-
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct CompletedActiveAnchorStats {
     pub daily_active_anchors: Option<ActiveAnchorCounter>,
@@ -262,7 +247,7 @@ pub struct OngoingActiveAnchorStats {
     // Ongoing active anchor counter for
     pub daily_active_anchors: ActiveAnchorCounter,
     // Monthly active users are collected using 30 day sliding windows.
-    // This vec contains up to 29 30-day active windows each offset by one day.
+    // This vec contains up to 30 30-day active windows each offset by one day.
     // The vec is sorted with the first element being the next window to reach the end of the
     // 30 day collection period.
     pub monthly_active_anchors: Vec<ActiveAnchorCounter>,
@@ -272,15 +257,6 @@ pub struct OngoingActiveAnchorStats {
 pub struct ActiveAnchorCounter {
     pub start_timestamp: Timestamp,
     pub counter: u64,
-}
-
-impl ActiveAnchorCounter {
-    pub fn new(time: Timestamp) -> Self {
-        Self {
-            start_timestamp: time,
-            counter: 0,
-        }
-    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

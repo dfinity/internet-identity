@@ -1,12 +1,15 @@
 use crate::{state, DAY};
 use ic_cdk::api::time;
-use internet_identity_interface::{ActiveAnchorCounter, ActiveAnchorStatistics, Timestamp};
+use internet_identity_interface::{
+    ActiveAnchorCounter, ActiveAnchorStatistics, CompletedActiveAnchorStats,
+    OngoingActiveAnchorStats, Timestamp,
+};
 
 pub fn update_active_anchors_stats(previous_activity_timestamp: Option<Timestamp>) {
     state::persistent_state_mut(
         |persistent_state| match persistent_state.active_anchor_stats {
             None => {
-                let mut stats = ActiveAnchorStatistics::new(time());
+                let mut stats = new_active_anchor_statistics(time());
                 increment_stats_on_activity(&mut stats, previous_activity_timestamp);
                 persistent_state.active_anchor_stats = Some(stats)
             }
@@ -24,7 +27,7 @@ fn rotate_active_anchor_stats_if_necessary(stats: &mut ActiveAnchorStatistics) {
     if stats.ongoing.daily_active_anchors.start_timestamp + 1 * DAY <= now {
         let new_start_timestamp = stats.ongoing.daily_active_anchors.start_timestamp + 1 * DAY;
         stats.completed.daily_active_anchors = Some(stats.ongoing.daily_active_anchors.clone());
-        stats.ongoing.daily_active_anchors = ActiveAnchorCounter::new(new_start_timestamp)
+        stats.ongoing.daily_active_anchors = new_active_anchor_counter(new_start_timestamp)
     }
 
     if let Some(monthly_stats) = stats.ongoing.monthly_active_anchors.first() {
@@ -35,7 +38,7 @@ fn rotate_active_anchor_stats_if_necessary(stats: &mut ActiveAnchorStatistics) {
             stats
                 .ongoing
                 .monthly_active_anchors
-                .push(ActiveAnchorCounter::new(new_start_timestamp));
+                .push(new_active_anchor_counter(new_start_timestamp));
         }
     }
     if let Some(monthly_stats) = stats.ongoing.monthly_active_anchors.first() {
@@ -44,7 +47,7 @@ fn rotate_active_anchor_stats_if_necessary(stats: &mut ActiveAnchorStatistics) {
             stats
                 .ongoing
                 .monthly_active_anchors
-                .push(ActiveAnchorCounter::new(
+                .push(new_active_anchor_counter(
                     monthly_stats.start_timestamp + 1 * DAY,
                 ));
         }
@@ -75,4 +78,24 @@ fn increment_stats_on_activity(
                 monthly_stats.counter += 1;
             }
         });
+}
+
+fn new_active_anchor_statistics(time: Timestamp) -> ActiveAnchorStatistics {
+    ActiveAnchorStatistics {
+        completed: CompletedActiveAnchorStats {
+            daily_active_anchors: None,
+            monthly_active_anchors: None,
+        },
+        ongoing: OngoingActiveAnchorStats {
+            daily_active_anchors: new_active_anchor_counter(time),
+            monthly_active_anchors: vec![new_active_anchor_counter(time)],
+        },
+    }
+}
+
+fn new_active_anchor_counter(time: Timestamp) -> ActiveAnchorCounter {
+    ActiveAnchorCounter {
+        start_timestamp: time,
+        counter: 0,
+    }
 }
