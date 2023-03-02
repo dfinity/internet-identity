@@ -163,6 +163,11 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
+#[update]
+fn http_request_update(req: HttpRequest) -> HttpResponse {
+    http::http_request(req)
+}
+
 #[query]
 fn stats() -> InternetIdentityStats {
     let archive_info = match state::archive_state() {
