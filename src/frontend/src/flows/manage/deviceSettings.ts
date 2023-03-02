@@ -13,8 +13,12 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
   isProtected,
-  RecoveryDevice,
+  RecoveryPhrase,
 } from "../../utils/recoveryDevice";
+import { generate } from "../../crypto/mnemonic";
+import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
+import { IC_DERIVATION_PATH } from "../../utils/iiConnection";
+import { displaySeedPhrase } from "../recovery/displaySeedPhrase";
 
 // A particular device setting, e.g. remove, protect, etc
 export type Setting = { label: string; fn: () => void };
@@ -31,58 +35,52 @@ export const deviceSettings = ({
   connection: AuthenticatedConnection;
   device: DeviceData;
   isOnlyDevice: boolean;
-  /* Reload the page after the new settings were applied */
-  reload: () => void;
+  /* Reload the page after the new settings were applied, potentially using another connection */
+  reload: (connection?: AuthenticatedConnection) => void;
 }): Setting[] => {
   const settings: Setting[] = [];
 
-  // Whether the device can be protected or not
-  if (shouldOfferToProtect(device)) {
-    settings.push({
-      label: "protect",
-      fn: () => protectDevice({ userNumber, connection, device, reload }),
-    });
+  // Whether the device can be (un)protected or not (only recovery phrases can be protected)
+  if (isRecoveryPhrase(device)) {
+    if (!isProtected(device)) {
+      settings.push({
+        label: "protect",
+        fn: () => protectDevice({ userNumber, connection, device, reload }),
+      });
+    } else {
+      settings.push({
+        label: "unprotect",
+        fn: () =>
+          unprotectDevice(userNumber, connection, device, isOnlyDevice, reload),
+      });
+    }
   }
 
-  // Whether the device can be unprotected or not
-  if (shouldOfferToUnprotect(device)) {
+  // For recovery phrases, we only allow resetting, not removing
+  if (isRecoveryPhrase(device)) {
     settings.push({
-      label: "unprotect",
-      fn: () =>
-        unprotectDevice(userNumber, connection, device, isOnlyDevice, reload),
+      label: "reset",
+      fn: () => resetPhrase({ userNumber, connection, device, reload }),
     });
-  }
-
-  // If this is _not_ the only device, then we allow removing it
-  if (!isOnlyDevice) {
-    settings.push({
-      label: "remove",
-      fn: () => deleteDevice({ userNumber, connection, device, reload }),
-    });
+  } else {
+    // For all other devices, we allow removing (unless it's the only device)
+    if (!isOnlyDevice) {
+      settings.push({
+        label: "remove",
+        fn: () => deleteDevice({ connection, device, reload }),
+      });
+    }
   }
 
   return settings;
 };
-
-// We offer to protect unprotected recovery phrases only, although in the
-// future we may offer to protect all devices
-const shouldOfferToProtect = (
-  device: DeviceData
-): device is RecoveryDevice & DeviceData =>
-  isRecoveryPhrase(device) && !isProtected(device);
-
-// We offer to unprotect protected recovery phrases only
-const shouldOfferToUnprotect = (
-  device: DeviceData
-): device is RecoveryDevice & DeviceData =>
-  isRecoveryPhrase(device) && isProtected(device);
 
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   connection: Connection,
   userNumber: bigint,
-  device: DeviceData & RecoveryDevice,
+  device: DeviceData & RecoveryPhrase,
   recoveryPhraseMessage: string
 ): Promise<AuthenticatedConnection | null> => {
   try {
@@ -104,9 +102,9 @@ const deviceConnection = async (
     }
   } catch (error: unknown) {
     await displayError({
-      title: "Could not delete device",
+      title: "Could not modify device",
       message:
-        "An unexpected error occurred when trying to read recovery phrase for device deletion.",
+        "An unexpected error occurred when trying to read recovery phrase for device modification.",
       detail: error instanceof Error ? error.toString() : "unknown error",
       primaryButton: "Ok",
     });
@@ -116,12 +114,10 @@ const deviceConnection = async (
 
 /* Remove the device and return */
 const deleteDevice = async ({
-  userNumber,
   connection,
   device,
   reload,
 }: {
-  userNumber: bigint;
   connection: AuthenticatedConnection;
   device: DeviceData;
   reload: () => void;
@@ -146,25 +142,8 @@ const deleteDevice = async ({
     return;
   }
 
-  // If the device is protected then we need to be authenticated with the device to remove it
-  // NOTE: the user may be authenticated with the device already, but for consistency we still ask them to input their recovery phrase
-  const removalConnection =
-    isRecoveryDevice(device) && isProtected(device)
-      ? await deviceConnection(
-          connection,
-          userNumber,
-          device,
-          "Please input your recovery phrase to remove it."
-        )
-      : connection;
-
   await withLoader(async () => {
-    // if null then user canceled so we just redraw the manage page
-    if (removalConnection == null) {
-      await reload();
-      return;
-    }
-    await removalConnection.remove(device.pubkey);
+    await connection.remove(device.pubkey);
   });
 
   if (sameDevice) {
@@ -178,6 +157,81 @@ const deleteDevice = async ({
   }
 };
 
+/* Reset the device and return to caller */
+const resetPhrase = async ({
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData & RecoveryPhrase;
+  reload: (connection?: AuthenticatedConnection) => void;
+}) => {
+  const confirmed = confirm(
+    "Reset your recovery phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one by confirming."
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  // Create a new recovery phrase
+  const recoveryPhrase = generate().trim();
+  const recoverIdentity = await fromMnemonicWithoutValidation(
+    recoveryPhrase,
+    IC_DERIVATION_PATH
+  );
+
+  // Figure out if we need a new connection
+  // NOTE: we create this _before_ replacing the phrase, just in case something
+  // goes wrong it goes wrong before we've replaced the phrase.
+  let nextConnection: AuthenticatedConnection | undefined;
+  const sameDevice = bufferEqual(
+    connection.identity.getPublicKey().toDer(),
+    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey
+  );
+  if (sameDevice) {
+    nextConnection = await connection.fromIdentity(userNumber, recoverIdentity);
+  }
+
+  // The connection used in the replace op
+  // (if the phrase is protected, this prompts for the phrase and builds a new connection)
+  const opConnection = isProtected(device)
+    ? await deviceConnection(
+        connection,
+        userNumber,
+        device,
+        "Please input your recovery phrase to reset it."
+      )
+    : connection;
+  if (opConnection === null) {
+    // User aborted, just return
+    reload();
+    return;
+  }
+
+  // Save the old pubkey (used as index for replace)
+  const oldKey = device.pubkey;
+  device.pubkey = Array.from(
+    new Uint8Array(recoverIdentity.getPublicKey().toDer())
+  );
+
+  try {
+    await withLoader(() => opConnection.replace(oldKey, device));
+    await displaySeedPhrase(userNumber.toString(10) + " " + recoveryPhrase);
+  } catch (e: unknown) {
+    await displayError({
+      title: "Could not reset recovery phrase",
+      message: "An unexpected error occurred",
+      detail: e instanceof Error ? e.toString() : "unknown error",
+      primaryButton: "Ok",
+    });
+  }
+
+  reload(nextConnection);
+};
+
 /* Protect the device and re-render the device settings (with the updated device) */
 const protectDevice = async ({
   userNumber,
@@ -187,7 +241,7 @@ const protectDevice = async ({
 }: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
-  device: DeviceData & RecoveryDevice;
+  device: DeviceData & RecoveryPhrase;
   reload: () => void;
 }) => {
   device.protection = { protected: null };
@@ -218,7 +272,7 @@ const protectDevice = async ({
 const unprotectDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  device: DeviceData & RecoveryDevice,
+  device: DeviceData & RecoveryPhrase,
   isOnlyDevice: boolean,
   back: () => void
 ) => {
