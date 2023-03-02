@@ -302,6 +302,69 @@ const iiPages: Record<string, () => void> = {
         console.log("add recovery requested");
       },
     }),
+  displayManageComplete: () =>
+    displayManagePage({
+      userNumber,
+      authenticators: [
+        {
+          label: "Chrome on iPhone",
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+        {
+          label: "Yubikey Blue",
+          isProtected: false,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+      ],
+      recoveries: [
+        {
+          label: "Recovery Phrase",
+          recovery: "phrase",
+          isProtected: true,
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+            {
+              label: "Protect",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+        {
+          label: "Fancy Key",
+          recovery: "device",
+          settings: [
+            {
+              label: "Remove",
+              fn: () => Promise.resolve(),
+            },
+            {
+              label: "Protect",
+              fn: () => Promise.resolve(),
+            },
+          ],
+        },
+      ],
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      onAddRecovery: () => {
+        console.log("add recovery requested");
+      },
+    }),
   displayManageSingle: () =>
     displayManagePage({
       userNumber,

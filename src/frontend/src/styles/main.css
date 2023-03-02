@@ -74,6 +74,7 @@
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
+  --vc-brand-green: #7ed321;
   --vc-brand-alt: rgba(215, 205, 235, 1);
 
   /**
@@ -135,6 +136,8 @@
 
   --rc-warning: var(--vc-brand-pink);
   --rc-onWarning: var(--vc-snow);
+  --rc-positive: var(--vc-brand-green);
+  --rc-onPositive: var(--rc-dark);
 
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
@@ -526,6 +529,14 @@ a:hover,
   vertical-align: middle;
 }
 
+.c-icon--inline {
+  margin-right: var(--vs-inline);
+}
+
+.c-icon--inline-after {
+  margin-left: var(--vs-inline);
+}
+
 .c-icon--block {
   display: block;
   height: auto;
@@ -542,6 +553,22 @@ a:hover,
 
 .c-icon--warning [fill] {
   fill: var(--rc-warning);
+}
+
+.c-icon--success {
+  background: var(--rc-positive);
+  border-radius: 50%;
+  width: 0.9em;
+  height: 0.9em;
+  box-shadow: 0 0 0 1px var(--rc-onPositive), 0 0 1rem var(--rc-positive);
+}
+
+.c-icon--success svg {
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+.c-icon--success [fill] {
+  fill: var(--rc-onPositive);
 }
 
 .c-icon--lock svg {

@@ -8,7 +8,7 @@ export type Device = {
   settings?: Setting[];
   // The displayed name of a device (not exactly the "alias") because
   // recovery devices handle aliases differently.
-  label: string;
+  label: string | TemplateResult;
   recovery?: "phrase" | "device";
   isProtected?: boolean;
   warn?: TemplateResult;

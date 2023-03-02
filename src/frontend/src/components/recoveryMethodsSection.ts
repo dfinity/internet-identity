@@ -1,6 +1,7 @@
 import { TemplateResult, html } from "lit-html";
 import { deviceListItem, Device } from "./deviceListItem";
 import { warnBox } from "./warnBox";
+import { checkmarkIcon } from "./icons";
 
 const recoveryByType = ({
   type,
@@ -46,7 +47,7 @@ const sectionList = ({
             )
           : deviceListItem({
               device: {
-                label: "Recovery phrase",
+                label: "Phrase",
                 recovery: "phrase",
               },
               index: "recovery-phrase",
@@ -68,7 +69,7 @@ const sectionList = ({
             )
           : deviceListItem({
               device: {
-                label: "Recovery device",
+                label: "Device",
                 recovery: "device",
               },
               index: "recovery-device",
@@ -82,17 +83,6 @@ const sectionList = ({
               </button>`,
             })}
       </ul>
-      ${onAddRecovery === undefined
-        ? undefined
-        : html`<div class="c-action-list__actions">
-            <button
-              @click="${onAddRecovery}"
-              class="c-button c-button--primary"
-              id="addRecovery"
-            >
-              Add recovery method
-            </button>
-          </div>`}
     </div>
   `;
 };
@@ -115,7 +105,15 @@ export const recoveryMethodsSection = ({
             ? undefined
             : html`
                 <div class="t-title">
-                  <h2>Recovery methods</h2>
+                  <h2>
+                    Recovery
+                    methods${recoveries.length > 1
+                      ? html`<i
+                          class="c-icon c-icon--success c-icon--inline-after"
+                          >${checkmarkIcon}</i
+                        >`
+                      : null}
+                  </h2>
                 </div>
                 ${sectionList({ recoveries, onAddRecovery })}
               `
