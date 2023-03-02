@@ -153,6 +153,7 @@ export interface _SERVICE {
       Principal
     >,
   'http_request' : (arg_0: HttpRequest) => Promise<HttpResponse>,
+  'http_request_update' : (arg_0: HttpRequest) => Promise<HttpResponse>,
   'init_salt' : () => Promise<undefined>,
   'lookup' : (arg_0: UserNumber) => Promise<Array<DeviceData>>,
   'prepare_delegation' : (
