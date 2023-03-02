@@ -9,6 +9,11 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
+export interface AnchorCredentials {
+  'recovery_phrase' : Array<PublicKey>,
+  'credentials' : Array<WebauthnCredential>,
+  'recovery_credentials' : Array<WebauthnCredential>,
+}
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
@@ -131,6 +136,10 @@ export type VerifyTentativeDeviceResponse = {
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
+export interface WebauthnCredential {
+  'pubkey' : PublicKey,
+  'credentialId' : CredentialId,
+}
 export interface _SERVICE {
   'acknowledge_entries' : (arg_0: bigint) => Promise<undefined>,
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
@@ -142,6 +151,7 @@ export interface _SERVICE {
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'fetch_entries' : () => Promise<Array<BufferedArchiveEntry>>,
+  'get_anchor_credentials' : (arg_0: UserNumber) => Promise<AnchorCredentials>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,

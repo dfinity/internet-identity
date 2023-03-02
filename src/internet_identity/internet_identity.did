@@ -216,6 +216,17 @@ type IdentityAnchorInfo = record {
     device_registration: opt DeviceRegistrationInfo;
 };
 
+type AnchorCredentials = record {
+    credentials : vec WebauthnCredential;
+    recovery_credentials : vec WebauthnCredential;
+    recovery_phrase: vec PublicKey;
+};
+
+type WebauthnCredential = record {
+    credentialId : CredentialId;
+    pubkey: PublicKey;
+};
+
 type DeployArchiveResult = variant {
     // The archive was deployed successfully and the supplied wasm module has been installed. The principal of the archive
     // canister is returned.
@@ -245,8 +256,9 @@ service : (opt InternetIdentityInit) -> {
     remove : (UserNumber, DeviceKey) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
-    // Note: Will be changed in the future to be more consistent with get_anchor_info.
+    // Deprecated: Use 'get_anchor_credentials' instead.
     lookup : (UserNumber) -> (vec DeviceData) query;
+    get_anchor_credentials : (UserNumber) -> (AnchorCredentials) query;
     get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
     get_principal : (UserNumber, FrontendHostname) -> (principal) query;
     stats : () -> (InternetIdentityStats) query;
