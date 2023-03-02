@@ -133,13 +133,11 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     AnchorCredentials {
         credentials: auth_devices
             .into_iter()
-            .map(WebauthnCredential::try_from)
-            .flatten()
+            .flat_map(WebauthnCredential::try_from)
             .collect(),
         recovery_credentials: recovery_devices
             .into_iter()
-            .map(WebauthnCredential::try_from)
-            .flatten()
+            .flat_map(WebauthnCredential::try_from)
             .collect(),
         recovery_phrase,
     }
