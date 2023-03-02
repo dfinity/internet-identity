@@ -214,7 +214,7 @@ const protectDevice = async ({
   reload();
 };
 
-/* Protect the device and re-render the device settings (with the updated device) */
+/* Unprotect the device and re-render the device settings (with the updated device) */
 const unprotectDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
