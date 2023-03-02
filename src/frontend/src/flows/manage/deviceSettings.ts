@@ -35,8 +35,8 @@ export const deviceSettings = ({
   connection: AuthenticatedConnection;
   device: DeviceData;
   isOnlyDevice: boolean;
-  /* Reload the page after the new settings were applied */
-  reload: () => void;
+  /* Reload the page after the new settings were applied, potentially using another connection */
+  reload: (connection?: AuthenticatedConnection) => void;
 }): Setting[] => {
   const settings: Setting[] = [];
 
@@ -167,7 +167,7 @@ const resetPhrase = async ({
   userNumber: bigint;
   connection: AuthenticatedConnection;
   device: DeviceData & RecoveryPhrase;
-  reload: () => void;
+  reload: (connection?: AuthenticatedConnection) => void;
 }) => {
   const confirmed = confirm(
     "Reset your recovery phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one by confirming."
@@ -183,8 +183,21 @@ const resetPhrase = async ({
     IC_DERIVATION_PATH
   );
 
-  // If the phrase is protected, prompt for the phrase
-  const newConnection = isProtected(device)
+  // Figure out if we need a new connection
+  // NOTE: we create this _before_ replacing the phrase, just in case something
+  // goes wrong it goes wrong before we've replaced the phrase.
+  let nextConnection: AuthenticatedConnection | undefined;
+  const sameDevice = bufferEqual(
+    connection.identity.getPublicKey().toDer(),
+    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey
+  );
+  if (sameDevice) {
+    nextConnection = await connection.fromIdentity(userNumber, recoverIdentity);
+  }
+
+  // The connection used in the replace op
+  // (if the phrase is protected, this prompts for the phrase and builds a new connection)
+  const opConnection = isProtected(device)
     ? await deviceConnection(
         connection,
         userNumber,
@@ -192,8 +205,7 @@ const resetPhrase = async ({
         "Please input your recovery phrase to reset it."
       )
     : connection;
-
-  if (newConnection === null) {
+  if (opConnection === null) {
     // User aborted, just return
     reload();
     return;
@@ -206,7 +218,7 @@ const resetPhrase = async ({
   );
 
   try {
-    await withLoader(() => newConnection.replace(oldKey, device));
+    await withLoader(() => opConnection.replace(oldKey, device));
     await displaySeedPhrase(userNumber.toString(10) + " " + recoveryPhrase);
   } catch (e: unknown) {
     await displayError({
@@ -217,7 +229,7 @@ const resetPhrase = async ({
     });
   }
 
-  reload();
+  reload(nextConnection);
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */

@@ -52,6 +52,40 @@ test("Reset unprotected recovery phrase", async () => {
   });
 }, 300_000);
 
+test("Reset unprotected recovery phrase, when authenticated with phrase", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+    await mainView.waitForDisplay();
+    await mainView.logout();
+
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.recover();
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForDisplay();
+    await recoveryView.enterIdentityAnchor(userNumber);
+    await recoveryView.continue();
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(seedPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    // Ensure the settings dropdown is in view
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.reset(RECOVERY_PHRASE_NAME);
+    await browser.acceptAlert();
+    const _seedPhrase = await FLOWS.readSeedPhrase(browser);
+    await mainView.waitForDisplay();
+  });
+}, 300_000);
+
 test("Make recovery protected", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
