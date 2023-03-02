@@ -59,7 +59,7 @@ export const promptUserNumberPage = (
   render(promptUserNumberTemplate(props), contain);
 };
 
-export const promptUserNumber = async ({
+export const promptUserNumber = ({
   title,
   message,
   userNumber,

@@ -91,6 +91,7 @@ export interface HttpRequest {
 export interface HttpResponse {
   'body' : Array<number>,
   'headers' : Array<HeaderField>,
+  'upgrade' : [] | [boolean],
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }

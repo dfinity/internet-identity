@@ -16,7 +16,8 @@
         "varsIgnorePattern": "^_",
         "caughtErrorsIgnorePattern": "^_"
       }
-    ]
+    ],
+    "require-await": ["error"]
   },
   "ignorePatterns": [
     "src/**/*.test.ts",

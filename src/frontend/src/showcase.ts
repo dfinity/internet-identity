@@ -563,7 +563,7 @@ const pageContent = html`
   ${showcase} ${i18nExample()} ${components()} ${styleguide}
 `;
 
-const init = async () => {
+const init = () => {
   // We use the URL's path to route to the correct page.
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a

@@ -13,7 +13,7 @@ function isRegistrationAllowed() {
   );
 }
 
-export const registerIfAllowed = async (
+export const registerIfAllowed = (
   connection: Connection
 ): Promise<LoginFlowResult> => {
   return isRegistrationAllowed()

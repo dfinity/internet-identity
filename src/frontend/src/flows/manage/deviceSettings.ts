@@ -40,8 +40,16 @@ export const deviceSettings = ({
   if (shouldOfferToProtect(device)) {
     settings.push({
       label: "protect",
+      fn: () => protectDevice({ userNumber, connection, device, reload }),
+    });
+  }
+
+  // Whether the device can be unprotected or not
+  if (shouldOfferToUnprotect(device)) {
+    settings.push({
+      label: "unprotect",
       fn: () =>
-        protectDevice(userNumber, connection, device, isOnlyDevice, reload),
+        unprotectDevice(userNumber, connection, device, isOnlyDevice, reload),
     });
   }
 
@@ -49,8 +57,7 @@ export const deviceSettings = ({
   if (!isOnlyDevice) {
     settings.push({
       label: "remove",
-      fn: () =>
-        deleteDevice(userNumber, connection, device, isOnlyDevice, reload),
+      fn: () => deleteDevice({ userNumber, connection, device, reload }),
     });
   }
 
@@ -63,6 +70,12 @@ const shouldOfferToProtect = (
   device: DeviceData
 ): device is RecoveryDevice & DeviceData =>
   isRecoveryPhrase(device) && !isProtected(device);
+
+// We offer to unprotect protected recovery phrases only
+const shouldOfferToUnprotect = (
+  device: DeviceData
+): device is RecoveryDevice & DeviceData =>
+  isRecoveryPhrase(device) && isProtected(device);
 
 // Get a connection that's authenticated with the given device
 // NOTE: this expects a recovery phrase device
@@ -102,13 +115,17 @@ const deviceConnection = async (
 };
 
 /* Remove the device and return */
-const deleteDevice = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData,
-  isOnlyDevice: boolean,
-  back: () => void
-) => {
+const deleteDevice = async ({
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData;
+  reload: () => void;
+}) => {
   const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
     .buffer as DerEncodedPublicKey;
   const sameDevice = bufferEqual(
@@ -144,7 +161,7 @@ const deleteDevice = async (
   await withLoader(async () => {
     // if null then user canceled so we just redraw the manage page
     if (removalConnection == null) {
-      await back();
+      await reload();
       return;
     }
     await removalConnection.remove(device.pubkey);
@@ -152,23 +169,27 @@ const deleteDevice = async (
 
   if (sameDevice) {
     // clear anchor and reload the page.
-    // do not call "back", otherwise the management page will try to reload the list of devices which will cause an error
+    // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
     localStorage.clear();
     location.reload();
     return;
   } else {
-    back();
+    reload();
   }
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */
-const protectDevice = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  device: DeviceData & RecoveryDevice,
-  isOnlyDevice: boolean,
-  back: () => void
-) => {
+const protectDevice = async ({
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  device: DeviceData & RecoveryDevice;
+  reload: () => void;
+}) => {
   device.protection = { protected: null };
 
   // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
@@ -179,6 +200,36 @@ const protectDevice = async (
     userNumber,
     device,
     "Please input your recovery phrase to protect it."
+  );
+
+  await withLoader(async () => {
+    // if null then user canceled so we just redraw the manage page
+    if (newConnection == null) {
+      await reload();
+      return;
+    }
+
+    await newConnection.update(device);
+  });
+  reload();
+};
+
+/* Protect the device and re-render the device settings (with the updated device) */
+const unprotectDevice = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection,
+  device: DeviceData & RecoveryDevice,
+  isOnlyDevice: boolean,
+  back: () => void
+) => {
+  device.protection = { unprotected: null };
+
+  // NOTE: we do need to be authenticated with the device in order to unprotect it
+  const newConnection = await deviceConnection(
+    connection,
+    userNumber,
+    device,
+    "Please input your recovery phrase to unprotect it."
   );
 
   await withLoader(async () => {
