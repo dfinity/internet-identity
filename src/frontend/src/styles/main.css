@@ -556,11 +556,10 @@ a:hover,
 }
 
 .c-icon--success {
-  background: var(--rc-positive);
   border-radius: 50%;
   width: 0.9em;
   height: 0.9em;
-  box-shadow: 0 0 0 1px var(--rc-onPositive), 0 0 1rem var(--rc-positive);
+  box-shadow: 0 0 0 1px currentColor;
 }
 
 .c-icon--success svg {
@@ -568,7 +567,7 @@ a:hover,
 }
 
 .c-icon--success [fill] {
-  fill: var(--rc-onPositive);
+  fill: currentColor;
 }
 
 .c-icon--lock svg {
