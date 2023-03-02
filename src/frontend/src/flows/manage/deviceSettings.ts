@@ -21,7 +21,14 @@ import { IC_DERIVATION_PATH } from "../../utils/iiConnection";
 import { displaySeedPhrase } from "../recovery/displaySeedPhrase";
 
 // A particular device setting, e.g. remove, protect, etc
-export type Setting = { label: string; fn: () => void };
+export type Setting = { label: keyof typeof settingName; fn: () => void };
+
+export const settingName = {
+  protect: "Lock", // For users, protected devices are "lock"ed
+  unprotect: "Unlock",
+  remove: "Remove",
+  reset: "Reset",
+} as const;
 
 // Generate possible settings based on the device
 export const deviceSettings = ({
@@ -253,7 +260,7 @@ const protectDevice = async ({
     connection,
     userNumber,
     device,
-    "Please input your recovery phrase to protect it."
+    "Please input your recovery phrase to lock it."
   );
 
   await withLoader(async () => {
@@ -283,7 +290,7 @@ const unprotectDevice = async (
     connection,
     userNumber,
     device,
-    "Please input your recovery phrase to unprotect it."
+    "Please input your recovery phrase to unlock it."
   );
 
   await withLoader(async () => {
