@@ -39,7 +39,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     .to_string(),
             )],
             body: Cow::Owned(ByteBuf::new()),
-            upgrade: None,
+            upgrade: Some(true),
             streaming_strategy: None,
         },
         "/metrics" => {
