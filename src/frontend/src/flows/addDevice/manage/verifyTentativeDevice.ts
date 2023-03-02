@@ -49,7 +49,7 @@ const verifyTentativeDeviceTemplate = ({
   // use the provided verification function to decide whether to retry or contine by forwarding
   // the result.
   const submit = () => {
-    withRef(pinInput, async (pin) => {
+    void withRef(pinInput, async (pin) => {
       const value = pin.value;
       if (value === "") {
         badInput.send("bad");

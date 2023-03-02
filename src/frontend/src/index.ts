@@ -19,7 +19,7 @@ const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
   if (setupJs === null || setupJs.dataset.canisterId === undefined) {
-    displayError({
+    void displayError({
       title: "Canister ID not set",
       message:
         "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
@@ -100,15 +100,15 @@ const init = async () => {
   switch (userIntent.kind) {
     // Authenticate to a third party service
     case "auth": {
-      await authFlowAuthorize(connection);
+      void authFlowAuthorize(connection);
       break;
     }
     // Open the management page
     case "manage": {
-      await authFlowManage(connection);
+      void authFlowManage(connection);
       break;
     }
   }
 };
 
-init();
+void init();

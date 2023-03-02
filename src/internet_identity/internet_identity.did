@@ -23,6 +23,7 @@ type HttpResponse = record {
     status_code: nat16;
     headers: vec HeaderField;
     body: blob;
+    upgrade : opt bool;
     streaming_strategy: opt StreamingStrategy;
 };
 
@@ -259,6 +260,7 @@ service : (opt InternetIdentityInit) -> {
     get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
     http_request: (request: HttpRequest) -> (HttpResponse) query;
+    http_request_update: (request: HttpRequest) -> (HttpResponse);
 
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
     /// Returns a batch of entries _sorted by sequence number_ to be archived.

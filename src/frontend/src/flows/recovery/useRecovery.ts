@@ -53,5 +53,5 @@ const runRecovery = async (
     return window.location.reload();
   }
 
-  renderManage(res.userNumber, res.connection);
+  void renderManage(res.userNumber, res.connection);
 };

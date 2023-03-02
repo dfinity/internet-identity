@@ -82,7 +82,7 @@ export const authFlowManage = async (connection: Connection) => {
   // one. The exact flow depends on the device they use.
   await recoveryWizard(userNumber, authenticatedConnection);
   // From here on, the user is authenticated to II.
-  renderManage(userNumber, authenticatedConnection);
+  void renderManage(userNumber, authenticatedConnection);
 };
 
 const displayFailedToListDevices = (error: Error) =>
@@ -241,7 +241,7 @@ export const displayManage = (
     },
     onAddRecovery: async () => {
       await addNewRecovery(userNumber, connection);
-      renderManage(userNumber, connection);
+      void renderManage(userNumber, connection);
     },
   });
 
@@ -256,7 +256,7 @@ export const displayManage = (
         @click=${async () => {
           await setupPhrase(userNumber, connection);
           elem.remove();
-          renderManage(userNumber, connection);
+          void renderManage(userNumber, connection);
         }}
       >
         Create

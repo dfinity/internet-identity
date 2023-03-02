@@ -8,7 +8,7 @@ use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::HashTree;
 use ic_metrics_encoder::MetricsEncoder;
-use internet_identity_interface::{HeaderField, HttpRequest, HttpResponse};
+use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
 use serde_bytes::{ByteBuf, Bytes};
 use std::borrow::Cow;
@@ -39,6 +39,10 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     .to_string(),
             )],
             body: Cow::Owned(ByteBuf::new()),
+            // Redirects are not allowed as query because certification V1 does not cover headers.
+            // Upgrading to update fixes this. This flag can be removed when switching to
+            // certification V2.
+            upgrade: Some(true),
             streaming_strategy: None,
         },
         "/metrics" => {
@@ -58,6 +62,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                         status_code: 200,
                         headers,
                         body: Cow::Owned(ByteBuf::from(body)),
+                        upgrade: None,
                         streaming_strategy: None,
                     }
                 }
@@ -65,6 +70,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     status_code: 500,
                     headers: security_headers(),
                     body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
+                    upgrade: None,
                     streaming_strategy: None,
                 },
             }
@@ -82,6 +88,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                         status_code: 200,
                         headers,
                         body: Cow::Borrowed(Bytes::new(value)),
+                        upgrade: None,
                         streaming_strategy: None,
                     }
                 }
@@ -91,6 +98,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     body: Cow::Owned(ByteBuf::from(format!(
                         "Asset {probably_an_asset} not found."
                     ))),
+                    upgrade: None,
                     streaming_strategy: None,
                 },
             })
