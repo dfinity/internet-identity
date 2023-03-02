@@ -197,7 +197,7 @@ const iiPages: Record<string, () => void> = {
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
-  constructing: () => renderConstructing(),
+  constructing: () => renderConstructing({}),
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
@@ -359,7 +359,7 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  loader: () => withLoader(() => new Promise(() => renderConstructing())),
+  loader: () => withLoader(() => new Promise(() => renderConstructing({}))),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();

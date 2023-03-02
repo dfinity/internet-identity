@@ -25,7 +25,7 @@ export const register = async ({
 
     const [captcha, identity] = await Promise.all([
       connection.createChallenge(),
-      constructIdentity(),
+      constructIdentity({}),
     ]);
 
     const captchaResult = await promptCaptcha({
