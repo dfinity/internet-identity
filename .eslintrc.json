@@ -17,7 +17,8 @@
         "caughtErrorsIgnorePattern": "^_"
       }
     ],
-    "require-await": ["error"]
+    "require-await": ["error"],
+    "@typescript-eslint/no-floating-promises": ["error"]
   },
   "ignorePatterns": [
     "src/**/*.test.ts",

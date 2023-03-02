@@ -151,7 +151,7 @@ const init = (
           break;
         case "err":
           await displayError({ ...result, primaryButton: "Try again" });
-          phraseRecoveryPage(
+          void phraseRecoveryPage(
             userNumber,
             connection,
             device,

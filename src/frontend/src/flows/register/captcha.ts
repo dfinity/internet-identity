@@ -78,7 +78,7 @@ export const promptCaptchaTemplate = <T>({
   // or go to "bad" state
   const doVerify = (challenge: Challenge) => {
     update({ status: "verifying" });
-    withRef(input, async (input) => {
+    void withRef(input, async (input) => {
       const res = await verifyChallengeChars({
         chars: input.value,
         challenge,
@@ -141,7 +141,7 @@ export const promptCaptchaTemplate = <T>({
   };
 
   // Kickstart everything
-  doRetry();
+  void doRetry();
 
   const promptCaptchaSlot = html`
     <article>

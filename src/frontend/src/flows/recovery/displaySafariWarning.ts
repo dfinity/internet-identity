@@ -61,8 +61,9 @@ const init = (
     const displayWarningAddRecovery = document.getElementById(
       "displayWarningAddRecovery"
     ) as HTMLButtonElement;
-    displayWarningAddRecovery.onclick = () => {
-      setupRecovery(userNumber, connection).then(() => resolve());
+    displayWarningAddRecovery.onclick = async () => {
+      await setupRecovery(userNumber, connection);
+      resolve();
     };
     const displayWarningRemindLater = document.getElementById(
       "displayWarningRemindLater"
