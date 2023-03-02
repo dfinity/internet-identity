@@ -9,6 +9,11 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
+export interface AnchorCredentials {
+  'recovery_phrase' : boolean,
+  'credentials' : Array<WebauthnCredential>,
+  'recovery_credentials' : Array<WebauthnCredential>,
+}
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
@@ -40,10 +45,6 @@ export interface Delegation {
 export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'success' : Principal } |
   { 'failed' : string };
-export interface DeviceCredential {
-  'pubkey' : PublicKey,
-  'credentialId' : CredentialId,
-}
 export interface DeviceData {
   'alias' : string,
   'origin' : [] | [string],
@@ -73,11 +74,6 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
-export interface GetDeviceCredentialsResponse {
-  'recovery_phrase' : boolean,
-  'credentials' : Array<DeviceCredential>,
-  'recovery_credentials' : Array<DeviceCredential>,
-}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -140,6 +136,10 @@ export type VerifyTentativeDeviceResponse = {
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
+export interface WebauthnCredential {
+  'pubkey' : PublicKey,
+  'credentialId' : CredentialId,
+}
 export interface _SERVICE {
   'acknowledge_entries' : (arg_0: bigint) => Promise<undefined>,
   'add' : (arg_0: UserNumber, arg_1: DeviceData) => Promise<undefined>,
@@ -151,6 +151,7 @@ export interface _SERVICE {
   'enter_device_registration_mode' : (arg_0: UserNumber) => Promise<Timestamp>,
   'exit_device_registration_mode' : (arg_0: UserNumber) => Promise<undefined>,
   'fetch_entries' : () => Promise<Array<BufferedArchiveEntry>>,
+  'get_anchor_credentials' : (arg_0: UserNumber) => Promise<AnchorCredentials>,
   'get_anchor_info' : (arg_0: UserNumber) => Promise<IdentityAnchorInfo>,
   'get_delegation' : (
       arg_0: UserNumber,
@@ -158,9 +159,6 @@ export interface _SERVICE {
       arg_2: SessionKey,
       arg_3: Timestamp,
     ) => Promise<GetDelegationResponse>,
-  'get_device_credentials' : (arg_0: UserNumber) => Promise<
-      GetDeviceCredentialsResponse
-    >,
   'get_principal' : (arg_0: UserNumber, arg_1: FrontendHostname) => Promise<
       Principal
     >,
