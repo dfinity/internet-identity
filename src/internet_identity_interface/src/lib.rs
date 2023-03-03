@@ -196,6 +196,18 @@ pub struct WebauthnCredential {
     pub credential_id: CredentialId,
 }
 
+impl TryFrom<DeviceData> for WebauthnCredential {
+    type Error = ();
+
+    fn try_from(device: DeviceData) -> Result<Self, Self::Error> {
+        let credential_id = device.credential_id.ok_or(())?;
+        Ok(Self {
+            pubkey: device.pubkey,
+            credential_id,
+        })
+    }
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct AnchorCredentials {
     pub credentials: Vec<WebauthnCredential>,
