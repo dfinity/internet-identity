@@ -6,7 +6,6 @@ import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { promptDeviceAlias } from "../../../components/alias";
 import { withLoader } from "../../../components/loader";
-import { renderManage } from "../../manage";
 import { displayError } from "../../../components/displayError";
 import { setAnchorUsed } from "../../../utils/userNumber";
 
@@ -41,12 +40,12 @@ export const addLocalDevice = async (
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
     );
-    return renderManage(userNumber, connection);
+    return;
   }
   const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });
   if (deviceName === null) {
-    // user clicked "cancel", so we go back to "manage"
-    return await renderManage(userNumber, connection);
+    // user clicked "cancel", so we return
+    return;
   }
   try {
     await withLoader(() =>
@@ -66,7 +65,6 @@ export const addLocalDevice = async (
   }
 
   setAnchorUsed(userNumber);
-  await renderManage(userNumber, connection);
 };
 
 const unknownError = (): Error => {
