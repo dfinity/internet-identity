@@ -163,22 +163,35 @@ const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
   userNumber: bigint,
-  connection: AuthenticatedConnection
-): Promise<void> => {
-  let anchorInfo: IdentityAnchorInfo;
-  try {
-    anchorInfo = await withLoader(() => connection.getAnchorInfo());
-  } catch (error: unknown) {
-    await displayFailedToListDevices(
-      error instanceof Error ? error : unknownError()
+  origConnection: AuthenticatedConnection
+): Promise<never> => {
+  let connection = origConnection;
+
+  // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
+  // loop forever
+  for (;;) {
+    let anchorInfo: IdentityAnchorInfo;
+    try {
+      anchorInfo = await withLoader(() => connection.getAnchorInfo());
+    } catch (error: unknown) {
+      await displayFailedToListDevices(
+        error instanceof Error ? error : unknownError()
+      );
+      continue;
+    }
+    if (anchorInfo.device_registration.length !== 0) {
+      // we are actually in a device registration process
+      await pollForTentativeDevice(userNumber, connection);
+      continue;
+    }
+
+    // If some flow e.g. replaced the current device, use the new connection
+    const newConnection = await displayManage(
+      userNumber,
+      connection,
+      anchorInfo.devices
     );
-    return renderManage(userNumber, connection);
-  }
-  if (anchorInfo.device_registration.length !== 0) {
-    // we are actually in a device registration process
-    await pollForTentativeDevice(userNumber, connection);
-  } else {
-    displayManage(userNumber, connection, anchorInfo.devices);
+    connection = newConnection ?? connection;
   }
 };
 
@@ -195,76 +208,83 @@ export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
-): void => {
-  const hasSingleDevice = devices.length <= 1;
+): Promise<void | AuthenticatedConnection> =>
+  new Promise((resolve) => {
+    const hasSingleDevice = devices.length <= 1;
 
-  const _devices: Device[] = devices.map((device) => {
-    return {
-      settings: deviceSettings({
-        userNumber,
-        connection,
-        device,
-        isOnlyDevice: hasSingleDevice,
-        reload: (newConnection?: AuthenticatedConnection) =>
-          renderManage(userNumber, newConnection ?? connection),
-      }),
-      label: isRecoveryDevice(device)
-        ? recoveryDeviceToLabel(device)
-        : device.alias,
-      isRecovery: isRecoveryDevice(device),
-      isProtected: isProtected(device),
-      warn: domainWarning(device),
-    };
+    const _devices: Device[] = devices.map((device) => {
+      return {
+        settings: deviceSettings({
+          userNumber,
+          connection,
+          device,
+          isOnlyDevice: hasSingleDevice,
+          reload: (newConnection?: AuthenticatedConnection) =>
+            resolve(newConnection),
+        }),
+        label: isRecoveryDevice(device)
+          ? recoveryDeviceToLabel(device)
+          : device.alias,
+        isRecovery: isRecoveryDevice(device),
+        isProtected: isProtected(device),
+        warn: domainWarning(device),
+      };
+    });
+
+    displayManagePage({
+      userNumber,
+      authenticators: _devices.filter((device) => !device.isRecovery),
+      recoveries: _devices.filter((device) => device.isRecovery),
+      onAddDevice: async () => {
+        const nextAction = await chooseDeviceAddFlow();
+        switch (nextAction) {
+          case "canceled": {
+            resolve();
+            break;
+          }
+          case "local": {
+            await addLocalDevice(userNumber, connection, devices);
+            resolve();
+            break;
+          }
+          case "remote": {
+            await pollForTentativeDevice(userNumber, connection);
+            resolve();
+            break;
+          }
+          default:
+            unreachable(nextAction);
+            resolve();
+            break;
+        }
+      },
+      onAddRecovery: async () => {
+        await addNewRecovery(userNumber, connection);
+        resolve();
+      },
+    });
+
+    // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
+    // if they don't have one already. We lead them straight to recovery phrase creation, because
+    // recovery _device_ would be tied to the domain (which we want to avoid).
+    if (
+      window.location.origin === LEGACY_II_URL &&
+      !hasRecoveryPhrase(devices)
+    ) {
+      const elem = showWarning(html`<strong class="t-strong">Important!</strong>
+        Create a recovery phrase.
+        <button
+          class="features-warning-btn"
+          @click=${async () => {
+            await setupPhrase(userNumber, connection);
+            elem.remove();
+            resolve();
+          }}
+        >
+          Create
+        </button> `);
+    }
   });
-
-  displayManagePage({
-    userNumber,
-    authenticators: _devices.filter((device) => !device.isRecovery),
-    recoveries: _devices.filter((device) => device.isRecovery),
-    onAddDevice: async () => {
-      const nextAction = await chooseDeviceAddFlow();
-      switch (nextAction) {
-        case "canceled": {
-          await renderManage(userNumber, connection);
-          break;
-        }
-        case "local": {
-          await addLocalDevice(userNumber, connection, devices);
-          return;
-        }
-        case "remote": {
-          await pollForTentativeDevice(userNumber, connection);
-          return;
-        }
-        default:
-          unreachable(nextAction);
-          break;
-      }
-    },
-    onAddRecovery: async () => {
-      await addNewRecovery(userNumber, connection);
-      void renderManage(userNumber, connection);
-    },
-  });
-
-  // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
-  // if they don't have one already. We lead them straight to recovery phrase creation, because
-  // recovery _device_ would be tied to the domain (which we want to avoid).
-  if (window.location.origin === LEGACY_II_URL && !hasRecoveryPhrase(devices)) {
-    const elem = showWarning(html`<strong class="t-strong">Important!</strong>
-      Create a recovery phrase.
-      <button
-        class="features-warning-btn"
-        @click=${async () => {
-          await setupPhrase(userNumber, connection);
-          elem.remove();
-          void renderManage(userNumber, connection);
-        }}
-      >
-        Create
-      </button> `);
-  }
-};
 
 // Show a domain-related warning, if necessary.
 export const domainWarning = (

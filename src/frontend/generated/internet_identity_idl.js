@@ -62,14 +62,14 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
-  const WebauthnCredential = IDL.Record({
+  const WebAuthnCredential = IDL.Record({
     'pubkey' : PublicKey,
     'credentialId' : CredentialId,
   });
   const AnchorCredentials = IDL.Record({
     'recovery_phrase' : IDL.Vec(PublicKey),
-    'credentials' : IDL.Vec(WebauthnCredential),
-    'recovery_credentials' : IDL.Vec(WebauthnCredential),
+    'credentials' : IDL.Vec(WebAuthnCredential),
+    'recovery_credentials' : IDL.Vec(WebAuthnCredential),
   });
   const DeviceWithUsage = IDL.Record({
     'alias' : IDL.Text,

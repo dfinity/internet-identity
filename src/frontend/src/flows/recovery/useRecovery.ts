@@ -1,6 +1,6 @@
 import { displayError } from "../../components/displayError";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
-import { renderManage } from "../manage";
+import { LoginFlowResult } from "../../utils/flowResult";
 import { promptUserNumber } from "../../components/promptUserNumber";
 import { promptDeviceAlias } from "../../components/alias";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
@@ -14,7 +14,7 @@ import { constructIdentity } from "../register/construct";
 export const useRecovery = async (
   connection: Connection,
   userNumber?: bigint
-): Promise<void> => {
+): Promise<LoginFlowResult> => {
   if (userNumber !== undefined) {
     return runRecovery(userNumber, connection);
   } else {
@@ -24,7 +24,7 @@ export const useRecovery = async (
     if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
     } else {
-      return window.location.reload();
+      return window.location.reload() as never;
     }
   }
 };
@@ -32,7 +32,7 @@ export const useRecovery = async (
 const runRecovery = async (
   userNumber: bigint,
   connection: Connection
-): Promise<void> => {
+): Promise<LoginFlowResult> => {
   const recoveryDevices = await connection.lookupRecovery(userNumber);
   if (recoveryDevices.length === 0) {
     await displayError({
@@ -40,7 +40,7 @@ const runRecovery = async (
       message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
-    return window.location.reload();
+    return window.location.reload() as never;
   }
 
   const device =
@@ -54,7 +54,7 @@ const runRecovery = async (
 
   // If res is null, the user canceled the flow, so we go back to the main page.
   if (res.tag === "canceled") {
-    return window.location.reload();
+    return window.location.reload() as never;
   }
 
   const deviceAlias = await promptDeviceAlias({
@@ -71,7 +71,7 @@ const runRecovery = async (
     });
   }
 
-  void renderManage(res.userNumber, res.connection);
+  return res;
 };
 
 // Offer to enroll a new device
