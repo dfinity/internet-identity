@@ -9,6 +9,7 @@ import {
   closeIcon,
 } from "./components/icons";
 import { warnBox } from "./components/warnBox";
+import { irregularity } from "./components/irregularity";
 
 export const styleguide = html`
   <style>
@@ -400,20 +401,39 @@ export const styleguide = html`
           They can be used to show errors, warnings, or success messages.
         </p>
         <section class="demo" aria-label="Irregularity Elements Demo">
-          <div class="c-irregularity">
-            <div class="c-irregularity__icon">${warningIcon}</div>
-            <p class="c-irregularity__message">
-              This is an error message. It can be used to inform the user about
-              something that went wrong.
-            </p>
-          </div>
-          <div class="c-irregularity c-irregularity--closable">
-            <div class="c-irregularity__icon">${warningIcon}</div>
-            <p class="c-irregularity__message">
-              This is an error message. It can be used to inform the user about
-              something that went wrong.
-            </p>
-            <button class="c-irregularity__close">${closeIcon}</button>
+          ${irregularity({
+            message:
+              "This is an error message. It can be used to inform the user about something that went wrong.",
+            type: "error",
+          })}
+          ${irregularity({
+            message:
+              "This is an error message. It can be used to inform the user about something that went wrong.",
+            type: "error",
+            isClosable: true,
+          })}
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title">Toast</h2>
+        <p class="t-lead">
+          Toasts are messages of varying length and importance that appear at
+          the bottom or the top of the screen. They typically use the
+          Irregularity component.
+        </p>
+        <section class="demo" aria-label="Toast Elements Demo">
+          <button class="c-button c-button--primary">Show Toast</button>
+          <div class="c-toasts">
+            <div class="l-container">
+              <div class="c-toast">
+                ${irregularity({
+                  message:
+                    "This is an error message. It can be used to inform the user about something that went wrong.",
+                  type: "error",
+                })}
+              </div>
+            </div>
           </div>
         </section>
       </aside>
