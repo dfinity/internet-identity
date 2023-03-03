@@ -130,7 +130,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
             if device.key_type == KeyType::SeedPhrase {
                 credentials.recovery_phrases.push(device.pubkey);
             } else if let Some(credential_id) = device.credential_id {
-                let credential = WebauthnCredential {
+                let credential = WebAuthnCredential {
                     pubkey: device.pubkey,
                     credential_id,
                 };
