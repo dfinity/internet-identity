@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { renderManage } from "../../manage";
 import { withLoader } from "../../../components/loader";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
 import { setupCountdown } from "../../../utils/countdown";
@@ -65,25 +64,25 @@ export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
-  await withLoader(async () => {
-    const [timestamp, userInfo] = await Promise.all([
+  const [timestamp, tentativeDevice] = await withLoader(async () =>
+    Promise.all([
       connection.enterDeviceRegistrationMode(),
-      connection.getAnchorInfo(),
-    ]);
-    const tentativeDevice = getTentativeDevice(userInfo);
-    if (tentativeDevice) {
-      // directly show the verification screen if the tentative device already exists
-      await verifyTentativeDevice({
-        connection,
-        alias: tentativeDevice.alias,
-        endTimestamp: timestamp,
-      });
-      await renderManage(userNumber, connection);
-    } else {
-      renderPollForTentativeDevicePage(userNumber);
-      init(userNumber, connection, timestamp);
-    }
-  });
+      getTentativeDevice(await connection.getAnchorInfo()),
+    ])
+  );
+
+  if (tentativeDevice) {
+    // directly show the verification screen if the tentative device already exists
+    await verifyTentativeDevice({
+      connection,
+      alias: tentativeDevice.alias,
+      endTimestamp: timestamp,
+    });
+    return;
+  } else {
+    renderPollForTentativeDevicePage(userNumber);
+    await init(userNumber, connection, timestamp);
+  }
 };
 
 export const renderPollForTentativeDevicePage = (userNumber: bigint): void => {
@@ -112,44 +111,45 @@ const init = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: bigint
-) => {
-  const countdown = setupCountdown(
-    endTimestamp,
-    document.getElementById("timer") as HTMLElement,
-    async () => {
-      await displayError({
-        title: "Timeout Reached",
-        message:
-          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-        primaryButton: "Ok",
-      });
-      await renderManage(userNumber, connection);
-    }
-  );
-
-  void poll(userNumber, connection, () => countdown.hasStopped()).then(
-    async (device) => {
-      if (!countdown.hasStopped() && device) {
-        countdown.stop();
-        await verifyTentativeDevice({
-          connection,
-          alias: device.alias,
-          endTimestamp,
+): Promise<void> =>
+  new Promise((resolve) => {
+    const countdown = setupCountdown(
+      endTimestamp,
+      document.getElementById("timer") as HTMLElement,
+      async () => {
+        await displayError({
+          title: "Timeout Reached",
+          message:
+            'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+          primaryButton: "Ok",
         });
-        await renderManage(userNumber, connection);
+        resolve();
       }
-    }
-  );
+    );
 
-  const cancelButton = document.getElementById(
-    "cancelAddRemoteDevice"
-  ) as HTMLButtonElement;
-  cancelButton.onclick = async () => {
-    countdown.stop();
-    await withLoader(() => connection.exitDeviceRegistrationMode());
-    await renderManage(userNumber, connection);
-  };
-};
+    void poll(userNumber, connection, () => countdown.hasStopped()).then(
+      async (device) => {
+        if (!countdown.hasStopped() && device) {
+          countdown.stop();
+          await verifyTentativeDevice({
+            connection,
+            alias: device.alias,
+            endTimestamp,
+          });
+          resolve();
+        }
+      }
+    );
+
+    const cancelButton = document.getElementById(
+      "cancelAddRemoteDevice"
+    ) as HTMLButtonElement;
+    cancelButton.onclick = async () => {
+      countdown.stop();
+      await withLoader(() => connection.exitDeviceRegistrationMode());
+      resolve();
+    };
+  });
 
 const getTentativeDevice = (
   userInfo: IdentityAnchorInfo
