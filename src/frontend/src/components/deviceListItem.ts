@@ -1,5 +1,5 @@
 import { TemplateResult, html } from "lit-html";
-import { Setting } from "../flows/manage/deviceSettings";
+import { Setting, settingName } from "../flows/manage/deviceSettings";
 import { warningIcon, dropdownIcon, lockIcon } from "./icons";
 
 // A simple representation of "device"s used on the manage page.
@@ -41,7 +41,7 @@ export const deviceListItem = ({
               class="c-tooltip c-tooltip--left c-icon c-icon--lock"
               tabindex="0"
               >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
-                >Your device is protected</span
+                >Your device is locked</span
               ></span
             >
           </div>`
@@ -78,7 +78,7 @@ export const deviceListItem = ({
                     data-action=${setting.label}
                     @click=${() => setting.fn()}
                   >
-                    ${setting.label}
+                    ${settingName[setting.label]}
                   </button>
                 </li>`;
               })}

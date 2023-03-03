@@ -425,7 +425,7 @@ mod registration_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Only recovery phrases can be protected but key type is Unknown").unwrap(),
+            Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
         );
         Ok(())
     }
@@ -1556,7 +1556,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                Regex::new("Device is locked. Must be authenticated with this device to mutate")
                     .unwrap(),
             );
         }
@@ -1582,9 +1582,102 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Only recovery phrases can be protected but key type is Unknown")
-                    .unwrap(),
+                Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
             );
+        }
+    }
+
+    #[cfg(test)]
+    mod get_anchor_credentials {
+        use super::*;
+
+        /// Verifies that get_anchor_credentials returns the expected credentials.
+        #[test]
+        fn should_get_credentials() -> Result<(), CallError> {
+            let env = env();
+            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let user_number = flows::register_anchor(&env, canister_id);
+
+            let recovery_webauthn_device = DeviceData {
+                pubkey: ByteBuf::from("recovery device"),
+                alias: "Recovery Device".to_string(),
+                credential_id: Some(ByteBuf::from("recovery credential id")),
+                purpose: Purpose::Recovery,
+                key_type: KeyType::CrossPlatform,
+                protection: DeviceProtection::Unprotected,
+                origin: None,
+            };
+
+            api::add(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                device_data_2(),
+            )?;
+            api::add(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                recovery_device_data_1(),
+            )?;
+            api::add(
+                &env,
+                canister_id,
+                principal_1(),
+                user_number,
+                recovery_webauthn_device.clone(),
+            )?;
+
+            let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
+
+            assert_eq!(response.credentials.len(), 2);
+            assert!(response.credentials.contains(&WebauthnCredential {
+                pubkey: device_data_1().pubkey,
+                credential_id: device_data_1().credential_id.unwrap()
+            }));
+            assert!(response.credentials.contains(&WebauthnCredential {
+                pubkey: device_data_2().pubkey,
+                credential_id: device_data_2().credential_id.unwrap()
+            }));
+
+            assert_eq!(
+                response.recovery_credentials,
+                vec![WebauthnCredential {
+                    pubkey: recovery_webauthn_device.pubkey.clone(),
+                    credential_id: recovery_webauthn_device.credential_id.unwrap()
+                }]
+            );
+
+            assert_eq!(
+                response.recovery_phrases,
+                vec![recovery_device_data_1().pubkey]
+            );
+
+            Ok(())
+        }
+
+        /// Verifies that get_anchor_credentials returns the expected credentials (i.e. no recovery credentials if there are none).
+        #[test]
+        fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallError> {
+            let env = env();
+            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let user_number = flows::register_anchor(&env, canister_id);
+
+            let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
+
+            assert_eq!(
+                response.credentials,
+                vec![WebauthnCredential {
+                    pubkey: device_data_1().pubkey,
+                    credential_id: device_data_1().credential_id.unwrap()
+                }]
+            );
+            assert_eq!(response.recovery_credentials, vec![]);
+            assert_eq!(response.recovery_phrases, Vec::<PublicKey>::new());
+
+            Ok(())
         }
     }
 
@@ -1743,7 +1836,7 @@ mod device_management_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Device is protected. Must be authenticated with this device to mutate")
+            Regex::new("Device is locked. Must be authenticated with this device to mutate")
                 .unwrap(),
         );
     }

@@ -204,7 +204,8 @@ export const displayManage = (
         connection,
         device,
         isOnlyDevice: hasSingleDevice,
-        reload: () => renderManage(userNumber, connection),
+        reload: (newConnection?: AuthenticatedConnection) =>
+          renderManage(userNumber, newConnection ?? connection),
       }),
       label: isRecoveryDevice(device)
         ? recoveryDeviceToLabel(device)
