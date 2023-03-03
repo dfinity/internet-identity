@@ -1,7 +1,13 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
+import {
+  icLogo,
+  settingsIcon,
+  dropdownIcon,
+  warningIcon,
+  closeIcon,
+} from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
 export const styleguide = html`
@@ -386,7 +392,6 @@ export const styleguide = html`
         <p class="t-lead"></p>
       </aside>
 
-
       <aside class="l-stack demo-section">
         <h2 class="t-title">Irregularities</h2>
         <p class="t-lead">
@@ -395,16 +400,21 @@ export const styleguide = html`
           They can be used to show errors, warnings, or success messages.
         </p>
         <section class="demo" aria-label="Irregularity Elements Demo">
-          <aside class="c-irregularity">
-            <div class="c-irregularity__icon">${settingsIcon}</div>
-            <div class="c-irregularity__content">
-              <h3 class="c-irregularity__title">Error</h3>
-              <p class="c-irregularity__message">
-                This is an error message. It can be used to inform the user about
-                something that went wrong.
-              </p>
-            </div>
-          </aside>
+          <div class="c-irregularity">
+            <div class="c-irregularity__icon">${warningIcon}</div>
+            <p class="c-irregularity__message">
+              This is an error message. It can be used to inform the user about
+              something that went wrong.
+            </p>
+          </div>
+          <div class="c-irregularity c-irregularity--closable">
+            <div class="c-irregularity__icon">${warningIcon}</div>
+            <p class="c-irregularity__message">
+              This is an error message. It can be used to inform the user about
+              something that went wrong.
+            </p>
+            <button class="c-irregularity__close">${closeIcon}</button>
+          </div>
         </section>
       </aside>
 
