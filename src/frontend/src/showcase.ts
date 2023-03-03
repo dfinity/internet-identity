@@ -197,7 +197,7 @@ const iiPages: Record<string, () => void> = {
     phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
-  constructing: () => renderConstructing(),
+  constructing: () => renderConstructing({}),
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
@@ -252,7 +252,7 @@ const iiPages: Record<string, () => void> = {
           isProtected: false,
           settings: [
             {
-              label: "Remove",
+              label: "remove",
               fn: () => Promise.resolve(),
             },
           ],
@@ -263,7 +263,7 @@ const iiPages: Record<string, () => void> = {
           isProtected: false,
           settings: [
             {
-              label: "Remove",
+              label: "remove",
               fn: () => Promise.resolve(),
             },
           ],
@@ -275,7 +275,7 @@ const iiPages: Record<string, () => void> = {
           warn: html`Something is rotten in the state of Device`,
           settings: [
             {
-              label: "Remove",
+              label: "remove",
               fn: () => Promise.resolve(),
             },
           ],
@@ -288,11 +288,11 @@ const iiPages: Record<string, () => void> = {
           isProtected: true,
           settings: [
             {
-              label: "Remove",
+              label: "remove",
               fn: () => Promise.resolve(),
             },
             {
-              label: "Protect",
+              label: "protect",
               fn: () => Promise.resolve(),
             },
           ],
@@ -359,7 +359,7 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  loader: () => withLoader(() => new Promise(() => renderConstructing())),
+  loader: () => withLoader(() => new Promise(() => renderConstructing({}))),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();

@@ -588,6 +588,10 @@ export class RecoverView extends View {
     await this.browser.$("#inputSeedPhraseContinue").click();
   }
 
+  async skipDeviceEnrollment(): Promise<void> {
+    await this.browser.$("#pickAliasCancel").click();
+  }
+
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
     await this.browser.$("h3=Invalid Seed Phrase").waitForDisplayed();
   }

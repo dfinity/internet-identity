@@ -1,11 +1,15 @@
 import { displayError } from "../../components/displayError";
-import { Connection } from "../../utils/iiConnection";
+import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { renderManage } from "../manage";
 import { promptUserNumber } from "../../components/promptUserNumber";
+import { promptDeviceAlias } from "../../components/alias";
 import { phraseRecoveryPage } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { isRecoveryPhrase } from "../../utils/recoveryDevice";
+import { setAnchorUsed } from "../../utils/userNumber";
+import { unknownToString } from "../../utils/utils";
+import { constructIdentity } from "../register/construct";
 
 export const useRecovery = async (
   connection: Connection,
@@ -53,5 +57,75 @@ const runRecovery = async (
     return window.location.reload();
   }
 
+  const deviceAlias = await promptDeviceAlias({
+    title: "Remember this Device",
+    message: "Recovery successful. What device are you using?",
+    cancelText: "Skip",
+  });
+  if (deviceAlias !== null) {
+    // Offer to enroll a new authenticator
+    await enrollAuthenticator({
+      connection: res.connection,
+      userNumber: res.userNumber,
+      deviceAlias,
+    });
+  }
+
   void renderManage(res.userNumber, res.connection);
+};
+
+// Offer to enroll a new device
+const enrollAuthenticator = async ({
+  connection,
+  userNumber,
+  deviceAlias,
+}: {
+  connection: AuthenticatedConnection;
+  userNumber: bigint;
+  deviceAlias: string;
+}): Promise<void> => {
+  let newDevice;
+  try {
+    newDevice = await constructIdentity({
+      devices: async () => {
+        return (await connection.getAnchorInfo()).devices;
+      },
+      message: "Enrolling device...",
+    });
+  } catch (error: unknown) {
+    await displayError({
+      title: "Could not enroll device",
+      message:
+        "Could not create credentials: " +
+        unknownToString(error, "unknown error"),
+      primaryButton: "Ok",
+    });
+    return;
+  }
+
+  // XXX: Bit of a hack here: `constructIdentity` starts a loader but doesn't
+  // display anything else if everything goes well, meaning the loader is still
+  // running. Instead of starting a new loader explicitly (which would cause
+  // flicker) we simply use `constructIdentity`'s.
+  try {
+    await connection.add(
+      deviceAlias,
+      { unknown: null },
+      { authentication: null },
+      newDevice.getPublicKey().toDer(),
+      { unprotected: null },
+      newDevice.rawId
+    );
+  } catch (error: unknown) {
+    await displayError({
+      title: "Could not enroll device",
+      message:
+        "The device could not be added to the anchor: " +
+        unknownToString(error, "unknown error"),
+      primaryButton: "Ok",
+    });
+    return;
+  }
+
+  setAnchorUsed(userNumber);
 };

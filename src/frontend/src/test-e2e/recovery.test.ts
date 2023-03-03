@@ -27,6 +27,7 @@ test("Recover access, after registration", async () => {
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.skipDeviceEnrollment();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
@@ -75,6 +76,7 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.skipDeviceEnrollment();
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Ensure the settings dropdown is in view

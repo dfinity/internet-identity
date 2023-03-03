@@ -425,7 +425,7 @@ mod registration_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Only recovery phrases can be protected but key type is Unknown").unwrap(),
+            Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
         );
         Ok(())
     }
@@ -1556,7 +1556,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Device is protected. Must be authenticated with this device to mutate")
+                Regex::new("Device is locked. Must be authenticated with this device to mutate")
                     .unwrap(),
             );
         }
@@ -1582,8 +1582,7 @@ mod device_management_tests {
             expect_user_error_with_message(
                 result,
                 CanisterCalledTrap,
-                Regex::new("Only recovery phrases can be protected but key type is Unknown")
-                    .unwrap(),
+                Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
             );
         }
     }
@@ -1837,7 +1836,7 @@ mod device_management_tests {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new("Device is protected. Must be authenticated with this device to mutate")
+            Regex::new("Device is locked. Must be authenticated with this device to mutate")
                 .unwrap(),
         );
     }
