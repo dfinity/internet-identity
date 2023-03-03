@@ -1,40 +1,46 @@
 import { html, TemplateResult } from "lit-html";
-import { warningIcon } from "./icons";
+import { warningIcon, closeIcon } from "./icons";
 
-interface warnBoxProps {
+interface irregularityProps {
   message: string | TemplateResult;
   additionalClasses?: string[];
-  type: "warning" | "info" | "error";
-  isClosable?: boolean;
+  type?: "warning" | "info" | "error";
+  closeFn?: () => void;
 }
 
 export const irregularity = ({
   message,
   additionalClasses = [],
   type = "error",
-  isClosable = false,
-}: warnBoxProps): TemplateResult => {
+  closeFn,
+}: irregularityProps): TemplateResult => {
   const cssClasses = ["c-irregularity"];
 
   if (additionalClasses.length > 0) {
     cssClasses.push(...additionalClasses);
   }
 
-  if (type) {
+  if (typeof type === "string") {
     cssClasses.push(`c-irregularity--${type}`);
   }
 
-  if (isClosable) {
+  if (typeof closeFn === "function") {
     cssClasses.push(`c-irregularity--closable`);
   }
 
   const contents: TemplateResult = html`
     <div class="${cssClasses.join(" ")}">
       <div class="c-irregularity__icon">${warningIcon}</div>
-        <p class="c-irregularity__message">
-          ${message}
-        </p>
-      </div>
+      <p class="c-irregularity__message">${message}</p>
+      ${typeof closeFn === "function"
+        ? html`<button
+            class="c-irregularity__close"
+            aria-label="Close"
+            @click="${() => closeFn()}"
+          >
+            ${closeIcon}
+          </button>`
+        : null}
     </div>
   `;
 

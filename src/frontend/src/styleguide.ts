@@ -1,15 +1,33 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
-import { html } from "lit-html";
-import {
-  icLogo,
-  settingsIcon,
-  dropdownIcon,
-  warningIcon,
-  closeIcon,
-} from "./components/icons";
+import { html, render } from "lit-html";
+import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
+
+const removeToast = (toast: HTMLElement): void => {
+  toast.addEventListener("animationend", () => {
+    toast.remove();
+  });
+  toast.classList.add("c-toast--closing");
+};
+
+const createToast = (): void => {
+  const message = html`
+    This is a toast message. <a href="#">This is a link</a>. Message Nr.
+    ${Math.floor(Math.random() * 1000)}
+  `;
+  const toast = document.createElement("div");
+  toast.classList.add("c-toast");
+  render(
+    irregularity({
+      message,
+      closeFn: () => removeToast(toast),
+    }),
+    toast
+  );
+  document.querySelector("[data-toasts]")?.appendChild(toast);
+};
 
 export const styleguide = html`
   <style>
@@ -410,8 +428,17 @@ export const styleguide = html`
             message:
               "This is an error message. It can be used to inform the user about something that went wrong.",
             type: "error",
-            isClosable: true,
+            closeFn: () => {
+              console.log("close");
+            },
           })}
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Logo</h2>
+        <section class="demo" aria-label="Logo Demo">
+          <div class="c-logo">${icLogo}</div>
         </section>
       </aside>
 
@@ -423,25 +450,15 @@ export const styleguide = html`
           Irregularity component.
         </p>
         <section class="demo" aria-label="Toast Elements Demo">
-          <button class="c-button c-button--primary">Show Toast</button>
+          <button
+            class="c-button c-button--primary"
+            @click="${() => createToast()}"
+          >
+            Show Toast
+          </button>
           <div class="c-toasts">
-            <div class="l-container">
-              <div class="c-toast">
-                ${irregularity({
-                  message:
-                    "This is an error message. It can be used to inform the user about something that went wrong.",
-                  type: "error",
-                })}
-              </div>
-            </div>
+            <div class="l-container" data-toasts></div>
           </div>
-        </section>
-      </aside>
-
-      <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Logo</h2>
-        <section class="demo" aria-label="Logo Demo">
-          <div class="c-logo">${icLogo}</div>
         </section>
       </aside>
     </article>
