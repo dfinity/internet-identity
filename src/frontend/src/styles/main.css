@@ -795,6 +795,18 @@ a:hover,
 }
 
 /**
+ *  irregularity component
+ */
+.c-irregularity {
+  display: block;
+  position: relative;
+  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+  border: var(--vs-line) solid var(--rc-line);
+  background-color: var(--rc-background-transparent);
+  border-radius: var(--vs-border-radius);
+}
+
+/**
  *  logo component
  */
 .c-logo {

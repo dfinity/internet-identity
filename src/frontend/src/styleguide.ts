@@ -386,6 +386,28 @@ export const styleguide = html`
         <p class="t-lead"></p>
       </aside>
 
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title">Irregularities</h2>
+        <p class="t-lead">
+          Irregularities are messages that we show to the user when something
+          goes wrong or something happens that we want to inform the user about.
+          They can be used to show errors, warnings, or success messages.
+        </p>
+        <section class="demo" aria-label="Irregularity Elements Demo">
+          <aside class="c-irregularity">
+            <div class="c-irregularity__icon">${settingsIcon}</div>
+            <div class="c-irregularity__content">
+              <h3 class="c-irregularity__title">Error</h3>
+              <p class="c-irregularity__message">
+                This is an error message. It can be used to inform the user about
+                something that went wrong.
+              </p>
+            </div>
+          </aside>
+        </section>
+      </aside>
+
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
