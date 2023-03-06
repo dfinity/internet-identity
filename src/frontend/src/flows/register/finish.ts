@@ -4,6 +4,7 @@ import { withRef } from "../../utils/lit-html";
 import { warnBox } from "../../components/warnBox";
 import { mainWindow } from "../../components/mainWindow";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
+import { toast } from "../../components/toast";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -39,6 +40,9 @@ export const displayUserNumberTemplate = ({
               elem.classList.add("is-copied");
             });
           } catch (e: unknown) {
+            toast.error(
+              "Unable to copy Identity Anchor, check the console for details"
+            );
             console.error("Unable to copy Identity Anchor", e);
           }
         }}

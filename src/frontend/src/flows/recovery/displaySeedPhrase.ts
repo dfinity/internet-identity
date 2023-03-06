@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
+import { toast } from "../../components/toast";
 
 const pageContent = (seedPhrase: string) => {
   const pageContentSlot = html`
@@ -102,6 +103,7 @@ const init = (): Promise<void> =>
           seedCopy.classList.add("is-copied");
         })
         .catch((e) => {
+          toast.error("Unable to copy seed phrase, check console for details");
           console.error("Unable to copy seed phrase", e);
         });
     });
