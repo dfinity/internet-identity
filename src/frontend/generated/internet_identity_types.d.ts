@@ -96,6 +96,7 @@ export interface InternetIdentityInit {
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
+  'register_rate_limit' : [] | [RateLimitConfig],
 }
 export interface InternetIdentityStats {
   'storage_layout_version' : number,
@@ -111,6 +112,10 @@ export type KeyType = { 'platform' : null } |
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
+export interface RateLimitConfig {
+  'max_tokens' : bigint,
+  'time_per_token_ns' : bigint,
+}
 export type RegisterResponse = { 'bad_challenge' : null } |
   { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
