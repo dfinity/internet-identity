@@ -3,7 +3,6 @@ import { authFlowManage } from "./flows/manage";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
-import { intentFromUrl } from "./utils/userIntent";
 import { version } from "./version";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
@@ -92,22 +91,16 @@ const init = async () => {
     return compatibilityNotice(okOrReason);
   }
 
-  const userIntent = intentFromUrl(url);
-
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
-  switch (userIntent.kind) {
-    // Authenticate to a third party service
-    case "auth": {
-      void authFlowAuthorize(connection);
-      break;
-    }
-    // Open the management page
-    case "manage": {
-      void authFlowManage(connection);
-      break;
-    }
+  // Simple, #-based routing
+  if (url.hash == "#authorize") {
+    // User was brought here by a dapp for authorization
+    void authFlowAuthorize(connection);
+  } else {
+    // The default flow
+    void authFlowManage(connection);
   }
 };
 
