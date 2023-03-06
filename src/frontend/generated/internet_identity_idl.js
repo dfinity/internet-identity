@@ -67,7 +67,7 @@ export const idlFactory = ({ IDL }) => {
     'credentialId' : CredentialId,
   });
   const AnchorCredentials = IDL.Record({
-    'recovery_phrase' : IDL.Vec(PublicKey),
+    'recovery_phrases' : IDL.Vec(PublicKey),
     'credentials' : IDL.Vec(WebAuthnCredential),
     'recovery_credentials' : IDL.Vec(WebAuthnCredential),
   });
