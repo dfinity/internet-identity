@@ -1,3 +1,7 @@
+import {
+  Timestamp,
+  IdentityAnchorInfo,
+} from "../../../../generated/internet_identity_types";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
 import { displayError } from "../../../components/displayError";
@@ -13,12 +17,13 @@ export const addRemoteDevice = async ({
   connection: AuthenticatedConnection;
 }): Promise<void> => {
   // Enter registration mode and get info about the anchor
-  const [timestamp, anchorInfo] = await withLoader(() =>
-    Promise.all([
-      connection.enterDeviceRegistrationMode(),
-      connection.getAnchorInfo(),
-    ])
-  );
+  const [timestamp, anchorInfo]: [Timestamp, IdentityAnchorInfo] =
+    await withLoader(() =>
+      Promise.all([
+        connection.enterDeviceRegistrationMode(),
+        connection.getAnchorInfo(),
+      ])
+    );
 
   let tentativeDevice = anchorInfo.device_registration[0]?.tentative_device[0];
   if (tentativeDevice === undefined) {
@@ -30,7 +35,7 @@ export const addRemoteDevice = async ({
     );
 
     if (result === "timeout") {
-      // On timeout, notify the user
+      // On timeout, notify the user and return back to the caller
       await displayError({
         title: "Timeout Reached",
         message:

@@ -81,7 +81,7 @@ export const pollForTentativeDevicePage = (
  * @param userNumber anchor of the authenticated user
  * @param connection authenticated II connection
  */
-export const pollForTentativeDevice = async (
+export const pollForTentativeDevice = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
@@ -103,7 +103,7 @@ export const pollForTentativeDevice = async (
   // Poll repeatedly
   const polling = poll(userNumber, connection, () => countdown.hasStopped());
 
-  return await Promise.race([page, polling]);
+  return Promise.race([page, polling]);
 };
 
 const poll = async (
