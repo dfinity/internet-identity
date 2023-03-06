@@ -59,7 +59,7 @@ export const authenticateBox = async (
         register: () => {
           resolve(registerIfAllowed(connection));
         },
-        recover: (userNumber) => useRecovery(connection, userNumber),
+        recover: (userNumber) => resolve(useRecovery(connection, userNumber)),
       });
 
       // If there _are_ some anchors, then we show the "pick" screen, otherwise

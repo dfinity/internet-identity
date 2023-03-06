@@ -10,9 +10,9 @@ export type AddTentativeDeviceResponse = {
     }
   };
 export interface AnchorCredentials {
-  'recovery_phrase' : Array<PublicKey>,
-  'credentials' : Array<WebauthnCredential>,
-  'recovery_credentials' : Array<WebauthnCredential>,
+  'recovery_phrases' : Array<PublicKey>,
+  'credentials' : Array<WebAuthnCredential>,
+  'recovery_credentials' : Array<WebAuthnCredential>,
 }
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
@@ -136,7 +136,7 @@ export type VerifyTentativeDeviceResponse = {
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
-export interface WebauthnCredential {
+export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credentialId' : CredentialId,
 }

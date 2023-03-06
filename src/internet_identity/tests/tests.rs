@@ -1633,18 +1633,18 @@ mod device_management_tests {
             let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
 
             assert_eq!(response.credentials.len(), 2);
-            assert!(response.credentials.contains(&WebauthnCredential {
+            assert!(response.credentials.contains(&WebAuthnCredential {
                 pubkey: device_data_1().pubkey,
                 credential_id: device_data_1().credential_id.unwrap()
             }));
-            assert!(response.credentials.contains(&WebauthnCredential {
+            assert!(response.credentials.contains(&WebAuthnCredential {
                 pubkey: device_data_2().pubkey,
                 credential_id: device_data_2().credential_id.unwrap()
             }));
 
             assert_eq!(
                 response.recovery_credentials,
-                vec![WebauthnCredential {
+                vec![WebAuthnCredential {
                     pubkey: recovery_webauthn_device.pubkey.clone(),
                     credential_id: recovery_webauthn_device.credential_id.unwrap()
                 }]
@@ -1669,7 +1669,7 @@ mod device_management_tests {
 
             assert_eq!(
                 response.credentials,
-                vec![WebauthnCredential {
+                vec![WebAuthnCredential {
                     pubkey: device_data_1().pubkey,
                     credential_id: device_data_1().credential_id.unwrap()
                 }]
