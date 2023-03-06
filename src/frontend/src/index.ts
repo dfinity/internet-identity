@@ -95,7 +95,7 @@ const init = async () => {
   const connection = new Connection(readCanisterId());
 
   // Simple, #-based routing
-  if (url.hash == "#authorize") {
+  if (url.hash === "#authorize") {
     // User was brought here by a dapp for authorization
     void authFlowAuthorize(connection);
   } else {
