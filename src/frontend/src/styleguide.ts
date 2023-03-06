@@ -422,12 +422,12 @@ export const styleguide = html`
           ${irregularity({
             message:
               "This is an error message. It can be used to inform the user about something that went wrong.",
-            type: "error",
+            errorType: "error",
           })}
           ${irregularity({
             message:
               "This is an error message. It can be used to inform the user about something that went wrong.",
-            type: "error",
+            errorType: "error",
             closeFn: () => {
               console.log("close");
             },

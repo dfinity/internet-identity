@@ -4,14 +4,14 @@ import { warningIcon, closeIcon } from "./icons";
 interface irregularityProps {
   message: string | TemplateResult;
   additionalClasses?: string[];
-  type?: "warning" | "info" | "error";
+  errorType?: "warning" | "info" | "error";
   closeFn?: () => void;
 }
 
 export const irregularity = ({
   message,
   additionalClasses = [],
-  type = "error",
+  errorType = "error",
   closeFn,
 }: irregularityProps): TemplateResult => {
   const cssClasses = ["c-irregularity"];
@@ -20,8 +20,8 @@ export const irregularity = ({
     cssClasses.push(...additionalClasses);
   }
 
-  if (typeof type === "string") {
-    cssClasses.push(`c-irregularity--${type}`);
+  if (typeof errorType === "string") {
+    cssClasses.push(`c-irregularity--${errorType}`);
   }
 
   if (typeof closeFn === "function") {
