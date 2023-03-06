@@ -10,7 +10,7 @@ export type AddTentativeDeviceResponse = {
     }
   };
 export interface AnchorCredentials {
-  'recovery_phrase' : Array<PublicKey>,
+  'recovery_phrases' : Array<PublicKey>,
   'credentials' : Array<WebAuthnCredential>,
   'recovery_credentials' : Array<WebAuthnCredential>,
 }
