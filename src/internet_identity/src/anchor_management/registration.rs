@@ -166,7 +166,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     }
     // Normalize challenge attempts by replacing characters that are not in the captcha character set
     // with the respective replacement from CHAR_REPLACEMENTS.
-    let normalized_challenge: String = res
+    let normalized_challenge_res: String = res
         .chars
         .chars()
         .map(|c| *CHAR_REPLACEMENTS.get(&c).unwrap_or(&c))
@@ -175,7 +175,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     state::inflight_challenges_mut(|inflight_challenges| {
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
-                if normalized_challenge != challenge.chars {
+                if normalized_challenge_res != challenge.chars {
                     return Err(());
                 }
                 Ok(())
