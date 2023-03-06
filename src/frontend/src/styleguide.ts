@@ -4,30 +4,7 @@ import { html, render } from "lit-html";
 import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
-
-const removeToast = (toast: HTMLElement): void => {
-  toast.addEventListener("animationend", () => {
-    toast.remove();
-  });
-  toast.classList.add("c-toast--closing");
-};
-
-const createToast = (): void => {
-  const message = html`
-    This is a toast message. <a href="#">This is a link</a>. Message Nr.
-    ${Math.floor(Math.random() * 1000)}
-  `;
-  const toast = document.createElement("div");
-  toast.classList.add("c-toast");
-  render(
-    irregularity({
-      message,
-      closeFn: () => removeToast(toast),
-    }),
-    toast
-  );
-  document.querySelector("[data-toasts]")?.appendChild(toast);
-};
+import { toast } from "./components/toast";
 
 export const styleguide = html`
   <style>
@@ -452,13 +429,13 @@ export const styleguide = html`
         <section class="demo" aria-label="Toast Elements Demo">
           <button
             class="c-button c-button--primary"
-            @click="${() => createToast()}"
+            @click="${() =>
+              toast.error(
+                `some error message ${Math.round(Math.random() * 100)}`
+              )}"
           >
             Show Toast
           </button>
-          <div class="c-toasts">
-            <div class="l-container" data-toasts></div>
-          </div>
         </section>
       </aside>
     </article>
