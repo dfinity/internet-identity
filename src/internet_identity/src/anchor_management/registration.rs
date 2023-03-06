@@ -13,7 +13,7 @@ use rand_core::{RngCore, SeedableRng};
 use std::collections::HashMap;
 
 #[cfg(not(feature = "dummy_captcha"))]
-use captcha::filters::{Grid, Wave};
+use captcha::filters::Wave;
 use lazy_static::lazy_static;
 
 // 5 mins
