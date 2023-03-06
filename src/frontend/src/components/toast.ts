@@ -1,4 +1,4 @@
-import { html, TemplateResult, render } from "lit-html";
+import { html, render } from "lit-html";
 import { irregularity } from "./irregularity";
 
 export const removeToast = (toast: HTMLElement): void => {
@@ -22,6 +22,10 @@ const createToast = (messageStr: string): HTMLDivElement => {
   return $toast;
 };
 
+/**
+ * Get the container for the toasts, or create it if it doesn't exist.
+ * @returns the container reference for the toasts
+ */
 const getOrCreateToaster = (): Element | null => {
   const $toaster = document.querySelector("[data-toaster]");
   if (!$toaster) {
@@ -38,6 +42,10 @@ const getOrCreateToaster = (): Element | null => {
   return $toaster.querySelector("[data-toasts]");
 };
 
+/**
+ * A lot like console.error, but with a toast.
+ * use like: toast.error("Something went wrong");
+ */
 export const toast = {
   error: (message: string): void => {
     const $toaster = getOrCreateToaster();
