@@ -393,18 +393,12 @@ export const styleguide = html`
         <p class="t-lead">
           Irregularities are messages that we show to the user when something
           goes wrong or something happens that we want to inform the user about.
-          They can be used to show errors, warnings, or success messages.
+          They can be used to show errors messages.
         </p>
         <section class="demo" aria-label="Irregularity Elements Demo">
           ${irregularity({
             message:
               "This is an error message. It can be used to inform the user about something that went wrong.",
-            errorType: "error",
-          })}
-          ${irregularity({
-            message:
-              "This is an error message. It can be used to inform the user about something that went wrong.",
-            errorType: "error",
             closeFn: () => {
               console.log("close");
             },

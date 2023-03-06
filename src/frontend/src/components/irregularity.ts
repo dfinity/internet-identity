@@ -3,8 +3,7 @@ import { warningIcon, closeIcon } from "./icons";
 
 interface irregularityProps {
   message: string | TemplateResult;
-  errorType?: "warning" | "info" | "error";
-  closeFn?: () => void;
+  closeFn: () => void;
 }
 
 /**
@@ -17,19 +16,16 @@ interface irregularityProps {
  * It is a generic to use for all irregularities.
  *
  * @param {string} message - The message to display
- * @param {string} errorType - The type of irregularity. Can be "warning", "info" or "error"
  * @param {function} closeFn - When provided, the irregularity will be closable.
+ *
+ * For now we assume that all irregularities are errors. In the future, we may
+ * want to add a type parameter to this component.
  **/
 export const irregularity = ({
   message,
-  errorType = "error",
   closeFn,
 }: irregularityProps): TemplateResult => {
-  const cssClasses = ["c-irregularity"];
-
-  if (typeof errorType === "string") {
-    cssClasses.push(`c-irregularity--${errorType}`);
-  }
+  const cssClasses = ["c-irregularity", "c-irregularity--error"];
 
   if (typeof closeFn === "function") {
     cssClasses.push(`c-irregularity--closable`);
