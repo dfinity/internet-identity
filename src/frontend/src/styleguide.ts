@@ -1,6 +1,6 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
