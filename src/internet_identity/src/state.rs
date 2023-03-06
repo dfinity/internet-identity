@@ -73,6 +73,18 @@ pub struct PersistentState {
     pub archive_state: ArchiveState,
     // Amount of cycles that need to be attached when II creates a canister
     pub canister_creation_cycles_cost: u64,
+    // Configuration for the rate limit on `register`, if any.
+    pub registration_rate_limit: Option<RateLimitConfig>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct RateLimitState {
+    // Number of tokens available for calls, where each call will deduct one token. If tokens reaches
+    // 0 the rate limit will cancel the call.
+    pub tokens: u64,
+    // Timestamp from which `time_per_token_ns` (see RateLimitConfig) must have passed to
+    // increment `tokens`.
+    pub token_timestamp: Timestamp,
 }
 
 struct State {
@@ -95,6 +107,8 @@ struct State {
     persistent_state: RefCell<PersistentState>,
     // Cache of the archive status (to make unwanted calls to deploy_archive cheap to dismiss).
     archive_status_cache: RefCell<Option<ArchiveStatusCache>>,
+    // Tracking data for the registration rate limit, if any. Not persisted across upgrades.
+    registration_rate_limit: RefCell<Option<RateLimitState>>,
 }
 
 impl Default for State {
@@ -116,6 +130,7 @@ impl Default for State {
             usage_metrics: RefCell::new(UsageMetrics::default()),
             persistent_state: RefCell::new(PersistentState::default()),
             archive_status_cache: RefCell::new(None),
+            registration_rate_limit: RefCell::new(None),
         }
     }
 }
@@ -294,6 +309,14 @@ pub fn persistent_state<R>(f: impl FnOnce(&PersistentState) -> R) -> R {
 
 pub fn persistent_state_mut<R>(f: impl FnOnce(&mut PersistentState) -> R) -> R {
     STATE.with(|s| f(&mut s.persistent_state.borrow_mut()))
+}
+
+pub fn registration_rate_limit<R>(f: impl FnOnce(&Option<RateLimitState>) -> R) -> R {
+    STATE.with(|s| f(&s.registration_rate_limit.borrow()))
+}
+
+pub fn registration_rate_limit_mut<R>(f: impl FnOnce(&mut Option<RateLimitState>) -> R) -> R {
+    STATE.with(|s| f(&mut s.registration_rate_limit.borrow_mut()))
 }
 
 pub fn cached_archive_status() -> Option<ArchiveStatusCache> {

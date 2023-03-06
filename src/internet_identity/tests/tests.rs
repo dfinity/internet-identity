@@ -64,11 +64,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((10_000, 11_000)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range((10_000, 11_000)),
         )?;
 
         let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
@@ -87,11 +83,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((2000, 4000)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range((2000, 4000)),
         )?;
 
         let stats = api::stats(&env, canister_id)?;
@@ -111,11 +103,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((2000, 4000)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range((2000, 4000)),
         );
 
         expect_user_error_with_message(
@@ -138,11 +126,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((10_000, 10_000)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range((10_000, 10_000)),
         );
 
         expect_user_error_with_message(
@@ -165,11 +149,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((10_000, 10_000_000_000_000)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range((10_000, 10_000_000_000_000)),
         );
 
         expect_user_error_with_message(
@@ -192,11 +172,7 @@ mod upgrade_tests {
             &env,
             canister_id,
             II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some(stats.assigned_user_number_range),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
+            arg_with_anchor_range(stats.assigned_user_number_range),
         );
 
         assert!(result.is_ok());
@@ -345,15 +321,8 @@ mod registration_tests {
     #[test]
     fn should_assign_correct_user_numbers() -> Result<(), CallError> {
         let env = env();
-        let canister_id = install_ii_canister_with_arg(
-            &env,
-            II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((127, 129)),
-                archive_config: None,
-                canister_creation_cycles_cost: None,
-            }),
-        );
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((127, 129)));
 
         let user_number = flows::register_anchor(&env, canister_id);
         assert_eq!(user_number, 127);
@@ -494,6 +463,108 @@ mod registration_tests {
             result,
             CanisterCalledTrap,
             Regex::new("too many inflight captchas").unwrap(),
+        );
+        Ok(())
+    }
+
+    /// Tests that the `register` call will hit the rate limit on too many calls and that the limit
+    /// will allow new calls after some time.
+    #[test]
+    fn should_rate_limit_register_calls() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_rate_limit(RateLimitConfig {
+                time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
+                max_tokens: 2,
+            }),
+        );
+
+        for _ in 0..2 {
+            flows::register_anchor(&env, canister_id);
+        }
+        let challenge = api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key.clone(),
+            },
+        );
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("rate limit reached, try again later").unwrap(),
+        );
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_register_rate_limit_current_tokens",
+            0f64,
+        );
+
+        env.advance_time(Duration::from_secs(1));
+
+        let result = api::register(
+            &env,
+            canister_id,
+            principal_1(),
+            &device_data_1(),
+            ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+        );
+        assert!(result.is_ok());
+        Ok(())
+    }
+
+    /// Tests that the `register` rate limit does not replenish tokens to more than max_tokens.
+    #[test]
+    fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_rate_limit(RateLimitConfig {
+                time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
+                max_tokens: 2,
+            }),
+        );
+
+        env.advance_time(Duration::from_secs(100));
+
+        // some activity required to process the rate limit (which will use one token)
+        flows::register_anchor(&env, canister_id);
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_register_rate_limit_current_tokens",
+            1f64, // 1 and not 2 because of register call required to update rate limit
+        );
+        Ok(())
+    }
+
+    /// Tests that the II correctly reports the max tokens metric.
+    #[test]
+    fn should_report_max_rate_limit_tokens() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_rate_limit(RateLimitConfig {
+                time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
+                max_tokens: 2,
+            }),
+        );
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_register_rate_limit_max_tokens",
+            2f64,
         );
         Ok(())
     }

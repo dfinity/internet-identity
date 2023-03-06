@@ -347,5 +347,6 @@ fn sample_persistent_state() -> PersistentState {
             },
         },
         canister_creation_cycles_cost: 12_346_000_000,
+        registration_rate_limit: None,
     }
 }

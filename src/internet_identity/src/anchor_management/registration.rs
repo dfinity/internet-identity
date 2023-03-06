@@ -14,6 +14,8 @@ use rand_core::{RngCore, SeedableRng};
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
 
+mod rate_limit;
+
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 // How many captcha challenges we keep in memory (at most)
@@ -153,6 +155,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 }
 
 pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    rate_limit::process_rate_limit();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }

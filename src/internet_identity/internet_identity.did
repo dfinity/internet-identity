@@ -180,6 +180,15 @@ type ArchiveInfo = record {
     archive_config: opt ArchiveConfig;
 };
 
+// Rate limit configuration.
+// Currently only used for `register`.
+type RateLimitConfig = record {
+    // Time it takes (in ns) for a rate limiting token to be replenished.
+    time_per_token_ns : nat64;
+    // How many tokens are at most generated (to accommodate peaks).
+    max_tokens: nat64;
+};
+
 // Init arguments of II which can be supplied on install and upgrade.
 // Setting a value to null keeps the previous value.
 type InternetIdentityInit = record {
@@ -197,6 +206,8 @@ type InternetIdentityInit = record {
     // The canister creation cost on mainnet is currently 100'000'000'000 cycles. If this value is higher thant the
     // canister creation cost, the newly created canister will keep extra cycles.
     canister_creation_cycles_cost : opt nat64;
+    // Rate limit for the `register` call.
+    register_rate_limit : opt RateLimitConfig;
 };
 
 type ChallengeKey = text;

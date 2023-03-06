@@ -208,6 +208,7 @@ pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
+    pub register_rate_limit: Option<RateLimitConfig>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -224,6 +225,16 @@ pub struct InternetIdentityStats {
 pub struct ArchiveInfo {
     pub archive_canister: Option<Principal>,
     pub archive_config: Option<ArchiveConfig>,
+}
+
+/// Configuration for a rate limit.
+/// Currently only used on the `register` call.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RateLimitConfig {
+    // time it takes for a rate limiting token to be replenished.
+    pub time_per_token_ns: u64,
+    // How many tokens are at most generated (to accommodate peaks).
+    pub max_tokens: u64,
 }
 
 /// Configuration parameters of the archive to be used on the next deployment.

@@ -288,6 +288,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.canister_creation_cycles_cost = cost;
             })
         }
+        if let Some(rate_limit) = arg.register_rate_limit {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.registration_rate_limit = Some(rate_limit);
+            })
+        }
     }
 }
 
