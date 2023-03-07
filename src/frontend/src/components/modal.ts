@@ -24,7 +24,7 @@ export const createModal = ({
   `;
 
   const $modal = document.createElement("dialog");
-  $modal.id = id || "modal";
+  $modal.id = id != null ? id : "modal";
   $modal.classList.add("c-modal");
   $modal.setAttribute("aria-modal", "true");
 
