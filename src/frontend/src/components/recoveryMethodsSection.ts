@@ -33,7 +33,7 @@ const sectionList = ({
             )
           : deviceListItem({
               device: {
-                label: "Phrase",
+                label: "Recovery Phrase",
                 recovery: "phrase",
               },
               index: "recovery-phrase",
@@ -55,7 +55,7 @@ const sectionList = ({
             )
           : deviceListItem({
               device: {
-                label: "Device",
+                label: "Recovery Device",
                 recovery: "device",
               },
               index: "recovery-device",
