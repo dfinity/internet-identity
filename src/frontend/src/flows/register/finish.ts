@@ -40,9 +40,7 @@ export const displayUserNumberTemplate = ({
               elem.classList.add("is-copied");
             });
           } catch (e: unknown) {
-            toast.error(
-              "Unable to copy Identity Anchor"
-            );
+            toast.error("Unable to copy Identity Anchor");
             console.error("Unable to copy Identity Anchor", e);
           }
         }}

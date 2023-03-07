@@ -25,19 +25,23 @@ export const irregularity = ({
   message,
   closeFn,
 }: irregularityProps): TemplateResult => {
-  const cssClasses = ["c-irregularity", "c-irregularity--error", "c-irregularity--closable"];
+  const cssClasses = [
+    "c-irregularity",
+    "c-irregularity--error",
+    "c-irregularity--closable",
+  ];
 
   const contents: TemplateResult = html`
     <div class="${cssClasses.join(" ")}">
       <div class="c-irregularity__icon">${warningIcon}</div>
       <p class="c-irregularity__message">${message}</p>
       <button
-            class="c-irregularity__close"
-            aria-label="Close"
-            @click="${() => closeFn()}"
-          >
-            ${closeIcon}
-          </button>
+        class="c-irregularity__close"
+        aria-label="Close"
+        @click="${() => closeFn()}"
+      >
+        ${closeIcon}
+      </button>
     </div>
   `;
 
