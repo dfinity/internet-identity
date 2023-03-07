@@ -43,7 +43,7 @@ const sectionList = ({
                 id="addRecoveryPhrase"
                 aria-label="Add recovery phrase"
               >
-                Add
+                Enable
               </button>`,
             })}
         ${recoveryDevices.length > 0
@@ -65,7 +65,7 @@ const sectionList = ({
                 id="addRecoveryDevice"
                 aria-label="Add recovery device"
               >
-                Add
+                Enable
               </button>`,
             })}
       </ul>
