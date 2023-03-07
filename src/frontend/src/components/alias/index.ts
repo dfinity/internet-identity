@@ -11,7 +11,7 @@ import copyJson from "./index.json";
 
 export const promptDeviceAliasTemplate = (props: {
   title: string;
-  message?: string;
+  message?: string | TemplateResult;
   cancelText?: string;
   continue: (alias: string) => void;
   cancel: () => void;
@@ -92,7 +92,7 @@ export const promptDeviceAliasTemplate = (props: {
 
 export const promptDeviceAliasPage = (props: {
   title: string;
-  message?: string;
+  message?: string | TemplateResult;
   cancelText?: string;
   cancel: () => void;
   continue: (alias: string) => void;
@@ -110,7 +110,7 @@ export const promptDeviceAlias = ({
   cancelText,
 }: {
   title: string;
-  message?: string;
+  message?: string | TemplateResult;
   cancelText?: string;
 }): Promise<string | null> =>
   new Promise((resolve) => {
