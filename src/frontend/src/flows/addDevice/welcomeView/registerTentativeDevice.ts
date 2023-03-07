@@ -92,9 +92,8 @@ const createDevice = async ({
   const existingAuthenticators = await connection.lookupAuthenticators(
     userNumber
   );
-  let newDevice: WebAuthnIdentity;
   try {
-    newDevice = await WebAuthnIdentity.create({
+    return await WebAuthnIdentity.create({
       publicKey: creationOptions(existingAuthenticators),
     });
   } catch (error: unknown) {
@@ -104,7 +103,6 @@ const createDevice = async ({
       return new Error(unknownToString(error, "unknown error"));
     }
   }
-  return newDevice;
 };
 
 type AddDeviceSuccess = Extract<

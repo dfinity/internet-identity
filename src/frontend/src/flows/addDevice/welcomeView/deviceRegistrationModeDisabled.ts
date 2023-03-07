@@ -78,11 +78,11 @@ export const deviceRegistrationDisabledInfoPage = (
 export const deviceRegistrationDisabledInfo = (
   userNumber: bigint
 ): Promise<"canceled" | "retry"> => {
-  return new Promise((resolve) => {
-    return deviceRegistrationDisabledInfoPage({
+  return new Promise((resolve) =>
+    deviceRegistrationDisabledInfoPage({
       userNumber,
       cancel: () => resolve("canceled"),
       retry: () => resolve("retry"),
-    });
-  });
+    })
+  );
 };
