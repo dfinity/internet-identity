@@ -12,6 +12,7 @@ import {
 import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
 import { toast } from "./components/toast";
+import { modal } from "./components/modal";
 
 // these words are never longer than 8 characters
 // according to the bip39 spec
@@ -538,6 +539,16 @@ export const styleguide = html`
               )}"
           >
             Show Toast
+          </button>
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Modal</h2>
+        <section class="demo" aria-label="Modal Demo">
+          <button class="c-button c-button--primary" @click=${() =>
+            modal(html`<h1>I am a modal</h1>`)}>
+            Open Modal
           </button>
         </section>
       </aside>
