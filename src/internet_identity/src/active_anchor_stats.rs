@@ -22,7 +22,6 @@ pub fn update_active_anchors_stats(previous_activity_timestamp: Option<Timestamp
 }
 
 /// Updates the active anchor counters if an ongoing collection bucket has completed.
-#[allow(clippy::identity_op)]
 fn process_active_anchor_stats(stats: &mut ActiveAnchorStatistics) {
     process_daily_stats(stats);
     process_monthly_stats(stats);
@@ -31,6 +30,7 @@ fn process_active_anchor_stats(stats: &mut ActiveAnchorStatistics) {
 /// If the ongoing daily active users bucket was started 24h ago (or earlier), it replaces the current
 /// completed daily active user counter and a new ongoing 24h counter is created
 /// (starting from the end of the now completed counter).
+#[allow(clippy::identity_op)]
 fn process_daily_stats(stats: &mut ActiveAnchorStatistics) {
     let now = time();
     if stats.ongoing.daily_active_anchors.start_timestamp + 1 * DAY_NS <= now {
@@ -59,6 +59,7 @@ fn process_daily_stats(stats: &mut ActiveAnchorStatistics) {
 ///   or an empty one if the last completed bucket is already outdated
 /// * a new monthly ongoing collection period is added if the most recent one was started more than
 ///   24h ago
+#[allow(clippy::identity_op)]
 fn process_monthly_stats(stats: &mut ActiveAnchorStatistics) {
     let now = time();
     // Remove all completed 30-day time windows from the ongoing collection vector
