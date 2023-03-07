@@ -11,7 +11,7 @@ interface irregularityProps {
  *
  * To use when something is out of the ordinary. For example, when a user has
  * not yet completed a task, or when a user has not yet verified their email
- * address. Or if there is an error with a form. It can also be used as a tost.
+ * address. Or if there is an error with a form. It can also be used as a toast.
  *
  * It is a generic to use for all irregularities.
  *
