@@ -3,6 +3,7 @@ import "./styles/main.css";
 import { html } from "lit-html";
 import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
+import { modal } from "./components/modal";
 
 export const styleguide = html`
   <style>
@@ -392,6 +393,15 @@ export const styleguide = html`
           <div class="c-logo">${icLogo}</div>
         </section>
       </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Modal</h2>
+        <section class="demo" aria-label="Modal Demo">
+          <button class="c-button c-button--primary" @click=${() =>
+            modal(html`<h1>I am a modal</h1>`)}>
+            Open Modal
+          </button>
+        </section>
     </article>
   </section>
 `;
