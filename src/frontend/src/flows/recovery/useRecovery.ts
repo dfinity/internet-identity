@@ -8,7 +8,7 @@ import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 import { setAnchorUsed } from "../../utils/userNumber";
-import { unknownToString } from "../../utils/utils";
+import { unknownToString, unreachableLax } from "../../utils/utils";
 import { constructIdentity } from "../register/construct";
 
 export const useRecovery = async (
@@ -57,21 +57,61 @@ const runRecovery = async (
     return window.location.reload() as never;
   }
 
-  const deviceAlias = await promptDeviceAlias({
-    title: "Remember this Device",
-    message: "Recovery successful. What device are you using?",
-    cancelText: "Skip",
-  });
-  if (deviceAlias !== null) {
-    // Offer to enroll a new authenticator
-    await enrollAuthenticator({
-      connection: res.connection,
-      userNumber: res.userNumber,
-      deviceAlias,
-    });
-  }
+  // Wrap up recovery (notify of successful recovery, potentially add device)
+  await postRecoveryFlow({ userNumber, connection: res.connection });
 
   return res;
+};
+
+// Show the user that the recovery was successful and offer to enroll a new device
+const postRecoveryFlow = async ({
+  userNumber,
+  connection,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+}) => {
+  // The original title & message which mention a "successful recovery"; subsequently when retrying the
+  // messages don't need to mention the recovery
+  let title = "Successful Recovery";
+  let message =
+    "Remember this device to avoid losing access to your account again. What device are you using?";
+
+  // Offer to enroll the device repeatedly, until the user explicitly skips
+  for (;;) {
+    const deviceAlias = await promptDeviceAlias({
+      title: title,
+      message: message,
+      cancelText: "Skip",
+    });
+
+    // The user clicked "skip"
+    if (deviceAlias === null) {
+      break;
+    }
+
+    const enrollResult = await enrollAuthenticator({
+      connection: connection,
+      userNumber: userNumber,
+      deviceAlias,
+    });
+
+    // The device was successfully enrolled, so we break out of the loop
+    if (enrollResult === "enrolled") {
+      break;
+    }
+
+    // There was an error enrolling the device, so we retry
+    if (enrollResult === "error") {
+      title = "Remember this Device";
+      message = "What device are you using?";
+      continue;
+    }
+
+    // we should never get here, but in case the unexpected happens, we break out of the loop
+    unreachableLax(enrollResult);
+    break;
+  }
 };
 
 // Offer to enroll a new device
@@ -83,7 +123,7 @@ const enrollAuthenticator = async ({
   connection: AuthenticatedConnection;
   userNumber: bigint;
   deviceAlias: string;
-}): Promise<void> => {
+}): Promise<"enrolled" | "error"> => {
   let newDevice;
   try {
     newDevice = await constructIdentity({
@@ -96,11 +136,13 @@ const enrollAuthenticator = async ({
     await displayError({
       title: "Could not enroll device",
       message:
+        "Something went wrong when we were trying to remember this device. Could you try again?",
+      detail:
         "Could not create credentials: " +
         unknownToString(error, "unknown error"),
       primaryButton: "Ok",
     });
-    return;
+    return "error";
   }
 
   // XXX: Bit of a hack here: `constructIdentity` starts a loader but doesn't
@@ -118,14 +160,17 @@ const enrollAuthenticator = async ({
     );
   } catch (error: unknown) {
     await displayError({
-      title: "Could not enroll device",
+      title: "Failed to Remember Device",
       message:
+        "Something went wrong when we were trying to remember this device. Could you try again?",
+      detail:
         "The device could not be added to the anchor: " +
         unknownToString(error, "unknown error"),
       primaryButton: "Ok",
     });
-    return;
+    return "error";
   }
 
   setAnchorUsed(userNumber);
+  return "enrolled";
 };
