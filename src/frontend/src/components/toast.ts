@@ -37,6 +37,7 @@ const getOrCreateToaster = (): Element | null => {
     // 2. the toasts will only be as wide as the container (user can still interact with the rest of the page)
     const containerEl = document.createElement("div");
     containerEl.classList.add("l-container");
+    // Attribute used to retrieve the element to append toasts to
     containerEl.setAttribute("data-toasts", "");
     toasterEl.setAttribute("data-toaster", "");
     toasterEl.appendChild(containerEl);
