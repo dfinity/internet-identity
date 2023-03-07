@@ -192,6 +192,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='protect']`)
       .click();
+    await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -216,6 +217,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
       .click();
+    await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
