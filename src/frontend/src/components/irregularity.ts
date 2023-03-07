@@ -25,7 +25,7 @@ export const irregularity = ({
   message,
   closeFn,
 }: irregularityProps): TemplateResult => {
-  const cssClasses = ["c-irregularity", "c-irregularity--error"];
+  const cssClasses = ["c-irregularity", "c-irregularity--error", "c-irregularity--closable"];
 
   if (typeof closeFn === "function") {
     cssClasses.push(`c-irregularity--closable`);
