@@ -27,10 +27,6 @@ export const irregularity = ({
 }: irregularityProps): TemplateResult => {
   const cssClasses = ["c-irregularity", "c-irregularity--error", "c-irregularity--closable"];
 
-  if (typeof closeFn === "function") {
-    cssClasses.push(`c-irregularity--closable`);
-  }
-
   const contents: TemplateResult = html`
     <div class="${cssClasses.join(" ")}">
       <div class="c-irregularity__icon">${warningIcon}</div>
