@@ -29,8 +29,12 @@ const createToast = (messageStr: string): HTMLDivElement => {
 const getOrCreateToaster = (): Element | null => {
   const $toaster = document.querySelector("[data-toaster]");
   if (!$toaster) {
+    // generic toaster that will be appended to the body
     const $toaster = document.createElement("div");
     $toaster.classList.add("c-toasts");
+    // container for the toasts. Two reasons for this:
+    // 1. we can reuse the l-container class for styling
+    // 2. the toasts will only be as wide as the container (user can still interact with the rest of the page)
     const $container = document.createElement("div");
     $container.classList.add("l-container");
     $container.setAttribute("data-toasts", "");
