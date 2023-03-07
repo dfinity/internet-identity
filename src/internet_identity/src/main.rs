@@ -26,9 +26,9 @@ mod storage;
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
-const MINUTE: u64 = secs_to_nanos(60);
-const HOUR: u64 = 60 * MINUTE;
-const DAY: u64 = 24 * HOUR;
+const MINUTE_NS: u64 = secs_to_nanos(60);
+const HOUR_NS: u64 = 60 * MINUTE_NS;
+const DAY_NS: u64 = 24 * HOUR_NS;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";

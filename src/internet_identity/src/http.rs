@@ -201,12 +201,12 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             w.encode_gauge(
                 "internet_identity_monthly_active_anchors",
                 monthly_active_anchor_stats.counter as f64,
-                "The number of unique active anchors in the last completed 30 day collection window.",
+                "The number of unique active anchors in the last completed 30-day collection window.",
             )?;
             w.encode_gauge(
                 "internet_identity_monthly_active_anchors_start_timestamp_seconds",
                 Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
-                "Timestamp of the last completed 30 day collection window for unique active anchors.",
+                "Timestamp of the last completed 30-day collection window for unique active anchors.",
             )?;
         }
         Ok::<(), std::io::Error>(())

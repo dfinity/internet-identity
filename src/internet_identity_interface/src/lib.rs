@@ -244,12 +244,11 @@ pub struct CompletedActiveAnchorStats {
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct OngoingActiveAnchorStats {
-    // Ongoing active anchor counter for
+    // Ongoing active anchor counter for the current 24 h time bucket.
     pub daily_active_anchors: ActiveAnchorCounter,
-    // Monthly active users are collected using 30 day sliding windows.
+    // Monthly active users are collected using 30-day sliding windows.
     // This vec contains up to 30 30-day active windows each offset by one day.
-    // The vec is sorted with the first element being the next window to reach the end of the
-    // 30 day collection period.
+    // The vec is sorted, new collection windows are added at the end.
     pub monthly_active_anchors: Vec<ActiveAnchorCounter>,
 }
 

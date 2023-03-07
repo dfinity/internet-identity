@@ -1,5 +1,5 @@
 use crate::state::AssetHashes;
-use crate::{hash, state, update_root_hash, DAY, LABEL_ASSETS, LABEL_SIG, MINUTE};
+use crate::{hash, state, update_root_hash, DAY_NS, LABEL_ASSETS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
@@ -13,15 +13,15 @@ use std::collections::HashMap;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE;
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)
-const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY;
+const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
 // The expiration used for signatures
 #[allow(clippy::identity_op)]
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE;
+const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
 
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,
