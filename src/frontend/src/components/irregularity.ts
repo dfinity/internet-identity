@@ -35,15 +35,13 @@ export const irregularity = ({
     <div class="${cssClasses.join(" ")}">
       <div class="c-irregularity__icon">${warningIcon}</div>
       <p class="c-irregularity__message">${message}</p>
-      ${typeof closeFn === "function"
-        ? html`<button
+      <button
             class="c-irregularity__close"
             aria-label="Close"
             @click="${() => closeFn()}"
           >
             ${closeIcon}
-          </button>`
-        : null}
+          </button>
     </div>
   `;
 
