@@ -103,7 +103,7 @@ const init = (): Promise<void> =>
           seedCopy.classList.add("is-copied");
         })
         .catch((e) => {
-          toast.error("Unable to copy seed phrase, check console for details");
+          toast.error("Unable to copy seed phrase");
           console.error("Unable to copy seed phrase", e);
         });
     });
