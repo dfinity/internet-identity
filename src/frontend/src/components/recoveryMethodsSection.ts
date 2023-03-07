@@ -11,20 +11,6 @@ const recoveryByType = ({
   recoveries: Device[];
 }) => recoveries.filter((device) => device.recovery === type);
 
-const recoveryNag = ({
-  recoveries,
-  onAddRecovery,
-}: {
-  recoveries: Device[];
-  onAddRecovery: () => void;
-}) =>
-  warnBox({
-    title: "Recovery method",
-    message: "Add a recovery method to help protect this Identity Anchor.",
-    additionalClasses: ["l-stack"],
-    slot: html`${sectionList({ recoveries })}`,
-  });
-
 const sectionList = ({
   recoveries,
   onAddRecovery,
@@ -95,29 +81,20 @@ export const recoveryMethodsSection = ({
   recoveries: Device[];
   onAddRecovery: () => void;
 }): TemplateResult => {
-  if (recoveries.length === 0) {
-    return recoveryNag({ recoveries, onAddRecovery });
-  }
   return html`
     <aside class="l-stack">
       <details class="c-details" .open="${recoveries.length < 2}">
+        <summary class="t-title c-summary">
+          <h2>Recovery methods</h2>
+          <span class="c-summary__link c-summary__link--end"></span>
+        </summary>
+
         ${recoveries.length === 0
-          ? undefined
-          : html`
-              <summary class="t-title c-summary">
-                <h2>
-                  Recovery
-                  methods${recoveries.length > 1
-                    ? html`<i
-                        class="c-icon c-icon--success c-icon--inline-after"
-                        >${checkmarkIcon}</i
-                      >`
-                    : null}
-                </h2>
-                <span class="c-summary__link c-summary__link--end"></span>
-              </summary>
-              ${sectionList({ recoveries, onAddRecovery })}
-            `}
+          ? html`<p class="t-lead">
+              We recommend that you create at least 1 recovery method.
+            </p>`
+          : null}
+        ${sectionList({ recoveries, onAddRecovery })}
       </details>
     </aside>
   `;

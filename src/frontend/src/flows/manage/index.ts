@@ -145,20 +145,6 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
   </aside>
 `;
 
-const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
-  warnBox({
-    title: "Recovery method",
-    message: "Add a recovery method to help protect this Identity Anchor.",
-    additionalClasses: ["l-stack"],
-    slot: html`<button
-      @click="${onAddRecovery}"
-      id="addRecovery"
-      class="c-button"
-    >
-      Add Recovery
-    </button>`,
-  });
-
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
   userNumber: bigint,
@@ -232,7 +218,9 @@ export const displayManage = (
 
     displayManagePage({
       userNumber,
-      authenticators: _devices.filter((device) => device.recovery === undefined),
+      authenticators: _devices.filter(
+        (device) => device.recovery === undefined
+      ),
       recoveries: _devices.filter((device) => device.recovery),
       onAddDevice: async () => {
         const nextAction = await chooseDeviceAddFlow();
