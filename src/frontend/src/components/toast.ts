@@ -10,16 +10,16 @@ export const removeToast = (toast: HTMLElement): void => {
 
 const createToast = (messageStr: string): HTMLDivElement => {
   const message = html`${messageStr}`;
-  const $toast = document.createElement("div");
-  $toast.classList.add("c-toast");
+  const toastEl = document.createElement("div");
+  toastEl.classList.add("c-toast");
   render(
     irregularity({
       message,
-      closeFn: () => removeToast($toast),
+      closeFn: () => removeToast(toastEl),
     }),
-    $toast
+    toastEl
   );
-  return $toast;
+  return toastEl;
 };
 
 /**
@@ -27,23 +27,23 @@ const createToast = (messageStr: string): HTMLDivElement => {
  * @returns the container reference for the toasts
  */
 const getOrCreateToaster = (): Element | null => {
-  const $toaster = document.querySelector("[data-toaster]");
-  if (!$toaster) {
+  const toasterEl = document.querySelector("[data-toaster]");
+  if (!toasterEl) {
     // generic toaster that will be appended to the body
-    const $toaster = document.createElement("div");
-    $toaster.classList.add("c-toasts");
+    const toasterEl = document.createElement("div");
+    toasterEl.classList.add("c-toasts");
     // container for the toasts. Two reasons for this:
     // 1. we can reuse the l-container class for styling
     // 2. the toasts will only be as wide as the container (user can still interact with the rest of the page)
-    const $container = document.createElement("div");
-    $container.classList.add("l-container");
-    $container.setAttribute("data-toasts", "");
-    $toaster.setAttribute("data-toaster", "");
-    $toaster.appendChild($container);
-    document.body.appendChild($toaster);
-    return $container;
+    const containerEl = document.createElement("div");
+    containerEl.classList.add("l-container");
+    containerEl.setAttribute("data-toasts", "");
+    toasterEl.setAttribute("data-toaster", "");
+    toasterEl.appendChild(containerEl);
+    document.body.appendChild(toasterEl);
+    return containerEl;
   }
-  return $toaster.querySelector("[data-toasts]");
+  return toasterEl.querySelector("[data-toasts]");
 };
 
 /**
@@ -52,8 +52,8 @@ const getOrCreateToaster = (): Element | null => {
  */
 export const toast = {
   error: (message: string): void => {
-    const $toaster = getOrCreateToaster();
-    const $toast = createToast(message);
-    $toaster?.appendChild($toast);
+    const toasterEl = getOrCreateToaster();
+    const toastEl = createToast(message);
+    toasterEl?.appendChild(toastEl);
   },
 };
