@@ -1,18 +1,24 @@
 import { html, render } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { AsyncCountdown } from "../../../utils/countdown";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { renderManage } from "../../manage";
-import { withLoader } from "../../../components/loader";
-import { verifyTentativeDevice } from "./verifyTentativeDevice";
-import { setupCountdown } from "../../../utils/countdown";
+import { delayMillis } from "../../../utils/utils";
 import {
   DeviceData,
-  IdentityAnchorInfo,
+  Timestamp,
 } from "../../../../generated/internet_identity_types";
-import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 import { LEGACY_II_URL } from "../../../config";
 
-const pageContent = (userNumber: bigint) => {
+const pollForTentativeDeviceTemplate = ({
+  userNumber,
+  cancel,
+  remaining,
+}: {
+  userNumber: bigint;
+  cancel: () => void;
+  remaining: AsyncIterable<string>;
+}) => {
   const pageContentSlot = html`
     <hgroup>
       <h1 class="t-title t-title--main">Add a Trusted Device</h1>
@@ -42,9 +48,14 @@ const pageContent = (userNumber: bigint) => {
       This page will automatically refresh after completing the above steps.
     </p>
     <p class="t-paragraph">
-      Time remaining: <span id="timer" class="t-strong"></span>
+      Time remaining:
+      <span id="timer" class="t-strong">${asyncReplace(remaining)}</span>
     </p>
-    <button id="cancelAddRemoteDevice" class="c-button c-button--secondary">
+    <button
+      @click=${() => cancel()}
+      id="cancelAddRemoteDevice"
+      class="c-button c-button--secondary"
+    >
       Cancel
     </button>
   `;
@@ -56,109 +67,64 @@ const pageContent = (userNumber: bigint) => {
   });
 };
 
+export const pollForTentativeDevicePage = (
+  props: Parameters<typeof pollForTentativeDeviceTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(pollForTentativeDeviceTemplate(props), contain);
+};
+
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
  * @param userNumber anchor of the authenticated user
  * @param connection authenticated II connection
  */
-export const pollForTentativeDevice = async (
+export const pollForTentativeDevice = (
   userNumber: bigint,
-  connection: AuthenticatedConnection
-): Promise<void> => {
-  await withLoader(async () => {
-    const [timestamp, userInfo] = await Promise.all([
-      connection.enterDeviceRegistrationMode(),
-      connection.getAnchorInfo(),
-    ]);
-    const tentativeDevice = getTentativeDevice(userInfo);
-    if (tentativeDevice) {
-      // directly show the verification screen if the tentative device already exists
-      await verifyTentativeDevice({
-        connection,
-        alias: tentativeDevice.alias,
-        endTimestamp: timestamp,
-      });
-      await renderManage(userNumber, connection);
-    } else {
-      renderPollForTentativeDevicePage(userNumber);
-      init(userNumber, connection, timestamp);
-    }
-  });
+  connection: AuthenticatedConnection,
+  endTimestamp: Timestamp
+): Promise<DeviceData | "timeout" | "canceled"> => {
+  const countdown = AsyncCountdown.fromNanos(endTimestamp);
+
+  // Show the page with the option to cancel
+  const page = new Promise<"canceled">((resolve) =>
+    pollForTentativeDevicePage({
+      userNumber,
+      cancel: () => {
+        countdown.stop();
+        resolve("canceled");
+      },
+      remaining: countdown.remainingFormattedAsync(),
+    })
+  );
+
+  // Poll repeatedly
+  const polling = poll(userNumber, connection, () => countdown.hasStopped());
+
+  return Promise.race([page, polling]);
 };
 
-export const renderPollForTentativeDevicePage = (userNumber: bigint): void => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(userNumber), container);
-};
-
-const poll = (
+const poll = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData | null> => {
-  return connection.getAnchorInfo().then((response) => {
+): Promise<DeviceData | "timeout"> => {
+  for (;;) {
     if (shouldStop()) {
-      return null;
+      return "timeout";
     }
-    const tentativeDevice = getTentativeDevice(response);
-    if (tentativeDevice) {
+
+    const anchorInfo = await connection.getAnchorInfo();
+    const tentativeDevice =
+      anchorInfo.device_registration[0]?.tentative_device[0];
+    if (tentativeDevice !== undefined) {
       return tentativeDevice;
     }
-    return poll(userNumber, connection, shouldStop);
-  });
-};
 
-const init = (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  endTimestamp: bigint
-) => {
-  const countdown = setupCountdown(
-    endTimestamp,
-    document.getElementById("timer") as HTMLElement,
-    async () => {
-      await displayError({
-        title: "Timeout Reached",
-        message:
-          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
-        primaryButton: "Ok",
-      });
-      await renderManage(userNumber, connection);
-    }
-  );
-
-  void poll(userNumber, connection, () => countdown.hasStopped()).then(
-    async (device) => {
-      if (!countdown.hasStopped() && device) {
-        countdown.stop();
-        await verifyTentativeDevice({
-          connection,
-          alias: device.alias,
-          endTimestamp,
-        });
-        await renderManage(userNumber, connection);
-      }
-    }
-  );
-
-  const cancelButton = document.getElementById(
-    "cancelAddRemoteDevice"
-  ) as HTMLButtonElement;
-  cancelButton.onclick = async () => {
-    countdown.stop();
-    await withLoader(() => connection.exitDeviceRegistrationMode());
-    await renderManage(userNumber, connection);
-  };
-};
-
-const getTentativeDevice = (
-  userInfo: IdentityAnchorInfo
-): DeviceData | null => {
-  if (
-    userInfo.device_registration.length === 1 &&
-    userInfo.device_registration[0].tentative_device.length === 1
-  ) {
-    return userInfo.device_registration[0].tentative_device[0];
+    // Debounce a little; in practice won't be noticed by users but
+    // will avoid hot looping in case the op becomes near instantaneous.
+    await delayMillis(100);
   }
-  return null;
 };

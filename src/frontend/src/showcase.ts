@@ -32,7 +32,7 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
+import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import {
   registerTentativeDevice,
   TentativeDeviceInfo,
@@ -384,8 +384,16 @@ const iiPages: Record<string, () => void> = {
       },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
-  renderPollForTentativeDevicePage: () =>
-    renderPollForTentativeDevicePage(userNumber),
+  pollForTentativeDevicePage: () =>
+    pollForTentativeDevicePage({
+      userNumber,
+      cancel: () => console.log("canceled"),
+      remaining: {
+        async *[Symbol.asyncIterator]() {
+          yield "00:34";
+        },
+      },
+    }),
   registerTentativeDevice: () =>
     registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>

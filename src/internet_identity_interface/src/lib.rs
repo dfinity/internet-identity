@@ -191,15 +191,15 @@ impl IdentityAnchorInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct WebauthnCredential {
+pub struct WebAuthnCredential {
     pub pubkey: DeviceKey,
     pub credential_id: CredentialId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct AnchorCredentials {
-    pub credentials: Vec<WebauthnCredential>,
-    pub recovery_credentials: Vec<WebauthnCredential>,
+    pub credentials: Vec<WebAuthnCredential>,
+    pub recovery_credentials: Vec<WebAuthnCredential>,
     pub recovery_phrases: Vec<PublicKey>,
 }
 
