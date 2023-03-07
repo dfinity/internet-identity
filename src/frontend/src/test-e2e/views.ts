@@ -298,7 +298,7 @@ export class AddDeviceFlowSelectorView extends View {
 export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#registerTentativeDeviceContinue")
+      .$("#pickAliasSubmit")
       .waitForDisplayed({ timeout: 5_000 });
 
     // Make sure the loader is gone
@@ -306,7 +306,7 @@ export class AddRemoteDeviceAliasView extends View {
   }
 
   async selectAlias(alias: string): Promise<void> {
-    await this.browser.$("#tentativeDeviceAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async continue(): Promise<void> {
@@ -314,7 +314,7 @@ export class AddRemoteDeviceAliasView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#registerTentativeDeviceContinue").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 

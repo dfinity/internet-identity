@@ -33,11 +33,7 @@ import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDevice
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import {
-  registerTentativeDevice,
-  TentativeDeviceInfo,
-} from "./flows/addDevice/welcomeView/registerTentativeDevice";
-import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
@@ -335,12 +331,12 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  registerTentativeDevice: () =>
-    registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
-    deviceRegistrationDisabledInfo(dummyConnection, [
+    deviceRegistrationDisabledInfoPage({
       userNumber,
-    ] as unknown as TentativeDeviceInfo),
+      retry: () => console.log("retry"),
+      cancel: () => console.log("canceled"),
+    }),
   showVerificationCode: () =>
     showVerificationCodePage({
       alias: simpleDevices[0].alias,

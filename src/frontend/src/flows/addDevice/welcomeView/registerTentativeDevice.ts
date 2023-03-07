@@ -1,174 +1,168 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { creationOptions, Connection } from "../../../utils/iiConnection";
+import {
+  unreachableLax,
+  unreachable,
+  unknownToString,
+} from "../../../utils/utils";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
-import { DerEncodedPublicKey } from "@dfinity/agent";
 import {
-  KeyType,
-  Purpose,
+  DeviceData,
+  AddTentativeDeviceResponse,
+  CredentialId,
 } from "../../../../generated/internet_identity_types";
 import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
-import { toggleErrorMessage } from "../../../utils/errorHelper";
+import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
-import { mainWindow } from "../../../components/mainWindow";
 
-const pageContent = ({ userNumber }: { userNumber: bigint }) => {
-  const pageContentSlot = html` <article>
-    <hgroup>
-      <h1 class="t-title t-title--main">Add a Trusted Device</h1>
-      <p class="t-lead">
-        What device do you want to add to anchor
-        <strong class="t-strong">${userNumber}</strong>?
-      </p>
-      <p id="invalidAliasMessage" class="is-hidden">
-        The device alias must not be empty.
-      </p>
-    </hgroup>
-    <input
-      type="text"
-      id="tentativeDeviceAlias"
-      placeholder="Example: my phone"
-      maxlength="64"
-      class="c-input"
-    />
-    <div class="c-button-group">
-      <button
-        class="c-button c-button--secondary"
-        id="registerTentativeDeviceCancel"
-      >
-        Cancel
-      </button>
-      <button
-        class="c-button"
-        id="registerTentativeDeviceContinue"
-        class="primary"
-      >
-        Continue
-      </button>
-    </div>
-  </article>`;
-
-  return mainWindow({
-    showLogo: false,
-    showFooter: false,
-    slot: pageContentSlot,
-  });
-};
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
  * @param userNumber anchor to add the tentative device to.
  */
-export const registerTentativeDevice = (
+export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
 ): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent({ userNumber }), container);
-  return init(userNumber, connection);
-};
+  // First, we need an alias for the device to (tentatively) add
+  const alias = await promptDeviceAlias({
+    title: "Add a Trusted Device",
+    message: html` What device do you want to add to anchor
+      <strong class="t-strong">${userNumber}</strong>?`,
+  });
 
-export type TentativeDeviceInfo = [
-  bigint,
-  string,
-  KeyType,
-  Purpose,
-  DerEncodedPublicKey,
-  ArrayBuffer
-];
+  if (alias === null) {
+    // TODO L2-309: do this without reload
+    window.location.reload();
+    return;
+  }
 
-export const addTentativeDevice = async (
-  connection: Connection,
-  tentativeDeviceInfo: TentativeDeviceInfo
-): Promise<void> => {
+  // Then, we create local WebAuthn credentials for the device
   const result = await withLoader(() =>
-    connection.addTentativeDevice(...tentativeDeviceInfo)
+    createDevice({ userNumber, connection })
   );
 
-  if ("added_tentatively" in result) {
-    await showVerificationCode(
-      tentativeDeviceInfo[0],
-      connection,
-      tentativeDeviceInfo[1],
-      result.added_tentatively,
-      Array.from(new Uint8Array(tentativeDeviceInfo[5]))
-    );
-  } else if ("device_registration_mode_off" in result) {
-    await deviceRegistrationDisabledInfo(connection, tentativeDeviceInfo);
-  } else if ("another_device_tentatively_added" in result) {
+  if (result instanceof Error) {
     await displayError({
-      title: "Tentative Device Already Exists",
-      message:
-        'The "add device" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the "add device" process.',
+      title: "Error adding new device",
+      message: "Unable to register new WebAuthn Device.",
+      detail: result.message,
       primaryButton: "Ok",
     });
     // TODO L2-309: do this without reload
-    window.location.reload();
-  } else {
-    throw new Error(
-      "unknown tentative device registration result: " + JSON.stringify(result)
-    );
+    return window.location.reload() as never;
   }
+
+  // Finally, we submit it to the canister
+  const device: Omit<DeviceData, "origin"> & { credential_id: [CredentialId] } =
+    {
+      alias: alias,
+      protection: { unprotected: null },
+      pubkey: Array.from(new Uint8Array(result.getPublicKey().toDer())),
+      key_type: { unknown: null },
+      purpose: { authentication: null },
+      credential_id: [Array.from(new Uint8Array(result.rawId))],
+    };
+  const addResponse = await addTentativeDevice({
+    userNumber,
+    connection,
+    device,
+  });
+
+  // If everything went well we can now ask the user to authenticate on an existing device
+  // and enter a verification code
+  await showVerificationCode(
+    userNumber,
+    connection,
+    device.alias,
+    addResponse.added_tentatively,
+    device.credential_id[0]
+  );
 };
 
-const init = async (userNumber: bigint, connection: Connection) => {
-  const existingAuthenticators = await withLoader(() =>
-    connection.lookupAuthenticators(userNumber)
+/** Create new WebAuthn credentials */
+const createDevice = async ({
+  userNumber,
+  connection,
+}: {
+  userNumber: bigint;
+  connection: Connection;
+}): Promise<WebAuthnIdentity | Error> => {
+  const existingAuthenticators = await connection.lookupAuthenticators(
+    userNumber
   );
-  const cancelButton = document.getElementById(
-    "registerTentativeDeviceCancel"
-  ) as HTMLButtonElement;
-
-  cancelButton.onclick = () => {
-    // TODO L2-309: do this without reload
-    window.location.reload();
-  };
-
-  const continueButton = document.getElementById(
-    "registerTentativeDeviceContinue"
-  ) as HTMLButtonElement;
-  const aliasInput = document.getElementById(
-    "tentativeDeviceAlias"
-  ) as HTMLInputElement;
-
-  aliasInput.onkeypress = (e) => {
-    // submit if user hits enter
-    if (e.key === "Enter") {
-      e.preventDefault();
-      continueButton.click();
+  let newDevice: WebAuthnIdentity;
+  try {
+    newDevice = await WebAuthnIdentity.create({
+      publicKey: creationOptions(existingAuthenticators),
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return error;
+    } else {
+      return new Error(unknownToString(error, "unknown error"));
     }
-  };
+  }
+  return newDevice;
+};
 
-  continueButton.onclick = async () => {
-    if (aliasInput.value === "") {
-      toggleErrorMessage("tentativeDeviceAlias", "invalidAliasMessage", true);
-      return;
-    }
+type AddDeviceSuccess = Extract<
+  AddTentativeDeviceResponse,
+  { added_tentatively: unknown }
+>;
 
-    let newDevice: WebAuthnIdentity;
-    try {
-      newDevice = await WebAuthnIdentity.create({
-        publicKey: creationOptions(existingAuthenticators),
-      });
-    } catch (error: unknown) {
+/** Add the device tentatively to the canister */
+export const addTentativeDevice = async ({
+  userNumber,
+  connection,
+  device,
+}: {
+  userNumber: bigint;
+  connection: Connection;
+  device: Omit<DeviceData, "origin">;
+}): Promise<AddDeviceSuccess> => {
+  // Try to add the device tentatively, retrying if necessary
+  for (;;) {
+    const result = await withLoader(() =>
+      connection.addTentativeDevice(userNumber, device)
+    );
+
+    if ("another_device_tentatively_added" in result) {
+      // User already added a device so we show an error and abort
       await displayError({
-        title: "Error adding new device",
-        message: "Unable to register new WebAuthn Device.",
-        detail: error instanceof Error ? error.message : JSON.stringify(error),
+        title: "Tentative Device Already Exists",
+        message:
+          'The "add device" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the "add device" process.',
         primaryButton: "Ok",
       });
       // TODO L2-309: do this without reload
-      window.location.reload();
-      return;
+      return window.location.reload() as never;
     }
-    const tentativeDeviceInfo: TentativeDeviceInfo = [
-      userNumber,
-      aliasInput.value,
-      { unknown: null },
-      { authentication: null },
-      newDevice.getPublicKey().toDer(),
-      newDevice.rawId,
-    ];
-    await addTentativeDevice(connection, tentativeDeviceInfo);
-  };
+
+    if ("device_registration_mode_off" in result) {
+      // User hasn't started the "add device" flow, so we offer to enable it and retry, or cancel
+      const res = await deviceRegistrationDisabledInfo(userNumber);
+      if (res === "canceled") {
+        // TODO L2-309: do this without reload
+        return window.location.reload() as never;
+      }
+
+      if (res === "retry") {
+        continue;
+      }
+
+      // We should never get here, but just in case we retry
+      unreachableLax(res);
+      continue;
+    }
+
+    if ("added_tentatively" in result) {
+      return result;
+    }
+
+    // We should never get here, but just in case we show an error
+    unreachable(result);
+    break;
+  }
 };
