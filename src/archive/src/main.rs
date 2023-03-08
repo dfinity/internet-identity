@@ -36,7 +36,7 @@
 //! - prefix scan with anchor to retrieve entries by anchor
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
-use candid::{CandidType, Deserialize, Principal};
+use candid::{candid_method, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable64_size;
@@ -242,6 +242,7 @@ impl BoundedStorable for AnchorIndexKey {
 /// I.e. this allows rolling back Internet Identity from pull to push without rolling back the
 /// archive.
 #[update]
+#[candid_method]
 fn write_entry(anchor_number: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
     with_config(|config| {
         if config.ii_canister != caller() {
@@ -380,6 +381,7 @@ fn store_call_error(call_error: CallErrorInfo) {
 }
 
 #[query]
+#[candid_method(query)]
 fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
     let limit = limit_or_default(limit);
 
@@ -405,6 +407,7 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 }
 
 #[query]
+#[candid_method(query)]
 fn get_anchor_entries(
     anchor: AnchorNumber,
     cursor: Option<Cursor>,
@@ -534,6 +537,7 @@ fn write_config(config: ArchiveConfig) {
 }
 
 #[query]
+#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
@@ -654,6 +658,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 /// Publicly exposes the status of the archive canister.
 /// This is useful to check operations or for debugging purposes.
 #[update]
+#[candid_method]
 async fn status() -> ArchiveStatus {
     let canister_id = id();
     let (canister_status,) = canister_status(CanisterIdRecord { canister_id })
@@ -680,8 +685,29 @@ async fn status() -> ArchiveStatus {
 /// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
 /// provisional, but works.
 #[query]
+#[candid_method(query)]
 fn __get_candid_interface_tmp_hack() -> String {
     include_str!("../archive.did").to_string()
 }
 
 fn main() {}
+
+// Order dependent: do not move above any function annotated with #[candid_method]!
+candid::export_service!();
+
+#[cfg(test)]
+mod test {
+    use crate::__export_service;
+    use candid::utils::{service_compatible, CandidSource};
+    use std::path::Path;
+
+    #[test]
+    fn check_candid_interface_compatibility() {
+        let canister_interface = __export_service();
+        service_compatible(
+            CandidSource::Text(&canister_interface),
+            CandidSource::File(Path::new("archive.did")),
+        )
+        .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
+    }
+}

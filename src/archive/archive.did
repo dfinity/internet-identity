@@ -74,13 +74,19 @@ type Private = variant {
 };
 
 type Cursor = variant {
-    timestamp: Timestamp; // get entries starting from this Timestamp
-    next_token: blob; // submit previously received token to fetch the next page of entries
+    timestamp: record {
+        // get entries starting from this timestamp
+        timestamp: Timestamp
+    };
+    next_token: record {
+        // submit previously received token to fetch the next page of entries
+        next_token: blob
+    };
 };
 
 type AnchorEntries = record {
     entries: vec opt Entry;
-    next_token: opt blob // cursor to fetch the next page of entries (if any)
+    cursor: opt Cursor // cursor to fetch the next page of entries (if any)
 };
 
 type Entries = record {
