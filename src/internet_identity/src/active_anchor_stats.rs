@@ -120,6 +120,13 @@ fn process_monthly_stats(stats: &mut ActiveAnchorStatistics) {
     }
 }
 
+/// Increases the counter on all windows, where the `previous_activity_timestamp` (if any) lies before
+/// their respective `start_timestamp` (i.e. all windows where the anchor has not yet had any activity in).
+///
+/// For any given anchor and window the `previous_activity_timestamp` is only absent or before the
+/// `window.start_timestamp` once because:
+/// * `previous_activity_timestamp` of the given anchor is set to `ic_cdk::time()` in this call
+/// * `window.start_timestamp` is <= `ic_cdk::time()` for any active window
 fn increment_stats_on_activity(
     stats: &mut ActiveAnchorStatistics,
     previous_activity_timestamp: Option<Timestamp>,
