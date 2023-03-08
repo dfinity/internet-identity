@@ -155,7 +155,7 @@ export type VerifyTentativeDeviceResponse = {
   { 'no_device_to_verify' : null };
 export interface WebAuthnCredential {
   'pubkey' : PublicKey,
-  'credentialId' : CredentialId,
+  'credential_id' : CredentialId,
 }
 export interface _SERVICE {
   'acknowledge_entries' : (arg_0: bigint) => Promise<undefined>,

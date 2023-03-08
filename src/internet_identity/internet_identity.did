@@ -259,7 +259,7 @@ type AnchorCredentials = record {
 };
 
 type WebAuthnCredential = record {
-    credentialId : CredentialId;
+    credential_id : CredentialId;
     pubkey: PublicKey;
 };
 
