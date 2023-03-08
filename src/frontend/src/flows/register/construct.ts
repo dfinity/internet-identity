@@ -1,5 +1,6 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
+import { DeviceData } from "../../../generated/internet_identity_types";
 import {
   IdentifiableIdentity,
   DummyIdentity,
@@ -11,27 +12,45 @@ import { mainWindow } from "../../components/mainWindow";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
-const constructingContentSlot = html` <div class="c-spinner-wrapper">
+const constructingContentSlot = ({
+  message,
+}: {
+  message?: string;
+}) => html` <div class="c-spinner-wrapper">
     <div class="c-spinner">${spinner}</div>
   </div>
-  <p class="t-lead t-paragraph l-stack">Creating your Identity Anchor.</p>
+  <p class="t-lead t-paragraph l-stack">
+    ${message ?? "Creating your Identity Anchor."}
+  </p>
   <p><strong class="t-strong">Do not refresh the page</strong></p>`;
 
-const constructingContent = mainWindow({
-  additionalContainerClasses: ["t-centered"],
-  showFooter: false,
-  showLogo: false,
-  slot: constructingContentSlot,
-});
+const constructingContent = (props: { message?: string }) =>
+  mainWindow({
+    additionalContainerClasses: ["t-centered"],
+    showFooter: false,
+    showLogo: false,
+    slot: constructingContentSlot(props),
+  });
 
-export const renderConstructing = (): void => {
+export const renderConstructing = (props: { message?: string }): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(constructingContent, container);
+  render(constructingContent(props), container);
 };
 
-export const constructIdentity = async (): Promise<IdentifiableIdentity> => {
-  renderConstructing();
+export const constructIdentity = async ({
+  devices,
+  message,
+}: {
+  devices?: () => Promise<Array<DeviceData>>;
+  message?: string;
+}): Promise<IdentifiableIdentity> => {
+  renderConstructing({ message });
   await tick();
+
+  const opts =
+    devices === undefined
+      ? creationOptions()
+      : creationOptions(await devices());
 
   /* The Identity (i.e. key pair) used when creating the anchor.
    * If "II_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
@@ -41,7 +60,7 @@ export const constructIdentity = async (): Promise<IdentifiableIdentity> => {
       ? () => Promise.resolve(new DummyIdentity())
       : () =>
           WebAuthnIdentity.create({
-            publicKey: creationOptions(),
+            publicKey: opts,
           });
 
   return createIdentity();

@@ -154,4 +154,4 @@ function readScreenshotsConfig(): {
   }
 }
 
-main();
+await main();

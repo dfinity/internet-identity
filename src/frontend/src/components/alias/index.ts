@@ -11,6 +11,8 @@ import copyJson from "./index.json";
 
 export const promptDeviceAliasTemplate = (props: {
   title: string;
+  message?: string | TemplateResult;
+  cancelText?: string;
   continue: (alias: string) => void;
   cancel: () => void;
   i18n: I18n;
@@ -25,7 +27,9 @@ export const promptDeviceAliasTemplate = (props: {
   const promptDeviceAliasSlot = html`
     <hgroup class="t-centered">
       <h1 class="t-title t-title--main">${props.title}</h1>
-      <p class="t-lead t-paragraph l-stack">${copy.specify_alias}</p>
+      <p class="t-lead t-paragraph l-stack">
+        ${props.message ?? copy.specify_alias}
+      </p>
     </hgroup>
     <form
       id="registerForm"
@@ -71,7 +75,7 @@ export const promptDeviceAliasTemplate = (props: {
           class="c-button c-button--secondary"
           @click="${() => props.cancel()}"
         >
-          ${copy.cancel}
+          ${props.cancelText ?? copy.cancel}
         </button>
         <button id="pickAliasSubmit" type="submit" class="c-button">
           ${copy.next}
@@ -88,6 +92,8 @@ export const promptDeviceAliasTemplate = (props: {
 
 export const promptDeviceAliasPage = (props: {
   title: string;
+  message?: string | TemplateResult;
+  cancelText?: string;
   cancel: () => void;
   continue: (alias: string) => void;
   container?: HTMLElement;
@@ -100,13 +106,19 @@ export const promptDeviceAliasPage = (props: {
 
 export const promptDeviceAlias = ({
   title,
+  message,
+  cancelText,
 }: {
   title: string;
+  message?: string | TemplateResult;
+  cancelText?: string;
 }): Promise<string | null> =>
   new Promise((resolve) => {
     const i18n = new I18n();
     promptDeviceAliasPage({
       title,
+      message,
+      cancelText,
       cancel: () => resolve(null),
       continue: resolve,
       i18n,

@@ -324,6 +324,10 @@ It is the responsibility of the frontend UI to protect the user from doing these
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
+:::note
+If the device has the `protected` flag, then the request must be sent to the canister with `caller` that is the self-authenticating id derived from the public key of that particular device.
+:::
+
 ### The `enter_device_registration_mode` method
 
 Enables device registration mode for the given identity anchor. When device registration mode is active, new devices can be added using `add_tentative_device` and `verify_tentative_device`. Device registration mode stays active for at most 15 minutes or until the flow is either completed or aborted.

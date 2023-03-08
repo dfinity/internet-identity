@@ -233,14 +233,34 @@ type ChallengeResult = record {
     chars : text;
 };
 
+// Extra information about registration status for new devices
 type DeviceRegistrationInfo = record {
+    // If present, the user has tentatively added a new device. This
+    // new device needs to be verified (see relevant endpoint) before
+    // 'expiration'.
     tentative_device : opt DeviceData;
+    // The timestamp at which the anchor will turn off registration mode
+    // (and the tentative device will be forgotten, if any, and if not verified)
     expiration: Timestamp;
 };
 
+// Information about the anchor
 type IdentityAnchorInfo = record {
+    // All devices that can authenticate to this anchor
     devices : vec DeviceWithUsage;
+    // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
+};
+
+type AnchorCredentials = record {
+    credentials : vec WebAuthnCredential;
+    recovery_credentials : vec WebAuthnCredential;
+    recovery_phrases: vec PublicKey;
+};
+
+type WebAuthnCredential = record {
+    credentialId : CredentialId;
+    pubkey: PublicKey;
 };
 
 type DeployArchiveResult = variant {
@@ -272,8 +292,9 @@ service : (opt InternetIdentityInit) -> {
     remove : (UserNumber, DeviceKey) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
-    // Note: Will be changed in the future to be more consistent with get_anchor_info.
+    // Deprecated: Use 'get_anchor_credentials' instead.
     lookup : (UserNumber) -> (vec DeviceData) query;
+    get_anchor_credentials : (UserNumber) -> (AnchorCredentials) query;
     get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
     get_principal : (UserNumber, FrontendHostname) -> (principal) query;
     stats : () -> (InternetIdentityStats) query;
@@ -287,6 +308,7 @@ service : (opt InternetIdentityInit) -> {
     get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
     http_request: (request: HttpRequest) -> (HttpResponse) query;
+    http_request_update: (request: HttpRequest) -> (HttpResponse);
 
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
     /// Returns a batch of entries _sorted by sequence number_ to be archived.

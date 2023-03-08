@@ -4,6 +4,10 @@ export type RecoveryDevice = Omit<DeviceData, "alias"> & {
   purpose: { recovery: null };
 };
 
+export type RecoveryPhrase = RecoveryDevice & {
+  key_type: { seed_phrase: null };
+};
+
 export const recoveryDeviceToLabel = (device: RecoveryDevice): string => {
   if ("seed_phrase" in device.key_type) {
     return "Recovery Phrase";
@@ -30,6 +34,6 @@ export const hasRecoveryKey = (
 export const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
 
-export const isRecoveryPhrase = ({
-  key_type,
-}: Pick<DeviceData, "key_type">): boolean => "seed_phrase" in key_type;
+export const isRecoveryPhrase = (
+  device: Pick<DeviceData, "key_type">
+): device is RecoveryPhrase => "seed_phrase" in device.key_type;

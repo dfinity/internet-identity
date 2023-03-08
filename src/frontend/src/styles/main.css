@@ -71,6 +71,7 @@
   --vc-brand-orange: #f15a24;
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
+  --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
@@ -99,6 +100,7 @@
   --vz-foreground: 2;
   --vz-tooltip: 10;
   --vz-loader: 30;
+  --vz-toasts: 50;
 
   /*
    * reference tokens
@@ -133,6 +135,7 @@
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
+  --rc-warningLight: var(--vc-brand-pink--transparent);
   --rc-warning: var(--vc-brand-pink);
   --rc-onWarning: var(--vc-snow);
 
@@ -792,6 +795,133 @@ a:hover,
   background: var(--rc-background);
   border-radius: var(--vs-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+/**
+ *  irregularity component
+ */
+.c-irregularity {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--rs-card-bezel-x) * 0.25);
+
+  --state-color: var(--rc-warningLight);
+  --state-onColor: var(--rc-warning);
+
+  position: relative;
+  padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
+  border: var(--vs-line) solid var(--rc-line);
+  background-color: var(--state-color);
+  border-radius: var(--vs-border-radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--state-onColor);
+}
+
+.c-irregularity + .c-irregularity {
+  margin-top: calc(var(--vs-stack) * 0.5);
+}
+
+.c-irregularity__icon {
+  position: relative;
+  flex: 0 0 4.5rem;
+  background: var(--state-onColor);
+  margin: calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel-x) * 0.1)
+    calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel) * -0.4);
+  border-radius: var(--vs-border-radius);
+}
+
+.c-irregularity__icon svg {
+  display: block;
+  width: 70%;
+  height: 70%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.c-irregularity__icon svg [fill] {
+  fill: #fff;
+}
+
+.c-irregularity__message {
+  flex: 1 1 auto;
+  font-size: 0.8em;
+  line-height: 1.2;
+}
+
+.c-irregularity__close {
+  position: relative;
+  background: #fff;
+  border-radius: 50%;
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+}
+
+.c-irregularity__close svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-irregularity__close:hover svg {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+/**
+ *  toast component
+ */
+
+.c-toasts {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--vz-toasts);
+}
+
+.c-toast + .c-toast {
+  margin-top: calc(var(--vs-stack) * 0.5);
+}
+
+.c-toast:last-child {
+  margin-bottom: calc(var(--vs-stack) * 0.5);
+}
+
+.c-toast {
+  position: relative;
+  background: var(--rc-background);
+  animation: appearFromBottom 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-toast--closing {
+  z-index: 1;
+  animation: disappearToBottom 200ms cubic-bezier(0.7, 0.3, 0, 1);
+}
+
+@keyframes appearFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes disappearToBottom {
+  0% {
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
 
 /**

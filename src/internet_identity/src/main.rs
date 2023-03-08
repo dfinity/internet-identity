@@ -102,7 +102,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
-/// Note: Will be changed in the future to be more consistent with get_anchor_info.
+/// Deprecated: use [get_anchor_credentials] instead
 #[query]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
@@ -119,6 +119,35 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
             })
             .collect()
     })
+}
+
+#[query]
+fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
+    let anchor = state::anchor(anchor_number);
+
+    anchor.into_devices().into_iter().fold(
+        AnchorCredentials {
+            credentials: vec![],
+            recovery_credentials: vec![],
+            recovery_phrases: vec![],
+        },
+        |mut credentials, device| {
+            if device.key_type == KeyType::SeedPhrase {
+                credentials.recovery_phrases.push(device.pubkey);
+            } else if let Some(credential_id) = device.credential_id {
+                let credential = WebAuthnCredential {
+                    pubkey: device.pubkey,
+                    credential_id,
+                };
+                if device.purpose == Purpose::Recovery {
+                    credentials.recovery_credentials.push(credential);
+                } else {
+                    credentials.credentials.push(credential);
+                }
+            }
+            credentials
+        },
+    )
 }
 
 #[update] // this is an update call because queries are not (yet) certified
@@ -165,6 +194,11 @@ fn get_delegation(
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
+    http::http_request(req)
+}
+
+#[update]
+fn http_request_update(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 

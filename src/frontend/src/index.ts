@@ -3,7 +3,6 @@ import { authFlowManage } from "./flows/manage";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
-import { intentFromUrl } from "./utils/userIntent";
 import { version } from "./version";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
@@ -19,7 +18,7 @@ const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
   if (setupJs === null || setupJs.dataset.canisterId === undefined) {
-    displayError({
+    void displayError({
       title: "Canister ID not set",
       message:
         "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
@@ -92,23 +91,17 @@ const init = async () => {
     return compatibilityNotice(okOrReason);
   }
 
-  const userIntent = intentFromUrl(url);
-
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
-  switch (userIntent.kind) {
-    // Authenticate to a third party service
-    case "auth": {
-      await authFlowAuthorize(connection);
-      break;
-    }
-    // Open the management page
-    case "manage": {
-      await authFlowManage(connection);
-      break;
-    }
+  // Simple, #-based routing
+  if (url.hash === "#authorize") {
+    // User was brought here by a dapp for authorization
+    void authFlowAuthorize(connection);
+  } else {
+    // The default flow
+    void authFlowManage(connection);
   }
 };
 
-init();
+void init();

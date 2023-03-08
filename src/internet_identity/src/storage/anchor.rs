@@ -432,11 +432,11 @@ impl fmt::Display for AnchorError {
             ),
             AnchorError::InvalidDeviceProtection { key_type } => write!(
                 f,
-                "Only recovery phrases can be protected but key type is {key_type:?}"
+                "Only recovery phrases can be locked but key type is {key_type:?}"
             ),
             AnchorError::MutationNotAllowed { actual_principal, authorized_principal } => write!(
                 f,
-                "Device is protected. Must be authenticated with this device to mutate: authorized principal {authorized_principal}, actual principal {actual_principal}"
+                "Device is locked. Must be authenticated with this device to mutate: authorized principal {authorized_principal}, actual principal {actual_principal}"
             ),
             AnchorError::MultipleRecoveryPhrases => write!(f, "There is already a recovery phrase and only one is allowed."),
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),

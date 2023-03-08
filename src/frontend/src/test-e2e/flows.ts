@@ -86,4 +86,13 @@ export const FLOWS = {
 
     return seedPhrase;
   },
+  readSeedPhrase: async (browser: WebdriverIO.Browser): Promise<string> => {
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
+    await recoveryMethodSelectorView.waitForSeedPhrase();
+    const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
+    await recoveryMethodSelectorView.acknowledgeCheckbox();
+    await recoveryMethodSelectorView.seedPhraseContinue();
+
+    return seedPhrase;
+  },
 };

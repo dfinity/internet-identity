@@ -62,6 +62,15 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const WebAuthnCredential = IDL.Record({
+    'pubkey' : PublicKey,
+    'credentialId' : CredentialId,
+  });
+  const AnchorCredentials = IDL.Record({
+    'recovery_phrases' : IDL.Vec(PublicKey),
+    'credentials' : IDL.Vec(WebAuthnCredential),
+    'recovery_credentials' : IDL.Vec(WebAuthnCredential),
+  });
   const DeviceWithUsage = IDL.Record({
     'alias' : IDL.Text,
     'last_usage' : IDL.Opt(Timestamp),
@@ -181,6 +190,11 @@ export const idlFactory = ({ IDL }) => {
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
+    'get_anchor_credentials' : IDL.Func(
+        [UserNumber],
+        [AnchorCredentials],
+        ['query'],
+      ),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
@@ -193,6 +207,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
