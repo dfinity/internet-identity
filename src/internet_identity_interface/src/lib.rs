@@ -199,7 +199,7 @@ pub struct WebAuthnCredential {
     pub credential_id: CredentialId,
 }
 
-impl TryFrom<DeviceData> for WebauthnCredential {
+impl TryFrom<DeviceData> for WebAuthnCredential {
     type Error = ();
 
     fn try_from(device: DeviceData) -> Result<Self, Self::Error> {

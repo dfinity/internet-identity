@@ -1,4 +1,4 @@
-use crate::{DeviceData, DeviceProtection, KeyType, Purpose, WebauthnCredential};
+use crate::{DeviceData, DeviceProtection, KeyType, Purpose, WebAuthnCredential};
 use serde_bytes::ByteBuf;
 
 #[test]
@@ -13,7 +13,7 @@ fn should_get_webauthn_credential_from_device_with_credential_id() {
         origin: None,
     };
 
-    let credential = WebauthnCredential::try_from(device_data);
+    let credential = WebAuthnCredential::try_from(device_data);
     assert!(credential.is_ok())
 }
 
@@ -29,6 +29,6 @@ fn should_not_get_webauthn_credential_from_device_without_credential_id() {
         origin: None,
     };
 
-    let credential = WebauthnCredential::try_from(device_data);
+    let credential = WebAuthnCredential::try_from(device_data);
     assert!(credential.is_err())
 }

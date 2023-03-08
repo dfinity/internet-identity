@@ -315,7 +315,7 @@ mod registration_tests {
         let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
         assert_eq!(
             anchor_credentials.credentials,
-            vec![WebauthnCredential::try_from(device_data_1()).unwrap()]
+            vec![WebAuthnCredential::try_from(device_data_1()).unwrap()]
         );
         let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
         assert_eq!(anchor_info.into_device_data(), vec![device_data_1()]);
@@ -1312,8 +1312,8 @@ mod device_management_tests {
         assert_eq!(
             credentials,
             vec![
-                WebauthnCredential::try_from(device_data_2()).unwrap(),
-                WebauthnCredential::try_from(device_data_1()).unwrap()
+                WebAuthnCredential::try_from(device_data_2()).unwrap(),
+                WebAuthnCredential::try_from(device_data_1()).unwrap()
             ]
         );
         Ok(())
