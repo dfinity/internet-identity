@@ -21,7 +21,7 @@ jobs:
         run: |
           # A somewhat old release, but the generated file format has changed a bit since
           # and we need to update our files manually before upgrading to something more recent
-          didc_release=2021-09-09
+          didc_release=2022-11-17
 
           # Actual install
           mkdir -p ~/.local/bin
