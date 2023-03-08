@@ -7,6 +7,9 @@ pub mod archive;
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 pub mod http_gateway;
 
+#[cfg(test)]
+mod test;
+
 pub type AnchorNumber = u64;
 pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
@@ -194,6 +197,18 @@ impl IdentityAnchorInfo {
 pub struct WebAuthnCredential {
     pub pubkey: DeviceKey,
     pub credential_id: CredentialId,
+}
+
+impl TryFrom<DeviceData> for WebAuthnCredential {
+    type Error = ();
+
+    fn try_from(device: DeviceData) -> Result<Self, Self::Error> {
+        let credential_id = device.credential_id.ok_or(())?;
+        Ok(Self {
+            pubkey: device.pubkey,
+            credential_id,
+        })
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
