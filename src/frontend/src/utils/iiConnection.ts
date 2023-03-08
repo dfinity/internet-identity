@@ -394,22 +394,11 @@ export class Connection {
 
   addTentativeDevice = async (
     userNumber: UserNumber,
-    alias: string,
-    keyType: KeyType,
-    purpose: Purpose,
-    newPublicKey: DerEncodedPublicKey,
-    credentialId?: ArrayBuffer
+    device: Omit<DeviceData, "origin">
   ): Promise<AddTentativeDeviceResponse> => {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
-      alias,
-      pubkey: Array.from(new Uint8Array(newPublicKey)),
-      credential_id: credentialId
-        ? [Array.from(new Uint8Array(credentialId))]
-        : [],
-      key_type: keyType,
-      purpose,
-      protection: { unprotected: null },
+      ...device,
       origin: window?.origin === undefined ? [] : [window.origin],
     });
   };

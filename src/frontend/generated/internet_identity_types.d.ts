@@ -1,4 +1,12 @@
 import type { Principal } from '@dfinity/principal';
+export interface ActiveAnchorCounter {
+  'counter' : bigint,
+  'start_timestamp' : Timestamp,
+}
+export interface ActiveAnchorStatistics {
+  'completed' : CompletedActiveAnchorStats,
+  'ongoing' : OngoingActiveAnchorStats,
+}
 export type AddTentativeDeviceResponse = {
     'device_registration_mode_off' : null
   } |
@@ -10,9 +18,9 @@ export type AddTentativeDeviceResponse = {
     }
   };
 export interface AnchorCredentials {
-  'recovery_phrase' : Array<PublicKey>,
-  'credentials' : Array<WebauthnCredential>,
-  'recovery_credentials' : Array<WebauthnCredential>,
+  'recovery_phrases' : Array<PublicKey>,
+  'credentials' : Array<WebAuthnCredential>,
+  'recovery_credentials' : Array<WebAuthnCredential>,
 }
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
@@ -36,6 +44,10 @@ export interface Challenge {
 }
 export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
+export interface CompletedActiveAnchorStats {
+  'monthly_active_anchors' : [] | [ActiveAnchorCounter],
+  'daily_active_anchors' : [] | [ActiveAnchorCounter],
+}
 export type CredentialId = Array<number>;
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -103,11 +115,16 @@ export interface InternetIdentityStats {
   'assigned_user_number_range' : [bigint, bigint],
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,
+  'active_anchor_stats' : [] | [ActiveAnchorStatistics],
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
+export interface OngoingActiveAnchorStats {
+  'monthly_active_anchors' : Array<ActiveAnchorCounter>,
+  'daily_active_anchors' : ActiveAnchorCounter,
+}
 export type PublicKey = Array<number>;
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
@@ -136,7 +153,7 @@ export type VerifyTentativeDeviceResponse = {
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
-export interface WebauthnCredential {
+export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credentialId' : CredentialId,
 }

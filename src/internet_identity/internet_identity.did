@@ -154,6 +154,7 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
+    active_anchor_stats: opt ActiveAnchorStatistics;
 };
 
 // Configuration parameters related to the archive.
@@ -178,6 +179,32 @@ type ArchiveInfo = record {
     archive_canister : opt principal;
     // Configuration parameters related to the II archive.
     archive_config: opt ArchiveConfig;
+};
+
+type ActiveAnchorStatistics = record {
+    // Stats for the last completed collection period for daily and monthly active anchors
+    completed: CompletedActiveAnchorStats;
+    // ongoing periods for daily and monthly active anchors
+    ongoing: OngoingActiveAnchorStats;
+};
+
+type CompletedActiveAnchorStats = record {
+    daily_active_anchors: opt ActiveAnchorCounter;
+    monthly_active_anchors: opt ActiveAnchorCounter;
+};
+
+type OngoingActiveAnchorStats = record {
+    // Ongoing active anchor counter for the current 24 h time bucket.
+    daily_active_anchors: ActiveAnchorCounter;
+    // Monthly active users are collected using 30-day sliding windows.
+    // This vec contains up to 30 30-day active windows each offset by one day.
+    // The vec is sorted, new collection windows are added at the end.
+    monthly_active_anchors: vec ActiveAnchorCounter;
+};
+
+type ActiveAnchorCounter = record {
+    start_timestamp: Timestamp;
+    counter: nat64;
 };
 
 // Init arguments of II which can be supplied on install and upgrade.
@@ -206,23 +233,32 @@ type ChallengeResult = record {
     chars : text;
 };
 
+// Extra information about registration status for new devices
 type DeviceRegistrationInfo = record {
+    // If present, the user has tentatively added a new device. This
+    // new device needs to be verified (see relevant endpoint) before
+    // 'expiration'.
     tentative_device : opt DeviceData;
+    // The timestamp at which the anchor will turn off registration mode
+    // (and the tentative device will be forgotten, if any, and if not verified)
     expiration: Timestamp;
 };
 
+// Information about the anchor
 type IdentityAnchorInfo = record {
+    // All devices that can authenticate to this anchor
     devices : vec DeviceWithUsage;
+    // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
 };
 
 type AnchorCredentials = record {
-    credentials : vec WebauthnCredential;
-    recovery_credentials : vec WebauthnCredential;
-    recovery_phrase: vec PublicKey;
+    credentials : vec WebAuthnCredential;
+    recovery_credentials : vec WebAuthnCredential;
+    recovery_phrases: vec PublicKey;
 };
 
-type WebauthnCredential = record {
+type WebAuthnCredential = record {
     credentialId : CredentialId;
     pubkey: PublicKey;
 };

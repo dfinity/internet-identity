@@ -1,13 +1,16 @@
 import { html, render } from "lit-html";
-import { Connection } from "../../../utils/iiConnection";
-import {
-  addTentativeDevice,
-  TentativeDeviceInfo,
-} from "./registerTentativeDevice";
 import { mainWindow } from "../../../components/mainWindow";
 import { LEGACY_II_URL_NO_PROTOCOL } from "../../../config";
 
-const pageContent = (userNumber: bigint) => {
+const deviceRegistrationDisabledInfoTemplate = ({
+  userNumber,
+  cancel,
+  retry,
+}: {
+  userNumber: bigint;
+  cancel: () => void;
+  retry: () => void;
+}) => {
   const pageContentSlot = html` <article>
     <hgroup>
       <h1 class="t-title t-title--main">
@@ -35,10 +38,17 @@ const pageContent = (userNumber: bigint) => {
     </ol>
     <p class="t-paragraph t-strong">Then, press Retry below.</p>
     <div class="l-stack">
-      <button id="deviceRegModeDisabledRetry" class="c-button">Retry</button>
+      <button
+        id="deviceRegModeDisabledRetry"
+        class="c-button"
+        @click=${() => retry()}
+      >
+        Retry
+      </button>
       <button
         id="deviceRegModeDisabledCancel"
         class="c-button c-button--secondary"
+        @click=${() => cancel()}
       >
         Cancel
       </button>
@@ -51,38 +61,28 @@ const pageContent = (userNumber: bigint) => {
     slot: pageContentSlot,
   });
 };
+
+export const deviceRegistrationDisabledInfoPage = (
+  props: Parameters<typeof deviceRegistrationDisabledInfoTemplate>[0],
+  container?: HTMLElement
+): void => {
+  const contain =
+    container ?? (document.getElementById("pageContent") as HTMLElement);
+  render(deviceRegistrationDisabledInfoTemplate(props), contain);
+};
+
 /**
  * Error page which is shown if the identy anchor does not have device registration mode enabled.
  * It shows instructions to the user on how to continue.
- * @param tentativeDeviceInfo Information about the device to be added so that the user does not have to enter everything again after enabling device registration mode.
  */
 export const deviceRegistrationDisabledInfo = (
-  connection: Connection,
-  tentativeDeviceInfo: TentativeDeviceInfo
-): void => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(tentativeDeviceInfo[0]), container);
-  return init(connection, tentativeDeviceInfo);
-};
-
-const init = (
-  connection: Connection,
-  tentativeDeviceInfo: TentativeDeviceInfo
-): void => {
-  const cancelButton = document.getElementById(
-    "deviceRegModeDisabledCancel"
-  ) as HTMLButtonElement;
-
-  cancelButton.onclick = () => {
-    // TODO L2-309: do this without reload
-    window.location.reload();
-  };
-
-  const retryButton = document.getElementById(
-    "deviceRegModeDisabledRetry"
-  ) as HTMLButtonElement;
-
-  retryButton.onclick = async () => {
-    await addTentativeDevice(connection, tentativeDeviceInfo);
-  };
+  userNumber: bigint
+): Promise<"canceled" | "retry"> => {
+  return new Promise((resolve) =>
+    deviceRegistrationDisabledInfoPage({
+      userNumber,
+      cancel: () => resolve("canceled"),
+      retry: () => resolve("retry"),
+    })
+  );
 };
