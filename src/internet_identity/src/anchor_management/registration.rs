@@ -1,3 +1,4 @@
+use crate::active_anchor_stats;
 use crate::anchor_management::write_anchor;
 use crate::archive::archive_operation;
 use crate::state::ChallengeInfo;
@@ -208,6 +209,8 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
                 trap(&format!("failed to register anchor {anchor_number}: {err}"))
             });
             write_anchor(anchor_number, anchor);
+
+            active_anchor_stats::update_active_anchors_stats(None);
             archive_operation(
                 anchor_number,
                 caller(),

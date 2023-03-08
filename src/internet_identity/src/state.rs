@@ -73,6 +73,7 @@ pub struct PersistentState {
     pub archive_state: ArchiveState,
     // Amount of cycles that need to be attached when II creates a canister
     pub canister_creation_cycles_cost: u64,
+    pub active_anchor_stats: Option<ActiveAnchorStatistics>,
 }
 
 struct State {
