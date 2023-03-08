@@ -7,6 +7,9 @@ pub mod archive;
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 pub mod http_gateway;
 
+#[cfg(test)]
+mod test;
+
 pub type AnchorNumber = u64;
 pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
