@@ -19,7 +19,7 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { showWarning } from "./banner";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
-import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
+import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authnPages } from "./components/authenticateBox";
@@ -368,7 +368,12 @@ const iiPages: Record<string, () => void> = {
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();
     }),
-  displaySeedPhrase: () => displaySeedPhrase(recoveryPhraseText),
+  displaySeedPhrase: () =>
+    displaySeedPhrasePage({
+      seedPhrase: recoveryPhraseText,
+      onContinue: () => console.log("continue with:"),
+      copyPhrase: () => Promise.resolve(console.log("copied")),
+    }),
   displayError: () =>
     displayError({
       title: "Authentication Failed",
