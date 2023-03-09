@@ -1163,6 +1163,12 @@ a:hover,
   list-style: none;
 }
 
+@media screen and (max-width: 512px) {
+  .c-list--recovery {
+    display: block;
+  }
+}
+
 .c-list--recovery li {
   position: relative;
   display: inline-flex;
@@ -1180,6 +1186,13 @@ a:hover,
   z-index: 1;
 
   --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
+}
+
+@media screen and (max-width: 512px) {
+  .c-list--recovery li {
+    width: 100%;
+    display: flex;
+  }
 }
 
 .c-list--recovery li::selection {
