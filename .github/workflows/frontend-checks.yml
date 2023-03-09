@@ -19,7 +19,7 @@ jobs:
         run: npm run format-check
       - name: Install didc
         run: |
-          didc_release=2022-11-17
+          didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
 
           # Actual install
           mkdir -p ~/.local/bin
