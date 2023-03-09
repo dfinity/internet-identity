@@ -20,7 +20,7 @@ jobs:
           current_didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
           echo "current didc release '$current_didc_release'"
 
-          latest_didc_release=$(curl -sSL https://api.github.com/repos/dfinity/candid/releases/latest | jq .tag_name -r
+          latest_didc_release=$(curl -sSL https://api.github.com/repos/dfinity/candid/releases/latest | jq .tag_name -r)
           echo "latest didc release '$latest_didc_release'"
 
           if [ "$current_didc_release" != "$latest_didc_release" ]
