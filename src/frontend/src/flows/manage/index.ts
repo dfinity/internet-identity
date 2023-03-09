@@ -1,4 +1,5 @@
-import { TemplateResult, render, html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
+import { renderPage } from "../../utils/lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
@@ -17,9 +18,9 @@ import {
 } from "../../components/authenticateBox";
 import { setupRecovery, setupPhrase } from "../recovery/setupRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
-import { pollForTentativeDevice } from "../addDevice/manage/pollForTentativeDevice";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
+import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { warnBox } from "../../components/warnBox";
 import { Device } from "../../components/deviceListItem";
 import { recoveryMethodsSection } from "../../components/recoveryMethodsSection";
@@ -181,7 +182,7 @@ export const renderManage = async (
     }
     if (anchorInfo.device_registration.length !== 0) {
       // we are actually in a device registration process
-      await pollForTentativeDevice(userNumber, connection);
+      await addRemoteDevice({ userNumber, connection });
       continue;
     }
 
@@ -195,14 +196,7 @@ export const renderManage = async (
   }
 };
 
-export const displayManagePage = (
-  props: Parameters<typeof displayManageTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(displayManageTemplate(props), contain);
-};
+export const displayManagePage = renderPage(displayManageTemplate);
 
 export const displayManage = (
   userNumber: bigint,
@@ -248,7 +242,7 @@ export const displayManage = (
             break;
           }
           case "remote": {
-            await pollForTentativeDevice(userNumber, connection);
+            await addRemoteDevice({ userNumber, connection });
             resolve();
             break;
           }

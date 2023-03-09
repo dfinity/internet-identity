@@ -621,8 +621,3 @@ pub fn test_principal(n: u64) -> Principal {
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
 }
-
-pub fn clear_alias(mut device: DeviceData) -> DeviceData {
-    device.alias = "".to_string();
-    device
-}

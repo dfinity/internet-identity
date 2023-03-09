@@ -75,6 +75,8 @@ pub struct PersistentState {
     pub canister_creation_cycles_cost: u64,
     // Configuration for the rate limit on `register`, if any.
     pub registration_rate_limit: Option<RateLimitConfig>,
+    // Daily and monthly active anchor statistics
+    pub active_anchor_stats: Option<ActiveAnchorStatistics>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

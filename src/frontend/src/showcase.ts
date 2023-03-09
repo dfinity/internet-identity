@@ -32,12 +32,8 @@ import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMech
 import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { renderPollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import {
-  registerTentativeDevice,
-  TentativeDeviceInfo,
-} from "./flows/addDevice/welcomeView/registerTentativeDevice";
-import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
+import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
@@ -325,14 +321,22 @@ const iiPages: Record<string, () => void> = {
       },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
-  renderPollForTentativeDevicePage: () =>
-    renderPollForTentativeDevicePage(userNumber),
-  registerTentativeDevice: () =>
-    registerTentativeDevice(userNumber, dummyConnection),
-  deviceRegistrationDisabledInfo: () =>
-    deviceRegistrationDisabledInfo(dummyConnection, [
+  pollForTentativeDevicePage: () =>
+    pollForTentativeDevicePage({
       userNumber,
-    ] as unknown as TentativeDeviceInfo),
+      cancel: () => console.log("canceled"),
+      remaining: {
+        async *[Symbol.asyncIterator]() {
+          yield "00:34";
+        },
+      },
+    }),
+  deviceRegistrationDisabledInfo: () =>
+    deviceRegistrationDisabledInfoPage({
+      userNumber,
+      retry: () => console.log("retry"),
+      cancel: () => console.log("canceled"),
+    }),
   showVerificationCode: () =>
     showVerificationCodePage({
       alias: simpleDevices[0].alias,

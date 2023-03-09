@@ -1,3 +1,4 @@
+use crate::active_anchor_stats;
 use crate::anchor_management::write_anchor;
 use crate::archive::archive_operation;
 use crate::state::ChallengeInfo;
@@ -10,9 +11,11 @@ use ic_cdk::{call, caller, trap};
 use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::*;
 use rand_core::{RngCore, SeedableRng};
+use std::collections::HashMap;
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
+use lazy_static::lazy_static;
 
 mod rate_limit;
 
@@ -120,11 +123,30 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
     return (resp, captcha.chars_as_string());
 }
 
+lazy_static! {
+    /// Map of problematic characters that are easily mixed up by humans to the "normalized" replacement.
+    /// I.e. the captcha will never contain any of the characters in the key set and any input provided
+    /// will be mapped to the matching value.
+    /// Note: the captcha library already excludes the characters o, O and 0.
+    static ref CHAR_REPLACEMENTS: HashMap<char, char> = vec![
+        ('C', 'c'),
+        ('l', '1'),
+        ('X', 'x'),
+        ('Y', 'y'),
+        ('Z', 'z'),
+    ].into_iter().collect();
+}
+
+const CAPTCHA_LENGTH: usize = 5;
 #[cfg(not(feature = "dummy_captcha"))]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
     let mut captcha = captcha::RngCaptcha::from_rng(rng);
+    let mut chars = captcha.supported_chars();
+    chars.retain(|c| !CHAR_REPLACEMENTS.contains_key(c));
+
     let captcha = captcha
-        .add_chars(5)
+        .set_chars(&chars)
+        .add_chars(CAPTCHA_LENGTH as u32)
         .apply_filter(Wave::new(2.0, 20.0).horizontal())
         .apply_filter(Wave::new(2.0, 20.0).vertical())
         .view(220, 120);
@@ -141,10 +163,22 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
 // Check whether the CAPTCHA challenge was solved
 fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
+    // avoid processing too many characters
+    if res.chars.len() > CAPTCHA_LENGTH {
+        return Err(());
+    }
+    // Normalize challenge attempts by replacing characters that are not in the captcha character set
+    // with the respective replacement from CHAR_REPLACEMENTS.
+    let normalized_challenge_res: String = res
+        .chars
+        .chars()
+        .map(|c| *CHAR_REPLACEMENTS.get(&c).unwrap_or(&c))
+        .collect();
+
     state::inflight_challenges_mut(|inflight_challenges| {
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
-                if res.chars != challenge.chars {
+                if normalized_challenge_res != challenge.chars {
                     return Err(());
                 }
                 Ok(())
@@ -178,6 +212,8 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
                 trap(&format!("failed to register anchor {anchor_number}: {err}"))
             });
             write_anchor(anchor_number, anchor);
+
+            active_anchor_stats::update_active_anchors_stats(None);
             archive_operation(
                 anchor_number,
                 caller(),

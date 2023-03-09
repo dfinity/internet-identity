@@ -280,7 +280,7 @@ mod rollback_tests {
 mod registration_tests {
     use super::*;
 
-    /// Tests user registration with cross checks for lookup, get_anchor_info and get_principal.
+    /// Tests user registration with cross checks for get_anchor_credentials, get_anchor_info and get_principal.
     #[test]
     fn should_register_new_anchor() -> Result<(), CallError> {
         let env = env();
@@ -288,8 +288,11 @@ mod registration_tests {
         api::init_salt(&env, canister_id)?;
         let user_number = flows::register_anchor(&env, canister_id);
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
-        assert_eq!(devices, vec![clear_alias(device_data_1())]);
+        let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
+        assert_eq!(
+            anchor_credentials.credentials,
+            vec![WebAuthnCredential::try_from(device_data_1()).unwrap()]
+        );
         let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
         assert_eq!(anchor_info.into_device_data(), vec![device_data_1()]);
         let principal = api::get_principal(
@@ -1000,14 +1003,8 @@ mod stable_memory_tests {
     /// Uses the same data initially created using the genesis layout and then migrated until v6.    
     #[test]
     fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
-        // strip away the alias form the known devices, because lookup no longer reveals it
         let [device1, device2, device3, device4, device5, device6]: [DeviceData; 6] =
-            known_devices()
-                .into_iter()
-                .map(clear_alias)
-                .collect::<Vec<DeviceData>>()
-                .try_into()
-                .unwrap();
+            known_devices();
 
         let env = env();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
@@ -1020,17 +1017,42 @@ mod stable_memory_tests {
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
         // check known anchors in the backup
-        let devices = api::lookup(&env, canister_id, 10_000)?;
+        let devices = api::get_anchor_info(
+            &env,
+            canister_id,
+            Principal::self_authenticating(&device1.pubkey),
+            10_000,
+        )?
+        .into_device_data();
         assert_eq!(devices, vec![device1]);
 
-        let mut devices = api::lookup(&env, canister_id, 10_002)?;
+        let mut devices = api::get_anchor_info(
+            &env,
+            canister_id,
+            Principal::self_authenticating(&device2.pubkey),
+            10_002,
+        )?
+        .into_device_data();
         devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
         assert_eq!(devices, vec![device2, device3]);
 
-        let devices = api::lookup(&env, canister_id, 10_029)?;
+        let devices = api::get_anchor_info(
+            &env,
+            canister_id,
+            Principal::self_authenticating(&device4.pubkey),
+            10_029,
+        )?
+        .into_device_data();
         assert_eq!(devices, vec![device4]);
 
-        let devices = api::lookup(&env, canister_id, 10_030)?;
+        let mut devices = api::get_anchor_info(
+            &env,
+            canister_id,
+            Principal::self_authenticating(&device5.pubkey),
+            10_030,
+        )?
+        .into_device_data();
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
         assert_eq!(devices, vec![device5, device6]);
         Ok(())
     }
@@ -1082,8 +1104,8 @@ mod stable_memory_tests {
     /// Tests that anchors can still be modified after stable memory restore.
     #[test]
     fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
-        let public_key = hex::decode("305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387").unwrap();
-        let principal = Principal::self_authenticating(public_key.clone());
+        let [_, _, _, _, device5, device6] = known_devices();
+        let principal = Principal::self_authenticating(device6.pubkey);
         let env = env();
         let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -1094,18 +1116,14 @@ mod stable_memory_tests {
         );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        let devices = api::lookup(&env, canister_id, 10_030)?;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal, 10_030)?.into_device_data();
 
         assert_eq!(devices.len(), 2);
-        api::remove(
-            &env,
-            canister_id,
-            principal,
-            10_030,
-            ByteBuf::from(public_key),
-        )?;
+        api::remove(&env, canister_id, principal, 10_030, device5.pubkey)?;
 
-        let devices = api::lookup(&env, canister_id, 10_030)?;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal, 10_030)?.into_device_data();
         assert_eq!(devices.len(), 1);
         Ok(())
     }
@@ -1210,7 +1228,8 @@ mod stable_memory_tests {
         );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        let devices = api::lookup(&env, canister_id, 10_005)?;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), 10_005)?.into_device_data();
         assert_eq!(devices.len(), 4);
 
         let stats = api::stats(&env, canister_id)?;
@@ -1232,7 +1251,8 @@ mod stable_memory_tests {
         );
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        let devices = api::lookup(&env, canister_id, 10_000)?;
+        let devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), 10_000)?.into_device_data();
         assert_eq!(devices.len(), 1);
 
         let stats = api::stats(&env, canister_id)?;
@@ -1305,11 +1325,48 @@ mod stable_memory_tests {
     }
 }
 
-/// Tests related to local device management (add, remove, lookup, get_anchor_info).
+/// Tests related to local device management (add, remove, update, replace, lookup, get_anchor_info and get_anchor_credentials).
 /// Tests for the 'add remote device flow' are in the module [remote_device_registration_tests].
 #[cfg(test)]
 mod device_management_tests {
     use super::*;
+
+    /// Tests that lookup is consistent with get anchor info, but without alias.
+    #[test]
+    fn should_lookup() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        api::init_salt(&env, canister_id)?;
+        let user_number = flows::register_anchor(&env, canister_id);
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            device_data_2(),
+        )?;
+        api::add(
+            &env,
+            canister_id,
+            principal_1(),
+            user_number,
+            recovery_device_data_1(),
+        )?;
+
+        let mut devices = api::lookup(&env, canister_id, user_number)?;
+        devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+        let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
+        // clear alias to make it consistent with lookup
+        anchor_info
+            .devices
+            .iter_mut()
+            .for_each(|device| device.alias = "".to_string());
+        anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+
+        assert_eq!(devices, anchor_info.into_device_data());
+        Ok(())
+    }
 
     /// Verifies that a new device can be added.
     #[test]
@@ -1325,29 +1382,21 @@ mod device_management_tests {
             user_number,
             device_data_2(),
         )?;
-        let mut devices = api::lookup(&env, canister_id, user_number)?;
-        let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
-        // sort devices to not fail on different orderings
+        let mut devices =
+            api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
         devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-        anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        assert_eq!(devices, vec![device_data_2(), device_data_1()]);
 
-        assert_eq!(anchor_info.devices.len(), 2);
-        assert!(anchor_info
-            .devices
-            .iter()
-            .any(|device| DeviceData::from(device.clone()) == device_data_1()));
-        assert!(anchor_info
-            .devices
-            .iter()
-            .any(|device| DeviceData::from(device.clone()) == device_data_2()));
-
+        let mut credentials =
+            api::get_anchor_credentials(&env, canister_id, user_number)?.credentials;
+        // sort devices to not fail on different orderings
+        credentials.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
         assert_eq!(
-            devices,
-            anchor_info
-                .into_device_data()
-                .into_iter()
-                .map(clear_alias)
-                .collect::<Vec<DeviceData>>()
+            credentials,
+            vec![
+                WebAuthnCredential::try_from(device_data_2()).unwrap(),
+                WebAuthnCredential::try_from(device_data_1()).unwrap()
+            ]
         );
         Ok(())
     }
@@ -1858,8 +1907,8 @@ mod device_management_tests {
             device_data_1().pubkey,
         )?;
 
-        let devices = api::lookup(&env, canister_id, user_number)?;
-        assert!(devices.is_empty());
+        let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
+        assert!(anchor_credentials.credentials.is_empty());
         Ok(())
     }
 
@@ -3263,6 +3312,420 @@ mod remote_device_registration_tests {
             )?,
             VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
         ));
+        Ok(())
+    }
+}
+
+/// Tests related to the daily and monthly active users statistics.
+mod active_anchors_tests {
+    use super::*;
+
+    const DAY_SECONDS: u64 = 24 * 60 * 60;
+    const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
+
+    /// Tests that daily active anchors are counted correctly.
+    #[test]
+    fn should_report_daily_active_anchors() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            2
+        );
+
+        // repeated activity within the 24h collection period should not increase the counter
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            2
+        );
+
+        env.advance_time(Duration::from_secs(DAY_SECONDS));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_daily_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .daily_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+        Ok(())
+    }
+
+    /// Tests that monthly active anchors are counted correctly.
+    #[test]
+    fn should_report_monthly_active_anchors() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // repeated activity within the 30-day collection period should not increase the counter
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        env.advance_time(Duration::from_secs(MONTH_SECONDS));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+        Ok(())
+    }
+
+    /// Tests that monthly active anchors are updated every 24h.
+    #[test]
+    fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        let anchor_number = flows::register_anchor(&env, canister_id);
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // advance by 24h to record in the shifted 30-day period
+        env.advance_time(Duration::from_secs(DAY_SECONDS));
+
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            2
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .get(1)
+                .unwrap()
+                .counter,
+            1
+        );
+
+        // advance time to complete the first 30-day collection period
+        env.advance_time(Duration::from_secs(29 * DAY_SECONDS));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            2f64,
+        );
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .first()
+                .unwrap()
+                .counter,
+            1
+        );
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .unwrap()
+                .counter,
+            2
+        );
+
+        // advance by 24h to complete the next 30-day period
+        env.advance_time(Duration::from_secs(DAY_SECONDS));
+
+        // some activity is required to update the stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_monthly_active_anchors",
+            1f64,
+        );
+
+        Ok(())
+    }
+
+    /// Tests that active anchor stats are kept across upgrades.
+    #[test]
+    fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors
+                .counter,
+            1
+        );
+
+        Ok(())
+    }
+
+    /// Tests that the ongoing monthly collection periods are rolled over correctly.
+    #[test]
+    fn should_have_30_parallel_monthly_collection_windows() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+        let anchor_number = flows::register_anchor(&env, canister_id);
+
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .len(),
+            1
+        );
+
+        for _ in 0..30 {
+            // advance time to trigger the next ongoing 30-day collection period
+            env.advance_time(Duration::from_secs(DAY_SECONDS));
+            // some activity is required to update the stats
+            api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+        }
+        let stats = api::stats(&env, canister_id)?;
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .len(),
+            30
+        );
+
+        // after 30 days the first monthly collection period should be completed
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .as_ref()
+                .unwrap()
+                .completed
+                .monthly_active_anchors
+                .as_ref()
+                .unwrap()
+                .counter,
+            1
+        );
+
+        Ok(())
+    }
+
+    /// Tests that the stats are updated correctly even with long periods of no activity at all.
+    #[test]
+    fn should_have_correct_stats_after_long_inactivity() -> Result<(), CallError> {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+        // some activity
+        let anchor_number = flows::register_anchor(&env, canister_id);
+
+        let t0 = env.time();
+
+        // more than 24h without activity
+        env.advance_time(Duration::from_secs(2 * DAY_SECONDS + 1));
+
+        // some activity to update stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        let daily_stats = stats
+            .active_anchor_stats
+            .unwrap()
+            .completed
+            .daily_active_anchors
+            .unwrap();
+        assert_eq!(daily_stats.counter, 0);
+        assert_eq!(
+            daily_stats.start_timestamp,
+            t0.duration_since(UNIX_EPOCH)
+                .unwrap()
+                .add(Duration::from_secs(DAY_SECONDS))
+                .as_nanos() as u64
+        );
+
+        // more than 30 days without activity
+        env.advance_time(Duration::from_secs(31 * DAY_SECONDS));
+
+        // some activity to update stats
+        api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
+
+        let stats = api::stats(&env, canister_id)?;
+        let monthly_stats = stats
+            .active_anchor_stats
+            .as_ref()
+            .unwrap()
+            .completed
+            .monthly_active_anchors
+            .as_ref()
+            .unwrap();
+        assert_eq!(monthly_stats.counter, 0);
+        assert_eq!(
+            monthly_stats.start_timestamp,
+            t0.duration_since(UNIX_EPOCH)
+                .unwrap()
+                .add(Duration::from_secs(3 * DAY_SECONDS))
+                .as_nanos() as u64
+        );
+
+        // there is one ongoing collection period setup
+        assert_eq!(
+            stats
+                .active_anchor_stats
+                .unwrap()
+                .ongoing
+                .monthly_active_anchors
+                .len(),
+            1
+        );
+
         Ok(())
     }
 }

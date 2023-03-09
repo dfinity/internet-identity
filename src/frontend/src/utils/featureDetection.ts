@@ -17,9 +17,9 @@ export const checkRequiredFeatures = async (
   try {
     return (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
       ? true
-      : "UserVerifyingPlatformAuthenticator is not available";
+      : "This device does not offer WebAuthn authentication. Please make sure you have biometrics (fingerprint / Touch ID / Face ID) enabled and try again.";
   } catch (error) {
-    return `An error occured when checking for compatibility: ${wrapError(
+    return `An error occurred when checking for compatibility: ${wrapError(
       error
     )}`;
   }
