@@ -1220,6 +1220,10 @@ a:hover,
   align-items: center;
   justify-content: center;
   transform: translateY(-50%);
+  /* 
+    --i is set on the element and creates a gradient creating a colored gradient
+    from the first to the last element. --i ranges from 0 to 1.  
+  */
   box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
 }
 
