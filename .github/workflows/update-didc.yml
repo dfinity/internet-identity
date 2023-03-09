@@ -1,0 +1,61 @@
+# A GitHub Actions workflow that regularly checks for new didc releases
+# and creates a PR on new versions.
+name: didc Update
+
+on:
+  schedule:
+    # check for new didc releases daily at 7:30
+    - cron:  '30 7 * * *'
+
+jobs:
+  didc-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+        # First, check didc releases (on the candid repo) for a new version.
+      - name: Check new didc version
+        id: update
+        run: |
+          current_didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
+          echo "current didc release '$current_didc_release'"
+
+          latest_didc_release=$(curl -sSL https://api.github.com/repos/dfinity/candid/releases/latest | jq .tag_name -r
+          echo "latest didc release '$latest_didc_release'"
+
+          if [ "$current_didc_release" != "$latest_didc_release" ]
+          then
+            echo didc needs an update
+            sed -i -e \
+              "s/$current_didc_release/$latest_didc_release/g" \
+              ".didc-release"
+            echo "updated=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=0" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat ./.didc-release
+
+        # If the .didc-release was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./.didc-release
+          commit-message: Update didc release
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-didc-update
+          delete-branch: true
+          title: 'Update didc release'
+
+        # Since this is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "didc update failed"
