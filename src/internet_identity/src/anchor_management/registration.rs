@@ -1,6 +1,4 @@
-use crate::active_anchor_stats;
-use crate::anchor_management::write_anchor;
-use crate::archive::archive_operation;
+use crate::anchor_management::anchor_operation_bookkeeping;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
@@ -206,25 +204,28 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     }
 
     let allocation = state::storage_mut(|storage| storage.allocate_anchor());
-    match allocation {
-        Some((anchor_number, mut anchor)) => {
-            anchor.add_device(device.clone()).unwrap_or_else(|err| {
-                trap(&format!("failed to register anchor {anchor_number}: {err}"))
-            });
-            write_anchor(anchor_number, anchor);
+    let Some((anchor_number, mut anchor)) = allocation else {
+        return RegisterResponse::CanisterFull;
+    };
 
-            active_anchor_stats::update_active_anchors_stats(None);
-            archive_operation(
-                anchor_number,
-                caller(),
-                Operation::RegisterAnchor {
-                    device: DeviceDataWithoutAlias::from(device),
-                },
-            );
-            RegisterResponse::Registered {
-                user_number: anchor_number,
-            }
-        }
-        None => RegisterResponse::CanisterFull,
+    anchor
+        .add_device(device.clone())
+        .unwrap_or_else(|err| trap(&format!("failed to register anchor {anchor_number}: {err}")));
+
+    // write anchor to stable memory
+    state::storage_mut(|storage| {
+        storage.write(anchor_number, anchor).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write data of anchor {anchor_number}: {err}"
+            ))
+        });
+    });
+
+    let operation = Operation::RegisterAnchor {
+        device: DeviceDataWithoutAlias::from(device),
+    };
+    anchor_operation_bookkeeping(anchor_number, operation, None);
+    RegisterResponse::Registered {
+        user_number: anchor_number,
     }
 }

@@ -1,8 +1,8 @@
 use crate::archive::{archive_operation, device_diff};
-use crate::state;
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
+use crate::{active_anchor_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
@@ -51,28 +51,18 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     })
 }
 
-pub fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    let mut anchor = state::anchor(anchor_number);
-
+pub fn add(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
     let new_device = Device::from(device_data);
-    anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to add device to anchor {anchor_number}: {err}"
-        ))
-    });
-    write_anchor(anchor_number, anchor);
-    archive_operation(
-        anchor_number,
-        caller(),
-        Operation::AddDevice {
-            device: DeviceDataWithoutAlias::from(new_device),
-        },
-    );
+    anchor
+        .add_device(new_device.clone())
+        .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
+
+    Operation::AddDevice {
+        device: DeviceDataWithoutAlias::from(new_device),
+    }
 }
 
-pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    let mut anchor = state::anchor(user_number);
-
+pub fn update(anchor: &mut Anchor, device_key: DeviceKey, device_data: DeviceData) -> Operation {
     let Some(existing_device) = anchor.device(&device_key) else {
         trap("Could not find device to update, check device key")
     };
@@ -83,78 +73,51 @@ pub fn update(user_number: AnchorNumber, device_key: DeviceKey, device_data: Dev
 
     anchor
         .modify_device(&device_key, new_device)
-        .unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to modify device of anchor {user_number}: {err}"
-            ))
-        });
-    write_anchor(user_number, anchor);
+        .unwrap_or_else(|err| trap(&format!("failed to modify device: {err}")));
 
-    archive_operation(
-        user_number,
-        caller(),
-        Operation::UpdateDevice {
-            device: device_key,
-            new_values: diff,
-        },
-    );
+    Operation::UpdateDevice {
+        device: device_key,
+        new_values: diff,
+    }
 }
 
-pub fn replace(anchor_number: AnchorNumber, old_device: DeviceKey, new_device: DeviceData) {
-    let mut anchor = state::anchor(anchor_number);
-
-    anchor.remove_device(&old_device).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to replace device of anchor {anchor_number}: {err}"
-        ))
-    });
+pub fn replace(anchor: &mut Anchor, old_device: DeviceKey, new_device: DeviceData) -> Operation {
+    anchor
+        .remove_device(&old_device)
+        .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
     let new_device = Device::from(new_device);
-    anchor.add_device(new_device.clone()).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to replace device of anchor {anchor_number}: {err}"
-        ))
-    });
-    write_anchor(anchor_number, anchor);
-    archive_operation(
-        anchor_number,
-        caller(),
-        Operation::ReplaceDevice {
-            old_device,
-            new_device: DeviceDataWithoutAlias::from(new_device),
-        },
-    );
+    anchor
+        .add_device(new_device.clone())
+        .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
+
+    Operation::ReplaceDevice {
+        old_device,
+        new_device: DeviceDataWithoutAlias::from(new_device),
+    }
 }
 
-pub fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    let mut anchor = state::anchor(anchor_number);
+pub fn remove(anchor: &mut Anchor, device_key: DeviceKey) -> Operation {
+    anchor
+        .remove_device(&device_key)
+        .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
-    anchor.remove_device(&device_key).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to remove device of anchor {anchor_number}: {err}"
-        ))
-    });
-    write_anchor(anchor_number, anchor);
-
-    archive_operation(
-        anchor_number,
-        caller(),
-        Operation::RemoveDevice { device: device_key },
-    );
+    Operation::RemoveDevice { device: device_key }
 }
 
-/// Writes the supplied entries to stable memory and updates the anchor operation metric.
-fn write_anchor(anchor_number: AnchorNumber, anchor: Anchor) {
-    state::storage_mut(|storage| {
-        storage.write(anchor_number, anchor).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to write data of anchor {anchor_number}: {err}"
-            ))
-        });
-    });
-
+/// Handles all the bookkeeping required after a successful anchor operation:
+/// * Add the operation to the archive buffer
+/// * Increment the anchor operation counter
+/// * Record anchor activity
+pub fn anchor_operation_bookkeeping(
+    anchor_number: AnchorNumber,
+    operation: Operation,
+    previous_activity: Option<Timestamp>,
+) {
+    archive_operation(anchor_number, caller(), operation);
     state::usage_metrics_mut(|metrics| {
         metrics.anchor_operation_counter += 1;
     });
+    active_anchor_stats::update_active_anchors_stats(previous_activity);
 }
 
 /// Updates the device on the anchor to reflect the current usage.
