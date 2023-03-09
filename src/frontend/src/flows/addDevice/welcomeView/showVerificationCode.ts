@@ -122,7 +122,7 @@ async function poll({
 }: {
   userNumber: bigint;
   connection: Connection;
-  credentialToBeVerified: Array<number>;
+  credentialToBeVerified: CredentialId;
   shouldStop: () => boolean;
 }): Promise<"timeout" | "match"> {
   const verifyCredentials = async (): Promise<boolean> => {
@@ -183,7 +183,7 @@ const anchorHasCredentials = async ({
   connection,
 }: {
   userNumber: bigint;
-  credential: Array<number>;
+  credential: CredentialId;
   connection: Connection;
 }) => {
   const devices = await connection.lookupAuthenticators(userNumber);
