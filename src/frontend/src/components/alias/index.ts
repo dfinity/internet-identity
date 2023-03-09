@@ -1,6 +1,7 @@
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { withRef } from "../../utils/lit-html";
-import { html, render, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit-html";
+import { renderPage } from "../../utils/lit-html";
 import { validateAlias } from "../../utils/validateAlias";
 import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
@@ -90,19 +91,7 @@ export const promptDeviceAliasTemplate = (props: {
   });
 };
 
-export const promptDeviceAliasPage = (props: {
-  title: string;
-  message?: string | TemplateResult;
-  cancelText?: string;
-  cancel: () => void;
-  continue: (alias: string) => void;
-  container?: HTMLElement;
-  i18n: I18n;
-}): void => {
-  const container =
-    props.container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(promptDeviceAliasTemplate(props), container);
-};
+export const promptDeviceAliasPage = renderPage(promptDeviceAliasTemplate);
 
 export const promptDeviceAlias = ({
   title,

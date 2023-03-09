@@ -6,13 +6,15 @@ test("can be canceled", () => {
   const ctn = jest.fn((_str) => {
     /* */
   });
-  promptDeviceAliasPage({
-    title: "Title",
-    continue: ctn,
-    cancel,
-    container: document.body,
-    i18n: new I18n(),
-  });
+  promptDeviceAliasPage(
+    {
+      title: "Title",
+      continue: ctn,
+      cancel,
+      i18n: new I18n(),
+    },
+    document.body
+  );
 
   const elem = document.querySelector("#pickAliasCancel") as HTMLElement;
   elem.click();
@@ -25,13 +27,15 @@ test("can be picked", () => {
   const ctn = jest.fn((_str) => {
     /* */
   });
-  promptDeviceAliasPage({
-    title: "Title",
-    continue: ctn,
-    cancel,
-    container: document.body,
-    i18n: new I18n(),
-  });
+  promptDeviceAliasPage(
+    {
+      title: "Title",
+      continue: ctn,
+      cancel,
+      i18n: new I18n(),
+    },
+    document.body
+  );
 
   const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
   input.value = "foo";
