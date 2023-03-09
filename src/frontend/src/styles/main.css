@@ -1173,6 +1173,7 @@ a:hover,
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
   border: var(--vs-line) var(--rc-line) solid;
+
   border-radius: 999px;
   padding: 0.5em 0.75em;
   padding-right: 0.75em;
@@ -1202,22 +1203,24 @@ a:hover,
 
 .c-list--recovery li::before {
   position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
+  top: 50%;
+  left: 0.25em;
+  height: 85%;
+  width: 2.6em;
   counter-increment: recovery;
   content: counter(recovery);
   background-color: var(--current-color);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
   margin-right: 0.75em;
-  width: 3em;
   font-weight: 200;
   border-radius: 50%;
   display: flex;
   text-align: center;
   align-items: center;
   justify-content: center;
+  transform: translateY(-50%);
+  box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
 }
 
 .c-list--recovery li::after {
