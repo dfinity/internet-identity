@@ -1190,7 +1190,7 @@ a:hover,
 
 @media screen and (max-width: 512px) {
   .c-list--recovery li {
-    width: 100%;
+    width: auto;
     display: flex;
   }
 }
