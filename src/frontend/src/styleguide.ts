@@ -4,7 +4,12 @@ import { html } from "lit-html";
 import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 
+// these words are never longer than 8 characters
+// according to the bip39 spec
+// https://getcoinplate.com/blog/official-bip39-word-list-mnemonic-in-english-verified/
+// we do include the anchor number as a first word
 const recoveryWords = [
+  "1988236",
   "gloom",
   "squirrel",
   "candy",
@@ -13,10 +18,22 @@ const recoveryWords = [
   "rebel",
   "ocelot",
   "vampire",
-  "spaghetti",
+  "pasta",
   "sister",
   "castle",
   "cinnamon",
+  "glue",
+  "potato",
+  "own",
+  "problem",
+  "evolve",
+  "door",
+  "country",
+  "basket",
+  "lyrics",
+  "tuna",
+  "catch",
+  "tongue",
 ];
 
 export const styleguide = html`
@@ -297,7 +314,7 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
-          <output class="c-input c-input--textarea c-input--readonly c-input--icon">
+          <output class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon">
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map(
                 (word, i) =>

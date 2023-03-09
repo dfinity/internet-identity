@@ -985,6 +985,10 @@ a:hover,
   padding: calc(3 * var(--rs-input-bezel));
 }
 
+.c-input--textarea-narrow {
+  padding: calc(1.5 * var(--rs-input-bezel));
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -1163,12 +1167,6 @@ a:hover,
   list-style: none;
 }
 
-@media screen and (max-width: 512px) {
-  .c-list--recovery {
-    display: block;
-  }
-}
-
 .c-list--recovery li {
   position: relative;
   display: inline-flex;
@@ -1176,12 +1174,15 @@ a:hover,
   color: var(--rc-input-onReadonly);
   border: var(--vs-line) var(--rc-line) solid;
   border-radius: 999px;
+  padding: 0.5em 0.75em;
   padding-right: 0.75em;
-  width: calc(50% - 1rem);
+  padding-left: 2.9em;
+  width: calc(33.33% - 1rem);
   margin: 0.5rem;
-  font-size: 0.8em;
-  line-height: 2.25;
+  font-size: 0.7em;
   font-weight: bold;
+  font-family: monospace;
+  text-align: center;
 
   z-index: 1;
 
@@ -1190,8 +1191,7 @@ a:hover,
 
 @media screen and (max-width: 512px) {
   .c-list--recovery li {
-    width: auto;
-    display: flex;
+    width: calc(50% - 1rem);
   }
 }
 
@@ -1201,18 +1201,23 @@ a:hover,
 }
 
 .c-list--recovery li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
   counter-increment: recovery;
   content: counter(recovery);
-  background-color: var(--rc-line);
   background-color: var(--current-color);
-  padding: 0 0.5em 0 0.5em;
-  font-size: 1em;
+  padding: 0 0.4em 0 0.4em;
+  font-size: 0.8em;
   margin-right: 0.75em;
-  width: 2.3em;
-  text-align: right;
+  width: 3em;
   font-weight: 200;
-  border-bottom-left-radius: 999px;
-  border-top-left-radius: 999px;
+  border-radius: 50%;
+  display: flex;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
 }
 
 .c-list--recovery li::after {
