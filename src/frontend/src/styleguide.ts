@@ -310,11 +310,12 @@ export const styleguide = html`
         </p>
       </aside>
 
-
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
-          <output class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon">
+          <output
+            class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+          >
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map(
                 (word, i) =>
@@ -323,12 +324,26 @@ export const styleguide = html`
                   </li>`
               )}
             </ol>
-            <i aria-label="Copy phrase to clipboard" "="" title="Copy phrase to clipboard" tabindex="0" id="seedCopy" class="c-button__icon c-input__icon">
-            <span>Copy</span>
-            <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16.5 0.500122H3.9375C3.83437 0.500122 3.75 0.584497 3.75 0.687622V2.00012C3.75 2.10325 3.83437 2.18762 3.9375 2.18762H15.5625V18.3126C15.5625 18.4157 15.6469 18.5001 15.75 18.5001H17.0625C17.1656 18.5001 17.25 18.4157 17.25 18.3126V1.25012C17.25 0.835278 16.9148 0.500122 16.5 0.500122ZM13.5 3.50012H1.5C1.08516 3.50012 0.75 3.83528 0.75 4.25012V16.6884C0.75 16.8876 0.829687 17.0775 0.970312 17.2181L5.03203 21.2798C5.08359 21.3314 5.14219 21.3736 5.20547 21.4087V21.4532H5.30391C5.38594 21.4837 5.47266 21.5001 5.56172 21.5001H13.5C13.9148 21.5001 14.25 21.165 14.25 20.7501V4.25012C14.25 3.83528 13.9148 3.50012 13.5 3.50012ZM5.20312 19.0673L3.18516 17.047H5.20312V19.0673ZM12.5625 19.8126H6.70312V16.4845C6.70312 15.9665 6.28359 15.547 5.76562 15.547H2.4375V5.18762H12.5625V19.8126Z" fill="currentColor"></path>
-            </svg>
-          </i>
+            <i
+              aria-label="Copy phrase to clipboard"
+              title="Copy phrase to clipboard"
+              tabindex="0"
+              class="c-button__icon c-input__icon"
+            >
+              <span>Copy</span>
+              <svg
+                width="18"
+                height="22"
+                viewBox="0 0 18 22"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M16.5 0.500122H3.9375C3.83437 0.500122 3.75 0.584497 3.75 0.687622V2.00012C3.75 2.10325 3.83437 2.18762 3.9375 2.18762H15.5625V18.3126C15.5625 18.4157 15.6469 18.5001 15.75 18.5001H17.0625C17.1656 18.5001 17.25 18.4157 17.25 18.3126V1.25012C17.25 0.835278 16.9148 0.500122 16.5 0.500122ZM13.5 3.50012H1.5C1.08516 3.50012 0.75 3.83528 0.75 4.25012V16.6884C0.75 16.8876 0.829687 17.0775 0.970312 17.2181L5.03203 21.2798C5.08359 21.3314 5.14219 21.3736 5.20547 21.4087V21.4532H5.30391C5.38594 21.4837 5.47266 21.5001 5.56172 21.5001H13.5C13.9148 21.5001 14.25 21.165 14.25 20.7501V4.25012C14.25 3.83528 13.9148 3.50012 13.5 3.50012ZM5.20312 19.0673L3.18516 17.047H5.20312V19.0673ZM12.5625 19.8126H6.70312V16.4845C6.70312 15.9665 6.28359 15.547 5.76562 15.547H2.4375V5.18762H12.5625V19.8126Z"
+                  fill="currentColor"
+                ></path>
+              </svg>
+            </i>
           </output>
         </section>
       </aside>
