@@ -1,4 +1,5 @@
-import { html, render, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit-html";
+import { renderPage } from "../utils/lit-html";
 import { Ref, ref, createRef } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "./anchorInput";
 import { mainWindow } from "./mainWindow";
@@ -50,14 +51,7 @@ const promptUserNumberTemplate = ({
   });
 };
 
-export const promptUserNumberPage = (
-  props: Parameters<typeof promptUserNumberTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(promptUserNumberTemplate(props), contain);
-};
+export const promptUserNumberPage = renderPage(promptUserNumberTemplate);
 
 export const promptUserNumber = ({
   title,

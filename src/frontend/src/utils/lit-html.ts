@@ -1,5 +1,6 @@
 /* A couple of lit-html helpers */
 
+import { render, TemplateResult } from "lit-html";
 import { Ref, ref } from "lit-html/directives/ref.js";
 import { DirectiveResult } from "lit-html/directive.js";
 import { toast } from "../components/toast";
@@ -64,3 +65,14 @@ export const autofocus = mount((elem: Element) => {
     elem.focus();
   }
 });
+
+/* A wrapper for lit-html's render, rendering a page to the "pageContent" element */
+export function renderPage<
+  T extends (props: Parameters<T>[0]) => TemplateResult
+>(template: T): (props: Parameters<T>[0], container?: HTMLElement) => void {
+  return (props, container) => {
+    const contain =
+      container ?? (document.getElementById("pageContent") as HTMLElement);
+    render(template(props), contain);
+  };
+}

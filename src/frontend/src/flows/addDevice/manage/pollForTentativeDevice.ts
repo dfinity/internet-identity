@@ -1,8 +1,9 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { AsyncCountdown } from "../../../utils/countdown";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { delayMillis } from "../../../utils/utils";
+import { renderPage } from "../../../utils/lit-html";
 import {
   DeviceData,
   Timestamp,
@@ -67,14 +68,9 @@ const pollForTentativeDeviceTemplate = ({
   });
 };
 
-export const pollForTentativeDevicePage = (
-  props: Parameters<typeof pollForTentativeDeviceTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(pollForTentativeDeviceTemplate(props), contain);
-};
+export const pollForTentativeDevicePage = renderPage(
+  pollForTentativeDeviceTemplate
+);
 
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
