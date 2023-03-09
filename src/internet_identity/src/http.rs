@@ -181,7 +181,26 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "The number of buffered archive entries.",
         )?;
     }
-
+    state::persistent_state(|persistent_state| {
+        if let Some(ref register_rate_limit_config) = persistent_state.registration_rate_limit {
+            w.encode_gauge(
+                "internet_identity_register_rate_limit_max_tokens",
+                register_rate_limit_config.max_tokens as f64,
+                "The maximum number of `register` calls that are allowed in any time window.",
+            )?;
+        }
+        Ok::<(), std::io::Error>(())
+    })?;
+    state::registration_rate_limit(|rate_limit_opt| {
+        if let Some(ref rate_limit_state) = rate_limit_opt {
+            w.encode_gauge(
+                "internet_identity_register_rate_limit_current_tokens",
+                rate_limit_state.tokens as f64,
+                "The number of `register` calls that are still allowed in the current time window.",
+            )?;
+        }
+        Ok::<(), std::io::Error>(())
+    })?;
     state::persistent_state(|persistent_state| {
         let Some(ref stats) = persistent_state.active_anchor_stats else {
             // skip if not existing
