@@ -685,7 +685,6 @@ async fn status() -> ArchiveStatus {
 /// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
 /// provisional, but works.
 #[query]
-#[candid_method(query)]
 fn __get_candid_interface_tmp_hack() -> String {
     include_str!("../archive.did").to_string()
 }
@@ -709,5 +708,11 @@ mod test {
             CandidSource::File(Path::new("archive.did")),
         )
         .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
+
+        service_compatible(
+            CandidSource::File(Path::new("archive.did")),
+            CandidSource::Text(&canister_interface),
+        )
+        .unwrap_or_else(|e| panic!("the did file is incompatible to the canister code: {:?}", e));
     }
 }

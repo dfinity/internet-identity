@@ -181,7 +181,6 @@ fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Pri
 /// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
 /// provisional, but works.
 #[query]
-#[candid_method(query)]
 fn __get_candid_interface_tmp_hack() -> String {
     include_str!("../internet_identity.did").to_string()
 }
@@ -281,7 +280,6 @@ fn acknowledge_entries(sequence_number: u64) {
 }
 
 #[init]
-#[candid_method]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
 
@@ -394,5 +392,11 @@ mod test {
             CandidSource::File(Path::new("internet_identity.did")),
         )
         .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
+
+        service_compatible(
+            CandidSource::File(Path::new("internet_identity.did")),
+            CandidSource::Text(&canister_interface),
+        )
+        .unwrap_or_else(|e| panic!("the did file is incompatible to the canister code: {:?}", e));
     }
 }
