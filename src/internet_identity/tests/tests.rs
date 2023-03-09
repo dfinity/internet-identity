@@ -531,8 +531,19 @@ mod registration_tests {
             II_WASM.clone(),
             arg_with_rate_limit(RateLimitConfig {
                 time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
-                max_tokens: 2,
+                max_tokens: 10_000,
             }),
+        );
+
+        // the canister starts out with max_tokens, so use some to make the replenish actually do something
+        for _ in 0..10 {
+            flows::register_anchor(&env, canister_id);
+        }
+
+        assert_metric(
+            &get_metrics(&env, canister_id),
+            "internet_identity_register_rate_limit_current_tokens",
+            9_990f64,
         );
 
         env.advance_time(Duration::from_secs(100));
@@ -543,7 +554,7 @@ mod registration_tests {
         assert_metric(
             &get_metrics(&env, canister_id),
             "internet_identity_register_rate_limit_current_tokens",
-            1f64, // 1 and not 2 because of register call required to update rate limit
+            9_999f64, // 1 less than the limit because of register call required to update rate limit
         );
         Ok(())
     }
