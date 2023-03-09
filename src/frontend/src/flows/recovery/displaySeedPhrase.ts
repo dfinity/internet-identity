@@ -1,9 +1,52 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
+import { withRef, renderPage } from "../../utils/lit-html";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { toast } from "../../components/toast";
 
-const pageContent = (seedPhrase: string) => {
+const displaySeedPhraseTemplate = ({
+  seedPhrase,
+  onContinue,
+  copyPhrase: copyPhrase_,
+}: {
+  seedPhrase: string;
+  copyPhrase: () => Promise<void>;
+  onContinue: () => void;
+}) => {
+  const phraseElement: Ref<HTMLElement> = createRef();
+  const phraseCopyElement: Ref<HTMLElement> = createRef();
+
+  const continueButton: Ref<HTMLButtonElement> = createRef();
+  const checkbox: Ref<HTMLInputElement> = createRef();
+
+  // Selects the phrase content to give visual feedback of what's been copied
+  const selectPhrase = () => {
+    withRef(phraseElement, (phraseElement) => {
+      const selection = window.getSelection();
+      if (selection !== null) {
+        const range = document.createRange();
+        range.selectNodeContents(phraseElement);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  };
+
+  // Copy the phrase and give visual feedback on success
+  const copyPhrase = async () => {
+    try {
+      await copyPhrase_();
+      selectPhrase();
+      withRef(phraseCopyElement, (phraseCopyElement) => {
+        phraseCopyElement.classList.add("is-copied");
+      });
+    } catch (e: unknown) {
+      toast.error("Unable to copy seed phrase");
+      console.error("Unable to copy seed phrase", e);
+    }
+  };
+
   const pageContentSlot = html`
     <article>
     <hgroup>
@@ -16,7 +59,11 @@ const pageContent = (seedPhrase: string) => {
     <div>
       <output
         class="c-input c-input--textarea c-input--readonly c-input--icon"
-        ><i translate="no" id="seedPhrase">${seedPhrase}</i><i
+        ><i translate="no"
+        ${ref(phraseElement)}
+        id="seedPhrase">${seedPhrase}</i><i
+            ${ref(phraseCopyElement)}
+            @click=${() => copyPhrase()}
           aria-label="Copy phrase to clipboard""
           title="Copy phrase to clipboard"
           tabindex="0"
@@ -36,11 +83,20 @@ const pageContent = (seedPhrase: string) => {
     </p>
 
     <div class="l-stack">
-      <input type="checkbox" id="ack-checkbox" name="scales" />
+      <input ${ref(checkbox)} type="checkbox" id="ack-checkbox" name="scales"
+        @change=${() =>
+          withRef(continueButton, (continueButton) =>
+            withRef(checkbox, (checkbox) => {
+              continueButton.disabled = !checkbox.checked;
+            })
+          )}
+      />
       <label for="ack-checkbox" class="t-strong">I have stored my recovery phrase.</label>
     </div>
     <div class="l-stack">
-      <button id="displaySeedPhraseContinue" class="c-button" disabled>
+      <button ${ref(continueButton)}
+      @click=${() => onContinue()}
+      id="displaySeedPhraseContinue" class="c-button" disabled>
         Continue
       </button>
     </div>
@@ -54,57 +110,14 @@ const pageContent = (seedPhrase: string) => {
   });
 };
 
+export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
+
 export const displaySeedPhrase = (seedPhrase: string): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(seedPhrase), container);
-  return init();
+  return new Promise((resolve) =>
+    displaySeedPhrasePage({
+      seedPhrase,
+      onContinue: () => resolve(),
+      copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
+    })
+  );
 };
-
-const init = (): Promise<void> =>
-  new Promise((resolve) => {
-    const displaySeedPhraseContinue = document.getElementById(
-      "displaySeedPhraseContinue"
-    ) as HTMLButtonElement;
-    displaySeedPhraseContinue.onclick = () => resolve();
-
-    const checkbox = document.getElementById(
-      "ack-checkbox"
-    ) as HTMLInputElement;
-
-    checkbox.onchange = () => {
-      if (checkbox.checked) {
-        displaySeedPhraseContinue.disabled = false;
-      } else {
-        displaySeedPhraseContinue.disabled = true;
-      }
-    };
-
-    const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
-    const seedPhrase = document.getElementById("seedPhrase")
-      ?.innerText as string;
-
-    const selectText = (element: HTMLElement) => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const selection = window.getSelection()!;
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    };
-
-    seedCopy.addEventListener("click", () => {
-      navigator.clipboard
-        .writeText(seedPhrase)
-        .then(() => {
-          const seedPhraseElem = document.getElementById("seedPhrase");
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          selectText(seedPhraseElem!);
-          displaySeedPhraseContinue.classList.toggle("is-hidden", false);
-          seedCopy.classList.add("is-copied");
-        })
-        .catch((e) => {
-          toast.error("Unable to copy seed phrase");
-          console.error("Unable to copy seed phrase", e);
-        });
-    });
-  });
