@@ -27,20 +27,20 @@ const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
 };
 
 export const devicesSection = ({
-  authenticators,
+  authenticators: authenticators_,
   onAddDevice,
 }: {
   authenticators: Device[];
   onAddDevice: () => void;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
-  const isWarning = authenticators.length < 2;
+  const isWarning = authenticators_.length < 2;
 
   if (isWarning === true) {
     wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
   }
 
-  const _authenticators = dedupLabels(authenticators);
+  const authenticators = dedupLabels(authenticators_);
 
   return html`
     <aside class="${wrapClasses.join(" ")}">
@@ -58,7 +58,7 @@ export const devicesSection = ({
             <span class="c-tooltip__message c-card c-card--tight">
               You can register up to ${MAX_AUTHENTICATORS} authenticator
               devices (recovery devices excluded)</span>
-              (${_authenticators.length}/${MAX_AUTHENTICATORS})
+              (${authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
         </div>
@@ -73,12 +73,12 @@ export const devicesSection = ({
 
         <div class="c-action-list">
           <ul>
-          ${_authenticators.map((device, index) =>
+          ${authenticators.map((device, index) =>
             deviceListItem({ device, index: `authenticator-${index}` })
           )}</ul>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${_authenticators.length >= MAX_AUTHENTICATORS}
+              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
               @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
