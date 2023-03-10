@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use captcha::filters::Wave;
 use lazy_static::lazy_static;
 
+mod rate_limit;
+
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
 // How many captcha challenges we keep in memory (at most)
@@ -187,6 +189,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 }
 
 pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    rate_limit::process_rate_limit();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }

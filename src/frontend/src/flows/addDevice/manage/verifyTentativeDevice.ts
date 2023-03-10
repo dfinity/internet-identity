@@ -1,8 +1,8 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { unreachableLax, unknownToString } from "../../../utils/utils";
 import { createRef, ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { withRef } from "../../../utils/lit-html";
+import { withRef, renderPage } from "../../../utils/lit-html";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { withLoader } from "../../../components/loader";
 import { displayError } from "../../../components/displayError";
@@ -115,14 +115,9 @@ const verifyTentativeDeviceTemplate = ({
   });
 };
 
-export const verifyTentativeDevicePage = (
-  props: Parameters<typeof verifyTentativeDeviceTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(verifyTentativeDeviceTemplate(props), contain);
-};
+export const verifyTentativeDevicePage = renderPage(
+  verifyTentativeDeviceTemplate
+);
 
 /**
  * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.

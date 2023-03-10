@@ -5,10 +5,15 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const RateLimitConfig = IDL.Record({
+    'max_tokens' : IDL.Nat64,
+    'time_per_token_ns' : IDL.Nat64,
+  });
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
   const DeviceProtection = IDL.Variant({
@@ -238,10 +243,15 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const RateLimitConfig = IDL.Record({
+    'max_tokens' : IDL.Nat64,
+    'time_per_token_ns' : IDL.Nat64,
+  });
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];
 };

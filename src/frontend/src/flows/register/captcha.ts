@@ -1,8 +1,8 @@
 import { Challenge } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { html, render, TemplateResult } from "lit-html";
-import { withRef, autofocus } from "../../utils/lit-html";
+import { html, TemplateResult } from "lit-html";
+import { withRef, autofocus, renderPage } from "../../utils/lit-html";
 import { Chan } from "../../utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { LoginFlowCanceled, cancel } from "../../utils/flowResult";
@@ -204,14 +204,16 @@ export const promptCaptchaTemplate = <T>({
   });
 };
 
-export const promptCaptchaPage = <T>(
-  props: Parameters<typeof promptCaptchaTemplate<T>>[0],
+type TemplateProps<T> = Parameters<typeof promptCaptchaTemplate<T>>[0];
+
+export function promptCaptchaPage<T>(
+  props: TemplateProps<T>,
   container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(promptCaptchaTemplate(props), contain);
-};
+): void {
+  return renderPage<(props: TemplateProps<T>) => TemplateResult>(
+    promptCaptchaTemplate
+  )(props, container);
+}
 
 export const promptCaptcha = ({
   connection,

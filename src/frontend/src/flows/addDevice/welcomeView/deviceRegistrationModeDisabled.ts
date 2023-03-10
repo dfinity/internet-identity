@@ -1,4 +1,5 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
+import { renderPage } from "../../../utils/lit-html";
 import { mainWindow } from "../../../components/mainWindow";
 import { LEGACY_II_URL_NO_PROTOCOL } from "../../../config";
 
@@ -62,14 +63,9 @@ const deviceRegistrationDisabledInfoTemplate = ({
   });
 };
 
-export const deviceRegistrationDisabledInfoPage = (
-  props: Parameters<typeof deviceRegistrationDisabledInfoTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(deviceRegistrationDisabledInfoTemplate(props), contain);
-};
+export const deviceRegistrationDisabledInfoPage = renderPage(
+  deviceRegistrationDisabledInfoTemplate
+);
 
 /**
  * Error page which is shown if the identy anchor does not have device registration mode enabled.

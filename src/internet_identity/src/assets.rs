@@ -37,14 +37,13 @@ fn fixup_html(html: &str) -> String {
         r#"<script id="setupJs"></script>"#,
         &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#),
     );
-    let html = html.replace(
+    html.replace(
         "<meta replaceme-with-csp/>",
         &format!(
             r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,
             &http::content_security_policy_meta()
         ),
-    );
-    html
+    )
 }
 
 lazy_static! {

@@ -1115,6 +1115,10 @@ a:hover,
   padding: calc(3 * var(--rs-input-bezel));
 }
 
+.c-input--textarea-narrow {
+  padding: calc(1.5 * var(--rs-input-bezel));
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -1284,6 +1288,84 @@ a:hover,
 
 .c-list--numbered {
   list-style-type: decimal;
+}
+
+.c-list--recovery {
+  flex-wrap: wrap;
+  counter-reset: recovery;
+  padding: 0;
+  list-style: none;
+}
+
+.c-list--recovery li {
+  position: relative;
+  display: inline-flex;
+  background: var(--rc-input-readonly);
+  color: var(--rc-input-onReadonly);
+  border: var(--vs-line) var(--rc-line) solid;
+
+  border-radius: 999px;
+  padding: 0.5em 0.75em;
+  padding-right: 0.75em;
+  padding-left: 2.9em;
+  width: calc(33.33% - 1rem);
+  margin: 0.5rem;
+  font-size: 0.7em;
+  font-weight: bold;
+  font-family: monospace;
+  text-align: center;
+
+  z-index: 1;
+
+  --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
+}
+
+@media screen and (max-width: 512px) {
+  .c-list--recovery li {
+    width: calc(50% - 1rem);
+  }
+}
+
+.c-list--recovery li::selection {
+  background-color: var(--current-color);
+  color: hsl(calc(150 + var(--i) * -180), 100%, 33%);
+}
+
+.c-list--recovery li::before {
+  position: absolute;
+  top: 50%;
+  left: 0.25em;
+  height: 85%;
+  width: 2.6em;
+  counter-increment: recovery;
+  content: counter(recovery);
+  background-color: var(--current-color);
+  padding: 0 0.4em 0 0.4em;
+  font-size: 0.8em;
+  margin-right: 0.75em;
+  font-weight: 200;
+  border-radius: 50%;
+  display: flex;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  /* 
+    --i is set on the element and creates a gradient creating a colored gradient
+    from the first to the last element. --i ranges from 0 to 1.  
+  */
+  box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
+}
+
+.c-list--recovery li::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  background-color: var(--current-color);
+  border-radius: 999px;
+  filter: blur(10px);
+  z-index: -1;
+  opacity: 0.5;
 }
 
 .c-list__item--vip {

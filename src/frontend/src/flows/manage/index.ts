@@ -1,4 +1,5 @@
-import { TemplateResult, render, html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
+import { renderPage } from "../../utils/lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
@@ -195,14 +196,7 @@ export const renderManage = async (
   }
 };
 
-export const displayManagePage = (
-  props: Parameters<typeof displayManageTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(displayManageTemplate(props), contain);
-};
+export const displayManagePage = renderPage(displayManageTemplate);
 
 export const displayManage = (
   userNumber: bigint,
