@@ -17,19 +17,7 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format-check
-      - name: Install didc
-        run: |
-          didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
-
-          # Actual install
-          mkdir -p ~/.local/bin
-          curl --location --silent --show-error \
-            https://github.com/dfinity/candid/releases/download/$didc_release/didc-linux64 \
-            -o ~/.local/bin/didc
-          chmod +x ~/.local/bin/didc
-          ~/.local/bin/didc --version
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
+      - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate
       - name: Commit type interfaces
