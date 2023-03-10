@@ -14,30 +14,18 @@ const displaySeedPhraseTemplate = ({
   copyPhrase: () => Promise<void>;
   onContinue: () => void;
 }) => {
-  const phraseElement: Ref<HTMLElement> = createRef();
   const phraseCopyElement: Ref<HTMLElement> = createRef();
 
   const continueButton: Ref<HTMLButtonElement> = createRef();
   const checkbox: Ref<HTMLInputElement> = createRef();
 
-  // Selects the phrase content to give visual feedback of what's been copied
-  const selectPhrase = () => {
-    withRef(phraseElement, (phraseElement) => {
-      const selection = window.getSelection();
-      if (selection !== null) {
-        const range = document.createRange();
-        range.selectNodeContents(phraseElement);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    });
-  };
+  // Assume the phrase is a list of space-separated words
+  const recoveryWords = seedPhrase.split(" ");
 
   // Copy the phrase and give visual feedback on success
   const copyPhrase = async () => {
     try {
       await copyPhrase_();
-      selectPhrase();
       withRef(phraseCopyElement, (phraseCopyElement) => {
         phraseCopyElement.classList.add("is-copied");
       });
@@ -58,13 +46,18 @@ const displaySeedPhraseTemplate = ({
     <h2 class="t-title l-stack">Your recovery phrase</h2>
     <div>
       <output
-        class="c-input c-input--textarea c-input--readonly c-input--icon"
-        ><i translate="no"
-        ${ref(phraseElement)}
-        id="seedPhrase">${seedPhrase}</i><i
+        class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+        ><ol translate="no"
+        class="c-list c-list--recovery">
+          ${recoveryWords.map(
+            (word, i) =>
+              html`<li style="--i: ${i / recoveryWords.length}">${word}</li>`
+          )}
+        </ol>
+        <i
             ${ref(phraseCopyElement)}
             @click=${() => copyPhrase()}
-          aria-label="Copy phrase to clipboard""
+          aria-label="Copy phrase to clipboard"
           title="Copy phrase to clipboard"
           tabindex="0"
           id="seedCopy"
@@ -104,6 +97,7 @@ const displaySeedPhraseTemplate = ({
 `;
 
   return mainWindow({
+    isWideContainer: true,
     showLogo: false,
     showFooter: false,
     slot: pageContentSlot,
