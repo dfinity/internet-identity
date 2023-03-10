@@ -20,9 +20,10 @@ use ArchiveState::{Configured, Created, CreationInProgress, NotConfigured};
 use CanisterInstallMode::Upgrade;
 
 /// State of the archive canister.
-#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize)]
+#[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize, Default)]
 pub enum ArchiveState {
     /// Not configured and not created.
+    #[default]
     NotConfigured,
     /// Configured but not created.
     Configured {
@@ -43,12 +44,6 @@ pub enum ArchiveState {
         /// Archive related configuration
         config: ArchiveConfig,
     },
-}
-
-impl Default for ArchiveState {
-    fn default() -> Self {
-        NotConfigured
-    }
 }
 
 /// Management metadata about the archive.
