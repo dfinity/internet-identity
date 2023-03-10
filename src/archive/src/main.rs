@@ -700,6 +700,8 @@ mod test {
     use candid::utils::{service_compatible, CandidSource};
     use std::path::Path;
 
+    /// Checks candid interface type equality by making sure that the service in the did file is
+    /// a subtype of the generated interface and vice versa.
     #[test]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
