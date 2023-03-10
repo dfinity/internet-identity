@@ -126,7 +126,6 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async getSeedPhrase(): Promise<string> {
-
     // This tries to read the recovery phrase by first copying it to the clipboard.
 
     await this.copySeedPhrase();
@@ -137,23 +136,25 @@ export class RecoveryMethodSelectorView extends View {
 
     // First, create a new textarea element where the phrase will be pasted
     await this.browser.execute(() => {
-        const elem = document.createElement("textarea");
-        elem.setAttribute("id", "my-paste-area");
-        document.body.prepend(elem);
+      const elem = document.createElement("textarea");
+      elem.setAttribute("id", "my-paste-area");
+      document.body.prepend(elem);
     });
 
     // Select the element and mock "Ctrl + V" for pasting the clipboard content into said element
     await this.browser.$("#my-paste-area").click();
-    await this.browser.keys(['Control', 'v'])
+    await this.browser.keys(["Control", "v"]);
 
     // Read the element's value and clean up
     const seedPhrase = await this.browser.execute(() => {
-        const elem = document.querySelector("#my-paste-area") as HTMLTextAreaElement;
-        // NOTE: we could also query the value with wdio's $(..).getValue(), but since we have
-        // the element here might as well.
-        const seedPhrase = elem.value!;
-        elem.remove();
-        return seedPhrase;
+      const elem = document.querySelector(
+        "#my-paste-area"
+      ) as HTMLTextAreaElement;
+      // NOTE: we could also query the value with wdio's $(..).getValue(), but since we have
+      // the element here might as well.
+      const seedPhrase = elem.value!;
+      elem.remove();
+      return seedPhrase;
     });
 
     return seedPhrase;
