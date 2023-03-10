@@ -2,7 +2,7 @@ use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::Anchor;
-use candid::Principal;
+use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
@@ -34,23 +34,27 @@ const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
 #[update]
+#[candid_method]
 async fn init_salt() {
     state::init_salt().await;
 }
 
 #[update]
+#[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
     authenticate_and_record_activity(anchor_number);
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
+#[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     authenticate_and_record_activity(anchor_number);
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
 #[update]
+#[candid_method]
 async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
@@ -59,6 +63,7 @@ async fn add_tentative_device(
 }
 
 #[update]
+#[candid_method]
 fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
@@ -68,34 +73,40 @@ fn verify_tentative_device(
 }
 
 #[update]
+#[candid_method]
 async fn create_challenge() -> Challenge {
     anchor_management::registration::create_challenge().await
 }
 
 #[update]
+#[candid_method]
 fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
     anchor_management::registration::register(device_data, challenge_result)
 }
 
 #[update]
+#[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     authenticate_and_record_activity(anchor_number);
     anchor_management::add(anchor_number, device_data)
 }
 
 #[update]
+#[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticate_and_record_activity(anchor_number);
     anchor_management::update(anchor_number, device_key, device_data)
 }
 
 #[update]
+#[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticate_and_record_activity(anchor_number);
     anchor_management::replace(anchor_number, device_key, device_data)
 }
 
 #[update]
+#[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     authenticate_and_record_activity(anchor_number);
     anchor_management::remove(anchor_number, device_key)
@@ -104,6 +115,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
 /// Deprecated: use [get_anchor_credentials] instead
 #[query]
+#[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
         storage
@@ -122,6 +134,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 }
 
 #[query]
+#[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     let anchor = state::anchor(anchor_number);
 
@@ -151,12 +164,14 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 }
 
 #[update] // this is an update call because queries are not (yet) certified
+#[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     authenticate_and_record_activity(anchor_number);
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
+#[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     trap_if_not_authenticated(&state::anchor(anchor_number));
     delegation::get_principal(anchor_number, frontend)
@@ -171,6 +186,7 @@ fn __get_candid_interface_tmp_hack() -> String {
 }
 
 #[update]
+#[candid_method]
 async fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -182,6 +198,7 @@ async fn prepare_delegation(
 }
 
 #[query]
+#[candid_method(query)]
 fn get_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -193,16 +210,19 @@ fn get_delegation(
 }
 
 #[query]
+#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[update]
+#[candid_method]
 fn http_request_update(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[query]
+#[candid_method(query)]
 fn stats() -> InternetIdentityStats {
     let archive_info = match state::archive_state() {
         ArchiveState::NotConfigured => ArchiveInfo {
@@ -237,6 +257,7 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[update]
+#[candid_method]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     archive::deploy_archive(wasm).await
 }
@@ -245,6 +266,7 @@ async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
 /// This is an update call because the archive information _must_ be certified.
 /// Only callable by this IIs archive canister.
 #[update]
+#[candid_method]
 fn fetch_entries() -> Vec<BufferedEntry> {
     archive::fetch_entries()
 }
@@ -252,6 +274,7 @@ fn fetch_entries() -> Vec<BufferedEntry> {
 /// Removes all buffered archive entries up to sequence number.
 /// Only callable by this IIs archive canister.
 #[update]
+#[candid_method]
 fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
@@ -356,3 +379,31 @@ fn trap_if_not_authenticated(anchor: &Anchor) -> DeviceKey {
 }
 
 fn main() {}
+
+// Order dependent: do not move above any function annotated with #[candid_method]!
+candid::export_service!();
+
+#[cfg(test)]
+mod test {
+    use crate::__export_service;
+    use candid::utils::{service_compatible, CandidSource};
+    use std::path::Path;
+
+    /// Checks candid interface type equality by making sure that the service in the did file is
+    /// a subtype of the generated interface and vice versa.
+    #[test]
+    fn check_candid_interface_compatibility() {
+        let canister_interface = __export_service();
+        service_compatible(
+            CandidSource::Text(&canister_interface),
+            CandidSource::File(Path::new("internet_identity.did")),
+        )
+        .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
+
+        service_compatible(
+            CandidSource::File(Path::new("internet_identity.did")),
+            CandidSource::Text(&canister_interface),
+        )
+        .unwrap_or_else(|e| panic!("the did file is incompatible to the canister code: {:?}", e));
+    }
+}
