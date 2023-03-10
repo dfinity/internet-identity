@@ -255,25 +255,23 @@ const page = (slot: TemplateResult) => {
 
 // Start the "remote device" add flow by prompting for an anchor, and then
 // adding a device to that anchor.
-const addRemoteDevice = async (
-  connection: Connection,
-  userNumber_?: bigint
-) => {
+const addRemoteDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
   const askUserNumber = async () => {
-    const userNumber = await promptUserNumber({
+    const result = await promptUserNumber({
       title: "Add a Trusted Device",
       message: "What’s your Identity Anchor?",
     });
-    if (userNumber === "canceled") {
+    if (result === "canceled") {
       // TODO L2-309: do this without reload
       return window.location.reload() as never;
     }
 
-    return userNumber;
+    return result;
   };
 
-  const userNumber = userNumber_ ?? (await askUserNumber());
-
-  return registerTentativeDevice(userNumber, connection);
+  return registerTentativeDevice(
+    userNumber ?? (await askUserNumber()),
+    connection
+  );
 };
