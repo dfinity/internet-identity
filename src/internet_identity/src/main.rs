@@ -1,12 +1,12 @@
-use crate::anchor_management::tentative_device_registration;
+use crate::anchor_management::{anchor_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
-use internet_identity_interface::archive::BufferedEntry;
+use internet_identity_interface::archive::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
@@ -87,29 +87,33 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 #[update]
 #[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    authenticate_and_record_activity(anchor_number);
-    anchor_management::add(anchor_number, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::add(anchor, device_data)
+    })
 }
 
 #[update]
 #[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_record_activity(anchor_number);
-    anchor_management::update(anchor_number, device_key, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::update(anchor, device_key, device_data)
+    })
 }
 
 #[update]
 #[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_record_activity(anchor_number);
-    anchor_management::replace(anchor_number, device_key, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::replace(anchor, device_key, device_data)
+    })
 }
 
 #[update]
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    authenticate_and_record_activity(anchor_number);
-    anchor_management::remove(anchor_number, device_key)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::remove(anchor, device_key)
+    })
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
@@ -365,6 +369,30 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
     let previous_activity = anchor.last_activity();
     anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
     active_anchor_stats::update_active_anchors_stats(previous_activity);
+}
+
+/// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
+/// the necessary bookkeeping for anchor operations.
+fn authenticated_anchor_operation(
+    anchor_number: AnchorNumber,
+    op: impl FnOnce(&mut Anchor) -> Operation,
+) {
+    // load anchor
+    let mut anchor = state::anchor(anchor_number);
+    let device_key = trap_if_not_authenticated(&anchor);
+
+    let previous_activity = anchor.last_activity();
+    anchor
+        .set_device_usage_timestamp(&device_key, time())
+        .expect("last_usage_timestamp update: unable to update last usage timestamp");
+
+    let operation = op(&mut anchor);
+
+    // write back anchor
+    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
+        panic!("unable to update anchor {anchor_number} in stable memory: {err}")
+    });
+    anchor_operation_bookkeeping(anchor_number, operation, previous_activity);
 }
 
 /// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.
