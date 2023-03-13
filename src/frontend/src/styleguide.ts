@@ -1,6 +1,7 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
+import { ifDefined } from "lit/directives/if-defined.js";
 import {
   icLogo,
   settingsIcon,
@@ -324,12 +325,38 @@ export const styleguide = html`
             class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
           >
             <ol class="c-list c-list--recovery">
-              ${recoveryWords.map(
-                (word, i) =>
-                  html`<li style="--i: ${i / recoveryWords.length}">
-                    ${word}
-                  </li>`
-              )}
+              ${recoveryWords.map((word, i) => {
+                const classes = ["c-list--recovery-word"];
+                let contenteditable: undefined | "true" = undefined;
+                let text = word;
+
+                if (i === 21) {
+                  classes.push("c-list--recovery-word__attention");
+                  contenteditable = "true";
+                  text = "";
+                }
+
+                if (i === 22) {
+                  classes.push("c-list--recovery-word__incorrect");
+                  contenteditable = "true";
+                }
+
+                if (i === 23) {
+                  classes.push("c-list--recovery-word__correct");
+                  contenteditable = "true";
+                }
+
+                if (i === 24) {
+                  classes.push("c-list--recovery-word__disabled");
+                }
+
+                return html`<li
+                  class=${classes.join(" ")}
+                  style="--index: '${i + 1}';"
+                >
+                  <i contenteditable=${ifDefined(contenteditable)}> ${text}</i>
+                </li>`;
+              })}
             </ol>
             <i
               aria-label="Copy phrase to clipboard"

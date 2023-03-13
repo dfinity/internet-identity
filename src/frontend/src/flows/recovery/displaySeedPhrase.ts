@@ -51,7 +51,12 @@ const displaySeedPhraseTemplate = ({
           ><ol translate="no" class="c-list c-list--recovery">
             ${recoveryWords.map(
               (word, i) =>
-                html`<li style="--i: ${i / recoveryWords.length}">${word}</li>`
+                html`<li
+                  class="c-list--recovery-word"
+                  style="--index: '${i + 1}';"
+                >
+                  <i>${word}</i>
+                </li>`
             )}
           </ol>
           <i

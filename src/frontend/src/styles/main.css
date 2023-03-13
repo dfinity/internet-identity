@@ -1297,7 +1297,7 @@ a:hover,
   list-style: none;
 }
 
-.c-list--recovery li {
+.c-list--recovery-word {
   position: relative;
   display: inline-flex;
   background: var(--rc-input-readonly);
@@ -1317,29 +1317,67 @@ a:hover,
 
   z-index: 1;
 
-  --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
+  --hue: 100;
+  /* Saturation, reduce to make appear less vivid/actionable  */
+  --saturation: 100%;
+
+  /* The counter displayed. We set this explicitly from the HTML because
+   * the index shown is important for recovery. Also this works around issues related
+   * to different counter behavior on Safari & Chrome. */
+  --counter: var(--index);
+}
+
+.c-list--recovery-word pre {
+  /* Display full width, necessary for selecting the text when contenteditable is on
+     * and the text is empty */
+  display: inline-block;
+  width: 100%;
+
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+/* When a word is disabled, bring the saturation down to make it look non-interactive */
+.c-list--recovery-word__disabled {
+  --saturation: 0%;
+}
+
+/* When a word requires attention, show it as yellow */
+.c-list--recovery-word__attention {
+  --hue: 43;
+}
+
+/* When a word requires attention, show it as green and show a checkmark instead of the counter */
+.c-list--recovery-word__correct {
+  --hue: 100;
+  --counter: url("data:image/svg+xml, %3Csvg id='checkmarkIcon' xmlns='http://www.w3.org/2000/svg' width='17' height='16' viewBox='0 0 17 16' fill='none' %3E%3Cpath d='M14.7493 2.96875H13.6571C13.504 2.96875 13.3587 3.03906 13.2649 3.15937L6.82271 11.3203L3.73365 7.40625C3.68692 7.34692 3.62736 7.29895 3.55943 7.26593C3.49151 7.23292 3.41699 7.21572 3.34146 7.21562H2.24928C2.14459 7.21562 2.08678 7.33594 2.15084 7.41719L6.43053 12.8391C6.63053 13.0922 7.0149 13.0922 7.21646 12.8391L14.8477 3.16875C14.9118 3.08906 14.854 2.96875 14.7493 2.96875V2.96875Z' fill='currentColor' /%3E%3C/svg%3E%0A");
+}
+
+/* When a word requires attention, show it as red and show a warning sign instead of the counter */
+.c-list--recovery-word__incorrect {
+  --hue: 10;
+  --counter: url("data:image/svg+xml, %3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg' %3E%3Cpath d='M22.3988 20.0625L12.6488 3.1875C12.5035 2.93672 12.2527 2.8125 11.9996 2.8125C11.7465 2.8125 11.4934 2.93672 11.3504 3.1875L1.6004 20.0625C1.31212 20.5641 1.67305 21.1875 2.24962 21.1875H21.7496C22.3262 21.1875 22.6871 20.5641 22.3988 20.0625ZM11.2496 9.75C11.2496 9.64687 11.334 9.5625 11.4371 9.5625H12.5621C12.6652 9.5625 12.7496 9.64687 12.7496 9.75V14.0625C12.7496 14.1656 12.6652 14.25 12.5621 14.25H11.4371C11.334 14.25 11.2496 14.1656 11.2496 14.0625V9.75ZM11.9996 18C11.7052 17.994 11.4249 17.8728 11.2188 17.6625C11.0128 17.4522 10.8973 17.1695 10.8973 16.875C10.8973 16.5805 11.0128 16.2978 11.2188 16.0875C11.4249 15.8772 11.7052 15.756 11.9996 15.75C12.294 15.756 12.5743 15.8772 12.7804 16.0875C12.9865 16.2978 13.1019 16.5805 13.1019 16.875C13.1019 17.1695 12.9865 17.4522 12.7804 17.6625C12.5743 17.8728 12.294 17.994 11.9996 18V18Z' fill='%23292A2E' paint-order='stroke' /%3E%3C/svg%3E%0A");
 }
 
 @media screen and (max-width: 512px) {
-  .c-list--recovery li {
+  .c-list--recovery-word {
     width: calc(50% - 1rem);
   }
 }
 
-.c-list--recovery li::selection {
-  background-color: var(--current-color);
-  color: hsl(calc(150 + var(--i) * -180), 100%, 33%);
+.c-list--recovery-word::selection {
+  background-color: hsl(var(--hue), 100%, 93%);
+  color: hsl(var(--hue), var(--saturation), 33%);
 }
 
-.c-list--recovery li::before {
+.c-list--recovery-word::before {
   position: absolute;
   top: 50%;
   left: 0.25em;
   height: 85%;
   width: 2.6em;
-  counter-increment: recovery;
-  content: counter(recovery);
-  background-color: var(--current-color);
+  content: var(--counter);
+  background-color: hsl(var(--hue), var(--saturation), 93%);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
   margin-right: 0.75em;
@@ -1350,18 +1388,14 @@ a:hover,
   align-items: center;
   justify-content: center;
   transform: translateY(-50%);
-  /* 
-    --i is set on the element and creates a gradient creating a colored gradient
-    from the first to the last element. --i ranges from 0 to 1.  
-  */
-  box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
+  box-shadow: 0 0 1em hsl(var(--hue), var(--saturation), 85%);
 }
 
-.c-list--recovery li::after {
+.c-list--recovery-word::after {
   position: absolute;
   content: "";
   inset: 0;
-  background-color: var(--current-color);
+  background-color: hsl(var(--hue), var(--saturation), 93%);
   border-radius: 999px;
   filter: blur(10px);
   z-index: -1;
