@@ -1448,6 +1448,11 @@ a:hover,
   width: 100%;
   text-align: left;
   color: var(--fg, currentColor);
+
+  height: calc(1em * var(--vs-line));
+
+  /* fixes layout-shifts in safari when input is empty */
+  position: absolute;
 }
 
 .c-list__item--vip {

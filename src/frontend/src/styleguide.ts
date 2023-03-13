@@ -364,13 +364,13 @@ export const styleguide = html`
                     : null}
                   ${contenteditable === true
                     ? html`<input
-                        type="text"
-                        class="c-recoveryInput"
-                        value=${text}
-                        pattern=${text}
-                        required
-                        maxlength="8"
-                      /> `
+                          type="text"
+                          class="c-recoveryInput"
+                          value=${text}
+                          pattern=${text}
+                          required
+                          maxlength="8"
+                        />&nbsp;`
                     : text}
                 </li>`;
               })}
