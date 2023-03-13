@@ -1127,7 +1127,7 @@ a:hover,
 
 .c-input--recovery {
   padding: calc(1.5 * var(--rs-input-bezel));
-  background-color: var(--rc-input);
+  background-color: var(--rc-line);
 }
 
 .c-input--icon {
@@ -1381,7 +1381,7 @@ a:hover,
 .c-list--recovery-word__icon {
   position: absolute;
   top: 50%;
-  left: 0.5em;
+  left: 0.6em;
   transform: translateY(-50%);
   z-index: 0;
 }
@@ -1399,6 +1399,16 @@ a:hover,
   stroke: var(--fg);
 }
 
+.c-list--recovery-word__attention::before,
+.c-list--recovery-word__attention .c-list--recovery-word__icon,
+.c-list--recovery-word__incorrect::before,
+.c-list--recovery-word__incorrect .c-list--recovery-word__icon,
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  --fg: var(--rc-onButton);
+  color: var(--fg);
+}
+
 /* When a word is disabled, bring the saturation down to make it look non-interactive */
 .c-list--recovery-word__disabled {
   --bg: var(--rc-input-readonly);
@@ -1408,24 +1418,29 @@ a:hover,
 /* When a word requires attention, show it as yellow */
 .c-list--recovery-word__attention {
   --bg: var(--rc-button);
-  --fg: var(--rc-onButton);
-  color: var(--bg);
 }
 
 /* When a word requires attention, show it as green and show a checkmark instead of the counter */
 .c-list--recovery-word__correct {
   --bg: var(--rc-input-success);
-  --fg: var(--rc-input-onSuccess);
+}
+
+.c-list--recovery-word__correct::before {
+  color: var(--bg);
+}
+
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  margin-top: 0.15em;
+  margin-left: -0.05em;
 }
 
 /* When a word requires attention, show it as red and show a warning sign instead of the counter */
 .c-list--recovery-word__incorrect {
   --bg: var(--rc-input-error);
-  --fg: var(--rc-input-onError);
 }
 
 .c-list--recovery-word__incorrect::before {
-  display: none;
+  color: var(--bg);
 }
 
 .c-recoveryInput {
