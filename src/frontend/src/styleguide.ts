@@ -7,6 +7,8 @@ import {
   settingsIcon,
   dropdownIcon,
   copyIcon,
+  warningIcon,
+  checkmarkIcon,
 } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
@@ -322,28 +324,31 @@ export const styleguide = html`
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
           <output
-            class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+            class="c-input c-input--recovery"
           >
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map((word, i) => {
                 const classes = ["c-list--recovery-word"];
-                let contenteditable: undefined | "true" = undefined;
+                let contenteditable: undefined | true;
+                let icon: undefined | 'warning' | 'check';
                 let text = word;
 
                 if (i === 21) {
                   classes.push("c-list--recovery-word__attention");
-                  contenteditable = "true";
+                  contenteditable = true;
                   text = "";
                 }
 
                 if (i === 22) {
                   classes.push("c-list--recovery-word__incorrect");
-                  contenteditable = "true";
+                  contenteditable = true;
+                  icon = 'warning';
                 }
 
                 if (i === 23) {
                   classes.push("c-list--recovery-word__correct");
-                  contenteditable = "true";
+                  contenteditable = true;
+                  icon = 'check';
                 }
 
                 if (i === 24) {
@@ -354,7 +359,11 @@ export const styleguide = html`
                   class=${classes.join(" ")}
                   style="--index: '${i + 1}';"
                 >
-                  <i contenteditable=${ifDefined(contenteditable)}> ${text}</i>
+                  ${icon != null ? html`<i class="c-list--recovery-word__icon">${icon === 'warning' ? warningIcon : checkmarkIcon}</i>` : null}
+                  ${contenteditable === true ? 
+                    html`<input type="text" class="c-recoveryInput" value=${text} pattern=${text} required maxlength="8" /> ` :
+                    text
+                  }
                 </li>`;
               })}
             </ol>
