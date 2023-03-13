@@ -323,14 +323,12 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
-          <output
-            class="c-input c-input--recovery"
-          >
+          <output class="c-input c-input--recovery">
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map((word, i) => {
                 const classes = ["c-list--recovery-word"];
                 let contenteditable: undefined | true;
-                let icon: undefined | 'warning' | 'check';
+                let icon: undefined | "warning" | "check";
                 let text = word;
 
                 if (i === 21) {
@@ -342,13 +340,13 @@ export const styleguide = html`
                 if (i === 22) {
                   classes.push("c-list--recovery-word__incorrect");
                   contenteditable = true;
-                  icon = 'warning';
+                  icon = "warning";
                 }
 
                 if (i === 23) {
                   classes.push("c-list--recovery-word__correct");
                   contenteditable = true;
-                  icon = 'check';
+                  icon = "check";
                 }
 
                 if (i === 24) {
@@ -359,11 +357,21 @@ export const styleguide = html`
                   class=${classes.join(" ")}
                   style="--index: '${i + 1}';"
                 >
-                  ${icon != null ? html`<i class="c-list--recovery-word__icon">${icon === 'warning' ? warningIcon : checkmarkIcon}</i>` : null}
-                  ${contenteditable === true ? 
-                    html`<input type="text" class="c-recoveryInput" value=${text} pattern=${text} required maxlength="8" /> ` :
-                    text
-                  }
+                  ${icon != null
+                    ? html`<i class="c-list--recovery-word__icon"
+                        >${icon === "warning" ? warningIcon : checkmarkIcon}</i
+                      >`
+                    : null}
+                  ${contenteditable === true
+                    ? html`<input
+                        type="text"
+                        class="c-recoveryInput"
+                        value=${text}
+                        pattern=${text}
+                        required
+                        maxlength="8"
+                      /> `
+                    : text}
                 </li>`;
               })}
             </ol>

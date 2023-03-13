@@ -1319,14 +1319,14 @@ a:hover,
   border: var(--vs-line) var(--rc-line) solid;
 
   border-radius: 999px;
-  
+
   padding: 0.5em 0.75em;
   padding-right: 0.75em;
   padding-left: 2.9em;
 
   width: calc(33.33% - 1rem);
   margin: 0.5rem;
-  
+
   font-size: 0.7em;
   font-weight: bold;
   font-family: monospace;
