@@ -21,7 +21,6 @@ import { recoveryWizard } from "../recovery/recoveryWizard";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
-import { warnBox } from "../../components/warnBox";
 import { Device } from "../../components/deviceListItem";
 import { recoveryMethodsSection } from "../../components/recoveryMethodsSection";
 import { devicesSection } from "../../components/devicesSection";
