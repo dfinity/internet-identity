@@ -119,7 +119,7 @@ export const wordTemplate = ({
       data-state=${asyncReplace(
         state.map(
           (x) => x
-        ) /* workaroudn because chan supports only one .recv() */
+        ) /* workaround because chan supports only one .recv() */
       )}
       @input=${() => {
         /* On input, immediately show word as correct when correct, but don't show if a
