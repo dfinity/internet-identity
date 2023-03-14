@@ -3,11 +3,9 @@ import { html, TemplateResult, render } from "lit-html";
 export const createModal = ({
   slot,
   id,
-  confirmText = "Ok",
 }: {
   slot: TemplateResult;
   id?: string;
-  confirmText?: string;
 }): HTMLDialogElement => {
   const modalHtml = html`
     <form method="dialog" class="c-modal__content c-card c-card--modal">
@@ -15,9 +13,7 @@ export const createModal = ({
         <span class="c-modal__close" data-closemodal>&times;</span>
         ${slot}
         <div class="c-modal__footer">
-          <button type="submit" class="c-button c-button--primary">
-            ${confirmText}
-          </button>
+          <button type="submit" class="c-button c-button--primary">OK</button>
         </div>
       </div>
     </form>
