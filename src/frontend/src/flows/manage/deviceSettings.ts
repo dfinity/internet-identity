@@ -136,15 +136,24 @@ const deleteDevice = async ({
     pubKey
   );
 
-  const shouldProceed = sameDevice
-    ? confirm(
-        "This will remove your current device and you will be logged out."
-      )
-    : confirm(
-        `Do you really want to remove the ${
-          isRecoveryDevice(device) ? "" : "device "
-        }"${device.alias}"?`
-      );
+  // Different confirmation based on the device
+  const confirmationPrompt = [];
+  if (isRecoveryDevice(device)) {
+    confirmationPrompt.push("Remove your Recovery Device");
+    confirmationPrompt.push(
+      "Are you sure you want to remove your recovery device? You will no longer be able to use it to recover your account."
+    );
+  } else {
+    confirmationPrompt.push(
+      `Do you really want to remove the device "${device.alias}"?`
+    );
+  }
+  if (sameDevice) {
+    confirmationPrompt.push(
+      "This will remove your current device and you will be logged out."
+    );
+  }
+  const shouldProceed = confirm(confirmationPrompt.join("\n\n"));
   if (!shouldProceed) {
     return;
   }
@@ -177,7 +186,7 @@ const resetPhrase = async ({
   reload: (connection?: AuthenticatedConnection) => void;
 }) => {
   const confirmed = confirm(
-    "Reset your recovery phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one by confirming."
+    "Reset your Recovery Phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one by confirming."
   );
   if (!confirmed) {
     return;
@@ -251,6 +260,13 @@ const protectDevice = async ({
   device: DeviceData & RecoveryPhrase;
   reload: () => void;
 }) => {
+  const confirmed = confirm(
+    "Lock your Recovery Phrase\n\nIf you lock your recovery phrase, you will not be able to reset it if you lose access to it or cannot remember it."
+  );
+  if (!confirmed) {
+    return;
+  }
+
   device.protection = { protected: null };
 
   // NOTE: we do _not_ need to be authenticated with the device in order to protect it,
@@ -283,6 +299,13 @@ const unprotectDevice = async (
   isOnlyDevice: boolean,
   back: () => void
 ) => {
+  const confirmed = confirm(
+    "Unlock your Recovery Phrase\n\nIf you unlock your recovery phrase, you will be able to reset your recovery phrase without re-entering the current phrase."
+  );
+  if (!confirmed) {
+    return;
+  }
+
   device.protection = { unprotected: null };
 
   // NOTE: we do need to be authenticated with the device in order to unprotect it

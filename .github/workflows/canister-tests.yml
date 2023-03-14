@@ -651,3 +651,13 @@ jobs:
         with:
           # we check that ubuntu builds match the docker build
           sha256: ${{ startsWith(matrix.os, 'ubuntu') && steps.sha256.outputs.sha256 || '' }}
+
+  interface-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-didc
+      - name: "Check canister interface compatibility"
+        run: |
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
+          didc check src/internet_identity/internet_identity.did internet_identity_previous.did

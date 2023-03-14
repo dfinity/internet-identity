@@ -1,110 +1,130 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
+import { withRef, renderPage } from "../../utils/lit-html";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
+import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
 import { toast } from "../../components/toast";
 
-const pageContent = (seedPhrase: string) => {
+import copyJson from "./displaySeedPhrase.json";
+
+const displaySeedPhraseTemplate = ({
+  seedPhrase,
+  onContinue,
+  copyPhrase: copyPhrase_,
+  i18n,
+}: {
+  seedPhrase: string;
+  copyPhrase: () => Promise<void>;
+  onContinue: () => void;
+  i18n: I18n;
+}) => {
+  const copy = i18n.i18n(copyJson);
+  const staticCopy = i18n.staticLang(copyJson);
+
+  const phraseCopyElement: Ref<HTMLElement> = createRef();
+
+  const continueButton: Ref<HTMLButtonElement> = createRef();
+  const checkbox: Ref<HTMLInputElement> = createRef();
+
+  // Assume the phrase is a list of space-separated words
+  const recoveryWords = seedPhrase.split(" ");
+
+  // Copy the phrase and give visual feedback on success
+  const copyPhrase = async () => {
+    try {
+      await copyPhrase_();
+      withRef(phraseCopyElement, (phraseCopyElement) => {
+        phraseCopyElement.classList.add("is-copied");
+      });
+    } catch (e: unknown) {
+      toast.error(staticCopy.unable_to_copy_phrase);
+      console.error(staticCopy.unable_to_copy_phrase, e);
+    }
+  };
+
   const pageContentSlot = html`
     <article>
-    <hgroup>
-      <h1 class="t-title t-title--main">Store Recovery Phrase</h1>
-      <p class="t-lead">
-         If you lose access to your devices, use your recovery phrase to access your Internet Identity.
-      </p>
-    </hgroup>
-    <h2 class="t-title l-stack">Your recovery phrase</h2>
-    <div>
-      <output
-        class="c-input c-input--textarea c-input--readonly c-input--icon"
-        ><i translate="no" id="seedPhrase">${seedPhrase}</i><i
-          aria-label="Copy phrase to clipboard""
-          title="Copy phrase to clipboard"
-          tabindex="0"
-          id="seedCopy"
-          class="c-button__icon c-input__icon"
+      <hgroup>
+        <h1 class="t-title t-title--main">${copy.title}</h1>
+        <p class="t-lead">${copy.header}</p>
+      </hgroup>
+      <h2 class="t-title l-stack">${copy.your_recovery_phrase}</h2>
+      <div>
+        <output
+          class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+          ><ol translate="no" class="c-list c-list--recovery">
+            ${recoveryWords.map(
+              (word, i) =>
+                html`<li style="--i: ${i / recoveryWords.length}">${word}</li>`
+            )}
+          </ol>
+          <i
+            ${ref(phraseCopyElement)}
+            @click=${() => copyPhrase()}
+            aria-label=${copy.copy_to_clipboard}
+            title=${copy.copy_to_clipboard}
+            tabindex="0"
+            id="seedCopy"
+            class="c-button__icon c-input__icon"
           >
-            <span>Copy</span>
-            ${copyIcon}
-            ${checkmarkIcon}
-          </i
-        ></output
-      >
-    </div>
+            <span>${copy.copy}</span>
+            ${copyIcon} ${checkmarkIcon}
+          </i></output
+        >
+      </div>
 
-    <p class="t-paragraph">
-      Securely store your recovery phrase, and do not share it with anyone!
-    </p>
+      <p class="t-paragraph">${copy.store_your_recovery_phrase}</p>
 
-    <div class="l-stack">
-      <input type="checkbox" id="ack-checkbox" name="scales" />
-      <label for="ack-checkbox" class="t-strong">I have stored my recovery phrase.</label>
-    </div>
-    <div class="l-stack">
-      <button id="displaySeedPhraseContinue" class="c-button" disabled>
-        Continue
-      </button>
-    </div>
-  </article>
-`;
+      <div class="l-stack">
+        <input
+          ${ref(checkbox)}
+          type="checkbox"
+          id="ack-checkbox"
+          name="scales"
+          @change=${() =>
+            withRef(continueButton, (continueButton) =>
+              withRef(checkbox, (checkbox) => {
+                continueButton.disabled = !checkbox.checked;
+              })
+            )}
+        />
+        <label for="ack-checkbox" class="t-strong"
+          >${copy.i_have_stored_phrase}</label
+        >
+      </div>
+      <div class="l-stack">
+        <button
+          ${ref(continueButton)}
+          @click=${() => onContinue()}
+          id="displaySeedPhraseContinue"
+          class="c-button"
+          disabled
+        >
+          ${copy.continue}
+        </button>
+      </div>
+    </article>
+  `;
 
   return mainWindow({
+    isWideContainer: true,
     showLogo: false,
     showFooter: false,
     slot: pageContentSlot,
   });
 };
 
+export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
+
 export const displaySeedPhrase = (seedPhrase: string): Promise<void> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(seedPhrase), container);
-  return init();
+  const i18n = new I18n();
+  return new Promise((resolve) =>
+    displaySeedPhrasePage({
+      seedPhrase,
+      onContinue: () => resolve(),
+      copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
+      i18n,
+    })
+  );
 };
-
-const init = (): Promise<void> =>
-  new Promise((resolve) => {
-    const displaySeedPhraseContinue = document.getElementById(
-      "displaySeedPhraseContinue"
-    ) as HTMLButtonElement;
-    displaySeedPhraseContinue.onclick = () => resolve();
-
-    const checkbox = document.getElementById(
-      "ack-checkbox"
-    ) as HTMLInputElement;
-
-    checkbox.onchange = () => {
-      if (checkbox.checked) {
-        displaySeedPhraseContinue.disabled = false;
-      } else {
-        displaySeedPhraseContinue.disabled = true;
-      }
-    };
-
-    const seedCopy = document.getElementById("seedCopy") as HTMLButtonElement;
-    const seedPhrase = document.getElementById("seedPhrase")
-      ?.innerText as string;
-
-    const selectText = (element: HTMLElement) => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const selection = window.getSelection()!;
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    };
-
-    seedCopy.addEventListener("click", () => {
-      navigator.clipboard
-        .writeText(seedPhrase)
-        .then(() => {
-          const seedPhraseElem = document.getElementById("seedPhrase");
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          selectText(seedPhraseElem!);
-          displaySeedPhraseContinue.classList.toggle("is-hidden", false);
-          seedCopy.classList.add("is-copied");
-        })
-        .catch((e) => {
-          toast.error("Unable to copy seed phrase");
-          console.error("Unable to copy seed phrase", e);
-        });
-    });
-  });

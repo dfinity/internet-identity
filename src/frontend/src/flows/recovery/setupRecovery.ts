@@ -8,10 +8,11 @@ import {
   IC_DERIVATION_PATH,
   AuthenticatedConnection,
 } from "../../utils/iiConnection";
-import { unknownToString } from "../../utils/utils";
+import { unknownToString, unreachableLax } from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
+import { confirmSeedPhrase } from "./confirmSeedPhrase";
 
 export const setupRecovery = async ({
   userNumber,
@@ -96,6 +97,27 @@ export const setupPhrase = async (
     seedPhrase,
     IC_DERIVATION_PATH
   );
+
+  const phrase = userNumber.toString(10) + " " + seedPhrase;
+
+  // Loop until the user has confirmed the phrase
+  for (;;) {
+    await displaySeedPhrase(phrase);
+
+    const result = await confirmSeedPhrase({ phrase });
+    // User has confirmed, so break out of the loop
+    if (result === "confirmed") {
+      break;
+    }
+
+    // User has clicked the back button, so we retry
+    if (result === "back") {
+      continue;
+    }
+
+    unreachableLax(result);
+  }
+
   await withLoader(() =>
     connection.add(
       name,
@@ -105,5 +127,4 @@ export const setupPhrase = async (
       { unprotected: null }
     )
   );
-  await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
 };

@@ -1,11 +1,48 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
+import {
+  icLogo,
+  settingsIcon,
+  dropdownIcon,
+  copyIcon,
+} from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { modal } from "./components/modal";
 import { irregularity } from "./components/irregularity";
 import { toast } from "./components/toast";
+
+// these words are never longer than 8 characters
+// according to the bip39 spec
+// https://getcoinplate.com/blog/official-bip39-word-list-mnemonic-in-english-verified/
+// we do include the anchor number as a first word
+const recoveryWords = [
+  "1988236",
+  "gloom",
+  "squirrel",
+  "candy",
+  "police",
+  "nicolas",
+  "rebel",
+  "ocelot",
+  "vampire",
+  "pasta",
+  "sister",
+  "castle",
+  "cinnamon",
+  "glue",
+  "potato",
+  "own",
+  "problem",
+  "evolve",
+  "door",
+  "country",
+  "basket",
+  "lyrics",
+  "tuna",
+  "catch",
+  "tongue",
+];
 
 export const styleguide = html`
   <style>
@@ -279,6 +316,33 @@ export const styleguide = html`
           The <code>.c-list</code> class is used to style list elements. It
           expects a <code>&lt;li&gt;</code> element as a direct child.
         </p>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Recovery Word List</h2>
+        <section class="demo" aria-label="Recovery List Elements Demo">
+          <output
+            class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+          >
+            <ol class="c-list c-list--recovery">
+              ${recoveryWords.map(
+                (word, i) =>
+                  html`<li style="--i: ${i / recoveryWords.length}">
+                    ${word}
+                  </li>`
+              )}
+            </ol>
+            <i
+              aria-label="Copy phrase to clipboard"
+              title="Copy phrase to clipboard"
+              tabindex="0"
+              class="c-button__icon c-input__icon"
+            >
+              <span>Copy</span>
+              ${copyIcon}
+            </i>
+          </output>
+        </section>
       </aside>
 
       <aside class="l-stack demo-section">

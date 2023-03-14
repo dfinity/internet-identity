@@ -1,6 +1,6 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { withRef } from "../../utils/lit-html";
+import { withRef, renderPage } from "../../utils/lit-html";
 import { warnBox } from "../../components/warnBox";
 import { mainWindow } from "../../components/mainWindow";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
@@ -73,14 +73,7 @@ export const displayUserNumberTemplate = ({
   });
 };
 
-export const displayUserNumberPage = (
-  props: Parameters<typeof displayUserNumberTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(displayUserNumberTemplate(props), contain);
-};
+export const displayUserNumberPage = renderPage(displayUserNumberTemplate);
 
 export const displayUserNumber = (userNumber: bigint): Promise<void> => {
   return new Promise((resolve) =>

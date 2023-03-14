@@ -176,6 +176,27 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
+        register_rate_limit: None,
+    })
+}
+
+pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: Some(rate_limit),
+    })
+}
+
+pub fn arg_with_anchor_range(
+    anchor_range: (AnchorNumber, AnchorNumber),
+) -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        assigned_user_number_range: Some(anchor_range),
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
     })
 }
 
@@ -599,9 +620,4 @@ pub fn test_principal(n: u64) -> Principal {
     let mut bytes = n.to_le_bytes().to_vec();
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
-}
-
-pub fn clear_alias(mut device: DeviceData) -> DeviceData {
-    device.alias = "".to_string();
-    device
 }

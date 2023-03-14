@@ -1,4 +1,5 @@
-import { html, render, TemplateResult } from "lit-html";
+import { html, TemplateResult } from "lit-html";
+import { renderPage } from "../../utils/lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
@@ -74,14 +75,9 @@ export type ChooseRecoveryProps = Pick<
   "title" | "message" | "cancelText"
 >;
 
-export const chooseRecoveryMechanismPage = (
-  props: TemplateProps,
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(chooseRecoveryMechanismTemplate(props), contain);
-};
+export const chooseRecoveryMechanismPage = renderPage(
+  chooseRecoveryMechanismTemplate
+);
 
 export const chooseRecoveryMechanism = ({
   devices,

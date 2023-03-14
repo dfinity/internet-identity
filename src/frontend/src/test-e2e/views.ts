@@ -126,7 +126,38 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async getSeedPhrase(): Promise<string> {
-    return await this.browser.$("#seedPhrase").getText();
+    // This tries to read the recovery phrase by first copying it to the clipboard.
+
+    await this.copySeedPhrase();
+
+    // Our CSP policy prevents us from directly reading the clipboard.
+    // Instead, we mock user input to paste the clipboard content in textarea element and
+    // read the element's value.
+
+    // First, create a new textarea element where the phrase will be pasted
+    await this.browser.execute(() => {
+      const elem = document.createElement("textarea");
+      elem.setAttribute("id", "my-paste-area");
+      document.body.prepend(elem);
+    });
+
+    // Select the element and mock "Ctrl + V" for pasting the clipboard content into said element
+    await this.browser.$("#my-paste-area").click();
+    await this.browser.keys(["Control", "v"]);
+
+    // Read the element's value and clean up
+    const seedPhrase = await this.browser.execute(() => {
+      const elem = document.querySelector(
+        "#my-paste-area"
+      ) as HTMLTextAreaElement;
+      // NOTE: we could also query the value with wdio's $(..).getValue(), but since we have
+      // the element here might as well.
+      const seedPhrase = elem.value!;
+      elem.remove();
+      return seedPhrase;
+    });
+
+    return seedPhrase;
   }
 
   async skipRecovery(): Promise<void> {
@@ -143,6 +174,16 @@ export class RecoveryMethodSelectorView extends View {
 
   async seedPhraseContinue(): Promise<void> {
     await this.browser.$("#displaySeedPhraseContinue").click();
+  }
+
+  async seedPhraseFill(): Promise<void> {
+    await this.browser.$('[data-action="next"]').waitForDisplayed();
+    const missings = await this.browser.$$("[data-expected]");
+    for await (const missing of missings) {
+      const expected = await missing.getAttribute("data-expected");
+      await missing.setValue(expected);
+    }
+    await this.browser.$('[data-action="next"]').click();
   }
 }
 
@@ -192,6 +233,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='protect']`)
       .click();
+    await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -216,6 +258,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
       .click();
+    await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -298,7 +341,7 @@ export class AddDeviceFlowSelectorView extends View {
 export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#registerTentativeDeviceContinue")
+      .$("#pickAliasSubmit")
       .waitForDisplayed({ timeout: 5_000 });
 
     // Make sure the loader is gone
@@ -306,7 +349,7 @@ export class AddRemoteDeviceAliasView extends View {
   }
 
   async selectAlias(alias: string): Promise<void> {
-    await this.browser.$("#tentativeDeviceAlias").setValue(alias);
+    await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
   async continue(): Promise<void> {
@@ -314,7 +357,7 @@ export class AddRemoteDeviceAliasView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    await this.browser.$("#registerTentativeDeviceContinue").click();
+    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 
