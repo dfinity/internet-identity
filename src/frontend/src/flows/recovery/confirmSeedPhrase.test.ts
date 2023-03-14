@@ -56,6 +56,9 @@ test("words can be completed", async () => {
       confirm: () => {
         /* */
       },
+      back: () => {
+        /* */
+      },
       i18n,
     },
     document.body

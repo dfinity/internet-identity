@@ -27,10 +27,12 @@ const checkWord = (word: Word): boolean =>
 const confirmSeedPhraseTemplate = ({
   words: words_,
   confirm,
+  back,
   i18n,
 }: {
   words: Omit<Word, "elem">[];
   confirm: () => void;
+  back: () => void;
   i18n: I18n;
 }) => {
   const copy = i18n.i18n(copyJson);
@@ -71,7 +73,14 @@ const confirmSeedPhraseTemplate = ({
         </ol>
       </div>
 
-      <div class="l-stack">
+      <div class="c-button-group">
+        <button
+          @click=${() => back()}
+          data-action="back"
+          class="c-button c-button--secondary"
+        >
+          ${copy.back}
+        </button>
         <button
           @click=${() => confirm()}
           data-action="next"
@@ -143,7 +152,7 @@ export const confirmSeedPhrase = ({
   phrase,
 }: {
   phrase: string;
-}): Promise<void> => {
+}): Promise<"confirmed" | "back"> => {
   return new Promise((resolve) => {
     const i18n = new I18n();
     confirmSeedPhrasePage({
@@ -151,7 +160,8 @@ export const confirmSeedPhrase = ({
         word,
         check: checkIndices.includes(i),
       })),
-      confirm: () => resolve(),
+      confirm: () => resolve("confirmed"),
+      back: () => resolve("back"),
       i18n,
     });
   });
