@@ -147,10 +147,11 @@ export const wordTemplate = ({
       }[s])
   );
 
-  return html`<li style="--index: '${i}'" class="c-list--recovery-word ${asyncReplace(
-    clazz
-  )}">
-  ${asyncReplace(icon)}
+  return html`<li
+    style="--index: '${i}'"
+    class="c-list--recovery-word ${asyncReplace(clazz)}"
+  >
+    ${asyncReplace(icon)}
     <input
       type="text"
       class="c-recoveryInput"
