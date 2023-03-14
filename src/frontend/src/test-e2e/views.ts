@@ -175,6 +175,16 @@ export class RecoveryMethodSelectorView extends View {
   async seedPhraseContinue(): Promise<void> {
     await this.browser.$("#displaySeedPhraseContinue").click();
   }
+
+  async seedPhraseFill(): Promise<void> {
+    await this.browser.$('[data-action="next"]').waitForDisplayed();
+    const missings = await this.browser.$$("[data-expected]");
+    for await (const missing of missings) {
+      const expected = await missing.getAttribute("data-expected");
+      await missing.setValue(expected);
+    }
+    await this.browser.$('[data-action="next"]').click();
+  }
 }
 
 export class MainView extends View {

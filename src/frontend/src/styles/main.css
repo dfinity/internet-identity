@@ -1297,6 +1297,10 @@ a:hover,
   list-style: none;
 }
 
+.c-list--recovery li input {
+  text-align: left;
+}
+
 .c-list--recovery li {
   position: relative;
   display: inline-flex;

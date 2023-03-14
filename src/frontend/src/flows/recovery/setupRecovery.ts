@@ -12,6 +12,7 @@ import { unknownToString } from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
+import { confirmSeedPhrase } from "./confirmSeedPhrase";
 
 export const setupRecovery = async ({
   userNumber,
@@ -96,6 +97,11 @@ export const setupPhrase = async (
     seedPhrase,
     IC_DERIVATION_PATH
   );
+
+  const phrase = userNumber.toString(10) + " " + seedPhrase;
+  await displaySeedPhrase(phrase);
+  await confirmSeedPhrase({ phrase });
+
   await withLoader(() =>
     connection.add(
       name,
@@ -105,5 +111,4 @@ export const setupPhrase = async (
       { unprotected: null }
     )
   );
-  await displaySeedPhrase(userNumber.toString(10) + " " + seedPhrase);
 };

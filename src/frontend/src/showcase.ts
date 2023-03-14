@@ -20,6 +20,10 @@ import { aboutView } from "./flows/about";
 import { showWarning } from "./banner";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
 import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
+import {
+  checkIndices,
+  confirmSeedPhrasePage,
+} from "./flows/recovery/confirmSeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authnPages } from "./components/authenticateBox";
@@ -373,6 +377,15 @@ const iiPages: Record<string, () => void> = {
       seedPhrase: recoveryPhraseText,
       onContinue: () => console.log("continue with:"),
       copyPhrase: () => Promise.resolve(console.log("copied")),
+    }),
+  confirmSeedPhrase: () =>
+    confirmSeedPhrasePage({
+      confirm: () => console.log("confirmed"),
+      words: recoveryPhraseText.split(" ").map((word, i) => ({
+        word,
+        check: checkIndices.includes(i),
+      })),
+      i18n,
     }),
   displayError: () =>
     displayError({
