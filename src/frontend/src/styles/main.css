@@ -140,7 +140,7 @@
   --rc-error: var(--vc-brand-pink);
   --rc-onError: var(--vc-snow);
 
-  --rc-warning: var(--vc-brand-orange);
+  --rc-warning: var(--vc-brand-yellow);
   --rc-onWarning: var(--rc-snow);
 
   --rc-positive: var(--vc-brand-green);
