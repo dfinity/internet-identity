@@ -5,6 +5,7 @@ import { Chan } from "../../utils/utils";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
+import { warningIcon, checkmarkIcon } from "../../components/icons";
 
 import copyJson from "./confirmSeedPhrase.json";
 
@@ -59,15 +60,14 @@ const confirmSeedPhraseTemplate = ({
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <div
-        class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
-      >
+      <div class="c-input c-input--recovery">
         <ol class="c-list c-list--recovery">
-          ${words.map((word) =>
+          ${words.map((word, i) =>
             wordTemplate({
               word,
               /* on word update, re-check all words */
               update: () => wordsOk.send(words.every(checkWord)),
+              i,
             })
           )}
         </ol>
@@ -105,24 +105,52 @@ const confirmSeedPhraseTemplate = ({
 export const wordTemplate = ({
   word,
   update,
+  i,
 }: {
   word: Word;
   /* Notify the caller that a word was updated */
   update: () => void;
+  i: number;
 }): TemplateResult => {
   // In the simple case the word doesn't need checking and is simply displayed
   if (!word.check) {
-    return html`<li>${word.word}</li>`;
+    return html`<li
+      style="--index: '${i}'"
+      class="c-list--recovery-word c-list--recovery-word__disabled"
+    >
+      ${word.word}
+    </li>`;
   }
 
   type State = "pending" | "correct" | "incorrect";
   const state = new Chan<State>("pending");
   // Visual feedback depending on state
-  const backgroundColor = state.map(
-    (s: State) => ({ pending: "yellow", correct: "green", incorrect: "red" }[s])
+  const clazz = state.map(
+    (s: State) =>
+      ({
+        pending: "c-list--recovery-word__attention",
+        correct: "c-list--recovery-word__correct",
+        incorrect: "c-list--recovery-word__incorrect",
+      }[s])
   );
 
-  return html`<li style="background-color: ${asyncReplace(backgroundColor)};">
+  const icon = state.map(
+    (s: State) =>
+      ({
+        pending: undefined,
+        correct: html`<i class="c-list--recovery-word__icon"
+          >${checkmarkIcon}</i
+        >`,
+        incorrect: html`<i class="c-list--recovery-word__icon"
+          >${warningIcon}</i
+        >`,
+      }[s])
+  );
+
+  return html`<li style="--index: '${i}'" class="c-list--recovery-word ${asyncReplace(
+    clazz
+  )}">
+  ${asyncReplace(icon)}
     <input
       ${ref(word.elem)}
       data-expected=${word.word}
