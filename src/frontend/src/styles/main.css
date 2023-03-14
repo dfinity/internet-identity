@@ -142,7 +142,7 @@
 
   --rc-warning: var(--vc-brand-orange);
   --rc-onWarning: var(--rc-snow);
-  
+
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
@@ -558,6 +558,14 @@ a:hover,
 }
 
 .c-icon--warning [fill] {
+  fill: var(--rc-warning);
+}
+
+.c-icon--ok [fill] {
+  fill: var(--rc-positive);
+}
+
+.c-icon--error [fill] {
   fill: var(--rc-error);
 }
 

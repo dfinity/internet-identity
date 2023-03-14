@@ -34,6 +34,11 @@ const sectionList = ({
               device: {
                 label: "Recovery Phrase",
                 recovery: "phrase",
+                status: {
+                  statusType: "error",
+                  statusText: html`We strongly recommend that you use a recovery
+                  phrase`,
+                },
               },
               index: "recovery-phrase",
               block: html`<button
@@ -56,6 +61,10 @@ const sectionList = ({
               device: {
                 label: "Recovery Device",
                 recovery: "device",
+                status: {
+                  statusType: "warning",
+                  statusText: html`we suggest that you use a recovery device`,
+                },
               },
               index: "recovery-device",
               block: html`<button

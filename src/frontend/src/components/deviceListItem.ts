@@ -1,6 +1,6 @@
 import { TemplateResult, html } from "lit-html";
 import { Setting, settingName } from "../flows/manage/deviceSettings";
-import { warningIcon, dropdownIcon, lockIcon } from "./icons";
+import { warningIcon, checkmarkIcon, dropdownIcon, lockIcon } from "./icons";
 
 // A simple representation of "device"s used on the manage page.
 export type Device = {
@@ -11,7 +11,16 @@ export type Device = {
   label: string | TemplateResult;
   recovery?: "phrase" | "device";
   isProtected?: boolean;
-  warn?: TemplateResult;
+  status?: {
+    statusType: "error" | "warning" | "ok";
+    statusText?: TemplateResult;
+  };
+};
+
+const iconByStatusType = {
+  error: warningIcon,
+  warning: warningIcon,
+  ok: checkmarkIcon,
 };
 
 // A device with extra information about whether another device (earlier in the list)
@@ -29,6 +38,20 @@ export const deviceListItem = ({
 }) => {
   return html`
     <li class="c-action-list__item" data-device=${device.label}>
+      ${device.status !== undefined
+        ? html`<div class="c-action-list__action">
+            <span
+              class="c-tooltip c-icon c-icon--${device.status.statusType}"
+              tabindex="0"
+              >${iconByStatusType[device.status.statusType]}
+              ${device.status.statusText !== undefined
+                ? html`<span class="c-tooltip__message c-card c-card--tight"
+                    >${device.status.statusText}</span
+                  >`
+                : null}
+            </span>
+          </div>`
+        : undefined}
       <div class="c-action-list__label">
         ${device.label}
         ${device.dupCount !== undefined && device.dupCount > 0
@@ -37,23 +60,9 @@ export const deviceListItem = ({
       </div>
       ${device.isProtected !== undefined && device.isProtected
         ? html`<div class="c-action-list__action" data-role="protected">
-            <span
-              class="c-tooltip c-tooltip--left c-icon c-icon--lock"
-              tabindex="0"
+            <span class="c-tooltip c-icon c-icon--lock" tabindex="0"
               >${lockIcon}<span class="c-tooltip__message c-card c-card--tight"
                 >Your device is locked</span
-              ></span
-            >
-          </div>`
-        : undefined}
-      ${device.warn !== undefined
-        ? html`<div class="c-action-list__action">
-            <span
-              class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-              tabindex="0"
-              >${warningIcon}<span
-                class="c-tooltip__message c-card c-card--tight"
-                >${device.warn}</span
               ></span
             >
           </div>`

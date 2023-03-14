@@ -269,7 +269,10 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Yubikey Blue",
           isProtected: false,
-          warn: html`Something is rotten in the state of Device`,
+          status: {
+            statusType: "warning",
+            statusText: html`Something is rotten in the state of Device`,
+          },
           settings: [
             {
               label: "remove",
@@ -283,6 +286,9 @@ const iiPages: Record<string, () => void> = {
           label: "Recovery Phrase",
           recovery: "phrase",
           isProtected: true,
+          status: {
+            statusType: "ok",
+          },
           settings: [
             {
               label: "remove",
@@ -332,6 +338,9 @@ const iiPages: Record<string, () => void> = {
           label: "Recovery Phrase",
           recovery: "phrase",
           isProtected: true,
+          status: {
+            statusType: "ok",
+          },
           settings: [
             {
               label: "remove",
@@ -346,6 +355,9 @@ const iiPages: Record<string, () => void> = {
         {
           label: "Fancy Key",
           recovery: "device",
+          status: {
+            statusType: "ok",
+          },
           settings: [
             {
               label: "remove",

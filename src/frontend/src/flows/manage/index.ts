@@ -205,7 +205,10 @@ export const displayManage = (
           : device.alias,
         isRecovery: isRecoveryDevice(device),
         isProtected: isProtected(device),
-        warn: domainWarning(device),
+        status: {
+          statusType: "warning",
+          statusText: domainWarning(device),
+        },
       };
     });
 
