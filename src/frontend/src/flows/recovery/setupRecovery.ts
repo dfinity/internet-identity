@@ -87,19 +87,11 @@ export const setupRecovery = async ({
   }
 };
 
-export const setupPhrase = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection
-) => {
-  const name = "Recovery phrase";
-  const seedPhrase = generate().trim();
-  const recoverIdentity = await fromMnemonicWithoutValidation(
-    seedPhrase,
-    IC_DERIVATION_PATH
-  );
-
-  const phrase = userNumber.toString(10) + " " + seedPhrase;
-
+export const displayAndConfirmPhrase = async ({
+  phrase,
+}: {
+  phrase: string;
+}) => {
   // Loop until the user has confirmed the phrase
   for (;;) {
     await displaySeedPhrase(phrase);
@@ -117,6 +109,22 @@ export const setupPhrase = async (
 
     unreachableLax(result);
   }
+};
+
+export const setupPhrase = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+) => {
+  const name = "Recovery phrase";
+  const seedPhrase = generate().trim();
+  const recoverIdentity = await fromMnemonicWithoutValidation(
+    seedPhrase,
+    IC_DERIVATION_PATH
+  );
+
+  const phrase = userNumber.toString(10) + " " + seedPhrase;
+
+  await displayAndConfirmPhrase({ phrase });
 
   await withLoader(() =>
     connection.add(
