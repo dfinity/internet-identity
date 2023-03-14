@@ -136,16 +136,19 @@
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
-  --rc-warningLight: var(--vc-brand-pink--transparent);
-  --rc-warning: var(--vc-brand-pink);
-  --rc-onWarning: var(--vc-snow);
+  --rc-errorLight: var(--vc-brand-pink--transparent);
+  --rc-error: var(--vc-brand-pink);
+  --rc-onError: var(--vc-snow);
+
+  --rc-warning: var(--vc-brand-orange);
+  --rc-onWarning: var(--rc-snow);
+  
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
-  --rc-input-readonly: var(--vc-silver);
   --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
 
@@ -555,7 +558,7 @@ a:hover,
 }
 
 .c-icon--warning [fill] {
-  fill: var(--rc-warning);
+  fill: var(--rc-error);
 }
 
 .c-icon--success {
@@ -776,7 +779,7 @@ a:hover,
 .c-card__icon svg * {
   fill: var(--rc-background);
   stroke-width: 3px;
-  stroke: var(--rc-warning);
+  stroke: var(--rc-error);
 }
 
 .c-card__content {
@@ -831,8 +834,8 @@ a:hover,
   align-items: stretch;
   gap: calc(var(--rs-card-bezel-x) * 0.25);
 
-  --state-color: var(--rc-warningLight);
-  --state-onColor: var(--rc-warning);
+  --state-color: var(--rc-errorLight);
+  --state-onColor: var(--rc-error);
 
   position: relative;
   padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
@@ -1084,8 +1087,8 @@ a:hover,
 }
 
 .c-button--warning {
-  background: var(--rc-warning);
-  color: var(--rc-onWarning);
+  background: var(--rc-error);
+  color: var(--rc-onError);
 }
 
 .c-input {
@@ -1109,8 +1112,8 @@ a:hover,
 
 .c-input.has-error,
 .c-input.has-error:focus {
-  color: var(--rc-warning);
-  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-warning);
+  color: var(--rc-error);
+  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-error);
   border-image: none;
 }
 
@@ -1192,7 +1195,7 @@ a:hover,
 
 .c-input__message {
   margin-top: var(--vs-stack);
-  color: var(--rc-warning);
+  color: var(--rc-error);
 }
 
 /* hides and show icons based on a class */
