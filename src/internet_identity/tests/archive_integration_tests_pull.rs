@@ -48,6 +48,7 @@ mod deployment_tests {
                     entries_fetch_limit: 0,
                 }),
                 canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
+                register_rate_limit: None,
             }),
         );
         env.add_cycles(ii_canister, 150_000_000_000);
@@ -185,6 +186,7 @@ mod deployment_tests {
                     entries_fetch_limit: 10,
                 }),
                 canister_creation_cycles_cost: None, // current cost in application subnets
+                register_rate_limit: None,
             }),
         )
         .unwrap();

@@ -258,19 +258,20 @@ const page = (slot: TemplateResult) => {
 const addRemoteDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
   const askUserNumber = async () => {
-    const _userNumber = await promptUserNumber({
+    const result = await promptUserNumber({
       title: "Add a Trusted Device",
       message: "What’s your Identity Anchor?",
     });
-    if (_userNumber === "canceled") {
+    if (result === "canceled") {
       // TODO L2-309: do this without reload
       return window.location.reload() as never;
     }
 
-    return _userNumber;
+    return result;
   };
 
-  const _userNumber = userNumber ?? (await askUserNumber());
-
-  return registerTentativeDevice(_userNumber, connection);
+  return registerTentativeDevice(
+    userNumber ?? (await askUserNumber()),
+    connection
+  );
 };

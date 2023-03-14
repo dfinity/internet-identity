@@ -1,5 +1,4 @@
-use crate::anchor_management::write_anchor;
-use crate::archive::archive_operation;
+use crate::anchor_management::anchor_operation_bookkeeping;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
@@ -15,6 +14,8 @@ use std::collections::HashMap;
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
 use lazy_static::lazy_static;
+
+mod rate_limit;
 
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
@@ -186,6 +187,7 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 }
 
 pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+    rate_limit::process_rate_limit();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
@@ -202,23 +204,28 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     }
 
     let allocation = state::storage_mut(|storage| storage.allocate_anchor());
-    match allocation {
-        Some((anchor_number, mut anchor)) => {
-            anchor.add_device(device.clone()).unwrap_or_else(|err| {
-                trap(&format!("failed to register anchor {anchor_number}: {err}"))
-            });
-            write_anchor(anchor_number, anchor);
-            archive_operation(
-                anchor_number,
-                caller(),
-                Operation::RegisterAnchor {
-                    device: DeviceDataWithoutAlias::from(device),
-                },
-            );
-            RegisterResponse::Registered {
-                user_number: anchor_number,
-            }
-        }
-        None => RegisterResponse::CanisterFull,
+    let Some((anchor_number, mut anchor)) = allocation else {
+        return RegisterResponse::CanisterFull;
+    };
+
+    anchor
+        .add_device(device.clone())
+        .unwrap_or_else(|err| trap(&format!("failed to register anchor {anchor_number}: {err}")));
+
+    // write anchor to stable memory
+    state::storage_mut(|storage| {
+        storage.write(anchor_number, anchor).unwrap_or_else(|err| {
+            trap(&format!(
+                "failed to write data of anchor {anchor_number}: {err}"
+            ))
+        });
+    });
+
+    let operation = Operation::RegisterAnchor {
+        device: DeviceDataWithoutAlias::from(device),
+    };
+    anchor_operation_bookkeeping(anchor_number, operation, None);
+    RegisterResponse::Registered {
+        user_number: anchor_number,
     }
 }

@@ -19,7 +19,11 @@ import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { aboutView } from "./flows/about";
 import { showWarning } from "./banner";
 import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
-import { displaySeedPhrase } from "./flows/recovery/displaySeedPhrase";
+import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
+import {
+  checkIndices,
+  confirmSeedPhrasePage,
+} from "./flows/recovery/confirmSeedPhrase";
 import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authnPages } from "./components/authenticateBox";
@@ -33,11 +37,7 @@ import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDevice
 import { displayManagePage, authnTemplateManage } from "./flows/manage";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import {
-  registerTentativeDevice,
-  TentativeDeviceInfo,
-} from "./flows/addDevice/welcomeView/registerTentativeDevice";
-import { deviceRegistrationDisabledInfo } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { mkAnchorPicker } from "./components/anchorPicker";
@@ -394,12 +394,12 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  registerTentativeDevice: () =>
-    registerTentativeDevice(userNumber, dummyConnection),
   deviceRegistrationDisabledInfo: () =>
-    deviceRegistrationDisabledInfo(dummyConnection, [
+    deviceRegistrationDisabledInfoPage({
       userNumber,
-    ] as unknown as TentativeDeviceInfo),
+      retry: () => console.log("retry"),
+      cancel: () => console.log("canceled"),
+    }),
   showVerificationCode: () =>
     showVerificationCodePage({
       alias: simpleDevices[0].alias,
@@ -431,7 +431,23 @@ const iiPages: Record<string, () => void> = {
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();
     }),
-  displaySeedPhrase: () => displaySeedPhrase(recoveryPhraseText),
+  displaySeedPhrase: () =>
+    displaySeedPhrasePage({
+      seedPhrase: recoveryPhraseText,
+      onContinue: () => console.log("continue with:"),
+      copyPhrase: () => Promise.resolve(console.log("copied")),
+      i18n,
+    }),
+  confirmSeedPhrase: () =>
+    confirmSeedPhrasePage({
+      confirm: () => console.log("confirmed"),
+      back: () => console.log("back"),
+      words: recoveryPhraseText.split(" ").map((word, i) => ({
+        word,
+        check: checkIndices.includes(i),
+      })),
+      i18n,
+    }),
   displayError: () =>
     displayError({
       title: "Authentication Failed",

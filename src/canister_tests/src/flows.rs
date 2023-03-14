@@ -16,7 +16,7 @@ pub fn register_anchor_with(
     device_data: &DeviceData,
 ) -> AnchorNumber {
     let challenge = create_challenge(env, canister_id).expect("challenge creation failed");
-    let user_number = match register(
+    match register(
         env,
         canister_id,
         sender,
@@ -28,6 +28,5 @@ pub fn register_anchor_with(
     ) {
         Ok(RegisterResponse::Registered { user_number }) => user_number,
         response => panic!("could not register: {response:?}"),
-    };
-    user_number
+    }
 }

@@ -1,7 +1,8 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Connection } from "../../../utils/iiConnection";
 import { delayMillis } from "../../../utils/utils";
+import { renderPage } from "../../../utils/lit-html";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
@@ -64,14 +65,9 @@ const showVerificationCodeTemplate = ({
   });
 };
 
-export const showVerificationCodePage = (
-  props: Parameters<typeof showVerificationCodeTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(showVerificationCodeTemplate(props), contain);
-};
+export const showVerificationCodePage = renderPage(
+  showVerificationCodeTemplate
+);
 
 /**
  * Page to display the verification code which is received after successfully registering a tentative device.
@@ -122,7 +118,7 @@ async function poll({
 }: {
   userNumber: bigint;
   connection: Connection;
-  credentialToBeVerified: Array<number>;
+  credentialToBeVerified: CredentialId;
   shouldStop: () => boolean;
 }): Promise<"timeout" | "match"> {
   const verifyCredentials = async (): Promise<boolean> => {
@@ -183,7 +179,7 @@ const anchorHasCredentials = async ({
   connection,
 }: {
   userNumber: bigint;
-  credential: Array<number>;
+  credential: CredentialId;
   connection: Connection;
 }) => {
   const devices = await connection.lookupAuthenticators(userNumber);

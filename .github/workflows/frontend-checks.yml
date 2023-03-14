@@ -17,21 +17,7 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format-check
-      - name: Install didc
-        run: |
-          # A somewhat old release, but the generated file format has changed a bit since
-          # and we need to update our files manually before upgrading to something more recent
-          didc_release=2021-09-09
-
-          # Actual install
-          mkdir -p ~/.local/bin
-          curl --location --silent --show-error \
-            https://github.com/dfinity/candid/releases/download/$didc_release/didc-linux64 \
-            -o ~/.local/bin/didc
-          chmod +x ~/.local/bin/didc
-          ~/.local/bin/didc --version
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
+      - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate
       - name: Commit type interfaces

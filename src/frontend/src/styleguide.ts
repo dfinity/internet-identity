@@ -1,8 +1,47 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { icLogo, settingsIcon, dropdownIcon } from "./components/icons";
+import {
+  icLogo,
+  settingsIcon,
+  dropdownIcon,
+  copyIcon,
+} from "./components/icons";
 import { warnBox } from "./components/warnBox";
+import { irregularity } from "./components/irregularity";
+import { toast } from "./components/toast";
+
+// these words are never longer than 8 characters
+// according to the bip39 spec
+// https://getcoinplate.com/blog/official-bip39-word-list-mnemonic-in-english-verified/
+// we do include the anchor number as a first word
+const recoveryWords = [
+  "1988236",
+  "gloom",
+  "squirrel",
+  "candy",
+  "police",
+  "nicolas",
+  "rebel",
+  "ocelot",
+  "vampire",
+  "pasta",
+  "sister",
+  "castle",
+  "cinnamon",
+  "glue",
+  "potato",
+  "own",
+  "problem",
+  "evolve",
+  "door",
+  "country",
+  "basket",
+  "lyrics",
+  "tuna",
+  "catch",
+  "tongue",
+];
 
 export const styleguide = html`
   <style>
@@ -279,6 +318,33 @@ export const styleguide = html`
       </aside>
 
       <aside class="l-stack demo-section">
+        <h2 class="t-title t-title--sub">Recovery Word List</h2>
+        <section class="demo" aria-label="Recovery List Elements Demo">
+          <output
+            class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+          >
+            <ol class="c-list c-list--recovery">
+              ${recoveryWords.map(
+                (word, i) =>
+                  html`<li style="--i: ${i / recoveryWords.length}">
+                    ${word}
+                  </li>`
+              )}
+            </ol>
+            <i
+              aria-label="Copy phrase to clipboard"
+              title="Copy phrase to clipboard"
+              tabindex="0"
+              class="c-button__icon c-input__icon"
+            >
+              <span>Copy</span>
+              ${copyIcon}
+            </i>
+          </output>
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Details / Summary</h2>
         <section class="demo" aria-label="Details / Summary Demo">
           <details>
@@ -387,9 +453,47 @@ export const styleguide = html`
       </aside>
 
       <aside class="l-stack demo-section">
+        <h2 class="t-title">Irregularities</h2>
+        <p class="t-lead">
+          Irregularities are messages that we show to the user when something
+          goes wrong or something happens that we want to inform the user about.
+          They can be used to show errors messages.
+        </p>
+        <section class="demo" aria-label="Irregularity Elements Demo">
+          ${irregularity({
+            message:
+              "This is an error message. It can be used to inform the user about something that went wrong.",
+            closeFn: () => {
+              console.log("close");
+            },
+          })}
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
           <div class="c-logo">${icLogo}</div>
+        </section>
+      </aside>
+
+      <aside class="l-stack demo-section">
+        <h2 class="t-title">Toast</h2>
+        <p class="t-lead">
+          Toasts are messages of varying length and importance that appear at
+          the bottom or the top of the screen. They typically use the
+          Irregularity component.
+        </p>
+        <section class="demo" aria-label="Toast Elements Demo">
+          <button
+            class="c-button c-button--primary"
+            @click="${() =>
+              toast.error(
+                `some error message ${Math.round(Math.random() * 100)}`
+              )}"
+          >
+            Show Toast
+          </button>
         </section>
       </aside>
     </article>

@@ -1,17 +1,18 @@
-use crate::anchor_management::tentative_device_registration;
+use crate::anchor_management::{anchor_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::Anchor;
-use candid::Principal;
-use ic_cdk::api::{caller, set_certified_data, trap};
+use candid::{candid_method, Principal};
+use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
-use internet_identity_interface::archive::BufferedEntry;
+use internet_identity_interface::archive::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
 
+mod active_anchor_stats;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -21,31 +22,39 @@ mod http;
 mod state;
 mod storage;
 
+// Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+const MINUTE_NS: u64 = secs_to_nanos(60);
+const HOUR_NS: u64 = 60 * MINUTE_NS;
+const DAY_NS: u64 = 24 * HOUR_NS;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
 #[update]
+#[candid_method]
 async fn init_salt() {
     state::init_salt().await;
 }
 
 #[update]
+#[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
+#[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
 #[update]
+#[candid_method]
 async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
@@ -54,51 +63,63 @@ async fn add_tentative_device(
 }
 
 #[update]
+#[candid_method]
 fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
 }
 
 #[update]
+#[candid_method]
 async fn create_challenge() -> Challenge {
     anchor_management::registration::create_challenge().await
 }
 
 #[update]
+#[candid_method]
 fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
     anchor_management::registration::register(device_data, challenge_result)
 }
 
 #[update]
+#[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
-    anchor_management::add(anchor_number, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::add(anchor, device_data)
+    })
 }
 
 #[update]
+#[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
-    anchor_management::update(anchor_number, device_key, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::update(anchor, device_key, device_data)
+    })
 }
 
 #[update]
+#[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticate_and_update_device_usage(anchor_number);
-    anchor_management::replace(anchor_number, device_key, device_data)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::replace(anchor, device_key, device_data)
+    })
 }
 
 #[update]
+#[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    authenticate_and_update_device_usage(anchor_number);
-    anchor_management::remove(anchor_number, device_key)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        anchor_management::remove(anchor, device_key)
+    })
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
 /// Deprecated: use [get_anchor_credentials] instead
 #[query]
+#[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     state::storage(|storage| {
         storage
@@ -117,6 +138,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 }
 
 #[query]
+#[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     let anchor = state::anchor(anchor_number);
 
@@ -146,12 +168,14 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 }
 
 #[update] // this is an update call because queries are not (yet) certified
+#[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
+#[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     trap_if_not_authenticated(&state::anchor(anchor_number));
     delegation::get_principal(anchor_number, frontend)
@@ -166,17 +190,19 @@ fn __get_candid_interface_tmp_hack() -> String {
 }
 
 #[update]
+#[candid_method]
 async fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    authenticate_and_update_device_usage(anchor_number);
+    authenticate_and_record_activity(anchor_number);
     delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
 }
 
 #[query]
+#[candid_method(query)]
 fn get_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -188,16 +214,19 @@ fn get_delegation(
 }
 
 #[query]
+#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[update]
+#[candid_method]
 fn http_request_update(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[query]
+#[candid_method(query)]
 fn stats() -> InternetIdentityStats {
     let archive_info = match state::archive_state() {
         ArchiveState::NotConfigured => ArchiveInfo {
@@ -218,6 +247,8 @@ fn stats() -> InternetIdentityStats {
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
+    let active_anchor_stats =
+        state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
 
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -225,10 +256,12 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
+        active_anchor_stats,
     })
 }
 
 #[update]
+#[candid_method]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     archive::deploy_archive(wasm).await
 }
@@ -237,6 +270,7 @@ async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
 /// This is an update call because the archive information _must_ be certified.
 /// Only callable by this IIs archive canister.
 #[update]
+#[candid_method]
 fn fetch_entries() -> Vec<BufferedEntry> {
     archive::fetch_entries()
 }
@@ -244,6 +278,7 @@ fn fetch_entries() -> Vec<BufferedEntry> {
 /// Removes all buffered archive entries up to sequence number.
 /// Only callable by this IIs archive canister.
 #[update]
+#[candid_method]
 fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
@@ -288,6 +323,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.canister_creation_cycles_cost = cost;
             })
         }
+        if let Some(rate_limit) = arg.register_rate_limit {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.registration_rate_limit = Some(rate_limit);
+            })
+        }
     }
 }
 
@@ -322,11 +362,37 @@ fn update_root_hash() {
 }
 
 /// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
-/// reflecting the current usage.
-fn authenticate_and_update_device_usage(anchor_number: AnchorNumber) {
+/// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
+fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
     let anchor = state::anchor(anchor_number);
     let device_key = trap_if_not_authenticated(&anchor);
+    let previous_activity = anchor.last_activity();
     anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
+    active_anchor_stats::update_active_anchors_stats(previous_activity);
+}
+
+/// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
+/// the necessary bookkeeping for anchor operations.
+fn authenticated_anchor_operation(
+    anchor_number: AnchorNumber,
+    op: impl FnOnce(&mut Anchor) -> Operation,
+) {
+    // load anchor
+    let mut anchor = state::anchor(anchor_number);
+    let device_key = trap_if_not_authenticated(&anchor);
+
+    let previous_activity = anchor.last_activity();
+    anchor
+        .set_device_usage_timestamp(&device_key, time())
+        .expect("last_usage_timestamp update: unable to update last usage timestamp");
+
+    let operation = op(&mut anchor);
+
+    // write back anchor
+    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
+        panic!("unable to update anchor {anchor_number} in stable memory: {err}")
+    });
+    anchor_operation_bookkeeping(anchor_number, operation, previous_activity);
 }
 
 /// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.
@@ -341,3 +407,31 @@ fn trap_if_not_authenticated(anchor: &Anchor) -> DeviceKey {
 }
 
 fn main() {}
+
+// Order dependent: do not move above any function annotated with #[candid_method]!
+candid::export_service!();
+
+#[cfg(test)]
+mod test {
+    use crate::__export_service;
+    use candid::utils::{service_compatible, CandidSource};
+    use std::path::Path;
+
+    /// Checks candid interface type equality by making sure that the service in the did file is
+    /// a subtype of the generated interface and vice versa.
+    #[test]
+    fn check_candid_interface_compatibility() {
+        let canister_interface = __export_service();
+        service_compatible(
+            CandidSource::Text(&canister_interface),
+            CandidSource::File(Path::new("internet_identity.did")),
+        )
+        .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
+
+        service_compatible(
+            CandidSource::File(Path::new("internet_identity.did")),
+            CandidSource::Text(&canister_interface),
+        )
+        .unwrap_or_else(|e| panic!("the did file is incompatible to the canister code: {:?}", e));
+    }
+}

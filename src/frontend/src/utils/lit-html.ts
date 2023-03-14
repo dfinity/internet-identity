@@ -1,7 +1,9 @@
 /* A couple of lit-html helpers */
 
+import { render, TemplateResult } from "lit-html";
 import { Ref, ref } from "lit-html/directives/ref.js";
 import { DirectiveResult } from "lit-html/directive.js";
+import { toast } from "../components/toast";
 
 // Read a "lit-html" ref, showing an error message (in the console) in case the
 // element is not available.
@@ -9,7 +11,7 @@ export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
   const value = ref.value;
 
   if (value === undefined) {
-    console.error(
+    toast.error(
       "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
     );
     return;
@@ -63,3 +65,14 @@ export const autofocus = mount((elem: Element) => {
     elem.focus();
   }
 });
+
+/* A wrapper for lit-html's render, rendering a page to the "pageContent" element */
+export function renderPage<
+  T extends (props: Parameters<T>[0]) => TemplateResult
+>(template: T): (props: Parameters<T>[0], container?: HTMLElement) => void {
+  return (props, container) => {
+    const contain =
+      container ?? (document.getElementById("pageContent") as HTMLElement);
+    render(template(props), contain);
+  };
+}

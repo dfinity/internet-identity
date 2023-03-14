@@ -1,4 +1,5 @@
-import { TemplateResult, render, html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
+import { renderPage } from "../../utils/lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
@@ -180,24 +181,17 @@ export const renderManage = async (
   }
 };
 
-export const displayManagePage = (
-  props: Parameters<typeof displayManageTemplate>[0],
-  container?: HTMLElement
-): void => {
-  const contain =
-    container ?? (document.getElementById("pageContent") as HTMLElement);
-  render(displayManageTemplate(props), contain);
-};
+export const displayManagePage = renderPage(displayManageTemplate);
 
 export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices: DeviceData[]
+  devices_: DeviceData[]
 ): Promise<void | AuthenticatedConnection> =>
   new Promise((resolve) => {
-    const hasSingleDevice = devices.length <= 1;
+    const hasSingleDevice = devices_.length <= 1;
 
-    const _devices: Device[] = devices.map((device) => {
+    const devices: Device[] = devices_.map((device) => {
       return {
         settings: deviceSettings({
           userNumber,
@@ -218,10 +212,8 @@ export const displayManage = (
 
     displayManagePage({
       userNumber,
-      authenticators: _devices.filter(
-        (device) => device.recovery === undefined
-      ),
-      recoveries: _devices.filter((device) => device.recovery),
+      authenticators: devices.filter((device) => device.recovery === undefined),
+      recoveries: devices.filter((device) => device.recovery),
       onAddDevice: async () => {
         const nextAction = await chooseDeviceAddFlow();
         switch (nextAction) {
@@ -230,7 +222,7 @@ export const displayManage = (
             break;
           }
           case "local": {
-            await addLocalDevice(userNumber, connection, devices);
+            await addLocalDevice(userNumber, connection, devices_);
             resolve();
             break;
           }
@@ -256,7 +248,7 @@ export const displayManage = (
     // recovery _device_ would be tied to the domain (which we want to avoid).
     if (
       window.location.origin === LEGACY_II_URL &&
-      !hasRecoveryPhrase(devices)
+      !hasRecoveryPhrase(devices_)
     ) {
       const elem = showWarning(html`<strong class="t-strong">Important!</strong>
         Create a recovery phrase.
