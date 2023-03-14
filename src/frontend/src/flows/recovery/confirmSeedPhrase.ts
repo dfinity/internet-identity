@@ -1,0 +1,157 @@
+import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { withRef, renderPage } from "../../utils/lit-html";
+import { Chan } from "../../utils/utils";
+import { ref, createRef, Ref } from "lit-html/directives/ref.js";
+import { mainWindow } from "../../components/mainWindow";
+import { I18n } from "../../i18n";
+
+import copyJson from "./confirmSeedPhrase.json";
+
+// A list of words, where "check" indicates if the user needs to double check (re-input) a word
+type Word = { word: string } & (
+  | { check: false }
+  | { check: true; elem: Ref<HTMLInputElement> }
+);
+
+// A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
+export const checkIndices = [3, 7, 12, 13, 15, 17, 18, 20, 22, 24];
+
+const checkWord = (word: Word): boolean =>
+  word.check
+    ? withRef(word.elem, (elem) => elem.value === elem.dataset.expected) ===
+      true
+    : true;
+
+const confirmSeedPhraseTemplate = ({
+  words: words_,
+  confirm,
+  i18n,
+}: {
+  words: Omit<Word, "elem">[];
+  confirm: () => void;
+  i18n: I18n;
+}) => {
+  const copy = i18n.i18n(copyJson);
+
+  // All words, where a `Ref` was added if the word needs checking
+  // NOTE: typescript can't follow if word is deconstructed with {...word}
+  const words: Word[] = words_.map((word) => {
+    if (word.check) {
+      const elem: Ref<HTMLInputElement> = createRef();
+      return { word: word.word, check: word.check, elem };
+    } else {
+      return { word: word.word, check: word.check };
+    }
+  });
+
+  // if all "check" words have been re-input correctly
+  const wordsOk = new Chan<boolean>(false);
+  // if the confirmation button is disabled
+  const disabled = wordsOk.map((ok) => !ok);
+
+  const pageContentSlot = html`
+    <article>
+      <hgroup>
+        <h1 class="t-title t-title--main">${copy.title}</h1>
+        <p class="t-lead">${copy.header}</p>
+      </hgroup>
+      <div
+        class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+      >
+        <ol class="c-list c-list--recovery">
+          ${words.map((word) =>
+            wordTemplate({
+              word,
+              /* on word update, re-check all words */
+              update: () => wordsOk.send(words.every(checkWord)),
+            })
+          )}
+        </ol>
+      </div>
+
+      <div class="l-stack">
+        <button
+          @click=${() => confirm()}
+          data-action="next"
+          class="c-button"
+          ?disabled=${asyncReplace(disabled)}
+        >
+          ${copy.continue}
+        </button>
+      </div>
+    </article>
+  `;
+
+  return mainWindow({
+    isWideContainer: true,
+    showLogo: false,
+    showFooter: false,
+    slot: pageContentSlot,
+  });
+};
+
+// Show a particular word
+export const wordTemplate = ({
+  word,
+  update,
+}: {
+  word: Word;
+  /* Notify the caller that a word was updated */
+  update: () => void;
+}): TemplateResult => {
+  // In the simple case the word doesn't need checking and is simply displayed
+  if (!word.check) {
+    return html`<li>${word.word}</li>`;
+  }
+
+  type State = "pending" | "correct" | "incorrect";
+  const state = new Chan<State>("pending");
+  // Visual feedback depending on state
+  const backgroundColor = state.map(
+    (s: State) => ({ pending: "yellow", correct: "green", incorrect: "red" }[s])
+  );
+
+  return html`<li style="background-color: ${asyncReplace(backgroundColor)};">
+    <input
+      ${ref(word.elem)}
+      data-expected=${word.word}
+      data-state=${asyncReplace(
+        state.map(
+          (x) => x
+        ) /* workaroudn because chan supports only one .recv() */
+      )}
+      @input=${() => {
+        /* On input, immediately show word as correct when correct, but don't show if a
+         * word is incorrect (done only when leaving the field) to not freak out user as they type */
+        state.send(checkWord(word) ? "correct" : "pending");
+        update();
+      }}
+      @change=${() => {
+        /* When leaving the field show if the word is corrrect or not */
+        state.send(checkWord(word) ? "correct" : "incorrect");
+        update();
+      }}
+    ></input>
+  </li>`;
+};
+
+export const confirmSeedPhrasePage = renderPage(confirmSeedPhraseTemplate);
+
+export const confirmSeedPhrase = ({
+  phrase,
+}: {
+  phrase: string;
+}): Promise<void> => {
+  return new Promise((resolve) => {
+    const i18n = new I18n();
+    confirmSeedPhrasePage({
+      words: phrase.split(" ").map((word, i) => ({
+        word,
+        check: checkIndices.includes(i),
+      })),
+      confirm: () => resolve(),
+      i18n,
+    });
+  });
+};
