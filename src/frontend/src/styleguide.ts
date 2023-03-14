@@ -1,7 +1,6 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import "./styles/main.css";
 import { html } from "lit-html";
-import { ifDefined } from "lit/directives/if-defined.js";
 import {
   icLogo,
   settingsIcon,
