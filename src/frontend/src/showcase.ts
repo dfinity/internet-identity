@@ -381,6 +381,7 @@ const iiPages: Record<string, () => void> = {
   confirmSeedPhrase: () =>
     confirmSeedPhrasePage({
       confirm: () => console.log("confirmed"),
+      back: () => console.log("back"),
       words: recoveryPhraseText.split(" ").map((word, i) => ({
         word,
         check: checkIndices.includes(i),
