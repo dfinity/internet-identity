@@ -17,11 +17,12 @@ type Word = { word: string } & (
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
 export const checkIndices = [3, 7, 12, 13, 15, 17, 18, 20, 22, 24];
 
+// Check that a word has been input correctly
 const checkWord = (word: Word): boolean =>
-  word.check
-    ? withRef(word.elem, (elem) => elem.value === elem.dataset.expected) ===
-      true
-    : true;
+  // If the word is not one that needs checking, then return
+  !word.check ||
+  // otherwise, make sure the input's value matches the HTML data-expected attribute
+  withRef(word.elem, (elem) => elem.value === elem.dataset.expected) === true;
 
 const confirmSeedPhraseTemplate = ({
   words: words_,
