@@ -152,6 +152,8 @@ export const wordTemplate = ({
   )}">
   ${asyncReplace(icon)}
     <input
+      type="text"
+      class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
       data-state=${asyncReplace(
@@ -170,7 +172,7 @@ export const wordTemplate = ({
         state.send(checkWord(word) ? "correct" : "incorrect");
         update();
       }}
-    ></input>
+    />&nbsp;
   </li>`;
 };
 

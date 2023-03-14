@@ -52,7 +52,7 @@ const displaySeedPhraseTemplate = ({
       <h2 class="t-title l-stack">${copy.your_recovery_phrase}</h2>
       <div>
         <output
-          class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+          class="c-input c-input--recovery"
           ><ol translate="no" class="c-list c-list--recovery">
             ${recoveryWords.map(
               (word, i) =>
