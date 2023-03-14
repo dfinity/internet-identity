@@ -35,10 +35,10 @@ const confirmSeedPhraseTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   // All words, where a `Ref` was added if the word needs checking
-  // NOTE: typescript can't follow if word is deconstructed with {...word}
   const words: Word[] = words_.map((word) => {
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
+      // NOTE: typescript can't follow if word is deconstructed with {...word}
       return { word: word.word, check: word.check, elem };
     } else {
       return { word: word.word, check: word.check };
