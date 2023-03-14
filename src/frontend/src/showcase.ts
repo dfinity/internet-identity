@@ -373,6 +373,7 @@ const iiPages: Record<string, () => void> = {
       seedPhrase: recoveryPhraseText,
       onContinue: () => console.log("continue with:"),
       copyPhrase: () => Promise.resolve(console.log("copied")),
+      i18n,
     }),
   displayError: () =>
     displayError({
