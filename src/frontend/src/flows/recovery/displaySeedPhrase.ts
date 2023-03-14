@@ -2,18 +2,26 @@ import { html } from "lit-html";
 import { withRef, renderPage } from "../../utils/lit-html";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
+import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
 import { toast } from "../../components/toast";
+
+import copyJson from "./displaySeedPhrase.json";
 
 const displaySeedPhraseTemplate = ({
   seedPhrase,
   onContinue,
   copyPhrase: copyPhrase_,
+  i18n,
 }: {
   seedPhrase: string;
   copyPhrase: () => Promise<void>;
   onContinue: () => void;
+  i18n: I18n;
 }) => {
+  const copy = i18n.i18n(copyJson);
+  const staticCopy = i18n.staticLang(copyJson);
+
   const phraseCopyElement: Ref<HTMLElement> = createRef();
 
   const continueButton: Ref<HTMLButtonElement> = createRef();
@@ -30,21 +38,18 @@ const displaySeedPhraseTemplate = ({
         phraseCopyElement.classList.add("is-copied");
       });
     } catch (e: unknown) {
-      toast.error("Unable to copy seed phrase");
-      console.error("Unable to copy seed phrase", e);
+      toast.error(staticCopy.unable_to_copy_phrase);
+      console.error(staticCopy.unable_to_copy_phrase, e);
     }
   };
 
   const pageContentSlot = html`
     <article>
       <hgroup>
-        <h1 class="t-title t-title--main">Store Recovery Phrase</h1>
-        <p class="t-lead">
-          If you lose access to your devices, use your recovery phrase to access
-          your Internet Identity.
-        </p>
+        <h1 class="t-title t-title--main">${copy.title}</h1>
+        <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <h2 class="t-title l-stack">Your recovery phrase</h2>
+      <h2 class="t-title l-stack">${copy.your_recovery_phrase}</h2>
       <div>
         <output
           class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
@@ -62,21 +67,19 @@ const displaySeedPhraseTemplate = ({
           <i
             ${ref(phraseCopyElement)}
             @click=${() => copyPhrase()}
-            aria-label="Copy phrase to clipboard"
-            title="Copy phrase to clipboard"
+            aria-label=${copy.copy_to_clipboard}
+            title=${copy.copy_to_clipboard}
             tabindex="0"
             id="seedCopy"
             class="c-button__icon c-input__icon"
           >
-            <span>Copy</span>
+            <span>${copy.copy}</span>
             ${copyIcon} ${checkmarkIcon}
           </i></output
         >
       </div>
 
-      <p class="t-paragraph">
-        Securely store your recovery phrase, and do not share it with anyone!
-      </p>
+      <p class="t-paragraph">${copy.store_your_recovery_phrase}</p>
 
       <div class="l-stack">
         <input
@@ -92,7 +95,7 @@ const displaySeedPhraseTemplate = ({
             )}
         />
         <label for="ack-checkbox" class="t-strong"
-          >I have stored my recovery phrase.</label
+          >${copy.i_have_stored_phrase}</label
         >
       </div>
       <div class="l-stack">
@@ -103,7 +106,7 @@ const displaySeedPhraseTemplate = ({
           class="c-button"
           disabled
         >
-          Continue
+          ${copy.continue}
         </button>
       </div>
     </article>
@@ -120,11 +123,13 @@ const displaySeedPhraseTemplate = ({
 export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
 
 export const displaySeedPhrase = (seedPhrase: string): Promise<void> => {
+  const i18n = new I18n();
   return new Promise((resolve) =>
     displaySeedPhrasePage({
       seedPhrase,
       onContinue: () => resolve(),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
+      i18n,
     })
   );
 };

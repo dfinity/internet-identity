@@ -1308,6 +1308,10 @@ a:hover,
   list-style: none;
 }
 
+.c-list--recovery-word input {
+  text-align: left;
+}
+
 .c-list--recovery-word {
   --bg: var(--rc-line);
   --fg: var(--rc-onInput);
