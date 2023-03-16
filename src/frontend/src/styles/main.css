@@ -63,6 +63,7 @@
   --vc-raven: #202124;
   --vc-snow: #ffffff;
 
+  --vc-mist: rgba(255, 255, 255, 0.3);
   --vc-vapour: rgba(255, 255, 255, 0.6);
   --vc-shadow: rgba(32, 33, 36, 0.6);
 
@@ -1309,14 +1310,15 @@ a:hover,
  */
 
 .c-list--recovery {
+  position: relative;
   flex-wrap: wrap;
   counter-reset: recovery;
   padding: 0;
   list-style: none;
-}
 
-.c-list--recovery-word input {
-  text-align: left;
+  /* this makes sure that the after element is always behind the pill
+      but in front of the background */
+  z-index: 1;
 }
 
 .c-list--recovery-word {
@@ -1342,8 +1344,6 @@ a:hover,
   font-weight: bold;
   font-family: monospace;
   text-align: center;
-
-  z-index: 1;
 }
 
 @media screen and (max-width: 512px) {
@@ -1352,6 +1352,7 @@ a:hover,
   }
 }
 
+/* Recovery phrase counter */
 .c-list--recovery-word::before {
   position: absolute;
   top: 50%;
@@ -1377,6 +1378,7 @@ a:hover,
   transform: translateY(-50%);
 }
 
+/* This is the background color for each pill */
 .c-list--recovery-word::after {
   position: absolute;
   content: "";
@@ -1423,6 +1425,9 @@ a:hover,
 .c-list--recovery-word__disabled {
   --bg: var(--rc-input-readonly);
   --fg: var(--rc-onInput-readonly);
+  background-color: var(--vc-mist);
+  /* make sure the user can't select the word */
+  user-select: none;
 }
 
 /* When a word requires attention, show it as yellow */
@@ -1455,7 +1460,9 @@ a:hover,
 
 .c-recoveryInput {
   display: block;
-  width: 100%;
+
+  /* full width minus the counter */
+  width: calc(100% - 4em);
   text-align: left;
   color: var(--fg, currentColor);
 
