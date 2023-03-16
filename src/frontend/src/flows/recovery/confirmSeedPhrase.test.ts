@@ -11,6 +11,7 @@ test("word changes state", async () => {
     update: () => {
       /* */
     },
+    i: 0,
   });
 
   render(template, document.body);

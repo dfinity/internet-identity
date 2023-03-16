@@ -51,12 +51,16 @@ const displaySeedPhraseTemplate = ({
       </hgroup>
       <h2 class="t-title l-stack">${copy.your_recovery_phrase}</h2>
       <div>
-        <output
-          class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
+        <output class="c-input c-input--recovery"
           ><ol translate="no" class="c-list c-list--recovery">
             ${recoveryWords.map(
               (word, i) =>
-                html`<li style="--i: ${i / recoveryWords.length}">${word}</li>`
+                html`<li
+                  class="c-list--recovery-word"
+                  style="--index: '${i + 1}';"
+                >
+                  <i>${word}</i>
+                </li>`
             )}
           </ol>
           <i

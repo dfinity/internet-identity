@@ -75,7 +75,7 @@
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
-  --vc-brand-green: #7ed321;
+  --vc-brand-green: #79d11c;
   --vc-brand-alt: rgba(215, 205, 235, 1);
 
   /**
@@ -151,6 +151,12 @@
 
   --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
+
+  --rc-input-error: var(--vc-brand-pink);
+  --rc-input-onError: var(--rc-light);
+
+  --rc-input-success: var(--vc-brand-green);
+  --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
@@ -1165,6 +1171,11 @@ a:hover,
   padding: calc(1.5 * var(--rs-input-bezel));
 }
 
+.c-input--recovery {
+  padding: calc(1.5 * var(--rs-input-bezel));
+  background-color: var(--rc-line);
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -1360,23 +1371,29 @@ a:hover,
   list-style: none;
 }
 
-.c-list--recovery li input {
+.c-list--recovery-word input {
   text-align: left;
 }
 
-.c-list--recovery li {
+.c-list--recovery-word {
+  --bg: var(--rc-line);
+  --fg: var(--rc-onInput);
+
   position: relative;
   display: inline-flex;
-  background: var(--rc-input-readonly);
-  color: var(--rc-input-onReadonly);
+  background: var(--rc-background);
+  color: var(--fg);
   border: var(--vs-line) var(--rc-line) solid;
 
   border-radius: 999px;
+
   padding: 0.5em 0.75em;
   padding-right: 0.75em;
   padding-left: 2.9em;
+
   width: calc(33.33% - 1rem);
   margin: 0.5rem;
+
   font-size: 0.7em;
   font-weight: bold;
   font-family: monospace;
@@ -1384,29 +1401,27 @@ a:hover,
 
   z-index: 1;
 
-  --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
+  /* The counter displayed. We set this explicitly from the HTML because
+   * the index shown is important for recovery. Also this works around issues related
+   * to different counter behavior on Safari & Chrome. */
+  --counter: var(--index);
 }
 
 @media screen and (max-width: 512px) {
-  .c-list--recovery li {
+  .c-list--recovery-word {
     width: calc(50% - 1rem);
   }
 }
 
-.c-list--recovery li::selection {
-  background-color: var(--current-color);
-  color: hsl(calc(150 + var(--i) * -180), 100%, 33%);
-}
-
-.c-list--recovery li::before {
+.c-list--recovery-word::before {
   position: absolute;
   top: 50%;
   left: 0.25em;
   height: 85%;
   width: 2.6em;
-  counter-increment: recovery;
-  content: counter(recovery);
-  background-color: var(--current-color);
+  content: var(--counter);
+  background-color: var(--bg);
+  color: var(--fg);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
   margin-right: 0.75em;
@@ -1417,22 +1432,94 @@ a:hover,
   align-items: center;
   justify-content: center;
   transform: translateY(-50%);
-  /* 
-    --i is set on the element and creates a gradient creating a colored gradient
-    from the first to the last element. --i ranges from 0 to 1.  
-  */
-  box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
 }
 
-.c-list--recovery li::after {
+.c-list--recovery-word::after {
   position: absolute;
   content: "";
   inset: 0;
-  background-color: var(--current-color);
+  background-color: var(--bg);
   border-radius: 999px;
   filter: blur(10px);
   z-index: -1;
-  opacity: 0.5;
+  opacity: 0.3;
+}
+
+.c-list--recovery-word__icon {
+  position: absolute;
+  top: 50%;
+  left: 0.6em;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+.c-list--recovery-word__icon svg {
+  width: 1.25em;
+  height: 1.25em;
+  margin-top: 0.25em;
+}
+
+.c-list--recovery-word__icon svg [fill] {
+  fill: var(--fg);
+}
+
+.c-list--recovery-word__icon svg [stroke] {
+  stroke: var(--fg);
+}
+
+.c-list--recovery-word__attention::before,
+.c-list--recovery-word__attention .c-list--recovery-word__icon,
+.c-list--recovery-word__incorrect::before,
+.c-list--recovery-word__incorrect .c-list--recovery-word__icon,
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  --fg: var(--rc-onButton);
+  color: var(--fg);
+}
+
+/* When a word is disabled, bring the saturation down to make it look non-interactive */
+.c-list--recovery-word__disabled {
+  --bg: var(--rc-input-readonly);
+  --fg: var(--rc-onInput-readonly);
+}
+
+/* When a word requires attention, show it as yellow */
+.c-list--recovery-word__attention {
+  --bg: var(--rc-button);
+}
+
+/* When a word requires attention, show it as green and show a checkmark instead of the counter */
+.c-list--recovery-word__correct {
+  --bg: var(--rc-input-success);
+}
+
+.c-list--recovery-word__correct::before {
+  color: var(--bg);
+}
+
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  margin-top: 0.15em;
+  margin-left: -0.05em;
+}
+
+/* When a word requires attention, show it as red and show a warning sign instead of the counter */
+.c-list--recovery-word__incorrect {
+  --bg: var(--rc-input-error);
+}
+
+.c-list--recovery-word__incorrect::before {
+  color: var(--bg);
+}
+
+.c-recoveryInput {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: var(--fg, currentColor);
+
+  height: calc(1em * var(--vs-line));
+
+  /* fixes layout-shifts in safari when input is empty */
+  position: absolute;
 }
 
 .c-list__item--vip {

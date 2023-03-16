@@ -129,6 +129,7 @@ lazy_static! {
     static ref CHAR_REPLACEMENTS: HashMap<char, char> = vec![
         ('C', 'c'),
         ('l', '1'),
+        ('S', 's'),
         ('X', 'x'),
         ('Y', 'y'),
         ('Z', 'z'),
