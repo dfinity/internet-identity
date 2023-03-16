@@ -1301,6 +1301,13 @@ a:hover,
   list-style-type: decimal;
 }
 
+/**
+ *  Recovery phrase
+ *
+ *  We use a a pill style for each word
+ *  and a counter to number them
+ */
+
 .c-list--recovery {
   flex-wrap: wrap;
   counter-reset: recovery;
@@ -1337,11 +1344,6 @@ a:hover,
   text-align: center;
 
   z-index: 1;
-
-  /* The counter displayed. We set this explicitly from the HTML because
-   * the index shown is important for recovery. Also this works around issues related
-   * to different counter behavior on Safari & Chrome. */
-  --counter: var(--index);
 }
 
 @media screen and (max-width: 512px) {
@@ -1356,7 +1358,11 @@ a:hover,
   left: 0.25em;
   height: 85%;
   width: 2.6em;
-  content: var(--counter);
+
+  /* The counter displayed. We set this explicitly from the HTML because
+  * the index shown is important for recovery. Also this works around issues related
+  * to different counter behavior on Safari & Chrome. */
+  content: var(--index);
   background-color: var(--bg);
   color: var(--fg);
   padding: 0 0.4em 0 0.4em;
