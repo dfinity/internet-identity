@@ -1,6 +1,12 @@
 import { TemplateResult, html } from "lit-html";
 import { Setting, settingName } from "../flows/manage/deviceSettings";
-import { warningIcon, checkmarkIcon, dropdownIcon, lockIcon } from "./icons";
+import {
+  warningIcon,
+  errorIcon,
+  successIcon,
+  dropdownIcon,
+  lockIcon,
+} from "./icons";
 
 // A simple representation of "device"s used on the manage page.
 export type Device = {
@@ -18,9 +24,9 @@ export type Device = {
 };
 
 const iconByStatusType = {
-  error: warningIcon,
+  error: errorIcon,
   warning: warningIcon,
-  ok: checkmarkIcon,
+  ok: successIcon,
 };
 
 // A device with extra information about whether another device (earlier in the list)

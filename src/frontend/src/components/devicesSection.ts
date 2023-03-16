@@ -1,6 +1,6 @@
 import { TemplateResult, html } from "lit-html";
 import { deviceListItem, Device } from "./deviceListItem";
-import { warningIcon } from "./icons";
+import { errorIcon } from "./icons";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
@@ -47,7 +47,7 @@ export const devicesSection = ({
       ${
         isWarning === true
           ? html`<span class="c-card__icon" aria-hidden="true"
-              >${warningIcon}</span
+              >${errorIcon}</span
             >`
           : undefined
       }

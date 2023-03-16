@@ -1,5 +1,5 @@
 import { html, TemplateResult } from "lit-html";
-import { warningIcon, closeIcon } from "./icons";
+import { errorIcon, closeIcon } from "./icons";
 
 interface irregularityProps {
   message: string | TemplateResult;
@@ -33,7 +33,7 @@ export const irregularity = ({
 
   const contents: TemplateResult = html`
     <div class="${cssClasses.join(" ")}">
-      <div class="c-irregularity__icon">${warningIcon}</div>
+      <div class="c-irregularity__icon">${errorIcon}</div>
       <p class="c-irregularity__message">${message}</p>
       <button
         class="c-irregularity__close"

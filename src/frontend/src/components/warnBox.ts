@@ -1,5 +1,5 @@
 import { html, TemplateResult } from "lit-html";
-import { warningIcon } from "./icons";
+import { errorIcon } from "./icons";
 
 // The Warning Component can be reused with following custom properties: title, message, slot and htmlElement.
 // "slot" is for a custom element, such as a button, that gets appended at the end.
@@ -26,7 +26,7 @@ export const warnBox = ({
     cssClasses.push(...additionalClasses);
   }
   const contents: TemplateResult = html`
-    <span class="c-card__icon" aria-hidden="true">${warningIcon}</span>
+    <span class="c-card__icon" aria-hidden="true">${errorIcon}</span>
     <div class="c-card__content">
       <h3 class="t-title c-card__title">${title}</h3>
       <div data-role="warning-message" class="t-paragraph c-card__paragraph">
