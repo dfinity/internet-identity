@@ -1388,6 +1388,14 @@ a:hover,
   filter: blur(10px);
   z-index: -1;
   opacity: 0.3;
+
+  transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+/* Make the blurred background more visible on focus */
+.c-list--recovery-word:focus-within::after {
+  opacity: 1;
+  filter: blur(3px);
 }
 
 .c-list--recovery-word__icon {
@@ -1444,6 +1452,7 @@ a:hover,
   color: var(--bg);
 }
 
+/* the check icon needs a bit of re-centering */
 .c-list--recovery-word__correct .c-list--recovery-word__icon {
   margin-top: 0.15em;
   margin-left: -0.05em;
