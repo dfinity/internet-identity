@@ -1,6 +1,5 @@
 import { TemplateResult, html } from "lit-html";
 import { deviceListItem, Device } from "./deviceListItem";
-import { checkmarkIcon } from "./icons";
 
 const recoveryByType = ({
   type,
