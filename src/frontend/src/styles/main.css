@@ -1731,7 +1731,7 @@ a:hover,
   display: flex;
   position: relative;
   gap: var(--vs-gutter);
-  padding: calc(var(--rs-button-bezel) * 0.7) var(--rs-button-bezel);
+  padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
 .c-action-list__item + .c-action-list__item::before {
@@ -1741,8 +1741,8 @@ a:hover,
   background: var(--rc-line);
   position: absolute;
   top: 0;
-  left: var(--rs-button-bezel);
-  right: var(--rs-button-bezel);
+  left: calc(var(--rs-button-bezel) * 0.6);
+  right: calc(var(--rs-button-bezel) * 0.6);
 }
 
 .c-action-list__actions {

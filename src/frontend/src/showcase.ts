@@ -270,7 +270,7 @@ const iiPages: Record<string, () => void> = {
           label: "Yubikey Blue",
           isProtected: false,
           status: {
-            statusType: "warning",
+            statusType: "error",
             statusText: html`Something is rotten in the state of Device`,
           },
           settings: [
