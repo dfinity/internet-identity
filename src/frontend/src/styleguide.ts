@@ -325,26 +325,28 @@ export const styleguide = html`
           <output class="c-input c-input--recovery">
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map((word, i) => {
+                // loop through the demo recovery words and add some classes to
+                // demonstrate the different states
                 const classes = ["c-list--recovery-word"];
-                let contenteditable: undefined | true;
+                let contentEditable = false;
                 let icon: undefined | "warning" | "check";
                 let text = word;
 
                 if (i === 21) {
                   classes.push("c-list--recovery-word__attention");
-                  contenteditable = true;
+                  contentEditable = true;
                   text = "";
                 }
 
                 if (i === 22) {
                   classes.push("c-list--recovery-word__incorrect");
-                  contenteditable = true;
+                  contentEditable = true;
                   icon = "warning";
                 }
 
                 if (i === 23) {
                   classes.push("c-list--recovery-word__correct");
-                  contenteditable = true;
+                  contentEditable = true;
                   icon = "check";
                 }
 

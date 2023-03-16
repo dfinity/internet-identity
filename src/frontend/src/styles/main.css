@@ -1322,6 +1322,14 @@ a:hover,
 }
 
 .c-list--recovery-word {
+  /* 
+    bg and fg stand for background and foreground 
+    and are used to make sure that the text is always readable
+    and make it easier to understand the code going forward
+
+    it creates a scoped design logic that is easier to understand
+    and maintain.
+  */
   --bg: var(--rc-line);
   --fg: var(--rc-onInput);
 
@@ -1429,7 +1437,7 @@ a:hover,
   color: var(--fg);
 }
 
-/* When a word is disabled, bring the saturation down to make it look non-interactive */
+/* When a word is disabled, make it more opaque to look non-interactive */
 .c-list--recovery-word__disabled {
   --bg: var(--rc-input-readonly);
   --fg: var(--rc-onInput-readonly);
@@ -1438,18 +1446,14 @@ a:hover,
   user-select: none;
 }
 
-/* When a word requires attention, show it as yellow */
+/* When a word requires attention make it look interactive */
 .c-list--recovery-word__attention {
   --bg: var(--rc-button);
 }
 
-/* When a word requires attention, show it as green and show a checkmark instead of the counter */
+/* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
 .c-list--recovery-word__correct {
   --bg: var(--rc-input-success);
-}
-
-.c-list--recovery-word__correct::before {
-  color: var(--bg);
 }
 
 /* the check icon needs a bit of re-centering */
@@ -1463,8 +1467,13 @@ a:hover,
   --bg: var(--rc-input-error);
 }
 
+/* 
+  since correct & incorrect words have an icon, but we still want to make use of the circle
+  the number used to be in, we need to hide the number. We do this by making it transparent
+*/
+.c-list--recovery-word__correct::before,
 .c-list--recovery-word__incorrect::before {
-  color: var(--bg);
+  color: transparent;
 }
 
 .c-recoveryInput {
