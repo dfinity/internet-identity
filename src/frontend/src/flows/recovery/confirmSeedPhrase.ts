@@ -12,7 +12,7 @@ import copyJson from "./confirmSeedPhrase.json";
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement>; autofocus: boolean }
+  | { check: true; elem: Ref<HTMLInputElement>; autofocus?: boolean }
 );
 
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
