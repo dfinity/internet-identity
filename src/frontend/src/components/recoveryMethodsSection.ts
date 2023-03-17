@@ -16,7 +16,6 @@ const sectionList = ({
   recoveries: Device[];
   onAddRecovery?: () => void;
 }): TemplateResult => {
-  console.log(recoveries);
   const recoveryPhrases = recoveryByType({ type: "phrase", recoveries });
   const recoveryDevices = recoveryByType({ type: "device", recoveries });
   return html`
