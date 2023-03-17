@@ -18,6 +18,8 @@ export type Device = {
   recovery?: "phrase" | "device";
   isProtected?: boolean;
   status?: {
+    // the status types are used to determine the icon & color to display
+    // and because of that used in the CSS
     statusType: "error" | "warning" | "ok";
     statusText?: TemplateResult;
   };
