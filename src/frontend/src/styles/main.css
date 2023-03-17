@@ -1274,7 +1274,7 @@ a:hover,
   left: calc(-1 * var(--vs-inline) / 2);
   text-decoration: none;
   transform: translateX(-100%);
-  transition: 300ms cubic-bezier(0.3, 0.7, 0, 1);
+  transition: 300ms transform cubic-bezier(0.3, 0.7, 0, 1);
 }
 
 .c-summary__link--end {
