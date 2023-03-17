@@ -1,7 +1,7 @@
 use crate::anchor_management::{anchor_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::storage::anchor::Anchor;
+use crate::storage::anchor::{Anchor, Device};
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -365,7 +365,7 @@ fn update_root_hash() {
 /// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
 fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
     let anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor);
+    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
     let previous_activity = anchor.last_activity();
     anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
     active_anchor_stats::update_active_anchors_stats(previous_activity);
@@ -379,11 +379,11 @@ fn authenticated_anchor_operation(
 ) {
     // load anchor
     let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor);
+    let device = trap_if_not_authenticated(&anchor);
 
     let previous_activity = anchor.last_activity();
     anchor
-        .set_device_usage_timestamp(&device_key, time())
+        .set_device_usage_timestamp(&device.pubkey.clone(), time())
         .expect("last_usage_timestamp update: unable to update last usage timestamp");
 
     let operation = op(&mut anchor);
@@ -395,12 +395,12 @@ fn authenticated_anchor_operation(
     anchor_operation_bookkeeping(anchor_number, operation, previous_activity);
 }
 
-/// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.
+/// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Traps if the caller is not authenticated.
-fn trap_if_not_authenticated(anchor: &Anchor) -> DeviceKey {
+fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
-            return device.pubkey.clone();
+            return device;
         }
     }
     trap(&format!("{} could not be authenticated.", caller()))
