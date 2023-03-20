@@ -9,7 +9,7 @@ import { toast } from "../../components/toast";
 import copyJson from "./displaySeedPhrase.json";
 
 const displaySeedPhraseTemplate = ({
-  op,
+  operation,
   seedPhrase,
   onContinue,
   cancel,
@@ -17,7 +17,7 @@ const displaySeedPhraseTemplate = ({
   i18n,
 }: {
   /* whether the phrase is created for the first time or just reset */
-  op: "create" | "reset";
+  operation: "create" | "reset";
   seedPhrase: string;
   copyPhrase: () => Promise<void>;
   onContinue: () => void;
@@ -52,7 +52,7 @@ const displaySeedPhraseTemplate = ({
     <article>
       <hgroup>
         <h1 class="t-title t-title--main">
-          ${op === "create" ? copy.title : copy.title_reset}
+          ${operation === "create" ? copy.title : copy.title_reset}
         </h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
@@ -139,16 +139,16 @@ const displaySeedPhraseTemplate = ({
 export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
 
 export const displaySeedPhrase = ({
-  op,
+  operation,
   seedPhrase,
 }: {
-  op: "create" | "reset";
+  operation: "create" | "reset";
   seedPhrase: string;
 }): Promise<"ok" | "canceled"> => {
   const i18n = new I18n();
   return new Promise((resolve) =>
     displaySeedPhrasePage({
-      op,
+      operation,
       seedPhrase,
       onContinue: () => resolve("ok"),
       cancel: () => resolve("canceled"),

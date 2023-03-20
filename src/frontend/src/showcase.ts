@@ -374,7 +374,7 @@ const iiPages: Record<string, () => void> = {
     }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
-      op: "create",
+      operation: "create",
       seedPhrase: recoveryPhraseText,
       cancel: () => console.log("cancel"),
       onContinue: () => console.log("continue with:"),

@@ -92,15 +92,18 @@ export const setupRecovery = async ({
 };
 
 export const displayAndConfirmPhrase = async ({
-  op,
+  operation,
   phrase,
 }: {
-  op: "create" | "reset";
+  operation: "create" | "reset";
   phrase: string;
 }) => {
   // Loop until the user has confirmed the phrase
   for (;;) {
-    const displayResult = await displaySeedPhrase({ seedPhrase: phrase, op });
+    const displayResult = await displaySeedPhrase({
+      seedPhrase: phrase,
+      operation,
+    });
     // User has canceled, so we return
     if (displayResult === "canceled") {
       return;
@@ -140,7 +143,7 @@ export const setupPhrase = async (
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;
 
-  await displayAndConfirmPhrase({ phrase, op: "create" });
+  await displayAndConfirmPhrase({ phrase, operation: "create" });
 
   await withLoader(() =>
     connection.add(
