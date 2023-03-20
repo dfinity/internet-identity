@@ -1,9 +1,9 @@
-use crate::anchor_management::{anchor_operation_bookkeeping, tentative_device_registration};
+use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::storage::anchor::Anchor;
+use crate::storage::anchor::{Anchor, Device};
 use candid::{candid_method, Principal};
-use ic_cdk::api::{caller, set_certified_data, time, trap};
+use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::{BufferedEntry, Operation};
@@ -68,8 +68,13 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    authenticate_and_record_activity(anchor_number);
-    tentative_device_registration::verify_tentative_device(anchor_number, user_verification_code)
+    authenticated_anchor_operation(anchor_number, |anchor| {
+        tentative_device_registration::verify_tentative_device(
+            anchor,
+            anchor_number,
+            user_verification_code,
+        )
+    })
 }
 
 #[update]
@@ -88,7 +93,7 @@ fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> Regi
 #[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        anchor_management::add(anchor, device_data)
+        Ok(((), anchor_management::add(anchor, device_data)))
     })
 }
 
@@ -96,7 +101,10 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 #[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        anchor_management::update(anchor, device_key, device_data)
+        Ok((
+            (),
+            anchor_management::update(anchor, device_key, device_data),
+        ))
     })
 }
 
@@ -104,7 +112,10 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 #[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        anchor_management::replace(anchor, device_key, device_data)
+        Ok((
+            (),
+            anchor_management::replace(anchor, device_key, device_data),
+        ))
     })
 }
 
@@ -112,7 +123,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        anchor_management::remove(anchor, device_key)
+        Ok(((), anchor_management::remove(anchor, device_key)))
     })
 }
 
@@ -363,44 +374,59 @@ fn update_root_hash() {
 
 /// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
 /// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
+///
+/// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
+/// do not further modify the anchor.
 fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
-    let anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor);
-    let previous_activity = anchor.last_activity();
-    anchor_management::update_last_device_usage(anchor_number, anchor, &device_key);
-    active_anchor_stats::update_active_anchors_stats(previous_activity);
+    let mut anchor = state::anchor(anchor_number);
+    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
+        panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
+    })
 }
 
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
 /// the necessary bookkeeping for anchor operations.
-fn authenticated_anchor_operation(
+///
+/// * anchor_number: indicates the anchor to be provided op should be called on
+/// * op: Function that modifies an anchor and returns a value `R` wrapped in a [Result] indicating
+///       success or failure which determines whether additional bookkeeping (on success) is required.
+///       On success, the function must also return an [Operation] which is used for archiving purposes.
+///       The type `R` is usually bound to an interface type specified in the candid file. This type
+///       is either unit or a variant unifying success and error cases (which is why the [Result] has
+///       `R` in both success and error positions).
+fn authenticated_anchor_operation<R>(
     anchor_number: AnchorNumber,
-    op: impl FnOnce(&mut Anchor) -> Operation,
-) {
+    op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
+) -> R {
     // load anchor
     let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor);
+    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
-    let previous_activity = anchor.last_activity();
-    anchor
-        .set_device_usage_timestamp(&device_key, time())
-        .expect("last_usage_timestamp update: unable to update last usage timestamp");
-
-    let operation = op(&mut anchor);
+    let result = op(&mut anchor);
 
     // write back anchor
     state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
         panic!("unable to update anchor {anchor_number} in stable memory: {err}")
     });
-    anchor_operation_bookkeeping(anchor_number, operation, previous_activity);
+
+    match result {
+        Ok((ret, operation)) => {
+            post_operation_bookkeeping(anchor_number, operation);
+            ret
+        }
+        Err(err) => err,
+    }
 }
 
-/// Checks if the caller is authenticated against the anchor provided and returns the device key of the device used.
+/// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Traps if the caller is not authenticated.
-fn trap_if_not_authenticated(anchor: &Anchor) -> DeviceKey {
+fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
     for device in anchor.devices() {
         if caller() == Principal::self_authenticating(&device.pubkey) {
-            return device.pubkey.clone();
+            return device;
         }
     }
     trap(&format!("{} could not be authenticated.", caller()))
