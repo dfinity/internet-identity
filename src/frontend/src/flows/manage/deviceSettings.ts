@@ -236,7 +236,7 @@ const resetPhrase = async ({
   try {
     const phrase = userNumber.toString(10) + " " + recoveryPhrase;
 
-    await displayAndConfirmPhrase({ phrase });
+    await displayAndConfirmPhrase({ phrase, op: "reset" });
     await withLoader(() => opConnection.replace(oldKey, device));
   } catch (e: unknown) {
     await displayError({
