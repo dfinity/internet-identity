@@ -1,9 +1,12 @@
+use crate::anchor_management::add;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
-use crate::{add, secs_to_nanos, state};
+use crate::storage::anchor::Anchor;
+use crate::{secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
+use internet_identity_interface::archive::Operation;
 use internet_identity_interface::AddTentativeDeviceResponse::{
     AddedTentatively, AnotherDeviceTentativelyAdded,
 };
@@ -85,16 +88,21 @@ pub async fn add_tentative_device(
     })
 }
 
+/// Verifies the tentative device using the submitted `user_verification_code` and returns
+/// a result of [VerifyTentativeDeviceResponse]. [VerifyTentativeDeviceResponse] is used both as
+/// a success and an error type because it corresponds to the candid variant unifying success and
+/// error cases. See `authenticated_anchor_operation` for more details on how the [Result] is handled.
 pub fn verify_tentative_device(
+    anchor: &mut Anchor,
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
-) -> VerifyTentativeDeviceResponse {
+) -> Result<(VerifyTentativeDeviceResponse, Operation), VerifyTentativeDeviceResponse> {
     match get_verified_device(anchor_number, user_verification_code) {
         Ok(device) => {
-            add(anchor_number, device);
-            VerifyTentativeDeviceResponse::Verified
+            let operation = add(anchor, device);
+            Ok((VerifyTentativeDeviceResponse::Verified, operation))
         }
-        Err(err) => err,
+        Err(err) => Err(err),
     }
 }
 

@@ -51,20 +51,29 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     })
 }
 
+/// Handles all the bookkeeping required on anchor activity:
+/// * Records anchor activity within aggregated activity stats
+/// * Updates the last usage timestamp
+///
+/// Note: modifies the anchor but not does not write to storage. It is the responsibility of the
+/// caller to persist the changes. This allows anchor operations to write to storage only once,
+/// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
+pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
+    let previous_activity = anchor.last_activity();
+    active_anchor_stats::update_active_anchors_stats(previous_activity);
+    anchor
+        .set_device_usage_timestamp(current_device_key, time())
+        .expect("unable to update last usage timestamp");
+}
+
 /// Handles all the bookkeeping required after a successful anchor operation:
 /// * Adds the operation to the archive buffer
 /// * Increments the anchor operation counter
-/// * Records anchor activity
-pub fn anchor_operation_bookkeeping(
-    anchor_number: AnchorNumber,
-    operation: Operation,
-    previous_activity: Option<Timestamp>,
-) {
+pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
     archive_operation(anchor_number, caller(), operation);
     state::usage_metrics_mut(|metrics| {
         metrics.anchor_operation_counter += 1;
     });
-    active_anchor_stats::update_active_anchors_stats(previous_activity);
 }
 
 /// Adds a device to the given anchor and returns the operation to be archived.
@@ -130,19 +139,4 @@ pub fn remove(anchor: &mut Anchor, device_key: DeviceKey) -> Operation {
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
     Operation::RemoveDevice { device: device_key }
-}
-
-/// Updates the device on the anchor to reflect the current usage.
-/// Note: This is considered internal bookkeeping and is not recorded in the archive and does not increase anchor operation counter.
-pub fn update_last_device_usage(
-    anchor_number: AnchorNumber,
-    mut anchor: Anchor,
-    device_key: &DeviceKey,
-) {
-    anchor
-        .set_device_usage_timestamp(device_key, time())
-        .expect("last_usage_timestamp update: unable to update last usage timestamp");
-    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
-        panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
-    })
 }

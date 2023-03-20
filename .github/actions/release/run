@@ -71,7 +71,7 @@ do
 
     # Find out the Job ID
     # XXX: Unfortunately GitHub actions doesn't give us a way to find out the Job ID explicitely.
-    # Instead, we find the job name that includes "$filename" without the .wasm extension and assume that's the Job ID.
+    # Instead, we find the job name that includes "$filename" without the .wasm or .wasm.gz extension and assume that's the Job ID.
     # This works because our jobs contain the filename without extension
     # (either added manually or by build matrix which takes in the filename as argument and adds it to the job name).
     # https://github.community/t/get-action-job-id/17365/7
@@ -83,7 +83,7 @@ do
     else
         job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
-            --arg search_string "${filename%.wasm}" \
+            --arg search_string "${filename%%.*}" \
             '.jobs[] | select(.name | contains($search_string)) | .id')
                     >&2 echo "Found job id: $job_id"
 
@@ -98,7 +98,8 @@ do
         step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
             --argjson job_id "$job_id" \
-            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum")) | .number')
+            --argjson filename "$filename" \
+            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum $filename")) | .number')
                 >&2 echo "Found step: $step"
     fi
 
