@@ -97,8 +97,10 @@ jobs:
           outputs: ./out
           target: scratch_internet_identity
 
-      - run: sha256sum out/internet_identity.wasm
       - run: mv out/internet_identity.wasm ${{ matrix.name }}
+      - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}.gz
+      - run: sha256sum ${{ matrix.name }}
+      - run: sha256sum ${{ matrix.name }}.gz
       - name: 'Upload ${{ matrix.name }}'
         uses: actions/upload-artifact@v3
         with:
@@ -107,6 +109,14 @@ jobs:
           # path is the name used as the file to upload and the name of the
           # downloaded file
           path: ${{ matrix.name }}
+      - name: 'Upload ${{ matrix.name }}.gz'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: ${{ matrix.name }}.gz
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ${{ matrix.name }}.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -128,7 +138,9 @@ jobs:
           target: scratch_archive
 
       - run: mv out/archive.wasm archive.wasm
+      - run: mv out/archive.wasm.gz archive.wasm.gz
       - run: sha256sum archive.wasm
+      - run: sha256sum archive.wasm.gz
       - name: 'Upload archive.wasm'
         uses: actions/upload-artifact@v3
         with:
@@ -137,6 +149,14 @@ jobs:
           # path is the name used as the file to upload and the name of the
           # downloaded file
           path: archive.wasm
+      - name: 'Upload archive.wasm.gz'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: archive.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: archive.wasm.gz
 
   wasm-size:
     runs-on: ubuntu-latest
@@ -595,6 +615,12 @@ jobs:
           name: internet_identity_production.wasm
           path: .
 
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_production.wasm.gz
+          path: .
+
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
         with:
@@ -607,6 +633,7 @@ jobs:
         with:
           assets: |
             internet_identity_production.wasm
+            internet_identity_production.wasm.gz
             internet_identity_dev.wasm
             internet_identity_test.wasm
             archive.wasm
@@ -619,6 +646,7 @@ jobs:
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
             -- \
             internet_identity_production.wasm \
+            internet_identity_production.wasm.gz \
             internet_identity_dev.wasm \
             internet_identity_test.wasm \
             src/internet_identity/internet_identity.did \
@@ -637,7 +665,7 @@ jobs:
         os: [ ubuntu-22.04, ubuntu-20.04, macos-11, macos-12 ]
     steps:
       - uses: actions/checkout@v3
-      - name: 'Download wasm'
+      - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm
