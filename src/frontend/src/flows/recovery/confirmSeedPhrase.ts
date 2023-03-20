@@ -12,7 +12,7 @@ import copyJson from "./confirmSeedPhrase.json";
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement>; autofocus?: boolean }
+  | { check: true; elem: Ref<HTMLInputElement>; shouldFocus?: boolean }
 );
 
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
@@ -38,29 +38,26 @@ const confirmSeedPhraseTemplate = ({
 }) => {
   const copy = i18n.i18n(copyJson);
 
-  let isFistCheckedWord = true;
-
   // All words, where a `Ref` was added if the word needs checking
   const words: Word[] = words_.map((word) => {
-    let isFirstInput = false;
-
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
       // NOTE: typescript can't follow if word is deconstructed with {...word}
-      if (isFistCheckedWord) {
-        isFistCheckedWord = false;
-        isFirstInput = true;
-      }
       return {
         word: word.word,
         check: word.check,
         elem,
-        autofocus: isFirstInput,
       };
     } else {
-      return { word: word.word, check: word.check, autofocus: isFirstInput };
+      return { word: word.word, check: word.check };
     }
   });
+
+  // find the first editable word and focus it
+  const firstEditable = words.find((w) => w.check);
+  if (firstEditable && "elem" in firstEditable) {
+    firstEditable.shouldFocus = true;
+  }
 
   // if all "check" words have been re-input correctly
   const wordsOk = new Chan<boolean>(false);
@@ -169,8 +166,8 @@ export const wordTemplate = ({
       type="text"
       class="c-recoveryInput"
       ${ref(word.elem)}
-      ?autofocus=${word.autofocus === true}
       data-expected=${word.word}
+      ?autofocus=${word.shouldFocus}
       data-state=${asyncReplace(
         state.map(
           (x) => x
