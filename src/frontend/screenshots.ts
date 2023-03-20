@@ -67,7 +67,7 @@ async function withChrome<T>(
   const chromeOptions: ChromeOptions = {
     // font-render-hinting causing broken kerning on headless chrome seems to be a
     // long-standing issue: see https://github.com/puppeteer/puppeteer/issues/2410
-    // -> we disabling it improves things
+    // -> disabling it improves things
     args: ["headless", "disable-gpu", "font-render-hinting=none"],
     mobileEmulation,
     binary: chromePath,
