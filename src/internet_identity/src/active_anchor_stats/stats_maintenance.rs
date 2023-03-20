@@ -4,7 +4,7 @@ use ic_cdk::api::time;
 use internet_identity_interface::ActiveAnchorStatistics;
 
 /// Updates the active anchor counters if an ongoing collection bucket has completed.
-pub fn process_active_anchor_stats(stats: &mut ActiveAnchorStatistics) {
+pub fn process_stats(stats: &mut ActiveAnchorStatistics) {
     process_daily_stats(stats);
     process_monthly_stats(stats);
 }
