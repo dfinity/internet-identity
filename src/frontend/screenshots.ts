@@ -65,7 +65,7 @@ async function withChrome<T>(
   const chromePath = await downloadChrome();
 
   const chromeOptions: ChromeOptions = {
-    args: ["headless", "disable-gpu"],
+    args: ["headless", "disable-gpu", "font-render-hinting=none"],
     mobileEmulation,
     binary: chromePath,
   };
