@@ -393,6 +393,9 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
 /// * op: Function that modifies an anchor and returns a value `R` wrapped in a [Result] indicating
 ///       success or failure which determines whether additional bookkeeping (on success) is required.
 ///       On success, the function must also return an [Operation] which is used for archiving purposes.
+///       The type `R` is usually bound to an interface type specified in the candid file. This type
+///       is either unit or a variant unifying success and error cases (which is why the [Result] has
+///       `R` in both success and error positions).
 fn authenticated_anchor_operation<R>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,

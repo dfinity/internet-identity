@@ -88,6 +88,10 @@ pub async fn add_tentative_device(
     })
 }
 
+/// Verifies the tentative device using the submitted `user_verification_code` and returns
+/// a result of [VerifyTentativeDeviceResponse]. [VerifyTentativeDeviceResponse] is used both as
+/// a success and an error type because it corresponds to the candid variant unifying success and
+/// error cases. See `authenticated_anchor_operation` for more details on how the [Result] is handled.
 pub fn verify_tentative_device(
     anchor: &mut Anchor,
     anchor_number: AnchorNumber,
