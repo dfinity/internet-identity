@@ -87,27 +87,16 @@ export const recoveryMethodsSection = ({
   recoveries: Device[];
   onAddRecovery: () => void;
 }): TemplateResult => {
-  /**
-   * - when you don't have any recovery methods, we want to nag the user to add one
-   * - when you have a single recovery method, we want to show it expanded
-   * - when you have a recovery key and a recovery phrase, we want to show them both collapsed
-   * - to keep the function simple we just check if there are less than 2 recovery methods
-   */
   return html`
     <aside class="l-stack">
-      <details class="c-details" .open="${recoveries.length < 2}">
-        <summary class="t-title c-summary">
-          <h2>Recovery methods</h2>
-          <span class="c-summary__link c-summary__link--end"></span>
-        </summary>
-
-        ${recoveries.length === 0
-          ? html`<p class="t-lead">
-              We recommend that you create at least 1 recovery method.
-            </p>`
-          : null}
-        ${sectionList({ recoveries, onAddRecovery })}
-      </details>
+      <h2 class="t-title">Recovery methods</h2>
+      ${recoveries.length === 0
+        ? // when you don't have any recovery methods, we want to nag the user to add one
+          html`<p class="t-lead">
+            We recommend that you create at least 1 recovery method.
+          </p>`
+        : null}
+      ${sectionList({ recoveries, onAddRecovery })}
     </aside>
   `;
 };
