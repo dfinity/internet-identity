@@ -390,9 +390,9 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
 /// the necessary bookkeeping for anchor operations.
 ///
 /// * anchor_number: indicates the anchor to be provided op should be called on
-/// * op: Function that modifies an anchor and provides a result indicating success or failure, which
-///       determines whether additional bookkeeping (on success) is required. On success, the
-///       function must also return an [Operation] which is used for archiving purposes.
+/// * op: Function that modifies an anchor and returns a value `R` wrapped in a [Result] indicating
+///       success or failure which determines whether additional bookkeeping (on success) is required.
+///       On success, the function must also return an [Operation] which is used for archiving purposes.
 fn authenticated_anchor_operation<R>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
