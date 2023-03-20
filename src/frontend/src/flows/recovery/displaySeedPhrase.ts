@@ -9,14 +9,19 @@ import { toast } from "../../components/toast";
 import copyJson from "./displaySeedPhrase.json";
 
 const displaySeedPhraseTemplate = ({
+  operation,
   seedPhrase,
   onContinue,
+  cancel,
   copyPhrase: copyPhrase_,
   i18n,
 }: {
+  /* whether the phrase is created for the first time or just reset */
+  operation: "create" | "reset";
   seedPhrase: string;
   copyPhrase: () => Promise<void>;
   onContinue: () => void;
+  cancel: () => void;
   i18n: I18n;
 }) => {
   const copy = i18n.i18n(copyJson);
@@ -46,13 +51,18 @@ const displaySeedPhraseTemplate = ({
   const pageContentSlot = html`
     <article>
       <hgroup>
-        <h1 class="t-title t-title--main">${copy.title}</h1>
+        <h1 class="t-title t-title--main">
+          ${operation === "create" ? copy.title : copy.title_reset}
+        </h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <h2 class="t-title l-stack">${copy.your_recovery_phrase}</h2>
-      <div>
+      <div class="l-stack">
         <output class="c-input c-input--recovery"
-          ><ol translate="no" class="c-list c-list--recovery">
+          ><ol
+            data-role="recovery-words"
+            translate="no"
+            class="c-list c-list--recovery"
+          >
             ${recoveryWords.map(
               (word, i) =>
                 html`<li
@@ -78,7 +88,7 @@ const displaySeedPhraseTemplate = ({
         >
       </div>
 
-      <p class="t-paragraph">${copy.store_your_recovery_phrase}</p>
+      <p class="t-paragraph l-stack">${copy.store_your_recovery_phrase}</p>
 
       <div class="l-stack">
         <input
@@ -97,7 +107,14 @@ const displaySeedPhraseTemplate = ({
           >${copy.i_have_stored_phrase}</label
         >
       </div>
-      <div class="l-stack">
+      <div class="c-button-group">
+        <button
+          @click=${() => cancel()}
+          data-action="cancel"
+          class="c-button c-button--secondary"
+        >
+          ${copy.cancel}
+        </button>
         <button
           ${ref(continueButton)}
           @click=${() => onContinue()}
@@ -121,12 +138,20 @@ const displaySeedPhraseTemplate = ({
 
 export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
 
-export const displaySeedPhrase = (seedPhrase: string): Promise<void> => {
+export const displaySeedPhrase = ({
+  operation,
+  seedPhrase,
+}: {
+  operation: "create" | "reset";
+  seedPhrase: string;
+}): Promise<"ok" | "canceled"> => {
   const i18n = new I18n();
   return new Promise((resolve) =>
     displaySeedPhrasePage({
+      operation,
       seedPhrase,
-      onContinue: () => resolve(),
+      onContinue: () => resolve("ok"),
+      cancel: () => resolve("canceled"),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
       i18n,
     })

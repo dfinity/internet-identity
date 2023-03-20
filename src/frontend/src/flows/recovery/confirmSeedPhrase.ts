@@ -70,7 +70,7 @@ const confirmSeedPhraseTemplate = ({
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <div class="c-input c-input--recovery">
+      <div class="c-input c-input--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${words.map((word, i) =>
             wordTemplate({
@@ -83,7 +83,7 @@ const confirmSeedPhraseTemplate = ({
         </ol>
       </div>
 
-      <div class="c-button-group">
+      <div class="c-button-group l-stack">
         <button
           @click=${() => back()}
           data-action="back"

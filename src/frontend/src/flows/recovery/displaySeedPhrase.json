@@ -1,13 +1,14 @@
 {
   "en": {
-    "title": "Store Recovery Phrase",
-    "header": " If you lose access to your devices, use your recovery phrase to access your Internet Identity.",
-    "your_recovery_phrase": "Your recovery phrase",
+    "title": "Safely Store your Recovery Phrase",
+    "title_reset": "Safely Store your new Recovery Phrase",
+    "header": "If you lose access to your devices, you will need your recovery phrase to access your accounts. Save this somewhere safe and private.",
     "copy": "Copy",
     "copy_to_clipboard": "Copy phrase to clipboard",
-    "store_your_recovery_phrase": "Securely store your recovery phrase, and do not share it with anyone!",
-    "i_have_stored_phrase": "I have stored my recovery phrase.",
+    "store_your_recovery_phrase": "Did you store your recovery phrase? You will need to re-enter it in the next step.",
+    "i_have_stored_phrase": "I have safely stored my recovery phrase.",
 
+    "cancel": "Cancel",
     "continue": "Continue",
 
     "unable_to_copy_phrase": "Unable to copy recovery phrase"
