@@ -55,7 +55,9 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 /// * Records anchor activity within aggregated activity stats
 /// * Updates the last usage timestamp
 ///
-/// Note: modifies the anchor but not does not write to storage.
+/// Note: modifies the anchor but not does not write to storage. It is the responsibility of the
+/// caller to persist the changes. This allows anchor operations to write to storage only once,
+/// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
 pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
     let previous_activity = anchor.last_activity();
     active_anchor_stats::update_active_anchors_stats(previous_activity);
