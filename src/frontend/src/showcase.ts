@@ -374,7 +374,9 @@ const iiPages: Record<string, () => void> = {
     }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
+      operation: "create",
       seedPhrase: recoveryPhraseText,
+      cancel: () => console.log("cancel"),
       onContinue: () => console.log("continue with:"),
       copyPhrase: () => Promise.resolve(console.log("copied")),
       i18n,
