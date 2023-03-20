@@ -1808,6 +1808,15 @@ a:hover,
   transform: rotate(180deg);
 }
 
+/**
+* Action list component
+* We typically use this to show a list of recovery methods but also
+* for devices in devices.
+* 
+* .c-action-list should be set on a <ul> or <ol> element.
+* .c-action-list__item should be set on a <li> element.
+**/
+
 .c-action-list {
   margin-top: 1rem;
   background: var(--rc-background);
@@ -1821,6 +1830,7 @@ a:hover,
   padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
+/* Add a line between items */
 .c-action-list__item + .c-action-list__item::before {
   content: "";
   display: block;
@@ -1845,7 +1855,8 @@ a:hover,
 }
 
 .c-action-list__action,
-.c-action-list__label {
+.c-action-list__label,
+.c-action-list__status {
   display: flex;
   align-items: center;
 }

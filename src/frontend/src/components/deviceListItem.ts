@@ -47,7 +47,7 @@ export const deviceListItem = ({
   return html`
     <li class="c-action-list__item" data-device=${device.label}>
       ${device.status !== undefined
-        ? html`<div class="c-action-list__action">
+        ? html`<div class="c-action-list__status">
             <span
               class="c-tooltip c-icon c-icon--${device.status.statusType}"
               tabindex="0"
