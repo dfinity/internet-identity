@@ -75,6 +75,7 @@
   --vc-raven: #202124;
   --vc-snow: #ffffff;
 
+  --vc-mist: rgba(255, 255, 255, 0.3);
   --vc-vapour: rgba(255, 255, 255, 0.6);
   --vc-shadow: rgba(32, 33, 36, 0.6);
 
@@ -1313,18 +1314,34 @@ a:hover,
   list-style-type: decimal;
 }
 
+/**
+ *  Recovery phrase
+ *
+ *  We use a a pill style for each word
+ *  and a counter to number them
+ */
+
 .c-list--recovery {
+  position: relative;
   flex-wrap: wrap;
   counter-reset: recovery;
   padding: 0;
   list-style: none;
-}
 
-.c-list--recovery-word input {
-  text-align: left;
+  /* this makes sure that the after element is always behind the pill
+      but in front of the background */
+  z-index: 1;
 }
 
 .c-list--recovery-word {
+  /* 
+    bg and fg stand for background and foreground 
+    and are used to make sure that the text is always readable
+    and make it easier to understand the code going forward
+
+    it creates a scoped design logic that is easier to understand
+    and maintain.
+  */
   --bg: var(--rc-line);
   --fg: var(--rc-onInput);
 
@@ -1347,13 +1364,6 @@ a:hover,
   font-weight: bold;
   font-family: monospace;
   text-align: center;
-
-  z-index: 1;
-
-  /* The counter displayed. We set this explicitly from the HTML because
-   * the index shown is important for recovery. Also this works around issues related
-   * to different counter behavior on Safari & Chrome. */
-  --counter: var(--index);
 }
 
 @media screen and (max-width: 512px) {
@@ -1362,13 +1372,18 @@ a:hover,
   }
 }
 
+/* Recovery phrase counter */
 .c-list--recovery-word::before {
   position: absolute;
   top: 50%;
   left: 0.25em;
   height: 85%;
   width: 2.6em;
-  content: var(--counter);
+
+  /* The counter displayed. We set this explicitly from the HTML because
+  * the index shown is important for recovery. Also this works around issues related
+  * to different counter behavior on Safari & Chrome. */
+  content: var(--index);
   background-color: var(--bg);
   color: var(--fg);
   padding: 0 0.4em 0 0.4em;
@@ -1383,6 +1398,7 @@ a:hover,
   transform: translateY(-50%);
 }
 
+/* This is the background color for each pill */
 .c-list--recovery-word::after {
   position: absolute;
   content: "";
@@ -1392,6 +1408,14 @@ a:hover,
   filter: blur(10px);
   z-index: -1;
   opacity: 0.3;
+
+  transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+/* Make the blurred background more visible on focus */
+.c-list--recovery-word:focus-within::after {
+  opacity: 1;
+  filter: blur(3px);
 }
 
 .c-list--recovery-word__icon {
@@ -1425,26 +1449,26 @@ a:hover,
   color: var(--fg);
 }
 
-/* When a word is disabled, bring the saturation down to make it look non-interactive */
+/* When a word is disabled, make it more opaque to look non-interactive */
 .c-list--recovery-word__disabled {
   --bg: var(--rc-input-readonly);
   --fg: var(--rc-onInput-readonly);
+  background-color: var(--vc-mist);
+  /* make sure the user can't select the word */
+  user-select: none;
 }
 
-/* When a word requires attention, show it as yellow */
+/* When a word requires attention make it look interactive */
 .c-list--recovery-word__attention {
   --bg: var(--rc-button);
 }
 
-/* When a word requires attention, show it as green and show a checkmark instead of the counter */
+/* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
 .c-list--recovery-word__correct {
   --bg: var(--rc-input-success);
 }
 
-.c-list--recovery-word__correct::before {
-  color: var(--bg);
-}
-
+/* the check icon needs a bit of re-centering */
 .c-list--recovery-word__correct .c-list--recovery-word__icon {
   margin-top: 0.15em;
   margin-left: -0.05em;
@@ -1455,13 +1479,20 @@ a:hover,
   --bg: var(--rc-input-error);
 }
 
+/* 
+  since correct & incorrect words have an icon, but we still want to make use of the circle
+  the number used to be in, we need to hide the number. We do this by making it transparent
+*/
+.c-list--recovery-word__correct::before,
 .c-list--recovery-word__incorrect::before {
-  color: var(--bg);
+  color: transparent;
 }
 
 .c-recoveryInput {
   display: block;
-  width: 100%;
+
+  /* full width minus the counter */
+  width: calc(100% - 4em);
   text-align: left;
   color: var(--fg, currentColor);
 

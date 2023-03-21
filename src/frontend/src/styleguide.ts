@@ -325,26 +325,28 @@ export const styleguide = html`
           <output class="c-input c-input--recovery">
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map((word, i) => {
+                // loop through the demo recovery words and add some classes to
+                // demonstrate the different states
                 const classes = ["c-list--recovery-word"];
-                let contenteditable: undefined | true;
+                let isEditable = false;
                 let icon: undefined | "warning" | "check";
                 let text = word;
 
                 if (i === 21) {
                   classes.push("c-list--recovery-word__attention");
-                  contenteditable = true;
+                  isEditable = true;
                   text = "";
                 }
 
                 if (i === 22) {
                   classes.push("c-list--recovery-word__incorrect");
-                  contenteditable = true;
+                  isEditable = true;
                   icon = "warning";
                 }
 
                 if (i === 23) {
                   classes.push("c-list--recovery-word__correct");
-                  contenteditable = true;
+                  isEditable = true;
                   icon = "check";
                 }
 
@@ -361,16 +363,16 @@ export const styleguide = html`
                         >${icon === "warning" ? warningIcon : checkmarkIcon}</i
                       >`
                     : null}
-                  ${contenteditable === true
+                  ${isEditable === true
                     ? html`<input
                           type="text"
                           class="c-recoveryInput"
                           value=${text}
-                          pattern=${text}
-                          required
                           maxlength="8"
                         />&nbsp;`
-                    : text}
+                    : // &nbsp; is used to prevent the element from collapsing
+                      // when the input is empty, especially in Safari
+                      text}
                 </li>`;
               })}
             </ol>

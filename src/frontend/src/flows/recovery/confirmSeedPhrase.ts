@@ -12,7 +12,7 @@ import copyJson from "./confirmSeedPhrase.json";
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement> }
+  | { check: true; elem: Ref<HTMLInputElement>; shouldFocus: boolean }
 );
 
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
@@ -31,7 +31,7 @@ const confirmSeedPhraseTemplate = ({
   back,
   i18n,
 }: {
-  words: Omit<Word, "elem">[];
+  words: Omit<Word, "elem" | "shouldFocus">[];
   confirm: () => void;
   back: () => void;
   i18n: I18n;
@@ -43,11 +43,18 @@ const confirmSeedPhraseTemplate = ({
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
       // NOTE: typescript can't follow if word is deconstructed with {...word}
-      return { word: word.word, check: word.check, elem };
+      return { word: word.word, check: word.check, elem, shouldFocus: false };
     } else {
       return { word: word.word, check: word.check };
     }
   });
+
+  for (const word of words) {
+    if (word.check) {
+      word.shouldFocus = true;
+      break;
+    }
+  }
 
   // if all "check" words have been re-input correctly
   const wordsOk = new Chan<boolean>(false);
@@ -157,6 +164,7 @@ export const wordTemplate = ({
       class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
+      ?autofocus=${word.shouldFocus}
       data-state=${asyncReplace(
         state.map(
           (x) => x
