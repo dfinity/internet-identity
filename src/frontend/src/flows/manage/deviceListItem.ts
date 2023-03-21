@@ -1,6 +1,6 @@
 import { TemplateResult, html } from "lit-html";
-import { Setting, settingName } from "../flows/manage/deviceSettings";
-import { warningIcon, dropdownIcon, lockIcon } from "./icons";
+import { Setting, settingName } from "./deviceSettings";
+import { warningIcon, dropdownIcon, lockIcon } from "../../components/icons";
 
 // A simple representation of "device"s used on the manage page.
 export type Device = {

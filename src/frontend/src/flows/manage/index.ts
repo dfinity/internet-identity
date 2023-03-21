@@ -22,9 +22,9 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { warnBox } from "../../components/warnBox";
-import { Device } from "../../components/deviceListItem";
-import { recoveryMethodsSection } from "../../components/recoveryMethodsSection";
-import { devicesSection } from "../../components/devicesSection";
+import { Device } from "./deviceListItem";
+import { recoveryMethodsSection } from "./recoveryMethodsSection";
+import { devicesSection } from "./devicesSection";
 import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
