@@ -37,7 +37,7 @@ import {
   hasRecoveryPhrase,
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
-import { Devices, Protection } from "./types";
+import { Devices, Protection, RecoveryPhrase, RecoveryKey } from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -216,7 +216,16 @@ export const displayManage = (
       connection,
       reload: resolve,
     });
-
+    if (devices.dupPhrase) {
+      toast.error(
+        "More than one recovery phrases are registered, which is unexpected. Only one will be showed."
+      );
+    }
+    if (devices.dupKey) {
+      toast.error(
+        "More than one recovery keys are registered, which is unexpected. Only one will be showed."
+      );
+    }
     displayManagePage({
       userNumber,
       devices,
@@ -271,6 +280,62 @@ export const displayManage = (
     }
   });
 
+// Try to read a DeviceData as a recovery
+export const readRecovery = ({
+  userNumber,
+  connection,
+  reload,
+  device,
+}: {
+  device: DeviceData;
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  reload: () => void;
+}):
+  | { recoveryPhrase: RecoveryPhrase }
+  | { recoveryKey: RecoveryKey }
+  | undefined => {
+  if (isRecoveryDevice(device)) {
+    if (isRecoveryPhrase(device)) {
+      const protection: Protection = isProtected(device)
+        ? {
+            isProtected: true,
+            unprotect: () =>
+              unprotectDevice(userNumber, connection, device, reload),
+          }
+        : {
+            isProtected: false,
+            protect: () =>
+              protectDevice({
+                userNumber,
+                connection,
+                device,
+                reload,
+              }),
+          };
+      return {
+        recoveryPhrase: {
+          reset: () =>
+            resetPhrase({
+              userNumber,
+              connection,
+              device,
+              reload,
+            }),
+          ...protection,
+        },
+      };
+    } else {
+      return {
+        recoveryKey: {
+          remove: () => deleteDevice({ connection, device, reload }),
+        },
+      };
+    }
+  }
+  return undefined;
+};
+
 // Convert devices read from the canister into types that are easier to work with
 // and that better represent what we expect.
 export const devicesFromDeviceDatas = ({
@@ -283,53 +348,25 @@ export const devicesFromDeviceDatas = ({
   reload: (connection?: AuthenticatedConnection) => void;
   connection: AuthenticatedConnection;
   userNumber: bigint;
-}): Devices => {
+}): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
 
-  return devices_.reduce<Devices>(
+  return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
-      if (isRecoveryDevice(device)) {
-        if (isRecoveryPhrase(device)) {
-          const protection: Protection = isProtected(device)
-            ? {
-                isProtected: true,
-                unprotect: () =>
-                  unprotectDevice(userNumber, connection, device, reload),
-              }
-            : {
-                isProtected: false,
-                protect: () =>
-                  protectDevice({
-                    userNumber,
-                    connection,
-                    device,
-                    reload,
-                  }),
-              };
+      const recovery = readRecovery({ userNumber, connection, reload, device });
+      if (recovery !== undefined) {
+        if ("recoveryPhrase" in recovery) {
           if (acc.recoveries.recoveryPhrase !== undefined) {
-            toast.error(
-              "More than one recovery phrases are registered, which is unexpected. Only one will be showed."
-            );
+            acc.dupPhrase = true;
           }
-          acc.recoveries.recoveryPhrase = {
-            reset: () =>
-              resetPhrase({
-                userNumber,
-                connection,
-                device,
-                reload,
-              }),
-            ...protection,
-          };
-        } else {
+          acc.recoveries.recoveryPhrase = recovery.recoveryPhrase;
+        } else if ("recoveryKey" in recovery) {
           if (acc.recoveries.recoveryKey !== undefined) {
-            toast.error(
-              "More than one recovery keys are registered, which is unexpected. Only one will be showed."
-            );
+            acc.dupKey = true;
           }
-          acc.recoveries.recoveryKey = {
-            remove: () => deleteDevice({ connection, device, reload }),
-          };
+          acc.recoveries.recoveryKey = recovery.recoveryKey;
+        } else {
+          unreachable(recovery, "returned unexpected recovery");
         }
         return acc;
       }
@@ -343,7 +380,7 @@ export const devicesFromDeviceDatas = ({
       });
       return acc;
     },
-    { authenticators: [], recoveries: {} }
+    { authenticators: [], recoveries: {}, dupPhrase: false, dupKey: false }
   );
 };
 

@@ -15,7 +15,7 @@ export const recoveryDeviceToLabel = (device: RecoveryDevice): string => {
   return recoveryKeyLabel;
 };
 export const recoveryPhraseLabel = "Recovery Phrase";
-export const recoveryKeyLabel = "External Hardware";
+export const recoveryKeyLabel = "Recovery Device";
 
 export const isRecoveryDevice = (
   device: Pick<DeviceData, "purpose">

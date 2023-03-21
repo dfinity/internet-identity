@@ -98,38 +98,25 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator,
+  authenticator: { alias, dupCount, warn, remove },
   index,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
 }) => {
-  const remove = authenticator.remove;
-
   return html`
-    <li class="c-action-list__item" data-device=${authenticator.alias}>
+    <li class="c-action-list__item" data-device=${alias}>
       <div class="c-action-list__label">
-        ${authenticator.alias}
-        ${authenticator.dupCount !== undefined && authenticator.dupCount > 0
-          ? html`<i class="t-muted">&nbsp;(${authenticator.dupCount})</i>`
+        ${alias}
+        ${dupCount !== undefined && dupCount > 0
+          ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
       </div>
-      ${authenticator.warn === undefined
-        ? undefined
-        : html`<div class="c-action-list__action">
-            <span
-              class="c-tooltip c-tooltip--left c-icon c-icon--warning"
-              tabindex="0"
-              >${warningIcon}<span
-                class="c-tooltip__message c-card c-card--tight"
-                >${authenticator.warn}</span
-              ></span
-            >
-          </div>`}
+      ${warn === undefined ? undefined : itemWarning({ warn })}
       ${remove === undefined
         ? undefined
         : settingsDropdown({
-            alias: authenticator.alias,
+            alias,
             id: `authenticator-${index}`,
             settings: [
               { action: "remove", caption: "Remove", fn: () => remove() },
@@ -138,3 +125,15 @@ export const authenticatorItem = ({
     </li>
   `;
 };
+
+const itemWarning = ({
+  warn,
+}: {
+  warn: TemplateResult;
+}): TemplateResult => html`<div class="c-action-list__action">
+  <span class="c-tooltip c-tooltip--left c-icon c-icon--warning" tabindex="0"
+    >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
+      >${warn}</span
+    ></span
+  >
+</div>`;
