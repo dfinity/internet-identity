@@ -7,7 +7,7 @@ const i18n = new I18n("en");
 
 test("word changes state", async () => {
   const template = wordTemplate({
-    word: { check: true, elem: createRef(), word: "hello" },
+    word: { check: true, elem: createRef(), word: "hello", shouldFocus: true },
     update: () => {
       /* */
     },
