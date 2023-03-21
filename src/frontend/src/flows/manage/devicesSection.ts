@@ -1,6 +1,7 @@
 import { TemplateResult, html } from "lit-html";
 import { Authenticator } from "./types";
-import { warningIcon, dropdownIcon } from "../../components/icons";
+import { warningIcon } from "../../components/icons";
+import { settingsDropdown } from "./settingsDropdown";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
@@ -127,28 +128,13 @@ export const authenticatorItem = ({
           </div>`}
       ${remove === undefined
         ? undefined
-        : html` <div class="c-action-list__action c-dropdown">
-            <button
-              class="c-dropdown__trigger c-action-list__action"
-              aria-expanded="false"
-              aria-controls="dropdown-authenticator-${index}"
-              data-device=${authenticator.alias}
-            >
-              ${dropdownIcon}
-            </button>
-            <ul class="c-dropdown__menu" id="dropdown-authenticator-${index}">
-              <li class="c-dropdown__item">
-                <button
-                  class="c-dropdown__link"
-                  data-device=${authenticator.alias}
-                  data-action="remove"
-                  @click=${() => remove()}
-                >
-                  Remove
-                </button>
-              </li>
-            </ul>
-          </div>`}
+        : settingsDropdown({
+            alias: authenticator.alias,
+            id: `authenticator-${index}`,
+            settings: [
+              { action: "remove", caption: "Remove", fn: () => remove() },
+            ],
+          })}
     </li>
   `;
 };

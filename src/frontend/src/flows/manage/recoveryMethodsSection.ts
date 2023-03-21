@@ -1,6 +1,7 @@
 import { TemplateResult, html } from "lit-html";
-import { dropdownIcon, lockIcon } from "../../components/icons";
+import { lockIcon } from "../../components/icons";
 import { RecoveryPhrase, RecoveryKey, Devices } from "./types";
+import { settingsDropdown } from "./settingsDropdown";
 
 // The list of recovery devices
 export const recoveryMethodsSection = ({
@@ -45,11 +46,24 @@ export const recoveryPhraseItem = ({
   recoveryPhrase: RecoveryPhrase;
 }) => {
   const alias = "Recovery Phrase";
-  const index = "recovery-phrase";
+  const id = "recovery-phrase";
+  const settings = [
+    { action: "reset", caption: "Reset", fn: () => recoveryPhrase.reset() },
+    recoveryPhrase.isProtected
+      ? {
+          action: "unprotect",
+          caption: "Unlock",
+          fn: () => recoveryPhrase.unprotect(),
+        }
+      : {
+          action: "protect",
+          caption: "Lock",
+          fn: () => recoveryPhrase.protect(),
+        },
+  ];
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       <div class="c-action-list__label">${alias}</div>
-
       ${recoveryPhrase.isProtected
         ? html`<div class="c-action-list__action" data-role="protected">
             <span
@@ -61,54 +75,7 @@ export const recoveryPhraseItem = ({
             >
           </div>`
         : undefined}
-      <div class="c-action-list__action c-dropdown">
-        <button
-          class="c-dropdown__trigger c-action-list__action"
-          aria-expanded="false"
-          aria-controls="dropdown-${index}"
-          data-device=${alias}
-        >
-          ${dropdownIcon}
-        </button>
-        <ul class="c-dropdown__menu" id="dropdown-${index}">
-          <li class="c-dropdown__item">
-            <button
-              class="c-dropdown__link"
-              data-device=${alias}
-              data-action="reset"
-              @click=${() => recoveryPhrase.reset()}
-            >
-              Reset
-            </button>
-          </li>
-
-          ${recoveryPhrase.isProtected
-            ? html`
-                <li class="c-dropdown__item">
-                  <button
-                    class="c-dropdown__link"
-                    data-device=${alias}
-                    data-action="unprotect"
-                    @click=${() => recoveryPhrase.unprotect()}
-                  >
-                    Unlock
-                  </button>
-                </li>
-              `
-            : html`
-                <li class="c-dropdown__item">
-                  <button
-                    class="c-dropdown__link"
-                    data-device=${alias}
-                    data-action="protect"
-                    @click=${() => recoveryPhrase.protect()}
-                  >
-                    Lock
-                  </button>
-                </li>
-              `}
-        </ul>
-      </div>
+      ${settingsDropdown({ alias, id, settings })}
     </li>
   `;
 };
@@ -119,32 +86,14 @@ export const recoveryKeyItem = ({
   recoveryKey: RecoveryKey;
 }) => {
   const alias = "Recovery Key";
-  const index = "recovery-key";
+  const id = "recovery-key";
+  const settings = [
+    { action: "remove", caption: "Remove", fn: () => recoveryKey.remove() },
+  ];
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       <div class="c-action-list__label">${alias}</div>
-      <div class="c-action-list__action c-dropdown">
-        <button
-          class="c-dropdown__trigger c-action-list__action"
-          aria-expanded="false"
-          aria-controls="dropdown-${index}"
-          data-device=${alias}
-        >
-          ${dropdownIcon}
-        </button>
-        <ul class="c-dropdown__menu" id="dropdown-${index}">
-          <li class="c-dropdown__item">
-            <button
-              class="c-dropdown__link"
-              data-device=${alias}
-              data-action="remove"
-              @click=${() => recoveryKey.remove()}
-            >
-              Remove
-            </button>
-          </li>
-        </ul>
-      </div>
+      ${settingsDropdown({ alias, id, settings })}
     </li>
   `;
 };
