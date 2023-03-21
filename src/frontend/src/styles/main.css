@@ -500,6 +500,13 @@ a:hover,
   max-width: 60rem;
 }
 
+.l-container--centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .l-divider {
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
@@ -706,36 +713,6 @@ a:hover,
 @media (max-width: 512px) {
   .c-card--background::after {
     inset: 0;
-  }
-}
-
-.c-card--background::before {
-  position: absolute;
-  content: "";
-  z-index: -2;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background-image: linear-gradient(170deg, var(--rg-brand));
-  background-size: 200% 200%;
-  filter: blur(120px);
-  opacity: 0.75;
-  pointer-events: none;
-  transform: translate3d(-50%, -50%, 0);
-
-  animation: 20s bganim linear infinite;
-}
-
-@keyframes bganim {
-  0%,
-  100% {
-    background-position: 0% 0%;
-  }
-
-  50% {
-    background-position: 0% -200%;
   }
 }
 

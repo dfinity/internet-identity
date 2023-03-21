@@ -26,7 +26,7 @@ const constructingContentSlot = ({
 
 const constructingContent = (props: { message?: string }) =>
   mainWindow({
-    additionalContainerClasses: ["t-centered"],
+    additionalContainerClasses: ["t-centered", "l-container--centered"],
     showFooter: false,
     showLogo: false,
     slot: constructingContentSlot(props),
