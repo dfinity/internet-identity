@@ -2,6 +2,10 @@ import { TemplateResult, html } from "lit-html";
 import { lockIcon } from "../../components/icons";
 import { RecoveryPhrase, RecoveryKey, Devices } from "./types";
 import { settingsDropdown } from "./settingsDropdown";
+import {
+  recoveryPhraseLabel,
+  recoveryKeyLabel,
+} from "../../utils/recoveryDevice";
 
 // The list of recovery devices
 export const recoveryMethodsSection = ({
@@ -24,10 +28,13 @@ export const recoveryMethodsSection = ({
                 ${recoveryPhrase === undefined
                   ? undefined
                   : recoveryPhraseItem({ recoveryPhrase })}
+                ${recoveryKey === undefined
+                  ? undefined
+                  : recoveryKeyItem({ recoveryKey })}
               </ul>
               <div class="c-action-list__actions">
                 <button
-                  @click="${onAddRecovery}"
+                  @click="${() => onAddRecovery()}"
                   class="c-button c-button--primary"
                   id="addRecovery"
                 >
@@ -40,12 +47,13 @@ export const recoveryMethodsSection = ({
   `;
 };
 
+// List a recovery phrase
 export const recoveryPhraseItem = ({
   recoveryPhrase,
 }: {
   recoveryPhrase: RecoveryPhrase;
 }) => {
-  const alias = "Recovery Phrase";
+  const alias = recoveryPhraseLabel;
   const id = "recovery-phrase";
   const settings = [
     { action: "reset", caption: "Reset", fn: () => recoveryPhrase.reset() },
@@ -80,12 +88,13 @@ export const recoveryPhraseItem = ({
   `;
 };
 
+// List a recovery key (non-phrase recovery device)
 export const recoveryKeyItem = ({
   recoveryKey,
 }: {
   recoveryKey: RecoveryKey;
 }) => {
-  const alias = "Recovery Key";
+  const alias = recoveryKeyLabel;
   const id = "recovery-key";
   const settings = [
     { action: "remove", caption: "Remove", fn: () => recoveryKey.remove() },

@@ -27,7 +27,7 @@ const dedupLabels = (authenticators: Authenticator[]): DedupAuthenticator[] => {
   }, []);
 };
 
-export const devicesSection = ({
+export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
 }: {

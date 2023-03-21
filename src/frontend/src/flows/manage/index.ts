@@ -3,6 +3,7 @@ import { renderPage } from "../../utils/lit-html";
 import { LEGACY_II_URL } from "../../config";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
+import { toast } from "../../components/toast";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
 import {
@@ -28,7 +29,7 @@ import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { warnBox } from "../../components/warnBox";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
-import { devicesSection } from "./devicesSection";
+import { authenticatorsSection } from "./authenticatorsSection";
 import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
@@ -124,7 +125,7 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
-    ${devicesSection({
+    ${authenticatorsSection({
       authenticators,
       onAddDevice,
     })}
@@ -270,6 +271,8 @@ export const displayManage = (
     }
   });
 
+// Convert devices read from the canister into types that are easier to work with
+// and that better represent what we expect.
 export const devicesFromDeviceDatas = ({
   devices: devices_,
   reload,
@@ -287,7 +290,6 @@ export const devicesFromDeviceDatas = ({
     (acc, device) => {
       if (isRecoveryDevice(device)) {
         if (isRecoveryPhrase(device)) {
-          // TODO: log error on existing phrase
           const protection: Protection = isProtected(device)
             ? {
                 isProtected: true,
@@ -304,6 +306,11 @@ export const devicesFromDeviceDatas = ({
                     reload,
                   }),
               };
+          if (acc.recoveries.recoveryPhrase !== undefined) {
+            toast.error(
+              "More than one recovery phrases are registered, which is unexpected. Only one will be showed."
+            );
+          }
           acc.recoveries.recoveryPhrase = {
             reset: () =>
               resetPhrase({
@@ -315,7 +322,11 @@ export const devicesFromDeviceDatas = ({
             ...protection,
           };
         } else {
-          // TODO: log error on existing device
+          if (acc.recoveries.recoveryKey !== undefined) {
+            toast.error(
+              "More than one recovery keys are registered, which is unexpected. Only one will be showed."
+            );
+          }
           acc.recoveries.recoveryKey = {
             remove: () => deleteDevice({ connection, device, reload }),
           };
