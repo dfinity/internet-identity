@@ -12,7 +12,6 @@ import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { displayAndConfirmPhrase } from "../recovery/setupRecovery";
 import {
   isRecoveryDevice,
-  isRecoveryPhrase,
   isProtected,
   RecoveryPhrase,
 } from "../../utils/recoveryDevice";
@@ -20,107 +19,8 @@ import { generate } from "../../crypto/mnemonic";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
 import { IC_DERIVATION_PATH } from "../../utils/iiConnection";
 
-// A particular device setting, e.g. remove, protect, etc
-export type Setting = { label: keyof typeof settingName; fn: () => void };
-
-export const settingName = {
-  protect: "Lock", // For users, protected devices are "lock"ed
-  unprotect: "Unlock",
-  remove: "Remove",
-  reset: "Reset",
-} as const;
-
-// Generate possible settings based on the device
-export const deviceSettings = ({
-  userNumber,
-  connection,
-  device,
-  isOnlyDevice,
-  reload,
-}: {
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-  device: DeviceData;
-  isOnlyDevice: boolean;
-  /* Reload the page after the new settings were applied, potentially using another connection */
-  reload: (connection?: AuthenticatedConnection) => void;
-}): Setting[] => {
-  const settings: Setting[] = [];
-
-  // Whether the device can be (un)protected or not (only recovery phrases can be protected)
-  if (isRecoveryPhrase(device)) {
-    if (!isProtected(device)) {
-      settings.push({
-        label: "protect",
-        fn: () => protectDevice({ userNumber, connection, device, reload }),
-      });
-    } else {
-      settings.push({
-        label: "unprotect",
-        fn: () =>
-          unprotectDevice(userNumber, connection, device, isOnlyDevice, reload),
-      });
-    }
-  }
-
-  // For recovery phrases, we only allow resetting, not removing
-  if (isRecoveryPhrase(device)) {
-    settings.push({
-      label: "reset",
-      fn: () => resetPhrase({ userNumber, connection, device, reload }),
-    });
-  } else {
-    // For all other devices, we allow removing (unless it's the only device)
-    if (!isOnlyDevice) {
-      settings.push({
-        label: "remove",
-        fn: () => deleteDevice({ connection, device, reload }),
-      });
-    }
-  }
-
-  return settings;
-};
-
-// Get a connection that's authenticated with the given device
-// NOTE: this expects a recovery phrase device
-const deviceConnection = async (
-  connection: Connection,
-  userNumber: bigint,
-  device: DeviceData & RecoveryPhrase,
-  recoveryPhraseMessage: string
-): Promise<AuthenticatedConnection | null> => {
-  try {
-    const loginResult = await phraseRecoveryPage(
-      userNumber,
-      connection,
-      device,
-      undefined,
-      recoveryPhraseMessage
-    );
-    switch (loginResult.tag) {
-      case "ok":
-        return loginResult.connection;
-      case "canceled":
-        return null;
-      default:
-        unreachable(loginResult);
-        break;
-    }
-  } catch (error: unknown) {
-    await displayError({
-      title: "Could not modify device",
-      message:
-        "An unexpected error occurred when trying to read recovery phrase for device modification.",
-      detail: error instanceof Error ? error.toString() : "unknown error",
-      primaryButton: "Ok",
-    });
-    return null;
-  }
-};
-
 /* Remove the device and return */
-const deleteDevice = async ({
+export const deleteDevice = async ({
   connection,
   device,
   reload,
@@ -174,7 +74,7 @@ const deleteDevice = async ({
 };
 
 /* Reset the device and return to caller */
-const resetPhrase = async ({
+export const resetPhrase = async ({
   userNumber,
   connection,
   device,
@@ -251,7 +151,7 @@ const resetPhrase = async ({
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */
-const protectDevice = async ({
+export const protectDevice = async ({
   userNumber,
   connection,
   device,
@@ -294,11 +194,10 @@ const protectDevice = async ({
 };
 
 /* Unprotect the device and re-render the device settings (with the updated device) */
-const unprotectDevice = async (
+export const unprotectDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   device: DeviceData & RecoveryPhrase,
-  isOnlyDevice: boolean,
   back: () => void
 ) => {
   const confirmed = confirm(
@@ -328,4 +227,41 @@ const unprotectDevice = async (
     await newConnection.update(device);
   });
   back();
+};
+
+// Get a connection that's authenticated with the given device
+// NOTE: this expects a recovery phrase device
+const deviceConnection = async (
+  connection: Connection,
+  userNumber: bigint,
+  device: DeviceData & RecoveryPhrase,
+  recoveryPhraseMessage: string
+): Promise<AuthenticatedConnection | null> => {
+  try {
+    const loginResult = await phraseRecoveryPage(
+      userNumber,
+      connection,
+      device,
+      undefined,
+      recoveryPhraseMessage
+    );
+    switch (loginResult.tag) {
+      case "ok":
+        return loginResult.connection;
+      case "canceled":
+        return null;
+      default:
+        unreachable(loginResult);
+        break;
+    }
+  } catch (error: unknown) {
+    await displayError({
+      title: "Could not modify device",
+      message:
+        "An unexpected error occurred when trying to read recovery phrase for device modification.",
+      detail: error instanceof Error ? error.toString() : "unknown error",
+      primaryButton: "Ok",
+    });
+    return null;
+  }
 };

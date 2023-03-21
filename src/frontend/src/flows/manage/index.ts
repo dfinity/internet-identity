@@ -5,7 +5,12 @@ import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { logoutSection } from "../../components/logout";
-import { deviceSettings } from "./deviceSettings";
+import {
+  resetPhrase,
+  deleteDevice,
+  protectDevice,
+  unprotectDevice,
+} from "./deviceSettings";
 import { showWarning } from "../../banner";
 import {
   DeviceData,
@@ -22,17 +27,16 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { warnBox } from "../../components/warnBox";
-import { Device } from "./deviceListItem";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { devicesSection } from "./devicesSection";
 import { mainWindow } from "../../components/mainWindow";
 import {
   isRecoveryDevice,
-  recoveryDeviceToLabel,
   isProtected,
   hasRecoveryPhrase,
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
+import { Devices, Protection } from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -103,14 +107,12 @@ const displayFailedToListDevices = (error: Error) =>
 // recovery devices.
 const displayManageTemplate = ({
   userNumber,
-  authenticators,
-  recoveries,
+  devices: { authenticators, recoveries },
   onAddDevice,
   onAddRecovery,
 }: {
   userNumber: bigint;
-  authenticators: Device[];
-  recoveries: Device[];
+  devices: Devices;
   onAddDevice: () => void;
   onAddRecovery: () => void;
 }): TemplateResult => {
@@ -126,7 +128,10 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
     })}
-    ${recoveries.length === 0 ? recoveryNag({ onAddRecovery }) : undefined}
+    ${recoveries.recoveryPhrase !== undefined ||
+    recoveries.recoveryKey !== undefined
+      ? undefined
+      : recoveryNag({ onAddRecovery })}
     ${recoveryMethodsSection({ recoveries, onAddRecovery })} ${logoutSection()}
   </section>`;
 
@@ -204,31 +209,16 @@ export const displayManage = (
   devices_: DeviceData[]
 ): Promise<void | AuthenticatedConnection> =>
   new Promise((resolve) => {
-    const hasSingleDevice = devices_.length <= 1;
-
-    const devices: Device[] = devices_.map((device) => {
-      return {
-        settings: deviceSettings({
-          userNumber,
-          connection,
-          device,
-          isOnlyDevice: hasSingleDevice,
-          reload: (newConnection?: AuthenticatedConnection) =>
-            resolve(newConnection),
-        }),
-        label: isRecoveryDevice(device)
-          ? recoveryDeviceToLabel(device)
-          : device.alias,
-        isRecovery: isRecoveryDevice(device),
-        isProtected: isProtected(device),
-        warn: domainWarning(device),
-      };
+    const devices = devicesFromDeviceDatas({
+      devices: devices_,
+      userNumber,
+      connection,
+      reload: resolve,
     });
 
     displayManagePage({
       userNumber,
-      authenticators: devices.filter((device) => !device.isRecovery),
-      recoveries: devices.filter((device) => device.isRecovery),
+      devices,
       onAddDevice: async () => {
         const nextAction = await chooseDeviceAddFlow();
         switch (nextAction) {
@@ -279,6 +269,72 @@ export const displayManage = (
         </button> `);
     }
   });
+
+export const devicesFromDeviceDatas = ({
+  devices: devices_,
+  reload,
+  connection,
+  userNumber,
+}: {
+  devices: DeviceData[];
+  reload: (connection?: AuthenticatedConnection) => void;
+  connection: AuthenticatedConnection;
+  userNumber: bigint;
+}): Devices => {
+  const hasSingleDevice = devices_.length <= 1;
+
+  return devices_.reduce<Devices>(
+    (acc, device) => {
+      if (isRecoveryDevice(device)) {
+        if (isRecoveryPhrase(device)) {
+          // TODO: log error on existing phrase
+          const protection: Protection = isProtected(device)
+            ? {
+                isProtected: true,
+                unprotect: () =>
+                  unprotectDevice(userNumber, connection, device, reload),
+              }
+            : {
+                isProtected: false,
+                protect: () =>
+                  protectDevice({
+                    userNumber,
+                    connection,
+                    device,
+                    reload,
+                  }),
+              };
+          acc.recoveries.recoveryPhrase = {
+            reset: () =>
+              resetPhrase({
+                userNumber,
+                connection,
+                device,
+                reload,
+              }),
+            ...protection,
+          };
+        } else {
+          // TODO: log error on existing device
+          acc.recoveries.recoveryKey = {
+            remove: () => deleteDevice({ connection, device, reload }),
+          };
+        }
+        return acc;
+      }
+
+      acc.authenticators.push({
+        alias: device.alias,
+        warn: domainWarning(device),
+        remove: hasSingleDevice
+          ? undefined
+          : () => deleteDevice({ connection, device, reload }),
+      });
+      return acc;
+    },
+    { authenticators: [], recoveries: {} }
+  );
+};
 
 // Show a domain-related warning, if necessary.
 export const domainWarning = (
