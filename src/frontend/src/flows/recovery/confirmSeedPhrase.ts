@@ -16,7 +16,7 @@ type Word = { word: string } & (
 );
 
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
-export const checkIndices = [3, 7, 12, 13, 15, 17, 18, 20, 22, 24];
+export const checkIndices = [0, 1, 24];
 
 // Check that a word has been input correctly
 const checkWord = (word: Word): boolean =>
@@ -122,7 +122,7 @@ export const wordTemplate = ({
   // In the simple case the word doesn't need checking and is simply displayed
   if (!word.check) {
     return html`<li
-      style="--index: '${i}'"
+      style="--index: '${i + 1}'"
       class="c-list--recovery-word c-list--recovery-word__disabled"
     >
       ${word.word}
@@ -155,7 +155,7 @@ export const wordTemplate = ({
   );
 
   return html`<li
-    style="--index: '${i}'"
+    style="--index: '${i + 1}'"
     class="c-list--recovery-word ${asyncReplace(clazz)}"
   >
     ${asyncReplace(icon)}
