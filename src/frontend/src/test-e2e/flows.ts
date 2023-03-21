@@ -93,6 +93,7 @@ export const FLOWS = {
     const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
     await recoveryMethodSelectorView.acknowledgeCheckbox();
     await recoveryMethodSelectorView.seedPhraseContinue();
+    await recoveryMethodSelectorView.seedPhraseFill();
 
     return seedPhrase;
   },

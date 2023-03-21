@@ -8,7 +8,11 @@ import {
   IC_DERIVATION_PATH,
   AuthenticatedConnection,
 } from "../../utils/iiConnection";
-import { unknownToString, unreachableLax } from "../../utils/utils";
+import {
+  unknownToString,
+  unreachable,
+  unreachableLax,
+} from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
@@ -87,22 +91,29 @@ export const setupRecovery = async ({
   }
 };
 
-export const setupPhrase = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection
-) => {
-  const name = "Recovery phrase";
-  const seedPhrase = generate().trim();
-  const recoverIdentity = await fromMnemonicWithoutValidation(
-    seedPhrase,
-    IC_DERIVATION_PATH
-  );
-
-  const phrase = userNumber.toString(10) + " " + seedPhrase;
-
+export const displayAndConfirmPhrase = async ({
+  operation,
+  phrase,
+}: {
+  operation: "create" | "reset";
+  phrase: string;
+}) => {
   // Loop until the user has confirmed the phrase
   for (;;) {
-    await displaySeedPhrase(phrase);
+    const displayResult = await displaySeedPhrase({
+      seedPhrase: phrase,
+      operation,
+    });
+    // User has canceled, so we return
+    if (displayResult === "canceled") {
+      return;
+    }
+
+    if (displayResult !== "ok") {
+      // According to typescript, should never happen
+      unreachable(displayResult, "unexpected return value");
+      return;
+    }
 
     const result = await confirmSeedPhrase({ phrase });
     // User has confirmed, so break out of the loop
@@ -117,6 +128,22 @@ export const setupPhrase = async (
 
     unreachableLax(result);
   }
+};
+
+export const setupPhrase = async (
+  userNumber: bigint,
+  connection: AuthenticatedConnection
+) => {
+  const name = "Recovery phrase";
+  const seedPhrase = generate().trim();
+  const recoverIdentity = await fromMnemonicWithoutValidation(
+    seedPhrase,
+    IC_DERIVATION_PATH
+  );
+
+  const phrase = userNumber.toString(10) + " " + seedPhrase;
+
+  await displayAndConfirmPhrase({ phrase, operation: "create" });
 
   await withLoader(() =>
     connection.add(

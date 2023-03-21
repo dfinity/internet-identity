@@ -121,7 +121,7 @@ export class RecoveryMethodSelectorView extends View {
 
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Store Recovery Phrase']")
+      .$('[data-role="recovery-words"]')
       .waitForDisplayed({ timeout: 15_000 });
   }
 

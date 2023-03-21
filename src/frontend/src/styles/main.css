@@ -45,7 +45,19 @@
 
 */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+/* Fonts */
+
+/* latin */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-v12-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
 
 /* I) Settings: Global variables, config switches. */
 
@@ -63,6 +75,7 @@
   --vc-raven: #202124;
   --vc-snow: #ffffff;
 
+  --vc-mist: rgba(255, 255, 255, 0.3);
   --vc-vapour: rgba(255, 255, 255, 0.6);
   --vc-shadow: rgba(32, 33, 36, 0.6);
 
@@ -75,6 +88,7 @@
   --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
+  --vc-brand-green: #79d11c;
   --vc-brand-alt: rgba(215, 205, 235, 1);
 
   /**
@@ -142,9 +156,14 @@
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
-  --rc-input-readonly: var(--vc-silver);
   --rc-input-readonly: var(--vc-vapour);
   --rc-input-onReadonly: var(--rc-dark);
+
+  --rc-input-error: var(--vc-brand-pink);
+  --rc-input-onError: var(--rc-light);
+
+  --rc-input-success: var(--vc-brand-green);
+  --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
@@ -1122,6 +1141,11 @@ a:hover,
   padding: calc(1.5 * var(--rs-input-bezel));
 }
 
+.c-input--recovery {
+  padding: calc(1.5 * var(--rs-input-bezel));
+  background-color: var(--rc-line);
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -1331,60 +1355,78 @@ a:hover,
   list-style-type: decimal;
 }
 
+/**
+ *  Recovery phrase
+ *
+ *  We use a a pill style for each word
+ *  and a counter to number them
+ */
+
 .c-list--recovery {
+  position: relative;
   flex-wrap: wrap;
   counter-reset: recovery;
   padding: 0;
   list-style: none;
+
+  /* this makes sure that the after element is always behind the pill
+      but in front of the background */
+  z-index: 1;
 }
 
-.c-list--recovery li input {
-  text-align: left;
-}
+.c-list--recovery-word {
+  /* 
+    bg and fg stand for background and foreground 
+    and are used to make sure that the text is always readable
+    and make it easier to understand the code going forward
 
-.c-list--recovery li {
+    it creates a scoped design logic that is easier to understand
+    and maintain.
+  */
+  --bg: var(--rc-line);
+  --fg: var(--rc-onInput);
+
   position: relative;
   display: inline-flex;
-  background: var(--rc-input-readonly);
-  color: var(--rc-input-onReadonly);
+  background: var(--rc-background);
+  color: var(--fg);
   border: var(--vs-line) var(--rc-line) solid;
 
   border-radius: 999px;
+
   padding: 0.5em 0.75em;
   padding-right: 0.75em;
   padding-left: 2.9em;
+
   width: calc(33.33% - 1rem);
   margin: 0.5rem;
+
   font-size: 0.7em;
   font-weight: bold;
   font-family: monospace;
   text-align: center;
-
-  z-index: 1;
-
-  --current-color: hsl(calc(150 + var(--i) * -180), 100%, 93%);
 }
 
 @media screen and (max-width: 512px) {
-  .c-list--recovery li {
+  .c-list--recovery-word {
     width: calc(50% - 1rem);
   }
 }
 
-.c-list--recovery li::selection {
-  background-color: var(--current-color);
-  color: hsl(calc(150 + var(--i) * -180), 100%, 33%);
-}
-
-.c-list--recovery li::before {
+/* Recovery phrase counter */
+.c-list--recovery-word::before {
   position: absolute;
   top: 50%;
   left: 0.25em;
   height: 85%;
   width: 2.6em;
-  counter-increment: recovery;
-  content: counter(recovery);
-  background-color: var(--current-color);
+
+  /* The counter displayed. We set this explicitly from the HTML because
+  * the index shown is important for recovery. Also this works around issues related
+  * to different counter behavior on Safari & Chrome. */
+  content: var(--index);
+  background-color: var(--bg);
+  color: var(--fg);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
   margin-right: 0.75em;
@@ -1395,22 +1437,110 @@ a:hover,
   align-items: center;
   justify-content: center;
   transform: translateY(-50%);
-  /* 
-    --i is set on the element and creates a gradient creating a colored gradient
-    from the first to the last element. --i ranges from 0 to 1.  
-  */
-  box-shadow: 0 0 1em hsl(calc(150 + var(--i) * -180), 100%, 85%);
 }
 
-.c-list--recovery li::after {
+/* This is the background color for each pill */
+.c-list--recovery-word::after {
   position: absolute;
   content: "";
   inset: 0;
-  background-color: var(--current-color);
+  background-color: var(--bg);
   border-radius: 999px;
   filter: blur(10px);
   z-index: -1;
-  opacity: 0.5;
+  opacity: 0.3;
+
+  transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+/* Make the blurred background more visible on focus */
+.c-list--recovery-word:focus-within::after {
+  opacity: 1;
+  filter: blur(3px);
+}
+
+.c-list--recovery-word__icon {
+  position: absolute;
+  top: 50%;
+  left: 0.6em;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+.c-list--recovery-word__icon svg {
+  width: 1.25em;
+  height: 1.25em;
+  margin-top: 0.25em;
+}
+
+.c-list--recovery-word__icon svg [fill] {
+  fill: var(--fg);
+}
+
+.c-list--recovery-word__icon svg [stroke] {
+  stroke: var(--fg);
+}
+
+.c-list--recovery-word__attention::before,
+.c-list--recovery-word__attention .c-list--recovery-word__icon,
+.c-list--recovery-word__incorrect::before,
+.c-list--recovery-word__incorrect .c-list--recovery-word__icon,
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  --fg: var(--rc-onButton);
+  color: var(--fg);
+}
+
+/* When a word is disabled, make it more opaque to look non-interactive */
+.c-list--recovery-word__disabled {
+  --bg: var(--rc-input-readonly);
+  --fg: var(--rc-onInput-readonly);
+  background-color: var(--vc-mist);
+  /* make sure the user can't select the word */
+  user-select: none;
+}
+
+/* When a word requires attention make it look interactive */
+.c-list--recovery-word__attention {
+  --bg: var(--rc-button);
+}
+
+/* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
+.c-list--recovery-word__correct {
+  --bg: var(--rc-input-success);
+}
+
+/* the check icon needs a bit of re-centering */
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  margin-top: 0.15em;
+  margin-left: -0.05em;
+}
+
+/* When a word requires attention, show it as red and show a warning sign instead of the counter */
+.c-list--recovery-word__incorrect {
+  --bg: var(--rc-input-error);
+}
+
+/* 
+  since correct & incorrect words have an icon, but we still want to make use of the circle
+  the number used to be in, we need to hide the number. We do this by making it transparent
+*/
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__incorrect::before {
+  color: transparent;
+}
+
+.c-recoveryInput {
+  display: block;
+
+  /* full width minus the counter */
+  width: calc(100% - 4em);
+  text-align: left;
+  color: var(--fg, currentColor);
+
+  height: calc(1em * var(--vs-line));
+
+  /* fixes layout-shifts in safari when input is empty */
+  position: absolute;
 }
 
 .c-list__item--vip {

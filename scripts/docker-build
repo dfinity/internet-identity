@@ -90,6 +90,7 @@ function build() {
 
     echo "Copying build output from $tmp_outdir to $PWD"
     cp "$tmp_outdir/$canister.wasm" .
+    cp "$tmp_outdir/$canister.wasm.gz" .
 
     echo "Removing $tmp_outdir"
     rm -rf "$tmp_outdir"

@@ -5,13 +5,14 @@ import { Chan } from "../../utils/utils";
 import { ref, createRef, Ref } from "lit-html/directives/ref.js";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
+import { warningIcon, checkmarkIcon } from "../../components/icons";
 
 import copyJson from "./confirmSeedPhrase.json";
 
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement> }
+  | { check: true; elem: Ref<HTMLInputElement>; shouldFocus: boolean }
 );
 
 // A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
@@ -30,7 +31,7 @@ const confirmSeedPhraseTemplate = ({
   back,
   i18n,
 }: {
-  words: Omit<Word, "elem">[];
+  words: Omit<Word, "elem" | "shouldFocus">[];
   confirm: () => void;
   back: () => void;
   i18n: I18n;
@@ -42,11 +43,18 @@ const confirmSeedPhraseTemplate = ({
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
       // NOTE: typescript can't follow if word is deconstructed with {...word}
-      return { word: word.word, check: word.check, elem };
+      return { word: word.word, check: word.check, elem, shouldFocus: false };
     } else {
       return { word: word.word, check: word.check };
     }
   });
+
+  for (const word of words) {
+    if (word.check) {
+      word.shouldFocus = true;
+      break;
+    }
+  }
 
   // if all "check" words have been re-input correctly
   const wordsOk = new Chan<boolean>(false);
@@ -59,21 +67,20 @@ const confirmSeedPhraseTemplate = ({
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <div
-        class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
-      >
+      <div class="c-input c-input--recovery l-stack">
         <ol class="c-list c-list--recovery">
-          ${words.map((word) =>
+          ${words.map((word, i) =>
             wordTemplate({
               word,
               /* on word update, re-check all words */
               update: () => wordsOk.send(words.every(checkWord)),
+              i,
             })
           )}
         </ol>
       </div>
 
-      <div class="c-button-group">
+      <div class="c-button-group l-stack">
         <button
           @click=${() => back()}
           data-action="back"
@@ -105,27 +112,59 @@ const confirmSeedPhraseTemplate = ({
 export const wordTemplate = ({
   word,
   update,
+  i,
 }: {
   word: Word;
   /* Notify the caller that a word was updated */
   update: () => void;
+  i: number;
 }): TemplateResult => {
   // In the simple case the word doesn't need checking and is simply displayed
   if (!word.check) {
-    return html`<li>${word.word}</li>`;
+    return html`<li
+      style="--index: '${i}'"
+      class="c-list--recovery-word c-list--recovery-word__disabled"
+    >
+      ${word.word}
+    </li>`;
   }
 
   type State = "pending" | "correct" | "incorrect";
   const state = new Chan<State>("pending");
   // Visual feedback depending on state
-  const backgroundColor = state.map(
-    (s: State) => ({ pending: "yellow", correct: "green", incorrect: "red" }[s])
+  const clazz = state.map(
+    (s: State) =>
+      ({
+        pending: "c-list--recovery-word__attention",
+        correct: "c-list--recovery-word__correct",
+        incorrect: "c-list--recovery-word__incorrect",
+      }[s])
   );
 
-  return html`<li style="background-color: ${asyncReplace(backgroundColor)};">
+  const icon = state.map(
+    (s: State) =>
+      ({
+        pending: undefined,
+        correct: html`<i class="c-list--recovery-word__icon"
+          >${checkmarkIcon}</i
+        >`,
+        incorrect: html`<i class="c-list--recovery-word__icon"
+          >${warningIcon}</i
+        >`,
+      }[s])
+  );
+
+  return html`<li
+    style="--index: '${i}'"
+    class="c-list--recovery-word ${asyncReplace(clazz)}"
+  >
+    ${asyncReplace(icon)}
     <input
+      type="text"
+      class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
+      ?autofocus=${word.shouldFocus}
       data-state=${asyncReplace(
         state.map(
           (x) => x
@@ -142,7 +181,7 @@ export const wordTemplate = ({
         state.send(checkWord(word) ? "correct" : "incorrect");
         update();
       }}
-    ></input>
+    />&nbsp;
   </li>`;
 };
 

@@ -6,6 +6,8 @@ import {
   settingsIcon,
   dropdownIcon,
   copyIcon,
+  warningIcon,
+  checkmarkIcon,
 } from "./components/icons";
 import { warnBox } from "./components/warnBox";
 import { modal } from "./components/modal";
@@ -321,16 +323,59 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
-          <output
-            class="c-input c-input--textarea c-input--textarea-narrow c-input--readonly c-input--icon"
-          >
+          <output class="c-input c-input--recovery">
             <ol class="c-list c-list--recovery">
-              ${recoveryWords.map(
-                (word, i) =>
-                  html`<li style="--i: ${i / recoveryWords.length}">
-                    ${word}
-                  </li>`
-              )}
+              ${recoveryWords.map((word, i) => {
+                // loop through the demo recovery words and add some classes to
+                // demonstrate the different states
+                const classes = ["c-list--recovery-word"];
+                let isEditable = false;
+                let icon: undefined | "warning" | "check";
+                let text = word;
+
+                if (i === 21) {
+                  classes.push("c-list--recovery-word__attention");
+                  isEditable = true;
+                  text = "";
+                }
+
+                if (i === 22) {
+                  classes.push("c-list--recovery-word__incorrect");
+                  isEditable = true;
+                  icon = "warning";
+                }
+
+                if (i === 23) {
+                  classes.push("c-list--recovery-word__correct");
+                  isEditable = true;
+                  icon = "check";
+                }
+
+                if (i === 24) {
+                  classes.push("c-list--recovery-word__disabled");
+                }
+
+                return html`<li
+                  class=${classes.join(" ")}
+                  style="--index: '${i + 1}';"
+                >
+                  ${icon != null
+                    ? html`<i class="c-list--recovery-word__icon"
+                        >${icon === "warning" ? warningIcon : checkmarkIcon}</i
+                      >`
+                    : null}
+                  ${isEditable === true
+                    ? html`<input
+                          type="text"
+                          class="c-recoveryInput"
+                          value=${text}
+                          maxlength="8"
+                        />&nbsp;`
+                    : // &nbsp; is used to prevent the element from collapsing
+                      // when the input is empty, especially in Safari
+                      text}
+                </li>`;
+              })}
             </ol>
             <i
               aria-label="Copy phrase to clipboard"

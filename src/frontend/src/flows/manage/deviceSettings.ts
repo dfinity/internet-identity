@@ -9,6 +9,7 @@ import { withLoader } from "../../components/loader";
 import { unreachable } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
+import { displayAndConfirmPhrase } from "../recovery/setupRecovery";
 import {
   isRecoveryDevice,
   isRecoveryPhrase,
@@ -18,7 +19,6 @@ import {
 import { generate } from "../../crypto/mnemonic";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
 import { IC_DERIVATION_PATH } from "../../utils/iiConnection";
-import { displaySeedPhrase } from "../recovery/displaySeedPhrase";
 
 // A particular device setting, e.g. remove, protect, etc
 export type Setting = { label: keyof typeof settingName; fn: () => void };
@@ -234,8 +234,10 @@ const resetPhrase = async ({
   );
 
   try {
+    const phrase = userNumber.toString(10) + " " + recoveryPhrase;
+
+    await displayAndConfirmPhrase({ phrase, operation: "reset" });
     await withLoader(() => opConnection.replace(oldKey, device));
-    await displaySeedPhrase(userNumber.toString(10) + " " + recoveryPhrase);
   } catch (e: unknown) {
     await displayError({
       title: "Could not reset recovery phrase",

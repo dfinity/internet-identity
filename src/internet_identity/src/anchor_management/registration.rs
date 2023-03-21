@@ -1,4 +1,4 @@
-use crate::anchor_management::anchor_operation_bookkeeping;
+use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
@@ -129,6 +129,7 @@ lazy_static! {
     static ref CHAR_REPLACEMENTS: HashMap<char, char> = vec![
         ('C', 'c'),
         ('l', '1'),
+        ('S', 's'),
         ('X', 'x'),
         ('Y', 'y'),
         ('Z', 'z'),
@@ -192,9 +193,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         return RegisterResponse::BadChallenge;
     }
 
-    let mut device = Device::from(device_data);
-    device.last_usage_timestamp = Some(time());
-
+    let device = Device::from(device_data);
     if caller() != Principal::self_authenticating(&device.pubkey) {
         trap(&format!(
             "{} could not be authenticated against {:?}",
@@ -211,6 +210,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     anchor
         .add_device(device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to register anchor {anchor_number}: {err}")));
+    activity_bookkeeping(&mut anchor, &device.pubkey);
 
     // write anchor to stable memory
     state::storage_mut(|storage| {
@@ -224,7 +224,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     let operation = Operation::RegisterAnchor {
         device: DeviceDataWithoutAlias::from(device),
     };
-    anchor_operation_bookkeeping(anchor_number, operation, None);
+    post_operation_bookkeeping(anchor_number, operation);
     RegisterResponse::Registered {
         user_number: anchor_number,
     }

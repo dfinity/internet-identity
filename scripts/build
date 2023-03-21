@@ -127,6 +127,7 @@ function build_canister() {
         ic-cdk-optimizer \
             "$CARGO_TARGET_DIR/$TARGET/release/$canister.wasm" \
             -o "./$canister.wasm"
+        gzip --no-name --force --keep "$canister.wasm"
     fi
 }
 
