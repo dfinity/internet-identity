@@ -1,3 +1,4 @@
+use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::DeviceDataWithoutAlias;
 use internet_identity_interface::*;
@@ -195,6 +196,65 @@ impl Anchor {
         timestamps.sort_unstable();
         timestamps.pop().unwrap_or_default()
     }
+
+    /// Returns whether information about the domains this anchor was active on
+    /// since the given timestamp.
+    pub fn domain_activity_since(&self, timestamp: Timestamp) -> DomainActivity {
+        #[derive(Default)]
+        struct Accumulator {
+            other: bool,
+            ic0_app: bool,
+            internet_computer_org: bool,
+        }
+
+        let result = self
+            .devices
+            .iter()
+            // filter devices with no activity
+            .filter(|d| {
+                d.last_usage_timestamp
+                    .map(|t| t >= timestamp)
+                    .unwrap_or(false)
+            })
+            // assign domain activity
+            .fold(Accumulator::default(), |mut acc, device| {
+                let Some(ref origin) = device.origin else {
+                    acc.other = true;
+                    return acc;
+                };
+                match origin.as_str() {
+                    IC0_APP_ORIGIN => acc.ic0_app = true,
+                    INTERNETCOMPUTER_ORG_ORIGIN => acc.internet_computer_org = true,
+                    _ => acc.other = true,
+                };
+                acc
+            });
+
+        // Activity on other domains is discarded if there is also activity on an II domain.
+        // The reason is that II might not have complete information since domain information was
+        // only introduced recently.
+        match (result.ic0_app, result.internet_computer_org, result.other) {
+            (true, true, _) => DomainActivity::BothIIDomains,
+            (true, false, _) => DomainActivity::Ic0App,
+            (false, true, _) => DomainActivity::InternetComputerOrg,
+            (false, false, true) => DomainActivity::Other,
+            (false, false, false) => DomainActivity::None,
+        }
+    }
+}
+
+/// Possible outcomes of domain bound activity for an anchor since a specific timestamp.
+pub enum DomainActivity {
+    // no activity at all
+    None,
+    // only active on non-ii domains
+    Other,
+    // only active on the identity.ic0.app domain
+    Ic0App,
+    // only active on the identity.internetcomputer.org domain
+    InternetComputerOrg,
+    // activity on both identity.ic0.app and identity.internetcomputer.org
+    BothIIDomains,
 }
 
 /// This is an internal version of `DeviceData` useful to provide a

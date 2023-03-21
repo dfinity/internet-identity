@@ -1,23 +1,34 @@
 use crate::state;
+use crate::storage::anchor::{Anchor, DomainActivity};
+use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use ic_cdk::api::time;
 use internet_identity_interface::{
-    ActiveAnchorCounter, ActiveAnchorStatistics, CompletedActiveAnchorStats,
-    OngoingActiveAnchorStats, Timestamp,
+    ActiveAnchorCounter, ActiveAnchorStatistics, ActivityCounter, CompletedActiveAnchorStats,
+    DomainActiveAnchorCounter, OngoingActiveAnchorStats, Timestamp,
 };
 
 mod stats_maintenance;
 
-pub fn update_active_anchors_stats(previous_activity_timestamp: Option<Timestamp>) {
+pub fn update_active_anchors_stats(anchor: &Anchor, current_domain: &Option<IIDomain>) {
+    let previous_activity_timestamp = anchor.last_activity();
+
     state::persistent_state_mut(|persistent_state| {
         update_activity_stats(&mut persistent_state.active_anchor_stats, |counter| {
             update_active_anchor_counter(counter, previous_activity_timestamp)
-        })
+        });
+
+        if let Some(domain) = current_domain {
+            update_activity_stats(
+                &mut persistent_state.domain_active_anchor_stats,
+                |counter| update_ii_domain_counter(counter, anchor, domain),
+            )
+        }
     })
 }
 
-fn update_activity_stats(
-    stats: &mut Option<ActiveAnchorStatistics>,
-    update: impl Fn(&mut ActiveAnchorCounter),
+fn update_activity_stats<T: ActivityCounter>(
+    stats: &mut Option<ActiveAnchorStatistics<T>>,
+    update: impl Fn(&mut T),
 ) {
     match stats {
         None => {
@@ -32,7 +43,10 @@ fn update_activity_stats(
     }
 }
 
-fn update_counters(stats: &mut ActiveAnchorStatistics, update: impl Fn(&mut ActiveAnchorCounter)) {
+fn update_counters<T: ActivityCounter>(
+    stats: &mut ActiveAnchorStatistics<T>,
+    update: impl Fn(&mut T),
+) {
     update(&mut stats.ongoing.daily_active_anchors);
     stats
         .ongoing
@@ -62,22 +76,90 @@ fn update_active_anchor_counter(
     }
 }
 
-fn new_active_anchor_statistics(time: Timestamp) -> ActiveAnchorStatistics {
+#[derive(Eq, PartialEq)]
+pub enum IIDomain {
+    Ic0AppDomain,
+    InternetComputerOrgDomain,
+}
+
+impl IIDomain {
+    pub fn is_same_domain(&self, activity: &DomainActivity) -> bool {
+        match self {
+            IIDomain::Ic0AppDomain => matches!(activity, DomainActivity::Ic0App),
+            IIDomain::InternetComputerOrgDomain => {
+                matches!(activity, DomainActivity::InternetComputerOrg)
+            }
+        }
+    }
+
+    pub fn other_domain(&self) -> IIDomain {
+        match self {
+            IIDomain::Ic0AppDomain => IIDomain::InternetComputerOrgDomain,
+            IIDomain::InternetComputerOrgDomain => IIDomain::Ic0AppDomain,
+        }
+    }
+}
+
+impl TryFrom<&str> for IIDomain {
+    type Error = ();
+
+    fn try_from(origin: &str) -> Result<Self, Self::Error> {
+        match origin {
+            IC0_APP_ORIGIN => Ok(IIDomain::Ic0AppDomain),
+            INTERNETCOMPUTER_ORG_ORIGIN => Ok(IIDomain::InternetComputerOrgDomain),
+            _ => Err(()),
+        }
+    }
+}
+
+fn update_ii_domain_counter(
+    counter: &mut DomainActiveAnchorCounter,
+    anchor: &Anchor,
+    current_domain: &IIDomain,
+) {
+    let previous_domain_activity = anchor.domain_activity_since(counter.start_timestamp);
+
+    match previous_domain_activity {
+        DomainActivity::None | DomainActivity::Other => {
+            increment_counter_for_domain(counter, current_domain)
+        }
+        DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
+            if !current_domain.is_same_domain(&previous_domain_activity) {
+                // the anchor switched from being active on only one II domain to being active on both
+                // --> total active remains the same, but the anchor switches to the both domains bucket
+                decrement_counter_for_domain(counter, &current_domain.other_domain());
+                counter.both_ii_domains_counter += 1;
+            }
+        }
+        DomainActivity::BothIIDomains => {
+            // already counted => do nothing
+        }
+    }
+}
+
+fn increment_counter_for_domain(counter: &mut DomainActiveAnchorCounter, domain: &IIDomain) {
+    match domain {
+        IIDomain::Ic0AppDomain => counter.ic0_app_counter += 1,
+        IIDomain::InternetComputerOrgDomain => counter.internetcomputer_org_counter += 1,
+    }
+}
+
+fn decrement_counter_for_domain(counter: &mut DomainActiveAnchorCounter, domain: &IIDomain) {
+    match domain {
+        IIDomain::Ic0AppDomain => counter.ic0_app_counter -= 1,
+        IIDomain::InternetComputerOrgDomain => counter.internetcomputer_org_counter -= 1,
+    }
+}
+
+fn new_active_anchor_statistics<T: ActivityCounter>(time: Timestamp) -> ActiveAnchorStatistics<T> {
     ActiveAnchorStatistics {
         completed: CompletedActiveAnchorStats {
             daily_active_anchors: None,
             monthly_active_anchors: None,
         },
         ongoing: OngoingActiveAnchorStats {
-            daily_active_anchors: new_active_anchor_counter(time),
-            monthly_active_anchors: vec![new_active_anchor_counter(time)],
+            daily_active_anchors: ActivityCounter::new(time),
+            monthly_active_anchors: vec![ActivityCounter::new(time)],
         },
-    }
-}
-
-fn new_active_anchor_counter(time: Timestamp) -> ActiveAnchorCounter {
-    ActiveAnchorCounter {
-        start_timestamp: time,
-        counter: 0,
     }
 }

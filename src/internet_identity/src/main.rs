@@ -33,6 +33,12 @@ const DAY_NS: u64 = 24 * HOUR_NS;
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
+// Note: concatenating const &str is a hassle in rust it seemed easiest to just repeat.
+const IC0_APP_DOMAIN: &str = "identity.ic0.app";
+const IC0_APP_ORIGIN: &str = "https://identity.ic0.app";
+const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
+const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
+
 #[update]
 #[candid_method]
 async fn init_salt() {
@@ -260,6 +266,9 @@ fn stats() -> InternetIdentityStats {
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
     let active_anchor_stats =
         state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
+    let domain_active_anchor_stats = state::persistent_state(|persistent_state| {
+        persistent_state.domain_active_anchor_stats.clone()
+    });
 
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -268,6 +277,7 @@ fn stats() -> InternetIdentityStats {
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
         active_anchor_stats,
+        domain_active_anchor_stats,
     })
 }
 

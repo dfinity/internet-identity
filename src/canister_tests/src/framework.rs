@@ -329,6 +329,22 @@ pub fn recovery_device_data_2() -> DeviceData {
     }
 }
 
+pub fn device_with_origin(origin: Option<String>) -> DeviceData {
+    DeviceData {
+        pubkey: ByteBuf::from(origin.as_deref().unwrap_or(PUBKEY_1)),
+        alias: "My Device".to_string(),
+        credential_id: Some(ByteBuf::from("credential id 1")),
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
+        origin,
+    }
+}
+
+pub fn principal(device: &DeviceData) -> Principal {
+    Principal::self_authenticating(&device.pubkey)
+}
+
 pub fn expect_user_error_with_message<T: std::fmt::Debug>(
     result: Result<T, CallError>,
     error_code: ErrorCode,

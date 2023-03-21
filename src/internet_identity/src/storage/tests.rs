@@ -369,5 +369,6 @@ fn sample_persistent_state() -> PersistentState {
                 }],
             },
         }),
+        domain_active_anchor_stats: None,
     }
 }

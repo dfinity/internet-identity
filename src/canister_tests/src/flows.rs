@@ -9,6 +9,15 @@ pub fn register_anchor(env: &StateMachine, canister_id: CanisterId) -> AnchorNum
     register_anchor_with(env, canister_id, principal_1(), &device_data_1())
 }
 
+pub fn register_anchor_with_device(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    device: &DeviceData,
+) -> AnchorNumber {
+    let principal = Principal::self_authenticating(&device.pubkey);
+    register_anchor_with(env, canister_id, principal, device)
+}
+
 pub fn register_anchor_with(
     env: &StateMachine,
     canister_id: CanisterId,
