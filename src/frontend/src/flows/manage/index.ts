@@ -218,12 +218,12 @@ export const displayManage = (
     });
     if (devices.dupPhrase) {
       toast.error(
-        "More than one recovery phrases are registered, which is unexpected. Only one will be showed."
+        "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
       );
     }
     if (devices.dupKey) {
       toast.error(
-        "More than one recovery keys are registered, which is unexpected. Only one will be showed."
+        "More than one recovery keys are registered, which is unexpected. Only one will be shown."
       );
     }
     displayManagePage({
