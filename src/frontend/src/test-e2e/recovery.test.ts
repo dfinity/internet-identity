@@ -98,8 +98,6 @@ test("Make recovery protected", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
     await mainView.assertDeviceUnprotected(RECOVERY_PHRASE_NAME);
-    // Ensure the settings dropdown is in view
-    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
     await mainView.assertDeviceProtected(RECOVERY_PHRASE_NAME);
   });
@@ -115,8 +113,6 @@ test("Make recovery unprotected", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
     await mainView.assertDeviceUnprotected(RECOVERY_PHRASE_NAME);
-    // Ensure the settings dropdown is in view
-    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
     await mainView.assertDeviceProtected(RECOVERY_PHRASE_NAME);
 
@@ -135,8 +131,6 @@ test("Reset protected recovery phrase", async () => {
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    // Ensure the settings dropdown is in view
-    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
 
     await mainView.waitForDisplay();
@@ -164,8 +158,6 @@ test("Reset protected recovery phrase, confirm with empty seed phrase", async ()
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    // Ensure the settings dropdown is in view
-    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
     await mainView.waitForDisplay();
     await mainView.reset(RECOVERY_PHRASE_NAME);

@@ -223,6 +223,10 @@ export class MainView extends View {
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
@@ -233,6 +237,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='protect']`)
       .click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
     await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
@@ -248,6 +253,10 @@ export class MainView extends View {
   }
 
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
@@ -258,6 +267,7 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
       .click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
     await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
