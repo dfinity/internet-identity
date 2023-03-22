@@ -352,8 +352,9 @@ pub fn content_security_policy_meta() -> String {
          script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
          base-uri 'none';\
          form-action 'none';\
-         style-src 'self' 'unsafe-inline';\
-         style-src-elem 'self' 'unsafe-inline';"
+         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+         style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
+         font-src https://fonts.gstatic.com;"
     );
     #[cfg(not(feature = "insecure_requests"))]
     let csp = format!("{csp}upgrade-insecure-requests;");
