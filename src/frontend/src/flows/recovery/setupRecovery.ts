@@ -97,7 +97,7 @@ export const displayAndConfirmPhrase = async ({
 }: {
   operation: "create" | "reset";
   phrase: string;
-}) => {
+}): Promise<"ok" | "error" | "canceled"> => {
   // Loop until the user has confirmed the phrase
   for (;;) {
     const displayResult = await displaySeedPhrase({
@@ -106,19 +106,19 @@ export const displayAndConfirmPhrase = async ({
     });
     // User has canceled, so we return
     if (displayResult === "canceled") {
-      return;
+      return "canceled";
     }
 
     if (displayResult !== "ok") {
       // According to typescript, should never happen
       unreachable(displayResult, "unexpected return value");
-      return;
+      return "error";
     }
 
     const result = await confirmSeedPhrase({ phrase });
     // User has confirmed, so break out of the loop
     if (result === "confirmed") {
-      break;
+      return "ok";
     }
 
     // User has clicked the back button, so we retry
@@ -143,7 +143,16 @@ export const setupPhrase = async (
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;
 
-  await displayAndConfirmPhrase({ phrase, operation: "create" });
+  const res = await displayAndConfirmPhrase({ phrase, operation: "create" });
+
+  if (res === "error" || res === "canceled") {
+    return;
+  }
+
+  if (res !== "ok") {
+    unreachableLax(res);
+    return;
+  }
 
   await withLoader(() =>
     connection.add(
