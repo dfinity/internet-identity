@@ -1,6 +1,7 @@
 import { TemplateResult, html } from "lit-html";
-import { deviceListItem, Device } from "./deviceListItem";
-import { warningIcon } from "./icons";
+import { Authenticator } from "./types";
+import { warningIcon } from "../../components/icons";
+import { settingsDropdown } from "./settingsDropdown";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
@@ -10,13 +11,13 @@ const MAX_AUTHENTICATORS = 8;
 
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
-export type DedupDevice = Device & { dupCount?: number };
+export type DedupAuthenticator = Authenticator & { dupCount?: number };
 
-// Deduplicate devices with same (duplicated) labels
-const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
-  return authenticators.reduce<Device[]>((acc, authenticator) => {
-    const _authenticator: DedupDevice = { ...authenticator };
-    const sameName = acc.filter((a) => a.label === _authenticator.label);
+// Deduplicate devices with same (duplicated) aliases
+const dedupLabels = (authenticators: Authenticator[]): DedupAuthenticator[] => {
+  return authenticators.reduce<Authenticator[]>((acc, authenticator) => {
+    const _authenticator: DedupAuthenticator = { ...authenticator };
+    const sameName = acc.filter((a) => a.alias === _authenticator.alias);
     if (sameName.length >= 1) {
       _authenticator.dupCount = sameName.length + 1;
     }
@@ -26,11 +27,11 @@ const dedupLabels = (authenticators: Device[]): DedupDevice[] => {
   }, []);
 };
 
-export const devicesSection = ({
+export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
 }: {
-  authenticators: Device[];
+  authenticators: Authenticator[];
   onAddDevice: () => void;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
@@ -73,8 +74,8 @@ export const devicesSection = ({
 
         <div class="c-action-list">
           <ul>
-          ${authenticators.map((device, index) =>
-            deviceListItem({ device, index: `authenticator-${index}` })
+          ${authenticators.map((authenticator, index) =>
+            authenticatorItem({ authenticator, index })
           )}</ul>
           <div class="c-action-list__actions">
             <button
@@ -95,3 +96,44 @@ export const devicesSection = ({
       </div>
     </aside>`;
 };
+
+export const authenticatorItem = ({
+  authenticator: { alias, dupCount, warn, remove },
+  index,
+}: {
+  authenticator: DedupAuthenticator;
+  index: number;
+}) => {
+  return html`
+    <li class="c-action-list__item" data-device=${alias}>
+      <div class="c-action-list__label">
+        ${alias}
+        ${dupCount !== undefined && dupCount > 0
+          ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
+          : undefined}
+      </div>
+      ${warn === undefined ? undefined : itemWarning({ warn })}
+      ${remove === undefined
+        ? undefined
+        : settingsDropdown({
+            alias,
+            id: `authenticator-${index}`,
+            settings: [
+              { action: "remove", caption: "Remove", fn: () => remove() },
+            ],
+          })}
+    </li>
+  `;
+};
+
+const itemWarning = ({
+  warn,
+}: {
+  warn: TemplateResult;
+}): TemplateResult => html`<div class="c-action-list__action">
+  <span class="c-tooltip c-tooltip--left c-icon c-icon--warning" tabindex="0"
+    >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
+      >${warn}</span
+    ></span
+  >
+</div>`;

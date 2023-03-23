@@ -10,10 +10,13 @@ export type RecoveryPhrase = RecoveryDevice & {
 
 export const recoveryDeviceToLabel = (device: RecoveryDevice): string => {
   if ("seed_phrase" in device.key_type) {
-    return "Recovery Phrase";
+    return recoveryPhraseLabel;
   }
-  return "External Hardware";
+  return recoveryKeyLabel;
 };
+export const recoveryPhraseLabel = "Recovery Phrase";
+export const recoveryKeyLabel = "Recovery Device";
+
 export const isRecoveryDevice = (
   device: Pick<DeviceData, "purpose">
 ): device is RecoveryDevice => "recovery" in device.purpose;

@@ -50,7 +50,7 @@ const chooseRecoveryMechanismTemplate = ({
           id="securityKey"
         >
           <span aria-hidden="true">${securityKeyIcon}</span>
-          <div class="t-strong">External Hardware</div>
+          <div class="t-strong">Recovery Device</div>
           <div class="t-weak">Use FIDO device</div>
         </button>
       </div>

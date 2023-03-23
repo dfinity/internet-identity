@@ -245,59 +245,30 @@ const iiPages: Record<string, () => void> = {
   displayManage: () =>
     displayManagePage({
       userNumber,
-      authenticators: [
-        {
-          label: "Chrome on iPhone",
-          isRecovery: false,
-          isProtected: false,
-          settings: [
-            {
-              label: "remove",
-              fn: () => Promise.resolve(),
-            },
-          ],
+      devices: {
+        authenticators: [
+          {
+            alias: "Chrome on iPhone",
+            remove: () => console.log("remove"),
+          },
+          {
+            alias: "Yubikey Blue",
+            remove: () => console.log("remove"),
+          },
+          {
+            alias: "Yubikey Blue",
+            remove: () => console.log("remove"),
+            warn: html`Something is rotten in the state of Device`,
+          },
+        ],
+        recoveries: {
+          recoveryPhrase: {
+            isProtected: true,
+            unprotect: () => console.log("unprotect"),
+            reset: () => Promise.resolve(),
+          },
         },
-        {
-          label: "Yubikey Blue",
-          isRecovery: false,
-          isProtected: false,
-          settings: [
-            {
-              label: "remove",
-              fn: () => Promise.resolve(),
-            },
-          ],
-        },
-        {
-          label: "Yubikey Blue",
-          isRecovery: false,
-          isProtected: false,
-          warn: html`Something is rotten in the state of Device`,
-          settings: [
-            {
-              label: "remove",
-              fn: () => Promise.resolve(),
-            },
-          ],
-        },
-      ],
-      recoveries: [
-        {
-          label: "Recovery Phrase",
-          isRecovery: true,
-          isProtected: true,
-          settings: [
-            {
-              label: "remove",
-              fn: () => Promise.resolve(),
-            },
-            {
-              label: "protect",
-              fn: () => Promise.resolve(),
-            },
-          ],
-        },
-      ],
+      },
       onAddDevice: () => {
         console.log("add device requested");
       },
@@ -308,15 +279,14 @@ const iiPages: Record<string, () => void> = {
   displayManageSingle: () =>
     displayManagePage({
       userNumber,
-      authenticators: [
-        {
-          label: "Chrome on iPhone",
-          isRecovery: false,
-          isProtected: false,
-          settings: [],
-        },
-      ],
-      recoveries: [],
+      devices: {
+        authenticators: [
+          {
+            alias: "Chrome on iPhone",
+          },
+        ],
+        recoveries: {},
+      },
       onAddDevice: () => {
         console.log("add device requested");
       },
@@ -486,7 +456,6 @@ const components = (): TemplateResult => {
             : ""
         )}>
                 </div>
-
     `;
 };
 
