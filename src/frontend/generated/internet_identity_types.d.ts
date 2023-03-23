@@ -85,6 +85,25 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+export interface DomainActiveAnchorCounter {
+  'counter' : bigint,
+  'start_timestamp' : Timestamp,
+  'internetcomputer_org_counter' : bigint,
+  'ic0_app_counter' : bigint,
+  'both_ii_domains_counter' : bigint,
+}
+export interface DomainActiveAnchorStatistics {
+  'completed' : DomainCompletedActiveAnchorStats,
+  'ongoing' : DomainOngoingActiveAnchorStats,
+}
+export interface DomainCompletedActiveAnchorStats {
+  'monthly_active_anchors' : [] | [DomainActiveAnchorCounter],
+  'daily_active_anchors' : [] | [DomainActiveAnchorCounter],
+}
+export interface DomainOngoingActiveAnchorStats {
+  'monthly_active_anchors' : Array<DomainActiveAnchorCounter>,
+  'daily_active_anchors' : DomainActiveAnchorCounter,
+}
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
@@ -115,6 +134,7 @@ export interface InternetIdentityInit {
 export interface InternetIdentityStats {
   'storage_layout_version' : number,
   'users_registered' : bigint,
+  'domain_active_anchor_stats' : [] | [DomainActiveAnchorStatistics],
   'assigned_user_number_range' : [bigint, bigint],
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,

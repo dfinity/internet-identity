@@ -148,6 +148,25 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
+  const DomainActiveAnchorCounter = IDL.Record({
+    'counter' : IDL.Nat64,
+    'start_timestamp' : Timestamp,
+    'internetcomputer_org_counter' : IDL.Nat64,
+    'ic0_app_counter' : IDL.Nat64,
+    'both_ii_domains_counter' : IDL.Nat64,
+  });
+  const DomainCompletedActiveAnchorStats = IDL.Record({
+    'monthly_active_anchors' : IDL.Opt(DomainActiveAnchorCounter),
+    'daily_active_anchors' : IDL.Opt(DomainActiveAnchorCounter),
+  });
+  const DomainOngoingActiveAnchorStats = IDL.Record({
+    'monthly_active_anchors' : IDL.Vec(DomainActiveAnchorCounter),
+    'daily_active_anchors' : DomainActiveAnchorCounter,
+  });
+  const DomainActiveAnchorStatistics = IDL.Record({
+    'completed' : DomainCompletedActiveAnchorStats,
+    'ongoing' : DomainOngoingActiveAnchorStats,
+  });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
     'archive_canister' : IDL.Opt(IDL.Principal),
@@ -171,6 +190,7 @@ export const idlFactory = ({ IDL }) => {
   const InternetIdentityStats = IDL.Record({
     'storage_layout_version' : IDL.Nat8,
     'users_registered' : IDL.Nat64,
+    'domain_active_anchor_stats' : IDL.Opt(DomainActiveAnchorStatistics),
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
