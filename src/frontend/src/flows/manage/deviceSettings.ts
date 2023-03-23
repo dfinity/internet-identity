@@ -140,7 +140,7 @@ export const resetPhrase = async ({
 
     if (res === "confirmed") {
       await withLoader(() => opConnection.replace(oldKey, device));
-    } else if (res !== "error" && res !== "canceled") {
+    } else if (res !== "canceled") {
       unreachableLax(res);
     }
   } catch (e: unknown) {
