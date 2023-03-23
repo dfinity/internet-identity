@@ -138,7 +138,7 @@ export const resetPhrase = async ({
 
     const res = await displayAndConfirmPhrase({ phrase, operation: "reset" });
 
-    if (res === "ok") {
+    if (res === "confirmed") {
       await withLoader(() => opConnection.replace(oldKey, device));
     } else if (res !== "error" && res !== "canceled") {
       unreachableLax(res);

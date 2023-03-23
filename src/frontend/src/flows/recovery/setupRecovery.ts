@@ -97,7 +97,7 @@ export const displayAndConfirmPhrase = async ({
 }: {
   operation: "create" | "reset";
   phrase: string;
-}): Promise<"ok" | "error" | "canceled"> => {
+}): Promise<"confirmed" | "error" | "canceled"> => {
   // Loop until the user has confirmed the phrase
   for (;;) {
     const displayResult = await displaySeedPhrase({
@@ -118,7 +118,7 @@ export const displayAndConfirmPhrase = async ({
     const result = await confirmSeedPhrase({ phrase });
     // User has confirmed, so break out of the loop
     if (result === "confirmed") {
-      return "ok";
+      return "confirmed";
     }
 
     // User has clicked the back button, so we retry
@@ -149,7 +149,7 @@ export const setupPhrase = async (
     return;
   }
 
-  if (res !== "ok") {
+  if (res !== "confirmed") {
     unreachableLax(res);
     return;
   }
