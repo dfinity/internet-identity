@@ -1,6 +1,6 @@
 use crate::state;
 use ic_cdk::api::time;
-use internet_identity_interface::{
+use internet_identity_interface::internet_identity::types::{
     ActiveAnchorCounter, ActiveAnchorStatistics, CompletedActiveAnchorStats,
     OngoingActiveAnchorStats, Timestamp,
 };

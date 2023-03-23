@@ -1,6 +1,8 @@
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
-use internet_identity_interface::{DeviceData, DeviceProtection, KeyType, Purpose, Timestamp};
+use internet_identity_interface::internet_identity::types::{
+    DeviceData, DeviceProtection, KeyType, Purpose, Timestamp,
+};
 use serde_bytes::ByteBuf;
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];

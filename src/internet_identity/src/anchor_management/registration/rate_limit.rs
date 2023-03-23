@@ -2,7 +2,7 @@ use crate::state;
 use crate::state::RateLimitState;
 use ic_cdk::api::time;
 use ic_cdk::trap;
-use internet_identity_interface::RateLimitConfig;
+use internet_identity_interface::internet_identity::types::RateLimitConfig;
 use std::cmp::min;
 
 /// Processes the registration rate limit:

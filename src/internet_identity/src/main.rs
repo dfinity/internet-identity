@@ -6,9 +6,9 @@ use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
-use internet_identity_interface::archive::{BufferedEntry, Operation};
+use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::*;
+use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
 
