@@ -6,7 +6,7 @@ import {
 } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
-import { unreachable } from "../../utils/utils";
+import { unreachable, unreachableLax } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { displayAndConfirmPhrase } from "../recovery/setupRecovery";
@@ -136,8 +136,13 @@ export const resetPhrase = async ({
   try {
     const phrase = userNumber.toString(10) + " " + recoveryPhrase;
 
-    await displayAndConfirmPhrase({ phrase, operation: "reset" });
-    await withLoader(() => opConnection.replace(oldKey, device));
+    const res = await displayAndConfirmPhrase({ phrase, operation: "reset" });
+
+    if (res === "confirmed") {
+      await withLoader(() => opConnection.replace(oldKey, device));
+    } else if (res !== "error" && res !== "canceled") {
+      unreachableLax(res);
+    }
   } catch (e: unknown) {
     await displayError({
       title: "Could not reset recovery phrase",
