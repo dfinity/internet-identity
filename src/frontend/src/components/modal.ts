@@ -1,11 +1,16 @@
 import { html, TemplateResult, render } from "lit-html";
 
+/**
+ * creates a modal that contains arbitrary content
+ * and ID is obligatory for accessibility reasons
+ * use crypto.randomUUID() if you feel uninspired
+ **/
 export const createModal = ({
   slot,
   id,
 }: {
   slot: TemplateResult;
-  id?: string;
+  id: string;
 }): HTMLDialogElement => {
   const modalHtml = html`
     <form method="dialog" class="c-modal__content c-card c-card--modal">
@@ -20,7 +25,7 @@ export const createModal = ({
   `;
 
   const $modal = document.createElement("dialog");
-  $modal.id = id != null ? id : "modal";
+  $modal.id = id;
   $modal.classList.add("c-modal");
   $modal.setAttribute("aria-modal", "true");
 
@@ -28,9 +33,14 @@ export const createModal = ({
   return $modal;
 };
 
-export const modal = (slot: TemplateResult): Promise<void> => {
-  // create modal and append it to the body
-  const $modal = createModal({ slot });
+export const modal = ({
+  slot,
+  id,
+}: {
+  slot: TemplateResult;
+  id: string;
+}): Promise<void> => {
+  const $modal = createModal({ slot, id });
   document.body.appendChild($modal);
 
   return new Promise((resolve) => {
