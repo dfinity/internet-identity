@@ -96,16 +96,20 @@ export const setupRecovery = async ({
 
 // Set up a recovery device
 export const setupKey = async ({
-  devices,
+  devices: devices_,
   connection,
 }: {
-  devices: Omit<DeviceData, "alias">[];
+  // When provided, use these devices for exclusion (webauthn) instead of looking up devices
+  // (avoids a request saves a couple seconds when used)
+  devices?: Omit<DeviceData, "alias">[];
   connection: AuthenticatedConnection;
 }): Promise<"ok" | { error: unknown }> => {
   const name = "Recovery key";
   try {
     // Create the WebAuthn credentials and upload them to the canister
     await withLoader(async () => {
+      const devices =
+        devices_ ?? (await connection.lookupAll(connection.userNumber));
       const recoverIdentity = await WebAuthnIdentity.create({
         publicKey: creationOptions(devices, "cross-platform"),
       });

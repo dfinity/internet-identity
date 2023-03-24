@@ -77,9 +77,6 @@ export const FLOWS = {
     await mainView.addRecovery();
 
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.useSeedPhrase();
-    await recoveryMethodSelectorView.waitForSeedPhrase();
     const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
     await recoveryMethodSelectorView.acknowledgeCheckbox();
     await recoveryMethodSelectorView.seedPhraseContinue();

@@ -272,8 +272,11 @@ const iiPages: Record<string, () => void> = {
       onAddDevice: () => {
         console.log("add device requested");
       },
-      onAddRecovery: () => {
-        console.log("add recovery requested");
+      addRecoveryPhrase: () => {
+        console.log("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        console.log("add recovery key");
       },
     }),
   displayManageSingle: () =>
@@ -290,8 +293,11 @@ const iiPages: Record<string, () => void> = {
       onAddDevice: () => {
         console.log("add device requested");
       },
-      onAddRecovery: () => {
-        console.log("add recovery requested");
+      addRecoveryPhrase: () => {
+        console.log("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        console.log("add recovery key");
       },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
