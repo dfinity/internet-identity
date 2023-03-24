@@ -118,9 +118,9 @@ const displayManageTemplate = ({
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
 }): TemplateResult => {
-  // Nudge the user to add a device iff there is fewer than 2 authenticators and no recoveries
+  // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
-    authenticators.length <= 2 &&
+    authenticators.length <= 1 &&
     recoveries.recoveryPhrase === undefined &&
     recoveries.recoveryKey === undefined;
 
@@ -252,6 +252,7 @@ export const displayManage = (
           "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
         );
         if (!confirmed) {
+          // No resolve here because we don't need to reload the screen
           return;
         }
         await setupKey({ connection });

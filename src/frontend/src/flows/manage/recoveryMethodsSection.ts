@@ -118,7 +118,7 @@ export const recoveryPhraseItem = ({
   ];
   return html`
     <li class="c-action-list__item" data-device=${alias}>
-      ${tickmark()}
+      ${checkmark()}
       <div class="c-action-list__label">${alias}</div>
       ${recoveryPhrase.isProtected ? lock() : undefined}
       ${settingsDropdown({ alias, id, settings })}
@@ -147,14 +147,14 @@ export const recoveryKeyItem = ({
   ];
   return html`
     <li class="c-action-list__item" data-device=${alias}>
-      ${tickmark()}
+      ${checkmark()}
       <div class="c-action-list__label">${alias}</div>
       ${settingsDropdown({ alias, id, settings })}
     </li>
   `;
 };
 
-const tickmark = (): TemplateResult => {
+const checkmark = (): TemplateResult => {
   return html`
     <div class="c-action-list__status">
       <span class="c-icon c-icon--ok">${checkmarkRoundIcon}</span>
