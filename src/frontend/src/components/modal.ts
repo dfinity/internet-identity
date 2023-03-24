@@ -59,21 +59,26 @@ export const modal = ({ slot }: { slot: TemplateResult }): Promise<void> => {
 
   document.body.appendChild(modalElement);
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     // open modal using the browsers API
     modalElement.showModal();
 
     const close = () => {
-      resolve();
       modalElement.close();
       modalElement.remove();
     };
 
     withRef(closeButtonRef, (closeButton) => {
-      closeButton.onclick = close;
+      closeButton.onclick = () => {
+        reject();
+        close();
+      };
     });
     withRef(submitButtonRef, (submitButton) => {
-      submitButton.onclick = close;
+      submitButton.onclick = () => {
+        resolve();
+        close();
+      };
     });
   });
 };
