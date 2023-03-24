@@ -47,7 +47,6 @@ import { displayError } from "./components/displayError";
 import { promptUserNumber } from "./components/promptUserNumber";
 import { registerDisabled } from "./flows/registerDisabled";
 import { RecoveryDevice } from "./utils/recoveryDevice";
-import { modal } from "./components/modal";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -250,24 +249,15 @@ const iiPages: Record<string, () => void> = {
         authenticators: [
           {
             alias: "Chrome on iPhone",
-            remove: async () =>
-              modal({
-                slot: html`<h1>Do you want to remove Chrome on iPhone</h1>`,
-              }).then(() => console.log("remove iphone")),
+            remove: () => console.log("remove"),
           },
           {
             alias: "Yubikey Blue",
-            remove: async () =>
-              modal({
-                slot: html`<h1>Do you want to remove Yubikey Blue</h1>`,
-              }).then(() => console.log("remove Yubikey Blue")),
+            remove: () => console.log("remove"),
           },
           {
             alias: "Yubikey Blue",
-            remove: async () =>
-              modal({
-                slot: html`<h1>Do you want to remove Yubikey Blue</h1>`,
-              }).then(() => console.log("remove Yubikey Blue")),
+            remove: () => console.log("remove"),
             warn: html`Something is rotten in the state of Device`,
           },
         ],
