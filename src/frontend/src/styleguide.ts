@@ -549,7 +549,6 @@ export const styleguide = html`
           <button class="c-button c-button--primary" @click=${async () =>
             await modal({
               slot: html`<h1>I am a modal</h1>`,
-              id: crypto.randomUUID(),
             })}>
             Open Modal
           </button>
