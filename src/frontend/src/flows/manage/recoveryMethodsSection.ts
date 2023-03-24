@@ -129,7 +129,9 @@ export const recoveryPhraseItem = ({
 const lock = (): TemplateResult => {
   return html`
     <div class="c-action-list__status" data-role="protected">
-      <span class="c-icon c-icon--lock" tabindex="0">${lockedIcon}</span>
+      <span class="c-icon c-icon--ok c-icon--lock" tabindex="0"
+        >${lockedIcon}</span
+      >
     </div>
   `;
 };
