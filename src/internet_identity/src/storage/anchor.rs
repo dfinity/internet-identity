@@ -197,8 +197,15 @@ impl Anchor {
         timestamps.pop().unwrap_or_default()
     }
 
-    /// Returns whether information about the domains this anchor was active on
-    /// since the given timestamp.
+    /// Returns information about the domains this anchor was active on since the given timestamp.
+    /// Activity on unknown / other domain will be dropped if there is also activity on an II domain
+    /// for the following reasons:
+    /// * no information is most likely caused by the device having been added before we started
+    ///   collecting domain information
+    /// * combinations of an unknown domain and an II domain shows that the anchor is at least partially
+    ///   active on the II domain (but also does non-standard / unsupported things to their anchor).
+    ///   If we are interested in this user group, we might consider extending this function to give
+    ///   them their own [DomainActivity] value.
     pub fn domain_activity_since(&self, timestamp: Timestamp) -> DomainActivity {
         #[derive(Default)]
         struct Accumulator {

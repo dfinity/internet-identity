@@ -112,6 +112,16 @@ impl TryFrom<&str> for IIDomain {
     }
 }
 
+/// Increases the counter on a window for a single II domain if the there was no activity before.
+///
+/// If there has been activity on an II domain and this is activity on the _other_ domain, then
+/// we decrement the counter for the previous single domain and instead increment the counter for
+/// both II domains.
+///
+/// If the anchor was already active on both domains, the activity has been counted in this window
+/// already and no action needs to be taken.
+///
+/// Only called if `current_domain` corresponds to an II domain.
 fn update_ii_domain_counter(
     counter: &mut DomainActiveAnchorCounter,
     anchor: &Anchor,
