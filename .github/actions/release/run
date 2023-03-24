@@ -97,8 +97,8 @@ do
         # Additionally grab the step number of the 'sha256sum' step
         step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
-            --argjson job_id "$job_id" \
-            --argjson filename "$filename" \
+            --arg job_id "$job_id" \
+            --arg filename "$filename" \
             '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum $filename")) | .number')
                 >&2 echo "Found step: $step"
     fi
