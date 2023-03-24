@@ -74,8 +74,8 @@ export const modal = ({
     // open modal
     modalElement.showModal();
 
-    const closeButton = closeButtonRef.value!;
-    const submitButton = submitButtonRef.value!;
+    const closeButton = closeButtonRef.value;
+    const submitButton = submitButtonRef.value;
 
     const close = () => {
       resolve();
@@ -83,7 +83,11 @@ export const modal = ({
       modalElement.remove();
     };
 
-    closeButton.onclick = close;
-    submitButton.onclick = close;
+    if (closeButton) {
+      closeButton.onclick = close;
+    }
+    if (submitButton) {
+      submitButton.onclick = close;
+    }
   });
 };
