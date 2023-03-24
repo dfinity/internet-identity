@@ -86,13 +86,13 @@ export const chooseRecoveryMechanism = ({
   cancelText,
 }: {
   devices: Omit<DeviceData, "alias">[];
-} & ChooseRecoveryProps): Promise<RecoveryMechanism | null> => {
+} & ChooseRecoveryProps): Promise<RecoveryMechanism | "canceled"> => {
   return new Promise((resolve) => {
     return chooseRecoveryMechanismPage({
       disablePhrase: hasRecoveryPhrase(devices),
       disableKey: hasRecoveryKey(devices),
       pick: resolve,
-      cancel: () => resolve(null),
+      cancel: () => resolve("canceled"),
 
       title,
       message,
