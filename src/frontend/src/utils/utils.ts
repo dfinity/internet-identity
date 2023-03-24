@@ -1,3 +1,8 @@
+// Ensures the argument has a given type (from ts' perspective, not js)
+export function assertType<T>(_: T) {
+  /* */
+}
+
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
 export function unknownToString(obj: unknown, def: string): string {
