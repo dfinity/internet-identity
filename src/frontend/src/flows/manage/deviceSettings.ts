@@ -123,14 +123,14 @@ export const resetPhrase = async ({
     uploadPhrase,
   });
 
-  if (typeof res === "object" && "ok" in res) {
+  if ("ok" in res) {
     // If the user was authenticated with the phrase, then replace the connection
     // to use the new phrase to void logging them out
     const nextConnection = sameDevice
       ? await connection.fromIdentity(userNumber, res.ok)
       : undefined;
     return reload(nextConnection);
-  } else if (typeof res === "object" && "error" in res) {
+  } else if ("error" in res) {
     await displayError({
       title: "Could not reset recovery phrase",
       message: "An unexpected error occurred",
@@ -139,7 +139,7 @@ export const resetPhrase = async ({
     });
     return reload();
   } else {
-    assertType<"canceled">(res);
+    assertType<{ canceled: void }>(res);
     return reload();
   }
 };

@@ -149,12 +149,13 @@ export const setupPhrase = async (
       ),
   });
 
-  if (typeof res === "object" && "ok" in res) {
+  if ("ok" in res) {
     return "ok";
-  } else if (typeof res === "object" && "error" in res) {
+  } else if ("error" in res) {
     return "error";
   } else {
-    return res;
+    assertType<{ canceled: void }>(res);
+    return "canceled";
   }
 };
 
@@ -167,7 +168,7 @@ export const phraseWizard = async ({
   userNumber: bigint;
   operation: "create" | "reset";
   uploadPhrase: (pubkey: DerEncodedPublicKey) => Promise<void>;
-}): Promise<{ ok: SignIdentity } | { error: unknown } | "canceled"> => {
+}): Promise<{ ok: SignIdentity } | { error: unknown } | { canceled: void }> => {
   const seedPhrase = generate().trim();
   const recoverIdentity = await fromMnemonicWithoutValidation(
     seedPhrase,
@@ -178,7 +179,7 @@ export const phraseWizard = async ({
   const res = await displayAndConfirmPhrase({ phrase, operation });
 
   if (res === "canceled") {
-    return res;
+    return { canceled: undefined };
   }
 
   assertType<"confirmed">(res);
