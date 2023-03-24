@@ -1,4 +1,5 @@
 import { html, TemplateResult, render } from "lit-html";
+import { withRef } from "../utils/lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /**
@@ -62,20 +63,17 @@ export const modal = ({ slot }: { slot: TemplateResult }): Promise<void> => {
     // open modal using the browsers API
     modalElement.showModal();
 
-    const closeButton = closeButtonRef.value;
-    const submitButton = submitButtonRef.value;
-
     const close = () => {
       resolve();
       modalElement.close();
       modalElement.remove();
     };
 
-    if (closeButton) {
+    withRef(closeButtonRef, (closeButton) => {
       closeButton.onclick = close;
-    }
-    if (submitButton) {
+    });
+    withRef(submitButtonRef, (submitButton) => {
       submitButton.onclick = close;
-    }
+    });
   });
 };
