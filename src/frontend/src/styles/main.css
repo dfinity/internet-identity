@@ -1259,11 +1259,13 @@ a:hover,
   border: none;
   background: transparent;
   cursor: pointer;
-  transition: 200ms cubic-bezier(0.3, 0.7, 0, 1);
+
   border-radius: 50%;
   line-height: 1;
+
   width: 2.5rem;
   height: 2.5rem;
+
   vertical-align: middle;
   text-align: center;
 
