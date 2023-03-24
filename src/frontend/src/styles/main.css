@@ -1250,14 +1250,25 @@ a:hover,
 
 .c-modal__close {
   position: absolute;
-  top: 0;
-  right: 0;
-  padding: var(--vs-inline);
+  /* take the close icon to the edge of the card */
+  top: calc(-1 * var(--rs-card-bezel));
+  right: calc(-1 * var(--rs-card-bezel-x));
+  /* makes the close button stick ouf of the box a bit */
+  transform: translate(50%, -50%);
+
   border: none;
   background: transparent;
-  color: var(--rc-onButton);
   cursor: pointer;
   transition: 200ms cubic-bezier(0.3, 0.7, 0, 1);
+  border-radius: 50%;
+  line-height: 1;
+  width: 2.5rem;
+  height: 2.5rem;
+  vertical-align: middle;
+  text-align: center;
+
+  background-color: var(--rc-background);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 /**
