@@ -6,13 +6,11 @@ use crate::{secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
-use internet_identity_interface::archive::Operation;
-use internet_identity_interface::AddTentativeDeviceResponse::{
-    AddedTentatively, AnotherDeviceTentativelyAdded,
-};
-use internet_identity_interface::VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
-use internet_identity_interface::*;
+use internet_identity_interface::archive::types::Operation;
+use internet_identity_interface::internet_identity::types::*;
 use std::collections::HashMap;
+use AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
+use VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
 
 // 15 mins
 const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);

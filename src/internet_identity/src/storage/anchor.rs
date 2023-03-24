@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Principal};
-use internet_identity_interface::archive::DeviceDataWithoutAlias;
-use internet_identity_interface::*;
+use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
+use internet_identity_interface::internet_identity::types::*;
 use std::{fmt, iter};
 
 #[cfg(test)]

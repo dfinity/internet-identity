@@ -1,4 +1,5 @@
-use crate::{DeviceData, DeviceProtection, KeyType, Purpose, WebAuthnCredential};
+use crate::internet_identity::types as ii_types;
+use ii_types::{DeviceData, DeviceProtection, KeyType, Purpose, WebAuthnCredential};
 use serde_bytes::ByteBuf;
 
 #[test]

@@ -3,9 +3,8 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{
     call_candid, call_candid_as, query_candid, query_candid_as, CallError, StateMachine,
 };
-use internet_identity_interface as types;
-use internet_identity_interface::archive::BufferedEntry;
-use internet_identity_interface::AnchorCredentials;
+use internet_identity_interface::archive::types::BufferedEntry;
+use internet_identity_interface::internet_identity::types;
 use serde_bytes::ByteBuf;
 
 /** The functions here are derived (manually) from Internet Identity's Candid file */
@@ -118,7 +117,7 @@ pub fn get_anchor_credentials(
     env: &StateMachine,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
-) -> Result<AnchorCredentials, CallError> {
+) -> Result<types::AnchorCredentials, CallError> {
     query_candid(env, canister_id, "get_anchor_credentials", (anchor_number,)).map(|(x,)| x)
 }
 

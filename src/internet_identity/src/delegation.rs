@@ -6,7 +6,7 @@ use ic_cdk::{id, trap};
 use ic_certified_map::AsHashTree;
 use ic_certified_map::{Hash, HashTree};
 use internet_identity::signature_map::SignatureMap;
-use internet_identity_interface::*;
+use internet_identity_interface::internet_identity::types::*;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;

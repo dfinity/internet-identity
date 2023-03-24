@@ -74,7 +74,7 @@ use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
 use ic_stable_structures::Memory;
 
-use internet_identity_interface::*;
+use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;

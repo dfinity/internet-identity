@@ -5,7 +5,7 @@ use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
-use internet_identity_interface::{
+use internet_identity_interface::internet_identity::types::{
     ActiveAnchorCounter, ActiveAnchorStatistics, ArchiveConfig, CompletedActiveAnchorStats,
     DeviceProtection, KeyType, OngoingActiveAnchorStats, Purpose,
 };
