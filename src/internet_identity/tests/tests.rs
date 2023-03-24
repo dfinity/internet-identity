@@ -3774,6 +3774,11 @@ mod active_anchors_tests {
                 both_domains_anchor,
             )?;
 
+            // more activity to get #active users different from 1
+            for _ in 0..5 {
+                flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+            }
+            flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
             flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
             flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
             flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
@@ -3783,8 +3788,8 @@ mod active_anchors_tests {
                 .unwrap()
                 .ongoing
                 .daily_active_anchors;
-            assert_eq!(stats.ic0_app_counter, 1);
-            assert_eq!(stats.internetcomputer_org_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 6);
+            assert_eq!(stats.internetcomputer_org_counter, 2);
             assert_eq!(stats.both_ii_domains_counter, 1);
 
             // repeated activity within the 24h collection period should not increase the counter
@@ -3800,7 +3805,7 @@ mod active_anchors_tests {
                 .unwrap()
                 .ongoing
                 .daily_active_anchors;
-            assert_eq!(stats.ic0_app_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 6);
 
             env.advance_time(Duration::from_secs(DAY_SECONDS));
 
@@ -3816,12 +3821,12 @@ mod active_anchors_tests {
             assert_metric(
                 &metrics,
                 "internet_identity_daily_active_anchors_by_domain{domain=\"identity.ic0.app\"}",
-                1f64,
+                6f64,
             );
             assert_metric(
                 &metrics,
                 "internet_identity_daily_active_anchors_by_domain{domain=\"identity.internetcomputer.org\"}",
-                1f64,
+                2f64,
             );
             assert_metric(
                 &metrics,
@@ -3835,8 +3840,8 @@ mod active_anchors_tests {
                 .completed
                 .daily_active_anchors
                 .unwrap();
-            assert_eq!(stats.ic0_app_counter, 1);
-            assert_eq!(stats.internetcomputer_org_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 6);
+            assert_eq!(stats.internetcomputer_org_counter, 2);
             assert_eq!(stats.both_ii_domains_counter, 1);
             Ok(())
         }
@@ -3878,6 +3883,10 @@ mod active_anchors_tests {
                 both_domains_anchor,
             )?;
 
+            // more activity to get #active users different from 1
+            flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+            flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
+            flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
             flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
             flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
             flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
@@ -3890,8 +3899,8 @@ mod active_anchors_tests {
                 .first()
                 .unwrap()
                 .clone();
-            assert_eq!(stats.ic0_app_counter, 1);
-            assert_eq!(stats.internetcomputer_org_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 2);
+            assert_eq!(stats.internetcomputer_org_counter, 3);
             assert_eq!(stats.both_ii_domains_counter, 1);
 
             // repeated activity within the 24h collection period should not increase the counter
@@ -3910,7 +3919,7 @@ mod active_anchors_tests {
                 .first()
                 .unwrap()
                 .clone();
-            assert_eq!(stats.ic0_app_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 2);
 
             env.advance_time(Duration::from_secs(MONTH_SECONDS));
 
@@ -3926,12 +3935,12 @@ mod active_anchors_tests {
             assert_metric(
                 &metrics,
                 "internet_identity_monthly_active_anchors_by_domain{domain=\"identity.ic0.app\"}",
-                1f64,
+                2f64,
             );
             assert_metric(
                 &metrics,
                 "internet_identity_monthly_active_anchors_by_domain{domain=\"identity.internetcomputer.org\"}",
-                1f64,
+                3f64,
             );
             assert_metric(
                 &metrics,
@@ -3945,8 +3954,8 @@ mod active_anchors_tests {
                 .completed
                 .monthly_active_anchors
                 .unwrap();
-            assert_eq!(stats.ic0_app_counter, 1);
-            assert_eq!(stats.internetcomputer_org_counter, 1);
+            assert_eq!(stats.ic0_app_counter, 2);
+            assert_eq!(stats.internetcomputer_org_counter, 3);
             assert_eq!(stats.both_ii_domains_counter, 1);
             Ok(())
         }
@@ -4190,6 +4199,59 @@ mod active_anchors_tests {
                 1
             );
 
+            Ok(())
+        }
+
+        /// Tests that activity on other domain and an II domain is attributed to the II domain.
+        #[test]
+        fn should_count_activity_on_other_and_ii_domain() -> Result<(), CallError> {
+            let env = env();
+            let canister_id = install_ii_canister(&env, II_WASM.clone());
+            let internetcomputer_org_device =
+                device_with_origin(Some(INTERNETCOMPUTER_ORG_ORIGIN.to_string()));
+            let other_origin_device = device_with_origin(Some(OTHER_ORIGIN.to_string()));
+
+            // ensure stats are initially absent
+            assert_eq!(
+                api::stats(&env, canister_id)?.domain_active_anchor_stats,
+                None
+            );
+
+            let anchor_number =
+                flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
+
+            // activity not attributed to any II domain --> no stats
+            assert_eq!(
+                api::stats(&env, canister_id)?.domain_active_anchor_stats,
+                None
+            );
+
+            api::add(
+                &env,
+                canister_id,
+                principal(&other_origin_device),
+                anchor_number,
+                internetcomputer_org_device.clone(),
+            )?;
+
+            // some activity on the II domain device
+            api::get_anchor_info(
+                &env,
+                canister_id,
+                principal(&internetcomputer_org_device),
+                anchor_number,
+            )?;
+
+            let stats = api::stats(&env, canister_id)?
+                .domain_active_anchor_stats
+                .unwrap()
+                .ongoing
+                .daily_active_anchors;
+
+            // activity is now attributed to II domain
+            assert_eq!(stats.ic0_app_counter, 0);
+            assert_eq!(stats.internetcomputer_org_counter, 1);
+            assert_eq!(stats.both_ii_domains_counter, 0);
             Ok(())
         }
     }
