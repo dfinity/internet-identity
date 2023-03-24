@@ -30,29 +30,30 @@ const dedupLabels = (authenticators: Authenticator[]): DedupAuthenticator[] => {
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
+  warnFewDevices,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
+  warnFewDevices: boolean;
 }): TemplateResult => {
   const wrapClasses = ["l-stack"];
-  const isWarning = authenticators_.length < 2;
 
-  if (isWarning === true) {
+  if (warnFewDevices) {
     wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
   }
 
   const authenticators = dedupLabels(authenticators_);
 
   return html`
-    <aside class="${wrapClasses.join(" ")}">
+    <aside class=${wrapClasses.join(" ")}>
       ${
-        isWarning === true
+        warnFewDevices
           ? html`<span class="c-card__icon" aria-hidden="true"
               >${warningIcon}</span
             >`
           : undefined
       }
-      <div class="${isWarning === true ? "c-card__content" : undefined}">
+      <div class=${warnFewDevices ? "c-card__content" : undefined}>
         <div class="t-title t-title--complications">
           <h2 class="t-title">Added devices</h2>
           <span class="t-title__complication c-tooltip" tabindex="0">
@@ -64,10 +65,9 @@ export const authenticatorsSection = ({
           </span>
         </div>
         ${
-          isWarning === true
+          warnFewDevices
             ? html`<p class="warning-message t-paragraph t-lead">
-                We recommend that you have at least two devices (for example,
-                your computer and your phone).
+                Add a device or recovery method to make your anchor more secure.
               </p>`
             : undefined
         }
@@ -106,13 +106,13 @@ export const authenticatorItem = ({
 }) => {
   return html`
     <li class="c-action-list__item" data-device=${alias}>
+      ${warn === undefined ? undefined : itemWarning({ warn })}
       <div class="c-action-list__label">
         ${alias}
         ${dupCount !== undefined && dupCount > 0
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
       </div>
-      ${warn === undefined ? undefined : itemWarning({ warn })}
       ${remove === undefined
         ? undefined
         : settingsDropdown({
@@ -131,7 +131,7 @@ const itemWarning = ({
 }: {
   warn: TemplateResult;
 }): TemplateResult => html`<div class="c-action-list__action">
-  <span class="c-tooltip c-tooltip--left c-icon c-icon--warning" tabindex="0"
+  <span class="c-tooltip c-tooltip--left c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
     ></span

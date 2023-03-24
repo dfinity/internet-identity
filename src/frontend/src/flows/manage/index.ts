@@ -22,12 +22,11 @@ import {
   authenticateBox,
   AuthnTemplates,
 } from "../../components/authenticateBox";
-import { setupRecovery, setupPhrase } from "../recovery/setupRecovery";
+import { setupPhrase, setupKey } from "../recovery/setupRecovery";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
-import { warnBox } from "../../components/warnBox";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { authenticatorsSection } from "./authenticatorsSection";
 import { mainWindow } from "../../components/mainWindow";
@@ -110,13 +109,21 @@ const displayManageTemplate = ({
   userNumber,
   devices: { authenticators, recoveries },
   onAddDevice,
-  onAddRecovery,
+  addRecoveryPhrase,
+  addRecoveryKey,
 }: {
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
-  onAddRecovery: () => void;
+  addRecoveryPhrase: () => void;
+  addRecoveryKey: () => void;
 }): TemplateResult => {
+  // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
+  const warnFewDevices =
+    authenticators.length <= 1 &&
+    recoveries.recoveryPhrase === undefined &&
+    recoveries.recoveryKey === undefined;
+
   const pageContentSlot = html` <section>
     <hgroup>
       <h1 class="t-title t-title--main">Manage your Anchor</h1>
@@ -128,12 +135,10 @@ const displayManageTemplate = ({
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
+      warnFewDevices,
     })}
-    ${recoveries.recoveryPhrase !== undefined ||
-    recoveries.recoveryKey !== undefined
-      ? undefined
-      : recoveryNag({ onAddRecovery })}
-    ${recoveryMethodsSection({ recoveries, onAddRecovery })} ${logoutSection()}
+    ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    ${logoutSection()}
   </section>`;
 
   return mainWindow({
@@ -152,20 +157,6 @@ const anchorSection = (userNumber: bigint): TemplateResult => html`
     >
   </aside>
 `;
-
-const recoveryNag = ({ onAddRecovery }: { onAddRecovery: () => void }) =>
-  warnBox({
-    title: "Recovery method",
-    message: "Add a recovery method to help protect this Identity Anchor.",
-    additionalClasses: ["l-stack"],
-    slot: html`<button
-      @click="${onAddRecovery}"
-      id="addRecovery"
-      class="c-button"
-    >
-      Add Recovery
-    </button>`,
-  });
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async (
@@ -252,8 +243,19 @@ export const displayManage = (
             break;
         }
       },
-      onAddRecovery: async () => {
-        await addNewRecovery(userNumber, connection);
+      addRecoveryPhrase: async () => {
+        await setupPhrase(userNumber, connection);
+        resolve();
+      },
+      addRecoveryKey: async () => {
+        const confirmed = confirm(
+          "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
+        );
+        if (!confirmed) {
+          // No resolve here because we don't need to reload the screen
+          return;
+        }
+        await setupKey({ connection });
         resolve();
       },
     });
@@ -426,16 +428,3 @@ export const domainWarning = (
 const unknownError = (): Error => {
   return new Error("Unknown error");
 };
-
-const addNewRecovery = (
-  userNumber: bigint,
-  connection: AuthenticatedConnection
-) =>
-  setupRecovery({
-    userNumber,
-    connection,
-    title: html`Add a Recovery Method`,
-    message: html`Use a FIDO device or connected phone to create an additional
-    recovery method.`,
-    cancelText: html`Back`,
-  });

@@ -86,7 +86,7 @@ export const resetPhrase = async ({
   reload: (connection?: AuthenticatedConnection) => void;
 }) => {
   const confirmed = confirm(
-    "Reset your Recovery Phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one by confirming."
+    "Reset your Recovery Phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one."
   );
   if (!confirmed) {
     return;
