@@ -68,10 +68,11 @@ export const modal = ({
     closeButtonRef,
     submitButtonRef,
   });
+
   document.body.appendChild(modalElement);
 
   return new Promise((resolve) => {
-    // open modal
+    // open modal using the browsers API
     modalElement.showModal();
 
     const closeButton = closeButtonRef.value;

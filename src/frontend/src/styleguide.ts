@@ -546,8 +546,8 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Modal</h2>
         <section class="demo" aria-label="Modal Demo">
-          <button class="c-button c-button--primary" @click=${() =>
-            modal({
+          <button class="c-button c-button--primary" @click=${async () =>
+            await modal({
               slot: html`<h1>I am a modal</h1>`,
               id: crypto.randomUUID(),
             })}>
