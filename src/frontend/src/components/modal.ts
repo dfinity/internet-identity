@@ -3,17 +3,13 @@ import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /**
  * creates a modal that contains arbitrary content
- * and ID is obligatory for accessibility reasons
- * use crypto.randomUUID() if you feel uninspired
  **/
 export const createModal = ({
   slot,
-  id,
   closeButtonRef,
   submitButtonRef,
 }: {
   slot: TemplateResult;
-  id: string;
   closeButtonRef: Ref<HTMLButtonElement>;
   submitButtonRef: Ref<HTMLButtonElement>;
 }): HTMLDialogElement => {
@@ -22,7 +18,6 @@ export const createModal = ({
       <div class="c-modal__inner">
         <button
           class="c-modal__close"
-          data-closemodal
           aria-label="Close Modal"
           ${ref(closeButtonRef)}
         >
@@ -43,7 +38,6 @@ export const createModal = ({
   `;
 
   const modalElement = document.createElement("dialog");
-  modalElement.id = id;
   modalElement.classList.add("c-modal");
   modalElement.setAttribute("aria-modal", "true");
 
@@ -52,19 +46,12 @@ export const createModal = ({
   return modalElement;
 };
 
-export const modal = ({
-  slot,
-  id,
-}: {
-  slot: TemplateResult;
-  id: string;
-}): Promise<void> => {
+export const modal = ({ slot }: { slot: TemplateResult }): Promise<void> => {
   const closeButtonRef: Ref<HTMLButtonElement> = createRef();
   const submitButtonRef: Ref<HTMLButtonElement> = createRef();
 
   const modalElement = createModal({
     slot,
-    id,
     closeButtonRef,
     submitButtonRef,
   });
