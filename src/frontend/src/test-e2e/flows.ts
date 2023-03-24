@@ -85,6 +85,10 @@ export const FLOWS = {
     await recoveryMethodSelectorView.seedPhraseContinue();
     await recoveryMethodSelectorView.seedPhraseFill();
 
+    // Wait for the main view to be displayed again to ensure that the recovery
+    // mechanism was added successfully.
+    await mainView.waitForDisplay();
+
     return seedPhrase;
   },
   readSeedPhrase: async (browser: WebdriverIO.Browser): Promise<string> => {
