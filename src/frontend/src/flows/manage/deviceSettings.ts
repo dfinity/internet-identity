@@ -6,18 +6,15 @@ import {
 } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
-import { unreachable, unreachableLax } from "../../utils/utils";
+import { unreachable, unknownToString, assertType } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
-import { displayAndConfirmPhrase } from "../recovery/setupRecovery";
+import { phraseWizard } from "../recovery/setupRecovery";
 import {
   isRecoveryDevice,
   isProtected,
   RecoveryPhrase,
 } from "../../utils/recoveryDevice";
-import { generate } from "../../crypto/mnemonic";
-import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
-import { IC_DERIVATION_PATH } from "../../utils/iiConnection";
 
 /* Remove the device and return */
 export const deleteDevice = async ({
@@ -84,7 +81,7 @@ export const resetPhrase = async ({
   connection: AuthenticatedConnection;
   device: DeviceData & RecoveryPhrase;
   reload: (connection?: AuthenticatedConnection) => void;
-}) => {
+}): Promise<void> => {
   const confirmed = confirm(
     "Reset your Recovery Phrase\n\nWas your recovery phrase compromised? Delete your recovery phrase and generate a new one."
   );
@@ -92,24 +89,10 @@ export const resetPhrase = async ({
     return;
   }
 
-  // Create a new recovery phrase
-  const recoveryPhrase = generate().trim();
-  const recoverIdentity = await fromMnemonicWithoutValidation(
-    recoveryPhrase,
-    IC_DERIVATION_PATH
-  );
-
-  // Figure out if we need a new connection
-  // NOTE: we create this _before_ replacing the phrase, just in case something
-  // goes wrong it goes wrong before we've replaced the phrase.
-  let nextConnection: AuthenticatedConnection | undefined;
   const sameDevice = bufferEqual(
     connection.identity.getPublicKey().toDer(),
     new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey
   );
-  if (sameDevice) {
-    nextConnection = await connection.fromIdentity(userNumber, recoverIdentity);
-  }
 
   // The connection used in the replace op
   // (if the phrase is protected, this prompts for the phrase and builds a new connection)
@@ -122,37 +105,43 @@ export const resetPhrase = async ({
       )
     : connection;
   if (opConnection === null) {
-    // User aborted, just return
-    reload();
-    return;
+    // User aborted
+    return reload();
   }
 
-  // Save the old pubkey (used as index for replace)
-  const oldKey = device.pubkey;
-  device.pubkey = Array.from(
-    new Uint8Array(recoverIdentity.getPublicKey().toDer())
-  );
+  const uploadPhrase = (pubkey: DerEncodedPublicKey): Promise<void> =>
+    withLoader(() =>
+      opConnection.replace(device.pubkey, {
+        ...device,
+        pubkey: Array.from(new Uint8Array(pubkey)),
+      })
+    );
 
-  try {
-    const phrase = userNumber.toString(10) + " " + recoveryPhrase;
+  const res = await phraseWizard({
+    userNumber,
+    operation: "reset",
+    uploadPhrase,
+  });
 
-    const res = await displayAndConfirmPhrase({ phrase, operation: "reset" });
-
-    if (res === "confirmed") {
-      await withLoader(() => opConnection.replace(oldKey, device));
-    } else if (res !== "canceled") {
-      unreachableLax(res);
-    }
-  } catch (e: unknown) {
+  if ("ok" in res) {
+    // If the user was authenticated with the phrase, then replace the connection
+    // to use the new phrase to void logging them out
+    const nextConnection = sameDevice
+      ? await connection.fromIdentity(userNumber, res.ok)
+      : undefined;
+    return reload(nextConnection);
+  } else if ("error" in res) {
     await displayError({
       title: "Could not reset recovery phrase",
       message: "An unexpected error occurred",
-      detail: e instanceof Error ? e.toString() : "unknown error",
+      detail: unknownToString(res.error, "unknown error"),
       primaryButton: "Ok",
     });
+    return reload();
+  } else {
+    assertType<{ canceled: void }>(res);
+    return reload();
   }
-
-  reload(nextConnection);
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */

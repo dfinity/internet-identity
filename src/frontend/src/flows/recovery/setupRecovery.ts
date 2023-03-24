@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import { displayError } from "../../components/displayError";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { withLoader } from "../../components/loader";
@@ -13,11 +14,13 @@ import {
   unknownToString,
   unreachable,
   unreachableLax,
+  assertType,
 } from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
+import { SignIdentity } from "@dfinity/agent";
 
 export const setupRecovery = async ({
   userNumber,
@@ -135,7 +138,41 @@ export const setupPhrase = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<"ok" | "error" | "canceled"> => {
-  const name = "Recovery phrase";
+  const res = await phraseWizard({
+    userNumber,
+    operation: "create",
+    uploadPhrase: (pubkey) =>
+      withLoader(() =>
+        connection.add(
+          "Recovery phrase",
+          { seed_phrase: null },
+          { recovery: null },
+          pubkey,
+          { unprotected: null }
+        )
+      ),
+  });
+
+  if ("ok" in res) {
+    return "ok";
+  } else if ("error" in res) {
+    return "error";
+  } else {
+    assertType<{ canceled: void }>(res);
+    return "canceled";
+  }
+};
+
+// Set up a recovery phrase
+export const phraseWizard = async ({
+  userNumber,
+  operation,
+  uploadPhrase,
+}: {
+  userNumber: bigint;
+  operation: "create" | "reset";
+  uploadPhrase: (pubkey: DerEncodedPublicKey) => Promise<void>;
+}): Promise<{ ok: SignIdentity } | { error: unknown } | { canceled: void }> => {
   const seedPhrase = generate().trim();
   const recoverIdentity = await fromMnemonicWithoutValidation(
     seedPhrase,
@@ -143,32 +180,21 @@ export const setupPhrase = async (
   );
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;
-  const res = await displayAndConfirmPhrase({ phrase, operation: "create" });
+  const res = await displayAndConfirmPhrase({ phrase, operation });
 
   if (res === "canceled") {
-    return res;
+    return { canceled: undefined };
   }
 
-  // exhaust return values
-  if (res !== "confirmed") {
-    return unreachable(res, "Unexpected return value when setting up phrase");
-  }
+  assertType<"confirmed">(res);
 
   try {
-    await withLoader(() =>
-      connection.add(
-        name,
-        { seed_phrase: null },
-        { recovery: null },
-        recoverIdentity.getPublicKey().toDer(),
-        { unprotected: null }
-      )
-    );
-  } catch (e: unknown) {
-    return "error";
+    const pubkey = recoverIdentity.getPublicKey().toDer();
+    await withLoader(() => uploadPhrase(pubkey));
+    return { ok: recoverIdentity };
+  } catch (error: unknown) {
+    return { error };
   }
-
-  return "ok";
 };
 
 // Show the new recovery phrase and ask for confirmation
