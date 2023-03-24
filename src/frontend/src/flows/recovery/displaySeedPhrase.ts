@@ -54,7 +54,9 @@ const displaySeedPhraseTemplate = ({
         <h1 class="t-title t-title--main">
           ${operation === "create" ? copy.title : copy.title_reset}
         </h1>
-        <p class="t-lead">${copy.header}</p>
+        <p class="t-lead">
+          ${operation === "create" ? copy.header : copy.header_reset}
+        </p>
       </hgroup>
       <div class="l-stack">
         <output class="c-input c-input--recovery"

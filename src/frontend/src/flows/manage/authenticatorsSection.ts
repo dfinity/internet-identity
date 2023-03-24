@@ -66,8 +66,7 @@ export const authenticatorsSection = ({
         ${
           isWarning === true
             ? html`<p class="warning-message t-paragraph t-lead">
-                We recommend that you have at least two devices (for example,
-                your computer and your phone).
+                Add a device or recovery method to make your anchor more secure.
               </p>`
             : undefined
         }
