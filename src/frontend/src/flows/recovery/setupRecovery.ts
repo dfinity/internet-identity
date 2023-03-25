@@ -14,7 +14,6 @@ import {
   unknownToString,
   unreachable,
   unreachableLax,
-  assertType,
 } from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
@@ -158,7 +157,7 @@ export const setupPhrase = async (
   } else if ("error" in res) {
     return "error";
   } else {
-    assertType<{ canceled: void }>(res);
+    res satisfies { canceled: void };
     return "canceled";
   }
 };
@@ -186,7 +185,7 @@ export const phraseWizard = async ({
     return { canceled: undefined };
   }
 
-  assertType<"confirmed">(res);
+  res satisfies "confirmed";
 
   try {
     const pubkey = recoverIdentity.getPublicKey().toDer();
