@@ -9,6 +9,7 @@ mod anchor_management;
 mod archive_integration;
 mod delegation;
 mod http;
+mod latest_delegation_origins;
 mod rollback;
 mod stable_memory;
 mod upgrade;

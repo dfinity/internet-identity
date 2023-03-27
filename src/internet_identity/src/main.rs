@@ -266,9 +266,24 @@ fn stats() -> InternetIdentityStats {
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
     let active_anchor_stats =
         state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
+
     let domain_active_anchor_stats = state::persistent_state(|persistent_state| {
         persistent_state.domain_active_anchor_stats.clone()
     });
+    let (latest_delegation_origins, max_num_latest_delegation_origins) =
+        state::persistent_state(|persistent_state| {
+            let origins = persistent_state
+                .latest_delegation_origins
+                .as_ref()
+                .map(|latest_delegation_origins| {
+                    latest_delegation_origins.keys().cloned().collect()
+                })
+                .unwrap_or(vec![]);
+            (
+                origins,
+                persistent_state.max_num_latest_delegation_origins.unwrap(),
+            )
+        });
 
     state::storage(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -278,6 +293,8 @@ fn stats() -> InternetIdentityStats {
         storage_layout_version: storage.version(),
         active_anchor_stats,
         domain_active_anchor_stats,
+        max_num_latest_delegation_origins,
+        latest_delegation_origins,
     })
 }
 
@@ -347,6 +364,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(rate_limit) = arg.register_rate_limit {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.registration_rate_limit = Some(rate_limit);
+            })
+        }
+        if let Some(limit) = arg.max_num_latest_delegation_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.max_num_latest_delegation_origins = Some(limit);
             })
         }
     }

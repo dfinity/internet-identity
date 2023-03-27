@@ -17,6 +17,9 @@ use std::time::Duration;
 pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
 pub type AssetHashes = RbTree<&'static str, Hash>;
 
+// Default value for max number of delegation origins to store in the list of latest used delegation origins
+const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
+
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<Assets> = RefCell::new(HashMap::default());
@@ -67,7 +70,7 @@ pub struct Challenge {
     pub challenge_key: ChallengeKey,
 }
 
-#[derive(Clone, Default, CandidType, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct PersistentState {
     // Information related to the archive
     pub archive_state: ArchiveState,
@@ -79,6 +82,24 @@ pub struct PersistentState {
     pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
     // Daily and monthly active anchor statistics (filtered by domain)
     pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    // Hashmap of last used delegation origins
+    pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
+    // Maximum number of latest delegation origins to store
+    pub max_num_latest_delegation_origins: Option<u64>,
+}
+
+impl Default for PersistentState {
+    fn default() -> Self {
+        Self {
+            archive_state: ArchiveState::default(),
+            canister_creation_cycles_cost: 0,
+            registration_rate_limit: None,
+            active_anchor_stats: None,
+            domain_active_anchor_stats: None,
+            latest_delegation_origins: None,
+            max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -212,7 +233,16 @@ pub fn load_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
         }
-    })
+    });
+
+    // Initialize a sensible default for max_latest_delegation_origins
+    // if it is not set in the persistent state.
+    // This will allow us to later drop the opt and make the field u64.
+    persistent_state_mut(|persistent_state| {
+        persistent_state
+            .max_num_latest_delegation_origins
+            .get_or_insert(MAX_NUM_DELEGATION_ORIGINS);
+    });
 }
 
 // helper methods to access / modify the state in a convenient way
