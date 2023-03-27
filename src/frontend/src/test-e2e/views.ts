@@ -219,7 +219,7 @@ export class MainView extends View {
   }
 
   async addRecovery(): Promise<void> {
-    await this.browser.$("#addRecovery").click();
+    await this.browser.$('[data-action="add-recovery-phrase"]').click();
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {

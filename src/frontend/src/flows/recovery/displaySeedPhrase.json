@@ -3,6 +3,7 @@
     "title": "Safely Store your Recovery Phrase",
     "title_reset": "Safely Store your new Recovery Phrase",
     "header": "If you lose access to your devices, you will need your recovery phrase to access your accounts. Save this somewhere safe and private.",
+    "header_reset": "Once you complete these steps, the recovery phrase below will replace your current phrase.",
     "copy": "Copy",
     "copy_to_clipboard": "Copy phrase to clipboard",
     "store_your_recovery_phrase": "Did you store your recovery phrase? You will need to re-enter it in the next step.",

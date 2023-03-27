@@ -77,13 +77,14 @@ export const FLOWS = {
     await mainView.addRecovery();
 
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.useSeedPhrase();
-    await recoveryMethodSelectorView.waitForSeedPhrase();
     const seedPhrase = await recoveryMethodSelectorView.getSeedPhrase();
     await recoveryMethodSelectorView.acknowledgeCheckbox();
     await recoveryMethodSelectorView.seedPhraseContinue();
     await recoveryMethodSelectorView.seedPhraseFill();
+
+    // Wait for the main view to be displayed again to ensure that the recovery
+    // mechanism was added successfully.
+    await mainView.waitForDisplay();
 
     return seedPhrase;
   },

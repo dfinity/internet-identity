@@ -2,8 +2,9 @@ use crate::state;
 use crate::storage::anchor::{Anchor, DomainActivity};
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use ic_cdk::api::time;
-use internet_identity_interface::{
-    ActiveAnchorCounter, ActiveAnchorStatistics, ActivityCounter, CompletedActiveAnchorStats,
+use internet_identity_interface::internet_identity::anchor_activity_counter::ActivityCounter;
+use internet_identity_interface::internet_identity::types::{
+    ActiveAnchorCounter, ActiveAnchorStatistics, CompletedActiveAnchorStats,
     DomainActiveAnchorCounter, OngoingActiveAnchorStats, Timestamp,
 };
 

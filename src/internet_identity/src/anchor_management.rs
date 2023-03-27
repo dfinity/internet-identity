@@ -6,8 +6,8 @@ use crate::storage::anchor::{Anchor, Device};
 use crate::{active_anchor_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
-use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
-use internet_identity_interface::*;
+use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
+use internet_identity_interface::internet_identity::types::*;
 
 pub mod registration;
 pub mod tentative_device_registration;

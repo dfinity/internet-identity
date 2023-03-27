@@ -1,6 +1,7 @@
 use crate::DAY_NS;
 use ic_cdk::api::time;
-use internet_identity_interface::{ActiveAnchorStatistics, ActivityCounter};
+use internet_identity_interface::internet_identity::anchor_activity_counter::ActivityCounter;
+use internet_identity_interface::internet_identity::types::ActiveAnchorStatistics;
 
 /// Updates the active anchor counters if an ongoing collection bucket has completed.
 pub fn process_stats<T: ActivityCounter>(stats: &mut ActiveAnchorStatistics<T>) {

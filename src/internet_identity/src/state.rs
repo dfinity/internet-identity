@@ -9,7 +9,7 @@ use ic_certified_map::{Hash, RbTree};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::http_gateway::HeaderField;
-use internet_identity_interface::*;
+use internet_identity_interface::internet_identity::types::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::time::Duration;

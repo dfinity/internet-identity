@@ -137,9 +137,15 @@
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
-  --rc-warningLight: var(--vc-brand-pink--transparent);
-  --rc-warning: var(--vc-brand-pink);
-  --rc-onWarning: var(--vc-snow);
+  --rc-errorLight: var(--vc-brand-pink--transparent);
+  --rc-error: var(--vc-brand-pink);
+  --rc-onError: var(--vc-snow);
+
+  --rc-warning: var(--vc-brand-yellow);
+  --rc-onWarning: var(--rc-snow);
+
+  --rc-positive: var(--vc-brand-green);
+  --rc-onPositive: var(--rc-dark);
 
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
@@ -543,6 +549,14 @@ a:hover,
   vertical-align: middle;
 }
 
+.c-icon--inline {
+  margin-right: var(--vs-inline);
+}
+
+.c-icon--inline-after {
+  margin-left: var(--vs-inline);
+}
+
 .c-icon--block {
   display: block;
   height: auto;
@@ -557,36 +571,20 @@ a:hover,
   width: 100%;
 }
 
+.c-icon--ok [fill] {
+  fill: var(--rc-positive);
+}
+
 .c-icon--warning [fill] {
   fill: var(--rc-warning);
 }
 
+.c-icon--error [fill] {
+  fill: var(--rc-error);
+}
+
 .c-icon--lock svg {
   transform: translate(-50%, -50%) scale(0.8);
-}
-
-.c-icon--lock:hover svg {
-  animation: shakeup 0.6s ease;
-}
-
-@keyframes shakeup {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) scale(0.8) rotate(0);
-  }
-  10%,
-  30%,
-  50%,
-  70%,
-  90% {
-    transform: translate(-50%, -50%) translateY(-2px) scale(0.8) rotate(-6deg);
-  }
-  20%,
-  40%,
-  60%,
-  80% {
-    transform: translate(-50%, -50%) translateY(-4px) scale(0.8) rotate(10deg);
-  }
 }
 
 .c-icon--more {
@@ -734,7 +732,7 @@ a:hover,
 .c-card__icon svg * {
   fill: var(--rc-background);
   stroke-width: 3px;
-  stroke: var(--rc-warning);
+  stroke: var(--rc-error);
 }
 
 .c-card__content {
@@ -754,13 +752,15 @@ a:hover,
   margin-top: calc(var(--vs-stack) * 0.75);
 }
 
-.c-card--warning {
+.c-card--warning,
+.c-card--modal {
   position: relative;
   border: none;
   border-radius: var(--vs-border-radius);
 }
 
-.c-card--warning::before {
+.c-card--warning::before,
+.c-card--modal::before {
   position: absolute;
   content: "";
   z-index: 0;
@@ -771,7 +771,8 @@ a:hover,
   pointer-events: none;
 }
 
-.c-card--warning::after {
+.c-card--warning::after,
+.c-card--modal::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -789,8 +790,8 @@ a:hover,
   align-items: stretch;
   gap: calc(var(--rs-card-bezel-x) * 0.25);
 
-  --state-color: var(--rc-warningLight);
-  --state-onColor: var(--rc-warning);
+  --state-color: var(--rc-errorLight);
+  --state-onColor: var(--rc-error);
 
   position: relative;
   padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
@@ -985,6 +986,15 @@ a:hover,
   border-radius: var(--vs-border-radius);
 }
 
+.c-button--minimal {
+  width: min-content;
+  flex-grow: 0;
+  flex-shrink: 1;
+  margin-top: 0;
+  padding: calc(0.3 * var(--rs-button-bezel)) calc(0.6 * var(--rs-button-bezel))
+    calc(0.2 * var(--rs-button-bezel));
+}
+
 .c-button__icon svg {
   height: 100%;
 }
@@ -1033,8 +1043,8 @@ a:hover,
 }
 
 .c-button--warning {
-  background: var(--rc-warning);
-  color: var(--rc-onWarning);
+  background: var(--rc-error);
+  color: var(--rc-onError);
 }
 
 .c-input {
@@ -1058,8 +1068,8 @@ a:hover,
 
 .c-input.has-error,
 .c-input.has-error:focus {
-  color: var(--rc-warning);
-  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-warning);
+  color: var(--rc-error);
+  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-error);
   border-image: none;
 }
 
@@ -1146,7 +1156,7 @@ a:hover,
 
 .c-input__message {
   margin-top: var(--vs-stack);
-  color: var(--rc-warning);
+  color: var(--rc-error);
 }
 
 /* hides and show icons based on a class */
@@ -1210,6 +1220,57 @@ a:hover,
 
 [open] .c-summary__link::before {
   transform: translateX(-100%) rotate(90deg);
+}
+
+/**
+  *  Dialog component
+  */
+.c-modal[open] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--vz-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.c-modal[open]::backdrop {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px) saturate(50%);
+}
+
+.c-modal__inner {
+  position: relative;
+  z-index: var(--vz-foreground);
+}
+
+.c-modal__close {
+  position: absolute;
+  /* take the close icon to the edge of the card */
+  top: calc(-1 * var(--rs-card-bezel));
+  right: calc(-1 * var(--rs-card-bezel-x));
+  /* makes the close button stick ouf of the box a bit */
+  transform: translate(50%, -50%);
+
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  border-radius: 50%;
+  line-height: 1;
+
+  width: 2.5rem;
+  height: 2.5rem;
+
+  vertical-align: middle;
+  text-align: center;
+
+  background-color: var(--rc-background);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 /**
@@ -1659,7 +1720,7 @@ a:hover,
 }
 
 .c-tooltip:focus {
-  outline: 1px solid var(--rc-button);
+  outline: 1px solid var(--rc-interaction);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -1763,7 +1824,7 @@ a:hover,
   display: flex;
   position: relative;
   gap: var(--vs-gutter);
-  padding: calc(var(--rs-button-bezel) * 0.7) var(--rs-button-bezel);
+  padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
 .c-action-list__item + .c-action-list__item::before {
@@ -1773,8 +1834,8 @@ a:hover,
   background: var(--rc-line);
   position: absolute;
   top: 0;
-  left: var(--rs-button-bezel);
-  right: var(--rs-button-bezel);
+  left: calc(var(--rs-button-bezel) * 0.6);
+  right: calc(var(--rs-button-bezel) * 0.6);
 }
 
 .c-action-list__actions {
@@ -1790,7 +1851,8 @@ a:hover,
 }
 
 .c-action-list__action,
-.c-action-list__label {
+.c-action-list__label,
+.c-action-list__status {
   display: flex;
   align-items: center;
 }

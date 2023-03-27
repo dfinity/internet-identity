@@ -1,18 +1,6 @@
-// A `hasOwnProperty` that produces evidence for the typechecker
-export function hasOwnProperty<
-  X extends Record<string, unknown>,
-  Y extends PropertyKey
->(obj: X, prop: Y): obj is X & Record<Y, unknown> {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-// A `hasOwnProperty` variant that checks that the property is a number
-// and produces evidence for the typechecked
-export function hasNumberProperty<
-  X extends Record<string, unknown>,
-  Y extends PropertyKey
->(obj: X, prop: Y): obj is X & Record<Y, number> {
-  return hasOwnProperty(obj, prop) && typeof obj[prop] === "number";
+// Ensures the argument has a given type (from ts' perspective, not js)
+export function assertType<T>(_: T) {
+  /* */
 }
 
 // Turns an 'unknown' into a string, if possible, otherwise use the default

@@ -6,8 +6,8 @@ use crate::{secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, trap};
-use internet_identity_interface::archive::{DeviceDataWithoutAlias, Operation};
-use internet_identity_interface::*;
+use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
+use internet_identity_interface::internet_identity::types::*;
 use rand_core::{RngCore, SeedableRng};
 use std::collections::HashMap;
 

@@ -1,4 +1,4 @@
-import { hasNumberProperty, unknownToRecord } from "./utils";
+import { unknownToRecord } from "./utils";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
  * at which the anchor is used.
@@ -165,11 +165,11 @@ const asAnchor = (msg: unknown): Anchor | undefined => {
     return undefined;
   }
 
-  if (!hasNumberProperty(obj, "lastUsedTimestamp")) {
-    return undefined;
+  if ("lastUsedTimestamp" in obj && typeof obj.lastUsedTimestamp === "number") {
+    return { ...obj, lastUsedTimestamp: obj.lastUsedTimestamp };
   }
 
-  return obj;
+  return undefined;
 };
 
 const writeAnchors = (anchors: Anchors) => {
