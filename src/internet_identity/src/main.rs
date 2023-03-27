@@ -33,7 +33,7 @@ const DAY_NS: u64 = 24 * HOUR_NS;
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
-// Note: concatenating const &str is a hassle in rust it seemed easiest to just repeat.
+// Note: concatenating const &str is a hassle in rust. It seemed easiest to just repeat.
 const IC0_APP_DOMAIN: &str = "identity.ic0.app";
 const IC0_APP_ORIGIN: &str = "https://identity.ic0.app";
 const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
