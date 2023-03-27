@@ -11,8 +11,17 @@ inputs:
         default: ""
 outputs:
   notes-file:
-    description: The notes file
+    description: The release-notes file
+    value: ${{ steps.release-notes.outputs.notes-file }}
 runs:
-    using: 'node16'
-    main: 'main.cjs'
-    post: 'main.cjs'
+    using: 'composite'
+    steps:
+      - name: 'Create release notes'
+        shell: bash
+        id: release-notes
+        env:
+          INPUT_ASSETS: ${{ inputs.assets }}
+          INPUT_TOKEN: ${{ inputs.token }}
+        run: |
+          .github/actions/release/run
+          

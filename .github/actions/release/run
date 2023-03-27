@@ -166,5 +166,3 @@ cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_w
 cat "$body"
 
 echo "notes-file=$body" >> "$GITHUB_OUTPUT"
-
-[ -n "${GITHUB_ENV:-}" ] && echo "RELEASE_ACTION_BODY_FILE=$body" >>"$GITHUB_ENV"
