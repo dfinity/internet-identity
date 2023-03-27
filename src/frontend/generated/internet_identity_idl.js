@@ -149,7 +149,6 @@ export const idlFactory = ({ IDL }) => {
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
   const DomainActiveAnchorCounter = IDL.Record({
-    'counter' : IDL.Nat64,
     'start_timestamp' : Timestamp,
     'internetcomputer_org_counter' : IDL.Nat64,
     'ic0_app_counter' : IDL.Nat64,

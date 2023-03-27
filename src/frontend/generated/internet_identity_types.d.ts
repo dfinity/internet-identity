@@ -86,7 +86,6 @@ export interface DeviceWithUsage {
   'credential_id' : [] | [CredentialId],
 }
 export interface DomainActiveAnchorCounter {
-  'counter' : bigint,
   'start_timestamp' : Timestamp,
   'internetcomputer_org_counter' : bigint,
   'ic0_app_counter' : bigint,
