@@ -10,21 +10,6 @@ GITHUB_TOKEN=${INPUT_TOKEN:-${GITHUB_TOKEN:?No token given}}
 RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
 RELEASE_TAG_PREVIOUS=${RELEASE_TAG_PREVIOUS:-}
 
-# This script sets "RELEASE_ACTION_BODY_FILE" to the path of the generated file. The script is run twice
-# (once when called with 'uses: ', once in post) meaning we can differentiate the first from second run
-# by reading "RELEASE_ACTION_BODY_FILE". On the "post" run, we just cleanup and exit.
-if [ -n "${RELEASE_ACTION_BODY_FILE:-}" ]
-then
-    >&2 echo "Cleaning up body file $RELEASE_ACTION_BODY_FILE"
-    if ! [ -f "$RELEASE_ACTION_BODY_FILE" ]
-    then
-        >&2 echo "strange, no file to remove"
-    else
-        rm "$RELEASE_ACTION_BODY_FILE"
-    fi
-    exit 0
-fi
-
 # Starting the "intro" section where we display a short intro
 section_intro=$(mktemp)
 cat > "$section_intro" << EOF
