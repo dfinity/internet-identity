@@ -209,9 +209,9 @@ impl Anchor {
     pub fn domain_activity_since(&self, timestamp: Timestamp) -> DomainActivity {
         #[derive(Default)]
         struct Accumulator {
-            other: bool,
             ic0_app: bool,
             internet_computer_org: bool,
+            non_ii: bool,
         }
 
         let result = self
@@ -226,13 +226,13 @@ impl Anchor {
             // assign domain activity
             .fold(Accumulator::default(), |mut acc, device| {
                 let Some(ref origin) = device.origin else {
-                    acc.other = true;
+                    acc.non_ii = true;
                     return acc;
                 };
                 match origin.as_str() {
                     IC0_APP_ORIGIN => acc.ic0_app = true,
                     INTERNETCOMPUTER_ORG_ORIGIN => acc.internet_computer_org = true,
-                    _ => acc.other = true,
+                    _ => acc.non_ii = true,
                 };
                 acc
             });
@@ -240,11 +240,11 @@ impl Anchor {
         // Activity on other domains is discarded if there is also activity on an II domain.
         // The reason is that II might not have complete information since domain information was
         // only introduced recently.
-        match (result.ic0_app, result.internet_computer_org, result.other) {
+        match (result.ic0_app, result.internet_computer_org, result.non_ii) {
             (true, true, _) => DomainActivity::BothIIDomains,
             (true, false, _) => DomainActivity::Ic0App,
             (false, true, _) => DomainActivity::InternetComputerOrg,
-            (false, false, true) => DomainActivity::Other,
+            (false, false, true) => DomainActivity::NonIIDomain,
             (false, false, false) => DomainActivity::None,
         }
     }
@@ -255,7 +255,7 @@ pub enum DomainActivity {
     // no activity at all
     None,
     // only active on non-ii domains
-    Other,
+    NonIIDomain,
     // only active on the identity.ic0.app domain
     Ic0App,
     // only active on the identity.internetcomputer.org domain

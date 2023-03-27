@@ -240,7 +240,6 @@ type DomainOngoingActiveAnchorStats = record {
 
 type DomainActiveAnchorCounter = record {
     start_timestamp: Timestamp;
-    counter: nat64;
     ic0_app_counter: nat64;
     internetcomputer_org_counter: nat64;
     both_ii_domains_counter: nat64;

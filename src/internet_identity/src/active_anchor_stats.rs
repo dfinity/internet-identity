@@ -92,7 +92,7 @@ impl IIDomain {
         }
     }
 
-    pub fn other_domain(&self) -> IIDomain {
+    pub fn other_ii_domain(&self) -> IIDomain {
         match self {
             IIDomain::Ic0AppDomain => IIDomain::InternetComputerOrgDomain,
             IIDomain::InternetComputerOrgDomain => IIDomain::Ic0AppDomain,
@@ -114,7 +114,7 @@ impl TryFrom<&str> for IIDomain {
 
 /// Increases the counter on a window for a single II domain if the there was no activity before.
 ///
-/// If there has been activity on an II domain and this is activity on the _other_ domain, then
+/// If there has been activity on an II domain and this is activity on the _other II_ domain, then
 /// we decrement the counter for the previous single domain and instead increment the counter for
 /// both II domains.
 ///
@@ -130,14 +130,14 @@ fn update_ii_domain_counter(
     let previous_domain_activity = anchor.domain_activity_since(counter.start_timestamp);
 
     match previous_domain_activity {
-        DomainActivity::None | DomainActivity::Other => {
+        DomainActivity::None | DomainActivity::NonIIDomain => {
             increment_counter_for_domain(counter, current_domain)
         }
         DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
             if !current_domain.is_same_domain(&previous_domain_activity) {
                 // the anchor switched from being active on only one II domain to being active on both
                 // --> total active remains the same, but the anchor switches to the both domains bucket
-                decrement_counter_for_domain(counter, &current_domain.other_domain());
+                decrement_counter_for_domain(counter, &current_domain.other_ii_domain());
                 counter.both_ii_domains_counter += 1;
             }
         }
