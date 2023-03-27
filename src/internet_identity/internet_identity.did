@@ -155,6 +155,7 @@ type InternetIdentityStats = record {
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
     active_anchor_stats: opt ActiveAnchorStatistics;
+    domain_active_anchor_stats: opt DomainActiveAnchorStatistics;
 };
 
 // Configuration parameters related to the archive.
@@ -214,6 +215,34 @@ type OngoingActiveAnchorStats = record {
 type ActiveAnchorCounter = record {
     start_timestamp: Timestamp;
     counter: nat64;
+};
+
+type DomainActiveAnchorStatistics = record {
+    // Stats for the last completed collection period for daily and monthly active anchors
+    completed: DomainCompletedActiveAnchorStats;
+    // ongoing periods for daily and monthly active anchors
+    ongoing: DomainOngoingActiveAnchorStats;
+};
+
+type DomainCompletedActiveAnchorStats = record {
+    daily_active_anchors: opt DomainActiveAnchorCounter;
+    monthly_active_anchors: opt DomainActiveAnchorCounter;
+};
+
+type DomainOngoingActiveAnchorStats = record {
+    // Ongoing active anchor counter for the current 24 h time bucket.
+    daily_active_anchors: DomainActiveAnchorCounter;
+    // Monthly active users are collected using 30-day sliding windows.
+    // This vec contains up to 30 30-day active windows each offset by one day.
+    // The vec is sorted, new collection windows are added at the end.
+    monthly_active_anchors: vec DomainActiveAnchorCounter;
+};
+
+type DomainActiveAnchorCounter = record {
+    start_timestamp: Timestamp;
+    ic0_app_counter: nat64;
+    internetcomputer_org_counter: nat64;
+    both_ii_domains_counter: nat64;
 };
 
 // Init arguments of II which can be supplied on install and upgrade.

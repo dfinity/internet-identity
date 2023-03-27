@@ -6,3 +6,6 @@ pub mod types;
 
 /// Helpful data conversions for the types.
 pub mod conversions;
+
+/// Anchor activity counter trait and implementations thereof.
+pub mod anchor_activity_counter;
