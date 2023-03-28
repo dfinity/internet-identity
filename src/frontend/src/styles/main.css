@@ -496,34 +496,6 @@ a:hover,
   max-width: 60rem;
 }
 
-.l-divider {
-  display: block;
-  margin-top: calc(var(--vs-stack) * 2);
-  margin-bottom: calc(var(--vs-stack) * 2);
-  border-top: var(--vs-line) var(--rc-line) solid;
-}
-
-.l-divider--text {
-  display: flex;
-  gap: calc(var(--vs-gutter) * 2);
-  align-items: center;
-  margin-top: calc(var(--vs-stack) * 2);
-  margin-bottom: calc(var(--vs-stack) * 2);
-  border-top: none;
-  height: calc(1em * var(--rs-line-height-body));
-}
-
-.l-divider--text::before,
-.l-divider--text::after {
-  content: "";
-  flex-grow: 1;
-  border-top: var(--vs-line) var(--rc-line) solid;
-}
-
-.l-divider__label {
-  display: inline-block;
-}
-
 .l-horizontal {
   display: flex;
   gap: var(--vs-inline);

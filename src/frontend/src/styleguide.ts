@@ -189,23 +189,6 @@ export const styleguide = html`
           <code>.l-stack--spacious</code> modifier class.
         </p>
       </aside>
-
-      <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Divider</h2>
-        <section class="demo" aria-label="Paragraphs Demo">
-          <hr class="l-divider" />
-          <div class="l-divider l-divider--text" aria-label="Other Options">
-            <span class="l-divider__label" aria-hidden="true">Or</span>
-          </div>
-        </section>
-        <p class="t-lead">
-          A divider is a horizontal line that can be used to separate sections.
-          It can be used with the <code>.l-divider</code> class. Typically it is
-          used on a <code>&lt;hr&gt;</code> element. But sometimes we would like
-          to add some text to it. In that case we can use the
-          <code>.l-divider--text</code> modifier class.
-        </p>
-      </aside>
     </article>
 
     <article class="l-stack c-card c-card--highlight">
