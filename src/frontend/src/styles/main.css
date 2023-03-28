@@ -182,6 +182,7 @@
 
   --rs-list-counter-space: calc(var(--vs-inline) * 2);
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
+  --rs-list-parcel-bezel: var(--vs-bezel);
 
   --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: var(--vs-gutter);
@@ -208,9 +209,11 @@
   --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
+  --rs-input-message-stack: var(--vs-stack);
   --rs-input-border-radius: var(--vs-border-radius);
 
   --rs-line-height-body: var(--vs-line-height);
+  --rs-dropdown-bezel: var(--vs-bezel);
 
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
@@ -1165,7 +1168,7 @@ a:hover,
 }
 
 .c-input__message {
-  margin-top: var(--vs-stack);
+  margin-top: var(--rs-input-message-stack);
   color: var(--rc-error);
 }
 
@@ -1473,7 +1476,7 @@ a:hover,
 }
 
 .c-list--anchors {
-  --border-radius: var(--vs-border-radius);
+  --border-radius: var(--rs-button-border-radius);
 }
 
 .c-list__item--icon {
@@ -1585,7 +1588,7 @@ a:hover,
 
 .c-list__parcel {
   position: relative;
-  padding: var(--vs-bezel) 0.8em;
+  padding: var(--rs-list-parcel-bezel) 0.8em;
   border: var(--rs-line) solid var(--rc-line);
   flex-grow: 1;
   margin: calc(-1 * var(--rs-line));
@@ -1598,7 +1601,7 @@ a:hover,
 .c-list__parcel--detail {
   overflow: hidden;
   white-space: inherit;
-  padding: var(--vs-bezel) 0.8em;
+  padding: var(--rs-list-parcel-bezel) 0.8em;
 }
 
 .c-list__parcel--fullwidth {
@@ -1610,7 +1613,7 @@ a:hover,
   position: absolute;
   pointer-events: none;
   top: 50%;
-  right: calc(var(--vs-bezel) * 1.5);
+  right: calc(var(--rs-list-parcel-bezel) * 1.5);
   transform: translateY(-50%);
   width: 1.5em;
   height: 1.5em;
@@ -1927,12 +1930,12 @@ a:hover,
   opacity: 0;
   content: "";
   position: absolute;
-  top: calc(var(--vs-bezel) * -1);
+  top: calc(var(--rs-dropdown-bezel) * -1);
   bottom: 0;
-  height: calc(100% - var(--vs-bezel));
+  height: calc(100% - var(--rs-dropdown-bezel));
   width: 100%;
-  padding: var(--vs-bezel);
-  right: calc(var(--vs-bezel) * -1);
+  padding: var(--rs-dropdown-bezel);
+  right: calc(var(--rs-dropdown-bezel) * -1);
   background: var(--rc-background);
   border-bottom-color: var(--rc-background);
   z-index: calc(var(--z-tooltip) + 1);
@@ -1945,13 +1948,13 @@ a:hover,
   visibility: hidden;
   position: absolute;
   top: 100%;
-  right: calc(var(--vs-bezel) * -1);
+  right: calc(var(--rs-dropdown-bezel) * -1);
   z-index: var(--z-tooltip);
   min-width: 100%;
   width: max-content;
   background-color: var(--rc-background);
   border-radius: var(--border-radius);
-  padding: 0 var(--vs-bezel);
+  padding: 0 var(--rs-dropdown-bezel);
   margin-top: calc(-1 * var(--rs-line));
   text-align: right;
   pointer-events: none;
@@ -2036,6 +2039,12 @@ input[type="checkbox"] {
   }
 }
 
+/* 
+ * stack helper classes
+ *
+ * it is fine to use value tokens here, because these are generic design
+ * helpers. They are not specific to a particular component.
+ */
 .l-stack {
   margin-top: calc(var(--vs-stack) * 3);
 }
