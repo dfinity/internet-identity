@@ -183,6 +183,7 @@
   --rs-list-counter-space: calc(var(--vs-inline) * 2);
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
   --rs-list-parcel-bezel: var(--vs-bezel);
+  --rs-list-gutter: var(--vs-gutter);
 
   --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: var(--vs-gutter);
@@ -1757,7 +1758,7 @@ a:hover,
 .c-action-list__item {
   display: flex;
   position: relative;
-  gap: var(--vs-gutter);
+  gap: var(--rs-list-gutter);
   padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
@@ -1774,7 +1775,7 @@ a:hover,
 
 .c-action-list__actions {
   display: flex;
-  gap: var(--vs-gutter);
+  gap: var(--rs-list-gutter);
   margin-top: calc(var(--rs-button-bezel) * -0.5);
   padding: 0 calc(var(--rs-button-bezel) * 0.5)
     calc(var(--rs-button-bezel) * 0.5);
@@ -1986,7 +1987,7 @@ a:hover,
 
 .c-dropdown__item {
   display: block;
-  padding: calc(var(--vs-bezel) * 0.75) 0;
+  padding: calc(var(--rs-dropdown-bezel) * 0.75) 0;
   color: var(--rc-text);
   text-decoration: none;
 }
@@ -2012,7 +2013,7 @@ a:hover,
 .c-dropdown__button {
   display: block;
   color: var(--rc-text);
-  padding: 0.1em calc(var(--vs-bezel) * 0.5) 0;
+  padding: 0.1em calc(var(--rs-dropdown-bezel) * 0.5) 0;
   text-align: left;
   width: 100%;
   font-size: 0.75em;
