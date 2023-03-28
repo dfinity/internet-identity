@@ -513,7 +513,7 @@ jobs:
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_dev.wasm
+          name: internet_identity_dev.wasm.gz
           path: .
 
       - name: Deploy II and run tests
@@ -524,14 +524,14 @@ jobs:
           builddir=$(mktemp -d)
           cp -r ./demos/using-dev-build/. "$builddir"
           
-          ii_wasm="$PWD/internet_identity_dev.wasm"
+          ii_wasm="$PWD/internet_identity_dev.wasm.gz"
           ii_did="$PWD/src/internet_identity/internet_identity.did"
           
           pushd "$builddir"
 
           # Install npm deps
           npm ci
-          sed -i "s;https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm;$ii_wasm;" ./dfx.json
+          sed -i "s;https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz;$ii_wasm;" ./dfx.json
           sed -i "s;https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did;$ii_did;" ./dfx.json
 
           dfx deploy --no-wallet
