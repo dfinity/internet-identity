@@ -581,7 +581,7 @@ jobs:
           sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_production.wasm \
+            --wasm internet_identity_production.wasm.gz \
             internet_identity
 
       - name: "Deploy archive"
@@ -651,7 +651,7 @@ jobs:
             internet_identity_test.wasm
             internet_identity_test.wasm.gz
             archive.wasm
-          production_asset: internet_identity_production.wasm
+          production_asset: internet_identity_production.wasm.gz
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
@@ -685,10 +685,10 @@ jobs:
       - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_production.wasm
+          name: internet_identity_production.wasm.gz
           path: .
       - run: |
-          sha256=$(shasum -a 256 ./internet_identity_production.wasm | cut -d ' ' -f1)
+          sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
         id: sha256
 
