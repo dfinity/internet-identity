@@ -194,6 +194,10 @@
   --rs-card-stack: calc(var(--vs-stack) * 1.5);
   --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
   --rs-card-border-radius: var(--vs-border-radius);
+  --rs-card-item-stack: calc(var(--vs-stack) * 0.75);
+
+  --rs-irregularity-stack: calc(var(--vs-stack) * 0.5);
+  --rs-toast-stack: var(--rs-irregularity-stack);
 
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
@@ -730,7 +734,7 @@ a:hover,
 }
 
 .c-card__paragraph {
-  margin-top: calc(var(--vs-stack) * 0.75);
+  margin-top: var(--rs-card-item-stack);
 }
 
 .c-card--warning,
@@ -784,7 +788,7 @@ a:hover,
 }
 
 .c-irregularity + .c-irregularity {
-  margin-top: calc(var(--vs-stack) * 0.5);
+  margin-top: var(--rs-irregularity-stack);
 }
 
 .c-irregularity__icon {
@@ -850,11 +854,11 @@ a:hover,
 }
 
 .c-toast + .c-toast {
-  margin-top: calc(var(--vs-stack) * 0.5);
+  margin-top: var(--rs-toast-stack);
 }
 
 .c-toast:last-child {
-  margin-bottom: calc(var(--vs-stack) * 0.5);
+  margin-bottom: var(--rs-toast-stack);
 }
 
 .c-toast {
