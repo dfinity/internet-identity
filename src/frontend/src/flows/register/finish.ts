@@ -32,7 +32,7 @@ export const displayUserNumberTemplate = ({
         aria-label="Copy phrase to clipboard""
         title="Copy phrase to clipboard"
         tabindex="0"
-        class="c-button__icon c-input__icon"
+        class="c-button__icon"
         @click=${async () => {
           try {
             await navigator.clipboard.writeText(userNumber.toString());

@@ -109,7 +109,7 @@ export const promptCaptchaTemplate = <T>({
             <img
               src="data:image/png;base64,${state.challenge.png_base64}"
               id="captchaImg"
-              class="c-img-block"
+              class="c-image"
               alt="captcha image"
             />
           </div>`
@@ -156,7 +156,7 @@ export const promptCaptchaTemplate = <T>({
           <i
             tabindex="0"
             id="seedCopy"
-            class="c-button__icon c-input__icon"
+            class="c-button__icon"
             @click=${asyncReplace(retry.recv())}
             ?disabled=${asyncReplace(retryDisabled)}
           >

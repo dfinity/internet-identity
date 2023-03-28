@@ -20,11 +20,12 @@ const pageContent = (options: ErrorOptions) =>
         htmlElement: "div",
         slot:
           options.detail !== undefined
-            ? html`<div class="l-divider"></div>
+            ? html`<div class="l-stack">
                 <h4>Error details:</h4>
                 <pre data-role="error-detail" class="t-paragraph">
 ${options.detail}</pre
-                >`
+                >
+              </div>`
             : undefined,
       })}
 

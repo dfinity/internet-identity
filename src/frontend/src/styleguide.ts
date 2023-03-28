@@ -189,23 +189,6 @@ export const styleguide = html`
           <code>.l-stack--spacious</code> modifier class.
         </p>
       </aside>
-
-      <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Divider</h2>
-        <section class="demo" aria-label="Paragraphs Demo">
-          <hr class="l-divider" />
-          <div class="l-divider l-divider--text" aria-label="Other Options">
-            <span class="l-divider__label" aria-hidden="true">Or</span>
-          </div>
-        </section>
-        <p class="t-lead">
-          A divider is a horizontal line that can be used to separate sections.
-          It can be used with the <code>.l-divider</code> class. Typically it is
-          used on a <code>&lt;hr&gt;</code> element. But sometimes we would like
-          to add some text to it. In that case we can use the
-          <code>.l-divider--text</code> modifier class.
-        </p>
-      </aside>
     </article>
 
     <article class="l-stack c-card c-card--highlight">
@@ -381,30 +364,13 @@ export const styleguide = html`
               aria-label="Copy phrase to clipboard"
               title="Copy phrase to clipboard"
               tabindex="0"
-              class="c-button__icon c-input__icon"
+              class="c-button__icon"
             >
               <span>Copy</span>
               ${copyIcon}
             </i>
           </output>
         </section>
-      </aside>
-
-      <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Details / Summary</h2>
-        <section class="demo" aria-label="Details / Summary Demo">
-          <details>
-            <summary class="c-summary">
-              <span class="c-summary__link t-link">Click me to open</span>
-            </summary>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed</p>
-          </details>
-        </section>
-        <p class="t-lead">
-          While the <code>&lt;details&gt;</code> element is not a component, it
-          is expected to be used with the <code>.c-summary</code> class, since
-          it relies on the <code>[open]</code> attribute.
-        </p>
       </aside>
 
       <aside class="l-stack demo-section">
