@@ -175,6 +175,7 @@
 
   --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: var(--vs-gutter);
+  --rs-footer-gap: var(--vs-inline);
 
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
 
@@ -1228,33 +1229,17 @@ a:hover,
   font-size: 0.85em;
 }
 
-.l-footer__elem {
+.l-footer__link {
   position: relative;
-  padding: 0 var(--vs-inline);
+  padding: 0 var(--rs-footer-gap);
 }
 
-.l-footer__elem + .l-footer__elem::before {
+.l-footer__link + .l-footer__link::before {
   position: absolute;
   content: "·";
   top: 50%;
   left: 0;
   transform: translate(-50%, -50%);
-}
-
-.page-signature {
-  display: block;
-  padding: var(--rs-footer-gutter);
-  transition: background 0.2s;
-}
-
-.page-signature img {
-  display: block;
-  max-width: 100%;
-}
-
-.page-signature:hover,
-.page-signature:focus {
-  background: var(--grey-050);
 }
 
 .c-list--flex {

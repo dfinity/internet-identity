@@ -27,19 +27,19 @@ export const footer = html`<footer class="l-footer">
     labelText: "Home",
     id: "homeLink",
     url: "/",
-    classes: "t-link--discreet l-footer__elem",
+    classes: "t-link--discreet l-footer__link",
   })}
   ${navigationLink({
     labelText: "About",
     id: "aboutLink",
     url: "/about",
-    classes: "t-link--discreet l-footer__elem",
+    classes: "t-link--discreet l-footer__link",
   })}
   ${navigationLink({
     labelText: "FAQ",
     id: "faqLink",
     url: "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity",
-    classes: "t-link--discreet l-footer__elem",
+    classes: "t-link--discreet l-footer__link",
     rel: "noopener noreferrer",
   })}
 </footer>`;
