@@ -187,6 +187,7 @@
   --rs-footer-gap: var(--vs-inline);
 
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
+  --rs-logo-type-stack: var(--vs-stack);
 
   --rs-card-bezel: calc(var(--vs-gutter) * 5);
   --rs-card-bezel-x: calc(var(--vs-gutter) * 7);
@@ -913,7 +914,7 @@ a:hover,
 
 .c-logo__type {
   text-align: center;
-  margin-top: var(--vs-stack);
+  margin-top: var(--rs-logo-type-stack);
 }
 
 .t-title + .c-logo {
