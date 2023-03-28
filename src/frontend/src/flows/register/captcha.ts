@@ -156,7 +156,7 @@ export const promptCaptchaTemplate = <T>({
           <i
             tabindex="0"
             id="seedCopy"
-            class="c-button__icon c-input__icon"
+            class="c-button__icon"
             @click=${asyncReplace(retry.recv())}
             ?disabled=${asyncReplace(retryDisabled)}
           >

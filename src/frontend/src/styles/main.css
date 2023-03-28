@@ -203,10 +203,12 @@
 
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
+  --rs-button-border-radius: var(--vs-border-radius);
 
   --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
+  --rs-input-border-radius: var(--vs-border-radius);
 
   --rs-line-height-body: var(--vs-line-height);
 
@@ -970,7 +972,7 @@ a:hover,
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-button-border-radius);
 }
 
 .c-button--minimal {
@@ -1034,6 +1036,57 @@ a:hover,
   color: var(--rc-onError);
 }
 
+.c-button__icon {
+  position: absolute;
+  bottom: 0;
+  right: 50%;
+  z-index: var(--z-foreground);
+  background-color: var(--rc-input);
+  border: var(--rs-line) solid var(--rc-line);
+  display: flex;
+  padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
+  border-radius: var(--rs-button-border-radius);
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  transform: translate(50%, 50%) scale(0.9);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 400ms transform cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-button__icon:not([disabled]):hover {
+  transform: translate(50%, 50%) scale(0.99);
+}
+
+.c-button__icon svg {
+  width: 1.2em;
+  height: 1.2em;
+  margin-left: var(--rs-input-bezel);
+  margin-right: calc(var(--rs-input-bezel) * -0.25);
+}
+
+/* hides and show icons based on a class */
+
+.c-button__icon svg + svg {
+  margin-left: -1em;
+  visibility: hidden;
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
+    opacity 300ms linear;
+  color: greenyellow;
+}
+
+.c-button__icon.is-copied svg {
+  visibility: hidden;
+}
+
+.c-button__icon.is-copied svg + svg {
+  visibility: visible;
+  transform: scale(1.2);
+  opacity: 1;
+}
+
 .c-input {
   position: relative;
   display: block;
@@ -1044,7 +1097,7 @@ a:hover,
   color: var(--rc-onInput);
   border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-input-border-radius);
 }
 
 .c-button-group {
@@ -1111,77 +1164,9 @@ a:hover,
   margin-bottom: calc(var(--rs-input-stack) * 2);
 }
 
-.c-input__icon {
-  position: absolute;
-  bottom: 0;
-  right: 50%;
-  z-index: var(--z-foreground);
-  background-color: var(--rc-input);
-  border: var(--rs-line) solid var(--rc-line);
-  border-radius: 4px;
-  display: flex;
-  padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
-  border-radius: var(--vs-border-radius);
-  background: var(--rc-button);
-  color: var(--rc-onButton);
-  transform: translate(50%, 50%) scale(0.9);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: 400ms transform cubic-bezier(0.3, 0.7, 0, 1);
-}
-
-.c-input__icon:not([disabled]):hover {
-  transform: translate(50%, 50%) scale(0.99);
-}
-
-.c-input__icon svg {
-  width: 1.2em;
-  height: 1.2em;
-  margin-left: var(--rs-input-bezel);
-  margin-right: calc(var(--rs-input-bezel) * -0.25);
-}
-
 .c-input__message {
   margin-top: var(--vs-stack);
   color: var(--rc-error);
-}
-
-/* hides and show icons based on a class */
-
-.c-input__icon svg + svg {
-  margin-left: -1em;
-  visibility: hidden;
-  transform: scale(0.4);
-  opacity: 0;
-  transition: transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
-    opacity 300ms linear;
-  color: greenyellow;
-}
-
-.c-input__icon.is-copied svg {
-  visibility: hidden;
-}
-
-.c-input__icon.is-copied svg + svg {
-  visibility: visible;
-  transform: scale(1.2);
-  opacity: 1;
-}
-
-.c-input__button {
-  position: absolute;
-  top: 50%;
-  right: var(--rs-input-bezel);
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-}
-
-.c-input__button:focus,
-.c-input__button:hover {
-  fill: var(--rc-onButton);
-  stroke-width: 0.5px;
-  stroke: var(--rc-button);
 }
 
 /**

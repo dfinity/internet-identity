@@ -364,7 +364,7 @@ export const styleguide = html`
               aria-label="Copy phrase to clipboard"
               title="Copy phrase to clipboard"
               tabindex="0"
-              class="c-button__icon c-input__icon"
+              class="c-button__icon"
             >
               <span>Copy</span>
               ${copyIcon}

@@ -82,7 +82,7 @@ const displaySeedPhraseTemplate = ({
             title=${copy.copy_to_clipboard}
             tabindex="0"
             id="seedCopy"
-            class="c-button__icon c-input__icon"
+            class="c-button__icon"
           >
             <span>${copy.copy}</span>
             ${copyIcon} ${checkmarkIcon}
