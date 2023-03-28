@@ -1268,7 +1268,7 @@ a:hover,
 .c-list--bulleted li,
 .c-list--numbered li {
   margin-left: var(--rs-list-counter-space);
-  margin-top: var(---rs-list-item-stack);
+  margin-top: var(--rs-list-item-stack);
 }
 
 .c-list--numbered {
