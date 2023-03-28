@@ -166,12 +166,12 @@ jobs:
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_production.wasm
+          name: internet_identity_production.wasm.gz
           path: .
       - id: record-size
         uses: ./.github/actions/file-size
         with:
-          file: internet_identity_production.wasm
+          file: internet_identity_production.wasm.gz
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: "Check canister size"
         run: |
