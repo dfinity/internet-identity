@@ -173,6 +173,9 @@
   --rs-inline-icon-gap: var(--vs-inline);
   --rs-inline-button-gap: var(--vs-inline);
 
+  --rs-list-counter-space: calc(var(--vs-inline) * 2);
+  --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
+
   --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: var(--vs-gutter);
   --rs-footer-gap: var(--vs-inline);
@@ -1259,8 +1262,8 @@ a:hover,
 
 .c-list--bulleted li,
 .c-list--numbered li {
-  margin-left: calc(var(--vs-inline) * 2);
-  margin-top: var(--vs-stack);
+  margin-left: var(--rs-list-counter-space);
+  margin-top: var(---rs-list-item-stack);
 }
 
 .c-list--numbered {
