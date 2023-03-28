@@ -7,6 +7,7 @@ set -euo pipefail
 
 GITHUB_TOKEN=${INPUT_TOKEN:-${GITHUB_TOKEN:?No token given}}
 
+PRODUCTION_ASSET=${INPUT_PRODUCTION_ASSET:?No production asset specified}
 RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
 RELEASE_TAG_PREVIOUS=${RELEASE_TAG_PREVIOUS:-}
 
@@ -82,9 +83,9 @@ do
         # Additionally grab the step number of the 'sha256sum' step
         step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
-            --arg job_id "$job_id" \
+            --argjson job_id "$job_id" \
             --arg filename "$filename" \
-            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum $filename")) | .number')
+            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | endswith("sha256sum " + $filename)) | .number')
                 >&2 echo "Found step: $step"
     fi
 
@@ -93,16 +94,15 @@ do
     download_link="https://github.com/dfinity/internet-identity/releases/download/$RELEASE_TAG/$filename"
     download="[\2]($download_link)"
 
-    # shellcheck disable=SC2016
     run_link="$html_url#step:$step:1"
+    # shellcheck disable=SC2016
     sha='[`\1`]'"($run_link)"
 
     # Get the shasum and capture the sha (using only POSIX sed)
     shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|%" >> "$section_build_flavors"
 
-    # If the filename contains "prod" then we assume it's a production asset, and we show the sha256 and download
-    # link in the intro section as well.
-    if [[ "$filename" == *"prod"* ]]
+    # Mention production asset in intro section
+    if [[ "$filename" == "$PRODUCTION_ASSET" ]]
     then
         shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%The sha256 of production asset [\2]($download_link) is [\1]($run_link).%" >> "$section_intro"
     fi
