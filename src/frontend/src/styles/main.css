@@ -520,10 +520,6 @@ a:hover,
   margin-right: var(--vs-inline);
 }
 
-.c-icon--inline-after {
-  margin-left: var(--vs-inline);
-}
-
 .c-icon--block {
   display: block;
   height: auto;
