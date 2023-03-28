@@ -109,7 +109,7 @@ export const promptCaptchaTemplate = <T>({
             <img
               src="data:image/png;base64,${state.challenge.png_base64}"
               id="captchaImg"
-              class="c-img-block"
+              class="c-image"
               alt="captcha image"
             />
           </div>`
