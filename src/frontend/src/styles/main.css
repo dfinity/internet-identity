@@ -196,6 +196,9 @@
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
   --rs-line-height-body: var(--vs-line-height);
+
+  /* generic Lines uses on cards and other separation elements */
+  --rs-line: var(--vs-line);
 }
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -622,7 +625,7 @@ a:hover,
   display: block;
   position: relative;
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
   border-radius: var(--vs-border-radius);
 }
@@ -766,7 +769,7 @@ a:hover,
 
   position: relative;
   padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
   background-color: var(--state-color);
   border-radius: var(--vs-border-radius);
   overflow: hidden;
@@ -984,7 +987,7 @@ a:hover,
 .c-button--secondary {
   background: var(--rc-button-secondary);
   color: var(--rc-button);
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
 }
 
 .c-button:not([disabled]):focus,
@@ -1026,7 +1029,7 @@ a:hover,
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
-  border: calc(var(--vs-line) * 2) solid var(--rc-line);
+  border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
   border-radius: var(--vs-border-radius);
 }
@@ -1040,7 +1043,7 @@ a:hover,
 .c-input.has-error,
 .c-input.has-error:focus {
   color: var(--rc-error);
-  box-shadow: inset 0 0 0 calc(var(--vs-line) * 2) var(--rc-error);
+  box-shadow: inset 0 0 0 calc(var(--rs-line) * 2) var(--rc-error);
   border-image: none;
 }
 
@@ -1073,7 +1076,7 @@ a:hover,
 .c-input--readonly {
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
-  border: var(--vs-line) var(--rc-line) solid;
+  border: var(--rs-line) var(--rc-line) solid;
 }
 
 .c-input--textarea {
@@ -1101,7 +1104,7 @@ a:hover,
   right: 50%;
   z-index: var(--vz-foreground);
   background-color: var(--rc-input);
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
   border-radius: 4px;
   display: flex;
   padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
@@ -1305,7 +1308,7 @@ a:hover,
   display: inline-flex;
   background: var(--rc-background);
   color: var(--fg);
-  border: var(--vs-line) var(--rc-line) solid;
+  border: var(--rs-line) var(--rc-line) solid;
 
   border-radius: 999px;
 
@@ -1452,7 +1455,7 @@ a:hover,
   text-align: left;
   color: var(--fg, currentColor);
 
-  height: calc(1em * var(--vs-line));
+  height: calc(1em * var(--rs-line));
 
   /* fixes layout-shifts in safari when input is empty */
   position: absolute;
@@ -1486,7 +1489,7 @@ a:hover,
 .c-list--anchors .c-list__item {
   display: flex;
   flex-wrap: wrap;
-  border: var(--vs-line) var(--rc-line) solid;
+  border: var(--rs-line) var(--rc-line) solid;
   position: relative;
 }
 
@@ -1579,15 +1582,15 @@ a:hover,
 }
 
 .c-list--anchors .c-list__item + .c-list__item {
-  margin-top: calc(-1 * var(--vs-line));
+  margin-top: calc(-1 * var(--rs-line));
 }
 
 .c-list__parcel {
   position: relative;
   padding: var(--vs-bezel) 0.8em;
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
   flex-grow: 1;
-  margin: calc(-1 * var(--vs-line));
+  margin: calc(-1 * var(--rs-line));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1747,7 +1750,7 @@ a:hover,
 .c-action-list {
   margin-top: 1rem;
   background: var(--rc-background);
-  border: var(--vs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--rc-line);
 }
 
 .c-action-list__item {
@@ -1760,7 +1763,7 @@ a:hover,
 .c-action-list__item + .c-action-list__item::before {
   content: "";
   display: block;
-  height: var(--vs-line);
+  height: var(--rs-line);
   background: var(--rc-line);
   position: absolute;
   top: 0;
@@ -1951,7 +1954,7 @@ a:hover,
   background-color: var(--rc-background);
   border-radius: var(--border-radius);
   padding: 0 var(--vs-bezel);
-  margin-top: calc(-1 * var(--vs-line));
+  margin-top: calc(-1 * var(--rs-line));
   text-align: right;
   pointer-events: none;
   transform: translateY(-2rem);
@@ -2002,7 +2005,7 @@ a:hover,
 }
 
 .c-dropdown__item + .c-dropdown__item {
-  border-top: var(--vs-line) solid var(--rc-line);
+  border-top: var(--rs-line) solid var(--rc-line);
 }
 
 .c-dropdown__button {
