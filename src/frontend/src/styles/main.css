@@ -169,9 +169,13 @@
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
-  --rs-footer-stack: var(--vs-stack);
+  --rs-inline-grid-gap: var(--vs-inline);
+  --rs-inline-icon-gap: var(--vs-inline);
+  --rs-inline-button-gap: var(--vs-inline);
 
+  --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: var(--vs-gutter);
+
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
 
   --rs-card-bezel: calc(var(--vs-gutter) * 5);
@@ -498,7 +502,7 @@ a:hover,
 
 .l-horizontal {
   display: flex;
-  gap: var(--vs-inline);
+  gap: var(--rs-inline-grid-gap);
 }
 
 /**
@@ -517,7 +521,7 @@ a:hover,
 }
 
 .c-icon--inline {
-  margin-right: var(--vs-inline);
+  margin-right: var(--rs-inline-icon-gap);
 }
 
 .c-icon--block {
@@ -1025,8 +1029,8 @@ a:hover,
 
 .c-button-group {
   display: flex;
-  gap: var(--vs-inline);
-  margin-top: var(--vs-stack);
+  gap: var(--rs-inline-button-gap);
+  margin-top: var(--rs-button-stack);
 }
 
 .c-input.has-error,
