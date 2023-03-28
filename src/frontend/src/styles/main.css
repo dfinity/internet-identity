@@ -922,7 +922,7 @@ a:hover,
 }
 
 .t-action:hover {
-  color: var(--vc-brand-blue);
+  color: var(--rc-interaction);
 }
 
 .c-spinner-wrapper {
