@@ -93,6 +93,8 @@
   --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
   --vs-line: 1px; /* 5 */
 
+  --vs-line-height: 1.35;
+
   --vs-border-radius: 0.4rem;
 
   /* value tokens: z-index (--vz => valueZindex) */
@@ -185,7 +187,7 @@
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
 
-  --vs-line-height: 1.35;
+  --rs-line-height-body: var(--vs-line-height);
 }
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -314,7 +316,7 @@ body {
 
 body {
   font-size: 1.6rem;
-  line-height: var(--vs-line-height);
+  line-height: var(--rs-line-height-body);
   background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
   background-size: 100% 100%;
   min-height: 100vh;
@@ -458,7 +460,7 @@ a:hover,
 .t-link__icon {
   display: inline-block;
   position: relative;
-  height: calc(1em * var(--vs-line-height));
+  height: calc(1em * var(--rs-line-height-body));
   aspect-ratio: 1;
   vertical-align: middle;
 }
@@ -508,7 +510,7 @@ a:hover,
   margin-top: calc(var(--vs-stack) * 2);
   margin-bottom: calc(var(--vs-stack) * 2);
   border-top: none;
-  height: calc(1em * var(--vs-line-height));
+  height: calc(1em * var(--rs-line-height-body));
 }
 
 .l-divider--text::before,
@@ -537,7 +539,7 @@ a:hover,
 .c-icon {
   display: inline-block;
   position: relative;
-  height: calc(1em * var(--vs-line-height));
+  height: calc(1em * var(--rs-line-height-body));
   aspect-ratio: 1;
   vertical-align: middle;
 }
@@ -1775,7 +1777,7 @@ a:hover,
 }
 
 .c-chasm[aria-expanded="true"] {
-  max-height: calc(5em * var(--vs-line-height) + var(--rs-card-bezel) * 2);
+  max-height: calc(5em * var(--rs-line-height-body) + var(--rs-card-bezel) * 2);
   visibility: visible;
   transition: max-height 400ms cubic-bezier(0.3, 0.7, 0, 1);
 }
