@@ -187,6 +187,7 @@
 
   --rs-card-stack: calc(var(--vs-stack) * 1.5);
   --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
+  --rs-card-border-radius: var(--vs-border-radius);
 
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
@@ -627,7 +628,7 @@ a:hover,
   padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
   border: var(--rs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-card-border-radius);
 }
 
 /* c-cards pretty much fill up the screen on small devices so we disable rounding */
@@ -730,7 +731,7 @@ a:hover,
 .c-card--modal {
   position: relative;
   border: none;
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-card-border-radius);
 }
 
 .c-card--warning::before,
@@ -752,7 +753,7 @@ a:hover,
   inset: 0;
   z-index: var(--vz-background);
   background: var(--rc-background);
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-card-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
@@ -771,7 +772,7 @@ a:hover,
   padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
   border: var(--rs-line) solid var(--rc-line);
   background-color: var(--state-color);
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-card-border-radius);
   overflow: hidden;
   box-shadow: 0 0 0 1px var(--state-onColor);
 }
@@ -786,7 +787,7 @@ a:hover,
   background: var(--state-onColor);
   margin: calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel-x) * 0.1)
     calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel) * -0.4);
-  border-radius: var(--vs-border-radius);
+  border-radius: var(--rs-card-border-radius);
 }
 
 .c-irregularity__icon svg {
