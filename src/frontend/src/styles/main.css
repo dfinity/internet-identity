@@ -1164,31 +1164,6 @@ a:hover,
   stroke: var(--rc-button);
 }
 
-.c-summary {
-  list-style: none;
-}
-
-.c-summary__link {
-  display: block;
-  position: relative;
-}
-
-.c-summary__link::before {
-  position: absolute;
-  content: "▶";
-  font-size: 0.75em;
-  line-height: 2;
-  /* Divide --vs-inline by 2 to ensure we don't actually hit the left border */
-  left: calc(-1 * var(--vs-inline) / 2);
-  text-decoration: none;
-  transform: translateX(-100%);
-  transition: 200ms cubic-bezier(0.3, 0.7, 0, 1);
-}
-
-[open] .c-summary__link::before {
-  transform: translateX(-100%) rotate(90deg);
-}
-
 /**
   *  Dialog component
   */

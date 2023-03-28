@@ -374,23 +374,6 @@ export const styleguide = html`
       </aside>
 
       <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Details / Summary</h2>
-        <section class="demo" aria-label="Details / Summary Demo">
-          <details>
-            <summary class="c-summary">
-              <span class="c-summary__link t-link">Click me to open</span>
-            </summary>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed</p>
-          </details>
-        </section>
-        <p class="t-lead">
-          While the <code>&lt;details&gt;</code> element is not a component, it
-          is expected to be used with the <code>.c-summary</code> class, since
-          it relies on the <code>[open]</code> attribute.
-        </p>
-      </aside>
-
-      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Actionable Lists</h2>
         <section class="demo" aria-label="Details / Summary Demo">
           <ul class="c-action-list">
