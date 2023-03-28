@@ -433,7 +433,7 @@ jobs:
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_test.wasm
+          name: internet_identity_test.wasm.gz
           path: .
 
       - name: 'Download test app wasm'
@@ -445,7 +445,7 @@ jobs:
       - name: Deploy Internet Identity
         run: |
           dfx canister create --all
-          dfx canister install internet_identity --wasm internet_identity_test.wasm
+          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
 
       - name: Deploy test app
         working-directory: demos/test-app
