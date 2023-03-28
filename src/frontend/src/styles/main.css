@@ -50,6 +50,21 @@
 /* I) Settings: Global variables, config switches. */
 
 :root {
+  /**
+     * z-index tokens: z-index (--z => valueZindex)
+     *
+     * z-index tokens are used to control the stacking order of elements.
+     * they are not a reference token, nor a value token as they are more about
+     * technical implementation than design.
+    **/
+
+  --z-backdrop: -1;
+  --z-background: 1;
+  --z-foreground: 2;
+  --z-tooltip: 10;
+  --z-loader: 30;
+  --z-toasts: 50;
+
   /*
    * value tokens
    *
@@ -96,15 +111,6 @@
   --vs-line-height: 1.35;
 
   --vs-border-radius: 0.4rem;
-
-  /* Z-index tokens: z-index (--z => valueZindex) */
-
-  --z-backdrop: -1;
-  --z-background: 1;
-  --z-foreground: 2;
-  --z-tooltip: 10;
-  --z-loader: 30;
-  --z-toasts: 50;
 
   /*
    * reference tokens
