@@ -138,6 +138,7 @@
 
   --rc-interaction: var(--vc-brand-blue);
   --rc-interaction-text: var(--vc-brand-blue--dark);
+  --rc-loading: var(--vc-brand-purple);
 
   --rc-button: var(--vc-brand-purple);
   --rc-button--disabled: var(--vc-shadow);
@@ -936,7 +937,7 @@ a:hover,
   position: absolute;
   width: 25%;
   aspect-ratio: 1;
-  color: var(--vc-brand-purple);
+  color: var(--rc-loading);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
