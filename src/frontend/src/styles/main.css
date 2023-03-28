@@ -494,13 +494,6 @@ a:hover,
   max-width: 60rem;
 }
 
-.l-container--centered {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
 .l-divider {
   display: block;
   margin-top: calc(var(--vs-stack) * 2);
@@ -702,6 +695,36 @@ a:hover,
   }
 }
 
+.c-card--background::before {
+  position: absolute;
+  content: "";
+  z-index: -2;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-image: linear-gradient(170deg, var(--rg-brand));
+  background-size: 200% 200%;
+  filter: blur(120px);
+  opacity: 0.75;
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0);
+
+  animation: 20s bganim linear infinite;
+}
+
+@keyframes bganim {
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+
+  50% {
+    background-position: 0% -200%;
+  }
+}
+
 @media (max-width: 512px) {
   .c-card--highlight {
     border: none;
@@ -752,13 +775,15 @@ a:hover,
   margin-top: calc(var(--vs-stack) * 0.75);
 }
 
-.c-card--warning {
+.c-card--warning,
+.c-card--modal {
   position: relative;
   border: none;
   border-radius: var(--vs-border-radius);
 }
 
-.c-card--warning::before {
+.c-card--warning::before,
+.c-card--modal::before {
   position: absolute;
   content: "";
   z-index: 0;
@@ -769,7 +794,8 @@ a:hover,
   pointer-events: none;
 }
 
-.c-card--warning::after {
+.c-card--warning::after,
+.c-card--modal::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1217,6 +1243,57 @@ a:hover,
 
 [open] .c-summary__link::before {
   transform: translateX(-100%) rotate(90deg);
+}
+
+/**
+  *  Dialog component
+  */
+.c-modal[open] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--vz-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.c-modal[open]::backdrop {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px) saturate(50%);
+}
+
+.c-modal__inner {
+  position: relative;
+  z-index: var(--vz-foreground);
+}
+
+.c-modal__close {
+  position: absolute;
+  /* take the close icon to the edge of the card */
+  top: calc(-1 * var(--rs-card-bezel));
+  right: calc(-1 * var(--rs-card-bezel-x));
+  /* makes the close button stick ouf of the box a bit */
+  transform: translate(50%, -50%);
+
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  border-radius: 50%;
+  line-height: 1;
+
+  width: 2.5rem;
+  height: 2.5rem;
+
+  vertical-align: middle;
+  text-align: center;
+
+  background-color: var(--rc-background);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 /**

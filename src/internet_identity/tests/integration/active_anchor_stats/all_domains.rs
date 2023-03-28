@@ -1,4 +1,4 @@
-//! Tests related to the daily and monthly active users statistics.
+//! Tests related to the daily and monthly active anchor statistics (domain independent).
 
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;

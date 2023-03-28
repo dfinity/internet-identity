@@ -6,7 +6,7 @@ import {
 } from "../../utils/iiConnection";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
-import { unreachable, unknownToString, assertType } from "../../utils/utils";
+import { unreachable, unknownToString } from "../../utils/utils";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import { phraseRecoveryPage } from "../recovery/recoverWith/phrase";
 import { phraseWizard } from "../recovery/setupRecovery";
@@ -139,7 +139,7 @@ export const resetPhrase = async ({
     });
     return reload();
   } else {
-    assertType<{ canceled: void }>(res);
+    res satisfies { canceled: void };
     return reload();
   }
 };

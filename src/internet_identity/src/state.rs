@@ -76,7 +76,9 @@ pub struct PersistentState {
     // Configuration for the rate limit on `register`, if any.
     pub registration_rate_limit: Option<RateLimitConfig>,
     // Daily and monthly active anchor statistics
-    pub active_anchor_stats: Option<ActiveAnchorStatistics>,
+    pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
+    // Daily and monthly active anchor statistics (filtered by domain)
+    pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

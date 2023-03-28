@@ -1,3 +1,4 @@
+use crate::active_anchor_stats::IIDomain;
 use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
@@ -59,8 +60,11 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 /// caller to persist the changes. This allows anchor operations to write to storage only once,
 /// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
 pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
-    let previous_activity = anchor.last_activity();
-    active_anchor_stats::update_active_anchors_stats(previous_activity);
+    let domain = anchor
+        .device(current_device_key)
+        .and_then(|device| device.origin.as_ref())
+        .and_then(|origin| IIDomain::try_from(origin.as_str()).ok());
+    active_anchor_stats::update_active_anchors_stats(anchor, &domain);
     anchor
         .set_device_usage_timestamp(current_device_key, time())
         .expect("unable to update last usage timestamp");

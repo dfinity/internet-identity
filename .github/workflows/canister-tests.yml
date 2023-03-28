@@ -637,6 +637,7 @@ jobs:
             internet_identity_dev.wasm
             internet_identity_test.wasm
             archive.wasm
+          production_asset: internet_identity_production.wasm
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
