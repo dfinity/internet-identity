@@ -603,10 +603,22 @@ jobs:
           name: internet_identity_test.wasm
           path: .
 
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_test.wasm.gz
+          path: .
+
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_dev.wasm
+          path: .
+
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_dev.wasm.gz
           path: .
 
       - name: 'Download wasm'
@@ -635,7 +647,9 @@ jobs:
             internet_identity_production.wasm
             internet_identity_production.wasm.gz
             internet_identity_dev.wasm
+            internet_identity_dev.wasm.gz
             internet_identity_test.wasm
+            internet_identity_test.wasm.gz
             archive.wasm
           production_asset: internet_identity_production.wasm
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -649,7 +663,9 @@ jobs:
             internet_identity_production.wasm \
             internet_identity_production.wasm.gz \
             internet_identity_dev.wasm \
+            internet_identity_dev.wasm.gz \
             internet_identity_test.wasm \
+            internet_identity_test.wasm.gz \
             src/internet_identity/internet_identity.did \
             archive.wasm
         env:
