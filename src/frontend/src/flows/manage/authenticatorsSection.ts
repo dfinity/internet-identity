@@ -131,7 +131,7 @@ const itemWarning = ({
 }: {
   warn: TemplateResult;
 }): TemplateResult => html`<div class="c-action-list__action">
-  <span class="c-tooltip c-tooltip--left c-icon c-icon--error" tabindex="0"
+  <span class="c-tooltip c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
     ></span
