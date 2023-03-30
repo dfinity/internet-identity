@@ -32,7 +32,7 @@ fn should_record_used_delegation_origin() -> Result<(), CallError> {
 #[test]
 fn should_record_max_delegation_origins() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_with_low_latest_origin_limit(&env);
+    let canister_id = install_ii_with_latest_origin_limit(&env, 10);
     let user_number = flows::register_anchor(&env, canister_id);
 
     for i in 0..11 {
@@ -51,7 +51,7 @@ fn should_record_max_delegation_origins() -> Result<(), CallError> {
 #[test]
 fn should_drop_orgins_after_30_days() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_with_low_latest_origin_limit(&env);
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
 
     delegation_for_origin(&env, canister_id, user_number, "https://dropped.com")?;
@@ -85,12 +85,12 @@ fn should_keep_latest_origins_across_upgrades() -> Result<(), CallError> {
     Ok(())
 }
 
-fn install_ii_with_low_latest_origin_limit(env: &StateMachine) -> CanisterId {
+fn install_ii_with_latest_origin_limit(env: &StateMachine, limit: u64) -> CanisterId {
     install_ii_canister_with_arg(
         env,
         II_WASM.clone(),
         Some(InternetIdentityInit {
-            max_num_latest_delegation_origins: Some(10),
+            max_num_latest_delegation_origins: Some(limit),
             ..Default::default()
         }),
     )
