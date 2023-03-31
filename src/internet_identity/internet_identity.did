@@ -156,6 +156,8 @@ type InternetIdentityStats = record {
     canister_creation_cycles_cost: nat64;
     active_anchor_stats: opt ActiveAnchorStatistics;
     domain_active_anchor_stats: opt DomainActiveAnchorStatistics;
+    max_num_latest_delegation_origins: nat64;
+    latest_delegation_origins: vec FrontendHostname
 };
 
 // Configuration parameters related to the archive.
@@ -264,6 +266,9 @@ type InternetIdentityInit = record {
     canister_creation_cycles_cost : opt nat64;
     // Rate limit for the `register` call.
     register_rate_limit : opt RateLimitConfig;
+    // Maximum number of latest delegation origins to track.
+    // Default: 1000
+    max_num_latest_delegation_origins : opt nat64;
 };
 
 type ChallengeKey = text;

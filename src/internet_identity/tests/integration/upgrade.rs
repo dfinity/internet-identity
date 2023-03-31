@@ -151,7 +151,7 @@ fn ii_upgrade_should_allow_same_user_range() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-    let stats = api::stats(&env, canister_id)?;
+    let stats = api::compat::stats(&env, canister_id)?;
 
     let result = upgrade_ii_canister_with_arg(
         &env,
