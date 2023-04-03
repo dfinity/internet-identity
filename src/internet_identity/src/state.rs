@@ -1,4 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
@@ -11,6 +10,7 @@ use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::internet_identity::types::*;
+use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -176,10 +176,10 @@ impl State {
     }
 
     fn storage_replace(&self, storage: Storage<DefaultMemoryImpl>) {
-        self.storage_state.replace(StorageState::Initialised(storage));
+        self.storage_state
+            .replace(StorageState::Initialised(storage));
     }
 }
-
 
 // Checks if salt is empty and calls `init_salt` to set it.
 pub async fn ensure_salt_set() {
@@ -247,7 +247,8 @@ pub fn init_new() {
                 FIRST_ANCHOR_NUMBER,
                 FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
             ),
-            DefaultMemoryImpl::default());
+            DefaultMemoryImpl::default(),
+        );
         s.storage_replace(storage);
     });
 }
