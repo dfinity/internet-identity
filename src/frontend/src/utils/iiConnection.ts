@@ -41,6 +41,7 @@ import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -49,7 +50,7 @@ import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
  */
 export class DummyIdentity
   extends Ed25519KeyIdentity
-  implements IdentifiableIdentity
+  implements IIWebAuthnIdentity
 {
   public rawId: ArrayBuffer;
 
@@ -99,8 +100,14 @@ type SeedPhraseFail = { kind: "seedPhraseFail" };
 
 export type { ChallengeResult } from "../../generated/internet_identity_types";
 
-export interface IdentifiableIdentity extends SignIdentity {
+/**
+ * Interface around the agent-js WebAuthnIdentity that allows us to provide
+ * alternate implementations (such as the dummy identity).
+ */
+export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
+
+  getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }
 
 export class Connection {
@@ -111,7 +118,7 @@ export class Connection {
     alias,
     challengeResult,
   }: {
-    identity: IdentifiableIdentity;
+    identity: IIWebAuthnIdentity;
     alias: string;
     challengeResult: ChallengeResult;
   }): Promise<RegisterResult> => {
@@ -140,7 +147,9 @@ export class Connection {
           alias,
           pubkey,
           credential_id: [credential_id],
-          key_type: { unknown: null },
+          key_type: authenticatorAttachmentToKeyType(
+            identity.getAuthenticatorAttachment()
+          ),
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),

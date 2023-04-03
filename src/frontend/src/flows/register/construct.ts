@@ -2,7 +2,7 @@ import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
 import { DeviceData } from "../../../generated/internet_identity_types";
 import {
-  IdentifiableIdentity,
+  IIWebAuthnIdentity,
   DummyIdentity,
   creationOptions,
 } from "../../utils/iiConnection";
@@ -43,7 +43,7 @@ export const constructIdentity = async ({
 }: {
   devices?: () => Promise<Array<DeviceData>>;
   message?: string;
-}): Promise<IdentifiableIdentity> => {
+}): Promise<IIWebAuthnIdentity> => {
   renderConstructing({ message });
   await tick();
 

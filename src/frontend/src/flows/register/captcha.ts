@@ -7,7 +7,7 @@ import { Chan } from "../../utils/utils";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { LoginFlowCanceled, cancel } from "../../utils/flowResult";
 import {
-  IdentifiableIdentity,
+  IIWebAuthnIdentity,
   Connection,
   RegisterResult,
 } from "../../utils/iiConnection";
@@ -222,7 +222,7 @@ export const promptCaptcha = ({
   challenge,
 }: {
   connection: Connection;
-  identity: IdentifiableIdentity;
+  identity: IIWebAuthnIdentity;
   alias: string;
   challenge?: Promise<Challenge>;
 }): Promise<RegisterResult | LoginFlowCanceled> => {

@@ -8,6 +8,7 @@ import { promptDeviceAlias } from "../../../components/alias";
 import { withLoader } from "../../../components/loader";
 import { displayError } from "../../../components/displayError";
 import { setAnchorUsed } from "../../../utils/userNumber";
+import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({
@@ -51,7 +52,9 @@ export const addLocalDevice = async (
     await withLoader(() =>
       connection.add(
         deviceName,
-        { unknown: null },
+        authenticatorAttachmentToKeyType(
+          newDevice.getAuthenticatorAttachment()
+        ),
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },

@@ -16,6 +16,7 @@ import { showVerificationCode } from "./showVerificationCode";
 import { withLoader } from "../../../components/loader";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
+import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
@@ -60,7 +61,9 @@ export const registerTentativeDevice = async (
       alias: alias,
       protection: { unprotected: null },
       pubkey: Array.from(new Uint8Array(result.getPublicKey().toDer())),
-      key_type: { unknown: null },
+      key_type: authenticatorAttachmentToKeyType(
+        result.getAuthenticatorAttachment()
+      ),
       purpose: { authentication: null },
       credential_id: [Array.from(new Uint8Array(result.rawId))],
     };
