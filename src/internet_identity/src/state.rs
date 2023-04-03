@@ -1,3 +1,4 @@
+use std::borrow::{Borrow, BorrowMut};
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
@@ -10,8 +11,9 @@ use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::internet_identity::types::*;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::time::Duration;
 
 pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
@@ -112,8 +114,13 @@ pub struct RateLimitState {
     pub token_timestamp: Timestamp,
 }
 
+enum StorageState {
+    Uninitialised,
+    Initialised(Storage<DefaultMemoryImpl>),
+}
+
 struct State {
-    storage: RefCell<Storage<DefaultMemoryImpl>>,
+    storage_state: RefCell<StorageState>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -138,15 +145,8 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
         Self {
-            storage: RefCell::new(Storage::new(
-                (
-                    FIRST_ANCHOR_NUMBER,
-                    FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
-                ),
-                DefaultMemoryImpl::default(),
-            )),
+            storage_state: RefCell::new(StorageState::Uninitialised),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
@@ -160,15 +160,36 @@ impl Default for State {
     }
 }
 
+impl State {
+    fn storage_borrow(&self) -> &Storage<DefaultMemoryImpl> {
+        match self.storage_state.borrow() {
+            StorageState::Uninitialised => panic!("Storage not initialised, cannot borrow_mut."),
+            StorageState::Initialised(ref storage) => storage,
+        }
+    }
+
+    fn storage_borrow_mut(&self) -> &mut Storage<DefaultMemoryImpl> {
+        match &mut *self.storage_state.borrow_mut() {
+            StorageState::Uninitialised => trap("Storage not initialised, cannot borrow_mut."),
+            StorageState::Initialised(storage) => storage,
+        }
+    }
+
+    fn storage_replace(&self, storage: Storage<DefaultMemoryImpl>) {
+        self.storage_state.replace(StorageState::Initialised(storage));
+    }
+}
+
+
 // Checks if salt is empty and calls `init_salt` to set it.
 pub async fn ensure_salt_set() {
-    let salt = STATE.with(|s| s.storage.borrow().salt().cloned());
+    let salt = STATE.with(|s| s.storage_borrow().salt().cloned());
     if salt.is_none() {
         init_salt().await;
     }
 
     STATE.with(|s| {
-        if s.storage.borrow().salt().is_none() {
+        if s.storage_borrow().salt().is_none() {
             trap("Salt is not set. Try calling init_salt() to set it");
         }
     });
@@ -176,7 +197,7 @@ pub async fn ensure_salt_set() {
 
 pub async fn init_salt() {
     STATE.with(|s| {
-        if s.storage.borrow().salt().is_some() {
+        if s.storage_borrow().salt().is_some() {
             trap("Salt already set");
         }
     });
@@ -193,42 +214,54 @@ pub async fn init_salt() {
     });
 
     STATE.with(|s| {
-        let mut store = s.storage.borrow_mut();
+        let mut store = s.storage_borrow_mut();
         store.update_salt(salt); // update_salt() traps if salt has already been set
     });
 }
 
 pub fn salt() -> [u8; 32] {
     STATE
-        .with(|s| s.storage.borrow().salt().cloned())
+        .with(|s| s.storage_borrow().salt().cloned())
         .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"))
 }
 
-pub fn initialize_from_stable_memory() {
+pub fn init_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
         match Storage::from_memory(DefaultMemoryImpl::default()) {
             Some(storage) => {
-                s.storage.replace(storage);
+                s.storage_replace(storage);
             }
             None => {
-                s.storage.borrow_mut().flush();
+                s.storage_borrow_mut().flush();
             }
         }
     });
 }
 
+pub fn init_new() {
+    STATE.with(|s| {
+        const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
+        let storage = Storage::new(
+            (
+                FIRST_ANCHOR_NUMBER,
+                FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
+            ),
+            DefaultMemoryImpl::default());
+        s.storage_replace(storage);
+    });
+}
+
 pub fn save_persistent_state() {
     STATE.with(|s| {
-        s.storage
-            .borrow_mut()
+        s.storage_borrow_mut()
             .write_persistent_state(&s.persistent_state.borrow());
     })
 }
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        let storage = s.storage.borrow();
+        let storage = s.storage_borrow();
         match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
@@ -249,7 +282,7 @@ pub fn load_persistent_state() {
 
 pub fn anchor(anchor: AnchorNumber) -> Anchor {
     STATE.with(|s| {
-        s.storage.borrow().read(anchor).unwrap_or_else(|err| {
+        s.storage_borrow().read(anchor).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to read device data of user {anchor}: {err}"
             ))
@@ -308,11 +341,11 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
 }
 
 pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&s.storage.borrow()))
+    STATE.with(|s| f(&s.storage_borrow()))
 }
 
 pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&mut s.storage.borrow_mut()))
+    STATE.with(|s| f(&mut s.storage_borrow_mut()))
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
