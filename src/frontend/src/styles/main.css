@@ -1377,7 +1377,7 @@ a:hover,
 
   /* 
    * the blur does not render nicely in Safari if its not on its own paint layer,
-   * so we use will-change to let the browser know that we want to animate this
+   * so we use will-change to let the browser know that we want to animate
    * those properties. As a result, the browser will create a new paint layer
    * for this element.
    */
