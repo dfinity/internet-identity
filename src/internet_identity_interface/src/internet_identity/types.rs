@@ -162,12 +162,13 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Default)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
     pub register_rate_limit: Option<RateLimitConfig>,
+    pub max_num_latest_delegation_origins: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -179,6 +180,8 @@ pub struct InternetIdentityStats {
     pub storage_layout_version: u8,
     pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
     pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    pub max_num_latest_delegation_origins: u64,
+    pub latest_delegation_origins: Vec<FrontendHostname>,
 }
 
 /// Information about the archive.

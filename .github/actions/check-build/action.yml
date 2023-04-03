@@ -1,5 +1,5 @@
 name: 'Check build'
-description: This action performs a clean, non-Docker build of II, and optionally checks the Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
+description: This action performs a clean, non-Docker build of II, and optionally checks the gzipped Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
 inputs:
   sha256:
     description: The expected sha256 of the final Wasm module
@@ -19,7 +19,7 @@ runs:
     - name: Check output hash
       shell: bash
       run: |
-        sha256=$(shasum -a 256 ./internet_identity.wasm | cut -d ' ' -f1)
+        sha256=$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)
         echo got sha "$sha256"
         if [ -n "${{ inputs.sha256 }}" ]
         then
