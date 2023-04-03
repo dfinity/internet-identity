@@ -81,6 +81,7 @@
   --vc-mist: rgba(255, 255, 255, 0.3);
   --vc-vapour: rgba(255, 255, 255, 0.6);
   --vc-shadow: rgba(32, 33, 36, 0.6);
+  --vc-night: rgba(32, 33, 36, 0.8);
 
   --vc-silver: #d9d9d9;
 
@@ -126,6 +127,8 @@
 
   --rc-dark-transparent: var(--vc-shadow);
   --rc-light-transparent: var(--vc-vapour);
+
+  --rc-overlay-backdrop: var(--vc-night);
 
   --rc-text: var(--rc-dark);
   --rc-text--disabled: var(--vc-shadow);
@@ -2038,6 +2041,23 @@ input[type="checkbox"] {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.c-loader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-loader);
+  background: var(--rc-overlay-backdrop);
+}
+
+.c-loader__image {
+  width: 125px;
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  user-select: none;
 }
 
 /* 
