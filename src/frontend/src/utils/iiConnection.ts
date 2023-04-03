@@ -36,7 +36,6 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { unreachable } from "./utils";
 import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
@@ -256,13 +255,14 @@ export class Connection {
       actor
     );
 
-    const attachmentInfo = identity.getAuthenticatorAttachment();
-    if (attachmentInfo !== undefined) {
-      try {
-        this.updateKeyTypeIfNecessary(devices, attachmentInfo, connection);
-      } catch (e) {
-        console.warn("Could not update key type:", e);
-      }
+    try {
+      this.updateOriginIfNecessary(
+        devices,
+        delegationIdentity.getPublicKey().toDer(),
+        connection
+      );
+    } catch (e) {
+      console.warn("Could not update device origin:", e);
     }
 
     return {
@@ -272,22 +272,17 @@ export class Connection {
     };
   };
 
-  private updateKeyTypeIfNecessary(
+  private updateOriginIfNecessary(
     devices: Omit<DeviceData, "alias">[],
-    attachmentInfo: {
-      credentialId: ArrayBuffer;
-      authenticatorAttachment: AuthenticatorAttachment;
-    },
+    pubkey: ArrayBuffer,
     authenticatedConnection: AuthenticatedConnection
   ) {
-    // Find the device based on the credential_id
-    const device = findDeviceByCredentialId(
-      devices,
-      attachmentInfo.credentialId
-    );
+    // Find the device based on the pubkey
+    const device = findDeviceByPubkey(devices, pubkey);
 
-    // only update devices with key-type unknown
-    if (device !== undefined && "unknown" in device.key_type) {
+    // only update devices without origin information
+    if (device !== undefined && device.origin.length === 0) {
+      device.origin satisfies string[];
       // we purposely do not await the promise as we just optimistically update
       // if it fails, no harm done
 
@@ -296,27 +291,14 @@ export class Connection {
         .getAnchorInfo()
         .then((info) => info.devices)
         .then((devices) =>
-          findDeviceByCredentialId(devices, attachmentInfo.credentialId)
+          findDeviceByPubkey(devices, Buffer.from(device.pubkey))
         )
         .then((device) => {
           if (device === undefined) {
             // this can happen if the device has been deleted between authentication and now
             throw Error("device is undefined");
           }
-          switch (attachmentInfo.authenticatorAttachment) {
-            case "cross-platform":
-              device.key_type = { cross_platform: null };
-              break;
-            case "platform":
-              device.key_type = { platform: null };
-              break;
-            default:
-              unreachable(
-                attachmentInfo.authenticatorAttachment,
-                `unexpected authenticator attachment: ${attachmentInfo.authenticatorAttachment}`
-              );
-              break;
-          }
+          device.origin = readDeviceOrigin();
           return device;
         })
         .then((device) => authenticatedConnection.update(device))
@@ -669,16 +651,12 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   return true;
 };
 
-function findDeviceByCredentialId<T extends Omit<DeviceData, "alias">>(
+function findDeviceByPubkey<T extends Omit<DeviceData, "alias">>(
   devices: T[],
-  credentialId: ArrayBuffer
+  pubkey: ArrayBuffer
 ): T | undefined {
   return devices.find((device) => {
-    const id = device.credential_id[0];
-    if (id === undefined) {
-      return false;
-    }
-    return bufferEqual(Buffer.from(id), credentialId);
+    return bufferEqual(Buffer.from(device.pubkey), pubkey);
   });
 }
 
