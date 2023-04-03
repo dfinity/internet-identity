@@ -50,7 +50,7 @@ import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
  */
 export class DummyIdentity
   extends Ed25519KeyIdentity
-  implements IdentifiableIdentity
+  implements IIWebAuthnIdentity
 {
   public rawId: ArrayBuffer;
 
@@ -100,7 +100,11 @@ type SeedPhraseFail = { kind: "seedPhraseFail" };
 
 export type { ChallengeResult } from "../../generated/internet_identity_types";
 
-export interface IdentifiableIdentity extends SignIdentity {
+/**
+ * Interface around the agent-js WebAuthnIdentity that allows us to provide
+ * alternate implementations (such as the dummy identity).
+ */
+export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
@@ -114,7 +118,7 @@ export class Connection {
     alias,
     challengeResult,
   }: {
-    identity: IdentifiableIdentity;
+    identity: IIWebAuthnIdentity;
     alias: string;
     challengeResult: ChallengeResult;
   }): Promise<RegisterResult> => {
