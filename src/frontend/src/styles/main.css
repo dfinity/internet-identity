@@ -1374,6 +1374,14 @@ a:hover,
   opacity: 0.3;
 
   transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+
+  /* 
+   * the blur does not render nicely in Safari if its not on its own paint layer,
+   * so we use will-change to let the browser know that we want to animate this
+   * those properties. As a result, the browser will create a new paint layer
+   * for this element.
+   */
+  will-change: opacity, blur;
 }
 
 /* Make the blurred background more visible on focus */
