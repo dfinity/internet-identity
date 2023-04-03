@@ -282,6 +282,7 @@ export class Connection {
 
     // only update devices without origin information
     if (device !== undefined && device.origin.length === 0) {
+              device.origin satisfies string[];
       // we purposely do not await the promise as we just optimistically update
       // if it fails, no harm done
 
