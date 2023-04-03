@@ -122,13 +122,10 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
     for (const cd of this.credentialData) {
       if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
-        const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
-        // would be nice if WebAuthnIdentity had a directly usable constructor
-        this._actualIdentity = WebAuthnIdentity.fromJSON(
-          JSON.stringify({
-            rawId: Buffer.from(cd.credentialId).toString("hex"),
-            publicKey: Buffer.from(strippedKey).toString("hex"),
-          })
+        this._actualIdentity = new WebAuthnIdentity(
+          cd.credentialId,
+          unwrapDER(cd.pubkey, DER_COSE_OID),
+          undefined
         );
         break;
       }
