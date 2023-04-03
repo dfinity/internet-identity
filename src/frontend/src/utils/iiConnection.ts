@@ -41,6 +41,7 @@ import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -101,6 +102,8 @@ export type { ChallengeResult } from "../../generated/internet_identity_types";
 
 export interface IdentifiableIdentity extends SignIdentity {
   rawId: ArrayBuffer;
+
+  getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }
 
 export class Connection {
@@ -140,7 +143,9 @@ export class Connection {
           alias,
           pubkey,
           credential_id: [credential_id],
-          key_type: { unknown: null },
+          key_type: authenticatorAttachmentToKeyType(
+            identity.getAuthenticatorAttachment()
+          ),
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),

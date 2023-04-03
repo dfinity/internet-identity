@@ -10,6 +10,7 @@ import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString, unreachableLax } from "../../utils/utils";
 import { constructIdentity } from "../register/construct";
+import { authenticatorAttachmentToKeyType } from "../../utils/authenticatorAttachment";
 
 export const useRecovery = async (
   connection: Connection,
@@ -152,7 +153,7 @@ const enrollAuthenticator = async ({
   try {
     await connection.add(
       deviceAlias,
-      { unknown: null },
+      authenticatorAttachmentToKeyType(newDevice.getAuthenticatorAttachment()),
       { authentication: null },
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
