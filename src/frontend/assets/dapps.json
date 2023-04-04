@@ -278,6 +278,6 @@
     "oneLiner": "Web3's answer to TikTok with speculation on short video content",
     "link": "https://hotornot.wtf",
     "description": "Hot or Not is a decentralized short-video social media (like TikTok) which integrates prediction markets for content. In addition to creating and sharing short videos on the platform, the users can also speculate on the short videos uploaded by other users on the platform. The users can vote whether a video would be 'Hot' or 'Not' and stake blockchain tokens to substantiate their vote. The results are declared every hour and the winners are rewarded with 2x tokens. With Decentralized governance and content moderation, Hot or Not would put the users at the center of the ecosystem",
-    "logo": "/img/showcase/hot_or_not_logo.svg"
+    "logo": "/img/showcase/hot_or_not_logo.webp"
   }
 ]
