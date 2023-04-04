@@ -634,11 +634,16 @@ export class RecoverView extends View {
   }
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
-    await this.browser.$("#inputSeedPhrase").setValue(seedPhrase);
+    const words = seedPhrase.split(" ");
+    const inputs = this.browser.$$('input[data-role="recovery-word-input"]');
+    for (let i in inputs) {
+      console.log(words[i]);
+      await inputs[i].setValue(words[i]);
+    }
   }
 
   async enterSeedPhraseContinue(): Promise<void> {
-    await this.browser.$("#inputSeedPhraseContinue").click();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async skipDeviceEnrollment(): Promise<void> {
