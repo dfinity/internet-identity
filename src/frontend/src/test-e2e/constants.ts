@@ -1,7 +1,9 @@
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
-import {readFileSync} from "fs";
-export const test_app_canister_ids = JSON.parse(readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8"));
+import { readFileSync } from "fs";
+export const test_app_canister_ids = JSON.parse(
+  readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
+);
 
 export const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 export const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.icp0.io`;
