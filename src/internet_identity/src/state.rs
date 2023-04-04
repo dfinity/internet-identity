@@ -162,21 +162,21 @@ impl Default for State {
 
 // Checks if salt is empty and calls `init_salt` to set it.
 pub async fn ensure_salt_set() {
-    let salt = STATE.with(|s| s.storage.borrow().salt().cloned());
+    let salt = storage_borrow(|storage| storage.salt().cloned());
     if salt.is_none() {
         init_salt().await;
     }
 
-    STATE.with(|s| {
-        if s.storage.borrow().salt().is_none() {
+    storage_borrow(|storage| {
+        if storage.salt().is_none() {
             trap("Salt is not set. Try calling init_salt() to set it");
         }
     });
 }
 
 pub async fn init_salt() {
-    STATE.with(|s| {
-        if s.storage.borrow().salt().is_some() {
+    storage_borrow(|storage| {
+        if storage.salt().is_some() {
             trap("Salt already set");
         }
     });
@@ -192,27 +192,27 @@ pub async fn init_salt() {
         ));
     });
 
-    STATE.with(|s| {
-        let mut store = s.storage.borrow_mut();
-        store.update_salt(salt); // update_salt() traps if salt has already been set
-    });
+    storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
 }
 
 pub fn salt() -> [u8; 32] {
-    STATE
-        .with(|s| s.storage.borrow().salt().cloned())
-        .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"))
+    storage_borrow(|storage| {
+        storage
+            .salt()
+            .cloned()
+            .unwrap_or_else(|| trap("Salt is not set. Try calling init_salt() to set it"))
+    })
 }
 
 pub fn initialize_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
         match Storage::from_memory(DefaultMemoryImpl::default()) {
-            Some(storage) => {
-                s.storage.replace(storage);
+            Some(new_storage) => {
+                storage_replace(new_storage);
             }
             None => {
-                s.storage.borrow_mut().flush();
+                storage_borrow_mut(|storage| storage.flush());
             }
         }
     });
@@ -228,11 +228,10 @@ pub fn save_persistent_state() {
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        let storage = s.storage.borrow();
-        match storage.read_persistent_state() {
+        storage_borrow(|storage| match storage.read_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
-        }
+        })
     });
 
     // Initialize a sensible default for max_latest_delegation_origins
@@ -248,8 +247,8 @@ pub fn load_persistent_state() {
 // helper methods to access / modify the state in a convenient way
 
 pub fn anchor(anchor: AnchorNumber) -> Anchor {
-    STATE.with(|s| {
-        s.storage.borrow().read(anchor).unwrap_or_else(|err| {
+    storage_borrow(|storage| {
+        storage.read(anchor).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to read device data of user {anchor}: {err}"
             ))
@@ -307,12 +306,16 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
 }
 
-pub fn storage<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
+pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&s.storage.borrow()))
 }
 
-pub fn storage_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
+pub fn storage_borrow_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
     STATE.with(|s| f(&mut s.storage.borrow_mut()))
+}
+
+pub fn storage_replace(storage: Storage<DefaultMemoryImpl>) {
+    STATE.with(|s| s.storage.replace(storage));
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
