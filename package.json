@@ -30,6 +30,7 @@
     "@types/selenium-standalone": "^7.0.1",
     "@typescript-eslint/eslint-plugin": "5.45.1",
     "@typescript-eslint/parser": "5.45.1",
+    "@wdio/globals": "^8.6.9",
     "buffer": "6.0.3",
     "compression-webpack-plugin": "~10",
     "copy-webpack-plugin": "~11",
@@ -50,7 +51,7 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "4.9",
-    "webdriverio": "7.25.1",
+    "webdriverio": "^8.6.9",
     "webpack": "~5",
     "webpack-cli": "~5",
     "webpack-dev-server": "~4"
