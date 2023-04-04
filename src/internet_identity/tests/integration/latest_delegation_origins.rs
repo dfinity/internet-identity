@@ -3,12 +3,14 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::{
-    env, install_ii_canister, install_ii_canister_with_arg, principal_1, upgrade_ii_canister,
-    II_WASM,
+    device_data_1, env, install_ii_canister, install_ii_canister_with_arg, principal_1,
+    upgrade_ii_canister, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, StateMachine};
-use internet_identity_interface::internet_identity::types::{AnchorNumber, InternetIdentityInit};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, DeviceData, InternetIdentityInit,
+};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -82,6 +84,24 @@ fn should_keep_latest_origins_across_upgrades() -> Result<(), CallError> {
 
     let latest_origins = api::stats(&env, canister_id)?.latest_delegation_origins;
     assert_eq!(latest_origins, vec!["https://some-dapp.com".to_string()]);
+    Ok(())
+}
+
+/// Verifies that origins are recorded only for devices on II domains.
+#[test]
+fn should_not_record_delegation_origin_for_devices_on_non_ii_domains() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = DeviceData {
+        origin: Some("https://some-other-domain.com".to_string()),
+        ..device_data_1()
+    };
+    let user_number = flows::register_anchor_with_device(&env, canister_id, &device);
+
+    delegation_for_origin(&env, canister_id, user_number, "https://some-dapp.com")?;
+
+    let latest_origins = api::stats(&env, canister_id)?.latest_delegation_origins;
+    assert!(latest_origins.is_empty());
     Ok(())
 }
 
