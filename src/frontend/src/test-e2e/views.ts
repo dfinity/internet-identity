@@ -634,7 +634,7 @@ export class RecoverView extends View {
   }
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
-    const words = seedPhrase.split(" ");
+    const words = seedPhrase.split(" ").filter(Boolean);
     const inputs = await this.browser.$$(
       'input[data-role="recovery-word-input"]'
     );
@@ -652,7 +652,7 @@ export class RecoverView extends View {
   }
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
-    await this.browser.$("h3=Invalid Seed Phrase").waitForDisplayed();
+    await this.browser.$("p*=Could not use recovery phrase").waitForDisplayed();
   }
 }
 
