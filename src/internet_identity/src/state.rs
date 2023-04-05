@@ -12,6 +12,7 @@ use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::internet_identity::types::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
@@ -112,8 +113,13 @@ pub struct RateLimitState {
     pub token_timestamp: Timestamp,
 }
 
+enum StorageState {
+    Uninitialised,
+    Initialised(Storage<DefaultMemoryImpl>),
+}
+
 struct State {
-    storage: RefCell<Storage<DefaultMemoryImpl>>,
+    storage_state: RefCell<StorageState>,
     sigs: RefCell<SignatureMap>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
@@ -138,15 +144,8 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
         Self {
-            storage: RefCell::new(Storage::new(
-                (
-                    FIRST_ANCHOR_NUMBER,
-                    FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
-                ),
-                DefaultMemoryImpl::default(),
-            )),
+            storage_state: RefCell::new(StorageState::Uninitialised),
             sigs: RefCell::new(SignatureMap::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
@@ -204,7 +203,19 @@ pub fn salt() -> [u8; 32] {
     })
 }
 
-pub fn initialize_from_stable_memory() {
+pub fn init_new() {
+    const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
+    let storage = Storage::new(
+        (
+            FIRST_ANCHOR_NUMBER,
+            FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
+        ),
+        DefaultMemoryImpl::default(),
+    );
+    storage_replace(storage);
+}
+
+pub fn init_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
     });
@@ -220,9 +231,7 @@ pub fn initialize_from_stable_memory() {
 
 pub fn save_persistent_state() {
     STATE.with(|s| {
-        s.storage
-            .borrow_mut()
-            .write_persistent_state(&s.persistent_state.borrow());
+        storage_borrow_mut(|storage| storage.write_persistent_state(&s.persistent_state.borrow()))
     })
 }
 
@@ -307,15 +316,21 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
 }
 
 pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&s.storage.borrow()))
+    STATE.with(|s| match s.storage_state.borrow().deref() {
+        StorageState::Uninitialised => trap("Storage not initialized."),
+        StorageState::Initialised(storage) => f(storage),
+    })
 }
 
 pub fn storage_borrow_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> R) -> R {
-    STATE.with(|s| f(&mut s.storage.borrow_mut()))
+    STATE.with(|s| match s.storage_state.borrow_mut().deref_mut() {
+        StorageState::Uninitialised => trap("Storage not initialized."),
+        StorageState::Initialised(ref mut storage) => f(storage),
+    })
 }
 
 pub fn storage_replace(storage: Storage<DefaultMemoryImpl>) {
-    STATE.with(|s| s.storage.replace(storage));
+    STATE.with(|s| s.storage_state.replace(StorageState::Initialised(storage)));
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
