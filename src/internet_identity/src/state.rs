@@ -14,8 +14,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::time::Duration;
 
-pub type Assets = HashMap<&'static str, (Vec<HeaderField>, &'static [u8])>;
-pub type AssetHashes = RbTree<&'static str, Hash>;
+pub type Assets = HashMap<String, (Vec<HeaderField>, Vec<u8>)>;
+pub type AssetHashes = RbTree<String, Hash>;
 
 // Default value for max number of delegation origins to store in the list of latest used delegation origins
 const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;

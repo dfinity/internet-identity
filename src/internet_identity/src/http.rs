@@ -10,8 +10,7 @@ use ic_certified_map::HashTree;
 use ic_metrics_encoder::MetricsEncoder;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
-use serde_bytes::{ByteBuf, Bytes};
-use std::borrow::Cow;
+use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 impl ContentType {
@@ -39,7 +38,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
                     .to_string(),
             )],
-            body: Cow::Owned(ByteBuf::new()),
+            body: ByteBuf::new(),
             // Redirects are not allowed as query because certification V1 does not cover headers.
             // Upgrading to update fixes this. This flag can be removed when switching to
             // certification V2.
@@ -62,7 +61,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     HttpResponse {
                         status_code: 200,
                         headers,
-                        body: Cow::Owned(ByteBuf::from(body)),
+                        body: ByteBuf::from(body),
                         upgrade: None,
                         streaming_strategy: None,
                     }
@@ -70,7 +69,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: security_headers(),
-                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
+                    body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                     upgrade: None,
                     streaming_strategy: None,
                 },
@@ -88,7 +87,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     HttpResponse {
                         status_code: 200,
                         headers,
-                        body: Cow::Borrowed(Bytes::new(value)),
+                        body: ByteBuf::from(value.clone()),
                         upgrade: None,
                         streaming_strategy: None,
                     }
@@ -96,9 +95,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 None => HttpResponse {
                     status_code: 404,
                     headers,
-                    body: Cow::Owned(ByteBuf::from(format!(
-                        "Asset {probably_an_asset} not found."
-                    ))),
+                    body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                     upgrade: None,
                     streaming_strategy: None,
                 },
