@@ -24,7 +24,7 @@ import {
   checkIndices,
   confirmSeedPhrasePage,
 } from "./flows/recovery/confirmSeedPhrase";
-import { phraseRecoveryPage } from "./flows/recovery/recoverWith/phrase";
+import { recoverWithPhrasePage } from "./flows/recovery/recoverWith/phrase";
 import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
 import { authnPages } from "./components/authenticateBox";
 import { authnTemplateAuthorize } from "./flows/authorize";
@@ -194,7 +194,15 @@ const iiPages: Record<string, () => void> = {
     }),
 
   recoverWithPhrase: () =>
-    phraseRecoveryPage(userNumber, dummyConnection, recoveryPhrase),
+    recoverWithPhrasePage<
+      { tag: "ok"; words: string },
+      { tag: "err"; message: string }
+    >({
+      verify: (words: string) => Promise.resolve({ tag: "ok", words }),
+      confirm: ({ words }) => console.log("confirmed: " + words),
+      back: () => console.log("remove"),
+      message: "Something cool will happen if you type your anchor",
+    }),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
   constructing: () => renderConstructing({}),

@@ -1,9 +1,10 @@
+import { html } from "lit-html";
 import { displayError } from "../../components/displayError";
 import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
 import { LoginFlowResult } from "../../utils/flowResult";
 import { promptUserNumber } from "../../components/promptUserNumber";
 import { promptDeviceAlias } from "../../components/alias";
-import { phraseRecoveryPage } from "./recoverWith/phrase";
+import { recoverWithPhrase } from "./recoverWith/phrase";
 import { deviceRecoveryPage } from "./recoverWith/device";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { isRecoveryPhrase } from "../../utils/recoveryDevice";
@@ -50,7 +51,13 @@ const runRecovery = async (
       : await pickRecoveryDevice(recoveryDevices);
 
   const res = isRecoveryPhrase(device)
-    ? await phraseRecoveryPage(userNumber, connection, device)
+    ? await recoverWithPhrase({
+        userNumber,
+        connection,
+        device,
+        message: html`Type your recovery phrase below to access your anchor
+          <strong class="t-strong">${userNumber}</strong>`,
+      })
     : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
