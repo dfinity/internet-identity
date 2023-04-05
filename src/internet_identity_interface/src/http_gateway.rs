@@ -2,8 +2,7 @@
 //! See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
 
 use candid::{CandidType, Deserialize, Func};
-use serde_bytes::{ByteBuf, Bytes};
-use std::borrow::Cow;
+use serde_bytes::ByteBuf;
 
 pub type HeaderField = (String, String);
 
@@ -33,7 +32,7 @@ pub struct HttpRequest {
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
-    pub body: Cow<'static, Bytes>,
+    pub body: ByteBuf,
     pub upgrade: Option<bool>,
     pub streaming_strategy: Option<StreamingStrategy>,
 }
