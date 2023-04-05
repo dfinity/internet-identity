@@ -1,3 +1,4 @@
+use crate::active_anchor_stats::IIDomain;
 use crate::state::{persistent_state_mut, AssetHashes};
 use crate::{hash, state, update_root_hash, DAY_NS, LABEL_ASSETS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
@@ -28,6 +29,7 @@ pub async fn prepare_delegation(
     frontend: FrontendHostname,
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
+    ii_domain: &Option<IIDomain>,
 ) -> (UserKey, Timestamp) {
     state::ensure_salt_set().await;
     prune_expired_signatures();
@@ -45,7 +47,7 @@ pub async fn prepare_delegation(
     });
     update_root_hash();
 
-    delegation_bookkeeping(frontend);
+    delegation_bookkeeping(frontend, ii_domain);
 
     (
         ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
@@ -54,11 +56,13 @@ pub async fn prepare_delegation(
 }
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(frontend: FrontendHostname) {
+fn delegation_bookkeeping(frontend: FrontendHostname, ii_domain: &Option<IIDomain>) {
     state::usage_metrics_mut(|metrics| {
         metrics.delegation_counter += 1;
     });
-    update_latest_delegation_origins(frontend);
+    if ii_domain.is_some() {
+        update_latest_delegation_origins(frontend);
+    }
 }
 
 /// Add the current front-end to the list of latest used front-end origins.
