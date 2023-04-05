@@ -139,7 +139,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 #[query]
 #[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
-    state::storage(|storage| {
+    state::storage_borrow(|storage| {
         storage
             .read(anchor_number)
             .unwrap_or_default()
@@ -285,7 +285,7 @@ fn stats() -> InternetIdentityStats {
             )
         });
 
-    state::storage(|storage| InternetIdentityStats {
+    state::storage_borrow(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
         users_registered: storage.anchor_count() as u64,
         archive_info,
@@ -328,7 +328,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     apply_install_arg(maybe_arg);
 
     // make sure the fully initialized storage configuration is written to stable memory
-    state::storage_mut(|storage| storage.flush());
+    state::storage_borrow_mut(|storage| storage.flush());
     update_root_hash();
 }
 
@@ -349,7 +349,7 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
-            state::storage_mut(|storage| {
+            state::storage_borrow_mut(|storage| {
                 storage.set_anchor_number_range(range);
             });
         }
@@ -415,9 +415,9 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDom
     let domain = device.ii_domain();
     let device_key = device.pubkey.clone();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
-        panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
-    });
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
+        |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
+    );
     domain
 }
 
@@ -443,9 +443,9 @@ fn authenticated_anchor_operation<R>(
     let result = op(&mut anchor);
 
     // write back anchor
-    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
-        panic!("unable to update anchor {anchor_number} in stable memory: {err}")
-    });
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
+        |err| panic!("unable to update anchor {anchor_number} in stable memory: {err}"),
+    );
 
     match result {
         Ok((ret, operation)) => {

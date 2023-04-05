@@ -108,7 +108,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
-    state::storage(|storage| {
+    state::storage_borrow(|storage| {
         w.encode_gauge(
             "internet_identity_user_count",
             storage.anchor_count() as f64,
