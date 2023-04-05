@@ -207,15 +207,15 @@ pub fn salt() -> [u8; 32] {
 pub fn initialize_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
-        match Storage::from_memory(DefaultMemoryImpl::default()) {
-            Some(new_storage) => {
-                storage_replace(new_storage);
-            }
-            None => {
-                storage_borrow_mut(|storage| storage.flush());
-            }
-        }
     });
+    match Storage::from_memory(DefaultMemoryImpl::default()) {
+        Some(new_storage) => {
+            storage_replace(new_storage);
+        }
+        None => {
+            storage_borrow_mut(|storage| storage.flush());
+        }
+    }
 }
 
 pub fn save_persistent_state() {
