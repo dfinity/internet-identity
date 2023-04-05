@@ -1,3 +1,4 @@
+use crate::active_anchor_stats::IIDomain;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
@@ -286,6 +287,12 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
+    }
+
+    pub fn ii_domain(&self) -> Option<IIDomain> {
+        self.origin
+            .as_ref()
+            .and_then(|origin| IIDomain::try_from(origin.as_str()).ok())
     }
 }
 
