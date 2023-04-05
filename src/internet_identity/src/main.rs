@@ -1,3 +1,4 @@
+use crate::active_anchor_stats::IIDomain;
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
@@ -206,8 +207,15 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    authenticate_and_record_activity(anchor_number);
-    delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
+    let ii_domain = authenticate_and_record_activity(anchor_number);
+    delegation::prepare_delegation(
+        anchor_number,
+        frontend,
+        session_key,
+        max_time_to_live,
+        &ii_domain,
+    )
+    .await
 }
 
 #[query]
@@ -401,13 +409,16 @@ fn update_root_hash() {
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
-fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
+fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
     let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    let device = trap_if_not_authenticated(&anchor);
+    let domain = device.ii_domain();
+    let device_key = device.pubkey.clone();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
         panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
-    })
+    });
+    domain
 }
 
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
