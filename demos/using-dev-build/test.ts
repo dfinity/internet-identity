@@ -9,15 +9,15 @@
 import * as fs from "fs";
 import { ChildProcess, spawn, execSync } from "child_process";
 
-// In order to proxy the calls Node v18 requires 127.0.0.1 instead of localhost as string
+// In order to proxy the calls Node v18 requires 127.0.0.1 instead of localhost as string for the proxy
 const LOCALHOST = "127.0.0.1";
 
-// Port and URL for II and the sign in app, then exported to the tests
+// Port and URL for II and the sign in app, then exported to the tests. Here we need localhost as string because it is used by wdio in the headless browser.
 const II_DAPP_PORT = 8086;
-const II_DAPP_URL = `http://${LOCALHOST}:${II_DAPP_PORT}`;
+const II_DAPP_URL = `http://localhost:${II_DAPP_PORT}`;
 
 const WEBAPP_PORT = 8087;
-const WEBAPP_URL = `http://${LOCALHOST}:${WEBAPP_PORT}`;
+const WEBAPP_URL = `http://localhost:${WEBAPP_PORT}`;
 
 type Arguments = { noRun: boolean };
 
