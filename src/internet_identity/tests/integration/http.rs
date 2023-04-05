@@ -16,7 +16,6 @@ use std::time::{Duration, UNIX_EPOCH};
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
     let mut assets: Vec<(String, Option<&str>)> = vec![
         ("/".to_string(), None),
-        ("/about".to_string(), None),
         ("/index.html".to_string(), None),
         ("/index.js".to_string(), Some("gzip")),
         ("/loader.webp".to_string(), None),
