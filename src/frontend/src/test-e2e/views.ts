@@ -635,9 +635,10 @@ export class RecoverView extends View {
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
     const words = seedPhrase.split(" ");
-    const inputs = this.browser.$$('input[data-role="recovery-word-input"]');
-    for (let i in inputs) {
-      console.log(words[i]);
+    const inputs = await this.browser.$$(
+      'input[data-role="recovery-word-input"]'
+    );
+    for (let i = 0; i < words.length; i++) {
       await inputs[i].setValue(words[i]);
     }
   }
