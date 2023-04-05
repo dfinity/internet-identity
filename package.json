@@ -15,7 +15,7 @@
     "showcase": "II_FETCH_ROOT_KEY=1 npm run opts -- webpack serve --config-name showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
@@ -30,6 +30,7 @@
     "@types/selenium-standalone": "^7.0.1",
     "@typescript-eslint/eslint-plugin": "5.45.1",
     "@typescript-eslint/parser": "5.45.1",
+    "@wdio/globals": "^8.6.9",
     "buffer": "6.0.3",
     "compression-webpack-plugin": "~10",
     "copy-webpack-plugin": "~11",
@@ -50,7 +51,7 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "4.9",
-    "webdriverio": "7.25.1",
+    "webdriverio": "^8.6.9",
     "webpack": "~5",
     "webpack-cli": "~5",
     "webpack-dev-server": "~4"
@@ -64,8 +65,8 @@
     "lit-html": "^2.3.1",
     "text-encoding": "^0.7.0"
   },
-  "engines" : { 
-    "npm" : ">=8.0.0",
-    "node" : ">=16.0.0 <18.0.0"
+  "engines": {
+    "npm": ">=9.0.0 <10.0.0",
+    "node": ">=18.0.0 <19.0.0"
   }
 }
