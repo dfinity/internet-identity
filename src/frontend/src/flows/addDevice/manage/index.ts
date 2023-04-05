@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
 import { browserIcon, securityKeyIcon } from "../../../components/icons";
-import { warnBox } from "../../../components/warnBox";
 import { mainWindow } from "../../../components/mainWindow";
+import { warnBox } from "../../../components/warnBox";
 import { LEGACY_II_URL } from "../../../config";
 
 const pageContent = () => {

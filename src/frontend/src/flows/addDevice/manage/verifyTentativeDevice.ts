@@ -1,15 +1,14 @@
 import { html } from "lit-html";
-import { unreachableLax, unknownToString } from "../../../utils/utils";
-import { createRef, ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { withRef, renderPage } from "../../../utils/lit-html";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { withLoader } from "../../../components/loader";
-import { displayError } from "../../../components/displayError";
-import { Chan } from "../../../utils/utils";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { mainWindow } from "../../../components/mainWindow";
+import { createRef, ref } from "lit-html/directives/ref.js";
 import { VerifyTentativeDeviceResponse } from "../../../../generated/internet_identity_types";
+import { displayError } from "../../../components/displayError";
+import { withLoader } from "../../../components/loader";
+import { mainWindow } from "../../../components/mainWindow";
+import { AsyncCountdown } from "../../../utils/countdown";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { renderPage, withRef } from "../../../utils/lit-html";
+import { Chan, unknownToString, unreachableLax } from "../../../utils/utils";
 
 // The type that we return, pretty much the result of the canister
 // except that all retries have been exhausted

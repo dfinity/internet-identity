@@ -1,4 +1,3 @@
-import { AuthenticateView, DemoAppView, WelcomeView } from "./views";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
@@ -9,15 +8,16 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
+import { AuthenticateView, DemoAppView } from "./views";
 
 import {
-  II_URL,
-  TEST_APP_CANISTER_ID,
-  TEST_APP_NICE_URL,
   DEVICE_NAME1,
+  II_URL,
+  REPLICA_URL,
+  TEST_APP_CANISTER_ID,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
-  REPLICA_URL,
+  TEST_APP_NICE_URL,
 } from "./constants";
 
 test("Authorize ready message should be sent immediately", async () => {

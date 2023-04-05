@@ -3,7 +3,7 @@
  * This module provides helper for loading multi-language copy definitions and updating the lit templates
  * depending on the user-selected language dynamically. */
 
-import { TemplateResult, html } from "lit-html";
+import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan } from "./utils";
 

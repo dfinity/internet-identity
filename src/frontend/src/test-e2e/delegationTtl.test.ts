@@ -1,4 +1,3 @@
-import { AuthenticateView, DemoAppView } from "./views";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
@@ -6,8 +5,9 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
+import { DemoAppView } from "./views";
 
-import { II_URL, TEST_APP_NICE_URL, DEVICE_NAME1 } from "./constants";
+import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
 
 test("Delegation maxTimeToLive: 1 min", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

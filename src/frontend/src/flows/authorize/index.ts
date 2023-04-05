@@ -1,18 +1,17 @@
 import { html, render, TemplateResult } from "lit-html";
-import { withRef } from "../../utils/lit-html";
-import { caretDownIcon } from "../../components/icons";
-import { ref, createRef, Ref } from "lit-html/directives/ref.js";
-import { unreachable } from "../../utils/utils";
-import { Connection } from "../../utils/iiConnection";
-import { displayError } from "../../components/displayError";
-import { spinner } from "../../components/icons";
-import { recoveryWizard } from "../recovery/recoveryWizard";
-import { authenticationProtocol } from "./postMessageInterface";
-import { I18n } from "../../i18n";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   authenticateBox,
   AuthnTemplates,
 } from "../../components/authenticateBox";
+import { displayError } from "../../components/displayError";
+import { caretDownIcon, spinner } from "../../components/icons";
+import { I18n } from "../../i18n";
+import { Connection } from "../../utils/iiConnection";
+import { withRef } from "../../utils/lit-html";
+import { unreachable } from "../../utils/utils";
+import { recoveryWizard } from "../recovery/recoveryWizard";
+import { authenticationProtocol } from "./postMessageInterface";
 
 import copyJson from "./index.json";
 

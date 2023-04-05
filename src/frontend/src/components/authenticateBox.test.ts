@@ -1,4 +1,4 @@
-import { render, html } from "lit-html";
+import { html, render } from "lit-html";
 import { authnTemplates } from "./authenticateBox";
 
 test("anchors are forwarded", async () => {

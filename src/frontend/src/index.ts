@@ -1,14 +1,14 @@
-import "./styles/main.css";
-import { authFlowManage } from "./flows/manage";
-import { authFlowAuthorize } from "./flows/authorize";
-import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { aboutView } from "./flows/about";
-import { version } from "./version";
-import { checkRequiredFeatures } from "./utils/featureDetection";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
-import { Connection } from "./utils/iiConnection";
 import { anyFeatures, features } from "./features";
+import { aboutView } from "./flows/about";
+import { authFlowAuthorize } from "./flows/authorize";
+import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { authFlowManage } from "./flows/manage";
+import "./styles/main.css";
+import { checkRequiredFeatures } from "./utils/featureDetection";
+import { Connection } from "./utils/iiConnection";
+import { version } from "./version";
 
 /** Reads the canister ID from the <script> tag.
  *

@@ -1,15 +1,15 @@
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { delayMillis } from "../../../utils/utils";
-import { renderPage } from "../../../utils/lit-html";
 import {
   DeviceData,
   Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { mainWindow } from "../../../components/mainWindow";
 import { LEGACY_II_URL } from "../../../config";
+import { AsyncCountdown } from "../../../utils/countdown";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { renderPage } from "../../../utils/lit-html";
+import { delayMillis } from "../../../utils/utils";
 
 const pollForTentativeDeviceTemplate = ({
   userNumber,

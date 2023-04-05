@@ -1,15 +1,15 @@
-import path from "path";
-import * as fs from "fs";
-import webpack from "webpack";
-import CopyPlugin from "copy-webpack-plugin";
 import CompressionPlugin from "compression-webpack-plugin";
+import CopyPlugin from "copy-webpack-plugin";
+import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
+import * as fs from "fs";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
-import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
+import path from "path";
 import { fileURLToPath } from "url";
+import webpack from "webpack";
 
-import { TemplateResult } from "lit-html";
 import { render } from "@lit-labs/ssr/lib/render-lit-html";
+import { TemplateResult } from "lit-html";
 import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
 import { I18n } from "./src/frontend/src/i18n";
 

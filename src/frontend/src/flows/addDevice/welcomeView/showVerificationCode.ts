@@ -1,16 +1,16 @@
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Connection } from "../../../utils/iiConnection";
-import { delayMillis } from "../../../utils/utils";
-import { renderPage } from "../../../utils/lit-html";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
 } from "../../../../generated/internet_identity_types";
-import { setAnchorUsed } from "../../../utils/userNumber";
-import { AsyncCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
+import { AsyncCountdown } from "../../../utils/countdown";
+import { Connection } from "../../../utils/iiConnection";
+import { renderPage } from "../../../utils/lit-html";
+import { setAnchorUsed } from "../../../utils/userNumber";
+import { delayMillis } from "../../../utils/utils";
 
 type TentativeRegistrationInfo = Extract<
   AddTentativeDeviceResponse,

@@ -1,14 +1,14 @@
-import { Connection } from "../../utils/iiConnection";
-import { unknownToString } from "../../utils/utils";
-import { setAnchorUsed } from "../../utils/userNumber";
-import { promptCaptcha } from "./captcha";
+import { promptDeviceAlias } from "../../components/alias";
 import {
   apiResultToLoginFlowResult,
-  LoginFlowResult,
   cancel,
+  LoginFlowResult,
 } from "../../utils/flowResult";
+import { Connection } from "../../utils/iiConnection";
+import { setAnchorUsed } from "../../utils/userNumber";
+import { unknownToString } from "../../utils/utils";
+import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
-import { promptDeviceAlias } from "../../components/alias";
 import { displayUserNumber } from "./finish";
 
 /** Registration (anchor creation) flow for new users */

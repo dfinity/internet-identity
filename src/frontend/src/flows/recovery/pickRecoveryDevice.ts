@@ -1,10 +1,10 @@
 import { html, render } from "lit-html";
-import { mainWindow } from "../../components/mainWindow";
 import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
+import { mainWindow } from "../../components/mainWindow";
 import {
+  isRecoveryPhrase,
   RecoveryDevice,
   recoveryDeviceToLabel,
-  isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
 
 const pageContent = () => {

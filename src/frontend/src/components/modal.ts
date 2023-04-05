@@ -1,6 +1,6 @@
-import { html, TemplateResult, render } from "lit-html";
-import { withRef } from "../utils/lit-html";
+import { html, render, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { withRef } from "../utils/lit-html";
 
 /**
  * creates a modal that contains arbitrary content
