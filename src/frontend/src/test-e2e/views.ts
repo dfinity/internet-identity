@@ -634,11 +634,17 @@ export class RecoverView extends View {
   }
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
-    await this.browser.$("#inputSeedPhrase").setValue(seedPhrase);
+    const words = seedPhrase.split(" ").filter(Boolean);
+    const inputs = await this.browser.$$(
+      'input[data-role="recovery-word-input"]'
+    );
+    for (let i = 0; i < words.length; i++) {
+      await inputs[i].setValue(words[i]);
+    }
   }
 
   async enterSeedPhraseContinue(): Promise<void> {
-    await this.browser.$("#inputSeedPhraseContinue").click();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async skipDeviceEnrollment(): Promise<void> {
@@ -646,7 +652,7 @@ export class RecoverView extends View {
   }
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
-    await this.browser.$("h3=Invalid Seed Phrase").waitForDisplayed();
+    await this.browser.$("p*=Could not use recovery phrase").waitForDisplayed();
   }
 }
 
