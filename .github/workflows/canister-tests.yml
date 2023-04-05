@@ -264,7 +264,7 @@ jobs:
 
       - name: Create dummy assets
         run: |
-          mkdir dist
+          mkdir -p dist/showcase/icons
           touch dist/index.html
           touch dist/about.html
           touch dist/index.js.gz

@@ -6,8 +6,10 @@ use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
+use include_dir::include_dir;
 use lazy_static::lazy_static;
 use sha2::Digest;
+use std::ops::Add;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ContentEncoding {
@@ -24,6 +26,7 @@ pub enum ContentType {
     WEBP,
     CSS,
     OCTETSTREAM,
+    PNG,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -88,10 +91,10 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(String, Vec<u8>, ContentEncoding, ContentType); 8] {
+fn get_assets() -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
     let index_html: Vec<u8> = INDEX_HTML_STR.as_bytes().to_vec();
     let about_html: Vec<u8> = ABOUT_HTML_STR.as_bytes().to_vec();
-    [
+    let mut assets = vec![
         (
             "/".to_string(),
             index_html.clone(),
@@ -142,5 +145,25 @@ fn get_assets() -> [(String, Vec<u8>, ContentEncoding, ContentType); 8] {
             ContentEncoding::Identity,
             ContentType::OCTETSTREAM,
         ),
-    ]
+    ];
+    add_showcase_icons(&mut assets);
+    assets
+}
+
+fn add_showcase_icons(assets: &mut Vec<(String, Vec<u8>, ContentEncoding, ContentType)>) {
+    for icon in include_dir!("$CARGO_MANIFEST_DIR/../../dist/showcase/icons").files() {
+        let content_type = match icon.path().extension().unwrap().to_str().unwrap() {
+            "webp" => ContentType::WEBP,
+            "png" => ContentType::PNG,
+            ext => panic!("Unexpected icon extension: {}", ext),
+        };
+        let name = icon.path().file_name().unwrap().to_str().unwrap();
+        let asset = "/showcase/icons/".to_string().add(name);
+        assets.push((
+            asset,
+            icon.contents().to_vec(),
+            ContentEncoding::Identity,
+            content_type,
+        ));
+    }
 }

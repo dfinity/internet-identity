@@ -14,13 +14,24 @@ use std::time::{Duration, UNIX_EPOCH};
 /// Verifies that expected assets are delivered, certified and have security headers.
 #[test]
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
-    let assets: Vec<(&str, Option<&str>)> = vec![
-        ("/", None),
-        ("/index.html", None),
-        ("/index.js", Some("gzip")),
-        ("/loader.webp", None),
-        ("/favicon.ico", None),
+    let mut assets: Vec<(String, Option<&str>)> = vec![
+        ("/".to_string(), None),
+        ("/about".to_string(), None),
+        ("/index.html".to_string(), None),
+        ("/index.js".to_string(), Some("gzip")),
+        ("/loader.webp".to_string(), None),
+        ("/favicon.ico".to_string(), None),
     ];
+
+    for icon in std::fs::read_dir("../frontend/assets/showcase/icons").unwrap() {
+        let icon = icon.unwrap();
+        let path = icon.path();
+        assets.push((
+            "/showcase/icons/".to_string() + path.file_name().unwrap().to_str().unwrap(),
+            None,
+        ));
+    }
+
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -62,8 +73,8 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         validate_certification(
             ic_certificate,
             canister_id,
-            asset,
-            &http_response.body,
+            &asset,
+            http_response.body.as_ref(),
             None, // should really be `encoding`, but cannot use it because II certifies encoded response bodies, see L2-722 for details
             &env.root_key(),
             env.time(),

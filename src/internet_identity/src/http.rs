@@ -22,6 +22,7 @@ impl ContentType {
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
+            ContentType::PNG => "image/png".to_string(),
         }
     }
 }
