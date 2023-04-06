@@ -42,6 +42,7 @@ import { displayUserNumberPage } from "./flows/register/finish";
 import { registerDisabled } from "./flows/registerDisabled";
 import { styleguide } from "./styleguide";
 import "./styles/main.css";
+import { addDeviceLink } from "./utils/addDeviceLink";
 import { I18n } from "./utils/i18n";
 import { AuthenticatedConnection } from "./utils/iiConnection";
 import { mount, withRef } from "./utils/lit-html";
@@ -311,8 +312,11 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
-      userNumber,
       cancel: () => console.log("canceled"),
+      link: addDeviceLink({
+        origin: "https://identity.internetcomputer.org",
+        userNumber: BigInt(1234),
+      }),
       remaining: {
         async *[Symbol.asyncIterator]() {
           yield "00:34";

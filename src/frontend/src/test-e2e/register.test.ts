@@ -113,17 +113,11 @@ test("Register new identity and add additional remote device", async () => {
 
     const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
     await addDeviceFlowView.waitForDisplay();
-    await addDeviceFlowView.selectRemoteDevice();
+    const addDeviceLink = await addDeviceFlowView.selectRemoteDevice();
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
-      await browser2.url(II_URL);
-      const welcomeView2 = new WelcomeView(browser2);
-      await welcomeView2.waitForDisplay();
-      await welcomeView2.addDevice();
-      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
-      await addIdentityAnchorView2.waitForDisplay();
-      await addIdentityAnchorView2.continue(userNumber);
+      await browser2.url(addDeviceLink);
       const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
       await addRemoteDeviceView.waitForDisplay();
       await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
