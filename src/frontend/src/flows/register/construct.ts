@@ -1,14 +1,14 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
-import {
-  IdentifiableIdentity,
-  DummyIdentity,
-  creationOptions,
-} from "../../utils/iiConnection";
 import { nextTick } from "process";
+import { DeviceData } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
+import {
+  creationOptions,
+  DummyIdentity,
+  IIWebAuthnIdentity,
+} from "../../utils/iiConnection";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
@@ -26,7 +26,7 @@ const constructingContentSlot = ({
 
 const constructingContent = (props: { message?: string }) =>
   mainWindow({
-    additionalContainerClasses: ["t-centered", "l-container--centered"],
+    additionalContainerClasses: ["t-centered"],
     showFooter: false,
     showLogo: false,
     slot: constructingContentSlot(props),
@@ -43,7 +43,7 @@ export const constructIdentity = async ({
 }: {
   devices?: () => Promise<Array<DeviceData>>;
   message?: string;
-}): Promise<IdentifiableIdentity> => {
+}): Promise<IIWebAuthnIdentity> => {
   renderConstructing({ message });
   await tick();
 

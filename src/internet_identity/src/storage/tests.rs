@@ -369,5 +369,8 @@ fn sample_persistent_state() -> PersistentState {
                 }],
             },
         }),
+        domain_active_anchor_stats: None,
+        latest_delegation_origins: None,
+        max_num_latest_delegation_origins: None,
     }
 }

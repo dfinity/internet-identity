@@ -1,7 +1,7 @@
-import { TemplateResult, html } from "lit-html";
-import { Authenticator } from "./types";
+import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "../../components/icons";
 import { settingsDropdown } from "./settingsDropdown";
+import { Authenticator } from "./types";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
@@ -131,7 +131,7 @@ const itemWarning = ({
 }: {
   warn: TemplateResult;
 }): TemplateResult => html`<div class="c-action-list__action">
-  <span class="c-tooltip c-tooltip--left c-icon c-icon--error" tabindex="0"
+  <span class="c-tooltip c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
     ></span

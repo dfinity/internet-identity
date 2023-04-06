@@ -1,4 +1,5 @@
-use crate::state::AssetHashes;
+use crate::active_anchor_stats::IIDomain;
+use crate::state::{persistent_state_mut, AssetHashes};
 use crate::{hash, state, update_root_hash, DAY_NS, LABEL_ASSETS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
 use ic_cdk::api::{data_certificate, time};
@@ -28,6 +29,7 @@ pub async fn prepare_delegation(
     frontend: FrontendHostname,
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
+    ii_domain: &Option<IIDomain>,
 ) -> (UserKey, Timestamp) {
     state::ensure_salt_set().await;
     prune_expired_signatures();
@@ -45,13 +47,53 @@ pub async fn prepare_delegation(
     });
     update_root_hash();
 
-    state::usage_metrics_mut(|metrics| {
-        metrics.delegation_counter += 1;
-    });
+    delegation_bookkeeping(frontend, ii_domain);
+
     (
         ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
         expiration,
     )
+}
+
+/// Update metrics and the list of latest front-end origins.
+fn delegation_bookkeeping(frontend: FrontendHostname, ii_domain: &Option<IIDomain>) {
+    state::usage_metrics_mut(|metrics| {
+        metrics.delegation_counter += 1;
+    });
+    if ii_domain.is_some() {
+        update_latest_delegation_origins(frontend);
+    }
+}
+
+/// Add the current front-end to the list of latest used front-end origins.
+fn update_latest_delegation_origins(frontend: FrontendHostname) {
+    let now_ns = time();
+
+    persistent_state_mut(|persistent_state| {
+        let latest_delegation_origins = persistent_state
+            .latest_delegation_origins
+            .get_or_insert(HashMap::new());
+
+        if let Some(timestamp_ns) = latest_delegation_origins.get_mut(&frontend) {
+            *timestamp_ns = now_ns;
+        } else {
+            latest_delegation_origins.insert(frontend, now_ns);
+        };
+
+        // drop entries older than 30 days
+        latest_delegation_origins.retain(|_, timestamp_ns| now_ns - *timestamp_ns < 30 * DAY_NS);
+
+        // if we still have too many entries, drop the oldest
+        if latest_delegation_origins.len() as u64
+            > persistent_state.max_num_latest_delegation_origins.unwrap()
+        {
+            // if this case is hit often (i.e. we routinely have more than 1000 entries), we should
+            // consider using a more efficient data structure
+            let mut values: Vec<_> = latest_delegation_origins.clone().into_iter().collect();
+            values.sort_by(|(_, timestamp_1), (_, timestamp_2)| timestamp_1.cmp(timestamp_2));
+            latest_delegation_origins.remove(&values[0].0);
+        };
+    });
 }
 
 pub fn get_delegation(

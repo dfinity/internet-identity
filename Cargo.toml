@@ -7,6 +7,6 @@ members = [
 ]
 
 [profile.release]
-debug = false # stripped by ic-cdk-optimizer anyway
+debug = false # stripped by ic-wasm anyway
 lto = true
 opt-level = 'z'

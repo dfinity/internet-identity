@@ -1,10 +1,10 @@
-import { remote } from "webdriverio";
-import { command } from "webdriver";
-import { wrapError, randomString } from "../utils/utils";
-import { WebAuthnCredential } from "../../test-setup";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
-import * as fsasync from "fs/promises";
 import * as fs from "fs";
+import * as fsasync from "fs/promises";
+import { command } from "webdriver";
+import { remote } from "webdriverio";
+import { WebAuthnCredential } from "../../test-setup";
+import { randomString, wrapError } from "../utils/utils";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {

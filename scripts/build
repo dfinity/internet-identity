@@ -32,7 +32,7 @@ function help() {
 
 Builds the Internet Identity and the Archive canister.
 
-NOTE: This requires a working rust toolchain as well as ic-cdk-optimizer.
+NOTE: This requires a working rust toolchain as well as ic-wasm.
 EOF
 
 }
@@ -80,11 +80,11 @@ if [ ${#CANISTERS[@]} -eq 0 ]; then
 fi
 
 # Checking for dependencies
-if [[ ! "$(command -v ic-cdk-optimizer)" || "$(ic-cdk-optimizer --version)" != "ic-cdk-optimizer 0.3.4" ]]
+if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.3.5" ]]
 then
-    echo "could not find ic-cdk-optimizer 0.3.4"
-    echo "ic-cdk-optimizer version 0.3.4 is needed, please run the following command:"
-    echo "  cargo install ic-cdk-optimizer --version 0.3.4"
+    echo "could not find ic-wasm 0.3.5"
+    echo "ic-wasm version 0.3.5 is needed, please run the following command:"
+    echo "  cargo install ic-wasm --version 0.3.5"
     exit 1
 fi
 
@@ -124,9 +124,11 @@ function build_canister() {
     then
         CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$SRC_DIR/../../target/}"
 
-        ic-cdk-optimizer \
+        ic-wasm \
             "$CARGO_TARGET_DIR/$TARGET/release/$canister.wasm" \
-            -o "./$canister.wasm"
+            -o "./$canister.wasm" \
+            shrink
+        ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:service -f "$SRC_DIR/$canister.did" -v public
         gzip --no-name --force --keep "$canister.wasm"
     fi
 }

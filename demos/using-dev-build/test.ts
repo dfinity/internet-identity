@@ -6,10 +6,13 @@
  * been deployed.
  */
 
+import { ChildProcess, execSync, spawn } from "child_process";
 import * as fs from "fs";
-import { ChildProcess, spawn, execSync } from "child_process";
 
-// Port and URL for II and the sign in app, then exported to the tests
+// In order to proxy the calls Node v18 requires 127.0.0.1 instead of localhost as string for the proxy
+const LOCALHOST = "127.0.0.1";
+
+// Port and URL for II and the sign in app, then exported to the tests. Here we need localhost as string because it is used by wdio in the headless browser.
 const II_DAPP_PORT = 8086;
 const II_DAPP_URL = `http://localhost:${II_DAPP_PORT}`;
 
@@ -59,7 +62,7 @@ function parseCanisterIDs(): CanisterIDs {
 
 function getReplicaHost(): string {
   let port = execSync("dfx info webserver-port");
-  return `http://localhost:${port}`;
+  return `http://${LOCALHOST}:${port}`;
 }
 
 /*

@@ -1,3 +1,4 @@
+use crate::active_anchor_stats::IIDomain;
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
@@ -32,6 +33,12 @@ const DAY_NS: u64 = 24 * HOUR_NS;
 
 const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
+
+// Note: concatenating const &str is a hassle in rust. It seemed easiest to just repeat.
+const IC0_APP_DOMAIN: &str = "identity.ic0.app";
+const IC0_APP_ORIGIN: &str = "https://identity.ic0.app";
+const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
+const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 
 #[update]
 #[candid_method]
@@ -132,7 +139,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 #[query]
 #[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
-    state::storage(|storage| {
+    state::storage_borrow(|storage| {
         storage
             .read(anchor_number)
             .unwrap_or_default()
@@ -192,14 +199,6 @@ fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Pri
     delegation::get_principal(anchor_number, frontend)
 }
 
-/// This makes this Candid service self-describing, so that for example Candid UI, but also other
-/// tools, can seamlessly integrate with it. The concrete interface (method name etc.) is
-/// provisional, but works.
-#[query]
-fn __get_candid_interface_tmp_hack() -> String {
-    include_str!("../internet_identity.did").to_string()
-}
-
 #[update]
 #[candid_method]
 async fn prepare_delegation(
@@ -208,8 +207,15 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    authenticate_and_record_activity(anchor_number);
-    delegation::prepare_delegation(anchor_number, frontend, session_key, max_time_to_live).await
+    let ii_domain = authenticate_and_record_activity(anchor_number);
+    delegation::prepare_delegation(
+        anchor_number,
+        frontend,
+        session_key,
+        max_time_to_live,
+        &ii_domain,
+    )
+    .await
 }
 
 #[query]
@@ -261,13 +267,34 @@ fn stats() -> InternetIdentityStats {
     let active_anchor_stats =
         state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
 
-    state::storage(|storage| InternetIdentityStats {
+    let domain_active_anchor_stats = state::persistent_state(|persistent_state| {
+        persistent_state.domain_active_anchor_stats.clone()
+    });
+    let (latest_delegation_origins, max_num_latest_delegation_origins) =
+        state::persistent_state(|persistent_state| {
+            let origins = persistent_state
+                .latest_delegation_origins
+                .as_ref()
+                .map(|latest_delegation_origins| {
+                    latest_delegation_origins.keys().cloned().collect()
+                })
+                .unwrap_or(vec![]);
+            (
+                origins,
+                persistent_state.max_num_latest_delegation_origins.unwrap(),
+            )
+        });
+
+    state::storage_borrow(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
         users_registered: storage.anchor_count() as u64,
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
         active_anchor_stats,
+        domain_active_anchor_stats,
+        max_num_latest_delegation_origins,
+        latest_delegation_origins,
     })
 }
 
@@ -297,18 +324,19 @@ fn acknowledge_entries(sequence_number: u64) {
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
+    state::init_new();
 
     apply_install_arg(maybe_arg);
 
     // make sure the fully initialized storage configuration is written to stable memory
-    state::storage_mut(|storage| storage.flush());
+    state::storage_borrow_mut(|storage| storage.flush());
     update_root_hash();
 }
 
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::initialize_from_stable_memory();
+    state::init_from_stable_memory();
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
@@ -322,7 +350,7 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(arg) = maybe_arg {
         if let Some(range) = arg.assigned_user_number_range {
-            state::storage_mut(|storage| {
+            state::storage_borrow_mut(|storage| {
                 storage.set_anchor_number_range(range);
             });
         }
@@ -337,6 +365,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(rate_limit) = arg.register_rate_limit {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.registration_rate_limit = Some(rate_limit);
+            })
+        }
+        if let Some(limit) = arg.max_num_latest_delegation_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.max_num_latest_delegation_origins = Some(limit);
             })
         }
     }
@@ -377,13 +410,16 @@ fn update_root_hash() {
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
-fn authenticate_and_record_activity(anchor_number: AnchorNumber) {
+fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
     let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    let device = trap_if_not_authenticated(&anchor);
+    let domain = device.ii_domain();
+    let device_key = device.pubkey.clone();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
-        panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}")
-    })
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
+        |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
+    );
+    domain
 }
 
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
@@ -408,9 +444,9 @@ fn authenticated_anchor_operation<R>(
     let result = op(&mut anchor);
 
     // write back anchor
-    state::storage_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(|err| {
-        panic!("unable to update anchor {anchor_number} in stable memory: {err}")
-    });
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
+        |err| panic!("unable to update anchor {anchor_number} in stable memory: {err}"),
+    );
 
     match result {
         Ok((ret, operation)) => {

@@ -23,7 +23,7 @@ jobs:
           # We look for the last released version that starts with "prefix", and then drop the
           # "v" prefix (which .node-version doesn't use)
           latest_node_version=$(curl -sSl https://nodejs.org/download/release/index.json \
-            | jq -cMr --arg prefix v16 \
+            | jq -cMr --arg prefix v18 \
             'sort_by(.data) | [.[] | select(.lts) | select(.version | startswith($prefix))][0] | .version | sub("^v"; "")')
           echo "latest node version '$latest_node_version'"
 

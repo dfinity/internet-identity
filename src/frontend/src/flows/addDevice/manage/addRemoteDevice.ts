@@ -1,12 +1,12 @@
 import {
-  Timestamp,
   IdentityAnchorInfo,
+  Timestamp,
 } from "../../../../generated/internet_identity_types";
+import { displayError } from "../../../components/displayError";
+import { withLoader } from "../../../components/loader";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
-import { displayError } from "../../../components/displayError";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
-import { withLoader } from "../../../components/loader";
 
 // The flow for adding a remote (i.e. other browser, non-hardware) device
 export const addRemoteDevice = async ({

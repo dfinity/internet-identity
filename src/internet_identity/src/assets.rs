@@ -70,7 +70,7 @@ lazy_static! {
 pub fn init_assets() {
     state::assets_and_hashes_mut(|assets, asset_hashes| {
         for (path, content, content_encoding, content_type) in get_assets() {
-            asset_hashes.insert(path, sha2::Sha256::digest(content).into());
+            asset_hashes.insert(path.clone(), sha2::Sha256::digest(&content).into());
             let mut headers = match content_encoding {
                 ContentEncoding::Identity => vec![],
                 ContentEncoding::GZip => {
@@ -88,57 +88,57 @@ pub fn init_assets() {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentEncoding, ContentType); 8] {
-    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
-    let about_html: &[u8] = ABOUT_HTML_STR.as_bytes();
+fn get_assets() -> [(String, Vec<u8>, ContentEncoding, ContentType); 8] {
+    let index_html: Vec<u8> = INDEX_HTML_STR.as_bytes().to_vec();
+    let about_html: Vec<u8> = ABOUT_HTML_STR.as_bytes().to_vec();
     [
         (
-            "/",
-            index_html,
+            "/".to_string(),
+            index_html.clone(),
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
         (
-            "/about",
+            "/about".to_string(),
             about_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
         (
-            "/index.html",
+            "/index.html".to_string(),
             index_html,
             ContentEncoding::Identity,
             ContentType::HTML,
         ),
         (
-            "/index.js",
-            include_bytes!("../../../dist/index.js.gz"),
+            "/index.js".to_string(),
+            include_bytes!("../../../dist/index.js.gz").to_vec(),
             ContentEncoding::GZip,
             ContentType::JS,
         ),
         (
-            "/index.css",
-            include_bytes!("../../../dist/index.css"),
+            "/index.css".to_string(),
+            include_bytes!("../../../dist/index.css").to_vec(),
             ContentEncoding::Identity,
             ContentType::CSS,
         ),
         (
-            "/loader.webp",
-            include_bytes!("../../../dist/loader.webp"),
+            "/loader.webp".to_string(),
+            include_bytes!("../../../dist/loader.webp").to_vec(),
             ContentEncoding::Identity,
             ContentType::WEBP,
         ),
         (
-            "/favicon.ico",
-            include_bytes!("../../../dist/favicon.ico"),
+            "/favicon.ico".to_string(),
+            include_bytes!("../../../dist/favicon.ico").to_vec(),
             ContentEncoding::Identity,
             ContentType::ICO,
         ),
         // Required to make II available on the identity.internetcomputer.org domain.
         // See https://github.com/r-birkner/portal/blob/rjb/custom-domains-docs-v2/docs/developer-docs/production/custom-domain/custom-domain.md#custom-domains-on-the-boundary-nodes
         (
-            "/.well-known/ic-domains",
-            b"identity.internetcomputer.org",
+            "/.well-known/ic-domains".to_string(),
+            b"identity.internetcomputer.org".to_vec(),
             ContentEncoding::Identity,
             ContentType::OCTETSTREAM,
         ),

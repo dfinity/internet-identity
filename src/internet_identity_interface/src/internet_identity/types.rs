@@ -162,12 +162,13 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Default)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
     pub register_rate_limit: Option<RateLimitConfig>,
+    pub max_num_latest_delegation_origins: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -177,7 +178,10 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
-    pub active_anchor_stats: Option<ActiveAnchorStatistics>,
+    pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
+    pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    pub max_num_latest_delegation_origins: u64,
+    pub latest_delegation_origins: Vec<FrontendHostname>,
 }
 
 /// Information about the archive.
@@ -212,33 +216,41 @@ pub struct ArchiveConfig {
 }
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
-pub struct ActiveAnchorStatistics {
+pub struct ActiveAnchorStatistics<T> {
     // Stats for the last completed collection period for daily and monthly active anchors
-    pub completed: CompletedActiveAnchorStats,
+    pub completed: CompletedActiveAnchorStats<T>,
     // ongoing periods for daily and monthly active anchors
-    pub ongoing: OngoingActiveAnchorStats,
+    pub ongoing: OngoingActiveAnchorStats<T>,
 }
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
-pub struct CompletedActiveAnchorStats {
-    pub daily_active_anchors: Option<ActiveAnchorCounter>,
-    pub monthly_active_anchors: Option<ActiveAnchorCounter>,
+pub struct CompletedActiveAnchorStats<T> {
+    pub daily_active_anchors: Option<T>,
+    pub monthly_active_anchors: Option<T>,
 }
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
-pub struct OngoingActiveAnchorStats {
+pub struct OngoingActiveAnchorStats<T> {
     // Ongoing active anchor counter for the current 24 h time bucket.
-    pub daily_active_anchors: ActiveAnchorCounter,
+    pub daily_active_anchors: T,
     // Monthly active users are collected using 30-day sliding windows.
     // This vec contains up to 30 30-day active windows each offset by one day.
     // The vec is sorted, new collection windows are added at the end.
-    pub monthly_active_anchors: Vec<ActiveAnchorCounter>,
+    pub monthly_active_anchors: Vec<T>,
 }
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct ActiveAnchorCounter {
     pub start_timestamp: Timestamp,
     pub counter: u64,
+}
+
+#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+pub struct DomainActiveAnchorCounter {
+    pub start_timestamp: Timestamp,
+    pub ic0_app_counter: u64,
+    pub internetcomputer_org_counter: u64,
+    pub both_ii_domains_counter: u64,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

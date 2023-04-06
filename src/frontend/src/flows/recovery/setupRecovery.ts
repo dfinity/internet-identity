@@ -1,26 +1,24 @@
+import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { displayError } from "../../components/displayError";
 import { DeviceData } from "../../../generated/internet_identity_types";
+import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
 import { generate } from "../../crypto/mnemonic";
 import {
+  AuthenticatedConnection,
   creationOptions,
   IC_DERIVATION_PATH,
-  AuthenticatedConnection,
 } from "../../utils/iiConnection";
 import {
   unknownToString,
   unreachable,
   unreachableLax,
-  assertType,
 } from "../../utils/utils";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
-import { displaySeedPhrase } from "./displaySeedPhrase";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
-import { SignIdentity } from "@dfinity/agent";
+import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async ({
   userNumber,
@@ -158,7 +156,7 @@ export const setupPhrase = async (
   } else if ("error" in res) {
     return "error";
   } else {
-    assertType<{ canceled: void }>(res);
+    res satisfies { canceled: void };
     return "canceled";
   }
 };
@@ -186,7 +184,7 @@ export const phraseWizard = async ({
     return { canceled: undefined };
   }
 
-  assertType<"confirmed">(res);
+  res satisfies "confirmed";
 
   try {
     const pubkey = recoverIdentity.getPublicKey().toDer();

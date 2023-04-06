@@ -1,6 +1,6 @@
-import { render, html, TemplateResult } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
+import { LEGACY_II_URL, OFFICIAL_II_URL } from "./config";
 import { anyFeatures } from "./features";
-import { OFFICIAL_II_URL, LEGACY_II_URL } from "./config";
 
 // Show a warning banner if the build is not "official". This happens if either the build
 // is a flavored build, or if the origin is not the official II URL.

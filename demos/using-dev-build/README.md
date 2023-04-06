@@ -1,4 +1,3 @@
-
 [comment]: # This document is mainly written to be viewed on https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/integrate-identity/
 
 # Integrating with Internet Identity
@@ -9,8 +8,8 @@ This is a standalone project that you can copy to your own project.
 
 ## Prerequisites
 
-* [dfx](https://internetcomputer.org/docs/current/developer-docs/build/install-upgrade-remove)
-* Node.js v16+
+- [dfx](https://internetcomputer.org/docs/current/developer-docs/build/install-upgrade-remove)
+- Node.js v16+
 
 This tutorial assumes that you are already familiar with the [basic concepts of the IC](https://internetcomputer.org/docs/current/developer-docs/ic-overview) (canisters, how to use `dfx`, etc.).
 
@@ -44,6 +43,7 @@ If the IC actually lets the call (request) through to the `whoami` canister, it 
 ### Adding Internet Identity to your Local Project
 
 This section explains how to add Internet Identity to your (local) project. Add the following snippet to the `canister` section in your `dfx.json` file (see full example [here](https://github.com/dfinity/internet-identity/blob/main/demos/using-dev-build/dfx.json)):
+
 ```json
 "internet_identity": {
   "type": "custom",
@@ -56,6 +56,7 @@ This section explains how to add Internet Identity to your (local) project. Add 
   }
 }
 ```
+
 The `remote` property makes sure that your project will _not_ create a copy of Internet Identity on the IC when deploying to production.
 
 > Note: The wasm URL points to the [dev build](https://github.com/dfinity/internet-identity#flavors) of Internet Identity. It is recommended to use the dev build locally because it has modifications that make test automation easy.

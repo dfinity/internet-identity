@@ -1,10 +1,10 @@
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { withRef, renderPage } from "../../utils/lit-html";
-import { warnBox } from "../../components/warnBox";
-import { mainWindow } from "../../components/mainWindow";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
+import { mainWindow } from "../../components/mainWindow";
 import { toast } from "../../components/toast";
+import { warnBox } from "../../components/warnBox";
+import { renderPage, withRef } from "../../utils/lit-html";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -32,7 +32,7 @@ export const displayUserNumberTemplate = ({
         aria-label="Copy phrase to clipboard""
         title="Copy phrase to clipboard"
         tabindex="0"
-        class="c-button__icon c-input__icon"
+        class="c-button__icon"
         @click=${async () => {
           try {
             await navigator.clipboard.writeText(userNumber.toString());

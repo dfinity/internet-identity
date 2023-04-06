@@ -1,4 +1,4 @@
-import { AuthenticatedConnection, ApiResult } from "./iiConnection";
+import { ApiResult, AuthenticatedConnection } from "./iiConnection";
 
 export type LoginFlowResult =
   | LoginFlowSuccess

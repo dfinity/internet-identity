@@ -1,21 +1,22 @@
-import { html } from "lit-html";
-import { creationOptions, Connection } from "../../../utils/iiConnection";
-import {
-  unreachableLax,
-  unreachable,
-  unknownToString,
-} from "../../../utils/utils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
+import { html } from "lit-html";
 import {
-  DeviceData,
   AddTentativeDeviceResponse,
   CredentialId,
+  DeviceData,
 } from "../../../../generated/internet_identity_types";
-import { showVerificationCode } from "./showVerificationCode";
-import { withLoader } from "../../../components/loader";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
+import { withLoader } from "../../../components/loader";
+import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
+import { Connection, creationOptions } from "../../../utils/iiConnection";
+import {
+  unknownToString,
+  unreachable,
+  unreachableLax,
+} from "../../../utils/utils";
+import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
+import { showVerificationCode } from "./showVerificationCode";
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
@@ -24,7 +25,7 @@ import { displayError } from "../../../components/displayError";
 export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
-): Promise<void> => {
+): Promise<"ok"> => {
   // First, we need an alias for the device to (tentatively) add
   const alias = await promptDeviceAlias({
     title: "Add a Trusted Device",
@@ -34,8 +35,7 @@ export const registerTentativeDevice = async (
 
   if (alias === null) {
     // TODO L2-309: do this without reload
-    window.location.reload();
-    return;
+    return window.location.reload() as never;
   }
 
   // Then, we create local WebAuthn credentials for the device
@@ -60,7 +60,9 @@ export const registerTentativeDevice = async (
       alias: alias,
       protection: { unprotected: null },
       pubkey: Array.from(new Uint8Array(result.getPublicKey().toDer())),
-      key_type: { unknown: null },
+      key_type: authenticatorAttachmentToKeyType(
+        result.getAuthenticatorAttachment()
+      ),
       purpose: { authentication: null },
       credential_id: [Array.from(new Uint8Array(result.rawId))],
     };
@@ -72,7 +74,7 @@ export const registerTentativeDevice = async (
 
   // If everything went well we can now ask the user to authenticate on an existing device
   // and enter a verification code
-  await showVerificationCode(
+  return await showVerificationCode(
     userNumber,
     connection,
     device.alias,

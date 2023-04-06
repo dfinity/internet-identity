@@ -1,5 +1,5 @@
 {
-  "name": "test_app",
+  "name": "@dfinity/internet-identity-test-app",
   "private": true,
   "dependencies": {
     "@dfinity/agent": "^0.12.1-beta.0",

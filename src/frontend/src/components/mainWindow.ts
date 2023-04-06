@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit/directives/if-defined.js";
-import { icLogo } from "./icons";
 import { footer } from "./footer";
+import { icLogo } from "./icons";
 
 /**
  * main window template

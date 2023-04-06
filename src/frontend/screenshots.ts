@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { remote } from "webdriverio";
-import { existsSync, mkdirSync } from "fs";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
+import { existsSync, mkdirSync } from "fs";
+import { remote } from "webdriverio";
 import { downloadChrome } from "./download-chrome";
 
 /** This executable takes screenshots of every page in the showcase.
@@ -68,7 +68,12 @@ async function withChrome<T>(
     // font-render-hinting causing broken kerning on headless chrome seems to be a
     // long-standing issue: see https://github.com/puppeteer/puppeteer/issues/2410
     // -> disabling it improves things
-    args: ["headless", "disable-gpu", "font-render-hinting=none"],
+    args: [
+      "headless",
+      "disable-gpu",
+      "font-render-hinting=none",
+      "hide-scrollbars",
+    ],
     mobileEmulation,
     binary: chromePath,
   };

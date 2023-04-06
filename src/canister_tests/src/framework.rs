@@ -177,6 +177,7 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
         }),
         canister_creation_cycles_cost: Some(0),
         register_rate_limit: None,
+        max_num_latest_delegation_origins: None,
     })
 }
 
@@ -186,6 +187,7 @@ pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdenti
         archive_config: None,
         canister_creation_cycles_cost: None,
         register_rate_limit: Some(rate_limit),
+        max_num_latest_delegation_origins: None,
     })
 }
 
@@ -197,6 +199,7 @@ pub fn arg_with_anchor_range(
         archive_config: None,
         canister_creation_cycles_cost: None,
         register_rate_limit: None,
+        max_num_latest_delegation_origins: None,
     })
 }
 
@@ -327,6 +330,22 @@ pub fn recovery_device_data_2() -> DeviceData {
         protection: DeviceProtection::Unprotected,
         origin: None,
     }
+}
+
+pub fn device_with_origin(origin: Option<String>) -> DeviceData {
+    DeviceData {
+        pubkey: ByteBuf::from(origin.as_deref().unwrap_or(PUBKEY_1)),
+        alias: "My Device".to_string(),
+        credential_id: Some(ByteBuf::from("credential id 1")),
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
+        origin,
+    }
+}
+
+pub fn principal(device: &DeviceData) -> Principal {
+    Principal::self_authenticating(&device.pubkey)
 }
 
 pub fn expect_user_error_with_message<T: std::fmt::Debug>(

@@ -7,23 +7,9 @@ set -euo pipefail
 
 GITHUB_TOKEN=${INPUT_TOKEN:-${GITHUB_TOKEN:?No token given}}
 
+PRODUCTION_ASSET=${INPUT_PRODUCTION_ASSET:?No production asset specified}
 RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
 RELEASE_TAG_PREVIOUS=${RELEASE_TAG_PREVIOUS:-}
-
-# This script sets "RELEASE_ACTION_BODY_FILE" to the path of the generated file. The script is run twice
-# (once when called with 'uses: ', once in post) meaning we can differentiate the first from second run
-# by reading "RELEASE_ACTION_BODY_FILE". On the "post" run, we just cleanup and exit.
-if [ -n "${RELEASE_ACTION_BODY_FILE:-}" ]
-then
-    >&2 echo "Cleaning up body file $RELEASE_ACTION_BODY_FILE"
-    if ! [ -f "$RELEASE_ACTION_BODY_FILE" ]
-    then
-        >&2 echo "strange, no file to remove"
-    else
-        rm "$RELEASE_ACTION_BODY_FILE"
-    fi
-    exit 0
-fi
 
 # Starting the "intro" section where we display a short intro
 section_intro=$(mktemp)
@@ -56,7 +42,7 @@ To build the wasm modules yourself and verify their hashes, run the following co
 git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
 ./scripts/docker-build
-sha256sum internet_identity.wasm
+sha256sum internet_identity.wasm.gz
 ./scripts/docker-build --archive
 sha256sum archive.wasm
 \`\`\`
@@ -97,9 +83,9 @@ do
         # Additionally grab the step number of the 'sha256sum' step
         step=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
             | jq -cMr \
-            --arg job_id "$job_id" \
+            --argjson job_id "$job_id" \
             --arg filename "$filename" \
-            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | contains("sha256sum $filename")) | .number')
+            '.jobs[] | select(.id == $job_id) | .steps[] | select(.name | endswith("sha256sum " + $filename)) | .number')
                 >&2 echo "Found step: $step"
     fi
 
@@ -108,16 +94,15 @@ do
     download_link="https://github.com/dfinity/internet-identity/releases/download/$RELEASE_TAG/$filename"
     download="[\2]($download_link)"
 
-    # shellcheck disable=SC2016
     run_link="$html_url#step:$step:1"
+    # shellcheck disable=SC2016
     sha='[`\1`]'"($run_link)"
 
     # Get the shasum and capture the sha (using only POSIX sed)
     shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|%" >> "$section_build_flavors"
 
-    # If the filename contains "prod" then we assume it's a production asset, and we show the sha256 and download
-    # link in the intro section as well.
-    if [[ "$filename" == *"prod"* ]]
+    # Mention production asset in intro section
+    if [[ "$filename" == "$PRODUCTION_ASSET" ]]
     then
         shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%The sha256 of production asset [\2]($download_link) is [\1]($run_link).%" >> "$section_intro"
     fi
@@ -166,5 +151,3 @@ cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_w
 cat "$body"
 
 echo "notes-file=$body" >> "$GITHUB_OUTPUT"
-
-[ -n "${GITHUB_ENV:-}" ] && echo "RELEASE_ACTION_BODY_FILE=$body" >>"$GITHUB_ENV"

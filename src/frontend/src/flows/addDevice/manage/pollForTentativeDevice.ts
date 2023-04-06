@@ -1,24 +1,24 @@
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { delayMillis } from "../../../utils/utils";
-import { renderPage } from "../../../utils/lit-html";
 import {
   DeviceData,
   Timestamp,
 } from "../../../../generated/internet_identity_types";
 import { mainWindow } from "../../../components/mainWindow";
-import { LEGACY_II_URL } from "../../../config";
+import { addDeviceLink } from "../../../utils/addDeviceLink";
+import { AsyncCountdown } from "../../../utils/countdown";
+import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { renderPage } from "../../../utils/lit-html";
+import { delayMillis } from "../../../utils/utils";
 
 const pollForTentativeDeviceTemplate = ({
-  userNumber,
   cancel,
   remaining,
+  link,
 }: {
-  userNumber: bigint;
   cancel: () => void;
   remaining: AsyncIterable<string>;
+  link: string;
 }) => {
   const pageContentSlot = html`
     <hgroup>
@@ -32,16 +32,13 @@ const pollForTentativeDeviceTemplate = ({
       <li>
         Open
         <em class="c-tooltip">
-          <strong class="t-strong">${LEGACY_II_URL}</strong>
+          <strong data-role="add-device-link" class="t-strong t-wrap"
+            >${link}</strong
+          >
           <span class="c-tooltip__message c-card c-card--tight">
             Open this link on the device you want to add.
           </span>
         </em>
-      </li>
-      <li>Select <strong class="t-strong">“Add a new device?”</strong></li>
-      <li>
-        Enter your Identity Anchor:
-        <strong class="t-strong">${userNumber}</strong>
       </li>
       <li>Name your new device</li>
     </ol>
@@ -83,15 +80,14 @@ export const pollForTentativeDevice = (
   endTimestamp: Timestamp
 ): Promise<DeviceData | "timeout" | "canceled"> => {
   const countdown = AsyncCountdown.fromNanos(endTimestamp);
-
   // Show the page with the option to cancel
   const page = new Promise<"canceled">((resolve) =>
     pollForTentativeDevicePage({
-      userNumber,
       cancel: () => {
         countdown.stop();
         resolve("canceled");
       },
+      link: addDeviceLink({ userNumber }),
       remaining: countdown.remainingFormattedAsync(),
     })
   );

@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-html";
-import { withRef, mount } from "../utils/lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { mount, withRef } from "../utils/lit-html";
 import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */

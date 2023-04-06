@@ -1,15 +1,17 @@
-import { displayError } from "../../components/displayError";
-import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
-import { LoginFlowResult } from "../../utils/flowResult";
-import { promptUserNumber } from "../../components/promptUserNumber";
+import { html } from "lit-html";
 import { promptDeviceAlias } from "../../components/alias";
-import { phraseRecoveryPage } from "./recoverWith/phrase";
-import { deviceRecoveryPage } from "./recoverWith/device";
-import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { displayError } from "../../components/displayError";
+import { promptUserNumber } from "../../components/promptUserNumber";
+import { authenticatorAttachmentToKeyType } from "../../utils/authenticatorAttachment";
+import { LoginFlowResult } from "../../utils/flowResult";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString, unreachableLax } from "../../utils/utils";
 import { constructIdentity } from "../register/construct";
+import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { deviceRecoveryPage } from "./recoverWith/device";
+import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
   connection: Connection,
@@ -49,7 +51,13 @@ const runRecovery = async (
       : await pickRecoveryDevice(recoveryDevices);
 
   const res = isRecoveryPhrase(device)
-    ? await phraseRecoveryPage(userNumber, connection, device)
+    ? await recoverWithPhrase({
+        userNumber,
+        connection,
+        device,
+        message: html`Type your recovery phrase below to access your anchor
+          <strong class="t-strong">${userNumber}</strong>`,
+      })
     : await deviceRecoveryPage(userNumber, connection, device);
 
   // If res is null, the user canceled the flow, so we go back to the main page.
@@ -152,7 +160,7 @@ const enrollAuthenticator = async ({
   try {
     await connection.add(
       deviceAlias,
-      { unknown: null },
+      authenticatorAttachmentToKeyType(newDevice.getAuthenticatorAttachment()),
       { authentication: null },
       newDevice.getPublicKey().toDer(),
       { unprotected: null },

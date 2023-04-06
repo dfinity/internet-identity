@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
+import extract from "extract-zip";
+import { createWriteStream, mkdirSync } from "fs";
+import { stat, unlink } from "fs/promises";
 import { get } from "https";
 import { platform as osPlatform } from "os";
-import { mkdirSync, createWriteStream } from "fs";
-import { stat, unlink } from "fs/promises";
-import extract from "extract-zip";
 import { unreachable } from "./src/utils/utils";
 
 const installPath = `${nodeModulesPath()}/.local-chromium`;

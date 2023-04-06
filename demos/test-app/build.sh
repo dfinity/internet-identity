@@ -8,4 +8,5 @@ cd "$SCRIPT_DIR"
 npm ci
 npm run build
 cargo build --release --target wasm32-unknown-unknown
-ic-cdk-optimizer "target/wasm32-unknown-unknown/release/test_app.wasm" -o "./test_app.wasm"
+ic-wasm "target/wasm32-unknown-unknown/release/test_app.wasm" -o "./test_app.wasm" shrink
+ic-wasm test_app.wasm -o test_app.wasm metadata candid:service -f test_app.did -v public

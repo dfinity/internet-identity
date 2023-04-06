@@ -1,6 +1,6 @@
 import { html, render, TemplateResult } from "lit-html";
-import { warnBox } from "./warnBox";
 import { mainWindow } from "./mainWindow";
+import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {
   title: string | TemplateResult;
@@ -20,11 +20,12 @@ const pageContent = (options: ErrorOptions) =>
         htmlElement: "div",
         slot:
           options.detail !== undefined
-            ? html`<div class="l-divider"></div>
+            ? html`<div class="l-stack">
                 <h4>Error details:</h4>
                 <pre data-role="error-detail" class="t-paragraph">
 ${options.detail}</pre
-                >`
+                >
+              </div>`
             : undefined,
       })}
 

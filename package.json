@@ -15,12 +15,12 @@
     "showcase": "II_FETCH_ROOT_KEY=1 npm run opts -- webpack serve --config-name showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "jest --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts",
-    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts"
+    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts demos",
+    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json webpack.config.ts jest.config.ts demos"
   },
   "devDependencies": {
     "@lit-labs/ssr": "^2.2.3",
@@ -30,6 +30,7 @@
     "@types/selenium-standalone": "^7.0.1",
     "@typescript-eslint/eslint-plugin": "5.45.1",
     "@typescript-eslint/parser": "5.45.1",
+    "@wdio/globals": "^8.6.9",
     "buffer": "6.0.3",
     "compression-webpack-plugin": "~10",
     "copy-webpack-plugin": "~11",
@@ -43,6 +44,7 @@
     "jest-environment-jsdom": "~29",
     "mini-css-extract-plugin": "^2.6.1",
     "prettier": "2.8.0",
+    "prettier-plugin-organize-imports": "^3.2.2",
     "process": "0.11.10",
     "stream-browserify": "3.0.0",
     "style-loader": "^3.2.1",
@@ -50,22 +52,22 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "4.9",
-    "webdriverio": "7.25.1",
+    "webdriverio": "^8.6.9",
     "webpack": "~5",
     "webpack-cli": "~5",
     "webpack-dev-server": "~4"
   },
   "dependencies": {
-    "@dfinity/agent": "0.10.2",
-    "@dfinity/candid": "0.10.2",
-    "@dfinity/identity": "0.10.2",
-    "@dfinity/principal": "0.10.2",
+    "@dfinity/agent": "0.15.5",
+    "@dfinity/candid": "0.15.5",
+    "@dfinity/identity": "0.15.5",
+    "@dfinity/principal": "0.15.5",
     "bip39": "^3.0.4",
     "lit-html": "^2.3.1",
     "text-encoding": "^0.7.0"
   },
-  "engines" : { 
-    "npm" : ">=8.0.0",
-    "node" : ">=16.0.0 <18.0.0"
+  "engines": {
+    "npm": ">=9.0.0 <10.0.0",
+    "node": ">=18.0.0 <19.0.0"
   }
 }

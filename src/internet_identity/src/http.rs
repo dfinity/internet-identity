@@ -1,6 +1,6 @@
 use crate::archive::ArchiveState;
 use crate::assets::ContentType;
-use crate::{assets, state, LABEL_ASSETS, LABEL_SIG};
+use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_ASSETS, LABEL_SIG};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api::stable::stable64_size;
@@ -10,8 +10,7 @@ use ic_certified_map::HashTree;
 use ic_metrics_encoder::MetricsEncoder;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
-use serde_bytes::{ByteBuf, Bytes};
-use std::borrow::Cow;
+use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 impl ContentType {
@@ -39,7 +38,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
                     .to_string(),
             )],
-            body: Cow::Owned(ByteBuf::new()),
+            body: ByteBuf::new(),
             // Redirects are not allowed as query because certification V1 does not cover headers.
             // Upgrading to update fixes this. This flag can be removed when switching to
             // certification V2.
@@ -62,7 +61,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     HttpResponse {
                         status_code: 200,
                         headers,
-                        body: Cow::Owned(ByteBuf::from(body)),
+                        body: ByteBuf::from(body),
                         upgrade: None,
                         streaming_strategy: None,
                     }
@@ -70,7 +69,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 Err(err) => HttpResponse {
                     status_code: 500,
                     headers: security_headers(),
-                    body: Cow::Owned(ByteBuf::from(format!("Failed to encode metrics: {err}"))),
+                    body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                     upgrade: None,
                     streaming_strategy: None,
                 },
@@ -88,7 +87,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     HttpResponse {
                         status_code: 200,
                         headers,
-                        body: Cow::Borrowed(Bytes::new(value)),
+                        body: ByteBuf::from(value.clone()),
                         upgrade: None,
                         streaming_strategy: None,
                     }
@@ -96,9 +95,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 None => HttpResponse {
                     status_code: 404,
                     headers,
-                    body: Cow::Owned(ByteBuf::from(format!(
-                        "Asset {probably_an_asset} not found."
-                    ))),
+                    body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                     upgrade: None,
                     streaming_strategy: None,
                 },
@@ -108,7 +105,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
-    state::storage(|storage| {
+    state::storage_borrow(|storage| {
         w.encode_gauge(
             "internet_identity_user_count",
             storage.anchor_count() as f64,
@@ -189,6 +186,54 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                 "The maximum number of `register` calls that are allowed in any time window.",
             )?;
         }
+        if let Some(ref stats) = persistent_state.active_anchor_stats {
+            if let Some(ref daily_active_anchor_stats) = stats.completed.daily_active_anchors {
+                w.encode_gauge(
+                "internet_identity_daily_active_anchors",
+                daily_active_anchor_stats.counter as f64,
+                "The number of unique active anchors in the last completed 24h collection window.",
+            )?;
+                w.encode_gauge(
+                "internet_identity_daily_active_anchors_start_timestamp_seconds",
+                Duration::from_nanos(daily_active_anchor_stats.start_timestamp).as_secs() as f64,
+                "Timestamp of the last completed 24h collection window for unique active anchors.",
+            )?;
+            }
+            if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_active_anchors {
+                w.encode_gauge(
+                "internet_identity_monthly_active_anchors",
+                monthly_active_anchor_stats.counter as f64,
+                "The number of unique active anchors in the last completed 30-day collection window.",
+            )?;
+                w.encode_gauge(
+                "internet_identity_monthly_active_anchors_start_timestamp_seconds",
+                Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
+                "Timestamp of the last completed 30-day collection window for unique active anchors.",
+            )?;
+            }
+        };
+        if let Some(ref stats) = persistent_state.domain_active_anchor_stats {
+            const BOTH_DOMAINS: &str = "both_ii_domains";
+            if let Some(ref daily_stats) = stats.completed.daily_active_anchors {
+                w.gauge_vec("internet_identity_daily_active_anchors_by_domain", "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.")
+                    .unwrap()
+                    .value(&[("domain", IC0_APP_DOMAIN)], daily_stats.ic0_app_counter as f64)
+                    .unwrap()
+                    .value(&[("domain", INTERNETCOMPUTER_ORG_DOMAIN)], daily_stats.internetcomputer_org_counter as f64)
+                    .unwrap()
+                    .value(&[("domain", BOTH_DOMAINS)], daily_stats.both_ii_domains_counter as f64)?;
+            }
+            if let Some(ref daily_stats) = stats.completed.monthly_active_anchors {
+                w.gauge_vec("internet_identity_monthly_active_anchors_by_domain", "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.")
+                    .unwrap()
+                    .value(&[("domain", IC0_APP_DOMAIN)], daily_stats.ic0_app_counter as f64)
+                    .unwrap()
+                    .value(&[("domain", INTERNETCOMPUTER_ORG_DOMAIN)], daily_stats.internetcomputer_org_counter as f64)
+                    .unwrap()
+                    .value(&[("domain", BOTH_DOMAINS )], daily_stats.both_ii_domains_counter as f64)?;
+            }
+        };
+
         Ok::<(), std::io::Error>(())
     })?;
     state::registration_rate_limit(|rate_limit_opt| {
@@ -197,38 +242,6 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                 "internet_identity_register_rate_limit_current_tokens",
                 rate_limit_state.tokens as f64,
                 "The number of `register` calls that are still allowed in the current time window.",
-            )?;
-        }
-        Ok::<(), std::io::Error>(())
-    })?;
-    state::persistent_state(|persistent_state| {
-        let Some(ref stats) = persistent_state.active_anchor_stats else {
-            // skip if not existing
-            return Ok::<(), std::io::Error>(())
-        };
-        if let Some(ref daily_active_anchor_stats) = stats.completed.daily_active_anchors {
-            w.encode_gauge(
-                "internet_identity_daily_active_anchors",
-                daily_active_anchor_stats.counter as f64,
-                "The number of unique active anchors in the last completed 24h collection window.",
-            )?;
-            w.encode_gauge(
-                "internet_identity_daily_active_anchors_start_timestamp_seconds",
-                Duration::from_nanos(daily_active_anchor_stats.start_timestamp).as_secs() as f64,
-                "Timestamp of the last completed 24h collection window for unique active anchors.",
-            )?;
-        }
-
-        if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_active_anchors {
-            w.encode_gauge(
-                "internet_identity_monthly_active_anchors",
-                monthly_active_anchor_stats.counter as f64,
-                "The number of unique active anchors in the last completed 30-day collection window.",
-            )?;
-            w.encode_gauge(
-                "internet_identity_monthly_active_anchors_start_timestamp_seconds",
-                Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
-                "Timestamp of the last completed 30-day collection window for unique active anchors.",
             )?;
         }
         Ok::<(), std::io::Error>(())

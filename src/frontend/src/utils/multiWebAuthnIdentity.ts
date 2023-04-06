@@ -40,7 +40,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   /* Set after the first `sign`, see `sign()` for more info. */
   protected _actualIdentity?: WebAuthnIdentity;
-  protected _authenticatorAttachment?: AuthenticatorAttachment;
 
   protected constructor(readonly credentialData: CredentialData[]) {
     super();
@@ -57,38 +56,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     } else {
       return this._actualIdentity.getPublicKey();
     }
-  }
-
-  /**
-   * This method exposes information about the underlying WebAuthn device. Only
-   * available after `sign()` has been called successfully.
-   * The 'authenticatorAttachment' is a field specified in the draft of the
-   * WebAuthn Level 3 spec (see
-   * https://w3c.github.io/webauthn/#dom-publickeycredential-authenticatorattachment)
-   * and already available on Chrome and Safari.
-   * Not yet implemented on Firefox.
-   *
-   * This method also exposes the credential id of the underlying device that was
-   * used so that the caller knows to which device the attachment applies.
-   */
-  public getAuthenticatorAttachment():
-    | {
-        credentialId: ArrayBuffer;
-        authenticatorAttachment: AuthenticatorAttachment;
-      }
-    | undefined {
-    if (
-      this._actualIdentity === undefined ||
-      this._authenticatorAttachment === undefined ||
-      this._authenticatorAttachment ===
-        null /* on Windows the attachment is 'null' */
-    ) {
-      return undefined;
-    }
-    return {
-      credentialId: this._actualIdentity.rawId,
-      authenticatorAttachment: this._authenticatorAttachment,
-    };
   }
 
   /* The use the 'sign'ing for two things:
@@ -115,20 +82,14 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         challenge: blob,
         userVerification: "discouraged",
       },
-    })) as PublicKeyCredential & {
-      // Extends `PublicKeyCredential` with an optional field that's only supported by Chrome & Safari
-      authenticatorAttachment?: AuthenticatorAttachment;
-    };
+    })) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
       if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
-        const strippedKey = unwrapDER(cd.pubkey, DER_COSE_OID);
-        // would be nice if WebAuthnIdentity had a directly usable constructor
-        this._actualIdentity = WebAuthnIdentity.fromJSON(
-          JSON.stringify({
-            rawId: Buffer.from(cd.credentialId).toString("hex"),
-            publicKey: Buffer.from(strippedKey).toString("hex"),
-          })
+        this._actualIdentity = new WebAuthnIdentity(
+          cd.credentialId,
+          unwrapDER(cd.pubkey, DER_COSE_OID),
+          undefined
         );
         break;
       }
@@ -138,8 +99,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       // Odd, user logged in with a credential we didn't provide?
       throw new Error("internal error");
     }
-
-    this._authenticatorAttachment = result.authenticatorAttachment;
 
     const response = result.response as AuthenticatorAssertionResponse;
     const cbor = borc.encode(
