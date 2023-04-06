@@ -89,11 +89,11 @@
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
-  --vc-brand-purple: #4727ce;
+  --vc-brand-purple: #4B19D6;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
-  --vc-brand-alt: rgba(215, 205, 235, 1);
+  --vc-brand-alt: #ffffff;
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -227,6 +227,7 @@
 
 :root:is([data-theme="legacy"]) {
   --vc-brand-purple: #522785;
+  --vc-brand-alt: rgba(215, 205, 235, 1);
 }
 
 /***
