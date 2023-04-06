@@ -26,7 +26,6 @@ module.exports = {
     // Set up a proxy that redirects API calls and /index.html to the
     // replica; the rest we serve from here.
     setupMiddlewares: (middlewares, devServer) => {
-
       const replicaHost = "http://localhost:4943";
 
       const canisterIdsJson = "./.dfx/local/canister_ids.json";
