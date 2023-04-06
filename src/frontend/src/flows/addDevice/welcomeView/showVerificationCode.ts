@@ -1,16 +1,16 @@
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Connection } from "../../../utils/iiConnection";
-import { delayMillis } from "../../../utils/utils";
-import { renderPage } from "../../../utils/lit-html";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
 } from "../../../../generated/internet_identity_types";
-import { setAnchorUsed } from "../../../utils/userNumber";
-import { AsyncCountdown } from "../../../utils/countdown";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
+import { AsyncCountdown } from "../../../utils/countdown";
+import { Connection } from "../../../utils/iiConnection";
+import { renderPage } from "../../../utils/lit-html";
+import { setAnchorUsed } from "../../../utils/userNumber";
+import { delayMillis, unreachableLax } from "../../../utils/utils";
 
 type TentativeRegistrationInfo = Extract<
   AddTentativeDeviceResponse,
@@ -82,7 +82,7 @@ export const showVerificationCode = async (
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
   credentialToBeVerified: CredentialId
-): Promise<void> => {
+): Promise<"ok"> => {
   const countdown = AsyncCountdown.fromNanos(
     tentativeRegistrationInfo.device_registration_timeout
   );
@@ -157,10 +157,10 @@ const handlePollResult = async ({
 }: {
   userNumber: bigint;
   pollResult: "match" | "timeout";
-}) => {
+}): Promise<"ok"> => {
   if (pollResult === "match") {
     setAnchorUsed(userNumber);
-    window.location.reload();
+    return "ok";
   } else if (pollResult === "timeout") {
     await displayError({
       title: "Timeout Reached",
@@ -168,8 +168,11 @@ const handlePollResult = async ({
         'The timeout has been reached. For security reasons the "add device" process has been aborted.',
       primaryButton: "Ok",
     });
-    window.location.reload();
+    return window.location.reload as never;
   }
+
+  unreachableLax(pollResult);
+  return window.location.reload as never;
 };
 
 // Returns true if the given anchor has credentials with the given credential id.

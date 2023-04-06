@@ -22,6 +22,8 @@ export const MAX_SAVED_ANCHORS = 10;
 
 /* Migrated version, see function below for implementation */
 export { getAnchorsMigrated as getAnchors };
+/* Migrated version, see function below for implementation */
+export { setAnchorUsedMigrated as setAnchorUsed };
 const getAnchorsMigrated = (): bigint[] => {
   migrate();
   return getAnchors();
@@ -41,8 +43,6 @@ const getAnchors = (): bigint[] => {
   return anchors;
 };
 
-/* Migrated version, see function below for implementation */
-export { setAnchorUsedMigrated as setAnchorUsed };
 const setAnchorUsedMigrated = (anchor: bigint) => {
   migrate();
   return setAnchorUsed(anchor);

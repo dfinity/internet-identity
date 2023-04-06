@@ -1,5 +1,5 @@
 import { html, TemplateResult } from "lit-html";
-import { warningIcon, closeIcon } from "./icons";
+import { closeIcon, warningIcon } from "./icons";
 
 interface irregularityProps {
   message: string | TemplateResult;

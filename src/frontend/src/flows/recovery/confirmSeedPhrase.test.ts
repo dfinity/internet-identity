@@ -1,7 +1,7 @@
-import { confirmSeedPhrasePage, wordTemplate } from "./confirmSeedPhrase";
-import { ref, createRef, Ref } from "lit-html/directives/ref.js";
-import { render, html } from "lit-html";
+import { render } from "lit-html";
+import { createRef } from "lit-html/directives/ref.js";
 import { I18n } from "../../utils/i18n";
+import { confirmSeedPhrasePage, wordTemplate } from "./confirmSeedPhrase";
 
 const i18n = new I18n("en");
 

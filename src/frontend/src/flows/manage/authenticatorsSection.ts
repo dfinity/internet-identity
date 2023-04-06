@@ -1,7 +1,7 @@
-import { TemplateResult, html } from "lit-html";
-import { Authenticator } from "./types";
+import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "../../components/icons";
 import { settingsDropdown } from "./settingsDropdown";
+import { Authenticator } from "./types";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,

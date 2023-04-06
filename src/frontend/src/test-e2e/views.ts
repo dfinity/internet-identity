@@ -343,8 +343,9 @@ export class AddDeviceFlowSelectorView extends View {
     await this.browser.$("#local").click();
   }
 
-  async selectRemoteDevice(): Promise<void> {
+  async selectRemoteDevice(): Promise<string> {
     await this.browser.$("#remote").click();
+    return await this.browser.$(`[data-role="add-device-link"]`).getText();
   }
 }
 

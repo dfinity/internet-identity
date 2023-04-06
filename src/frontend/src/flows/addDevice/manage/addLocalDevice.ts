@@ -1,14 +1,14 @@
-import {
-  creationOptions,
-  AuthenticatedConnection,
-} from "../../../utils/iiConnection";
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { DeviceData } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
-import { withLoader } from "../../../components/loader";
 import { displayError } from "../../../components/displayError";
-import { setAnchorUsed } from "../../../utils/userNumber";
+import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
+import {
+  AuthenticatedConnection,
+  creationOptions,
+} from "../../../utils/iiConnection";
+import { setAnchorUsed } from "../../../utils/userNumber";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({

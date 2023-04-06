@@ -1,5 +1,5 @@
-import { promptDeviceAliasPage } from "../alias";
 import { I18n } from "../../i18n";
+import { promptDeviceAliasPage } from "../alias";
 
 test("can be canceled", () => {
   const cancel = jest.fn();

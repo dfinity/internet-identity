@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-html";
-import { arrowRight } from "./icons";
 import { autofocus } from "../utils/lit-html";
 import { NonEmptyArray } from "../utils/utils";
+import { arrowRight } from "./icons";
 
 type PickerProps = {
   savedAnchors: NonEmptyArray<bigint>;

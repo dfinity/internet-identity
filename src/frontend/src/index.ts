@@ -1,14 +1,17 @@
-import "./styles/main.css";
-import { authFlowManage } from "./flows/manage";
-import { authFlowAuthorize } from "./flows/authorize";
-import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { aboutView } from "./flows/about";
-import { version } from "./version";
-import { checkRequiredFeatures } from "./utils/featureDetection";
+import { html, render } from "lit-html";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
-import { Connection } from "./utils/iiConnection";
 import { anyFeatures, features } from "./features";
+import { aboutView } from "./flows/about";
+import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
+import { authFlowAuthorize } from "./flows/authorize";
+import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { authFlowManage } from "./flows/manage";
+import "./styles/main.css";
+import { getAddDeviceAnchor } from "./utils/addDeviceLink";
+import { checkRequiredFeatures } from "./utils/featureDetection";
+import { Connection } from "./utils/iiConnection";
+import { version } from "./version";
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -93,6 +96,26 @@ const init = async () => {
 
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
+
+  // Figure out if user is trying to add a device. If so, use the anchor from the URL.
+  const addDeviceAnchor = getAddDeviceAnchor();
+  if (addDeviceAnchor !== undefined) {
+    // Register this device (tentatively)
+    await registerTentativeDevice(addDeviceAnchor, connection);
+
+    // Show a good bye message
+    const container = document.getElementById("pageContent") as HTMLElement;
+    render(
+      html`<h1
+        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+        data-role="notify-auth-success"
+      >
+        You may close this page.
+      </h1>`,
+      container
+    );
+    return;
+  }
 
   // Simple, #-based routing
   if (url.hash === "#authorize") {

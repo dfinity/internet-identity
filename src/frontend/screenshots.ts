@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { remote } from "webdriverio";
-import { existsSync, mkdirSync } from "fs";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
+import { existsSync, mkdirSync } from "fs";
+import { remote } from "webdriverio";
 import { downloadChrome } from "./download-chrome";
 
 /** This executable takes screenshots of every page in the showcase.

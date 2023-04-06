@@ -1,26 +1,28 @@
 import { html, render, TemplateResult } from "lit-html";
-import { withRef } from "../utils/lit-html";
-import { promptUserNumber } from "./promptUserNumber";
 import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
-import { NonEmptyArray } from "../utils/utils";
-import { parseUserNumber } from "../utils/userNumber";
-import { withLoader } from "./loader";
-import { mkAnchorPicker } from "./anchorPicker";
-import { mkAnchorInput } from "./anchorInput";
-import { getAnchors, setAnchorUsed } from "../utils/userNumber";
-import { unreachable, isNonEmptyArray } from "../utils/utils";
-import { Connection } from "../utils/iiConnection";
+import { useRecovery } from "../flows/recovery/useRecovery";
 import {
   apiResultToLoginFlowResult,
+  LoginData,
+  LoginFlowError,
   LoginFlowResult,
   LoginFlowSuccess,
-  LoginFlowError,
-  LoginData,
 } from "../utils/flowResult";
-import { displayError } from "./displayError";
-import { useRecovery } from "../flows/recovery/useRecovery";
+import { Connection } from "../utils/iiConnection";
+import { withRef } from "../utils/lit-html";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
+import {
+  getAnchors,
+  parseUserNumber,
+  setAnchorUsed,
+} from "../utils/userNumber";
+import { isNonEmptyArray, NonEmptyArray, unreachable } from "../utils/utils";
+import { mkAnchorInput } from "./anchorInput";
+import { mkAnchorPicker } from "./anchorPicker";
+import { displayError } from "./displayError";
+import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
+import { promptUserNumber } from "./promptUserNumber";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
  * for meaning of "firstTime", "useExisting" and "pick". */

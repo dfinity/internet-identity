@@ -1,52 +1,53 @@
 /** A showcase for static pages. II pages are given a fake connection and loaded from here
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
-import "./styles/main.css";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
-import { I18n } from "./utils/i18n";
-import { withRef, mount } from "./utils/lit-html";
-import { TemplateResult, html, render } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   Challenge,
   DeviceData,
   Timestamp,
 } from "../generated/internet_identity_types";
-import { AuthenticatedConnection } from "./utils/iiConnection";
-import { styleguide } from "./styleguide";
-import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { aboutView } from "./flows/about";
 import { showWarning } from "./banner";
-import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
-import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
+import { promptDeviceAliasPage } from "./components/alias";
+import { mkAnchorPicker } from "./components/anchorPicker";
+import { authnPages } from "./components/authenticateBox";
+import { displayError } from "./components/displayError";
+import { withLoader } from "./components/loader";
+import { promptUserNumber } from "./components/promptUserNumber";
+import { aboutView } from "./flows/about";
+import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
+import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
+import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
+import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
+import { authnTemplateAuthorize } from "./flows/authorize";
+import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { authnTemplateManage, displayManagePage } from "./flows/manage";
+import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
   confirmSeedPhrasePage,
 } from "./flows/recovery/confirmSeedPhrase";
-import { recoverWithPhrasePage } from "./flows/recovery/recoverWith/phrase";
-import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
-import { authnPages } from "./components/authenticateBox";
-import { authnTemplateAuthorize } from "./flows/authorize";
-import { promptDeviceAliasPage } from "./components/alias";
-import { renderConstructing } from "./flows/register/construct";
-import { promptCaptchaPage, badChallenge } from "./flows/register/captcha";
-import { displayUserNumberPage } from "./flows/register/finish";
-import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
-import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
-import { displayManagePage, authnTemplateManage } from "./flows/manage";
-import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
-import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
-import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
-import { mkAnchorPicker } from "./components/anchorPicker";
-import { withLoader } from "./components/loader";
 import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
-import { displayError } from "./components/displayError";
-import { promptUserNumber } from "./components/promptUserNumber";
+import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
+import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
+import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
+import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
+import { recoverWithPhrasePage } from "./flows/recovery/recoverWith/phrase";
+import { badChallenge, promptCaptchaPage } from "./flows/register/captcha";
+import { renderConstructing } from "./flows/register/construct";
+import { displayUserNumberPage } from "./flows/register/finish";
 import { registerDisabled } from "./flows/registerDisabled";
+import { styleguide } from "./styleguide";
+import "./styles/main.css";
+import { addDeviceLink } from "./utils/addDeviceLink";
+import { I18n } from "./utils/i18n";
+import { AuthenticatedConnection } from "./utils/iiConnection";
+import { mount, withRef } from "./utils/lit-html";
 import { RecoveryDevice } from "./utils/recoveryDevice";
+import { asNonEmptyArray, Chan, NonEmptyArray } from "./utils/utils";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -311,8 +312,11 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
-      userNumber,
       cancel: () => console.log("canceled"),
+      link: addDeviceLink({
+        origin: "https://identity.internetcomputer.org",
+        userNumber: BigInt(1234),
+      }),
       remaining: {
         async *[Symbol.asyncIterator]() {
           yield "00:34";

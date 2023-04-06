@@ -1,42 +1,42 @@
-import { TemplateResult, html } from "lit-html";
-import { renderPage } from "../../utils/lit-html";
-import { LEGACY_II_URL } from "../../config";
-import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
-import { withLoader } from "../../components/loader";
-import { toast } from "../../components/toast";
-import { unreachable } from "../../utils/utils";
-import { logoutSection } from "../../components/logout";
-import {
-  resetPhrase,
-  deleteDevice,
-  protectDevice,
-  unprotectDevice,
-} from "./deviceSettings";
-import { showWarning } from "../../banner";
+import { html, TemplateResult } from "lit-html";
 import {
   DeviceData,
   IdentityAnchorInfo,
 } from "../../../generated/internet_identity_types";
-import { displayError } from "../../components/displayError";
+import { showWarning } from "../../banner";
 import {
   authenticateBox,
   AuthnTemplates,
 } from "../../components/authenticateBox";
-import { setupPhrase, setupKey } from "../recovery/setupRecovery";
-import { recoveryWizard } from "../recovery/recoveryWizard";
+import { displayError } from "../../components/displayError";
+import { withLoader } from "../../components/loader";
+import { logoutSection } from "../../components/logout";
+import { mainWindow } from "../../components/mainWindow";
+import { toast } from "../../components/toast";
+import { LEGACY_II_URL } from "../../config";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
+import { renderPage } from "../../utils/lit-html";
+import {
+  hasRecoveryPhrase,
+  isProtected,
+  isRecoveryDevice,
+  isRecoveryPhrase,
+} from "../../utils/recoveryDevice";
+import { unreachable } from "../../utils/utils";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
-import { recoveryMethodsSection } from "./recoveryMethodsSection";
+import { recoveryWizard } from "../recovery/recoveryWizard";
+import { setupKey, setupPhrase } from "../recovery/setupRecovery";
 import { authenticatorsSection } from "./authenticatorsSection";
-import { mainWindow } from "../../components/mainWindow";
 import {
-  isRecoveryDevice,
-  isProtected,
-  hasRecoveryPhrase,
-  isRecoveryPhrase,
-} from "../../utils/recoveryDevice";
-import { Devices, Protection, RecoveryPhrase, RecoveryKey } from "./types";
+  deleteDevice,
+  protectDevice,
+  resetPhrase,
+  unprotectDevice,
+} from "./deviceSettings";
+import { recoveryMethodsSection } from "./recoveryMethodsSection";
+import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {

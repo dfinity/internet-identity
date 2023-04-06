@@ -1,17 +1,17 @@
 import { html } from "lit-html";
-import { displayError } from "../../components/displayError";
-import { Connection, AuthenticatedConnection } from "../../utils/iiConnection";
-import { LoginFlowResult } from "../../utils/flowResult";
-import { promptUserNumber } from "../../components/promptUserNumber";
 import { promptDeviceAlias } from "../../components/alias";
-import { recoverWithPhrase } from "./recoverWith/phrase";
-import { deviceRecoveryPage } from "./recoverWith/device";
-import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { displayError } from "../../components/displayError";
+import { promptUserNumber } from "../../components/promptUserNumber";
+import { authenticatorAttachmentToKeyType } from "../../utils/authenticatorAttachment";
+import { LoginFlowResult } from "../../utils/flowResult";
+import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
 import { isRecoveryPhrase } from "../../utils/recoveryDevice";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString, unreachableLax } from "../../utils/utils";
 import { constructIdentity } from "../register/construct";
-import { authenticatorAttachmentToKeyType } from "../../utils/authenticatorAttachment";
+import { pickRecoveryDevice } from "./pickRecoveryDevice";
+import { deviceRecoveryPage } from "./recoverWith/device";
+import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
   connection: Connection,

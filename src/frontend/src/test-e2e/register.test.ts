@@ -1,3 +1,15 @@
+import { FLOWS } from "./flows";
+import {
+  addVirtualAuthenticator,
+  addWebAuthnCredential,
+  focusBrowser,
+  getWebAuthnCredentials,
+  originToRelyingPartyId,
+  removeVirtualAuthenticator,
+  runInBrowser,
+  switchToPopup,
+  waitToClose,
+} from "./util";
 import {
   AddDeviceAliasView,
   AddDeviceFlowSelectorView,
@@ -14,22 +26,11 @@ import {
   VerifyRemoteDeviceView,
   WelcomeView,
 } from "./views";
-import { FLOWS } from "./flows";
-import {
-  addVirtualAuthenticator,
-  addWebAuthnCredential,
-  focusBrowser,
-  getWebAuthnCredentials,
-  originToRelyingPartyId,
-  removeVirtualAuthenticator,
-  runInBrowser,
-  switchToPopup,
-  waitToClose,
-} from "./util";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import { readFileSync } from "fs";
+import { II_URL, REPLICA_URL } from "./constants";
 export const test_app_canister_ids = JSON.parse(
   readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
 );
@@ -37,8 +38,6 @@ export const test_app_canister_ids = JSON.parse(
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
-import { REPLICA_URL } from "./constants";
-import { II_URL } from "./constants";
 const ABOUT_URL = `${II_URL}/about`;
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
@@ -114,17 +113,11 @@ test("Register new identity and add additional remote device", async () => {
 
     const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
     await addDeviceFlowView.waitForDisplay();
-    await addDeviceFlowView.selectRemoteDevice();
+    const addDeviceLink = await addDeviceFlowView.selectRemoteDevice();
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
-      await browser2.url(II_URL);
-      const welcomeView2 = new WelcomeView(browser2);
-      await welcomeView2.waitForDisplay();
-      await welcomeView2.addDevice();
-      const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
-      await addIdentityAnchorView2.waitForDisplay();
-      await addIdentityAnchorView2.continue(userNumber);
+      await browser2.url(addDeviceLink);
       const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
       await addRemoteDeviceView.waitForDisplay();
       await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
