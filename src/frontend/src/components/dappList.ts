@@ -66,6 +66,36 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
   </div>`;
 };
 
+export const dappsListElement = (
+  dappsList: DappDescription[]
+): TemplateResult => {
+  return html` <article class="c-card c-card--narrow">
+    <h2 class="t-title t-title--discrete">Dapps explorer</h2>
+    <h2 class="t-title">Explore dapps</h2>
+    <section aria-label="List of dapps">
+      <div class="c-action-list">
+        ${dappsList.map(
+          (dapp) => html` <a
+            href="${dapp.link}"
+            class="c-action-list__item"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div class="c-action-list__icon" aria-hidden>
+              <img src="icons/${dapp.logo}" alt="${dapp.name} logo" />
+            </div>
+            <div class="c-action-list__label c-action-list__label--stacked">
+              <h3 class="t-title t-title--list">${dapp.name}</h3>
+              <p class="t-weak">${dapp.oneLiner}</p>
+            </div>
+            <span class="c-action-list__action"> ↗ </span>
+          </a>`
+        )}
+      </div>
+    </section>
+  </article>`;
+};
+
 export const dappsTeaser = (dappsList: DappDescription[]): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
     <h2 class="t-title t-title--discrete">Dapps explorer</h2>

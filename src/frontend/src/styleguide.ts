@@ -13,7 +13,11 @@ import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
 import { toast } from "./components/toast";
 import { modal } from "./components/modal";
-import { dappsTeaser, DappDescription } from "./components/dappList";
+import {
+  dappsTeaser,
+  dappsListElement,
+  DappDescription,
+} from "./components/dappList";
 
 // these words are never longer than 8 characters
 // according to the bip39 spec
@@ -565,6 +569,7 @@ export const styleguide = html`
         <h2 class="t-title t-title--sub">Dapp List</h2>
         <section class="demo" aria-label="Dapp List Demo">
           ${dappsTeaser(dappsMeta)}
+          <div class="l-stack">${dappsListElement(dappsMeta)}</div>
         </section>
       </aside>
 
