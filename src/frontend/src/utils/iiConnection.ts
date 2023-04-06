@@ -8,9 +8,15 @@ import {
   HttpAgent,
   SignIdentity,
 } from "@dfinity/agent";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/principal";
+import * as tweetnacl from "tweetnacl";
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
-  _SERVICE,
   AddTentativeDeviceResponse,
   Challenge,
   ChallengeResult,
@@ -28,19 +34,13 @@ import {
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
+  _SERVICE,
 } from "../../generated/internet_identity_types";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
-import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
+import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is

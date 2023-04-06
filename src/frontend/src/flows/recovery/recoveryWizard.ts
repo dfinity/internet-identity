@@ -1,9 +1,9 @@
-import { AuthenticatedConnection } from "../../utils/iiConnection";
-import { setupRecovery } from "./setupRecovery";
-import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
-import { displaySafariWarning } from "./displaySafariWarning";
-import { iOSOrSafari } from "../../utils/utils";
 import { html } from "lit-html";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { iOSOrSafari } from "../../utils/utils";
+import { displaySafariWarning } from "./displaySafariWarning";
+import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
+import { setupRecovery } from "./setupRecovery";
 
 export const recoveryWizard = async (
   userNumber: bigint,

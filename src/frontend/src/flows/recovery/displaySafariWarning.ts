@@ -1,7 +1,7 @@
 import { html, render } from "lit-html";
+import { mainWindow } from "../../components/mainWindow";
 import { warnBox } from "../../components/warnBox";
 import { AuthenticatedConnection } from "../../utils/iiConnection";
-import { mainWindow } from "../../components/mainWindow";
 
 const pageContent = () => {
   const pageContentSlot = html` <article id="warningContainer">

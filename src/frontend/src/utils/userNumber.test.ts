@@ -1,4 +1,4 @@
-import { getAnchors, setAnchorUsed, MAX_SAVED_ANCHORS } from "./userNumber";
+import { getAnchors, MAX_SAVED_ANCHORS, setAnchorUsed } from "./userNumber";
 
 testLocalStorage("anchors default to nothing", () => {
   expect(getAnchors()).toStrictEqual([]);

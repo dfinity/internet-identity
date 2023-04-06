@@ -1,8 +1,8 @@
-import { MainView, RecoverView, WelcomeView } from "./views";
 import { FLOWS } from "./flows";
 import { addVirtualAuthenticator, runInBrowser } from "./util";
+import { MainView, RecoverView, WelcomeView } from "./views";
 
-import { II_URL, DEVICE_NAME1, RECOVERY_PHRASE_NAME } from "./constants";
+import { DEVICE_NAME1, II_URL, RECOVERY_PHRASE_NAME } from "./constants";
 
 test("Recover access, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

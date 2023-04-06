@@ -1,22 +1,22 @@
-import { html } from "lit-html";
-import { creationOptions, Connection } from "../../../utils/iiConnection";
-import {
-  unreachableLax,
-  unreachable,
-  unknownToString,
-} from "../../../utils/utils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
+import { html } from "lit-html";
 import {
-  DeviceData,
   AddTentativeDeviceResponse,
   CredentialId,
+  DeviceData,
 } from "../../../../generated/internet_identity_types";
-import { showVerificationCode } from "./showVerificationCode";
-import { withLoader } from "../../../components/loader";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
+import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
+import { Connection, creationOptions } from "../../../utils/iiConnection";
+import {
+  unknownToString,
+  unreachable,
+  unreachableLax,
+} from "../../../utils/utils";
+import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
+import { showVerificationCode } from "./showVerificationCode";
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.

@@ -1,8 +1,8 @@
 /* A couple of lit-html helpers */
 
 import { render, TemplateResult } from "lit-html";
-import { Ref, ref } from "lit-html/directives/ref.js";
 import { DirectiveResult } from "lit-html/directive.js";
+import { Ref, ref } from "lit-html/directives/ref.js";
 import { toast } from "../components/toast";
 
 // Read a "lit-html" ref, showing an error message (in the console) in case the

@@ -1,6 +1,6 @@
 import { html, render, TemplateResult } from "lit-html";
-import { warnBox } from "./warnBox";
 import { mainWindow } from "./mainWindow";
+import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {
   title: string | TemplateResult;

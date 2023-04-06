@@ -1,14 +1,14 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html, render } from "lit-html";
-import { DeviceData } from "../../../generated/internet_identity_types";
-import {
-  IIWebAuthnIdentity,
-  DummyIdentity,
-  creationOptions,
-} from "../../utils/iiConnection";
 import { nextTick } from "process";
+import { DeviceData } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
+import {
+  creationOptions,
+  DummyIdentity,
+  IIWebAuthnIdentity,
+} from "../../utils/iiConnection";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 

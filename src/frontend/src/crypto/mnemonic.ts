@@ -1,5 +1,5 @@
-import { entropyToMnemonic, wordlists, validateMnemonic } from "bip39";
 import { toHexString } from "@dfinity/identity/lib/cjs/buffer";
+import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
 import { isUserNumber } from "../utils/userNumber";
 
 /**

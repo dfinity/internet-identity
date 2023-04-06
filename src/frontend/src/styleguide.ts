@@ -1,18 +1,18 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
-import "./styles/main.css";
 import { html } from "lit-html";
 import {
+  checkmarkIcon,
+  copyIcon,
+  dropdownIcon,
   icLogo,
   settingsIcon,
-  dropdownIcon,
-  copyIcon,
   warningIcon,
-  checkmarkIcon,
 } from "./components/icons";
-import { warnBox } from "./components/warnBox";
 import { irregularity } from "./components/irregularity";
-import { toast } from "./components/toast";
 import { modal } from "./components/modal";
+import { toast } from "./components/toast";
+import { warnBox } from "./components/warnBox";
+import "./styles/main.css";
 
 // these words are never longer than 8 characters
 // according to the bip39 spec

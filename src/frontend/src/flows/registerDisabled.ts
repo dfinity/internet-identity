@@ -1,8 +1,8 @@
 import { html, render } from "lit-html";
-import { warnBox } from "../components/warnBox";
-import { LoginFlowCanceled, cancel } from "../utils/flowResult";
 import { mainWindow } from "../components/mainWindow";
+import { warnBox } from "../components/warnBox";
 import { LEGACY_II_URL } from "../config";
+import { cancel, LoginFlowCanceled } from "../utils/flowResult";
 
 const pageContent = (onCancel: () => void) => {
   const pageContentSlot = html` <hgroup>

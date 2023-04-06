@@ -1,16 +1,16 @@
-import { TemplateResult, html } from "lit-html";
+import { html, TemplateResult } from "lit-html";
 import {
+  checkmarkRoundIcon,
   lockedIcon,
   warningIcon,
   warningRoundIcon,
-  checkmarkRoundIcon,
 } from "../../components/icons";
-import { RecoveryPhrase, RecoveryKey, Devices } from "./types";
-import { settingsDropdown } from "./settingsDropdown";
 import {
-  recoveryPhraseLabel,
   recoveryKeyLabel,
+  recoveryPhraseLabel,
 } from "../../utils/recoveryDevice";
+import { settingsDropdown } from "./settingsDropdown";
+import { Devices, RecoveryKey, RecoveryPhrase } from "./types";
 
 // The list of recovery devices
 export const recoveryMethodsSection = ({
