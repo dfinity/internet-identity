@@ -1,6 +1,6 @@
 import { Ed25519PublicKey } from "@dfinity/identity";
-import * as ed25519 from "./ed25519";
 import { fromHexString } from "@dfinity/identity/lib/cjs/buffer";
+import * as ed25519 from "./ed25519";
 
 type TestVector = {
   seed: string;

@@ -1,5 +1,5 @@
-import { mkAnchorPicker } from "./anchorPicker";
 import { render } from "lit-html";
+import { mkAnchorPicker } from "./anchorPicker";
 
 const commonProps = {
   button: "go",

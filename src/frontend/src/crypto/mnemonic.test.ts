@@ -1,8 +1,8 @@
 import {
-  Warning,
-  parseRecoveryPhrase,
-  getWarnings,
   dropLeadingUserNumber,
+  getWarnings,
+  parseRecoveryPhrase,
+  Warning,
 } from "./mnemonic";
 
 const expectLeadingUserNumberToBe = (

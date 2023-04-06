@@ -1,10 +1,10 @@
 import { html } from "lit-html";
-import { withRef, renderPage } from "../../utils/lit-html";
-import { ref, createRef, Ref } from "lit-html/directives/ref.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { checkmarkIcon, copyIcon } from "../../components/icons";
-import { I18n } from "../../i18n";
 import { mainWindow } from "../../components/mainWindow";
 import { toast } from "../../components/toast";
+import { I18n } from "../../i18n";
+import { renderPage, withRef } from "../../utils/lit-html";
 
 import copyJson from "./displaySeedPhrase.json";
 

@@ -1,9 +1,9 @@
-import { AuthenticatedConnection } from "../../utils/iiConnection";
-import { AuthContext, Delegation } from "./postMessageInterface";
 import {
   PublicKey,
   SignedDelegation,
 } from "../../../generated/internet_identity_types";
+import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { AuthContext, Delegation } from "./postMessageInterface";
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the application information contained in

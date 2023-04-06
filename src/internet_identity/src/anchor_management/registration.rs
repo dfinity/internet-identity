@@ -202,7 +202,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         ));
     }
 
-    let allocation = state::storage_mut(|storage| storage.allocate_anchor());
+    let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());
     let Some((anchor_number, mut anchor)) = allocation else {
         return RegisterResponse::CanisterFull;
     };
@@ -213,7 +213,7 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
     activity_bookkeeping(&mut anchor, &device.pubkey);
 
     // write anchor to stable memory
-    state::storage_mut(|storage| {
+    state::storage_borrow_mut(|storage| {
         storage.write(anchor_number, anchor).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to write data of anchor {anchor_number}: {err}"

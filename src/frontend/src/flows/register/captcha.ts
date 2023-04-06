@@ -1,18 +1,18 @@
+import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { Challenge } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { html, TemplateResult } from "lit-html";
-import { withRef, autofocus, renderPage } from "../../utils/lit-html";
-import { Chan } from "../../utils/utils";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { LoginFlowCanceled, cancel } from "../../utils/flowResult";
-import {
-  IIWebAuthnIdentity,
-  Connection,
-  RegisterResult,
-} from "../../utils/iiConnection";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
+import { cancel, LoginFlowCanceled } from "../../utils/flowResult";
+import {
+  Connection,
+  IIWebAuthnIdentity,
+  RegisterResult,
+} from "../../utils/iiConnection";
+import { autofocus, renderPage, withRef } from "../../utils/lit-html";
+import { Chan } from "../../utils/utils";
 
 import copyJson from "./captcha.json";
 
