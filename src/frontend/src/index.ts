@@ -104,18 +104,16 @@ const init = async () => {
     await registerTentativeDevice(addDeviceAnchor, connection);
 
     // Show a good bye message
-    await new Promise((_) => {
-      const container = document.getElementById("pageContent") as HTMLElement;
-      render(
-        html`<h1
-          style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-          data-role="notify-auth-success"
-        >
-          You may close this page.
-        </h1>`,
-        container
-      );
-    });
+    const container = document.getElementById("pageContent") as HTMLElement;
+    render(
+      html`<h1
+        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
+        data-role="notify-auth-success"
+      >
+        You may close this page.
+      </h1>`,
+      container
+    );
     return;
   }
 
