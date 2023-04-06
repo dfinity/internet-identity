@@ -191,7 +191,7 @@ export default [
       // Set up a proxy that redirects API calls to the replica.
       proxy: {
         // Make sure /api calls land on the replica (and not on webpack)
-        "/api": "http://localhost:4943",
+        "/api": "http://127.0.0.1:4943",
       },
       historyApiFallback: {
         // Make sure that visiting links like `/about` serves the correct HTML

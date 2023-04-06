@@ -26,7 +26,7 @@ module.exports = {
     // Set up a proxy that redirects API calls and /index.html to the
     // replica; the rest we serve from here.
     setupMiddlewares: (middlewares, devServer) => {
-      const replicaHost = "http://localhost:4943";
+      const replicaHost = "http://127.0.0.1:4943";
 
       const canisterIdsJson = "./.dfx/local/canister_ids.json";
       let canisterId;
@@ -65,7 +65,7 @@ module.exports = {
     port: 8081,
     proxy: {
       // Make sure /api calls land on the replica (and not on webpack)
-      "/api": "http://localhost:4943",
+      "/api": "http://127.0.0.1:4943",
     },
     allowedHosts: [".localhost", ".local", ".ngrok.io"],
   },
