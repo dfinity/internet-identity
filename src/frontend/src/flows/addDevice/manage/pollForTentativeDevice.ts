@@ -32,7 +32,7 @@ const pollForTentativeDeviceTemplate = ({
       <li>
         Open
         <em class="c-tooltip">
-          <strong data-role="add-device-link" class="t-strong">${link}</strong>
+          <strong data-role="add-device-link" class="t-strong t-wrap">${link}</strong>
           <span class="c-tooltip__message c-card c-card--tight">
             Open this link on the device you want to add.
           </span>
