@@ -51,11 +51,6 @@ const recoveryWords = [
   "tongue",
 ];
 
-const getDappsMeta = async (): Promise<DappDescription[]> => {
-  const dappsList = await fetch("/dapps.json").then((d) => d.json());
-  return dappsList;
-};
-
 /**
  * Fetch the actual information at some point?
  **/
