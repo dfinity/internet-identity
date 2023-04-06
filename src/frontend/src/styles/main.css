@@ -47,6 +47,30 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
 
+@font-face {
+  font-family: "Circular";
+  src: url("../../assets/fonts/CircularXXWeb-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Circular";
+  src: url("../../assets/fonts/CircularXXWeb-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Circular";
+  src: url("../../assets/fonts/CircularXXWeb-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 /* I) Settings: Global variables, config switches. */
 
 :root {
@@ -93,7 +117,7 @@
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
-  --vc-brand-alt: #ffffff;
+  --vc-brand-alt: #f4f3f8;
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -335,6 +359,7 @@ display:revert; revert to element instead of attribute */
 :root {
   /* general styles */
   font-family: "Inter", sans-serif;
+  font-family: "Circular", sans-serif;
   font-size: 62.5%; /* 10px */
   font-size: max(62.5%, calc(0.6vh + 0.25rem));
   font-weight: 350;
