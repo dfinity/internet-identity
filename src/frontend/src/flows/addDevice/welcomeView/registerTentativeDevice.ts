@@ -25,7 +25,7 @@ import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAt
 export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
-): Promise<void> => {
+): Promise<"ok"> => {
   // First, we need an alias for the device to (tentatively) add
   const alias = await promptDeviceAlias({
     title: "Add a Trusted Device",
@@ -35,8 +35,7 @@ export const registerTentativeDevice = async (
 
   if (alias === null) {
     // TODO L2-309: do this without reload
-    window.location.reload();
-    return;
+    return window.location.reload() as never;
   }
 
   // Then, we create local WebAuthn credentials for the device
@@ -75,7 +74,7 @@ export const registerTentativeDevice = async (
 
   // If everything went well we can now ask the user to authenticate on an existing device
   // and enter a verification code
-  await showVerificationCode(
+  return await showVerificationCode(
     userNumber,
     connection,
     device.alias,

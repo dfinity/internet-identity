@@ -5,6 +5,7 @@ import "./styles/main.css";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "./utils/utils";
+import { addDeviceLink } from "./utils/addDeviceLink";
 import { I18n } from "./utils/i18n";
 import { withRef, mount } from "./utils/lit-html";
 import { TemplateResult, html, render } from "lit-html";
@@ -311,8 +312,11 @@ const iiPages: Record<string, () => void> = {
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
-      userNumber,
       cancel: () => console.log("canceled"),
+      link: addDeviceLink({
+        origin: "https://identity.internetcomputer.org",
+        userNumber: BigInt(1234),
+      }),
       remaining: {
         async *[Symbol.asyncIterator]() {
           yield "00:34";
