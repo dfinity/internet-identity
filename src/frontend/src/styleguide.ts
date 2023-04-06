@@ -1,6 +1,11 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import { html } from "lit-html";
 import {
+  DappDescription,
+  dappsListElement,
+  dappsTeaser,
+} from "./components/dappList";
+import {
   checkmarkIcon,
   copyIcon,
   dropdownIcon,
@@ -12,11 +17,6 @@ import { irregularity } from "./components/irregularity";
 import { modal } from "./components/modal";
 import { toast } from "./components/toast";
 import { warnBox } from "./components/warnBox";
-import {
-  dappsTeaser,
-  dappsListElement,
-  DappDescription,
-} from "./components/dappList";
 import "./styles/main.css";
 
 // these words are never longer than 8 characters
