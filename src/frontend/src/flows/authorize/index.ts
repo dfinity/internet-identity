@@ -6,6 +6,7 @@ import {
 } from "../../components/authenticateBox";
 import { displayError } from "../../components/displayError";
 import { caretDownIcon, spinner } from "../../components/icons";
+import { showMessage } from "../../components/message";
 import { I18n } from "../../i18n";
 import { Connection } from "../../utils/iiConnection";
 import { withRef } from "../../utils/lit-html";
@@ -73,8 +74,9 @@ export const authFlowAuthorize = async (
   const i18n = new I18n();
   const container = document.getElementById("pageContent") as HTMLElement;
   const copy = i18n.i18n(copyJson);
+  const staticCopy = i18n.staticLang(copyJson);
   render(html`<h1>${copy.starting_authentication}</h1>`, container);
-  const showMessage = (msg: string | TemplateResult) =>
+  const loadingMessage = (msg: string | TemplateResult) =>
     render(
       html`
         <div class="l-container c-card c-card--highlight t-centered">
@@ -111,13 +113,13 @@ export const authFlowAuthorize = async (
     onProgress: (status) => {
       switch (status) {
         case "waiting":
-          showMessage(copy.waiting_for_auth_data);
+          loadingMessage(copy.waiting_for_auth_data);
           break;
         case "validating":
-          showMessage(copy.validating_auth_data);
+          loadingMessage(copy.validating_auth_data);
           break;
         case "fetching delegation":
-          showMessage(copy.finalizing_auth);
+          loadingMessage(copy.finalizing_auth);
           break;
         default:
           unreachable(status);
@@ -141,15 +143,10 @@ export const authFlowAuthorize = async (
       render(html`<h1>${copy.auth_failed}</h1>`, container);
       break;
     case "success":
-      render(
-        html`<h1
-          style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-          data-role="notify-auth-success"
-        >
-          ${copy.auth_success}
-        </h1>`,
-        container
-      );
+      showMessage({
+        role: "notify-auth-success",
+        message: staticCopy.auth_success,
+      });
       break;
     default:
       unreachable(result);
