@@ -89,7 +89,7 @@
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
-  --vc-brand-purple: #522785;
+  --vc-brand-purple: #4727ce;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
@@ -224,6 +224,10 @@
 }
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
+
+:root:is([data-theme="legacy"]) {
+  --vc-brand-purple: #522785;
+}
 
 /***
  * III) Generic: Ground-zero styles (Normalize.css, resets, box-sizing)
