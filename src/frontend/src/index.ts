@@ -1,17 +1,20 @@
-import { html, render } from "lit-html";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
+import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
 import { aboutView } from "./flows/about";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage } from "./flows/manage";
+import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
+
+import copyJson from "./index.json";
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -103,17 +106,14 @@ const init = async () => {
     // Register this device (tentatively)
     await registerTentativeDevice(addDeviceAnchor, connection);
 
+    const i18n = new I18n();
+    const staticCopy = i18n.staticLang(copyJson);
+
     // Show a good bye message
-    const container = document.getElementById("pageContent") as HTMLElement;
-    render(
-      html`<h1
-        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-        data-role="notify-auth-success"
-      >
-        You may close this page.
-      </h1>`,
-      container
-    );
+    showMessage({
+      message: staticCopy.close_page_device_added,
+      role: "notify-device-added",
+    });
     return;
   }
 
