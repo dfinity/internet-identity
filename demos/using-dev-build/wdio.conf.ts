@@ -1,5 +1,3 @@
-import { existsSync, mkdirSync } from "fs";
-
 export const config: WebdriverIO.Config = {
   baseUrl: process.env.II_DAPP_URL || "http://localhost:8080",
 

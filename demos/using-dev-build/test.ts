@@ -6,8 +6,8 @@
  * been deployed.
  */
 
+import { ChildProcess, execSync, spawn } from "child_process";
 import * as fs from "fs";
-import { ChildProcess, spawn, execSync } from "child_process";
 
 // In order to proxy the calls Node v18 requires 127.0.0.1 instead of localhost as string for the proxy
 const LOCALHOST = "127.0.0.1";
