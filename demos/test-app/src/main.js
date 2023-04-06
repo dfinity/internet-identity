@@ -1,13 +1,12 @@
 import { Actor, HttpAgent } from "@dfinity/agent";
+import { AuthClient } from "@dfinity/auth-client";
 import {
   Delegation,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
-import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
-import { IDL } from "@dfinity/candid";
 
 const signInBtn = document.getElementById("signinBtn");
 const signOutBtn = document.getElementById("signoutBtn");
