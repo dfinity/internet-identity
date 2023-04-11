@@ -10,6 +10,23 @@ export type DappDescription = {
   logo: string;
 };
 
+const createMarqueeListRowItems = (
+  dapps: DappDescription[]
+): TemplateResult => {
+  return html` ${dapps.map((dapp) => {
+    const { logo, name } = dapp;
+
+    return html`<div class="c-marquee__item">
+      <img
+        src="icons/${logo}"
+        alt="${name}"
+        class="c-marquee__image"
+        loading="lazy"
+      />
+    </div>`;
+  })}`;
+};
+
 /**
  * The marquee is a list of dapps that scrolls horizontally.
  * It uses a CSS keyframe animation to scroll the each row alternating from left to right and viceversa.
@@ -39,29 +56,9 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
   >
     ${rows.map(
       (row, i) => html`<div class="c-marquee__row" style="--rowEq: ${i}">
-        <div class="c-marquee__rowHalf">
-          ${row.map(
-            (dapp) => html`<div class="c-marquee__item">
-              <img
-                src="icons/${dapp.logo}"
-                alt="${dapp.name}"
-                class="c-marquee__image"
-                loading="lazy"
-              />
-            </div>`
-          )}
-        </div>
+        <div class="c-marquee__rowHalf">${createMarqueeListRowItems(row)}</div>
         <div class="c-marquee__rowHalf c-marquee__rowHalf--second">
-          ${row.map(
-            (dapp) => html`<div class="c-marquee__item">
-              <img
-                src="icons/${dapp.logo}"
-                alt="${dapp.name}"
-                class="c-marquee__image"
-                loading="lazy"
-              />
-            </div>`
-          )}
+          ${createMarqueeListRowItems(row)}
         </div>
       </div>`
     )}
