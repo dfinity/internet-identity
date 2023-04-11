@@ -2100,3 +2100,7 @@ input[type="checkbox"] {
 .l-stack--tight {
   margin-top: var(--vs-stack);
 }
+
+.l-stack--none {
+  margin-top: 0;
+}

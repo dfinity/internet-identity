@@ -44,9 +44,9 @@ const pollForTentativeDeviceTemplate = ({
   };
 
   const pageContentSlot = html`
-    <p class="t-paragraph">Identity Anchor ${userNumber}</p>
     <hgroup>
-      <h1 class="t-title t-title--main">Add Trusted Device</h1>
+      <h2 class="t-paragraph">Identity Anchor ${userNumber}</h2>
+      <h1 class="t-title t-title--main l-stack--none">Add Trusted Device</h1>
       <p class="t-lead">Follow these steps on your new device</p>
     </hgroup>
     <div
