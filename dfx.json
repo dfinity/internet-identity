@@ -3,7 +3,7 @@
     "internet_identity": {
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
-      "wasm": "internet_identity.wasm",
+      "wasm": "internet_identity.wasm.gz",
       "build": "scripts/build",
       "shrink" : false
     }
