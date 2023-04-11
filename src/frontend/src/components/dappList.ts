@@ -10,9 +10,7 @@ export type DappDescription = {
   logo: string;
 };
 
-const createMarqueeListRowItems = (
-  dapps: DappDescription[]
-): TemplateResult => {
+const marqueeListRow = (dapps: DappDescription[]): TemplateResult => {
   return html` ${dapps.map(
     ({ logo, name }) => html`<div class="c-marquee__item">
       <img
@@ -32,7 +30,7 @@ const createMarqueeListRowItems = (
  * when the animation reaches the end of the list, it is reset to the beginning. (default keyframe animation behaviour)
  */
 
-const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
+const marqueeList = (dapps: DappDescription[]): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 
@@ -69,24 +67,22 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
   >
     ${rows.map(
       (row, i) => html`<div class="c-marquee__row" style="--rowIndex: ${i}">
-        <div class="c-marquee__rowHalf">${createMarqueeListRowItems(row)}</div>
+        <div class="c-marquee__rowHalf">${marqueeListRow(row)}</div>
         <div class="c-marquee__rowHalf c-marquee__rowHalf--second">
-          ${createMarqueeListRowItems(row)}
+          ${marqueeListRow(row)}
         </div>
       </div>`
     )}
   </div>`;
 };
 
-export const dappsListElement = (
-  dappsList: DappDescription[]
-): TemplateResult => {
+export const dappsList = (dapps: DappDescription[]): TemplateResult => {
   return html` <article class="c-card c-card--narrow">
     <h2 class="t-title t-title--discrete">Dapps explorer</h2>
     <h2 class="t-title">Explore dapps</h2>
     <section aria-label="List of dapps">
       <div class="c-action-list">
-        ${dappsList.map(
+        ${dapps.map(
           ({ link, logo, name, oneLiner }) => html`<a
             href="${link}"
             class="c-action-list__item"
@@ -109,7 +105,7 @@ export const dappsListElement = (
 };
 
 export const dappsTeaser = (
-  dappsList: DappDescription[],
+  dapps: DappDescription[],
   clickFn: () => void
 ): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
@@ -122,9 +118,7 @@ export const dappsTeaser = (
       @click="${() => clickFn()}"
       aria-label="Show list of dapps"
     >
-      <figure class="c-card__teaser c-marquee">
-        ${createMarqueeList(dappsList)}
-      </figure>
+      <figure class="c-card__teaser c-marquee">${marqueeList(dapps)}</figure>
     </button>
   </article>`;
 };

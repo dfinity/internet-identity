@@ -1,10 +1,6 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
 import { html } from "lit-html";
-import {
-  DappDescription,
-  dappsListElement,
-  dappsTeaser,
-} from "./components/dappList";
+import { DappDescription, dappsList, dappsTeaser } from "./components/dappList";
 import {
   checkmarkIcon,
   copyIcon,
@@ -566,7 +562,7 @@ export const styleguide = html`
           ${dappsTeaser(dappsMeta, () => {
             console.log("show dapps list");
           })}
-          <div class="l-stack">${dappsListElement(dappsMeta)}</div>
+          <div class="l-stack">${dappsList(dappsMeta)}</div>
         </section>
       </aside>
 
