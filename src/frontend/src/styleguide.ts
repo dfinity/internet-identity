@@ -563,7 +563,9 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Dapp List</h2>
         <section class="demo" aria-label="Dapp List Demo">
-          ${dappsTeaser(dappsMeta)}
+          ${dappsTeaser(dappsMeta, () => {
+            console.log("show dapps list");
+          })}
           <div class="l-stack">${dappsListElement(dappsMeta)}</div>
         </section>
       </aside>

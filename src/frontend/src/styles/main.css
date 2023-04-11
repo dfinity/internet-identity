@@ -1153,6 +1153,16 @@ a:hover,
   margin-top: var(--rs-button-stack);
 }
 
+/**
+ * This is mostly used on buttons that don't look like buttons
+ * but we still want to make an arbitrary area clickable 
+ */
+.c-click-area {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
 .c-input.has-error,
 .c-input.has-error:focus {
   color: var(--rc-error);

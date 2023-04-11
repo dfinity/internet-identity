@@ -51,6 +51,7 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
 
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
+    aria-hidden="true"
     class="c-marquee__list"
     style="--itemsPerRow: ${itemsPerRow}; --totalRows: ${totalRows}"
   >
@@ -99,12 +100,21 @@ export const dappsListElement = (
   </article>`;
 };
 
-export const dappsTeaser = (dappsList: DappDescription[]): TemplateResult => {
+export const dappsTeaser = (
+  dappsList: DappDescription[],
+  clickFn: () => void
+): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
     <h2 class="t-title t-title--discrete">Dapps explorer</h2>
     <h2 class="t-title">Explore dapps</h2>
-    <figure class="c-card__teaser c-marquee">
-      ${createMarqueeList(dappsList)}
-    </figure>
+    <button
+      class="c-click-area"
+      @click="${clickFn}"
+      aria-label="Show list of dapps"
+    >
+      <figure class="c-card__teaser c-marquee">
+        ${createMarqueeList(dappsList)}
+      </figure>
+    </button>
   </article>`;
 };
