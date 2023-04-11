@@ -46,6 +46,7 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
                 src="icons/${dapp.logo}"
                 alt="${dapp.name}"
                 class="c-marquee__image"
+                loading="lazy"
               />
             </div>`
           )}
@@ -57,6 +58,7 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
                 src="icons/${dapp.logo}"
                 alt="${dapp.name}"
                 class="c-marquee__image"
+                loading="lazy"
               />
             </div>`
           )}
@@ -82,7 +84,11 @@ export const dappsListElement = (
             rel="noopener noreferrer"
           >
             <div class="c-action-list__icon" aria-hidden>
-              <img src="icons/${dapp.logo}" alt="${dapp.name} logo" />
+              <img
+                src="icons/${dapp.logo}"
+                alt="${dapp.name} logo"
+                loading="lazy"
+              />
             </div>
             <div class="c-action-list__label c-action-list__label--stacked">
               <h3 class="t-title t-title--list">${dapp.name}</h3>
