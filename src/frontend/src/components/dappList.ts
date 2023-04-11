@@ -48,11 +48,20 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
     Array.from(
       new Array(itemsPerRow),
       (item, j) =>
-        // If the number of dapps is less than the number of items per row, the list is repeated.
-        // So if there are only 5 dapps but we want to show a grid of 5x5, the list is repeated 5 times.
+        /**
+         * If the number of dapps is less than the number of items per row, the list is repeated.
+         * So if there are only 5 dapps but we want to show a grid of 5x5, the list is repeated 5 times.
+         *
+         * x = i * itemsPerRow
+         * y = x + j
+         * dappsIndex = x + y
+         * dappsIndexWrapped = dappsIndex % dapps.length
+         */
         dapps[(i * itemsPerRow + j) % dapps.length]
     )
   );
+
+  // create a list of dapps chunks (rows)
 
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
