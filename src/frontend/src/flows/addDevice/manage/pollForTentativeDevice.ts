@@ -177,7 +177,7 @@ const displayQR = async ({
     return;
   }
 
-  // Retrieve a fitting color from design tokens (defaults to black if for some reason none is found)
+  // Retrieve a fitting color CSS (defaults to black if for some reason none is set)
   const fill: string = getComputedStyle(
     document.documentElement
   ).getPropertyValue("currentColor");
