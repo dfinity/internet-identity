@@ -16,10 +16,13 @@ use std::time::{Duration, UNIX_EPOCH};
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
     let assets: Vec<(&str, Option<&str>)> = vec![
         ("/", None),
+        ("/about", None),
         ("/index.html", None),
         ("/index.js", Some("gzip")),
+        ("/index.css", None),
         ("/loader.webp", None),
         ("/favicon.ico", None),
+        ("/.well-known/ic-domains", None),
     ];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
