@@ -6,10 +6,9 @@ use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
-use include_dir::{include_dir, Dir};
+use include_dir::{include_dir, Dir, File};
 use lazy_static::lazy_static;
 use sha2::Digest;
-use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ContentEncoding {
@@ -57,14 +56,6 @@ lazy_static! {
         let hash = BASE64.encode(hash);
         format!("sha256-{hash}")
     };
-
-    /// Map of path aliases
-    /// This creates a copy of the asset at the mapped path with the same content as the asset at the
-    /// original path.
-    static ref PATH_ALIASES: HashMap<String, String> = vec![
-        ("/index.html".to_string(), "/".to_string()),
-        ("/about.html".to_string(), "/about".to_string()),
-    ].into_iter().collect();
 }
 
 // used both in init and post_upgrade
@@ -117,65 +108,74 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
     let mut assets: Vec<(String, Vec<u8>, ContentEncoding, ContentType)> = vec![];
     for asset in dir.files() {
         let file_bytes = asset.contents().to_vec();
-        let file_path = "/".to_string() + asset.path().to_str().unwrap();
-        let (asset_path, content, encoding, content_type) = match asset
-            .path()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .split_once('.')
-            .unwrap()
-            .1
-        {
-            "css" => (
-                file_path,
-                file_bytes,
-                ContentEncoding::Identity,
-                ContentType::CSS,
-            ),
+        let (content, encoding, content_type) = match file_extension(asset) {
+            "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
             "html" => (
-                file_path,
                 fixup_html(String::from_utf8_lossy(&file_bytes).as_ref())
                     .as_bytes()
                     .to_vec(),
                 ContentEncoding::Identity,
                 ContentType::HTML,
             ),
-            "ico" => (
-                file_path,
-                file_bytes,
-                ContentEncoding::Identity,
-                ContentType::ICO,
-            ),
-            "js.gz" => (
-                file_path.chars().take(file_path.len() - 3).collect(), // drop ".gz"
-                file_bytes,
-                ContentEncoding::GZip,
-                ContentType::JS,
-            ),
-            "png" => (
-                file_path,
-                file_bytes,
-                ContentEncoding::Identity,
-                ContentType::PNG,
-            ),
-            "webp" => (
-                file_path,
-                file_bytes,
-                ContentEncoding::Identity,
-                ContentType::WEBP,
-            ),
+            "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
+            "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
+            "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
+            "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
             _ => panic!("Unknown asset type: {}", asset.path().display()),
         };
 
-        // Create a copy if an alias exists
-        ic_cdk::println!("Adding asset: {}", asset_path);
-        if let Some(alias) = PATH_ALIASES.get(&asset_path) {
-            assets.push((alias.clone(), content.clone(), encoding, content_type));
-        }
-
-        assets.push((asset_path, content, encoding, content_type));
+        assets.push((file_to_asset_path(asset), content, encoding, content_type));
     }
     assets
+}
+
+/// Returns the portion of the filename after the first dot.
+/// This corresponds to the file extension for the assets handled by this canister.
+///
+/// The builtin `extension` method on `Path` does not work for file extensions with multiple dots
+/// such as `.js.gz`.
+fn file_extension<'a>(asset: &'a File) -> &'a str {
+    asset
+        .path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split_once('.')
+        .unwrap()
+        .1
+}
+
+/// Returns the asset path for a given file:
+/// * make relative path absolute
+/// * map **/index.html to **/
+/// * map **/<foo>.html to **/foo
+/// * map **/<foo>.js.gz to **/<foo>.js
+fn file_to_asset_path(asset: &File) -> String {
+    const INDEX_HTML: &str = "index.html";
+    const HTML_EXTENSION: &str = ".html";
+    const GZIP_EXTENSION: &str = ".gz";
+
+    // make path absolute
+    let mut file_path = "/".to_string() + asset.path().to_str().unwrap();
+    if file_path.ends_with(INDEX_HTML) {
+        // drop index.html filename (i.e. maps **/index.html to **/)
+        file_path = file_path
+            .chars()
+            .take(file_path.len() - INDEX_HTML.len())
+            .collect()
+    } else if file_path.ends_with(HTML_EXTENSION) {
+        // drop .html file endings (i.e. maps **/<foo>.html to **/foo)
+        file_path = file_path
+            .chars()
+            .take(file_path.len() - HTML_EXTENSION.len())
+            .collect()
+    } else if file_path.ends_with(".js.gz") {
+        // drop .gz for .js.gz files (i.e. maps **/<foo>.js.gz to **/<foo>.js)
+        file_path = file_path
+            .chars()
+            .take(file_path.len() - GZIP_EXTENSION.len())
+            .collect()
+    }
+    file_path
 }
