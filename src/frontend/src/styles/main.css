@@ -219,6 +219,8 @@
   --rs-line-height-body: var(--vs-line-height);
   --rs-dropdown-bezel: var(--vs-bezel);
 
+  --rs-marquee-gap: var(--vs-inline);
+
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
 }
@@ -421,6 +423,23 @@ body {
 .t-title--main {
   font-size: 2.8rem;
   margin-top: 0.5em;
+}
+
+.t-title--discrete {
+  font-size: 1rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.t-title--discrete + .t-title {
+  margin-top: 0.2em;
+}
+
+.t-title--list {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+  margin-top: 0;
 }
 
 .t-lead {
@@ -650,9 +669,12 @@ a:hover,
  */
 
 .c-card {
+  --bezel-x: var(--rs-card-bezel-x);
+  --bezel-y: var(--rs-card-bezel);
+
   display: block;
   position: relative;
-  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+  padding: var(--bezel-y) var(--bezel-x);
   border: var(--rs-line) solid var(--rc-line);
   background-color: var(--rc-background-transparent);
   border-radius: var(--rs-card-border-radius);
@@ -673,17 +695,29 @@ a:hover,
 }
 
 .c-card--narrow {
-  padding: var(--rs-card-bezel-narrow);
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
 }
 
 .c-card--tight {
-  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
-    calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-x: calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-y: calc(var(--rs-card-bezel-narrow) * 0.5);
 }
 
 .c-card--background {
   padding: calc(var(--rs-card-bezel) * 0.3);
   background: rgba(255, 255, 255, 0.2);
+}
+
+/**
+  * Card Teaser
+  * it goes to the edge of the card
+  **/
+
+.c-card__teaser {
+  margin-left: calc(var(--bezel-x) * -1);
+  margin-right: calc(var(--bezel-x) * -1);
+  margin-bottom: calc(var(--bezel-x) * -1);
 }
 
 .c-card--background::after {
@@ -1779,6 +1813,11 @@ a:hover,
   padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
+a.c-action-list__item {
+  text-decoration: none;
+  color: var(--rc-text);
+}
+
 .c-action-list__item + .c-action-list__item::before {
   content: "";
   display: block;
@@ -1802,11 +1841,33 @@ a:hover,
   flex-grow: 1;
 }
 
+.c-action-list__icon {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-action-list__icon img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .c-action-list__action,
 .c-action-list__label,
 .c-action-list__status {
   display: flex;
   align-items: center;
+}
+
+.c-action-list__label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .c-action-list__action {
@@ -2072,6 +2133,78 @@ input[type="checkbox"] {
   left: 50%;
   transform: translate(-50%, -50%);
   user-select: none;
+}
+
+.c-marquee {
+  --marqueeGap: var(--rs-marquee-gap);
+
+  position: relative;
+  overflow: hidden;
+  height: 40rem;
+}
+
+.c-marquee__row {
+  position: absolute;
+  top: calc(var(--rowEq) / var(--totalRows) * 100% + var(--marqueeGap));
+  left: 0;
+  width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
+  height: calc(100% / var(--totalRows) + var(--marqueeGap));
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-5deg);
+  transform-origin: 25% 50%;
+}
+
+.c-marquee__rowHalf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  gap: var(--marqueeGap);
+  animation: marquee 40s linear infinite;
+}
+
+.c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
+  animation-direction: reverse;
+  /** makes sure the rows are staggered */
+  animation-delay: -4.5s;
+}
+
+.c-marquee__rowHalf--second {
+  left: 50%;
+}
+
+@media (prefers-reduced-motion) {
+  .c-marquee__rowHalf {
+    animation-play-state: paused;
+  }
+}
+
+.c-marquee__item {
+  flex: 0 0 auto;
+  width: calc(100% / var(--itemsPerRow) - var(--marqueeGap));
+  height: 100%;
+  position: relative;
+  user-select: none;
+}
+
+.c-marquee__image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 65%;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 /* 
