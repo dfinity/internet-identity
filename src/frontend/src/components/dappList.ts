@@ -24,6 +24,36 @@ const marqueeListRow = (dapps: DappDescription[]): TemplateResult => {
 };
 
 /**
+ * rows = [
+ *   [dapp0, dapp1, dapp2, dapp3, dapp4],
+ *   [dapp5, dapp6, dapp7, dapp8, dapp9],
+ *   ...,
+ *   [dapp0, dapp1, dapp2, dapp3, dapp4]
+ * ]
+ */
+const dappsToRows = (
+  dapps: DappDescription[],
+  rows: number,
+  columns: number
+): DappDescription[][] =>
+  Array.from(new Array(rows), (row, i) =>
+    Array.from(
+      new Array(columns),
+      (item, j) =>
+        /**
+         * If the number of dapps is less than the number of items per row, the list is repeated.
+         * So if there are only 5 dapps but we want to show a grid of 5x5, the list is repeated 5 times.
+         *
+         * x = i * columns
+         * y = x + j
+         * dappsIndex = x + y
+         * dappsIndexWrapped = dappsIndex % dapps.length
+         */
+        dapps[(i * columns + j) % dapps.length]
+    )
+  );
+
+/**
  * The marquee is a list of dapps that scrolls horizontally.
  * It uses a CSS keyframe animation to scroll the each row alternating from left to right and viceversa.
  * To give the illusion of an infinite scrolling, the list is duplicated horizontally.
@@ -34,30 +64,7 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 
-  /**
-   * rows = [
-   *   [dapp0, dapp1, dapp2, dapp3, dapp4],
-   *   [dapp5, dapp6, dapp7, dapp8, dapp9],
-   *   ...,
-   *   [dapp0, dapp1, dapp2, dapp3, dapp4]
-   * ]
-   */
-  const rows = Array.from(new Array(totalRows), (row, i) =>
-    Array.from(
-      new Array(itemsPerRow),
-      (item, j) =>
-        /**
-         * If the number of dapps is less than the number of items per row, the list is repeated.
-         * So if there are only 5 dapps but we want to show a grid of 5x5, the list is repeated 5 times.
-         *
-         * x = i * itemsPerRow
-         * y = x + j
-         * dappsIndex = x + y
-         * dappsIndexWrapped = dappsIndex % dapps.length
-         */
-        dapps[(i * itemsPerRow + j) % dapps.length]
-    )
-  );
+  const rows = dappsToRows(dapps, totalRows, itemsPerRow);
 
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
