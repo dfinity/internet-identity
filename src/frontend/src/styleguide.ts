@@ -47,6 +47,7 @@ const recoveryWords = [
   "tongue",
 ];
 
+// normalized JSON from: https://github.com/dfinity/internet-identity/blob/frederik/dapp-list/src/frontend/assets/dapps.json
 const dappsMeta: DappDescription[] = [
   {
     name: "DSCVR",
