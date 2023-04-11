@@ -2076,10 +2076,8 @@ input[type="checkbox"] {
 
 /* Wrap QR codes in a white square (for legibility) and prettify a bit */
 .c-qrcode canvas {
+  /* Make sure it has a white background to be easy to scan, not matter the background */
   background: white;
-  padding: calc(2 * var(--vs-gutter));
-  border: 2px solid var(--vc-brand-purple);
-  border-radius: 2px;
   /* Ensure the canvas doesn't overflow on small screens */
   max-width: 100%;
   image-rendering: pixelated;
