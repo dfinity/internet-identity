@@ -66,14 +66,15 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
     class="c-marquee__list"
     style="--itemsPerRow: ${itemsPerRow}; --totalRows: ${totalRows}"
   >
-    ${rows.map(
-      (row, i) => html`<div class="c-marquee__row" style="--rowIndex: ${i}">
-        <div class="c-marquee__rowHalf">${marqueeListRow(row)}</div>
+    ${rows.map((row, i) => {
+      const rowContent = marqueeListRow(row);
+      return html`<div class="c-marquee__row" style="--rowIndex: ${i}">
+        <div class="c-marquee__rowHalf">${rowContent}</div>
         <div class="c-marquee__rowHalf c-marquee__rowHalf--second">
-          ${marqueeListRow(row)}
+          ${rowContent}
         </div>
-      </div>`
-    )}
+      </div>`;
+    })}
   </div>`;
 };
 
