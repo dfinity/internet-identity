@@ -89,7 +89,7 @@
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
-  --vc-brand-purple: #522785; /* NOTE: this is read by the QR code generator */
+  --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
@@ -2085,6 +2085,7 @@ input[type="checkbox"] {
   background: white;
   /* Ensure the canvas doesn't overflow on small screens */
   max-width: 100%;
+  /* Makes the canvas more sharp */
   image-rendering: pixelated;
 }
 
