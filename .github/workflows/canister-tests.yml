@@ -267,6 +267,7 @@ jobs:
           mkdir dist
           touch dist/index.html
           touch dist/about.html
+          touch dist/1.js.gz
           touch dist/index.js.gz
           touch dist/index.css
           touch dist/loader.webp

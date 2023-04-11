@@ -89,7 +89,7 @@
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
-  --vc-brand-purple: #522785;
+  --vc-brand-purple: #522785; /* NOTE: this is read by the QR code generator */
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
@@ -2072,6 +2072,17 @@ input[type="checkbox"] {
   left: 50%;
   transform: translate(-50%, -50%);
   user-select: none;
+}
+
+/* Wrap QR codes in a white square (for legibility) and prettify a bit */
+.c-qrcode canvas {
+  background: white;
+  padding: calc(2 * var(--vs-gutter));
+  border: 2px solid var(--vc-brand-purple);
+  border-radius: 2px;
+  /* Ensure the canvas doesn't overflow on small screens */
+  max-width: 100%;
+  image-rendering: pixelated;
 }
 
 /* 
