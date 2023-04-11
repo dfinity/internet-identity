@@ -154,6 +154,7 @@ const defaults = {
     }),
     new CompressionPlugin({
       test: /\.js(\?.*)?$/i,
+      deleteOriginalAssets: isProduction,
     }),
     new webpack.IgnorePlugin({
       checkResource(resource) {
@@ -165,9 +166,13 @@ const defaults = {
         {
           from: path.join(__dirname, "src", "frontend", "assets"),
           to: path.join(__dirname, "dist"),
-          // We want html files from HtmlWebpackPlugin, not the original ones
           filter: (resourcePath) => {
-            return !resourcePath.endsWith(".html");
+            return (
+              // we want html files from HtmlWebpackPlugin, not the original ones
+              !resourcePath.endsWith(".html") &&
+              // exclude dotfiles
+              !resourcePath.split("/").pop()?.startsWith(".")
+            );
           },
         },
       ],
