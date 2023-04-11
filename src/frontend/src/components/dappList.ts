@@ -74,27 +74,24 @@ export const dappsListElement = (
     <h2 class="t-title">Explore dapps</h2>
     <section aria-label="List of dapps">
       <div class="c-action-list">
-        ${dappsList.map(
-          (dapp) => html` <a
-            href="${dapp.link}"
+        ${dappsList.map((dapp) => {
+          const { link, logo, name, oneLiner } = dapp;
+          return html` <a
+            href="${link}"
             class="c-action-list__item"
             target="_blank"
             rel="noopener noreferrer"
           >
-            <div class="c-action-list__icon" aria-hidden>
-              <img
-                src="icons/${dapp.logo}"
-                alt="${dapp.name} logo"
-                loading="lazy"
-              />
+            <div class="c-action-list__icon" aria-hidden="true">
+              <img src="icons/${logo}" alt="${name} logo" loading="lazy" />
             </div>
             <div class="c-action-list__label c-action-list__label--stacked">
-              <h3 class="t-title t-title--list">${dapp.name}</h3>
-              <p class="t-weak">${dapp.oneLiner}</p>
+              <h3 class="t-title t-title--list">${name}</h3>
+              <p class="t-weak">${oneLiner}</p>
             </div>
             <span class="c-action-list__action"> ↗ </span>
-          </a>`
-        )}
+          </a>`;
+        })}
       </div>
     </section>
   </article>`;
