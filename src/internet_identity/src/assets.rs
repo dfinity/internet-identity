@@ -152,29 +152,26 @@ fn file_extension<'a>(asset: &'a File) -> &'a str {
 /// * map **/<foo>.html to **/foo
 /// * map **/<foo>.js.gz to **/<foo>.js
 fn file_to_asset_path(asset: &File) -> String {
-    const INDEX_HTML: &str = "index.html";
-    const HTML_EXTENSION: &str = ".html";
-    const GZIP_EXTENSION: &str = ".gz";
-
     // make path absolute
     let mut file_path = "/".to_string() + asset.path().to_str().unwrap();
-    if file_path.ends_with(INDEX_HTML) {
+
+    if file_path.ends_with("index.html") {
         // drop index.html filename (i.e. maps **/index.html to **/)
         file_path = file_path
             .chars()
-            .take(file_path.len() - INDEX_HTML.len())
+            .take(file_path.len() - "index.html".len())
             .collect()
-    } else if file_path.ends_with(HTML_EXTENSION) {
+    } else if file_path.ends_with(".html") {
         // drop .html file endings (i.e. maps **/<foo>.html to **/foo)
         file_path = file_path
             .chars()
-            .take(file_path.len() - HTML_EXTENSION.len())
+            .take(file_path.len() - ".html".len())
             .collect()
     } else if file_path.ends_with(".js.gz") {
         // drop .gz for .js.gz files (i.e. maps **/<foo>.js.gz to **/<foo>.js)
         file_path = file_path
             .chars()
-            .take(file_path.len() - GZIP_EXTENSION.len())
+            .take(file_path.len() - ".gz".len())
             .collect()
     }
     file_path
