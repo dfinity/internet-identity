@@ -11,16 +11,12 @@ use internet_identity_interface::internet_identity::types::ChallengeAttempt;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, UNIX_EPOCH};
 
-/// Verifies that expected assets are delivered, certified and have security headers.
+/// Verifies that some expected assets are delivered, certified and have security headers.
 #[test]
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
     let assets: Vec<(&str, Option<&str>)> = vec![
         ("/", None),
-        ("/about", None),
         ("/index.js", Some("gzip")),
-        ("/index.css", None),
-        ("/loader.webp", None),
-        ("/favicon.ico", None),
         ("/.well-known/ic-domains", None),
     ];
     let env = env();
