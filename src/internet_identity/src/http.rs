@@ -14,7 +14,7 @@ use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 impl ContentType {
-    pub fn to_mime_type_string(&self) -> String {
+    pub fn to_mime_type_string(self) -> String {
         match self {
             ContentType::HTML => "text/html".to_string(),
             ContentType::JS => "text/javascript".to_string(),
@@ -22,6 +22,7 @@ impl ContentType {
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
+            ContentType::PNG => "image/png".to_string(),
         }
     }
 }

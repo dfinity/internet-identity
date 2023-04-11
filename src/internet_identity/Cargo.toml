@@ -8,6 +8,7 @@ edition = "2021"
 internet_identity_interface = { path = "../internet_identity_interface" }
 
 hex = "0.4"
+include_dir = "0.7"
 lazy_static = "1.4"
 serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
