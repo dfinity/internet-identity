@@ -112,7 +112,7 @@ fn get_assets() -> [(String, Vec<u8>, ContentEncoding, ContentType); 9] {
         ),
         (
             "/1.js".to_string(),
-            include_bytes!("../../../dist/1.js.gz").to_vec(),
+            include_bytes!("../../../dist/qr-creator.js.gz").to_vec(),
             ContentEncoding::GZip,
             ContentType::JS,
         ),

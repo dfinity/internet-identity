@@ -164,8 +164,9 @@ const displayQR = async ({
   container: HTMLElement;
 }) => {
   // Dynamically load the QR code module
-  const qrCreator: typeof QrCreator | null = (await import("qr-creator"))
-    .default;
+  const qrCreator: typeof QrCreator | null = (
+    await import(/* webpackChunkName: "qr-creator" */ "qr-creator")
+  ).default;
   if (qrCreator === null) {
     toast.error("Could not load QR code");
     console.error("Could not load qr-creator module");
