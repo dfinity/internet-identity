@@ -57,25 +57,23 @@ const pollForTentativeDeviceTemplate = ({
           : undefined
       )}
     ></div>
-    <p data-role="add-device-link" class="t-paragraph l-stack t-wrap">
+    <div
+      data-role="add-device-link"
+      class="t-wrap c-input c-input--with-button c-input--centered t-weak"
+    >
       ${link}
-    </p>
-    <!-- this is an absolute hack: position relative is needed for c-button__icon to be anchored, and
-        padding-bottom is needed otherwise the button overlaps the text -->
-    <div class="t-centered" style="position: relative; padding-bottom: 2em;">
-      <i
+      <button
         ${ref(linkCopyElement)}
         @click=${() => copyLink()}
         aria-label="Copy to clipboard"
         title="Copy to clipboard"
-        tabindex="0"
         id="seedCopy"
         data-action="copy-link"
         class="c-button__icon"
       >
         <span>Copy</span>
         ${copyIcon} ${checkmarkIcon}
-      </i>
+      </button>
     </div>
 
     <ol class="c-list c-list--numbered l-stack">

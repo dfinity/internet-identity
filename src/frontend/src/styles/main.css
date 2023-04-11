@@ -1171,6 +1171,11 @@ a:hover,
   background-color: var(--rc-line);
 }
 
+.c-input--with-button {
+  padding: calc(1.5 * var(--rs-input-bezel)) calc(1.5 * var(--rs-input-bezel))
+    calc(3 * var(--rs-input-bezel));
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
