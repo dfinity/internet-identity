@@ -6,7 +6,7 @@ const showMessageTemplate = ({
   message,
   role,
 }: {
-  message: string;
+  message: TemplateResult | string;
   role?: string;
 }): TemplateResult => {
   return html`<h1
@@ -24,7 +24,7 @@ export const showMessage = ({
   message,
   role,
 }: {
-  message: string;
+  message: TemplateResult | string;
   role?: string;
 }): void =>
   showMessagePage({

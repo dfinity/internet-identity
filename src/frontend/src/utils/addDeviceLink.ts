@@ -6,9 +6,9 @@ export const addDeviceLink = ({
   origin,
 }: {
   userNumber: bigint;
-  origin?: string;
+  origin: string;
 }): string => {
-  return (origin ?? window.origin) + "/?action=add-device&anchor=" + userNumber;
+  return origin + "/?action=add-device&anchor=" + userNumber;
 };
 
 /** When called from an "add device" URL, returns the anchor. Otherwise returns undefined */

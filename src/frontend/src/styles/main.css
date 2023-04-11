@@ -1215,6 +1215,11 @@ a:hover,
   background-color: var(--rc-line);
 }
 
+.c-input--with-button {
+  padding: calc(1.5 * var(--rs-input-bezel)) calc(1.5 * var(--rs-input-bezel))
+    calc(3 * var(--rs-input-bezel));
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -2145,6 +2150,16 @@ input[type="checkbox"] {
   user-select: none;
 }
 
+/* Wrap QR codes in a white square (for legibility) and prettify a bit */
+.c-qrcode canvas {
+  /* Make sure it has a white background to be easy to scan, not matter the background */
+  background: white;
+  /* Ensure the canvas doesn't overflow on small screens */
+  max-width: 100%;
+  /* Makes the canvas more sharp */
+  image-rendering: pixelated;
+}
+
 .c-marquee {
   --marqueeGap: var(--rs-marquee-gap);
 
@@ -2233,4 +2248,8 @@ input[type="checkbox"] {
 
 .l-stack--tight {
   margin-top: var(--vs-stack);
+}
+
+.l-stack--none {
+  margin-top: 0;
 }

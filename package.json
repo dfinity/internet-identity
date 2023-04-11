@@ -64,7 +64,8 @@
     "@dfinity/principal": "0.15.5",
     "bip39": "^3.0.4",
     "lit-html": "^2.3.1",
-    "text-encoding": "^0.7.0"
+    "text-encoding": "^0.7.0",
+    "qr-creator": "^1.0.0"
   },
   "engines": {
     "npm": ">=9.0.0 <10.0.0",

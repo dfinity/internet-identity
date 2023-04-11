@@ -15,7 +15,9 @@ import { mkAnchorPicker } from "./components/anchorPicker";
 import { authnPages } from "./components/authenticateBox";
 import { displayError } from "./components/displayError";
 import { withLoader } from "./components/loader";
+import { showMessage } from "./components/message";
 import { promptUserNumber } from "./components/promptUserNumber";
+import { toast } from "./components/toast";
 import { aboutView } from "./flows/about";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
@@ -42,7 +44,6 @@ import { displayUserNumberPage } from "./flows/register/finish";
 import { registerDisabled } from "./flows/registerDisabled";
 import { styleguide } from "./styleguide";
 import "./styles/main.css";
-import { addDeviceLink } from "./utils/addDeviceLink";
 import { I18n } from "./utils/i18n";
 import { AuthenticatedConnection } from "./utils/iiConnection";
 import { mount, withRef } from "./utils/lit-html";
@@ -313,10 +314,8 @@ const iiPages: Record<string, () => void> = {
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
-      link: addDeviceLink({
-        origin: "https://identity.internetcomputer.org",
-        userNumber: BigInt(1234),
-      }),
+      origin: "https://identity.internetcomputer.org",
+      userNumber: BigInt(1234),
       remaining: {
         async *[Symbol.asyncIterator]() {
           yield "00:34";
@@ -392,6 +391,13 @@ const iiPages: Record<string, () => void> = {
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
+  toasts: () => {
+    showMessage({ message: html`hello` });
+    toast.error("This is an error!");
+    toast.error(
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
+    );
+  },
 };
 
 const showcase: TemplateResult = html`
