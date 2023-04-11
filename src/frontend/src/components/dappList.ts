@@ -1,12 +1,9 @@
 import { html, TemplateResult } from "lit-html";
 
 export type DappDescription = {
-  id: string;
   name: string;
   oneLiner?: string;
   link: string;
-  derivationOrigin?: string;
-  description: string;
   logo: string;
 };
 
