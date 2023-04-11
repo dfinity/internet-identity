@@ -108,7 +108,7 @@ export const dappsTeaser = (
     <h2 class="t-title">Explore dapps</h2>
     <button
       class="c-click-area"
-      @click="${clickFn}"
+      @click="${() => clickFn()}"
       aria-label="Show list of dapps"
     >
       <figure class="c-card__teaser c-marquee">
