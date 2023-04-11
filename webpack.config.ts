@@ -168,10 +168,10 @@ const defaults = {
           to: path.join(__dirname, "dist"),
           filter: (resourcePath) => {
             return (
-              // We want
-              // * html files from HtmlWebpackPlugin, not the original ones
-              // * no dotfiles
-              !resourcePath.endsWith(".html") && !resourcePath.startsWith(".")
+              // we want html files from HtmlWebpackPlugin, not the original ones
+              !resourcePath.endsWith(".html") &&
+              // exclude dotfiles
+              !resourcePath.split("/").pop()?.startsWith(".")
             );
           },
         },
