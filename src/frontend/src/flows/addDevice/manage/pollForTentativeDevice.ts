@@ -44,9 +44,9 @@ const pollForTentativeDeviceTemplate = ({
   };
 
   const pageContentSlot = html`
-    <p class="t-paragraph">Identity Anchor ${userNumber}</p>
     <hgroup>
-      <h1 class="t-title t-title--main">Add Trusted Device</h1>
+      <h2 class="t-paragraph">Identity Anchor ${userNumber}</h2>
+      <h1 class="t-title t-title--main l-stack--none">Add Trusted Device</h1>
       <p class="t-lead">Follow these steps on your new device</p>
     </hgroup>
     <div
@@ -57,25 +57,20 @@ const pollForTentativeDeviceTemplate = ({
           : undefined
       )}
     ></div>
-    <p data-role="add-device-link" class="t-paragraph l-stack t-wrap">
-      ${link}
-    </p>
-    <!-- this is an absolute hack: position relative is needed for c-button__icon to be anchored, and
-        padding-bottom is needed otherwise the button overlaps the text -->
-    <div class="t-centered" style="position: relative; padding-bottom: 2em;">
-      <i
+    <div class="t-wrap c-input c-input--with-button c-input--centered t-weak">
+      <span data-role="add-device-link">${link}</span>
+      <button
         ${ref(linkCopyElement)}
         @click=${() => copyLink()}
         aria-label="Copy to clipboard"
         title="Copy to clipboard"
-        tabindex="0"
         id="seedCopy"
         data-action="copy-link"
         class="c-button__icon"
       >
         <span>Copy</span>
         ${copyIcon} ${checkmarkIcon}
-      </i>
+      </button>
     </div>
 
     <ol class="c-list c-list--numbered l-stack">
@@ -86,7 +81,7 @@ const pollForTentativeDeviceTemplate = ({
     <button
       @click=${() => cancel()}
       id="cancelAddRemoteDevice"
-      class="c-button c-button--secondary"
+      class="c-button c-button--secondary l-stack"
     >
       Cancel
     </button>
@@ -177,10 +172,10 @@ const displayQR = async ({
     return;
   }
 
-  // Retrieve a fitting color from design tokens (defaults to black if for some reason none is found)
+  // Retrieve a fitting color CSS (defaults to black if for some reason none is set)
   const fill: string = getComputedStyle(
     document.documentElement
-  ).getPropertyValue("--vc-brand-purple");
+  ).getPropertyValue("currentColor");
 
   // Create the QR code
   qrCreator.render(
