@@ -85,7 +85,9 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
 
 export const dappsList = (dapps: DappDescription[]): TemplateResult => {
   return html` <article class="c-card c-card--narrow">
-    <h2 class="t-title t-title--discrete">Dapps explorer</h2>
+    <h3 class="t-title t-title--discrete" role="presentation">
+      Dapps explorer
+    </h3>
     <h2 class="t-title">Explore dapps</h2>
     <section aria-label="List of dapps">
       <div class="c-action-list">
