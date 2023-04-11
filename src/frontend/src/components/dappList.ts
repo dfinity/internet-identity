@@ -13,18 +13,16 @@ export type DappDescription = {
 const createMarqueeListRowItems = (
   dapps: DappDescription[]
 ): TemplateResult => {
-  return html` ${dapps.map((dapp) => {
-    const { logo, name } = dapp;
-
-    return html`<div class="c-marquee__item">
+  return html` ${dapps.map(
+    ({ logo, name }) => html`<div class="c-marquee__item">
       <img
         src="icons/${logo}"
         alt="${name}"
         class="c-marquee__image"
         loading="lazy"
       />
-    </div>`;
-  })}`;
+    </div>`
+  )}`;
 };
 
 /**
@@ -74,9 +72,8 @@ export const dappsListElement = (
     <h2 class="t-title">Explore dapps</h2>
     <section aria-label="List of dapps">
       <div class="c-action-list">
-        ${dappsList.map((dapp) => {
-          const { link, logo, name, oneLiner } = dapp;
-          return html` <a
+        ${dappsList.map(
+          ({ link, logo, name, oneLiner }) => html`<a
             href="${link}"
             class="c-action-list__item"
             target="_blank"
@@ -90,8 +87,8 @@ export const dappsListElement = (
               <p class="t-weak">${oneLiner}</p>
             </div>
             <span class="c-action-list__action"> ↗ </span>
-          </a>`;
-        })}
+          </a>`
+        )}
       </div>
     </section>
   </article>`;
