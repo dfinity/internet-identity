@@ -6,16 +6,18 @@ use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
+use include_dir::{include_dir, Dir};
 use lazy_static::lazy_static;
 use sha2::Digest;
+use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ContentEncoding {
     Identity,
     GZip,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum ContentType {
     HTML,
@@ -24,6 +26,7 @@ pub enum ContentType {
     WEBP,
     CSS,
     OCTETSTREAM,
+    PNG,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -55,21 +58,19 @@ lazy_static! {
         format!("sha256-{hash}")
     };
 
-    // Various HTML pages, after the canister ID, the script tag and the CSP have been injected
-
-    static ref INDEX_HTML_STR: String = {
-        fixup_html(include_str!("../../../dist/index.html"))
-    };
-
-    static ref ABOUT_HTML_STR: String = {
-        fixup_html(include_str!("../../../dist/about.html"))
-    };
+    /// Map of path aliases
+    /// This creates a copy of the asset at the mapped path with the same content as the asset at the
+    /// original path.
+    static ref PATH_ALIASES: HashMap<String, String> = vec![
+        ("/index.html".to_string(), "/".to_string()),
+        ("/about.html".to_string(), "/about".to_string()),
+    ].into_iter().collect();
 }
 
 // used both in init and post_upgrade
 pub fn init_assets() {
     state::assets_and_hashes_mut(|assets, asset_hashes| {
-        for (path, content, content_encoding, content_type) in get_assets() {
+        for (path, content, content_encoding, content_type) in get_static_assets() {
             asset_hashes.insert(path.clone(), sha2::Sha256::digest(&content).into());
             let mut headers = match content_encoding {
                 ContentEncoding::Identity => vec![],
@@ -86,61 +87,95 @@ pub fn init_assets() {
     });
 }
 
-// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
-// prepared only once (like injecting the canister ID).
-fn get_assets() -> [(String, Vec<u8>, ContentEncoding, ContentType); 8] {
-    let index_html: Vec<u8> = INDEX_HTML_STR.as_bytes().to_vec();
-    let about_html: Vec<u8> = ABOUT_HTML_STR.as_bytes().to_vec();
-    [
-        (
-            "/".to_string(),
-            index_html.clone(),
-            ContentEncoding::Identity,
-            ContentType::HTML,
-        ),
-        (
-            "/about".to_string(),
-            about_html,
-            ContentEncoding::Identity,
-            ContentType::HTML,
-        ),
-        (
-            "/index.html".to_string(),
-            index_html,
-            ContentEncoding::Identity,
-            ContentType::HTML,
-        ),
-        (
-            "/index.js".to_string(),
-            include_bytes!("../../../dist/index.js.gz").to_vec(),
-            ContentEncoding::GZip,
-            ContentType::JS,
-        ),
-        (
-            "/index.css".to_string(),
-            include_bytes!("../../../dist/index.css").to_vec(),
-            ContentEncoding::Identity,
-            ContentType::CSS,
-        ),
-        (
-            "/loader.webp".to_string(),
-            include_bytes!("../../../dist/loader.webp").to_vec(),
-            ContentEncoding::Identity,
-            ContentType::WEBP,
-        ),
-        (
-            "/favicon.ico".to_string(),
-            include_bytes!("../../../dist/favicon.ico").to_vec(),
-            ContentEncoding::Identity,
-            ContentType::ICO,
-        ),
-        // Required to make II available on the identity.internetcomputer.org domain.
-        // See https://github.com/r-birkner/portal/blob/rjb/custom-domains-docs-v2/docs/developer-docs/production/custom-domain/custom-domain.md#custom-domains-on-the-boundary-nodes
-        (
-            "/.well-known/ic-domains".to_string(),
-            b"identity.internetcomputer.org".to_vec(),
-            ContentEncoding::Identity,
-            ContentType::OCTETSTREAM,
-        ),
-    ]
+static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
+
+// Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
+fn get_static_assets() -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+    let mut assets = collect_assets_recursive(&ASSET_DIR);
+
+    // Required to make II available on the identity.internetcomputer.org domain.
+    // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
+    assets.push((
+        "/.well-known/ic-domains".to_string(),
+        b"identity.internetcomputer.org".to_vec(),
+        ContentEncoding::Identity,
+        ContentType::OCTETSTREAM,
+    ));
+
+    assets
+}
+
+fn collect_assets_recursive(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+    let mut assets = collect_assets_from_dir(dir);
+    for subdir in dir.dirs() {
+        assets.extend(collect_assets_recursive(subdir).into_iter());
+    }
+    assets
+}
+
+fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+    let mut assets: Vec<(String, Vec<u8>, ContentEncoding, ContentType)> = vec![];
+    for asset in dir.files() {
+        let file_bytes = asset.contents().to_vec();
+        let file_path = "/".to_string() + asset.path().to_str().unwrap();
+        let (asset_path, content, encoding, content_type) = match asset
+            .path()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split_once('.')
+            .unwrap()
+            .1
+        {
+            "css" => (
+                file_path,
+                file_bytes,
+                ContentEncoding::Identity,
+                ContentType::CSS,
+            ),
+            "html" => (
+                file_path,
+                fixup_html(String::from_utf8_lossy(&file_bytes).as_ref())
+                    .as_bytes()
+                    .to_vec(),
+                ContentEncoding::Identity,
+                ContentType::HTML,
+            ),
+            "ico" => (
+                file_path,
+                file_bytes,
+                ContentEncoding::Identity,
+                ContentType::ICO,
+            ),
+            "js.gz" => (
+                file_path.chars().take(file_path.len() - 3).collect(), // drop ".gz"
+                file_bytes,
+                ContentEncoding::GZip,
+                ContentType::JS,
+            ),
+            "png" => (
+                file_path,
+                file_bytes,
+                ContentEncoding::Identity,
+                ContentType::PNG,
+            ),
+            "webp" => (
+                file_path,
+                file_bytes,
+                ContentEncoding::Identity,
+                ContentType::WEBP,
+            ),
+            _ => panic!("Unknown asset type: {}", asset.path().display()),
+        };
+
+        // Create a copy if an alias exists
+        ic_cdk::println!("Adding asset: {}", asset_path);
+        if let Some(alias) = PATH_ALIASES.get(&asset_path) {
+            assets.push((alias.clone(), content.clone(), encoding, content_type));
+        }
+
+        assets.push((asset_path, content, encoding, content_type));
+    }
+    assets
 }
