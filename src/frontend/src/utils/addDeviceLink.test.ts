@@ -1,38 +1,27 @@
 import { addDeviceLink, getAddDeviceAnchor } from "./addDeviceLink";
 
-function onOrigin<T>(origin: string, fn: () => T): T {
-  const oldOrigin = window.origin;
-  Object.defineProperty(window, "origin", {
-    writable: true,
-    value: origin,
-  });
-
-  const res = fn();
-  Object.defineProperty(window, "origin", {
-    writable: true,
-    value: oldOrigin,
-  });
-
-  return res;
-}
-
 test("add device link looks as expected", () => {
-  onOrigin("https://identity.ic0.app", () => {
-    expect(addDeviceLink({ userNumber: BigInt(10000) })).toBe(
-      "https://identity.ic0.app/?action=add-device&anchor=10000"
-    );
-  });
-  onOrigin("https://identity.internetcomputer.org", () => {
-    expect(addDeviceLink({ userNumber: BigInt(10000) })).toBe(
-      "https://identity.internetcomputer.org/?action=add-device&anchor=10000"
-    );
-  });
+  expect(
+    addDeviceLink({
+      userNumber: BigInt(10000),
+      origin: "https://identity.ic0.app",
+    })
+  ).toBe("https://identity.ic0.app/?action=add-device&anchor=10000");
+  expect(
+    addDeviceLink({
+      userNumber: BigInt(10000),
+      origin: "https://identity.internetcomputer.org",
+    })
+  ).toBe(
+    "https://identity.internetcomputer.org/?action=add-device&anchor=10000"
+  );
 });
 
 test("anchor is read from add-device link", () => {
-  const link = onOrigin("https://identity.ic0.app", () =>
-    addDeviceLink({ userNumber: BigInt(10000) })
-  );
+  const link = addDeviceLink({
+    userNumber: BigInt(10000),
+    origin: "https://identity.ic0.app",
+  });
 
   const url = new URL(link);
 
