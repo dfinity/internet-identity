@@ -180,7 +180,7 @@ const displayQR = async ({
   // Retrieve a fitting color from design tokens (defaults to black if for some reason none is found)
   const fill: string = getComputedStyle(
     document.documentElement
-  ).getPropertyValue("--vc-brand-purple");
+  ).getPropertyValue("currentColor");
 
   // Create the QR code
   qrCreator.render(
