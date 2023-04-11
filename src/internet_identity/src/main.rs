@@ -484,7 +484,7 @@ fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
         None
     }) {
         if principal == caller() {
-            return anchor.device(&device_key).unwrap();
+            return anchor.device(device_key).unwrap();
         }
     };
 
