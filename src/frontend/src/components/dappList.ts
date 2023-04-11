@@ -61,8 +61,6 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
     )
   );
 
-  // create a list of dapps chunks (rows)
-
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
     aria-hidden="true"
