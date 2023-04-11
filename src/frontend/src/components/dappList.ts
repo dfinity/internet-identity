@@ -56,7 +56,7 @@ const createMarqueeList = (dapps: DappDescription[]): TemplateResult => {
     style="--itemsPerRow: ${itemsPerRow}; --totalRows: ${totalRows}"
   >
     ${rows.map(
-      (row, i) => html`<div class="c-marquee__row" style="--rowEq: ${i}">
+      (row, i) => html`<div class="c-marquee__row" style="--rowIndex: ${i}">
         <div class="c-marquee__rowHalf">${createMarqueeListRowItems(row)}</div>
         <div class="c-marquee__rowHalf c-marquee__rowHalf--second">
           ${createMarqueeListRowItems(row)}

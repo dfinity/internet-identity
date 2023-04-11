@@ -2155,7 +2155,7 @@ input[type="checkbox"] {
 
 .c-marquee__row {
   position: absolute;
-  top: calc(var(--rowEq) / var(--totalRows) * 100% + var(--marqueeGap));
+  top: calc(var(--rowIndex) / var(--totalRows) * 100% + var(--marqueeGap));
   left: 0;
   width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
   height: calc(100% / var(--totalRows) + var(--marqueeGap));
