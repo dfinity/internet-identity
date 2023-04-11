@@ -24,33 +24,20 @@ const marqueeListRow = (dapps: DappDescription[]): TemplateResult => {
 };
 
 /**
- * rows = [
- *   [dapp0, dapp1, dapp2, dapp3, dapp4],
- *   [dapp5, dapp6, dapp7, dapp8, dapp9],
- *   ...,
- *   [dapp0, dapp1, dapp2, dapp3, dapp4]
- * ]
+ * Pad the list of dapps by repeating it until it has the desired number of items.
  */
-const dappsToRows = (
+const padDapps = (dapps: DappDescription[], items: number): DappDescription[] =>
+  Array.from(new Array(items), (_, index) => dapps[index % dapps.length]);
+
+/**
+ * Chunks the list of dapps into rows.
+ */
+const chunkDapps = (
   dapps: DappDescription[],
-  rows: number,
-  columns: number
+  itemsPerRow: number
 ): DappDescription[][] =>
-  Array.from(new Array(rows), (row, i) =>
-    Array.from(
-      new Array(columns),
-      (item, j) =>
-        /**
-         * If the number of dapps is less than the number of items per row, the list is repeated.
-         * So if there are only 5 dapps but we want to show a grid of 5x5, the list is repeated 5 times.
-         *
-         * x = i * columns
-         * y = x + j
-         * dappsIndex = x + y
-         * dappsIndexWrapped = dappsIndex % dapps.length
-         */
-        dapps[(i * columns + j) % dapps.length]
-    )
+  Array.from(new Array(Math.ceil(dapps.length / itemsPerRow)), (_, index) =>
+    dapps.slice(index * itemsPerRow, index * itemsPerRow + itemsPerRow)
   );
 
 /**
@@ -64,7 +51,17 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 
-  const rows = dappsToRows(dapps, totalRows, itemsPerRow);
+  const paddedDapps = padDapps(dapps, itemsPerRow * totalRows);
+
+  /**
+   * rows = [
+   *   [dapp0, dapp1, dapp2, dapp3, dapp4],
+   *   [dapp5, dapp6, dapp7, dapp8, dapp9],
+   *   ...,
+   *   [dapp0, dapp1, dapp2, dapp3, dapp4]
+   * ]
+   */
+  const rows = chunkDapps(paddedDapps, itemsPerRow);
 
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
