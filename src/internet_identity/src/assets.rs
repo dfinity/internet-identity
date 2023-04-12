@@ -31,7 +31,7 @@ pub enum ContentType {
 }
 
 // The <script> tag that loads the 'index.js'
-const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.async = true;s.src = 'index.js';document.head.appendChild(s);";
+const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = 'index.js';document.head.appendChild(s);";
 
 // Fix up HTML pages, by injecting canister ID, script tag and CSP
 fn fixup_html(html: &str) -> String {

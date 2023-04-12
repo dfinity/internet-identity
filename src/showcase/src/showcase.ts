@@ -8,47 +8,47 @@ import {
   Challenge,
   DeviceData,
   Timestamp,
-} from "../generated/internet_identity_types";
-import { showWarning } from "./banner";
-import { promptDeviceAliasPage } from "./components/alias";
-import { mkAnchorPicker } from "./components/anchorPicker";
-import { authnPages } from "./components/authenticateBox";
-import { displayError } from "./components/displayError";
-import { withLoader } from "./components/loader";
-import { showMessage } from "./components/message";
-import { promptUserNumber } from "./components/promptUserNumber";
-import { toast } from "./components/toast";
-import { aboutView } from "./flows/about";
-import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
-import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
-import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
-import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
-import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
-import { authnTemplateAuthorize } from "./flows/authorize";
-import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { authnTemplateManage, displayManagePage } from "./flows/manage";
-import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
+} from "../../frontend/generated/internet_identity_types";
+import { showWarning } from "../../frontend/src/banner";
+import { promptDeviceAliasPage } from "../../frontend/src/components/alias";
+import { mkAnchorPicker } from "../../frontend/src/components/anchorPicker";
+import { authnPages } from "../../frontend/src/components/authenticateBox";
+import { displayError } from "../../frontend/src/components/displayError";
+import { withLoader } from "../../frontend/src/components/loader";
+import { showMessage } from "../../frontend/src/components/message";
+import { promptUserNumber } from "../../frontend/src/components/promptUserNumber";
+import { toast } from "../../frontend/src/components/toast";
+import { aboutView } from "../../frontend/src/flows/about";
+import { chooseDeviceAddFlow } from "../../frontend/src/flows/addDevice/manage";
+import { pollForTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/pollForTentativeDevice";
+import { verifyTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/verifyTentativeDevice";
+import { deviceRegistrationDisabledInfoPage } from "../../frontend/src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { showVerificationCodePage } from "../../frontend/src/flows/addDevice/welcomeView/showVerificationCode";
+import { authnTemplateAuthorize } from "../../frontend/src/flows/authorize";
+import { compatibilityNotice } from "../../frontend/src/flows/compatibilityNotice";
+import { authnTemplateManage, displayManagePage } from "../../frontend/src/flows/manage";
+import { chooseRecoveryMechanismPage } from "../../frontend/src/flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
   confirmSeedPhrasePage,
-} from "./flows/recovery/confirmSeedPhrase";
-import { displaySafariWarning } from "./flows/recovery/displaySafariWarning";
-import { displaySeedPhrasePage } from "./flows/recovery/displaySeedPhrase";
-import { displaySingleDeviceWarning } from "./flows/recovery/displaySingleDeviceWarning";
-import { pickRecoveryDevice } from "./flows/recovery/pickRecoveryDevice";
-import { deviceRecoveryPage } from "./flows/recovery/recoverWith/device";
-import { recoverWithPhrasePage } from "./flows/recovery/recoverWith/phrase";
-import { badChallenge, promptCaptchaPage } from "./flows/register/captcha";
-import { renderConstructing } from "./flows/register/construct";
-import { displayUserNumberPage } from "./flows/register/finish";
-import { registerDisabled } from "./flows/registerDisabled";
-import { styleguide } from "./styleguide";
-import "./styles/main.css";
-import { I18n } from "./utils/i18n";
-import { AuthenticatedConnection } from "./utils/iiConnection";
-import { mount, withRef } from "./utils/lit-html";
-import { RecoveryDevice } from "./utils/recoveryDevice";
-import { asNonEmptyArray, Chan, NonEmptyArray } from "./utils/utils";
+} from "../../frontend/src/flows/recovery/confirmSeedPhrase";
+import { displaySafariWarning } from "../../frontend/src/flows/recovery/displaySafariWarning";
+import { displaySeedPhrasePage } from "../../frontend/src/flows/recovery/displaySeedPhrase";
+import { displaySingleDeviceWarning } from "../../frontend/src/flows/recovery/displaySingleDeviceWarning";
+import { pickRecoveryDevice } from "../../frontend/src/flows/recovery/pickRecoveryDevice";
+import { deviceRecoveryPage } from "../../frontend/src/flows/recovery/recoverWith/device";
+import { recoverWithPhrasePage } from "../../frontend/src/flows/recovery/recoverWith/phrase";
+import { badChallenge, promptCaptchaPage } from "../../frontend/src/flows/register/captcha";
+import { renderConstructing } from "../../frontend/src/flows/register/construct";
+import { displayUserNumberPage } from "../../frontend/src/flows/register/finish";
+import { registerDisabled } from "../../frontend/src/flows/registerDisabled";
+import { styleguide } from "../../frontend/src/styleguide";
+import "../../frontend/src/styles/main.css";
+import { I18n } from "../../frontend/src/utils/i18n";
+import { AuthenticatedConnection } from "../../frontend/src/utils/iiConnection";
+import { mount, withRef } from "../../frontend/src/utils/lit-html";
+import { RecoveryDevice } from "../../frontend/src/utils/recoveryDevice";
+import { asNonEmptyArray, Chan, NonEmptyArray } from "../../frontend/src/utils/utils";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
