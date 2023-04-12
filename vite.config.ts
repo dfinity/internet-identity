@@ -63,6 +63,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   }
 };
 
+// TODO: about.html
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: UserConfig): UserConfig => {
   const { build, ...rest } = defaultConfig(mode);
