@@ -9,23 +9,30 @@ import {
 import { checkmarkIcon, copyIcon } from "../../../components/icons";
 import { mainWindow } from "../../../components/mainWindow";
 import { toast } from "../../../components/toast";
+import { I18n } from "../../../i18n";
 import { addDeviceLink } from "../../../utils/addDeviceLink";
 import { AsyncCountdown } from "../../../utils/countdown";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { mount, renderPage, withRef } from "../../../utils/lit-html";
 import { delayMillis } from "../../../utils/utils";
 
+import copyJson from "./pollForTentativeDevice.json";
+
 const pollForTentativeDeviceTemplate = ({
   userNumber,
   cancel,
   remaining,
   origin,
+  i18n,
 }: {
   userNumber: bigint;
   cancel: () => void;
   remaining: AsyncIterable<string>;
   origin: string;
+  i18n: I18n;
 }) => {
+  const copy = i18n.i18n(copyJson);
+  const staticCopy = i18n.staticLang(copyJson);
   const link = addDeviceLink({ userNumber, origin });
   const copyLink_ = () => navigator.clipboard.writeText(link);
 
@@ -38,16 +45,18 @@ const pollForTentativeDeviceTemplate = ({
         linkCopyElement.classList.add("is-copied");
       });
     } catch (e: unknown) {
-      toast.error("Could not copy link to clipboard");
-      console.error("Could not copy link to clipboard", e);
+      toast.error(staticCopy.could_not_copy_link);
+      console.error(staticCopy.could_not_copy_link, e);
     }
   };
 
   const pageContentSlot = html`
     <hgroup>
-      <h2 class="t-paragraph">Identity Anchor ${userNumber}</h2>
-      <h1 class="t-title t-title--main l-stack--none">Add Trusted Device</h1>
-      <p class="t-lead">Follow these steps on your new device</p>
+      <h2 class="t-paragraph">${copy.identity_anchor} ${userNumber}</h2>
+      <h1 class="t-title t-title--main l-stack--none">
+        ${copy.add_trusted_device}
+      </h1>
+      <p class="t-lead">${copy.follow_steps_on_new_device}</p>
     </hgroup>
     <div
       class="t-centered c-qrcode l-stack"
@@ -62,8 +71,8 @@ const pollForTentativeDeviceTemplate = ({
       <button
         ${ref(linkCopyElement)}
         @click=${() => copyLink()}
-        aria-label="Copy to clipboard"
-        title="Copy to clipboard"
+        aria-label=${staticCopy.copy_to_clipboard}
+        title=${staticCopy.copy_to_clipboard}
         id="seedCopy"
         data-action="copy-link"
         class="c-button__icon"
@@ -74,8 +83,8 @@ const pollForTentativeDeviceTemplate = ({
     </div>
 
     <ol class="c-list c-list--numbered l-stack">
-      <li>Scan the QR code with your device’s camera or visit the link.</li>
-      <li>Sign in using your device.</li>
+      <li>${copy.scan_qr_or_visit_link}</li>
+      <li>${copy.sign_in_using_device}</li>
     </ol>
 
     <button
@@ -83,10 +92,10 @@ const pollForTentativeDeviceTemplate = ({
       id="cancelAddRemoteDevice"
       class="c-button c-button--secondary l-stack"
     >
-      Cancel
+      ${copy.cancel}
     </button>
     <p class="t-paragraph">
-      Time remaining:
+      ${copy.time_remaining}:
       <span id="timer" class="t-strong">${asyncReplace(remaining)}</span>
     </p>
   `;
@@ -112,6 +121,7 @@ export const pollForTentativeDevice = (
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
 ): Promise<DeviceData | "timeout" | "canceled"> => {
+  const i18n = new I18n();
   const countdown = AsyncCountdown.fromNanos(endTimestamp);
   // Show the page with the option to cancel
   const page = new Promise<"canceled">((resolve) =>
@@ -123,6 +133,7 @@ export const pollForTentativeDevice = (
       origin: window.origin,
       userNumber,
       remaining: countdown.remainingFormattedAsync(),
+      i18n,
     })
   );
 

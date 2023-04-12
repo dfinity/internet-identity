@@ -321,6 +321,7 @@ const iiPages: Record<string, () => void> = {
           yield "00:34";
         },
       },
+      i18n,
     }),
   deviceRegistrationDisabledInfo: () =>
     deviceRegistrationDisabledInfoPage({
