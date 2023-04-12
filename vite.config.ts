@@ -33,7 +33,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
         plugins: [rollupNodePolyFill() as Plugin],
         output: {
           entryFileNames: `[name].js`,
-          chunkFileNames: `[name].js`,
+          // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
+          chunkFileNames: ({ name }) => `${name.replace(/.es6|.min/gm, "")}.js`,
           assetFileNames: `[name].[ext]`,
         },
       },
