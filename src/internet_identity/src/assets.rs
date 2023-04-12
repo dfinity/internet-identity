@@ -21,11 +21,13 @@ pub enum ContentEncoding {
 pub enum ContentType {
     HTML,
     JS,
+    JSON,
     ICO,
     WEBP,
     CSS,
     OCTETSTREAM,
     PNG,
+    SVG,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -118,8 +120,10 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
                 ContentType::HTML,
             ),
             "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
+            "json" => (file_bytes, ContentEncoding::Identity, ContentType::JSON),
             "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
             "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
+            "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
             "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
             _ => panic!("Unknown asset type: {}", asset.path().display()),
         };

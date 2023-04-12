@@ -18,11 +18,13 @@ impl ContentType {
         match self {
             ContentType::HTML => "text/html".to_string(),
             ContentType::JS => "text/javascript".to_string(),
+            ContentType::JSON => "application/json".to_string(),
             ContentType::CSS => "text/css".to_string(),
             ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
             ContentType::WEBP => "image/webp".to_string(),
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
             ContentType::PNG => "image/png".to_string(),
+            ContentType::SVG => "image/svg+xml".to_string(),
         }
     }
 }
