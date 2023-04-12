@@ -553,7 +553,7 @@ jobs:
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_production.wasm
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: 'Download archive wasm'
