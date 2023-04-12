@@ -68,6 +68,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
 };
 
 // TODO: about.html
+// TODO: loader.webp not copied
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: UserConfig): UserConfig => {
