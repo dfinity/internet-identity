@@ -266,11 +266,7 @@ jobs:
         run: |
           mkdir dist
           touch dist/index.html
-          touch dist/about.html
           touch dist/index.js.gz
-          touch dist/index.css
-          touch dist/loader.webp
-          touch dist/favicon.ico
 
       # Caching ~/.cargo
 
