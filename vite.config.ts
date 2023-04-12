@@ -1,10 +1,10 @@
-import {defineConfig, loadEnv, UserConfig} from "vite";
 import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
-import rollupNodePolyFill from "rollup-plugin-node-polyfills";
-import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
 import { resolve } from "path";
 import type { Plugin } from "rollup";
+import rollupNodePolyFill from "rollup-plugin-node-polyfills";
+import { defineConfig, loadEnv, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
+import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   const envPrefix = "II_" as const;
@@ -12,7 +12,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // Expand environment - .env files - with canister IDs
   process.env = {
     ...process.env,
-    ...loadEnv(mode ?? 'development', process.cwd()),
+    ...loadEnv(mode ?? "development", process.cwd()),
   };
 
   return {
@@ -56,11 +56,11 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     },
     define: {
       // TODO: replace process.env with import
-      'process.env': {
-        ...process.env
-      }
-    }
-  }
+      "process.env": {
+        ...process.env,
+      },
+    },
+  };
 };
 
 // TODO: about.html
