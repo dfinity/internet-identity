@@ -39,7 +39,10 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     plugins: [
-      viteCompression(),
+      // II canister only supports one content type per resource. That is why we remove the original file.
+      viteCompression({
+        deleteOriginFile: true,
+      }),
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [stripInjectJsScript()] : [])],
     ],
