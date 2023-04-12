@@ -112,6 +112,7 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
         let file_bytes = asset.contents().to_vec();
         let (content, encoding, content_type) = match file_extension(asset) {
             "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
+            "css.gz" => (file_bytes, ContentEncoding::GZip, ContentType::CSS),
             "html" => (
                 fixup_html(String::from_utf8_lossy(&file_bytes).as_ref())
                     .as_bytes()
