@@ -480,7 +480,6 @@ fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
                 return Some((*principal, &device.pubkey));
             }
         }
-
         None
     }) {
         if principal == caller() {
