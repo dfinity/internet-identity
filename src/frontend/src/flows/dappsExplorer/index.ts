@@ -54,25 +54,30 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
   : "argument is not an array";
 
 /* Template for a single dapp */
-const dappTemplate = (dapp: ElementOf<typeof dapps>): TemplateResult => {
+const dappTemplate = ({
+  link,
+  logo,
+  name,
+  oneLiner,
+}: ElementOf<typeof dapps>): TemplateResult => {
   return html`
     <a
-      href=${dapp.link}
+      href=${link}
       target="_blank"
       class="c-action-list__item"
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
         <img
-          src=${dapp.logo.replace("/img/showcase/", "/icons/")}
-          alt=${dapp.name}
+          src=${logo.replace("/img/showcase/", "/icons/")}
+          alt=${name}
           loading="lazy"
         />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
-        <h3 class="t-title t-title--list">${dapp.name}</h3>
-        ${dapp.oneLiner !== undefined
-          ? html`<p class="t-weak">${dapp.oneLiner}</p>`
+        <h3 class="t-title t-title--list">${name}</h3>
+        ${oneLiner !== undefined
+          ? html`<p class="t-weak">${oneLiner}</p>`
           : undefined}
       </div>
       <span class="c-action-list__action"> ↗ </span>
