@@ -88,11 +88,11 @@ A user has a separate *user identity* for each client application frontend (i.e.
 
     user_id = SHA-224(DER encoded public key) · 0x02` (29 bytes)
 
-and the `BIT STRING` field of the DER encoded public key has the form  
-  
+and the `BIT STRING` field of the DER encoded public key has the form
+
     bit_string = |ii_canister_id| · ii_canister_id · seed
 
-where the `seed` is derived as follows 
+where the `seed` is derived as follows
 
     seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
 

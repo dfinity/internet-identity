@@ -1309,8 +1309,8 @@ a:hover,
 }
 
 .c-list--recovery-word {
-  /* 
-    bg and fg stand for background and foreground 
+  /*
+    bg and fg stand for background and foreground
     and are used to make sure that the text is always readable
     and make it easier to understand the code going forward
 
@@ -1386,7 +1386,7 @@ a:hover,
 
   transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
 
-  /* 
+  /*
    * the blur does not render nicely in Safari if its not on its own paint layer,
    * so we use will-change to let the browser know that we want to animate
    * those properties. As a result, the browser will create a new paint layer
@@ -1462,7 +1462,7 @@ a:hover,
   --bg: var(--rc-input-error);
 }
 
-/* 
+/*
   since correct & incorrect words have an icon, but we still want to make use of the circle
   the number used to be in, we need to hide the number. We do this by making it transparent
 */
@@ -2089,7 +2089,7 @@ input[type="checkbox"] {
   image-rendering: pixelated;
 }
 
-/* 
+/*
  * stack helper classes
  *
  * it is fine to use value tokens here, because these are generic design
