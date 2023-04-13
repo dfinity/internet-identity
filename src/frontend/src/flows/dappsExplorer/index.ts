@@ -26,7 +26,7 @@ const dappsExplorerTemplate = ({
   const pageContent = html`
     <button
       class="c-card__close"
-      aria-label="${staticCopy.back}"
+      aria-label=${staticCopy.back}
       @click="${() => back()}"
     >
       ${closeIcon}
