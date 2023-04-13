@@ -1,4 +1,5 @@
 import { html, TemplateResult } from "lit-html";
+import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
 import { renderPage } from "../../utils/lit-html";
 
@@ -21,18 +22,23 @@ const dappsExplorerTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   const pageContent = html`
-    <p>${copy.dapps_explorer}</p>
-    <h1>${copy.try_these_dapps}</h1>
+    <hgroup>
+      <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
+      <h1 class="t-title">${copy.try_these_dapps}</h1>
+    </hgroup>
     <button @click=${() => back()} class="c-button">
       Let's get out of here
     </button>
-    <hr />
-    <ul>
-      ${dapps.map((dapp) => dappTemplate(dapp))}
-    </ul>
+    <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
   `;
 
-  return pageContent;
+  const wrappedPageContent = mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: pageContent,
+  });
+
+  return wrappedPageContent;
 };
 
 export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
@@ -45,23 +51,27 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
 /* Template for a single dapp */
 const dappTemplate = (dapp: ElementOf<typeof dapps>): TemplateResult => {
   return html`
-    <li style="display: flex; justify-content: space-between; padding: 1em;">
-      <img
-        height="64"
-        width="64"
-        src=${dapp.logo.replace("/img/showcase/", "/icons/")}
-        alt=${dapp.name}
-      />
-      <h1>${dapp.name}</h1>
-      ${dapp.oneLiner !== undefined ? html`<p>${dapp.oneLiner}</p>` : undefined}
-      <a
-        href=${dapp.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="c-button c-button--minimal"
-        >Open</a
-      >
-    </li>
+    <a
+      href=${dapp.link}
+      target="_blank"
+      class="c-action-list__item"
+      rel="noopener noreferrer"
+    >
+      <div class="c-action-list__icon" aria-hidden="true">
+        <img
+          src=${dapp.logo.replace("/img/showcase/", "/icons/")}
+          alt=${dapp.name}
+          loading="lazy"
+        />
+      </div>
+      <div class="c-action-list__label c-action-list__label--stacked">
+        <h3 class="t-title t-title--list">${dapp.name}</h3>
+        ${dapp.oneLiner !== undefined
+          ? html`<p class="t-weak">${dapp.oneLiner}</p>`
+          : undefined}
+      </div>
+      <span class="c-action-list__action"> ↗ </span>
+    </a>
   `;
 };
 
