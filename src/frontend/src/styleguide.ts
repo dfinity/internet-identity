@@ -46,7 +46,7 @@ const recoveryWords = [
   "tongue",
 ];
 
-type Theme = "legacy" | "default";
+type Theme = "new" | "default";
 
 const selectStyle = (themeName: Theme): void => {
   document.documentElement.setAttribute("data-theme", themeName);
@@ -110,11 +110,11 @@ export const styleguide = html`
     <aside class="l-stack demo-section">
       <h2 class="t-title t-title--sub">Set Theme</h2>
       <div class="c-button-group">
-        <button class="c-button" @click=${() => selectStyle("legacy")}>
-          Legacy
-        </button>
         <button class="c-button" @click=${() => selectStyle("default")}>
-          New Domain (default)
+          Legacy (default)
+        </button>
+        <button class="c-button" @click=${() => selectStyle("new")}>
+          New Domain
         </button>
       </div>
     </aside>

@@ -113,11 +113,11 @@
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
-  --vc-brand-purple: #4B19D6;
+  --vc-brand-purple: #522785;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
-  --vc-brand-alt: #f4f3f8;
+  --vc-brand-alt: rgba(215, 205, 235, 1);
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -161,15 +161,22 @@
   --rc-background-transparent: var(--rc-light-transparent);
 
   --rc-line: var(--vc-brand-alt);
+  --rc-line-interaction: var(--vc-brand-alt);
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
   --rc-interaction-text: var(--vc-brand-blue--dark);
   --rc-loading: var(--vc-brand-purple);
 
+
   --rc-button: var(--vc-brand-purple);
+  --rc-button-pair: var(--vc-brand-purple);
+
   --rc-button--disabled: var(--vc-shadow);
+
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
+  --rc-onButton-secondary: var(--vc-brand-purple);
+  
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
@@ -200,6 +207,7 @@
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
   --rg-brand-alt: var(--vc-brand-alt), white;
+  --rg-button: var(--rc-button), var(--rc-button-pair);
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
@@ -232,7 +240,7 @@
 
   --rs-button-bezel: var(--rs-card-bezel-narrow);
   --rs-button-stack: var(--vs-stack);
-  --rs-button-border-radius: var(--vs-border-radius);
+  --rs-button-radius: var(--vs-border-radius);
 
   --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
   --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
@@ -249,9 +257,35 @@
 
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
 
-:root:is([data-theme="legacy"]) {
-  --vc-brand-purple: #522785;
-  --vc-brand-alt: rgba(215, 205, 235, 1);
+:root:is([data-theme="new"]) {
+  --vc-brand-purple: #4B19D6;
+  --vc-brand-purple-light: #890eed;
+
+  --vc-light-grey: #d4d8e5;
+
+
+  --vs-border-radius: 0.8rem;
+
+  --rc-line: var(--vc-light-grey);
+  --rc-line-interaction: var(--vc-brand-purple);
+
+  --rg-brand-alt: var(--vc-light-grey), white;
+
+  --rc-text-interaction: var(--vc-brand-purple);
+  --rc-text-interaction-inverted: var(--vc-snow);
+
+  --rc-button: var(--vc-brand-purple);
+  --rc-button-pair: var(--vc-brand-purple-light);
+  --rc-onButton: var(--rc-text-interaction-inverted);
+
+  /* 
+    color used to elevate something from its background 
+    secondary button, card, icon button
+  */
+  --rc-surface: var(--vc-snow);
+
+  --rc-button-secondary: var(--rc-surface);
+  --rc-onButton-secondary: var(--rc-text-interaction);
 }
 
 /***
@@ -1008,14 +1042,18 @@ a:hover,
  */
 
 .c-button {
-  background: var(--rc-button);
+  background: linear-gradient(
+    90deg,
+    var(--rg-button)
+  );
+  
   color: var(--rc-onButton);
   padding: calc(0.8 * var(--rs-button-bezel)) var(--rs-button-bezel);
   margin-top: var(--rs-button-stack);
   display: block;
   width: 100%;
   text-align: center;
-  border-radius: var(--rs-button-border-radius);
+  border-radius: var(--rs-button-radius);
 }
 
 .c-button--minimal {
@@ -1044,8 +1082,8 @@ a:hover,
 
 .c-button--secondary {
   background: var(--rc-button-secondary);
-  color: var(--rc-button);
-  border: var(--rs-line) solid var(--rc-line);
+  color: var(--rc-onButton-secondary);
+  border: var(--rs-line) solid var(--rc-line-interaction);
 }
 
 .c-button:not([disabled]):focus,
@@ -1088,7 +1126,7 @@ a:hover,
   border: var(--rs-line) solid var(--rc-line);
   display: flex;
   padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
-  border-radius: var(--rs-button-border-radius);
+  border-radius: var(--rs-button-radius);
   background: var(--rc-button);
   color: var(--rc-onButton);
   transform: translate(50%, 50%) scale(0.9);
@@ -1524,7 +1562,7 @@ a:hover,
 }
 
 .c-list--anchors {
-  --border-radius: var(--rs-button-border-radius);
+  --border-radius: var(--rs-button-radius);
 }
 
 .c-list__item--icon {
