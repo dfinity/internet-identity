@@ -78,8 +78,8 @@ const displaySeedPhraseTemplate = ({
           <i
             ${ref(phraseCopyElement)}
             @click=${() => copyPhrase()}
-            aria-label=${copy.copy_to_clipboard}
-            title=${copy.copy_to_clipboard}
+            aria-label=${staticCopy.copy_to_clipboard}
+            title=${staticCopy.copy_to_clipboard}
             tabindex="0"
             id="seedCopy"
             class="c-button__icon"
