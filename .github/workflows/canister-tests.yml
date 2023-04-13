@@ -519,10 +519,10 @@ jobs:
           # Copy example to make sure it does not rely on living inside the II repo
           builddir=$(mktemp -d)
           cp -r ./demos/using-dev-build/. "$builddir"
-          
+
           ii_wasm="$PWD/internet_identity_dev.wasm.gz"
           ii_did="$PWD/src/internet_identity/internet_identity.did"
-          
+
           pushd "$builddir"
 
           # Install npm deps
