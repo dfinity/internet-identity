@@ -754,6 +754,31 @@ a:hover,
   stroke: var(--rc-error);
 }
 
+.c-card__close {
+  position: absolute;
+  right: var(--rs-card-bezel);
+  top: var(--rs-card-bezel);
+  width: 2.1rem;
+  aspect-ratio: 1;
+  background: var(--rc-button);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.c-card__close svg {
+  position: absolute;
+  display: block;
+  width: 60%;
+  height: 60%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.c-card__close svg [fill] {
+  fill: var(--rc-onButton);
+}
+
 .c-card__content {
   position: relative;
   z-index: var(--z-foreground);

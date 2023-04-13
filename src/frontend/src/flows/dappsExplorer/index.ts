@@ -1,4 +1,5 @@
 import { html, TemplateResult } from "lit-html";
+import { closeIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
 import { renderPage } from "../../utils/lit-html";
@@ -22,13 +23,17 @@ const dappsExplorerTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   const pageContent = html`
+    <button
+      class="c-card__close"
+      aria-label="Back to the previous page"
+      @click="${() => back()}"
+    >
+      ${closeIcon}
+    </button>
     <hgroup>
       <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
       <h1 class="t-title">${copy.try_these_dapps}</h1>
     </hgroup>
-    <button @click=${() => back()} class="c-button">
-      Let's get out of here
-    </button>
     <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
   `;
 
