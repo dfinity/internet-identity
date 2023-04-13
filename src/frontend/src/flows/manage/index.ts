@@ -112,12 +112,14 @@ const displayManageTemplate = ({
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
+  exploreDapps,
 }: {
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  exploreDapps: () => void;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
@@ -134,7 +136,7 @@ const displayManageTemplate = ({
     </hgroup>
     ${anchorSection(userNumber)}
     <p class="t-paragraph">
-      <button @click=${() => dappsExplorer()} class="c-button">
+      <button @click=${() => exploreDapps()} class="c-button">
         Explore Dapps
       </button>
     </p>
@@ -262,6 +264,10 @@ export const displayManage = (
           return;
         }
         await setupKey({ connection });
+        resolve();
+      },
+      exploreDapps: async () => {
+        await dappsExplorer();
         resolve();
       },
     });
