@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::state::temp_keys::{TempKeyError, TempKeys};
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
@@ -11,13 +12,14 @@ use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::internet_identity::types::*;
 use std::cell::{Cell, RefCell};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 pub type Assets = HashMap<String, (Vec<HeaderField>, Vec<u8>)>;
 pub type AssetHashes = RbTree<String, Hash>;
+
+mod temp_keys;
 
 // Default value for max number of delegation origins to store in the list of latest used delegation origins
 const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
@@ -117,56 +119,6 @@ pub struct RateLimitState {
 enum StorageState {
     Uninitialised,
     Initialised(Storage<DefaultMemoryImpl>),
-}
-
-#[derive(Default, Debug)]
-pub struct TempKeys {
-    /// A map of "temporary keys" attached to devices (and a specific anchor). A temporary key can be used in lieu
-    /// of the device but has a short expiration time. These keys are used as a workaround for WebAuthn
-    /// needing two users interactions: one for "create" and one for "sign". So instead we only "create"
-    /// and instead authenticate the user with a temporary key for their first visit.
-    ///
-    /// Note: we link the temporary keys to a device so that we can make sure the temporary key is dropped
-    /// if the device itself is removed. This ensures the temporary key is no more powerful than the device,
-    /// i.e. if the user decides to remove the device right after registration, then the the temporary key
-    /// cannot be used to authenticate (similarly to how the browser session key pair cannot be used to
-    /// authenticate if the actual delegated WebAuthn device is removed).
-    /// In addition, the temporary key is also linked to an anchor so that even if the same device is
-    /// added to multiple anchors, it can only be used in the context of the anchor it was created for.
-    pub temp_keys: HashMap<DeviceKey, TempKey>,
-
-    /// Heap to efficiently prune expired temp keys
-    pub expirations: BinaryHeap<TempKeyExpiration>,
-}
-
-pub struct TempKey {
-    /// The device the temporary key is linked to
-    pub temp_key: Principal,
-    /// The anchor the temporary key is linked to
-    pub anchor: AnchorNumber,
-    /// The expiration timestamp of the temp key
-    pub expiration: Timestamp,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TempKeyExpiration {
-    /// The device key the temp key is linked to
-    pub device_key: DeviceKey,
-    /// The expiration timestamp of the temp key
-    pub expiration: Timestamp,
-}
-
-impl PartialOrd<Self> for TempKeyExpiration {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for TempKeyExpiration {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // reverse ordering because we want to have the smallest timestamp first
-        other.expiration.cmp(&self.expiration)
-    }
 }
 
 struct State {
@@ -390,6 +342,19 @@ pub fn storage_replace(storage: Storage<DefaultMemoryImpl>) {
 pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
     STATE.with(|s| f(&mut s.temp_keys.borrow_mut()))
 }
+
+pub fn check_temp_key(
+    caller: &Principal,
+    device_key: &DeviceKey,
+    anchor_number: AnchorNumber,
+) -> Result<(), TempKeyError> {
+    STATE.with(|s| {
+        s.temp_keys
+            .borrow()
+            .check_temp_key(caller, device_key, anchor_number)
+    })
+}
+
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
     STATE.with(|s| f(&s.usage_metrics.borrow()))
 }

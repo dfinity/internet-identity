@@ -4,7 +4,7 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::{Anchor, Device};
 use candid::{candid_method, Principal};
-use ic_cdk::api::{caller, set_certified_data, time, trap};
+use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -125,7 +125,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
     authenticated_anchor_operation(anchor_number, |anchor| {
         Ok((
             (),
-            anchor_management::replace(anchor, device_key, device_data),
+            anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
 }
@@ -134,7 +134,10 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok(((), anchor_management::remove(anchor, device_key)))
+        Ok((
+            (),
+            anchor_management::remove(anchor_number, anchor, device_key),
+        ))
     })
 }
 
@@ -199,7 +202,7 @@ fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 #[query]
 #[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    trap_if_not_authenticated(anchor_number, &state::anchor(anchor_number));
     delegation::get_principal(anchor_number, frontend)
 }
 
@@ -230,7 +233,7 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    trap_if_not_authenticated(anchor_number, &state::anchor(anchor_number));
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
 }
 
@@ -416,7 +419,7 @@ fn update_root_hash() {
 /// do not further modify the anchor.
 fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
     let mut anchor = state::anchor(anchor_number);
-    let device = trap_if_not_authenticated(&anchor);
+    let device = trap_if_not_authenticated(anchor_number, &anchor);
     let domain = device.ii_domain();
     let device_key = device.pubkey.clone();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
@@ -442,7 +445,9 @@ fn authenticated_anchor_operation<R>(
 ) -> R {
     // load anchor
     let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    let device_key = trap_if_not_authenticated(anchor_number, &anchor)
+        .pubkey
+        .clone();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
@@ -463,31 +468,18 @@ fn authenticated_anchor_operation<R>(
 
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Traps if the caller is not authenticated.
-fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
-    let now = time();
+fn trap_if_not_authenticated(anchor_number: AnchorNumber, anchor: &Anchor) -> &Device {
+    state::with_temp_keys_mut(|temp_keys| temp_keys.prune_expired_keys());
+
+    let caller = caller();
     for device in anchor.devices() {
-        if caller() == Principal::self_authenticating(&device.pubkey) {
+        if caller == Principal::self_authenticating(&device.pubkey)
+            || state::check_temp_key(&caller, &device.pubkey, anchor_number).is_ok()
+        {
             return device;
         }
     }
-
-    // Expire temporary keys, and if a principal is found for the anchor, compare against
-    // caller() and approve if matching
-    if let Some((principal, device_key)) = state::with_temp_keys_mut(|temp_keys| {
-        temp_keys.retain(|_, (_, expiration)| *expiration > now);
-        for device in anchor.devices() {
-            if let Some((principal, _expiration)) = temp_keys.get(&device.pubkey) {
-                return Some((*principal, &device.pubkey));
-            }
-        }
-        None
-    }) {
-        if principal == caller() {
-            return anchor.device(device_key).unwrap();
-        }
-    };
-
-    trap(&format!("{} could not be authenticated.", caller()))
+    trap(&format!("{} could not be authenticated.", caller))
 }
 
 fn main() {}

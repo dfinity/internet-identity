@@ -120,7 +120,12 @@ pub fn update(anchor: &mut Anchor, device_key: DeviceKey, device_data: DeviceDat
 /// Panics if
 /// * the device to be replaced does not exist
 /// * the operation violates anchor constraints (see [Anchor])
-pub fn replace(anchor: &mut Anchor, old_device: DeviceKey, new_device: DeviceData) -> Operation {
+pub fn replace(
+    anchor_number: AnchorNumber,
+    anchor: &mut Anchor,
+    old_device: DeviceKey,
+    new_device: DeviceData,
+) -> Operation {
     anchor
         .remove_device(&old_device)
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
@@ -129,6 +134,7 @@ pub fn replace(anchor: &mut Anchor, old_device: DeviceKey, new_device: DeviceDat
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
 
+    state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &old_device));
     Operation::ReplaceDevice {
         old_device,
         new_device: DeviceDataWithoutAlias::from(new_device),
@@ -137,12 +143,15 @@ pub fn replace(anchor: &mut Anchor, old_device: DeviceKey, new_device: DeviceDat
 
 /// Removes a device of the given anchor and returns the operation to be archived.
 /// Panics if the device to be removed does not exist
-pub fn remove(anchor: &mut Anchor, device_key: DeviceKey) -> Operation {
+pub fn remove(
+    anchor_number: AnchorNumber,
+    anchor: &mut Anchor,
+    device_key: DeviceKey,
+) -> Operation {
     anchor
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
-    state::with_temp_keys_mut(|temp_keys| temp_keys.remove(&device_key));
-
+    state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &device_key));
     Operation::RemoveDevice { device: device_key }
 }
