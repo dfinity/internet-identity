@@ -7,78 +7,47 @@ import { withRef } from "../utils/lit-html";
  **/
 export const createModal = ({
   slot,
-  closeButtonRef,
-  submitButtonRef,
+  submit,
 }: {
   slot: TemplateResult;
-  closeButtonRef: Ref<HTMLButtonElement>;
-  submitButtonRef: Ref<HTMLButtonElement>;
-}): HTMLDialogElement => {
-  const modalHtml = html`
-    <form method="dialog" class="c-modal__content c-card c-card--modal">
-      <div class="c-modal__inner">
-        <button
-          class="c-modal__close"
-          aria-label="Close Modal"
-          ${ref(closeButtonRef)}
-        >
-          &times;
-        </button>
-        ${slot}
-        <div class="c-modal__footer">
-          <button
-            type="submit"
-            class="c-button c-button--primary"
-            ${ref(submitButtonRef)}
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </form>
-  `;
+  submit: () => void;
+}) => {
+  const modalElement: Ref<HTMLDialogElement> = createRef();
 
-  const modalElement = document.createElement("dialog");
-  modalElement.classList.add("c-modal");
-  modalElement.setAttribute("aria-modal", "true");
-
-  render(modalHtml, modalElement);
-
-  return modalElement;
-};
-
-export const modal = ({ slot }: { slot: TemplateResult }): Promise<void> => {
-  const closeButtonRef: Ref<HTMLButtonElement> = createRef();
-  const submitButtonRef: Ref<HTMLButtonElement> = createRef();
-
-  const modalElement = createModal({
-    slot,
-    closeButtonRef,
-    submitButtonRef,
-  });
-
-  document.body.appendChild(modalElement);
-
-  return new Promise((resolve, reject) => {
-    // open modal using the browsers API
-    modalElement.showModal();
-
-    const close = () => {
+  const closeModal = () =>
+    withRef(modalElement, (modalElement) => {
       modalElement.close();
       modalElement.remove();
-    };
+    });
 
-    withRef(closeButtonRef, (closeButton) => {
-      closeButton.onclick = () => {
-        reject();
-        close();
-      };
-    });
-    withRef(submitButtonRef, (submitButton) => {
-      submitButton.onclick = () => {
-        resolve();
-        close();
-      };
-    });
-  });
+  const modalHtml = html`
+    <dialog class="c-modal" aria-modal ${ref(modalElement)}>
+      <form
+        @submit=${() => submit()}
+        method="dialog"
+        class="c-modal__content c-card c-card--modal"
+      >
+        <div class="c-modal__inner">
+          <button
+            @click=${() => closeModal()}
+            class="c-modal__close"
+            aria-label="Close Modal"
+          >
+            &times;
+          </button>
+          ${slot}
+          <div class="c-modal__footer">
+            <button type="submit" class="c-button c-button--primary">OK</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+  `;
+
+  render(modalHtml, document.body);
+  withRef(modalElement, (modalElement) => modalElement.showModal());
 };
+
+// Create a modal. The promise resolves iff the "OK" button is clicked.
+export const modal = ({ slot }: { slot: TemplateResult }): Promise<void> =>
+  new Promise((resolve) => createModal({ slot, submit: () => resolve() }));
