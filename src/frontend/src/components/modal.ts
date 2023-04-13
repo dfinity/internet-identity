@@ -17,7 +17,6 @@ export const createModal = ({ slot }: { slot: TemplateResult }) => {
   const removeContainer = () => container.remove();
 
   // dialog role="dialog": closes modal on Esc
-  // form method="dialog": closes modal on submit
   // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog
   const modalHtml = html`
     <dialog
@@ -51,6 +50,8 @@ export const createModal = ({ slot }: { slot: TemplateResult }) => {
 // (but _not_ when the form is closed via the close button)
 export const formModal = ({ slot }: { slot: TemplateResult }): Promise<void> =>
   new Promise((resolve) =>
+    // form method="dialog": closes modal on submit
+    // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog
     createModal({
       slot: html`
         <form @submit=${() => resolve()} method="dialog">
