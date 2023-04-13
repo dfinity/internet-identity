@@ -26,7 +26,7 @@ import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeVie
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { dappsExplorer } from "./flows/dappsExplorer";
+import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
@@ -289,6 +289,9 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   displayManageSingle: () =>
     displayManagePage({
@@ -309,6 +312,9 @@ const iiPages: Record<string, () => void> = {
       },
       addRecoveryKey: () => {
         console.log("add recovery key");
+      },
+      exploreDapps: () => {
+        console.log("explore dapps");
       },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
@@ -400,7 +406,8 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: () => dappsExplorer(),
+  dappsExplorer: () =>
+    dappsExplorerPage({ i18n, back: () => console.log("back") }),
 };
 
 const showcase: TemplateResult = html`

@@ -1,6 +1,6 @@
 import { html, TemplateResult } from "lit-html";
-import { createModal } from "../../components/modal";
 import { I18n } from "../../i18n";
+import { renderPage } from "../../utils/lit-html";
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used
@@ -11,12 +11,21 @@ import dapps from "./dapps.json";
 import copyJson from "./copy.json";
 
 /* Template for the explorer containing all dapps */
-const dappsExplorerTemplate = ({ i18n }: { i18n: I18n }) => {
+const dappsExplorerTemplate = ({
+  i18n,
+  back,
+}: {
+  i18n: I18n;
+  back: () => void;
+}) => {
   const copy = i18n.i18n(copyJson);
 
   const pageContent = html`
     <p>${copy.dapps_explorer}</p>
     <h1>${copy.try_these_dapps}</h1>
+    <button @click=${() => back()} class="c-button">
+      Let's get out of here
+    </button>
     <hr />
     <ul>
       ${dapps.map((dapp) => dappTemplate(dapp))}
@@ -25,6 +34,8 @@ const dappsExplorerTemplate = ({ i18n }: { i18n: I18n }) => {
 
   return pageContent;
 };
+
+export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
 // Infer the type of an array's elements
 type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
@@ -55,7 +66,9 @@ const dappTemplate = (dapp: ElementOf<typeof dapps>): TemplateResult => {
 };
 
 /* Show a list of dapps known to use Internet Identity, in a closable modal */
-export const dappsExplorer = (): void => {
+export const dappsExplorer = (): Promise<void> => {
   const i18n = new I18n();
-  createModal({ slot: dappsExplorerTemplate({ i18n }) });
+  return new Promise((resolve) =>
+    dappsExplorerPage({ i18n, back: () => resolve() })
+  );
 };
