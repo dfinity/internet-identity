@@ -26,6 +26,7 @@ import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeVie
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { dappsExplorer } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
@@ -399,6 +400,7 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
+  dappsExplorer: () => dappsExplorer(),
 };
 
 const showcase: TemplateResult = html`
