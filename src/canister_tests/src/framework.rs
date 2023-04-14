@@ -75,7 +75,7 @@ lazy_static! {
         /** The gzipped Wasm module for the _previous_ archive build, or latest release, which is used when testing
             * upgrades and downgrades */
     pub static ref ARCHIVE_WASM_PREVIOUS: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("archive_previous.wasm");
+        let def_path = path::PathBuf::from("..").join("..").join("archive_previous.wasm.gz");
         let err = format!("
         Could not find Archive Wasm module for previous build/latest release.
 
