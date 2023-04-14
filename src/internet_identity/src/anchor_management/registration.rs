@@ -205,7 +205,7 @@ pub fn register(
 
     temp_key.as_ref().map(|temp_key| {
         if temp_key == &device_principal {
-            panic!("temp_key and device_principal are the same")
+            panic!("temp_key and device key must not be equal")
         }
     });
 

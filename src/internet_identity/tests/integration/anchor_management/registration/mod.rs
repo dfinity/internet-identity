@@ -2,6 +2,8 @@
 //! 1. create_challenge: retrieve a captcha
 //! 2. register: submit the captcha solution and device information to create a new anchor
 
+mod temp_keys;
+
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
@@ -75,6 +77,7 @@ fn should_assign_correct_user_numbers() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     )?;
     assert!(matches!(result, RegisterResponse::CanisterFull));
     Ok(())
@@ -96,6 +99,7 @@ fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     );
 
     expect_user_error_with_message(
@@ -124,6 +128,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallErro
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     );
 
     expect_user_error_with_message(
@@ -150,6 +155,7 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
             chars: "wrong solution".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     )?;
 
     assert!(matches!(result, RegisterResponse::BadChallenge));
@@ -177,6 +183,7 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     )?;
 
     assert!(matches!(result, RegisterResponse::BadChallenge));
@@ -229,6 +236,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge.challenge_key.clone(),
         },
+        None,
     );
     expect_user_error_with_message(
         result,
@@ -252,6 +260,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     );
     assert!(result.is_ok());
     Ok(())
