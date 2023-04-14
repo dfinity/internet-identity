@@ -1,8 +1,9 @@
 import { html, TemplateResult } from "lit-html";
+import { TemplateElement } from "../utils/lit-html";
 import { closeIcon, warningIcon } from "./icons";
 
 interface irregularityProps {
-  message: string | TemplateResult;
+  message: TemplateElement;
   closeFn: () => void;
 }
 
