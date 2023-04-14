@@ -1,4 +1,5 @@
 import { html, TemplateResult } from "lit-html";
+import { TemplateElement } from "../utils/lit-html";
 import { warningIcon } from "./icons";
 
 // The Warning Component can be reused with following custom properties: title, message, slot and htmlElement.
@@ -7,8 +8,8 @@ import { warningIcon } from "./icons";
 // By default the component will be an <aside>. The other option is a <div> wrapper.
 
 interface warnBoxProps {
-  title: string | TemplateResult;
-  message: string | TemplateResult;
+  title: TemplateElement;
+  message: TemplateElement;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";
   additionalClasses?: string[];

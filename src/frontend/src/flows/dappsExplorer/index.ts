@@ -21,12 +21,11 @@ const dappsExplorerTemplate = ({
   back: () => void;
 }) => {
   const copy = i18n.i18n(copyJson);
-  const staticCopy = i18n.staticLang(copyJson);
 
   const pageContent = html`
     <button
       class="c-card__close"
-      aria-label=${staticCopy.back_to_the_previous_page}
+      aria-label=${copy.back_to_the_previous_page}
       @click=${() => back()}
     >
       ${closeIcon}

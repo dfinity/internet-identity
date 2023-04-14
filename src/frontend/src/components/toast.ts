@@ -1,4 +1,5 @@
-import { html, render } from "lit-html";
+import { render } from "lit-html";
+import { TemplateElement } from "../utils/lit-html";
 import { irregularity } from "./irregularity";
 
 export const removeToast = (toast: HTMLElement): void => {
@@ -8,8 +9,7 @@ export const removeToast = (toast: HTMLElement): void => {
   toast.classList.add("c-toast--closing");
 };
 
-const createToast = (messageStr: string): HTMLDivElement => {
-  const message = html`${messageStr}`;
+const createToast = (message: TemplateElement): HTMLDivElement => {
   const toastEl = document.createElement("div");
   toastEl.classList.add("c-toast");
   render(
@@ -52,7 +52,7 @@ const getOrCreateToaster = (): Element | null => {
  * use like: toast.error("Something went wrong");
  */
 export const toast = {
-  error: (message: string): void => {
+  error: (message: TemplateElement): void => {
     const toasterEl = getOrCreateToaster();
     const toastEl = createToast(message);
     toasterEl?.appendChild(toastEl);
