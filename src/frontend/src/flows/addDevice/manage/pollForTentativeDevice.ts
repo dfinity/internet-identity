@@ -32,7 +32,6 @@ const pollForTentativeDeviceTemplate = ({
   i18n: I18n;
 }) => {
   const copy = i18n.i18n(copyJson);
-  const staticCopy = i18n.staticLang(copyJson);
   const link = addDeviceLink({ userNumber, origin });
   const copyLink_ = () => navigator.clipboard.writeText(link);
 
@@ -45,8 +44,8 @@ const pollForTentativeDeviceTemplate = ({
         linkCopyElement.classList.add("is-copied");
       });
     } catch (e: unknown) {
-      toast.error(staticCopy.could_not_copy_link);
-      console.error(staticCopy.could_not_copy_link, e);
+      toast.error(copy.could_not_copy_link);
+      console.error(copy.could_not_copy_link, e);
     }
   };
 
@@ -71,8 +70,8 @@ const pollForTentativeDeviceTemplate = ({
       <button
         ${ref(linkCopyElement)}
         @click=${() => copyLink()}
-        aria-label=${staticCopy.copy_to_clipboard}
-        title=${staticCopy.copy_to_clipboard}
+        aria-label=${copy.copy_to_clipboard}
+        title=${copy.copy_to_clipboard}
         id="seedCopy"
         data-action="copy-link"
         class="c-button__icon"

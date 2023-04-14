@@ -7,9 +7,9 @@ import {
 import { displayError } from "../../components/displayError";
 import { caretDownIcon, spinner } from "../../components/icons";
 import { showMessage } from "../../components/message";
-import { I18n } from "../../i18n";
+import { DynamicKey, I18n } from "../../i18n";
 import { Connection } from "../../utils/iiConnection";
-import { withRef } from "../../utils/lit-html";
+import { TemplateElement, withRef } from "../../utils/lit-html";
 import { unreachable } from "../../utils/utils";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { authenticationProtocol } from "./postMessageInterface";
@@ -38,7 +38,7 @@ export const authnTemplateAuthorize = ({
         })
       : undefined;
 
-  const wrap = (title: string | TemplateResult) => html`
+  const wrap = (title: DynamicKey) => html`
     <div class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
@@ -74,9 +74,8 @@ export const authFlowAuthorize = async (
   const i18n = new I18n();
   const container = document.getElementById("pageContent") as HTMLElement;
   const copy = i18n.i18n(copyJson);
-  const staticCopy = i18n.staticLang(copyJson);
   render(html`<h1>${copy.starting_authentication}</h1>`, container);
-  const loadingMessage = (msg: string | TemplateResult) =>
+  const loadingMessage = (msg: TemplateElement) =>
     render(
       html`
         <div class="l-container c-card c-card--highlight t-centered">
@@ -145,7 +144,7 @@ export const authFlowAuthorize = async (
     case "success":
       showMessage({
         role: "notify-auth-success",
-        message: staticCopy.auth_success,
+        message: copy.auth_success,
       });
       break;
     default:

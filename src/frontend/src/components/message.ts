@@ -1,12 +1,12 @@
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { renderPage } from "../utils/lit-html";
+import { renderPage, TemplateElement } from "../utils/lit-html";
 
 const showMessageTemplate = ({
   message,
   role,
 }: {
-  message: TemplateResult | string;
+  message: TemplateElement;
   role?: string;
 }): TemplateResult => {
   return html`<h1
@@ -24,7 +24,7 @@ export const showMessage = ({
   message,
   role,
 }: {
-  message: TemplateResult | string;
+  message: TemplateElement;
   role?: string;
 }): void =>
   showMessagePage({
