@@ -1,3 +1,4 @@
+import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -231,8 +232,10 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
+        const tempIdentity = Ed25519KeyIdentity.generate();
         const result = await connection.register({
           identity,
+          tempIdentity,
           alias,
           challengeResult: {
             key: challenge.challenge_key,

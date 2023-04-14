@@ -31,13 +31,14 @@ pub fn register(
     sender: Principal,
     device_data: &types::DeviceData,
     challenge_attempt: types::ChallengeAttempt,
+    temp_key: Option<Principal>,
 ) -> Result<types::RegisterResponse, CallError> {
     call_candid_as(
         env,
         canister_id,
         sender,
         "register",
-        (device_data, challenge_attempt),
+        (device_data, challenge_attempt, temp_key),
     )
     .map(|(x,)| x)
 }

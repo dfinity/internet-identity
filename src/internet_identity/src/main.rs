@@ -2,7 +2,7 @@ use crate::active_anchor_stats::IIDomain;
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -92,8 +92,12 @@ async fn create_challenge() -> Challenge {
 
 #[update]
 #[candid_method]
-fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
-    anchor_management::registration::register(device_data, challenge_result)
+fn register(
+    device_data: DeviceData,
+    challenge_result: ChallengeAttempt,
+    temp_key: Option<Principal>,
+) -> RegisterResponse {
+    anchor_management::registration::register(device_data, challenge_result, temp_key)
 }
 
 #[update]
@@ -121,7 +125,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
     authenticated_anchor_operation(anchor_number, |anchor| {
         Ok((
             (),
-            anchor_management::replace(anchor, device_key, device_data),
+            anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
 }
@@ -130,7 +134,10 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok(((), anchor_management::remove(anchor, device_key)))
+        Ok((
+            (),
+            anchor_management::remove(anchor_number, anchor, device_key),
+        ))
     })
 }
 
@@ -195,7 +202,7 @@ fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 #[query]
 #[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    trap_if_not_authenticated(anchor_number);
     delegation::get_principal(anchor_number, frontend)
 }
 
@@ -226,7 +233,7 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    trap_if_not_authenticated(&state::anchor(anchor_number));
+    trap_if_not_authenticated(anchor_number);
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
 }
 
@@ -411,10 +418,8 @@ fn update_root_hash() {
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
 fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
-    let mut anchor = state::anchor(anchor_number);
-    let device = trap_if_not_authenticated(&anchor);
-    let domain = device.ii_domain();
-    let device_key = device.pubkey.clone();
+    let (mut anchor, device_key) = trap_if_not_authenticated(anchor_number);
+    let domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
         |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
@@ -436,9 +441,7 @@ fn authenticated_anchor_operation<R>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
 ) -> R {
-    // load anchor
-    let mut anchor = state::anchor(anchor_number);
-    let device_key = trap_if_not_authenticated(&anchor).pubkey.clone();
+    let (mut anchor, device_key) = trap_if_not_authenticated(anchor_number);
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
@@ -459,13 +462,22 @@ fn authenticated_anchor_operation<R>(
 
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Traps if the caller is not authenticated.
-fn trap_if_not_authenticated(anchor: &Anchor) -> &Device {
+fn trap_if_not_authenticated(anchor_number: AnchorNumber) -> (Anchor, DeviceKey) {
+    let anchor = state::anchor(anchor_number);
+    let caller = caller();
+
     for device in anchor.devices() {
-        if caller() == Principal::self_authenticating(&device.pubkey) {
-            return device;
+        if caller == Principal::self_authenticating(&device.pubkey)
+            || state::with_temp_keys_mut(|temp_keys| {
+                temp_keys
+                    .check_temp_key(&caller, &device.pubkey, anchor_number)
+                    .is_ok()
+            })
+        {
+            return (anchor.clone(), device.pubkey.clone());
         }
     }
-    trap(&format!("{} could not be authenticated.", caller()))
+    trap(&format!("{} could not be authenticated.", caller))
 }
 
 fn main() {}
