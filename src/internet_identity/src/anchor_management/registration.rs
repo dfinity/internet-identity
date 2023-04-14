@@ -203,6 +203,12 @@ pub fn register(
     let device = Device::from(device_data);
     let device_principal = Principal::self_authenticating(&device.pubkey);
 
+    temp_key.as_ref().map(|temp_key| {
+        if temp_key == &device_principal {
+            panic!("temp_key and device_principal are the same")
+        }
+    });
+
     verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
 
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());
