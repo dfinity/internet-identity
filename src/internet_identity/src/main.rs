@@ -474,7 +474,11 @@ fn trap_if_not_authenticated(anchor_number: AnchorNumber, anchor: &Anchor) -> &D
     let caller = caller();
     for device in anchor.devices() {
         if caller == Principal::self_authenticating(&device.pubkey)
-            || state::check_temp_key(&caller, &device.pubkey, anchor_number).is_ok()
+            || state::with_temp_keys(|temp_keys| {
+                temp_keys
+                    .check_temp_key(&caller, &device.pubkey, anchor_number)
+                    .is_ok()
+            })
         {
             return device;
         }

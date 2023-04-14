@@ -4,15 +4,17 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::{
-    device_data_1, env, expect_user_error_with_message, install_ii_canister, test_principal,
-    II_WASM,
+    assert_metric, device_data_1, env, expect_user_error_with_message, get_metrics,
+    install_ii_canister, test_principal, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Challenge, ChallengeAttempt, DeviceData, RegisterResponse,
+    AnchorNumber, Challenge, ChallengeAttempt, DeviceData, DeviceProtection, KeyType, Purpose,
+    RegisterResponse,
 };
 use regex::Regex;
+use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Tests successful registration with a temporary key.
@@ -117,6 +119,31 @@ fn should_not_allow_temp_key_for_different_anchor() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Tests that the number of temp keys is exposed as a metric.
+#[test]
+fn should_provide_temp_keys_metric() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_temp_keys_count",
+        0.0,
+    );
+
+    for i in 0..5 {
+        register_with_temp_key(&env, canister_id, test_principal(i), &device(i));
+    }
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_temp_keys_count",
+        5.0,
+    );
+
+    Ok(())
+}
+
 fn register_with_temp_key(
     env: &StateMachine,
     canister_id: CanisterId,
@@ -144,5 +171,17 @@ fn challenge_solution(challenge: Challenge) -> ChallengeAttempt {
     ChallengeAttempt {
         chars: "a".to_string(),
         key: challenge.challenge_key,
+    }
+}
+
+fn device(n: u64) -> DeviceData {
+    DeviceData {
+        pubkey: ByteBuf::from([n as u8; 64]),
+        alias: "Device ".to_string() + n.to_string().as_str(),
+        credential_id: None,
+        purpose: Purpose::Authentication,
+        key_type: KeyType::Unknown,
+        protection: DeviceProtection::Unprotected,
+        origin: None,
     }
 }

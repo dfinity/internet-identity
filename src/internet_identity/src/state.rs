@@ -1,5 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
-use crate::state::temp_keys::{TempKeyError, TempKeys};
+use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
@@ -343,16 +343,8 @@ pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
     STATE.with(|s| f(&mut s.temp_keys.borrow_mut()))
 }
 
-pub fn check_temp_key(
-    caller: &Principal,
-    device_key: &DeviceKey,
-    anchor_number: AnchorNumber,
-) -> Result<(), TempKeyError> {
-    STATE.with(|s| {
-        s.temp_keys
-            .borrow()
-            .check_temp_key(caller, device_key, anchor_number)
-    })
+pub fn with_temp_keys<R>(f: impl FnOnce(&TempKeys) -> R) -> R {
+    STATE.with(|s| f(&mut s.temp_keys.borrow()))
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {

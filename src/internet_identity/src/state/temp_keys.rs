@@ -101,6 +101,10 @@ impl TempKeys {
         }
         Ok(())
     }
+
+    pub fn num_temp_keys(&self) -> usize {
+        self.temp_keys.len()
+    }
 }
 
 pub enum TempKeyError {
