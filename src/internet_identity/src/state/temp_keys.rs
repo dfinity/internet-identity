@@ -98,6 +98,9 @@ impl TempKeys {
                 break;
             };
 
+            // The expirations are sorted by expiration time because the expiration is constant
+            // (10 minutes) and time() is monotonous
+            // -> we can stop pruning once we reach a temp key that is not expired
             if expiration.expiration > now {
                 break;
             }
