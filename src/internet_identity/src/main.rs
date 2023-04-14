@@ -165,7 +165,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 #[query]
 #[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
-    let anchor = state::anchor(anchor_number);
+    let anchor = state::storage_borrow(|storage| storage.read(anchor_number).unwrap_or_default());
 
     anchor.into_devices().into_iter().fold(
         AnchorCredentials {

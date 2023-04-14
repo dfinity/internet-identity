@@ -456,6 +456,18 @@ fn should_get_credentials() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Verifies that get_anchor_credentials returns an empty list of credentials for invalid anchor numbers.
+#[test]
+fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let response = api::get_anchor_credentials(&env, canister_id, 1234564)?;
+
+    assert_eq!(response, AnchorCredentials::default());
+    Ok(())
+}
+
 /// Verifies that get_anchor_credentials returns the expected credentials (i.e. no recovery credentials if there are none).
 #[test]
 fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallError> {
