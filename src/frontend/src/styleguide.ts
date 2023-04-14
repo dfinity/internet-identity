@@ -8,7 +8,6 @@ import {
   settingsIcon,
   warningIcon,
 } from "./components/icons";
-import { irregularity } from "./components/irregularity";
 import { formModal } from "./components/modal";
 import { toast } from "./components/toast";
 import { warnBox } from "./components/warnBox";
@@ -462,24 +461,6 @@ export const styleguide = html`
           })}
         </section>
         <p class="t-lead"></p>
-      </aside>
-
-      <aside class="l-stack demo-section">
-        <h2 class="t-title">Irregularities</h2>
-        <p class="t-lead">
-          Irregularities are messages that we show to the user when something
-          goes wrong or something happens that we want to inform the user about.
-          They can be used to show errors messages.
-        </p>
-        <section class="demo" aria-label="Irregularity Elements Demo">
-          ${irregularity({
-            message:
-              "This is an error message. It can be used to inform the user about something that went wrong.",
-            closeFn: () => {
-              console.log("close");
-            },
-          })}
-        </section>
       </aside>
 
       <aside class="l-stack demo-section">
