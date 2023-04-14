@@ -209,6 +209,7 @@ pub fn register(
         }
     }
 
+    // sanity check
     verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
 
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());

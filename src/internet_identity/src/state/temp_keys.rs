@@ -2,8 +2,7 @@ use crate::MINUTE_NS;
 use candid::Principal;
 use ic_cdk::api::time;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, DeviceKey, Timestamp};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{HashMap, VecDeque};
 
 // Expiration for temp keys, the same as the front-end delegation expiry
 const TEMP_KEY_EXPIRATION_NS: u64 = 10 * MINUTE_NS;
@@ -28,8 +27,8 @@ pub struct TempKeys {
     /// bounded by the registration rate limit.
     temp_keys: HashMap<DeviceKey, TempKey>,
 
-    /// Heap to efficiently prune expired temp keys
-    expirations: BinaryHeap<TempKeyExpiration>,
+    /// Deque to efficiently prune expired temp keys
+    expirations: VecDeque<TempKeyExpiration>,
 }
 
 impl TempKeys {
@@ -45,7 +44,7 @@ impl TempKeys {
             expiration: time() + TEMP_KEY_EXPIRATION_NS,
         };
 
-        self.expirations.push(TempKeyExpiration {
+        self.expirations.push_back(TempKeyExpiration {
             device_key: device_key.clone(),
             expiration: tmp_key.expiration,
         });
@@ -64,12 +63,38 @@ impl TempKeys {
         }
     }
 
-    pub fn prune_expired_keys(&mut self) {
+    /// Checks that the temporary key is valid for the given device and anchor.
+    ///
+    /// Requires a mutable reference because it does amortized clean-up of expired temp keys.
+    pub fn check_temp_key(
+        &mut self,
+        caller: &Principal,
+        device_key: &DeviceKey,
+        anchor: AnchorNumber,
+    ) -> Result<(), ()> {
+        self.prune_expired_keys();
+
+        let Some(temp_key) = self.temp_keys.get(device_key) else {
+            return Err(());
+        };
+        if temp_key.expiration < time() {
+            return Err(());
+        }
+        if temp_key.anchor != anchor {
+            return Err(());
+        }
+        if &temp_key.principal != caller {
+            return Err(());
+        }
+        Ok(())
+    }
+
+    fn prune_expired_keys(&mut self) {
         const MAX_TO_PRUNE: usize = 100;
 
         let now = time();
         for _ in 0..MAX_TO_PRUNE {
-            let Some(expiration) = self.expirations.peek() else {
+            let Some(expiration) = self.expirations.front() else {
                 break;
             };
 
@@ -77,45 +102,13 @@ impl TempKeys {
                 break;
             }
             self.temp_keys.remove(&expiration.device_key);
-            self.expirations.pop();
+            self.expirations.pop_front();
         }
-    }
-
-    pub fn check_temp_key(
-        &self,
-        caller: &Principal,
-        device_key: &DeviceKey,
-        anchor: AnchorNumber,
-    ) -> Result<(), TempKeyError> {
-        let Some(temp_key) = self.temp_keys.get(device_key) else {
-            return Err(TempKeyError::NotFound);
-        };
-        if temp_key.expiration < time() {
-            return Err(TempKeyError::Expired);
-        }
-        if temp_key.anchor != anchor {
-            return Err(TempKeyError::AnchorMismatch);
-        }
-        if &temp_key.principal != caller {
-            return Err(TempKeyError::Invalid);
-        }
-        Ok(())
     }
 
     pub fn num_temp_keys(&self) -> usize {
         self.temp_keys.len()
     }
-}
-
-pub enum TempKeyError {
-    /// There is no temp key for the current device
-    NotFound,
-    /// The temporary key does not match the caller
-    Invalid,
-    /// The temporary key is not linked to the provided anchor
-    AnchorMismatch,
-    /// The temporary key is expired
-    Expired,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,17 +127,4 @@ pub struct TempKeyExpiration {
     pub device_key: DeviceKey,
     /// The expiration timestamp of the temp key
     pub expiration: Timestamp,
-}
-
-impl Ord for TempKeyExpiration {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // reverse ordering because we want to have the smallest timestamp first
-        other.expiration.cmp(&self.expiration)
-    }
-}
-
-impl PartialOrd<Self> for TempKeyExpiration {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
 }

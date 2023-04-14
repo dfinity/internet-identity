@@ -4,7 +4,7 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::{
-    assert_metric, device_data_1, env, expect_user_error_with_message, get_metrics,
+    assert_metric, device_data_1, device_data_2, env, expect_user_error_with_message, get_metrics,
     install_ii_canister, test_principal, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
@@ -42,6 +42,34 @@ fn should_remove_temp_key_on_device_deletion() -> Result<(), CallError> {
     let anchor = register_with_temp_key(&env, canister_id, temp_key, &device);
 
     api::remove(&env, canister_id, temp_key, anchor, device.pubkey)?;
+
+    let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
+    expect_user_error_with_message(
+        result,
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("[\\w-]+ could not be authenticated").unwrap(),
+    );
+    Ok(())
+}
+
+/// Tests that the temporary key is removed on device replacement.
+#[test]
+fn should_remove_temp_key_on_device_replacement() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let temp_key = test_principal(1);
+    let device = device_data_1();
+
+    let anchor = register_with_temp_key(&env, canister_id, temp_key, &device);
+
+    api::replace(
+        &env,
+        canister_id,
+        temp_key,
+        anchor,
+        device.pubkey,
+        device_data_2(),
+    )?;
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
     expect_user_error_with_message(
