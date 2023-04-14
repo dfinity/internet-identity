@@ -15,6 +15,7 @@ export const settingsDropdown = ({
       class="c-dropdown__trigger c-action-list__action"
       aria-expanded="false"
       aria-controls="dropdown-${id}"
+      aria-label="Open settings"
       data-device=${alias}
     >
       ${dropdownIcon}
