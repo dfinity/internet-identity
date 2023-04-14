@@ -24,6 +24,10 @@ const dappsExplorerTemplate = ({
   const staticCopy = i18n.staticLang(copyJson);
 
   const pageContent = html`
+    <hgroup>
+      <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
+      <h1 class="t-title">${copy.try_these_dapps}</h1>
+    </hgroup>
     <button
       class="c-card__close"
       aria-label=${staticCopy.back_to_the_previous_page}
@@ -31,10 +35,6 @@ const dappsExplorerTemplate = ({
     >
       ${closeIcon}
     </button>
-    <hgroup>
-      <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
-      <h1 class="t-title">${copy.try_these_dapps}</h1>
-    </hgroup>
     <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
   `;
 
