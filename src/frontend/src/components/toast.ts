@@ -9,7 +9,7 @@ import { closeIcon, warningIcon } from "./icons";
 // must be an object because we (lit) use object-references in `repeat` to figure out which DOM elements
 // to replace.
 type Toast = { message: TemplateElement };
-const toasts: Toast[] = []; // the "toasts" singleton
+const toastStore: Toast[] = []; // the "toasts" singleton
 
 /**
  * A lot like console.error, but with a toast.
@@ -17,7 +17,7 @@ const toasts: Toast[] = []; // the "toasts" singleton
  */
 export const toast = {
   error: (message: Toast["message"]): void => {
-    toasts.push({ message });
+    toastStore.push({ message });
     renderToasts();
   },
 };
@@ -26,7 +26,7 @@ export const toast = {
 const renderToasts = () => {
   render(
     html` <div class="c-toasts l-container">
-      ${repeat(toasts, (x) => x, toastTemplate)}
+      ${repeat(toastStore, (x) => x, toastTemplate)}
     </div>`,
     document.body
   );
@@ -34,12 +34,15 @@ const renderToasts = () => {
 
 const toastTemplate = (toast: Toast): TemplateResult => {
   const closing = new Chan<boolean>(false);
+
+  // Trigger the closing animation
   const closeToast = () => closing.send(true);
 
+  // Remove the toast from the store
   const removeToast = () => {
-    const toastIndex = toasts.indexOf(toast);
+    const toastIndex = toastStore.indexOf(toast);
     if (toastIndex > -1) {
-      toasts.splice(toastIndex, 1);
+      toastStore.splice(toastIndex, 1);
     }
     renderToasts();
   };
