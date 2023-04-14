@@ -123,9 +123,9 @@ fn register_with_temp_key(
     temp_key: Principal,
     device: &DeviceData,
 ) -> AnchorNumber {
-    let challenge = api::create_challenge(&env, canister_id).unwrap();
+    let challenge = api::create_challenge(env, canister_id).unwrap();
     let response = api::register(
-        &env,
+        env,
         canister_id,
         temp_key,
         device,
