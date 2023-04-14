@@ -79,7 +79,6 @@ RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
 RUN ./scripts/build
-RUN sha256sum /internet_identity.wasm
 RUN sha256sum /internet_identity.wasm.gz
 
 FROM deps as build_archive
@@ -91,13 +90,10 @@ RUN touch src/archive/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 
 RUN ./scripts/build --archive
-RUN sha256sum /archive.wasm
 RUN sha256sum /archive.wasm.gz
 
 FROM scratch AS scratch_internet_identity
-COPY --from=build_internet_identity /internet_identity.wasm /
 COPY --from=build_internet_identity /internet_identity.wasm.gz /
 
 FROM scratch AS scratch_archive
-COPY --from=build_archive /archive.wasm /
 COPY --from=build_archive /archive.wasm.gz /
