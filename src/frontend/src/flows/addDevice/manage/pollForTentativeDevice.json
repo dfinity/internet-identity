@@ -1,0 +1,14 @@
+{
+  "en": {
+    "identity_anchor": "Identity Anchor",
+    "add_trusted_device": "Add Trusted Device",
+    "follow_steps_on_new_device": "Follow these steps on your new device",
+    "copy_to_clipboard": "Copy to clipboard",
+    "scan_qr_or_visit_link": "Scan the QR code with your device’s camera or visit the link.",
+    "sign_in_using_device": "Sign in using your device.",
+    "time_remaining": "Time remaining",
+
+    "cancel": "Cancel",
+    "could_not_copy_link": "Could not copy link to clipboard"
+  }
+}

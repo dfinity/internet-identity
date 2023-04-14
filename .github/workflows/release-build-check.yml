@@ -31,7 +31,7 @@ jobs:
             exit 1
           fi
           curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_previous.wasm.gz
-          latest_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm | cut -d ' ' -f1)
+          latest_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm.gz | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
           echo latest release sha256 is "$latest_release_sha256"
           echo "ref=$latest_release_ref" >> "$GITHUB_OUTPUT"

@@ -423,6 +423,23 @@ body {
   margin-top: 0.5em;
 }
 
+.t-title--discrete {
+  font-size: 1rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.t-title--discrete + .t-title {
+  margin-top: 0.2em;
+}
+
+.t-title--list {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+  margin-top: 0;
+}
+
 .t-lead {
   font-size: 1.6rem;
 }
@@ -735,6 +752,31 @@ a:hover,
   fill: var(--rc-background);
   stroke-width: 3px;
   stroke: var(--rc-error);
+}
+
+.c-card__close {
+  position: absolute;
+  right: var(--rs-card-bezel);
+  top: var(--rs-card-bezel);
+  width: 2.1rem;
+  aspect-ratio: 1;
+  background: var(--rc-button);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.c-card__close svg {
+  position: absolute;
+  display: block;
+  width: 60%;
+  height: 60%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.c-card__close svg [fill] {
+  fill: var(--rc-onButton);
 }
 
 .c-card__content {
@@ -1171,6 +1213,11 @@ a:hover,
   background-color: var(--rc-line);
 }
 
+.c-input--with-button {
+  padding: calc(1.5 * var(--rs-input-bezel)) calc(1.5 * var(--rs-input-bezel))
+    calc(3 * var(--rs-input-bezel));
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
@@ -1304,8 +1351,8 @@ a:hover,
 }
 
 .c-list--recovery-word {
-  /* 
-    bg and fg stand for background and foreground 
+  /*
+    bg and fg stand for background and foreground
     and are used to make sure that the text is always readable
     and make it easier to understand the code going forward
 
@@ -1381,7 +1428,7 @@ a:hover,
 
   transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
 
-  /* 
+  /*
    * the blur does not render nicely in Safari if its not on its own paint layer,
    * so we use will-change to let the browser know that we want to animate
    * those properties. As a result, the browser will create a new paint layer
@@ -1457,7 +1504,7 @@ a:hover,
   --bg: var(--rc-input-error);
 }
 
-/* 
+/*
   since correct & incorrect words have an icon, but we still want to make use of the circle
   the number used to be in, we need to hide the number. We do this by making it transparent
 */
@@ -1779,6 +1826,27 @@ a:hover,
   padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
+a.c-action-list__item {
+  text-decoration: none;
+  color: var(--rc-text);
+}
+
+.c-action-list__icon {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-action-list__icon img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .c-action-list__item + .c-action-list__item::before {
   content: "";
   display: block;
@@ -1807,6 +1875,12 @@ a:hover,
 .c-action-list__status {
   display: flex;
   align-items: center;
+}
+
+.c-action-list__label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .c-action-list__action {
@@ -2074,7 +2148,17 @@ input[type="checkbox"] {
   user-select: none;
 }
 
-/* 
+/* Wrap QR codes in a white square (for legibility) and prettify a bit */
+.c-qrcode canvas {
+  /* Make sure it has a white background to be easy to scan, not matter the background */
+  background: white;
+  /* Ensure the canvas doesn't overflow on small screens */
+  max-width: 100%;
+  /* Makes the canvas more sharp */
+  image-rendering: pixelated;
+}
+
+/*
  * stack helper classes
  *
  * it is fine to use value tokens here, because these are generic design
@@ -2090,4 +2174,8 @@ input[type="checkbox"] {
 
 .l-stack--tight {
   margin-top: var(--vs-stack);
+}
+
+.l-stack--none {
+  margin-top: 0;
 }

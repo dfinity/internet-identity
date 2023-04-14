@@ -9,7 +9,7 @@ import {
   warningIcon,
 } from "./components/icons";
 import { irregularity } from "./components/irregularity";
-import { modal } from "./components/modal";
+import { formModal } from "./components/modal";
 import { toast } from "./components/toast";
 import { warnBox } from "./components/warnBox";
 import "./styles/main.css";
@@ -515,7 +515,7 @@ export const styleguide = html`
           <button
             class="c-button c-button--primary"
             @click=${async () =>
-              await modal({
+              await formModal({
                 slot: html`<h1>I am a modal</h1>`,
               })}
           >

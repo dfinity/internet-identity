@@ -266,11 +266,7 @@ jobs:
         run: |
           mkdir dist
           touch dist/index.html
-          touch dist/about.html
           touch dist/index.js.gz
-          touch dist/index.css
-          touch dist/loader.webp
-          touch dist/favicon.ico
 
       # Caching ~/.cargo
 
@@ -523,10 +519,10 @@ jobs:
           # Copy example to make sure it does not rely on living inside the II repo
           builddir=$(mktemp -d)
           cp -r ./demos/using-dev-build/. "$builddir"
-          
+
           ii_wasm="$PWD/internet_identity_dev.wasm.gz"
           ii_did="$PWD/src/internet_identity/internet_identity.did"
-          
+
           pushd "$builddir"
 
           # Install npm deps
@@ -557,7 +553,7 @@ jobs:
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_production.wasm
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: 'Download archive wasm'

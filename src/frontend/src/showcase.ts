@@ -26,6 +26,7 @@ import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeVie
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
@@ -44,7 +45,6 @@ import { displayUserNumberPage } from "./flows/register/finish";
 import { registerDisabled } from "./flows/registerDisabled";
 import { styleguide } from "./styleguide";
 import "./styles/main.css";
-import { addDeviceLink } from "./utils/addDeviceLink";
 import { I18n } from "./utils/i18n";
 import { AuthenticatedConnection } from "./utils/iiConnection";
 import { mount, withRef } from "./utils/lit-html";
@@ -289,6 +289,9 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   displayManageSingle: () =>
     displayManagePage({
@@ -310,20 +313,22 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
-      link: addDeviceLink({
-        origin: "https://identity.internetcomputer.org",
-        userNumber: BigInt(1234),
-      }),
+      origin: "https://identity.internetcomputer.org",
+      userNumber: BigInt(1234),
       remaining: {
         async *[Symbol.asyncIterator]() {
           yield "00:34";
         },
       },
+      i18n,
     }),
   deviceRegistrationDisabledInfo: () =>
     deviceRegistrationDisabledInfoPage({
@@ -401,6 +406,8 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
+  dappsExplorer: () =>
+    dappsExplorerPage({ i18n, back: () => console.log("back") }),
 };
 
 const showcase: TemplateResult = html`
