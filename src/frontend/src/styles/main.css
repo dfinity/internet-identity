@@ -219,6 +219,8 @@
   --rs-line-height-body: var(--vs-line-height);
   --rs-dropdown-bezel: var(--vs-bezel);
 
+  --rs-marquee-gap: var(--vs-inline);
+
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
 }
@@ -687,6 +689,16 @@ a:hover,
   padding: var(--rs-card-bezel);
   background-color: var(--rc-background-transparent);
   border-color: transparent;
+}
+
+/**
+  * Card Teaser
+  * it goes to the edge of the card
+  **/
+.c-card__teaser {
+  margin-left: calc(var(--bezel-x) * -1);
+  margin-right: calc(var(--bezel-x) * -1);
+  margin-bottom: calc(var(--bezel-x) * -1);
 }
 
 .c-card--narrow {
@@ -1159,6 +1171,16 @@ a:hover,
   display: flex;
   gap: var(--rs-inline-button-gap);
   margin-top: var(--rs-button-stack);
+}
+
+/**
+  * This is mostly used on buttons that don't look like buttons
+  * but we still want to make an arbitrary area clickable
+  */
+.c-click-area {
+  display: block;
+  width: 100%;
+  cursor: pointer;
 }
 
 .c-input.has-error,
@@ -2156,6 +2178,80 @@ input[type="checkbox"] {
   max-width: 100%;
   /* Makes the canvas more sharp */
   image-rendering: pixelated;
+}
+
+/* Marquee */
+
+.c-marquee {
+  --marqueeGap: var(--rs-marquee-gap);
+
+  position: relative;
+  overflow: hidden;
+  height: 40rem;
+}
+
+.c-marquee__row {
+  position: absolute;
+  top: calc(var(--rowIndex) / var(--totalRows) * 100% + var(--marqueeGap));
+  left: 0;
+  width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
+  height: calc(100% / var(--totalRows) + var(--marqueeGap));
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-5deg);
+  transform-origin: 25% 50%;
+}
+
+.c-marquee__rowHalf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  gap: var(--marqueeGap);
+  animation: marquee 40s linear infinite;
+}
+
+.c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
+  animation-direction: reverse;
+  /** makes sure the rows are staggered */
+  animation-delay: -4.5s;
+}
+
+.c-marquee__rowHalf--second {
+  left: 50%;
+}
+
+@media (prefers-reduced-motion) {
+  .c-marquee__rowHalf {
+    animation-play-state: paused;
+  }
+}
+
+.c-marquee__item {
+  flex: 0 0 auto;
+  width: calc(100% / var(--itemsPerRow) - var(--marqueeGap));
+  height: 100%;
+  position: relative;
+  user-select: none;
+}
+
+.c-marquee__image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 65%;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 /*
