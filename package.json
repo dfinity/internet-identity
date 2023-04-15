@@ -44,7 +44,6 @@
     "process": "0.11.10",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "stream-browserify": "3.0.0",
-    "style-loader": "^3.2.1",
     "ts-jest": "~29",
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
