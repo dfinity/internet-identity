@@ -129,7 +129,7 @@ function build_canister() {
             -o "./$canister.wasm" \
             shrink
         ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:service -f "$SRC_DIR/$canister.did" -v public
-        gzip --no-name --force --keep "$canister.wasm"
+        gzip --no-name --force "$canister.wasm"
     fi
 }
 

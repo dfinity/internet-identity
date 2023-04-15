@@ -8,8 +8,7 @@ import {
   settingsIcon,
   warningIcon,
 } from "./components/icons";
-import { irregularity } from "./components/irregularity";
-import { modal } from "./components/modal";
+import { formModal } from "./components/modal";
 import { toast } from "./components/toast";
 import { warnBox } from "./components/warnBox";
 import "./styles/main.css";
@@ -465,24 +464,6 @@ export const styleguide = html`
       </aside>
 
       <aside class="l-stack demo-section">
-        <h2 class="t-title">Irregularities</h2>
-        <p class="t-lead">
-          Irregularities are messages that we show to the user when something
-          goes wrong or something happens that we want to inform the user about.
-          They can be used to show errors messages.
-        </p>
-        <section class="demo" aria-label="Irregularity Elements Demo">
-          ${irregularity({
-            message:
-              "This is an error message. It can be used to inform the user about something that went wrong.",
-            closeFn: () => {
-              console.log("close");
-            },
-          })}
-        </section>
-      </aside>
-
-      <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Logo</h2>
         <section class="demo" aria-label="Logo Demo">
           <div class="c-logo">${icLogo}</div>
@@ -515,7 +496,7 @@ export const styleguide = html`
           <button
             class="c-button c-button--primary"
             @click=${async () =>
-              await modal({
+              await formModal({
                 slot: html`<h1>I am a modal</h1>`,
               })}
           >

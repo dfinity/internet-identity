@@ -25,7 +25,6 @@ const displaySeedPhraseTemplate = ({
   i18n: I18n;
 }) => {
   const copy = i18n.i18n(copyJson);
-  const staticCopy = i18n.staticLang(copyJson);
 
   const phraseCopyElement: Ref<HTMLElement> = createRef();
 
@@ -43,8 +42,8 @@ const displaySeedPhraseTemplate = ({
         phraseCopyElement.classList.add("is-copied");
       });
     } catch (e: unknown) {
-      toast.error(staticCopy.unable_to_copy_phrase);
-      console.error(staticCopy.unable_to_copy_phrase, e);
+      toast.error(copy.unable_to_copy_phrase);
+      console.error(copy.unable_to_copy_phrase, e);
     }
   };
 

@@ -83,7 +83,7 @@ fn known_devices() -> [DeviceData; 6] {
 }
 
 /// Tests that some known anchors with their respective devices are available after stable memory restore.
-/// Uses the same data initially created using the genesis layout and then migrated until v6.    
+/// Uses the same data initially created using the genesis layout and then migrated until v6.
 #[test]
 fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
     let [device1, device2, device3, device4, device5, device6]: [DeviceData; 6] = known_devices();
@@ -354,7 +354,7 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Tests that II will refuse to install on a stable memory layout that is no longer supported.  
+/// Tests that II will refuse to install on a stable memory layout that is no longer supported.
 #[test]
 fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
     let env = env();

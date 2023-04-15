@@ -114,16 +114,18 @@ export class Connection {
 
   register = async ({
     identity,
+    tempIdentity,
     alias,
     challengeResult,
   }: {
     identity: IIWebAuthnIdentity;
+    tempIdentity: SignIdentity;
     alias: string;
     challengeResult: ChallengeResult;
   }): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await this.requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(tempIdentity);
     } catch (error: unknown) {
       if (error instanceof Error) {
         return { kind: "authFail", error };
@@ -153,7 +155,8 @@ export class Connection {
           protection: { unprotected: null },
           origin: readDeviceOrigin(),
         },
-        challengeResult
+        challengeResult,
+        [tempIdentity.getPrincipal()]
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -675,6 +678,16 @@ export const inferHost = (): string => {
   }
 
   if (
+    location.hostname.endsWith("icp0.io") ||
+    location.hostname.endsWith("ic0.app") ||
+    location.hostname.endsWith("internetcomputer.org")
+  ) {
+    // If this is a canister running on one of the official IC domains, then return the
+    // official API endpoint
+    return "https://" + IC_API_DOMAIN;
+  }
+
+  if (
     location.host === "127.0.0.1" /* typical development */ ||
     location.host ===
       "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
@@ -687,6 +700,6 @@ export const inferHost = (): string => {
     return location.protocol + "//" + location.host;
   }
 
-  // In general, use the official IC HTTP domain.
-  return location.protocol + "//" + IC_API_DOMAIN;
+  // Otherwise assume it's a custom setup and use the host itself as API.
+  return location.protocol + "//" + location.host;
 };

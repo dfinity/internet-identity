@@ -5,6 +5,9 @@ import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
 import { toast } from "../components/toast";
 
+// Helper for types that can (meaningfully) be inserted in a template
+export type TemplateElement = string | TemplateResult | DirectiveResult;
+
 // Read a "lit-html" ref, showing an error message (in the console) in case the
 // element is not available.
 export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {

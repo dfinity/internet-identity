@@ -46,10 +46,10 @@ If you do not have a security key, you can alternatively also generate a key fro
 
 +
 . Authenticate the device.
-+ 
++
 Authenticate using the method you selected when prompted.
 
-. Click *Confirm*. 
+. Click *Confirm*.
 +
 Your Identity Anchor is not created until you perform this step.
 +
@@ -63,7 +63,7 @@ Your browser will remember your Identity Anchor, but you will need it when you a
 +
 WARNING: If you forget your Identity Anchor and are logged out of all devices, you will no longer be able to authenticate with Internet Identity, unless you have set up account recovery using a seed phrase in the next step. So don't lose your Identity Anchor!
 
-. Click *Continue*. 
+. Click *Continue*.
 
 . Add a recovery mechanism to an Identity Anchor
 +
@@ -72,10 +72,10 @@ In addition to adding multiple devices and using security keys, you can set up a
 On the next screen, you can select one of the following options:
 
 * *Seed Phrase*
-+ 
++
 Select this option to generate a cryptographically-secure seed phrase that you can use to recover an Identity Anchor. Make sure you store this phrase somewhere safe and it is known only to you, as anyone who knows the seed phrase will be able to take full control of this Identity Anchor. *Note that the first string in your seed phrase is the Identity Anchor*. You will need this number to begin the recovery process.
 +
-NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered. 
+NOTE: You must click the *copy* button and then *continue* or the seed phrase will not be registered.
 
 * *Security Key*
 +
@@ -92,7 +92,7 @@ WARNING: However, we highly recommend setting up a recovery mechanism so you don
 On the next screen, you will see your Identity Anchor and your registered authentication methods.
 From here, you can add and remove authentication methods, and set up additional account recovery methods.
 
-== Add a device 
+== Add a device
 
 The workflow for adding a device can vary depending on what devices you’ve already added to an Identity Anchor. For example, if you first authorized your computer to create the Identity Anchor, and you’d like to add your phone as a second authentication method, you must be able to authenticate your phone on the authorized computer. You must always be able to authorize the device you want to add by using a device that is already authorized.
 
@@ -124,7 +124,7 @@ When you create an Identity Anchor, you will be prompted to copy a seed phrase o
 
 You can choose to do this at any time, but note that if you lose an Identity Anchor or if you no longer have access to authorized devices, you will need the seed phrase or the recovery security key to recover the Identity Anchor. Without one of these, you will be locked out of any dapps that require the associated identity.
 
-If you have set up a recovery phrase or recovery security key for an Identity Anchor, you can regain access by following these steps: 
+If you have set up a recovery phrase or recovery security key for an Identity Anchor, you can regain access by following these steps:
 
 **1. Click *Lost access and want to recover?* from the Internet Identity landing page.**
 

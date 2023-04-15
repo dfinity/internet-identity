@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: |
         didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
-        
+
         # Actual install
         mkdir -p ~/.local/bin
         curl --location --silent --show-error \

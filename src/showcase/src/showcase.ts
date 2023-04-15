@@ -26,7 +26,11 @@ import { deviceRegistrationDisabledInfoPage } from "../../frontend/src/flows/add
 import { showVerificationCodePage } from "../../frontend/src/flows/addDevice/welcomeView/showVerificationCode";
 import { authnTemplateAuthorize } from "../../frontend/src/flows/authorize";
 import { compatibilityNotice } from "../../frontend/src/flows/compatibilityNotice";
-import { authnTemplateManage, displayManagePage } from "../../frontend/src/flows/manage";
+import { dappsExplorerPage } from "../../frontend/src/flows/dappsExplorer";
+import {
+  authnTemplateManage,
+  displayManagePage,
+} from "../../frontend/src/flows/manage";
 import { chooseRecoveryMechanismPage } from "../../frontend/src/flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
@@ -38,7 +42,10 @@ import { displaySingleDeviceWarning } from "../../frontend/src/flows/recovery/di
 import { pickRecoveryDevice } from "../../frontend/src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "../../frontend/src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "../../frontend/src/flows/recovery/recoverWith/phrase";
-import { badChallenge, promptCaptchaPage } from "../../frontend/src/flows/register/captcha";
+import {
+  badChallenge,
+  promptCaptchaPage,
+} from "../../frontend/src/flows/register/captcha";
 import { renderConstructing } from "../../frontend/src/flows/register/construct";
 import { displayUserNumberPage } from "../../frontend/src/flows/register/finish";
 import { registerDisabled } from "../../frontend/src/flows/registerDisabled";
@@ -48,7 +55,11 @@ import { I18n } from "../../frontend/src/utils/i18n";
 import { AuthenticatedConnection } from "../../frontend/src/utils/iiConnection";
 import { mount, withRef } from "../../frontend/src/utils/lit-html";
 import { RecoveryDevice } from "../../frontend/src/utils/recoveryDevice";
-import { asNonEmptyArray, Chan, NonEmptyArray } from "../../frontend/src/utils/utils";
+import {
+  asNonEmptyArray,
+  Chan,
+  NonEmptyArray,
+} from "../../frontend/src/utils/utils";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -288,6 +299,9 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   displayManageSingle: () =>
     displayManagePage({
@@ -308,6 +322,9 @@ const iiPages: Record<string, () => void> = {
       },
       addRecoveryKey: () => {
         console.log("add recovery key");
+      },
+      exploreDapps: () => {
+        console.log("explore dapps");
       },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
@@ -399,6 +416,8 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
+  dappsExplorer: () =>
+    dappsExplorerPage({ i18n, back: () => console.log("back") }),
 };
 
 const showcase: TemplateResult = html`
