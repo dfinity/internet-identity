@@ -2175,7 +2175,18 @@ input[type="checkbox"] {
   image-rendering: pixelated;
 }
 
-/* Marquee */
+/* 
+  Marquee 
+
+  This is a very simple marquee implementation. 
+  It works by having a row of logos, the contents of which are duplicated and
+  positioned next to each other. An keyframe animation then moves the logos horizontally
+  to create the illusion of a continuous marquee. Every second row is going in the opposite
+  direction to create a more natural movement.
+
+  The `--marqueeGap` variable, which is the amount of space between logos, is set in the
+  `c-marquee` class. `--rowIndex`, `--itemsPerRow` and `--totalRows` are set by the component itself.
+*/
 
 .c-marquee {
   --marqueeGap: var(--rs-marquee-gap);
