@@ -17,7 +17,9 @@ export const dappsTeaser = ({
       @click="${() => click()}"
       aria-label="Show list of dapps"
     >
-      <figure class="c-card__teaser c-marquee">${marqueeList()}</figure>
+      <figure class="c-card__teaser c-marquee c-marquee--clickable">
+        ${marqueeList()}
+      </figure>
     </button>
   </article>`;
 };
@@ -39,6 +41,7 @@ const marqueeList = (): TemplateResult => {
   const rows = chunkArray(paddedDapps, itemsPerRow);
 
   // rows are duplicated to create the infinite scrolling effect
+  // --rnd is used to randomize the transition delay on hover
   return html`<div
     aria-hidden="true"
     class="c-marquee__list"
@@ -46,7 +49,10 @@ const marqueeList = (): TemplateResult => {
   >
     ${rows.map((rowDapps, i) => {
       const rowContent = rowDapps.map(
-        ({ logo, name }) => html`<div class="c-marquee__item">
+        ({ logo, name }) => html`<div
+          class="c-marquee__item"
+          style="--rnd: ${Math.random()}"
+        >
           <img
             src=${logo}
             alt="${name}"
