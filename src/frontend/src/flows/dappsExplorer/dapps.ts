@@ -11,8 +11,9 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
 
 export type DappDescription = ElementOf<typeof dappsJson>;
 
-// TODO: explain
+// The list of dapps we showcase
 export const dapps: DappDescription[] = dappsJson.map((dapp) => ({
   ...dapp,
+  /* fix up logo path (inherited from dfinity/portal) to match our assets */
   logo: dapp.logo.replace("/img/showcase/", "/icons/"),
 }));

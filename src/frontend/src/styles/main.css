@@ -2175,12 +2175,12 @@ input[type="checkbox"] {
   image-rendering: pixelated;
 }
 
-/* 
-  Marquee 
+/*
+  Marquee
 
-  This is a very simple marquee implementation. 
+  This is a very simple marquee implementation.
   It works by having a row of logos, the contents of which are duplicated and
-  positioned next to each other. An keyframe animation then moves the logos horizontally
+  positioned next to each other. A keyframe animation then moves the logos horizontally
   to create the illusion of a continuous marquee. Every second row is going in the opposite
   direction to create a more natural movement.
 
@@ -2226,9 +2226,9 @@ input[type="checkbox"] {
 /* makes sure every second row animates in the oposite direction */
 .c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
   animation-direction: reverse;
-  /* 
+  /*
     staggers the animation so that the icons don't start in the same position
-    for every row 
+    for every row
 
     X X X X X
    X X X X X
