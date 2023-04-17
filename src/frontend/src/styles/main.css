@@ -2208,9 +2208,21 @@ input[type="checkbox"] {
   animation: marquee 70s linear infinite;
 }
 
+/* makes sure every second row animates in the oposite direction */
 .c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
   animation-direction: reverse;
-  /** makes sure the rows are staggered */
+  /* 
+    staggers the animation so that the icons don't start in the same position
+    for every row 
+
+    X X X X X
+   X X X X X
+
+    otherwise, the animation would start like this:
+
+    X X X X X
+    X X X X X
+  */
   animation-delay: -4.5s;
 }
 
