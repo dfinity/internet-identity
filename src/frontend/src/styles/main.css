@@ -2202,8 +2202,7 @@ input[type="checkbox"] {
   left: 0;
   width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
   height: calc(100% / var(--totalRows));
-  align-items: center;
-  justify-content: center;
+
   transform: rotate(-5deg);
   transform-origin: 25% 50%;
 }
