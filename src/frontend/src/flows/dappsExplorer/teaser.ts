@@ -28,7 +28,10 @@ const marqueeList = (): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 
-  const paddedDapps = repeatArray(dapps, itemsPerRow * totalRows);
+  const paddedDapps = repeatArray({
+    arr: dapps,
+    length: itemsPerRow * totalRows,
+  });
 
   /**
    * rows = [
@@ -38,7 +41,7 @@ const marqueeList = (): TemplateResult => {
    *   [dapp0, dapp1, dapp2]
    * ]
    */
-  const rows = chunkArray(paddedDapps, itemsPerRow);
+  const rows = chunkArray({ arr: paddedDapps, chunkSize: itemsPerRow });
 
   // rows are duplicated to create the infinite scrolling effect
   return html`<div
@@ -73,13 +76,19 @@ const marqueeList = (): TemplateResult => {
 /**
  * Pad the array by repeating it until it has the desired number of items.
  */
-const repeatArray = <T>(arr: T[], length: number): T[] =>
+const repeatArray = <T>({ arr, length }: { arr: T[]; length: number }): T[] =>
   Array.from(new Array(length), (_, index) => arr[index % arr.length]);
 
 /**
  * Chunk an array into chunks of the specified size (last chunk may be smaller)
  */
-const chunkArray = <T>(dapps: T[], chunkSize: number): T[][] =>
+const chunkArray = <T>({
+  arr,
+  chunkSize,
+}: {
+  arr: T[];
+  chunkSize: number;
+}): T[][] =>
   Array.from(new Array(Math.ceil(dapps.length / chunkSize)), (_, index) =>
-    dapps.slice(index * chunkSize, index * chunkSize + chunkSize)
+    arr.slice(index * chunkSize, index * chunkSize + chunkSize)
   );
