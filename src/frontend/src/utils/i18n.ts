@@ -60,7 +60,6 @@ export class I18n<Lang extends string> {
 
   // Retrieve the currently selected language
   getLanguageAsync(): AsyncIterable<Lang> {
-    // Workaround to copy the chan
-    return this.chan.map((x) => x);
+    return this.chan.values();
   }
 }
