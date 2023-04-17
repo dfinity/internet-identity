@@ -2192,8 +2192,13 @@ input[type="checkbox"] {
   --marqueeGap: var(--rs-marquee-gap);
 
   position: relative;
-  overflow: hidden;
   height: 35rem;
+}
+
+.c-marquee__list {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .c-marquee__row {
