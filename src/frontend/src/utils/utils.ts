@@ -165,7 +165,11 @@ export class Chan<A> implements AsyncIterable<A> {
   // sent to us
   // We use weak references to the channels so that they do not need to deregister explicitely,
   // but instead we simply drop them when they're gone.
-  private listeners: WeakRef<{ send: (a: A) => void }>[] = [];
+  private listeners: WeakRef<{ notify: (a: A) => void }>[] = [];
+
+  // Reference to a parent (whose listeners we've added ourselves to) to prevent garbage collection of parent (necessary if parent itself is a listener, to prevent dropping the listener).
+  // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
+  protected parent?: unknown;
 
   private latest?: A;
 
@@ -189,7 +193,7 @@ export class Chan<A> implements AsyncIterable<A> {
       (acc, ref) => {
         const listener = ref.deref();
         if (listener !== undefined) {
-          listener.send(a);
+          listener.notify(a);
           acc.push(ref);
         }
         return acc;
@@ -228,9 +232,16 @@ export class Chan<A> implements AsyncIterable<A> {
   // Return a new Chan mapped with `f`.
   map<B>(f: (a: A) => B): Chan<B> {
     const latest = this.latest === undefined ? undefined : f(this.latest);
-    const input = new Chan<B>(latest);
-    this.listeners.push(new WeakRef({ send: (a) => input.send(f(a)) }));
-
+    // Create a chan that the WeakRef can hang on to, but that automatically
+    // translates As into Bs
+    class MappedChan extends Chan<B> {
+      notify(a: A) {
+        this.send(f(a));
+      }
+    }
+    const input = new MappedChan(latest);
+    this.listeners.push(new WeakRef(input));
+    this.parent = input; // keep a ref to prevent parent being garbage collected
     return input;
   }
 
