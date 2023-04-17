@@ -139,6 +139,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         "Number of stable memory pages used by this canister.",
     )?;
     w.encode_gauge(
+        "internet_identity_temp_keys_count",
+        state::with_temp_keys(|temp_keys| temp_keys.num_temp_keys()) as f64,
+        "Number of temporary keys.",
+    )?;
+    w.encode_gauge(
         "internet_identity_last_upgrade_timestamp",
         state::last_upgrade_timestamp() as f64,
         "The most recent IC time (in nanos) when this canister was successfully upgraded.",

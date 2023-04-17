@@ -136,6 +136,9 @@
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
 
+  --rc-card: var(--rc-background-transparent);
+  --rc-card-background: var(--vc-mist);
+
   --rc-line: var(--vc-brand-alt);
   --rc-line-inverted: var(--rc-dark);
 
@@ -669,11 +672,16 @@ a:hover,
  */
 
 .c-card {
+  --bezel-x: var(--rs-card-bezel-x);
+  --bezel-y: var(--rs-card-bezel);
+
   display: block;
   position: relative;
-  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+
+  padding: var(--bezel-y) var(--bezel-x);
   border: var(--rs-line) solid var(--rc-line);
-  background-color: var(--rc-background-transparent);
+
+  background-color: var(--rc-card);
   border-radius: var(--rs-card-border-radius);
 }
 
@@ -686,7 +694,9 @@ a:hover,
 
 .c-card--highlight,
 .c-card--background {
-  padding: var(--rs-card-bezel);
+  --bezel-x: var(--rs-card-bezel);
+  --bezel-y: var(--rs-card-bezel);
+
   background-color: var(--rc-background-transparent);
   border-color: transparent;
 }
@@ -702,35 +712,20 @@ a:hover,
 }
 
 .c-card--narrow {
-  padding: var(--rs-card-bezel-narrow);
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
 }
 
 .c-card--tight {
-  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
-    calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-x: calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-y: calc(var(--rs-card-bezel-narrow) * 0.5);
 }
 
 .c-card--background {
-  padding: calc(var(--rs-card-bezel) * 0.3);
+  --bezel-x: calc(var(--rs-card-bezel) * 0.3);
+  --bezel-y: calc(var(--rs-card-bezel) * 0.3);
+
   background: rgba(255, 255, 255, 0.2);
-}
-
-.c-card--background::after {
-  position: absolute;
-  content: "";
-  z-index: -1;
-  inset: -0.2em;
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 10%, var(--rg-brand));
-  opacity: 0.1;
-  filter: blur(8px);
-}
-
-/* c-cards pretty much fill up the screen on so disable the effect which causes scrolling issues */
-@media (max-width: 512px) {
-  .c-card--background::after {
-    inset: 0;
-  }
 }
 
 @media (max-width: 512px) {
@@ -799,7 +794,7 @@ a:hover,
 .c-card__title {
   /*
     approximation: to make sure the title
-    does not collide with the icon on the left
+    does not collide with the icon on the right
   */
   padding-right: 10%;
 }

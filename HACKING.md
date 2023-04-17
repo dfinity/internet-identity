@@ -141,7 +141,7 @@ Use the following command to build the backend canister Wasm file instead:
 dfx build internet_identity
 ```
 
-This will produce `./internet_identity.wasm`.
+This will produce `./internet_identity.wasm.gz`.
 
 [releases]: https://github.com/dfinity/internet-identity/releases
 [docker-build]: ./README.md#building-with-docker

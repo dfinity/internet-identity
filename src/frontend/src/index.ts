@@ -107,11 +107,11 @@ const init = async () => {
     await registerTentativeDevice(addDeviceAnchor, connection);
 
     const i18n = new I18n();
-    const staticCopy = i18n.staticLang(copyJson);
+    const copy = i18n.i18n(copyJson);
 
     // Show a good bye message
     showMessage({
-      message: staticCopy.close_page_device_added,
+      message: copy.close_page_device_added,
       role: "notify-device-added",
     });
     return;

@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
@@ -17,6 +18,8 @@ use std::time::Duration;
 
 pub type Assets = HashMap<String, (Vec<HeaderField>, Vec<u8>)>;
 pub type AssetHashes = RbTree<String, Hash>;
+
+mod temp_keys;
 
 // Default value for max number of delegation origins to store in the list of latest used delegation origins
 const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
@@ -121,6 +124,8 @@ enum StorageState {
 struct State {
     storage_state: RefCell<StorageState>,
     sigs: RefCell<SignatureMap>,
+    // Temporary keys that can be used in lieu of a particular device
+    temp_keys: RefCell<TempKeys>,
     asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
@@ -147,6 +152,7 @@ impl Default for State {
         Self {
             storage_state: RefCell::new(StorageState::Uninitialised),
             sigs: RefCell::new(SignatureMap::default()),
+            temp_keys: RefCell::new(TempKeys::default()),
             asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
@@ -331,6 +337,14 @@ pub fn storage_borrow_mut<R>(f: impl FnOnce(&mut Storage<DefaultMemoryImpl>) -> 
 
 pub fn storage_replace(storage: Storage<DefaultMemoryImpl>) {
     STATE.with(|s| s.storage_state.replace(StorageState::Initialised(storage)));
+}
+
+pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
+    STATE.with(|s| f(&mut s.temp_keys.borrow_mut()))
+}
+
+pub fn with_temp_keys<R>(f: impl FnOnce(&TempKeys) -> R) -> R {
+    STATE.with(|s| f(&mut s.temp_keys.borrow()))
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {

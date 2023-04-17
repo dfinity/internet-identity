@@ -34,6 +34,7 @@ pub fn register_anchor_with(
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     ) {
         Ok(RegisterResponse::Registered { user_number }) => user_number,
         response => panic!("could not register: {response:?}"),

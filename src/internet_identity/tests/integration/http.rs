@@ -281,6 +281,7 @@ fn metrics_inflight_challenges() -> Result<(), CallError> {
             chars: "a".to_string(),
             key: challenge_1.challenge_key,
         },
+        None,
     )?;
 
     let metrics = get_metrics(&env, canister_id);
