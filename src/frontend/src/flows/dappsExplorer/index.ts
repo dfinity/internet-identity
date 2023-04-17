@@ -3,12 +3,7 @@ import { closeIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
 import { renderPage } from "../../utils/lit-html";
-
-// The list of dapps. This is derived from https://github.com/dfinity/portal:
-// * Only dapps using II are used
-// * All relevant logos are copied to II's assets
-// * Some logos are converted to webp
-import dapps from "./dapps.json";
+import { DappDescription, dapps } from "./dapps";
 
 import copyJson from "./copy.json";
 
@@ -48,18 +43,13 @@ const dappsExplorerTemplate = ({
 
 export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
-// Infer the type of an array's elements
-type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
-  ? ElementOf
-  : "argument is not an array";
-
 /* Template for a single dapp */
 const dappTemplate = ({
   link,
   logo,
   name,
   oneLiner,
-}: ElementOf<typeof dapps>): TemplateResult => {
+}: DappDescription): TemplateResult => {
   return html`
     <a
       href=${link}
@@ -68,11 +58,7 @@ const dappTemplate = ({
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
-        <img
-          src=${logo.replace("/img/showcase/", "/icons/")}
-          alt=${name}
-          loading="lazy"
-        />
+        <img src=${logo} alt=${name} loading="lazy" />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
