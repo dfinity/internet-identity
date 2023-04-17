@@ -2237,7 +2237,12 @@ input[type="checkbox"] {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  height: 65%;
+  height: 55%;
+  /*
+    remove the max-width set by the reset, so that the image can be as wide as
+    as required by the height
+  */
+  max-width: unset;
 }
 
 @keyframes marquee {
