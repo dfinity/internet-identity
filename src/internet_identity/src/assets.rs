@@ -111,7 +111,7 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
     for asset in dir.files() {
         let file_bytes = asset.contents().to_vec();
         let (content, encoding, content_type) = match file_extension(asset) {
-            "css.gz" => (file_bytes, ContentEncoding::GZip, ContentType::CSS),
+            "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
             "html" => (
                 fixup_html(String::from_utf8_lossy(&file_bytes).as_ref())
                     .as_bytes()
@@ -171,8 +171,8 @@ fn file_to_asset_path(asset: &File) -> String {
             .chars()
             .take(file_path.len() - ".html".len())
             .collect()
-    } else if file_path.ends_with(".gz") {
-        // drop .gz for .gz files (i.e. maps **/<foo>.js.gz to **/<foo>.js or **/<foo>.css.gz to **/<foo>.css)
+    } else if file_path.ends_with(".js.gz") {
+        // drop .gz for .js.gz files (i.e. maps **/<foo>.js.gz to **/<foo>.js)
         file_path = file_path
             .chars()
             .take(file_path.len() - ".gz".len())

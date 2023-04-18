@@ -56,7 +56,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
         // II canister only supports one content type per resource. That is why we remove the original file.
         deleteOriginFile: true,
         filter: (file: string): boolean =>
-          ![".html", ".webp", ".png", ".ico"].includes(extname(file)),
+          ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
       }),
     ],
     optimizeDeps: {
