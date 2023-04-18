@@ -6,6 +6,7 @@ import {
   preRenderAboutPlugin,
   stripInjectJsScript,
 } from "./vite.plugins";
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   const envPrefix = "II_" as const;
@@ -45,6 +46,9 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     plugins: [
+      nodePolyfills({
+        protocolImports: true,
+      }),
       preRenderAboutPlugin(),
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [stripInjectJsScript()] : [])],
