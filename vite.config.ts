@@ -86,6 +86,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     return {
       ...rest,
       root: "src/showcase",
+      publicDir: "../frontend/assets",
       build: {
         ...build,
         outDir: "../../showcase",
