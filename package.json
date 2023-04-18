@@ -16,7 +16,7 @@
     "build:showcase": "vite build --mode showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
-    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e/register.test.ts\"",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
