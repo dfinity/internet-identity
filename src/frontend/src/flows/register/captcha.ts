@@ -147,18 +147,14 @@ export const promptCaptchaTemplate = <T>({
   const promptCaptchaSlot = html`
     <article>
       <h1 class="t-title t-title--main">${copy.title}</h1>
-      <form
-        autocomplete="off"
-        @submit=${asyncReplace(next.recv())}
-        class="l-stack"
-      >
+      <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div class="c-input c-input--icon">
-          ${asyncReplace(img.recv())}
+          ${asyncReplace(img)}
           <i
             tabindex="0"
             id="seedCopy"
             class="c-button__icon"
-            @click=${asyncReplace(retry.recv())}
+            @click=${asyncReplace(retry)}
             ?disabled=${asyncReplace(retryDisabled)}
           >
             <span>${copy.retry}</span>
@@ -172,9 +168,7 @@ export const promptCaptchaTemplate = <T>({
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"
           />
-          <strong class="c-input__message">
-            ${asyncReplace(errorText.recv())}
-          </strong>
+          <strong class="c-input__message">${asyncReplace(errorText)}</strong>
         </label>
         <p class="t-paragraph confirm-paragraph"></p>
         <div class="c-button-group">
@@ -191,7 +185,7 @@ export const promptCaptchaTemplate = <T>({
             id="confirmRegisterButton"
             ?disabled=${asyncReplace(nextDisabled)}
           >
-            ${asyncReplace(nextCaption.recv())}
+            ${asyncReplace(nextCaption)}
           </button>
         </div>
       </form>
