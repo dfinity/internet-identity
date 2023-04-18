@@ -240,31 +240,7 @@ export class Chan<A> implements AsyncIterable<A> {
   map<B>(
     opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
   ): Chan<B> {
-    // How the mapped chan should handle the value
-    let handleValue: (opts: { send: (b: B) => void; value: A }) => void;
-    let latest: B;
-
-    if (typeof opts === "function") {
-      // Case of a simple mapper
-      const f = opts;
-      handleValue = ({ send, value }) => send(f(value));
-      latest = f(this.latest);
-    } else {
-      // Advanced case with "unchanged" handling, where sending is skipped on "unchanged" (and initial/latest value may
-      // be set to "def")
-      handleValue = ({ send, value }) => {
-        const result = opts.f(value);
-        if (result !== Chan.unchanged) {
-          send(result);
-        }
-      };
-      const result = opts.f(this.latest);
-      if (result === Chan.unchanged) {
-        latest = opts.def;
-      } else {
-        latest = result;
-      }
-    }
+    const { handleValue, latest } = this.__handleMapOpts(opts);
 
     // Create a chan that the WeakRef can hang on to, but that automatically
     // translates As into Bs
@@ -277,6 +253,37 @@ export class Chan<A> implements AsyncIterable<A> {
     this.listeners.push(new WeakRef(input));
     this.parent = input; // keep a ref to prevent parent being garbage collected
     return input;
+  }
+
+  // How the mapped chan should handle the value
+  protected __handleMapOpts<B>(
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+  ): {
+    handleValue: (arg: { send: (b: B) => void; value: A }) => void;
+    latest: B;
+  } {
+    if (typeof opts === "function") {
+      // Case of a simple mapper
+      const f = opts;
+      return {
+        handleValue: ({ send, value }) => send(f(value)),
+        latest: f(this.latest),
+      };
+    }
+
+    // Advanced case with "unchanged" handling, where sending is skipped on "unchanged" (and initial/latest value may
+    // be set to "def")
+    const result = opts.f(this.latest);
+
+    return {
+      handleValue: ({ send, value }) => {
+        const result = opts.f(value);
+        if (result !== Chan.unchanged) {
+          send(result);
+        }
+      },
+      latest: result === Chan.unchanged ? opts.def : result,
+    };
   }
 
   // Read all the values sent to this `Chan`.
