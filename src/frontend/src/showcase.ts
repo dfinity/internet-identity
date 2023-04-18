@@ -439,7 +439,7 @@ const components = (): TemplateResult => {
       moreOptions: () => console.log("More options requested"),
     }).template;
 
-  const chan = new Chan<TemplateResult>();
+  const chan = new Chan<TemplateResult>(html`loading...`);
 
   const update = () => {
     const value = savedAnchors.value?.value;
