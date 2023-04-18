@@ -11,6 +11,7 @@ module.exports = {
   target: "web",
   output: {
     path: path.join(__dirname, "dist"),
+    jsonpFunction: "wpJsonpTestApp",
   },
   resolve: {
     alias: {
