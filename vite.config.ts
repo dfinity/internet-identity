@@ -15,8 +15,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
 
   // Expand environment - .env files - with canister IDs
   process.env = {
-    ...process.env,
     ...loadEnv(mode ?? "development", process.cwd()),
+    ...process.env,
   };
 
   return {
