@@ -171,10 +171,10 @@ export class Chan<A> implements AsyncIterable<A> {
   // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
   protected parent?: unknown;
 
-  private latest?: A;
+  private latest: A;
 
   // Constructor with latest which is "initial" and then latest
-  constructor(initial?: A) {
+  constructor(initial: A) {
     this.latest = initial;
   }
 
@@ -229,14 +229,48 @@ export class Chan<A> implements AsyncIterable<A> {
     }
   }
 
+  // Signal to `map` that the element should remain unchanged
+  static readonly unchanged = Symbol("unchanged");
+
   // Return a new Chan mapped with `f`.
-  map<B>(f: (a: A) => B): Chan<B> {
-    const latest = this.latest === undefined ? undefined : f(this.latest);
+  // In the simplest case, a mapping function is provided.
+  // For advanced cases, the mapping function may return 'Chan.unchanged' signalling
+  // that the element shouldn't be changed, in which case a default (initial) value
+  // also needs to be provided.
+  map<B>(
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+  ): Chan<B> {
+    // How the mapped chan should handle the value
+    let handleValue: (opts: { send: (b: B) => void; value: A }) => void;
+    let latest: B;
+
+    if (typeof opts === "function") {
+      // Case of a simple mapper
+      const f = opts;
+      handleValue = ({ send, value }) => send(f(value));
+      latest = f(this.latest);
+    } else {
+      // Advanced case with "unchanged" handling, where sending is skipped on "unchanged" (and initial/latest value may
+      // be set to "def")
+      handleValue = ({ send, value }) => {
+        const result = opts.f(value);
+        if (result !== Chan.unchanged) {
+          send(result);
+        }
+      };
+      const result = opts.f(this.latest);
+      if (result === Chan.unchanged) {
+        latest = opts.def;
+      } else {
+        latest = result;
+      }
+    }
+
     // Create a chan that the WeakRef can hang on to, but that automatically
     // translates As into Bs
     class MappedChan extends Chan<B> {
-      notify(a: A) {
-        this.send(f(a));
+      notify(value: A) {
+        handleValue({ send: (a: B) => this.send(a), value });
       }
     }
     const input = new MappedChan(latest);
