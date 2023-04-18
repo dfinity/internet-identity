@@ -64,6 +64,9 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     },
     server: {
       port: 8080,
+      proxy: {
+        "/api": "http://127.0.0.1:4943",
+      },
     },
     define: {
       // TODO: replace process.env with import
