@@ -8,6 +8,7 @@ use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -307,6 +308,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
+                    meta_data: None,
                 },
             },
             timestamp,
@@ -344,6 +346,76 @@ mod pull_entries_tests {
             entries.entries.get(4).unwrap().as_ref().unwrap(),
             &delete_entry
         );
+        Ok(())
+    }
+
+    /// Test to verify that the archive pulls device metadata changes from II.
+    #[test]
+    fn should_record_metadata_change() -> Result<(), CallError> {
+        const METADATA_KEY: &str = "key";
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let mut device = DeviceData::auth_test_device();
+        let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        device.meta_data = Some(HashMap::from_iter(vec![(
+            METADATA_KEY.to_string(),
+            MetaDataEntry::String("some value".to_string()),
+        )]));
+
+        ii_api::update(
+            &env,
+            ii_canister,
+            device.principal(),
+            anchor,
+            device.pubkey.clone(),
+            device.clone(),
+        )?;
+
+        // the archive polls for entries once per second
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_eq!(entries.entries.len(), 2);
+
+        let update_entry = Entry {
+            anchor,
+            operation: Operation::UpdateDevice {
+                device: device.pubkey.clone(),
+                new_values: DeviceDataUpdate {
+                    alias: None,
+                    credential_id: None,
+                    purpose: None,
+                    key_type: None,
+                    protection: None,
+                    origin: None,
+                    meta_data: Some(vec![METADATA_KEY.to_string()]),
+                },
+            },
+            timestamp,
+            caller: device.principal(),
+            sequence_number: 1,
+        };
+        assert_eq!(
+            entries.entries.get(1).unwrap().as_ref().unwrap(),
+            &update_entry
+        );
+
         Ok(())
     }
 

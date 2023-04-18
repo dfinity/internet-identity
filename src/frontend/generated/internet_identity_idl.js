@@ -1,4 +1,5 @@
 export const idlFactory = ({ IDL }) => {
+  const MetaDataMap = IDL.Rec();
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -34,6 +35,18 @@ export const idlFactory = ({ IDL }) => {
     'recovery' : IDL.Null,
   });
   const CredentialId = IDL.Vec(IDL.Nat8);
+  MetaDataMap.fill(
+    IDL.Vec(
+      IDL.Tuple(
+        IDL.Text,
+        IDL.Variant({
+          'map' : MetaDataMap,
+          'string' : IDL.Text,
+          'bytes' : IDL.Vec(IDL.Nat8),
+        }),
+      )
+    )
+  );
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
     'origin' : IDL.Opt(IDL.Text),
@@ -42,6 +55,7 @@ export const idlFactory = ({ IDL }) => {
     'key_type' : KeyType,
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
+    'meta_data' : IDL.Opt(MetaDataMap),
   });
   const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
@@ -86,6 +100,7 @@ export const idlFactory = ({ IDL }) => {
     'key_type' : KeyType,
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
+    'meta_data' : IDL.Opt(MetaDataMap),
   });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),

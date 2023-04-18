@@ -199,7 +199,7 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
         principal_1(),
         user_number,
         device_data_2().pubkey,
-        max_size_device(),
+        large_size_device(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -209,7 +209,7 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
 
     assert!(anchor_info
         .devices
-        .contains(&DeviceWithUsage::from(max_size_device()))); // without last usage timestamp
+        .contains(&DeviceWithUsage::from(large_size_device()))); // without last usage timestamp
 
     assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp);
 

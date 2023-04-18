@@ -496,6 +496,7 @@ mod test {
     #[test]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
+        println!("{}", canister_interface);
         service_compatible(
             CandidSource::Text(&canister_interface),
             CandidSource::File(Path::new("internet_identity.did")),

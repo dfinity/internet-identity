@@ -1,5 +1,6 @@
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 pub type AnchorNumber = u64;
 pub type CredentialId = ByteBuf;
@@ -24,6 +25,7 @@ pub struct DeviceData {
     pub key_type: KeyType,
     pub protection: DeviceProtection,
     pub origin: Option<String>,
+    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -36,6 +38,7 @@ pub struct DeviceWithUsage {
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage: Option<Timestamp>,
+    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -74,6 +77,16 @@ pub enum DeviceProtection {
     Protected,
     #[serde(rename = "unprotected")]
     Unprotected,
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+pub enum MetaDataEntry {
+    #[serde(rename = "string")]
+    String(String),
+    #[serde(rename = "bytes")]
+    Bytes(ByteBuf),
+    #[serde(rename = "map")]
+    Map(HashMap<String, MetaDataEntry>),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

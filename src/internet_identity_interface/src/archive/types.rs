@@ -56,6 +56,8 @@ pub struct DeviceDataUpdate {
     pub key_type: Option<KeyType>,
     pub protection: Option<DeviceProtection>,
     pub origin: Option<Option<String>>,
+    // If present, the meta_data has been changed and now contains the given keys.
+    pub meta_data: Option<Vec<String>>,
 }
 
 // Placeholder for information that has been hidden for privacy reasons.

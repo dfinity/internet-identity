@@ -3,6 +3,7 @@ use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::*;
+use std::collections::HashMap;
 use std::{fmt, iter};
 
 #[cfg(test)]
@@ -27,6 +28,7 @@ impl Device {
         self.key_type = device_data.key_type;
         self.protection = device_data.protection;
         self.origin = device_data.origin;
+        self.meta_data = device_data.meta_data;
     }
 }
 
@@ -41,6 +43,7 @@ impl From<DeviceData> for Device {
             protection: device_data.protection,
             origin: device_data.origin,
             last_usage_timestamp: None,
+            meta_data: device_data.meta_data,
         }
     }
 }
@@ -55,6 +58,7 @@ impl From<Device> for DeviceData {
             key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
+            meta_data: device.meta_data,
         }
     }
 }
@@ -70,6 +74,7 @@ impl From<Device> for DeviceWithUsage {
             protection: device.protection,
             origin: device.origin,
             last_usage: device.last_usage_timestamp,
+            meta_data: device.meta_data,
         }
     }
 }
@@ -279,6 +284,7 @@ pub struct Device {
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage_timestamp: Option<Timestamp>,
+    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
 }
 
 impl Device {
@@ -287,6 +293,26 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
+            + self
+                .meta_data
+                .as_ref()
+                .map(Self::meta_data_len)
+                .unwrap_or(0)
+    }
+
+    fn meta_data_len(meta_data: &HashMap<String, MetaDataEntry>) -> usize {
+        meta_data
+            .iter()
+            .map(|(key, value)| key.len() + Self::meta_data_entry_len(value))
+            .sum()
+    }
+
+    fn meta_data_entry_len(entry: &MetaDataEntry) -> usize {
+        match entry {
+            MetaDataEntry::String(value) => value.len(),
+            MetaDataEntry::Bytes(value) => value.len(),
+            MetaDataEntry::Map(data) => Self::meta_data_len(data),
+        }
     }
 
     pub fn ii_domain(&self) -> Option<IIDomain> {
@@ -341,15 +367,13 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
     /// due to the `VARIABLE_FIELDS_LIMIT`.
     const MAX_DEVICES_PER_ANCHOR: usize = 10;
 
-    /// Single devices can use up to 564 bytes for the variable length fields alone.
+    /// Single devices can use >500 bytes for the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector, we limit the sum of the
     /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
     /// or change anchors in the future.
-    /// The value 2048 was chosen because it is the max anchor size before the stable memory migration.
-    /// This means that all pre-existing anchors are below this limit. And after the migration, the
-    /// candid encoded `vec devices` will stay far below 4KB in size (testing showed anchors of
-    /// ~2500 bytes).
-    const VARIABLE_FIELDS_LIMIT: usize = 2348;
+    /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
+    /// plus an additional 452 bytes to fit new fields introduced since.
+    const VARIABLE_FIELDS_LIMIT: usize = 2500;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {

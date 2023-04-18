@@ -67,6 +67,7 @@ export interface DeviceData {
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
+  'meta_data' : [] | [MetaDataMap],
 }
 export type DeviceKey = PublicKey;
 export type DeviceProtection = { 'unprotected' : null } |
@@ -84,6 +85,7 @@ export interface DeviceWithUsage {
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
+  'meta_data' : [] | [MetaDataMap],
 }
 export interface DomainActiveAnchorCounter {
   'start_timestamp' : Timestamp,
@@ -146,6 +148,14 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
+export type MetaDataMap = Array<
+  [
+    string,
+    { 'map' : MetaDataMap } |
+      { 'string' : string } |
+      { 'bytes' : Uint8Array | number[] },
+  ]
+>;
 export interface OngoingActiveAnchorStats {
   'monthly_active_anchors' : Array<ActiveAnchorCounter>,
   'daily_active_anchors' : ActiveAnchorCounter,

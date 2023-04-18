@@ -17,6 +17,7 @@ impl DeviceData {
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
             origin: None,
+            meta_data: None,
         }
     }
 }

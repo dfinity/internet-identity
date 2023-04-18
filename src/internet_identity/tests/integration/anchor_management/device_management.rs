@@ -189,7 +189,7 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     for i in 0..3u8 {
-        let mut device = max_size_device();
+        let mut device = large_size_device();
         device.pubkey = ByteBuf::from([i; 300]);
         api::add(&env, canister_id, principal_1(), user_number, device)?;
     }
@@ -199,7 +199,7 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        max_size_device(),
+        large_size_device(),
     );
 
     expect_user_error_with_message(

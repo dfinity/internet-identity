@@ -65,6 +65,7 @@ const recoveryPhrase: RecoveryDevice & DeviceData = {
   purpose: { recovery: null },
   credential_id: [],
   origin: [],
+  meta_data: [],
 };
 
 const recoveryPhraseText =
@@ -78,6 +79,7 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   purpose: { recovery: null },
   credential_id: [],
   origin: [],
+  meta_data: [],
 };
 
 const simpleDevices: [DeviceData, DeviceData] = [
@@ -89,6 +91,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     purpose: { authentication: null },
     credential_id: [],
     origin: [],
+    meta_data: [],
   },
 
   {
@@ -99,6 +102,7 @@ const simpleDevices: [DeviceData, DeviceData] = [
     purpose: { authentication: null },
     credential_id: [],
     origin: [],
+    meta_data: [],
   },
 ];
 

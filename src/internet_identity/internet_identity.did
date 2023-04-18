@@ -74,6 +74,7 @@ type DeviceData = record {
     key_type: KeyType;
     protection: DeviceProtection;
     origin: opt text;
+    meta_data: opt MetaDataMap;
 };
 
 // The same as `DeviceData` but with the `last_usage` field.
@@ -87,6 +88,14 @@ type DeviceWithUsage = record {
     protection: DeviceProtection;
     origin: opt text;
     last_usage: opt Timestamp;
+    meta_data: opt MetaDataMap;
+};
+
+// Map with some variants for the value type.
+// Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
+type MetaDataMap = vec record {
+    text;
+    variant { map : MetaDataMap; string : text; bytes : vec nat8 };
 };
 
 type RegisterResponse = variant {
