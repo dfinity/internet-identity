@@ -88,6 +88,6 @@ const chunkArray = <T>({
   arr: T[];
   chunkSize: number;
 }): T[][] =>
-  Array.from(new Array(Math.ceil(dapps.length / chunkSize)), (_, index) =>
+  Array.from(new Array(Math.ceil(arr.length / chunkSize)), (_, index) =>
     arr.slice(index * chunkSize, index * chunkSize + chunkSize)
   );
