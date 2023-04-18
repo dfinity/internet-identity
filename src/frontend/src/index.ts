@@ -16,6 +16,10 @@ import { version } from "./version";
 
 import copyJson from "./index.json";
 
+// Polyfill Buffer globally for the browser
+import { Buffer } from "buffer";
+globalThis.Buffer = Buffer;
+
 /** Reads the canister ID from the <script> tag.
  *
  * The canister injects the canister ID as a `data-canister-id` attribute on the script tag, which we then read to figure out where to make the IC calls.

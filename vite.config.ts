@@ -1,7 +1,4 @@
-import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
 import { extname, resolve } from "path";
-import type { Plugin } from "rollup";
-import rollupNodePolyFill from "rollup-plugin-node-polyfills";
 import { defineConfig, loadEnv, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
 import {
@@ -35,7 +32,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
-        plugins: [rollupNodePolyFill() as Plugin],
         input: {
           main: resolve(__dirname, "src/frontend/index.html"),
           about: resolve(__dirname, "src/frontend/about.html"),
@@ -64,7 +60,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
         define: {
           global: "globalThis",
         },
-        plugins: [NodeModulesPolyfillPlugin()],
       },
     },
     server: {
