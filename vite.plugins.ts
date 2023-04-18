@@ -82,8 +82,8 @@ export const preRenderAboutPlugin = (): PluginOption => ({
 
     const pageContent = aboutStaticContent(new I18n());
     const content = Array.from(render(pageContent)).reduce(
-        (acc, v) => acc + v,
-        ""
+      (acc, v) => acc + v,
+      ""
     );
 
     return html.replace(
