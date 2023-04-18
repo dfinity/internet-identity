@@ -56,7 +56,6 @@ const marqueeList = (): TemplateResult => {
             src=${logo}
             alt="${name}"
             class="c-marquee__image"
-            loading="lazy"
           />
         </div>`
       );
