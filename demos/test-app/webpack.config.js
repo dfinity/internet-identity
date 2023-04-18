@@ -11,7 +11,6 @@ module.exports = {
   target: "web",
   output: {
     path: path.join(__dirname, "dist"),
-    chunkLoadingGlobal: "wpJsonpTestApp",
   },
   resolve: {
     alias: {
