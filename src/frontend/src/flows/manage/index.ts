@@ -27,6 +27,7 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { dappsExplorer } from "../dappsExplorer";
+import { dappsTeaser } from "../dappsExplorer/teaser";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "../recovery/setupRecovery";
 import { authenticatorsSection } from "./authenticatorsSection";
@@ -135,11 +136,7 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
-    <p class="t-paragraph">
-      <button @click=${() => exploreDapps()} class="c-button">
-        Explore Dapps
-      </button>
-    </p>
+    <p class="t-paragraph">${dappsTeaser({ click: () => exploreDapps() })}</p>
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
