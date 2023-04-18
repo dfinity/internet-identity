@@ -223,55 +223,55 @@ export const displayManage = (
       );
     }
     const display = () =>
-    displayManagePage({
-      userNumber,
-      devices,
-      onAddDevice: async () => {
-        const nextAction = await chooseDeviceAddFlow();
-        switch (nextAction) {
-          case "canceled": {
-            resolve();
-            break;
+      displayManagePage({
+        userNumber,
+        devices,
+        onAddDevice: async () => {
+          const nextAction = await chooseDeviceAddFlow();
+          switch (nextAction) {
+            case "canceled": {
+              resolve();
+              break;
+            }
+            case "local": {
+              await addLocalDevice(userNumber, connection, devices_);
+              resolve();
+              break;
+            }
+            case "remote": {
+              await addRemoteDevice({ userNumber, connection });
+              resolve();
+              break;
+            }
+            default:
+              unreachable(nextAction);
+              resolve();
+              break;
           }
-          case "local": {
-            await addLocalDevice(userNumber, connection, devices_);
-            resolve();
-            break;
+        },
+        addRecoveryPhrase: async () => {
+          await setupPhrase(userNumber, connection);
+          resolve();
+        },
+        addRecoveryKey: async () => {
+          const confirmed = confirm(
+            "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
+          );
+          if (!confirmed) {
+            // No resolve here because we don't need to reload the screen
+            return;
           }
-          case "remote": {
-            await addRemoteDevice({ userNumber, connection });
-            resolve();
-            break;
-          }
-          default:
-            unreachable(nextAction);
-            resolve();
-            break;
-        }
-      },
-      addRecoveryPhrase: async () => {
-        await setupPhrase(userNumber, connection);
-        resolve();
-      },
-      addRecoveryKey: async () => {
-        const confirmed = confirm(
-          "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
-        );
-        if (!confirmed) {
-          // No resolve here because we don't need to reload the screen
-          return;
-        }
-        await setupKey({ connection });
-        resolve();
-      },
-      exploreDapps: async () => {
-        await dappsExplorer();
-        // We know that the user couldn't have changed anything (the user can't delete e.g. delete
-        // a device from the explorer), so we just re-display without reloading devices etc.
-        // the page without
-        display();
-      },
-    });
+          await setupKey({ connection });
+          resolve();
+        },
+        exploreDapps: async () => {
+          await dappsExplorer();
+          // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+          // a device from the explorer), so we just re-display without reloading devices etc.
+          // the page without
+          display();
+        },
+      });
 
     display();
 
