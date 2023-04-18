@@ -1,10 +1,14 @@
 import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
-import { resolve } from "path";
+import { extname, resolve } from "path";
 import type { Plugin } from "rollup";
 import rollupNodePolyFill from "rollup-plugin-node-polyfills";
 import { defineConfig, loadEnv, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
+import {
+  injectCanisterIdPlugin,
+  preRenderAboutPlugin,
+  stripInjectJsScript,
+} from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   const envPrefix = "II_" as const;
@@ -31,6 +35,10 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       emptyOutDir: true,
       rollupOptions: {
         plugins: [rollupNodePolyFill() as Plugin],
+        input: {
+          main: resolve(__dirname, "src/frontend/index.html"),
+          about: resolve(__dirname, "src/frontend/about.html"),
+        },
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
@@ -40,12 +48,14 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     plugins: [
+      preRenderAboutPlugin(),
+      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
+      [...(mode === "production" ? [stripInjectJsScript()] : [])],
       // II canister only supports one content type per resource. That is why we remove the original file.
       viteCompression({
         deleteOriginFile: true,
+        filter: (file: string): boolean => ![".html"].includes(extname(file)),
       }),
-      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
-      [...(mode === "production" ? [stripInjectJsScript()] : [])],
     ],
     optimizeDeps: {
       esbuildOptions: {
