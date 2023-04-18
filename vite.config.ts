@@ -55,7 +55,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       // II canister only supports one content type per resource. That is why we remove the original file.
       viteCompression({
         deleteOriginFile: true,
-        filter: (file: string): boolean => ![".html", ".webp", ".png"].includes(extname(file)),
+        filter: (file: string): boolean => ![".html", ".webp", ".png", ".ico"].includes(extname(file)),
       }),
     ],
     optimizeDeps: {
