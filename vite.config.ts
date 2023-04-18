@@ -1,12 +1,12 @@
 import { extname, resolve } from "path";
 import { defineConfig, loadEnv, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import {
   injectCanisterIdPlugin,
   preRenderAboutPlugin,
   stripInjectJsScript,
 } from "./vite.plugins";
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   const envPrefix = "II_" as const;
