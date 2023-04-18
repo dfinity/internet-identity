@@ -51,13 +51,12 @@ const marqueeList = (): TemplateResult => {
   >
     ${rows.map((rowDapps, i) => {
       const rowContent = rowDapps.map(
+        // XXX: it's important not to lazy load the image, otherwise
+        // images start appearing before they're loaded. This then
+        // shows an empty space where the image suddenly pops seconds
+        // later.
         ({ logo, name }) => html`<div class="c-marquee__item">
-          <img
-            src=${logo}
-            alt="${name}"
-            class="c-marquee__image"
-            loading="lazy"
-          />
+          <img src=${logo} alt="${name}" class="c-marquee__image" />
         </div>`
       );
 
