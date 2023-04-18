@@ -63,7 +63,7 @@
     "@dfinity/identity": "0.15.5",
     "@dfinity/principal": "0.15.5",
     "bip39": "^3.0.4",
-    "lit-html": "^2.3.1",
+    "lit-html": "^2.7.2",
     "text-encoding": "^0.7.0",
     "qr-creator": "^1.0.0"
   },
