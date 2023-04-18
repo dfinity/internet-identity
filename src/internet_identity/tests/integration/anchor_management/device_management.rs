@@ -403,7 +403,7 @@ fn should_get_credentials() -> Result<(), CallError> {
         purpose: Purpose::Recovery,
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
 
     api::add(

@@ -28,56 +28,36 @@ fn known_devices() -> [DeviceData; 6] {
     let device1 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_1).unwrap()),
         alias: "Desktop".to_string(),
-        purpose: Purpose::Authentication,
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     let device2 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
         alias: "andrew-mbp".to_string(),
-        purpose: Purpose::Authentication,
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     let device3 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
         alias: "andrew phone chrome".to_string(),
-        purpose: Purpose::Authentication,
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     let device4 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
         alias: "Pixel".to_string(),
-        purpose: Purpose::Authentication,
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     let device5 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
         alias: "dfx".to_string(),
-        purpose: Purpose::Authentication,
-        credential_id: None,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     let device6 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
         alias: "testkey".to_string(),
-        purpose: Purpose::Authentication,
-        credential_id: None,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::test_device()
     };
     [device1, device2, device3, device4, device5, device6]
 }
@@ -99,41 +79,21 @@ fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     // check known anchors in the backup
-    let devices = api::get_anchor_info(
-        &env,
-        canister_id,
-        Principal::self_authenticating(&device1.pubkey),
-        10_000,
-    )?
-    .into_device_data();
+    let devices =
+        api::get_anchor_info(&env, canister_id, device1.principal(), 10_000)?.into_device_data();
     assert_eq!(devices, vec![device1]);
 
-    let mut devices = api::get_anchor_info(
-        &env,
-        canister_id,
-        Principal::self_authenticating(&device2.pubkey),
-        10_002,
-    )?
-    .into_device_data();
+    let mut devices =
+        api::get_anchor_info(&env, canister_id, device2.principal(), 10_002)?.into_device_data();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, vec![device2, device3]);
 
-    let devices = api::get_anchor_info(
-        &env,
-        canister_id,
-        Principal::self_authenticating(&device4.pubkey),
-        10_029,
-    )?
-    .into_device_data();
+    let devices =
+        api::get_anchor_info(&env, canister_id, device4.principal(), 10_029)?.into_device_data();
     assert_eq!(devices, vec![device4]);
 
-    let mut devices = api::get_anchor_info(
-        &env,
-        canister_id,
-        Principal::self_authenticating(&device5.pubkey),
-        10_030,
-    )?
-    .into_device_data();
+    let mut devices =
+        api::get_anchor_info(&env, canister_id, device5.principal(), 10_030)?.into_device_data();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, vec![device5, device6]);
     Ok(())
@@ -187,7 +147,6 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
 #[test]
 fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
     let [_, _, _, _, device5, device6] = known_devices();
-    let principal = Principal::self_authenticating(device6.pubkey);
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -198,12 +157,20 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    let devices = api::get_anchor_info(&env, canister_id, principal, 10_030)?.into_device_data();
+    let devices =
+        api::get_anchor_info(&env, canister_id, device6.principal(), 10_030)?.into_device_data();
 
     assert_eq!(devices.len(), 2);
-    api::remove(&env, canister_id, principal, 10_030, device5.pubkey)?;
+    api::remove(
+        &env,
+        canister_id,
+        device6.principal(),
+        10_030,
+        device5.pubkey,
+    )?;
 
-    let devices = api::get_anchor_info(&env, canister_id, principal, 10_030)?.into_device_data();
+    let devices =
+        api::get_anchor_info(&env, canister_id, device6.principal(), 10_030)?.into_device_data();
     assert_eq!(devices.len(), 1);
     Ok(())
 }
