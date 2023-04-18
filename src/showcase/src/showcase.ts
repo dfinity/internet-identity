@@ -474,7 +474,7 @@ const components = (): TemplateResult => {
         <button class="c-button" ${ref(
           updateSavedAnchors
         )} @click="${update}">update</button>
-        <div>${asyncReplace(chan.recv())}</div>
+        <div>${asyncReplace(chan)}</div>
     <div ${ref(
       showSelected
     )} class="c-input c-input--readonly">Please select anchor</div></div>
