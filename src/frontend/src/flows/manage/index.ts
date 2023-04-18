@@ -222,6 +222,7 @@ export const displayManage = (
         "More than one recovery keys are registered, which is unexpected. Only one will be shown."
       );
     }
+    const display = () =>
     displayManagePage({
       userNumber,
       devices,
@@ -265,9 +266,14 @@ export const displayManage = (
       },
       exploreDapps: async () => {
         await dappsExplorer();
-        resolve();
+        // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+        // a device from the explorer), so we just re-display without reloading devices etc.
+        // the page without
+        display();
       },
     });
+
+    display();
 
     // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
     // if they don't have one already. We lead them straight to recovery phrase creation, because
