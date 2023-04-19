@@ -70,9 +70,10 @@ use std::io::{Read, Write};
 use std::ops::RangeInclusive;
 
 use ic_cdk::api::trap;
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::Memory;
+use ic_stable_structures::{Memory, RestrictedMemory};
 
 use internet_identity_interface::internet_identity::types::*;
 
@@ -87,8 +88,9 @@ mod tests;
 // version   0: invalid
 // version 1-5: no longer supported
 // version   6: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-// version  7+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 6..=6;
+// version   7: like version 6, but with memory manager (in 2nd page)
+// version  8+: invalid
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 6..=7;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
 
@@ -98,6 +100,9 @@ const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
+const MAX_STABLE_MEMORY_SIZE: u64 = 32 * GB;
+const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
+
 /// In practice, II has 48 GB of stable memory available.
 /// This limit has last been raised when it was still 32 GB.
 const STABLE_MEMORY_SIZE: u64 = 32 * GB;
@@ -106,16 +111,33 @@ const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
+/// MemoryManager parameters.
+const MEMORY_MANAGER_OFFSET: u64 = WASM_PAGE_SIZE;
+const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(0);
+const BUCKET_SIZE_IN_PAGES: u16 = 1024;
+
 /// The maximum number of anchors this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
     (STABLE_MEMORY_SIZE - ENTRY_OFFSET - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
+enum AnchorMemory<M: Memory> {
+    Single(RestrictedMemory<M>),
+    Managed(VirtualMemory<RestrictedMemory<M>>),
+}
+
+pub enum SomeMemory<M: Memory> {
+    Single(M),
+    Managed(M),
+}
+
 /// Data type responsible for managing anchor data in stable memory.
-pub struct Storage<M> {
+pub struct Storage<M: Memory> {
     header: Header,
-    memory: M,
+    header_memory: RestrictedMemory<M>,
+    anchor_memory: AnchorMemory<M>,
+    maybe_memory_manager: Option<MemoryManager<RestrictedMemory<M>>>,
 }
 
 #[repr(packed)]
@@ -124,7 +146,8 @@ struct Header {
     // version   0: invalid
     // version 1-5: no longer supported
     // version   6: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-    // version  7+: invalid
+    // version   7: like 6, but with managed memory
+    // version  8+: invalid
     version: u8,
     num_anchors: u32,
     id_range_lo: u64,
@@ -134,10 +157,13 @@ struct Header {
     first_entry_offset: u64,
 }
 
-impl<M: Memory> Storage<M> {
+impl<M: Memory + Clone> Storage<M> {
     /// Creates a new empty storage that manages the data of anchors in
     /// the specified range.
-    pub fn new((id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber), memory: M) -> Self {
+    pub fn new(
+        (id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber),
+        memory: SomeMemory<M>,
+    ) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
                 "improper Identity Anchor range: [{id_range_lo}, {id_range_hi})",
@@ -149,11 +175,28 @@ impl<M: Memory> Storage<M> {
                 "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {DEFAULT_RANGE_SIZE} entries)",
             ));
         }
+        let (header_memory, anchor_memory, maybe_memory_manager, version) = match memory {
+            SomeMemory::Single(memory) => {
+                let header_memory = RestrictedMemory::new(memory.clone(), 0..2);
+                let anchor_memory =
+                    AnchorMemory::Single(RestrictedMemory::new(memory, 2..MAX_WASM_PAGES));
+                (header_memory, anchor_memory, None, 6)
+            }
+            SomeMemory::Managed(memory) => {
+                let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
+                let memory_manager = MemoryManager::init_with_bucket_size(
+                    RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
+                    BUCKET_SIZE_IN_PAGES,
+                );
+                let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
+                (header_memory, anchor_memory, Some(memory_manager), 7)
+            }
+        };
 
         Self {
             header: Header {
                 magic: *b"IIC",
-                version: 6,
+                version,
                 num_anchors: 0,
                 id_range_lo,
                 id_range_hi,
@@ -161,7 +204,9 @@ impl<M: Memory> Storage<M> {
                 salt: EMPTY_SALT,
                 first_entry_offset: ENTRY_OFFSET,
             },
-            memory,
+            header_memory,
+            anchor_memory,
+            maybe_memory_manager,
         }
     }
 
@@ -220,7 +265,31 @@ impl<M: Memory> Storage<M> {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
-        Some(Self { header, memory })
+        match header.version {
+            6 => Some(Self {
+                header,
+                header_memory: RestrictedMemory::new(memory.clone(), 0..2),
+                anchor_memory: AnchorMemory::Single(RestrictedMemory::new(
+                    memory,
+                    2..MAX_WASM_PAGES,
+                )),
+                maybe_memory_manager: None,
+            }),
+            7 => {
+                let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
+                let managed_memory = RestrictedMemory::new(memory, 1..MAX_WASM_PAGES);
+                let memory_manager =
+                    MemoryManager::init_with_bucket_size(managed_memory, BUCKET_SIZE_IN_PAGES);
+                let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
+                Some(Self {
+                    header,
+                    header_memory,
+                    anchor_memory,
+                    maybe_memory_manager: Some(memory_manager),
+                })
+            }
+            _ => trap(&format!("unsupported header version: {}", header.version)),
+        }
     }
 
     /// Allocates a fresh Identity Anchor.
@@ -245,15 +314,59 @@ impl<M: Memory> Storage<M> {
     }
 
     fn write_entry_bytes(&mut self, record_number: u32, buf: Vec<u8>) -> Result<(), StorageError> {
+        match &self.anchor_memory {
+            AnchorMemory::Single(_) => self.write_entry_bytes_single(record_number, buf),
+            AnchorMemory::Managed(_) => self.write_entry_bytes_managed(record_number, buf),
+        }
+    }
+
+    fn write_entry_bytes_single(
+        &mut self,
+        record_number: u32,
+        buf: Vec<u8>,
+    ) -> Result<(), StorageError> {
         if buf.len() > self.candid_entry_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
         let address = self.record_address(record_number);
         // use buffered writer to minimize expensive stable memory operations
+        let anchor_memory = if let AnchorMemory::Single(ref mut memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected single memory")
+        };
         let mut writer = BufferedWriter::new(
             self.header.entry_size as usize,
-            Writer::new(&mut self.memory, address),
+            Writer::new(anchor_memory, address),
+        );
+        writer
+            .write_all(&(buf.len() as u16).to_le_bytes())
+            .expect("memory write failed");
+        writer.write_all(&buf).expect("memory write failed");
+        writer.flush().expect("memory write failed");
+        Ok(())
+    }
+
+    fn write_entry_bytes_managed(
+        &mut self,
+        record_number: u32,
+        buf: Vec<u8>,
+    ) -> Result<(), StorageError> {
+        if buf.len() > self.candid_entry_size_limit() {
+            return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
+        }
+
+        let address = self.record_address(record_number);
+        // use buffered writer to minimize expensive stable memory operations
+        let anchor_memory = if let AnchorMemory::Managed(ref mut memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected managed memory")
+        };
+        let mut writer = BufferedWriter::new(
+            self.header.entry_size as usize,
+            Writer::new(anchor_memory, address),
         );
         writer
             .write_all(&(buf.len() as u16).to_le_bytes())
@@ -271,12 +384,61 @@ impl<M: Memory> Storage<M> {
     }
 
     fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
+        match &self.anchor_memory {
+            AnchorMemory::Single(_) => self.read_entry_bytes_single(record_number),
+            AnchorMemory::Managed(_) => self.read_entry_bytes_managed(record_number),
+        }
+    }
+
+    fn read_entry_bytes_single(&self, record_number: u32) -> Vec<u8> {
         let address = self.record_address(record_number);
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
+        let anchor_memory = if let AnchorMemory::Single(ref memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected single memory")
+        };
+
         let mut reader = BufferedReader::new(
             self.header.entry_size as usize,
-            Reader::new(&self.memory, address),
+            Reader::new(anchor_memory, address),
+        );
+
+        let mut len_buf = vec![0; 2];
+        reader
+            .read_exact(len_buf.as_mut_slice())
+            .expect("failed to read memory");
+        let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
+
+        // This error most likely indicates stable memory corruption.
+        if len > self.candid_entry_size_limit() {
+            trap(&format!(
+                "persisted value size {} exceeds maximum size {}",
+                len,
+                self.candid_entry_size_limit()
+            ))
+        }
+
+        let mut data_buf = vec![0; len];
+        reader
+            .read_exact(data_buf.as_mut_slice())
+            .expect("failed to read memory");
+        data_buf
+    }
+
+    fn read_entry_bytes_managed(&self, record_number: u32) -> Vec<u8> {
+        let address = self.record_address(record_number);
+        // the reader will check stable memory bounds
+        // use buffered reader to minimize expensive stable memory operations
+        let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected managed memory")
+        };
+        let mut reader = BufferedReader::new(
+            self.header.entry_size as usize,
+            Reader::new(anchor_memory, address),
         );
 
         let mut len_buf = vec![0; 2];
@@ -309,7 +471,7 @@ impl<M: Memory> Storage<M> {
                 std::mem::size_of::<Header>(),
             )
         };
-        let mut writer = Writer::new(&mut self.memory, 0);
+        let mut writer = Writer::new(&mut self.header_memory, 0);
 
         // this should never fail as this write only requires a memory of size 1
         writer.write_all(slice).expect("bug: failed to grow memory");
@@ -382,7 +544,7 @@ impl<M: Memory> Storage<M> {
     }
 
     fn record_address(&self, record_number: u32) -> u64 {
-        self.header.first_entry_offset + record_number as u64 * self.header.entry_size as u64
+        record_number as u64 * self.header.entry_size as u64
     }
 
     /// The anchor space is divided into two parts:
@@ -404,6 +566,12 @@ impl<M: Memory> Storage<M> {
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest anchor number.
     /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
+        match &self.anchor_memory {
+            AnchorMemory::Single(_) => self.write_persistent_state_single(state),
+            AnchorMemory::Managed(_) => self.write_persistent_state_managed(state),
+        }
+    }
+    fn write_persistent_state_single(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
         // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
@@ -411,7 +579,32 @@ impl<M: Memory> Storage<M> {
 
         // In practice, for all reasonably sized persistent states (<800MB) the writes are
         // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
-        let mut writer = Writer::new(&mut self.memory, address);
+        let anchor_memory = if let AnchorMemory::Single(ref mut memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected single memory")
+        };
+        let mut writer = Writer::new(anchor_memory, address);
+        writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
+        writer
+            .write_all(&(encoded_state.len() as u64).to_le_bytes())
+            .unwrap();
+        writer.write_all(&encoded_state).unwrap();
+    }
+    fn write_persistent_state_managed(&mut self, state: &PersistentState) {
+        let address = self.unused_memory_start();
+
+        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
+        let encoded_state = candid::encode_one(state).unwrap();
+
+        // In practice, for all reasonably sized persistent states (<800MB) the writes are
+        // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
+        let anchor_memory = if let AnchorMemory::Managed(ref mut memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected managed memory")
+        };
+        let mut writer = Writer::new(anchor_memory, address);
         writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
         writer
             .write_all(&(encoded_state.len() as u64).to_le_bytes())
@@ -422,15 +615,67 @@ impl<M: Memory> Storage<M> {
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest anchor number.
     /// This is only used to restore state in `post_upgrade`.
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
+        match &self.anchor_memory {
+            AnchorMemory::Single(_) => self.read_persistent_state_single(),
+            AnchorMemory::Managed(_) => self.read_persistent_state_managed(),
+        }
+    }
+    fn read_persistent_state_single(&self) -> Result<PersistentState, PersistentStateError> {
         const WASM_PAGE_SIZE: u64 = 65536;
         let address = self.unused_memory_start();
 
-        if address > self.memory.size() * WASM_PAGE_SIZE {
+        let anchor_memory = if let AnchorMemory::Single(ref memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected single memory")
+        };
+
+        if address > anchor_memory.size() * WASM_PAGE_SIZE {
             // the address where the persistent state would be is not allocated yet
             return Err(PersistentStateError::NotFound);
         }
+        let mut reader = Reader::new(anchor_memory, address);
+        let mut magic_buf: [u8; 4] = [0; 4];
+        reader
+            .read_exact(&mut magic_buf)
+            // if we hit out of bounds here, this means that the persistent state has not been
+            // written at the expected location and thus cannot be found
+            .map_err(|_| PersistentStateError::NotFound)?;
 
-        let mut reader = Reader::new(&self.memory, address);
+        if magic_buf != PERSISTENT_STATE_MAGIC {
+            // magic does not match --> this is not the persistent state
+            return Err(PersistentStateError::NotFound);
+        }
+
+        let mut size_buf: [u8; 8] = [0; 8];
+        reader
+            .read_exact(&mut size_buf)
+            .map_err(PersistentStateError::ReadError)?;
+
+        let size = u64::from_le_bytes(size_buf);
+        let mut data_buf = Vec::new();
+        data_buf.resize(size as usize, 0);
+        reader
+            .read_exact(data_buf.as_mut_slice())
+            .map_err(PersistentStateError::ReadError)?;
+
+        candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
+    }
+
+    fn read_persistent_state_managed(&self) -> Result<PersistentState, PersistentStateError> {
+        const WASM_PAGE_SIZE: u64 = 65536;
+        let address = self.unused_memory_start();
+
+        let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
+            memory
+        } else {
+            trap("Expected managed memory")
+        };
+        if address > anchor_memory.size() * WASM_PAGE_SIZE {
+            // the address where the persistent state would be is not allocated yet
+            return Err(PersistentStateError::NotFound);
+        }
+        let mut reader = Reader::new(anchor_memory, address);
         let mut magic_buf: [u8; 4] = [0; 4];
         reader
             .read_exact(&mut magic_buf)
