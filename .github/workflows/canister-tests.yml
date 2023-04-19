@@ -512,7 +512,7 @@ jobs:
 
           dfx deploy --no-wallet
 
-          npm run test:all
+          npm run test
           popd
           rm -rf "$builddir"
 
