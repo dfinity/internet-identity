@@ -422,6 +422,18 @@ export class VerifyRemoteDeviceView extends View {
   }
 }
 
+export class AddDeviceSuccessView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#continueToHome")
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$("#continueToHome").click();
+  }
+}
+
 export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
