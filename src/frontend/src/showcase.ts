@@ -412,7 +412,7 @@ const iiPages: Record<string, () => void> = {
   addDeviceSuccess: () =>
     addDeviceSuccessPage({
       i18n,
-      device: chromeDevice,
+      deviceAlias: chromeDevice.alias,
       onContinue: () => console.log("Continue"),
     }),
 };

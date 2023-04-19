@@ -53,11 +53,13 @@ export const addRemoteDevice = async ({
     tentativeDevice = result;
   }
 
+  const { alias } = tentativeDevice;
+
   await verifyTentativeDevice({
     connection,
-    alias: tentativeDevice.alias,
+    alias,
     endTimestamp: timestamp,
   });
 
-  await renderAddDeviceSuccess({ device: tentativeDevice });
+  await renderAddDeviceSuccess({ deviceAlias: alias });
 };

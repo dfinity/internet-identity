@@ -3,17 +3,18 @@ import { mainWindow } from "../../../components/mainWindow";
 import { I18n } from "../../../i18n";
 import { renderPage } from "../../../utils/lit-html";
 
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import copyJson from "./addDeviceSuccess.json";
 
+export type DeviceAlias = string;
+
 export interface AddDeviceSuccessTemplateProps {
-  device: DeviceData;
+  deviceAlias: DeviceAlias;
   onContinue: () => void;
   i18n: I18n;
 }
 
 const addDeviceSuccessTemplate = ({
-  device: { alias: deviceAlias },
+  deviceAlias,
   onContinue,
   i18n,
 }: AddDeviceSuccessTemplateProps) => {
@@ -44,7 +45,7 @@ const addDeviceSuccessTemplate = ({
 export const addDeviceSuccessPage = renderPage(addDeviceSuccessTemplate);
 
 export const renderAddDeviceSuccess = (
-  props: Pick<AddDeviceSuccessTemplateProps, "device">
+  props: Pick<AddDeviceSuccessTemplateProps, "deviceAlias">
 ): Promise<void> =>
   new Promise<void>((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
