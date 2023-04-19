@@ -28,6 +28,7 @@ import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
+import { addDeviceSuccessPage } from "./flows/recovery/addDeviceSuccess";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
@@ -408,6 +409,8 @@ const iiPages: Record<string, () => void> = {
   },
   dappsExplorer: () =>
     dappsExplorerPage({ i18n, back: () => console.log("back") }),
+  addDeviceSuccess: () =>
+    addDeviceSuccessPage({ i18n, onContinue: () => console.log("Continue") }),
 };
 
 const showcase: TemplateResult = html`
