@@ -43,7 +43,7 @@ describe("addDeviceSuccess", () => {
     expect(document.body.textContent).toContain(en.explore);
   });
 
-  it("should render a call to action", async () => {
+  it("should render a call to action", () => {
     renderAddDeviceSuccess({
       deviceAlias,
     });
