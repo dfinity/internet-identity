@@ -408,9 +408,10 @@ const iiPages: Record<string, () => void> = {
   },
   dappsExplorer: () =>
     dappsExplorerPage({ i18n, back: () => console.log("back") }),
-  showMessage: () => showMessagePage({
-      message: "You may close this page."
-  }),
+  showMessage: () =>
+    showMessagePage({
+      message: "You may close this page.",
+    }),
 };
 
 const showcase: TemplateResult = html`
