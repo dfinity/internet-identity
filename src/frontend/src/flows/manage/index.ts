@@ -127,7 +127,7 @@ const displayManageTemplate = ({
   const warnFewDevices =
     authenticators.length <= 1 &&
     isNullish(recoveries.recoveryPhrase) &&
-    isNullish(recoveries.recoveryKey) === undefined;
+    isNullish(recoveries.recoveryKey);
 
   const pageContentSlot = html` <section>
     <hgroup>
