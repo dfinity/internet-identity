@@ -20,6 +20,7 @@ import { promptUserNumber } from "./components/promptUserNumber";
 import { toast } from "./components/toast";
 import { aboutView } from "./flows/about";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
+import { addDeviceSuccessPage } from "./flows/addDevice/manage/addDeviceSuccess";
 import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
 import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
@@ -28,7 +29,6 @@ import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
-import { addDeviceSuccessPage } from "./flows/addDevice/manage/addDeviceSuccess";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,

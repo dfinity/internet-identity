@@ -1,4 +1,4 @@
-import { html } from "lit-html";
+import { html, render } from "lit-html";
 import { mainWindow } from "../../../components/mainWindow";
 import { I18n } from "../../../i18n";
 import { renderPage } from "../../../utils/lit-html";
@@ -12,7 +12,7 @@ export interface AddDeviceSuccessTemplateProps {
   i18n: I18n;
 }
 
-const showAddDeviceSuccessTemplate = ({
+const addDeviceSuccessTemplate = ({
   device: { alias: deviceAlias },
   onContinue,
   i18n,
@@ -41,17 +41,24 @@ const showAddDeviceSuccessTemplate = ({
   });
 };
 
-export const addDeviceSuccessPage = renderPage(showAddDeviceSuccessTemplate);
+export const addDeviceSuccessPage = renderPage(addDeviceSuccessTemplate);
 
-export const addDeviceSuccess = ({
-  device,
-}: Pick<AddDeviceSuccessTemplateProps, "device">): Promise<void> => {
-  const i18n = new I18n();
-  return new Promise((resolve) =>
-    showAddDeviceSuccessTemplate({
-      device,
-      onContinue: () => resolve(),
-      i18n,
-    })
-  );
-};
+export const renderAddDeviceSuccess = (
+  props: Pick<AddDeviceSuccessTemplateProps, "device">
+): Promise<void> =>
+  new Promise<void>((resolve) => {
+    const container = document.getElementById("pageContent") as HTMLElement;
+    render(
+      addDeviceSuccess({
+        ...props,
+        onContinue: resolve,
+      }),
+      container
+    );
+  });
+
+const addDeviceSuccess = (props: Omit<AddDeviceSuccessTemplateProps, "i18n">) =>
+  addDeviceSuccessTemplate({
+    ...props,
+    i18n: new I18n(),
+  });

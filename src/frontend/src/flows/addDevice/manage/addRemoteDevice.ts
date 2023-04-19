@@ -5,6 +5,7 @@ import {
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
 
@@ -57,4 +58,6 @@ export const addRemoteDevice = async ({
     alias: tentativeDevice.alias,
     endTimestamp: timestamp,
   });
+
+  await renderAddDeviceSuccess({ device: tentativeDevice });
 };
