@@ -1,9 +1,9 @@
 import { html } from "lit-html";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { renderPage } from "../../utils/lit-html";
+import { mainWindow } from "../../../components/mainWindow";
+import { I18n } from "../../../i18n";
+import { renderPage } from "../../../utils/lit-html";
 
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { DeviceData } from "../../../../generated/internet_identity_types";
 import copyJson from "./addDeviceSuccess.json";
 
 export interface AddDeviceSuccessTemplateProps {

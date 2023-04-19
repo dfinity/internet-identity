@@ -28,7 +28,7 @@ import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
-import { addDeviceSuccessPage } from "./flows/recovery/addDeviceSuccess";
+import { addDeviceSuccessPage } from "./flows/addDevice/manage/addDeviceSuccess";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
