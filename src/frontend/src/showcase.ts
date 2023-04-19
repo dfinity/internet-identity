@@ -81,27 +81,27 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   origin: [],
 };
 
-const simpleDevices: [DeviceData, DeviceData] = [
-  {
-    alias: "Chrome on iPhone",
-    protection: { unprotected: null },
-    pubkey: [1, 2, 3, 4],
-    key_type: { unknown: null },
-    purpose: { authentication: null },
-    credential_id: [],
-    origin: [],
-  },
+const chromeDevice: DeviceData = {
+  alias: "Chrome on iPhone",
+  protection: { unprotected: null },
+  pubkey: [1, 2, 3, 4],
+  key_type: { unknown: null },
+  purpose: { authentication: null },
+  credential_id: [],
+  origin: [],
+};
 
-  {
-    alias: "Yubikey Blue",
-    protection: { unprotected: null },
-    pubkey: [1, 2, 3, 5],
-    key_type: { unknown: null },
-    purpose: { authentication: null },
-    credential_id: [],
-    origin: [],
-  },
-];
+const yubikyDevice: DeviceData = {
+  alias: "Yubikey Blue",
+  protection: { unprotected: null },
+  pubkey: [1, 2, 3, 5],
+  key_type: { unknown: null },
+  purpose: { authentication: null },
+  credential_id: [],
+  origin: [],
+};
+
+const simpleDevices: [DeviceData, DeviceData] = [chromeDevice, yubikyDevice];
 
 const defaultPage = () => {
   document.title = "Showcase";
@@ -339,7 +339,7 @@ const iiPages: Record<string, () => void> = {
     }),
   showVerificationCode: () =>
     showVerificationCodePage({
-      alias: simpleDevices[0].alias,
+      alias: chromeDevice.alias,
       tentativeRegistrationInfo: {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
@@ -353,7 +353,7 @@ const iiPages: Record<string, () => void> = {
     }),
   verifyTentativeDevice: () =>
     verifyTentativeDevicePage({
-      alias: simpleDevices[0].alias,
+      alias: chromeDevice.alias,
       cancel: () => console.log("canceled"),
       verify: () => Promise.resolve({ retry: null }),
       doContinue: (v) => console.log("continue with:", v),
@@ -410,7 +410,11 @@ const iiPages: Record<string, () => void> = {
   dappsExplorer: () =>
     dappsExplorerPage({ i18n, back: () => console.log("back") }),
   addDeviceSuccess: () =>
-    addDeviceSuccessPage({ i18n, onContinue: () => console.log("Continue") }),
+    addDeviceSuccessPage({
+      i18n,
+      device: chromeDevice,
+      onContinue: () => console.log("Continue"),
+    }),
 };
 
 const showcase: TemplateResult = html`
