@@ -433,7 +433,7 @@ jobs:
         run: scripts/start-selenium-env --no-hot-reload
 
       - run: npm ci
-      - run: npm test
+      - run: npm run test:all
       - run: "II_URL=${{ matrix.domain }} SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
       - name: Collect docker logs
         working-directory: docker-test-env
@@ -512,7 +512,7 @@ jobs:
 
           dfx deploy --no-wallet
 
-          npm run test
+          npm run test:all
           popd
           rm -rf "$builddir"
 
