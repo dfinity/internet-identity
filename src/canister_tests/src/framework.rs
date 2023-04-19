@@ -278,7 +278,7 @@ pub fn device_data_1() -> DeviceData {
         alias: "My Device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 1")),
         origin: Some("https://identity.internetcomputer.org".to_string()),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -288,7 +288,7 @@ pub fn device_data_2() -> DeviceData {
         alias: "My second device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 2")),
         origin: Some("https://identity.ic0.app".to_string()),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -298,7 +298,7 @@ pub fn max_size_device() -> DeviceData {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -308,7 +308,7 @@ pub fn recovery_device_data_1() -> DeviceData {
         alias: "Recovery Phrase 1".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -318,7 +318,7 @@ pub fn recovery_device_data_2() -> DeviceData {
         alias: "Recovery Phrase 2".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -328,7 +328,7 @@ pub fn device_with_origin(origin: Option<String>) -> DeviceData {
         alias: "My Device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 1")),
         origin,
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }
 

@@ -29,35 +29,35 @@ fn known_devices() -> [DeviceData; 6] {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_1).unwrap()),
         alias: "Desktop".to_string(),
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_1).unwrap())),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     let device2 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_2).unwrap()),
         alias: "andrew-mbp".to_string(),
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_2).unwrap())),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     let device3 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_3).unwrap()),
         alias: "andrew phone chrome".to_string(),
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_3).unwrap())),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     let device4 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_4).unwrap()),
         alias: "Pixel".to_string(),
         credential_id: Some(ByteBuf::from(hex::decode(CREDENTIAL_ID_4).unwrap())),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     let device5 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_5).unwrap()),
         alias: "dfx".to_string(),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     let device6 = DeviceData {
         pubkey: ByteBuf::from(hex::decode(PUB_KEY_6).unwrap()),
         alias: "testkey".to_string(),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
     [device1, device2, device3, device4, device5, device6]
 }

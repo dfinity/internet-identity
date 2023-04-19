@@ -204,6 +204,6 @@ fn device(n: u64) -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([n as u8; 64]),
         alias: "Device ".to_string() + n.to_string().as_str(),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     }
 }

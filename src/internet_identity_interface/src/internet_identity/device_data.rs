@@ -8,7 +8,7 @@ impl DeviceData {
     }
 
     /// Creates a new device that can be used for test purposes.
-    pub fn test_device() -> Self {
+    pub fn auth_test_device() -> Self {
         Self {
             pubkey: ByteBuf::from([0; 32]),
             alias: "test device".to_string(),

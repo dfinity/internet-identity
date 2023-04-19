@@ -6,7 +6,7 @@ use serde_bytes::ByteBuf;
 fn should_get_webauthn_credential_from_device_with_credential_id() {
     let device_data = DeviceData {
         credential_id: Some(ByteBuf::from("credential id")),
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
 
     let credential = WebAuthnCredential::try_from(device_data);
@@ -17,7 +17,7 @@ fn should_get_webauthn_credential_from_device_with_credential_id() {
 fn should_not_get_webauthn_credential_from_device_without_credential_id() {
     let device_data = DeviceData {
         credential_id: None,
-        ..DeviceData::test_device()
+        ..DeviceData::auth_test_device()
     };
 
     let credential = WebAuthnCredential::try_from(device_data);
