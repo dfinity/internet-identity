@@ -29,4 +29,3 @@ runs:
           INPUT_TOKEN: ${{ inputs.token }}
         run: |
           ${{ github.action_path }}/run.sh
-          

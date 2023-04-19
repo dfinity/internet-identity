@@ -136,6 +136,9 @@
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
 
+  --rc-card: var(--rc-background-transparent);
+  --rc-card-background: var(--vc-mist);
+
   --rc-line: var(--vc-brand-alt);
   --rc-line-inverted: var(--rc-dark);
 
@@ -218,6 +221,8 @@
 
   --rs-line-height-body: var(--vs-line-height);
   --rs-dropdown-bezel: var(--vs-bezel);
+
+  --rs-marquee-gap: var(--vs-inline);
 
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
@@ -421,6 +426,23 @@ body {
 .t-title--main {
   font-size: 2.8rem;
   margin-top: 0.5em;
+}
+
+.t-title--discrete {
+  font-size: 1rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.t-title--discrete + .t-title {
+  margin-top: 0.2em;
+}
+
+.t-title--list {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+  margin-top: 0;
 }
 
 .t-lead {
@@ -650,11 +672,16 @@ a:hover,
  */
 
 .c-card {
+  --bezel-x: var(--rs-card-bezel-x);
+  --bezel-y: var(--rs-card-bezel);
+
   display: block;
   position: relative;
-  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
+
+  padding: var(--bezel-y) var(--bezel-x);
   border: var(--rs-line) solid var(--rc-line);
-  background-color: var(--rc-background-transparent);
+
+  background-color: var(--rc-card);
   border-radius: var(--rs-card-border-radius);
 }
 
@@ -667,41 +694,38 @@ a:hover,
 
 .c-card--highlight,
 .c-card--background {
-  padding: var(--rs-card-bezel);
+  --bezel-x: var(--rs-card-bezel);
+  --bezel-y: var(--rs-card-bezel);
+
   background-color: var(--rc-background-transparent);
   border-color: transparent;
 }
 
+/**
+  * Card Teaser
+  * it goes to the edge of the card
+  **/
+.c-card__teaser {
+  margin-left: calc(var(--bezel-x) * -1);
+  margin-right: calc(var(--bezel-x) * -1);
+  margin-bottom: calc(var(--bezel-x) * -1);
+}
+
 .c-card--narrow {
-  padding: var(--rs-card-bezel-narrow);
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
 }
 
 .c-card--tight {
-  padding: calc(var(--rs-card-bezel-narrow) * 0.5)
-    calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-x: calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-y: calc(var(--rs-card-bezel-narrow) * 0.5);
 }
 
 .c-card--background {
-  padding: calc(var(--rs-card-bezel) * 0.3);
+  --bezel-x: calc(var(--rs-card-bezel) * 0.3);
+  --bezel-y: calc(var(--rs-card-bezel) * 0.3);
+
   background: rgba(255, 255, 255, 0.2);
-}
-
-.c-card--background::after {
-  position: absolute;
-  content: "";
-  z-index: -1;
-  inset: -0.2em;
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 10%, var(--rg-brand));
-  opacity: 0.1;
-  filter: blur(8px);
-}
-
-/* c-cards pretty much fill up the screen on so disable the effect which causes scrolling issues */
-@media (max-width: 512px) {
-  .c-card--background::after {
-    inset: 0;
-  }
 }
 
 @media (max-width: 512px) {
@@ -737,6 +761,31 @@ a:hover,
   stroke: var(--rc-error);
 }
 
+.c-card__close {
+  position: absolute;
+  right: var(--rs-card-bezel);
+  top: var(--rs-card-bezel);
+  width: 2.1rem;
+  aspect-ratio: 1;
+  background: var(--rc-button);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.c-card__close svg {
+  position: absolute;
+  display: block;
+  width: 60%;
+  height: 60%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.c-card__close svg [fill] {
+  fill: var(--rc-onButton);
+}
+
 .c-card__content {
   position: relative;
   z-index: var(--z-foreground);
@@ -745,7 +794,7 @@ a:hover,
 .c-card__title {
   /*
     approximation: to make sure the title
-    does not collide with the icon on the left
+    does not collide with the icon on the right
   */
   padding-right: 10%;
 }
@@ -1119,6 +1168,16 @@ a:hover,
   margin-top: var(--rs-button-stack);
 }
 
+/**
+  * This is mostly used on buttons that don't look like buttons
+  * but we still want to make an arbitrary area clickable
+  */
+.c-click-area {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
 .c-input.has-error,
 .c-input.has-error:focus {
   color: var(--rc-error);
@@ -1309,8 +1368,8 @@ a:hover,
 }
 
 .c-list--recovery-word {
-  /* 
-    bg and fg stand for background and foreground 
+  /*
+    bg and fg stand for background and foreground
     and are used to make sure that the text is always readable
     and make it easier to understand the code going forward
 
@@ -1386,7 +1445,7 @@ a:hover,
 
   transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
 
-  /* 
+  /*
    * the blur does not render nicely in Safari if its not on its own paint layer,
    * so we use will-change to let the browser know that we want to animate
    * those properties. As a result, the browser will create a new paint layer
@@ -1462,7 +1521,7 @@ a:hover,
   --bg: var(--rc-input-error);
 }
 
-/* 
+/*
   since correct & incorrect words have an icon, but we still want to make use of the circle
   the number used to be in, we need to hide the number. We do this by making it transparent
 */
@@ -1784,6 +1843,27 @@ a:hover,
   padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
 }
 
+a.c-action-list__item {
+  text-decoration: none;
+  color: var(--rc-text);
+}
+
+.c-action-list__icon {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-action-list__icon img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .c-action-list__item + .c-action-list__item::before {
   content: "";
   display: block;
@@ -1812,6 +1892,12 @@ a:hover,
 .c-action-list__status {
   display: flex;
   align-items: center;
+}
+
+.c-action-list__label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .c-action-list__action {
@@ -2089,7 +2175,113 @@ input[type="checkbox"] {
   image-rendering: pixelated;
 }
 
-/* 
+/*
+  Marquee
+
+  This is a very simple marquee implementation.
+  It works by having a row of logos, the contents of which are duplicated and
+  positioned next to each other. A keyframe animation then moves the logos horizontally
+  to create the illusion of a continuous marquee. Every second row is going in the opposite
+  direction to create a more natural movement.
+
+  The `--marqueeGap` variable, which is the amount of space between logos, is set in the
+  `c-marquee` class. `--rowIndex`, `--itemsPerRow` and `--totalRows` are set by the component itself.
+*/
+
+.c-marquee {
+  --marqueeGap: var(--rs-marquee-gap);
+
+  position: relative;
+  height: 35rem;
+}
+
+.c-marquee__list {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.c-marquee__row {
+  position: absolute;
+  top: calc(var(--rowIndex) / var(--totalRows) * 100% + var(--marqueeGap));
+  left: 0;
+  width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
+  height: calc(100% / var(--totalRows));
+
+  transform: rotate(-5deg);
+  transform-origin: 25% 50%;
+}
+
+.c-marquee__rowHalf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  gap: var(--marqueeGap);
+  animation: marquee 70s linear infinite;
+}
+
+/* makes sure every second row animates in the oposite direction */
+.c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
+  animation-direction: reverse;
+  /*
+    staggers the animation so that the icons don't start in the same position
+    for every row
+
+    X X X X X
+   X X X X X
+
+    otherwise, the animation would start like this:
+
+    X X X X X
+    X X X X X
+  */
+  animation-delay: -4.5s;
+}
+
+.c-marquee__rowHalf--second {
+  left: 50%;
+}
+
+@media (prefers-reduced-motion) {
+  .c-marquee__rowHalf {
+    animation-play-state: paused;
+  }
+}
+
+.c-marquee__item {
+  flex: 0 0 auto;
+  width: calc(100% / var(--itemsPerRow) - var(--marqueeGap));
+  height: 100%;
+  position: relative;
+  user-select: none;
+}
+
+.c-marquee__image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 65%;
+  /*
+    remove the max-width set by the reset, so that the image can be as wide as
+    as required by the height
+  */
+  max-width: unset;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/*
  * stack helper classes
  *
  * it is fine to use value tokens here, because these are generic design

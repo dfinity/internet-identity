@@ -26,6 +26,7 @@ import { deviceRegistrationDisabledInfoPage } from "./flows/addDevice/welcomeVie
 import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVerificationCode";
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
+import { dappsExplorerPage } from "./flows/dappsExplorer";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
@@ -288,6 +289,9 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   displayManageSingle: () =>
     displayManagePage({
@@ -309,6 +313,9 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
     }),
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
@@ -321,6 +328,7 @@ const iiPages: Record<string, () => void> = {
           yield "00:34";
         },
       },
+      i18n,
     }),
   deviceRegistrationDisabledInfo: () =>
     deviceRegistrationDisabledInfoPage({
@@ -398,6 +406,8 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
+  dappsExplorer: () =>
+    dappsExplorerPage({ i18n, back: () => console.log("back") }),
 };
 
 const showcase: TemplateResult = html`
@@ -429,7 +439,7 @@ const components = (): TemplateResult => {
       moreOptions: () => console.log("More options requested"),
     }).template;
 
-  const chan = new Chan<TemplateResult>();
+  const chan = new Chan<TemplateResult>(html`loading...`);
 
   const update = () => {
     const value = savedAnchors.value?.value;
@@ -454,7 +464,7 @@ const components = (): TemplateResult => {
         <button class="c-button" ${ref(
           updateSavedAnchors
         )} @click="${update}">update</button>
-        <div>${asyncReplace(chan.recv())}</div>
+        <div>${asyncReplace(chan)}</div>
     <div ${ref(
       showSelected
     )} class="c-input c-input--readonly">Please select anchor</div></div>

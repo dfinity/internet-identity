@@ -9,7 +9,7 @@ import {
   LoginFlowSuccess,
 } from "../utils/flowResult";
 import { Connection } from "../utils/iiConnection";
-import { withRef } from "../utils/lit-html";
+import { TemplateElement, withRef } from "../utils/lit-html";
 import { registerIfAllowed } from "../utils/registerAllowedCheck";
 import {
   getAnchors,
@@ -29,12 +29,8 @@ import { promptUserNumber } from "./promptUserNumber";
 export type AuthnTemplates = {
   firstTime: {
     slot: TemplateResult;
-    useExistingText:
-      | string
-      | TemplateResult /** text shown on the button leading to "useExisting" */;
-    createAnchorText:
-      | string
-      | TemplateResult /** text shown on the button leading to anchor creation */;
+    useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
+    createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
   };
   useExisting: {
     slot: TemplateResult;

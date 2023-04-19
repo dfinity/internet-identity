@@ -165,11 +165,7 @@ export const wordTemplate = ({
       ${ref(word.elem)}
       data-expected=${word.word}
       ?autofocus=${word.shouldFocus}
-      data-state=${asyncReplace(
-        state.map(
-          (x) => x
-        ) /* workaround because chan supports only one .recv() */
-      )}
+      data-state=${asyncReplace(state)}
       @input=${() => {
         /* On input, immediately show word as correct when correct, but don't show if a
          * word is incorrect (done only when leaving the field) to not freak out user as they type */

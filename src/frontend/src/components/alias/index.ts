@@ -19,10 +19,6 @@ export const promptDeviceAliasTemplate = (props: {
 }): TemplateResult => {
   const copy = props.i18n.i18n(copyJson);
 
-  // static copy required because lit doesn't support template attributes (placeholder)
-  // https://github.com/lit/lit/issues/1862
-  const staticCopy = props.i18n.staticLang(copyJson);
-
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
     <hgroup class="t-centered">
@@ -59,7 +55,7 @@ export const promptDeviceAliasTemplate = (props: {
           );
           e.currentTarget.setCustomValidity(message);
         }}
-        placeholder=${staticCopy.placeholder}
+        placeholder=${copy.placeholder}
         aria-label="device name"
         type="text"
         required

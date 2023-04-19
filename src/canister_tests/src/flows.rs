@@ -14,8 +14,7 @@ pub fn register_anchor_with_device(
     canister_id: CanisterId,
     device: &DeviceData,
 ) -> AnchorNumber {
-    let principal = Principal::self_authenticating(&device.pubkey);
-    register_anchor_with(env, canister_id, principal, device)
+    register_anchor_with(env, canister_id, device.principal(), device)
 }
 
 pub fn register_anchor_with(
@@ -34,6 +33,7 @@ pub fn register_anchor_with(
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
+        None,
     ) {
         Ok(RegisterResponse::Registered { user_number }) => user_number,
         response => panic!("could not register: {response:?}"),

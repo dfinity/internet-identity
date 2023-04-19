@@ -155,7 +155,7 @@ pub struct WebAuthnCredential {
     pub credential_id: CredentialId,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
 pub struct AnchorCredentials {
     pub credentials: Vec<WebAuthnCredential>,
     pub recovery_credentials: Vec<WebAuthnCredential>,

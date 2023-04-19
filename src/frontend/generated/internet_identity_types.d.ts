@@ -213,7 +213,10 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
   >,
-  'register' : ActorMethod<[DeviceData, ChallengeResult], RegisterResponse>,
+  'register' : ActorMethod<
+    [DeviceData, ChallengeResult, [] | [Principal]],
+    RegisterResponse
+  >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,

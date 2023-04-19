@@ -26,6 +26,8 @@ import { unreachable } from "../../utils/utils";
 import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
+import { dappsExplorer } from "../dappsExplorer";
+import { dappsTeaser } from "../dappsExplorer/teaser";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "../recovery/setupRecovery";
 import { authenticatorsSection } from "./authenticatorsSection";
@@ -111,12 +113,14 @@ const displayManageTemplate = ({
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
+  exploreDapps,
 }: {
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  exploreDapps: () => void;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
@@ -132,6 +136,7 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
+    <p class="t-paragraph">${dappsTeaser({ click: () => exploreDapps() })}</p>
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
@@ -217,48 +222,58 @@ export const displayManage = (
         "More than one recovery keys are registered, which is unexpected. Only one will be shown."
       );
     }
-    displayManagePage({
-      userNumber,
-      devices,
-      onAddDevice: async () => {
-        const nextAction = await chooseDeviceAddFlow();
-        switch (nextAction) {
-          case "canceled": {
-            resolve();
-            break;
+    const display = () =>
+      displayManagePage({
+        userNumber,
+        devices,
+        onAddDevice: async () => {
+          const nextAction = await chooseDeviceAddFlow();
+          switch (nextAction) {
+            case "canceled": {
+              resolve();
+              break;
+            }
+            case "local": {
+              await addLocalDevice(userNumber, connection, devices_);
+              resolve();
+              break;
+            }
+            case "remote": {
+              await addRemoteDevice({ userNumber, connection });
+              resolve();
+              break;
+            }
+            default:
+              unreachable(nextAction);
+              resolve();
+              break;
           }
-          case "local": {
-            await addLocalDevice(userNumber, connection, devices_);
-            resolve();
-            break;
+        },
+        addRecoveryPhrase: async () => {
+          await setupPhrase(userNumber, connection);
+          resolve();
+        },
+        addRecoveryKey: async () => {
+          const confirmed = confirm(
+            "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
+          );
+          if (!confirmed) {
+            // No resolve here because we don't need to reload the screen
+            return;
           }
-          case "remote": {
-            await addRemoteDevice({ userNumber, connection });
-            resolve();
-            break;
-          }
-          default:
-            unreachable(nextAction);
-            resolve();
-            break;
-        }
-      },
-      addRecoveryPhrase: async () => {
-        await setupPhrase(userNumber, connection);
-        resolve();
-      },
-      addRecoveryKey: async () => {
-        const confirmed = confirm(
-          "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
-        );
-        if (!confirmed) {
-          // No resolve here because we don't need to reload the screen
-          return;
-        }
-        await setupKey({ connection });
-        resolve();
-      },
-    });
+          await setupKey({ connection });
+          resolve();
+        },
+        exploreDapps: async () => {
+          await dappsExplorer();
+          // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+          // a device from the explorer), so we just re-display without reloading devices etc.
+          // the page without
+          display();
+        },
+      });
+
+    display();
 
     // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
     // if they don't have one already. We lead them straight to recovery phrase creation, because

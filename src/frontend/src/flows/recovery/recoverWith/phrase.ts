@@ -245,11 +245,7 @@ export const wordTemplate = ({
       class="c-recoveryInput"
       ${ref(wordRef)}
       data-role="recovery-word-input"
-      data-state=${asyncReplace(
-        state.map(
-          (x: State) => x
-        ) /* workaround because chan supports only one .recv() */
-      )}
+      data-state=${asyncReplace(state)}
       @input=${(e: InputEvent) =>
         withElement(e, (_e, element) => {
           // Reset validity

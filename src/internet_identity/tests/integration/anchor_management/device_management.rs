@@ -403,7 +403,7 @@ fn should_get_credentials() -> Result<(), CallError> {
         purpose: Purpose::Recovery,
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::auth_test_device()
     };
 
     api::add(
@@ -453,6 +453,18 @@ fn should_get_credentials() -> Result<(), CallError> {
         vec![recovery_device_data_1().pubkey]
     );
 
+    Ok(())
+}
+
+/// Verifies that get_anchor_credentials returns an empty list of credentials for invalid anchor numbers.
+#[test]
+fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let response = api::get_anchor_credentials(&env, canister_id, 1234564)?;
+
+    assert_eq!(response, AnchorCredentials::default());
     Ok(())
 }
 

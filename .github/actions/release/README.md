@@ -13,11 +13,10 @@ $ # history file.
 $  export GITHUB_TOKEN="..."
 $ # The list of files for which we compute the sha256
 $ # (those file must exist, though they don't need to have meaningful content)
-$ export INPUT_ASSETS='internet_identity_production.wasm
-internet_identity_production.wasm.gz
-internet_identity_dev.wasm
-internet_identity_test.wasm
-archive.wasm'
+$ export INPUT_ASSETS='internet_identity_production.wasm.gz
+internet_identity_dev.wasm.gz
+internet_identity_test.wasm.gz
+archive.wasm.gz'
 $ export INPUT_PRODUCTION_ASSET=internet_identity_production.wasm
 $ export RELEASE_TAG=release-2022-10-28 # Any tag
 $ export GITHUB_SHA=$(git rev-parse $RELEASE_TAG)
