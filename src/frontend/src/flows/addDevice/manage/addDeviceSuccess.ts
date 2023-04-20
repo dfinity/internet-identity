@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html,render } from "lit-html";
 import { mainWindow } from "../../../components/mainWindow";
 import { I18n } from "../../../i18n";
 import { renderPage } from "../../../utils/lit-html";
@@ -6,17 +6,19 @@ import copyJson from "./addDeviceSuccess.json";
 
 export type DeviceAlias = string;
 
-export interface AddDeviceSuccessTemplateProps {
-  deviceAlias: DeviceAlias;
-  onContinue: () => void;
-  i18n: I18n;
-}
+export type AddDeviceSuccessTemplateProps = Parameters<
+  typeof addDeviceSuccessTemplate
+>[0];
 
 const addDeviceSuccessTemplate = ({
   deviceAlias,
   onContinue,
   i18n,
-}: AddDeviceSuccessTemplateProps) => {
+}: {
+  deviceAlias: DeviceAlias;
+  onContinue: () => void;
+  i18n: I18n;
+}) => {
   const { title, continue_to_home, explore } = i18n.i18n(copyJson);
 
   const slot = html`<article>
