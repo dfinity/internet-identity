@@ -443,7 +443,7 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
     let response = http_request(
         env,
         canister_id,
-        HttpRequest {
+        &HttpRequest {
             method: "GET".to_string(),
             url: "/metrics".to_string(),
             headers: vec![],
@@ -525,11 +525,7 @@ pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
-    match api::internet_identity::deploy_archive(
-        env,
-        ii_canister,
-        ByteBuf::from(ARCHIVE_WASM.clone()),
-    ) {
+    match api::internet_identity::deploy_archive(env, ii_canister, &ARCHIVE_WASM) {
         Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
         err => panic!("archive deployment failed: {err:?}"),
     }

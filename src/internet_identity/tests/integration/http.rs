@@ -27,7 +27,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         let http_response = http_request(
             &env,
             canister_id,
-            HttpRequest {
+            &HttpRequest {
                 method: "GET".to_string(),
                 url: asset.to_string(),
                 headers: vec![],
@@ -165,8 +165,8 @@ fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
             canister_id,
             principal_1(),
             user_number,
-            frontend_hostname.to_string(),
-            ByteBuf::from(format!("session key {count}")),
+            frontend_hostname,
+            &ByteBuf::from(format!("session key {count}")),
             None,
         )?;
 
@@ -190,8 +190,8 @@ fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        ByteBuf::from("last session key"),
+        frontend_hostname,
+        &ByteBuf::from("last session key"),
         None,
     )?;
 
@@ -277,7 +277,7 @@ fn metrics_inflight_challenges() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge_1.challenge_key,
         },
@@ -336,7 +336,7 @@ fn metrics_device_registration_mode() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number_2,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     let metrics = get_metrics(&env, canister_id);
@@ -371,7 +371,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),
@@ -386,8 +386,8 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device.pubkey.clone(),
-        device,
+        &device.pubkey,
+        &device,
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),
@@ -400,7 +400,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),

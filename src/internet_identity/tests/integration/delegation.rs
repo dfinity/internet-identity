@@ -26,8 +26,8 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
     assert_eq!(
@@ -44,8 +44,8 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(delegation) => delegation,
@@ -72,8 +72,8 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         Some(3_600_000_000_000), // 1 hour
     )?;
     assert_eq!(
@@ -90,8 +90,8 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(delegation) => delegation,
@@ -118,8 +118,8 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64), // 31 days
     )?;
     assert_eq!(
@@ -136,8 +136,8 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(delegation) => delegation,
@@ -195,8 +195,8 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
                     canister_id,
                     principal_1(),
                     user_number,
-                    frontend_hostname.to_string(),
-                    session_key.clone(),
+                    frontend_hostname,
+                    session_key,
                     None,
                 )
                 .expect("prepare_delegation failed");
@@ -219,8 +219,8 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
             canister_id,
             principal_1(),
             user_number,
-            frontend_hostname.to_string(),
-            session_key.clone(),
+            frontend_hostname,
+            session_key,
             expiration,
         )? {
             GetDelegationResponse::SignedDelegation(delegation) => delegation,
@@ -250,8 +250,8 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
     assert_eq!(
@@ -268,8 +268,8 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(delegation) => delegation,
@@ -288,8 +288,6 @@ fn should_issue_different_principals() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
-    let frontend_hostname_1 = "https://dapp1.com";
-    let frontend_hostname_2 = "https://dapp2.com";
     let pub_session_key = ByteBuf::from("session public key");
 
     let (canister_sig_key_1, _) = api::prepare_delegation(
@@ -297,8 +295,8 @@ fn should_issue_different_principals() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname_1.to_string(),
-        pub_session_key.clone(),
+        "https://dapp1.com",
+        &pub_session_key,
         None,
     )?;
     let (canister_sig_key_2, _) = api::prepare_delegation(
@@ -306,8 +304,8 @@ fn should_issue_different_principals() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname_2.to_string(),
-        pub_session_key,
+        "https://dapp2.com",
+        &pub_session_key,
         None,
     )?;
 
@@ -329,8 +327,8 @@ fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
 
@@ -342,8 +340,8 @@ fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key,
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
@@ -366,8 +364,8 @@ fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
 
@@ -379,8 +377,8 @@ fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
 
@@ -389,8 +387,8 @@ fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key,
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     )? {
         GetDelegationResponse::SignedDelegation(_) => panic!("unexpected delegation"),
@@ -411,8 +409,8 @@ fn can_not_prepare_delegation_for_different_user() {
         canister_id,
         principal_2(),
         user_number, // belongs to principal_1
-        "https://some-dapp.com".to_string(),
-        ByteBuf::from("session key"),
+        "https://some-dapp.com",
+        &ByteBuf::from("session key"),
         None,
     );
 
@@ -437,8 +435,8 @@ fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key.clone(),
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
     let result = api::get_delegation(
@@ -446,8 +444,8 @@ fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key,
+        frontend_hostname,
+        &pub_session_key,
         expiration,
     );
 
@@ -473,8 +471,8 @@ fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        pub_session_key,
+        frontend_hostname,
+        &pub_session_key,
         None,
     )?;
 
@@ -483,7 +481,7 @@ fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
+        frontend_hostname,
     )?;
     assert_eq!(Principal::self_authenticating(canister_sig_key), principal);
     Ok(())
@@ -496,15 +494,13 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
-    let frontend_hostname_1 = "https://dapp-1.com";
-    let frontend_hostname_2 = "https://dapp-2.com";
 
     let dapp_principal_1 = api::get_principal(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname_1.to_string(),
+        "https://dapp-1.com",
     )?;
 
     let dapp_principal_2 = api::get_principal(
@@ -512,7 +508,7 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname_2.to_string(),
+        "https://dapp-2.com",
     )?;
 
     assert_ne!(dapp_principal_1, dapp_principal_2);
@@ -536,7 +532,7 @@ fn should_return_different_principals_for_different_users() -> Result<(), CallEr
         canister_id,
         principal_1(),
         user_number_1,
-        frontend_hostname.to_string(),
+        frontend_hostname,
     )?;
 
     let dapp_principal_2 = api::get_principal(
@@ -544,7 +540,7 @@ fn should_return_different_principals_for_different_users() -> Result<(), CallEr
         canister_id,
         principal_1(),
         user_number_2,
-        frontend_hostname.to_string(),
+        frontend_hostname,
     )?;
 
     assert_ne!(dapp_principal_1, dapp_principal_2);
@@ -566,7 +562,7 @@ fn should_not_allow_get_principal_for_other_user() {
         canister_id,
         principal_1(),
         user_number_2,
-        frontend_hostname_1.to_string(),
+        frontend_hostname_1,
     );
 
     expect_user_error_with_message(

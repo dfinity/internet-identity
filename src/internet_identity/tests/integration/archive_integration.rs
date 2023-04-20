@@ -26,8 +26,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         Ok(())
     }
@@ -54,8 +53,7 @@ mod deployment_tests {
         );
         env.add_cycles(ii_canister, 150_000_000_000);
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         assert_eq!(env.cycle_balance(ii_canister), 50_000_000_000);
         Ok(())
@@ -71,7 +69,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &EMPTY_WASM)?;
         match result {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "invalid wasm module".to_string())
@@ -90,8 +88,7 @@ mod deployment_tests {
         let env = env();
         let ii_canister = install_ii_canister(&env, II_WASM.clone());
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         match result {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "archive deployment disabled".to_string())
@@ -115,8 +112,7 @@ mod deployment_tests {
         );
         upgrade_ii_canister(&env, ii_canister, II_WASM.clone());
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         Ok(())
     }
@@ -131,7 +127,7 @@ mod deployment_tests {
             arg_with_wasm_hash(EMPTY_WASM.clone()),
         );
 
-        let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &EMPTY_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
 
         upgrade_ii_canister_with_arg(
@@ -142,8 +138,7 @@ mod deployment_tests {
         )
         .unwrap();
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         let DeployArchiveResult::Success(archive_canister) = result else {
             panic!("Unexpected result")
         };
@@ -164,8 +159,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         let DeployArchiveResult::Success(archive_canister) = result else {
             panic!("Unexpected result")
         };
@@ -193,8 +187,7 @@ mod deployment_tests {
         )
         .unwrap();
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
 
         let status = archive_api::status(&env, archive_canister)?;
@@ -224,29 +217,22 @@ mod pull_entries_tests {
         let anchor = flows::register_anchor(&env, ii_canister);
 
         let mut device = device_data_2();
-        ii_api::add(&env, ii_canister, principal_1(), anchor, device.clone())?;
+        ii_api::add(&env, ii_canister, principal_1(), anchor, &device)?;
 
         device.purpose = Purpose::Recovery;
         let pubkey = device.pubkey.clone();
-        ii_api::update(
-            &env,
-            ii_canister,
-            principal_1(),
-            anchor,
-            pubkey.clone(),
-            device,
-        )?;
+        ii_api::update(&env, ii_canister, principal_1(), anchor, &pubkey, &device)?;
 
         ii_api::replace(
             &env,
             ii_canister,
             principal_1(),
             anchor,
-            pubkey.clone(),
-            device_data_2(),
+            &pubkey,
+            &device_data_2(),
         )?;
 
-        ii_api::remove(&env, ii_canister, principal_1(), anchor, pubkey.clone())?;
+        ii_api::remove(&env, ii_canister, principal_1(), anchor, &pubkey)?;
         let timestamp = env
             .time()
             .duration_since(SystemTime::UNIX_EPOCH)
