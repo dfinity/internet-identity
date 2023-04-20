@@ -1,8 +1,4 @@
-import { render } from "@lit-labs/ssr/lib/render-lit-html";
 import { readFileSync } from "fs";
-import { PluginOption } from "vite";
-import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
-import { I18n } from "./src/frontend/src/i18n";
 
 /**
  * Read the II canister ID from dfx's local state
@@ -62,33 +58,6 @@ export const stripInjectJsScript = (): {
     return html.replace(
       `<script type="module" crossorigin src="/index.js"></script>`,
       ``
-    );
-  },
-});
-
-/**
- * Pre-render about.html
- *
- * 1. Plugin transforms only /about.html
- * 2. When that file is detected, the lit SSR render function is used to render the TypeScript file to a string
- * 3. The rendered HTML is then injected into the file, as it would have been loaded at runtime
- */
-export const preRenderAboutPlugin = (): PluginOption => ({
-  name: "html-transform",
-  transformIndexHtml(html: string, { path }: { path: string }): string {
-    if (path !== "/about.html") {
-      return html;
-    }
-
-    const pageContent = aboutStaticContent(new I18n());
-    const content = Array.from(render(pageContent)).reduce(
-      (acc, v) => acc + v,
-      ""
-    );
-
-    return html.replace(
-      '<main id="pageContent" class="l-wrap" aria-live="polite"></main>',
-      `<main id="pageContent" class="l-wrap" aria-live="polite">${content}</main>`
     );
   },
 });

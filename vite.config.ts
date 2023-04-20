@@ -4,7 +4,6 @@ import viteCompression from "vite-plugin-compression";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import {
   injectCanisterIdPlugin,
-  preRenderAboutPlugin,
   stripInjectJsScript,
 } from "./vite.plugins";
 
@@ -38,10 +37,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
-        input: {
-          main: resolve(__dirname, "src/frontend/index.html"),
-          about: resolve(__dirname, "src/frontend/about.html"),
-        },
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
@@ -54,7 +49,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       nodePolyfills({
         protocolImports: true,
       }),
-      preRenderAboutPlugin(),
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [stripInjectJsScript()] : [])],
       viteCompression({
