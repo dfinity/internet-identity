@@ -13,8 +13,7 @@ impl From<DeviceData> for DeviceDataWithoutAlias {
             metadata_keys: device_data
                 .metadata
                 .as_ref()
-                .map(|m| m.keys().cloned().collect())
-                .unwrap_or_default(),
+                .map(|m| m.keys().cloned().collect()),
         }
     }
 }

@@ -258,7 +258,7 @@ mod pull_entries_tests {
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
                     origin: device_data_1().origin,
-                    metadata_keys: vec![],
+                    metadata_keys: None,
                 },
             },
             timestamp,

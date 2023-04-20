@@ -58,7 +58,7 @@ type DeviceDataWithoutAlias = record {
     protection: DeviceProtection;
     origin: opt text;
     // Only the top level keys are archived for privacy reasons.
-    metadata_keys: vec text;
+    metadata_keys: opt vec text;
 };
 
 type DeviceDataUpdate = record {
