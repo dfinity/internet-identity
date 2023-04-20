@@ -2,7 +2,6 @@ import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
-import { aboutView } from "./flows/about";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
@@ -87,10 +86,6 @@ const init = async () => {
     const faqUrl =
       "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity";
     window.location.replace(faqUrl);
-  }
-
-  if (window.location.pathname === "/about") {
-    return aboutView();
   }
 
   const okOrReason = await checkRequiredFeatures(url);

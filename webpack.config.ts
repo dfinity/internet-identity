@@ -8,14 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import webpack from "webpack";
 
-import { render } from "@lit-labs/ssr/lib/render-lit-html";
-import { TemplateResult } from "lit-html";
-import { pageContent as aboutStaticContent } from "./src/frontend/src/flows/about";
-import { I18n } from "./src/frontend/src/i18n";
-
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-
-const i18n = new I18n();
 
 /** Read the II canister ID from dfx's local state */
 function readCanisterId() {
@@ -70,22 +63,6 @@ const htmlPlugin = ({ filename }: { filename: string }): HtmlWebpackPlugin =>
     filename,
   });
 
-// A plugin that creates a static page by injecting a static TemplateResult into a page
-const staticPagePlugin = (
-  pageName: string,
-  pageContent: TemplateResult
-): HtmlReplacePlugin =>
-  new HtmlReplacePlugin((html) => {
-    const content = Array.from(render(pageContent)).reduce(
-      (acc, v) => acc + v,
-      ""
-    );
-    return html.replace(
-      '<main id="pageContent" class="l-wrap" aria-live="polite"></main>',
-      `<main id="pageContent" class="l-wrap" aria-live="polite">${content}</main>`
-    );
-  }, pageName);
-
 // This emulates the behaviour of http.rs while using webpack dev server locally
 // so we don't need to proxy to the backend canister for the index.html file.
 // This overcomes some issues with Safari and the CSP headers set in http.rs.
@@ -96,9 +73,6 @@ const injectCanisterIdPlugin = () =>
       `<script data-canister-id="${readCanisterId()}" id="setupJs"></script>`
     )
   );
-
-const staticAboutPlugin = () =>
-  staticPagePlugin("about.html", aboutStaticContent(i18n));
 
 const isProduction = process.env.NODE_ENV === "production";
 const devtool = isProduction ? undefined : "source-map";
@@ -141,10 +115,6 @@ const defaults = {
       process: "process/browser",
     }),
     new webpack.EnvironmentPlugin({
-      // Whether or not static pages should be hydrated
-      // (only done in production since we don't have statically rendered
-      // pages for development)
-      HYDRATE_STATIC_PAGES: isProduction ? "1" : "0",
       // Feature flags (see README)
       II_FETCH_ROOT_KEY: "0",
       II_DUMMY_AUTH: "0",
@@ -207,11 +177,9 @@ export default [
     },
     plugins: [
       ...defaults.plugins,
-      // In production, we generate static versions of our static pages (during development we
-      // prefer hot-reloading dynamic pages);
       // in development, we inject canister ID when using the dev server, so that the local
       // file can be used (instead of the HTML served by the canister)
-      ...(isProduction ? [staticAboutPlugin()] : [injectCanisterIdPlugin()]),
+      ...(isProduction ? [] : [injectCanisterIdPlugin()]),
     ],
   },
   {
