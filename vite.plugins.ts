@@ -1,3 +1,4 @@
+import { assertNonNullish } from "@dfinity/utils";
 import { readFileSync } from "fs";
 
 /**
@@ -10,14 +11,6 @@ const readCanisterId = (): string => {
     const {
       internet_identity: { local: canisterId },
     } = JSON.parse(readFileSync(canisterIdsJsonFile, "utf-8"));
-
-    const assertNonNullish: (
-      value: string
-    ) => asserts value is NonNullable<string> = (value: string): void => {
-      if (value === null || value === undefined) {
-        throw new Error("Internet identity canister ID undefined");
-      }
-    };
 
     assertNonNullish(canisterId);
 
