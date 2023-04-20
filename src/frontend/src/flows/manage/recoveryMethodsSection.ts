@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import {
   checkmarkRoundIcon,
@@ -29,10 +30,10 @@ export const recoveryMethodsSection = ({
       </div>
       <div class="c-action-list">
         <ul>
-          ${recoveryPhrase === undefined
+          ${isNullish(recoveryPhrase)
             ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
             : recoveryPhraseItem({ recoveryPhrase })}
-          ${recoveryKey === undefined
+          ${isNullish(recoveryKey)
             ? missingRecovery({ recovery: "key", addRecoveryKey })
             : recoveryKeyItem({ recoveryKey })}
         </ul>

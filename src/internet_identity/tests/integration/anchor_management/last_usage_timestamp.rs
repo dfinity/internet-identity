@@ -34,7 +34,7 @@ fn should_set_last_usage_on_add() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -45,7 +45,7 @@ fn should_set_last_usage_on_add() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -74,14 +74,14 @@ fn should_set_last_usage_on_remove() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
     api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -92,7 +92,7 @@ fn should_set_last_usage_on_remove() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -117,7 +117,7 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
     let mut device_to_be_updated = device_data_2();
     api::add(
@@ -125,7 +125,7 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_to_be_updated.clone(),
+        &device_to_be_updated,
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -146,8 +146,8 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_to_be_updated.pubkey.clone(),
-        device_to_be_updated.clone(),
+        &device_to_be_updated.pubkey,
+        &device_to_be_updated,
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -180,14 +180,14 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
     api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -198,8 +198,8 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
-        large_size_device(),
+        &device_data_2().pubkey,
+        &large_size_device(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -222,7 +222,6 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
-    let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
     api::add(
@@ -230,7 +229,7 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -241,8 +240,8 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname,
-        pub_session_key,
+        "https://some-dapp.com",
+        &pub_session_key,
         None,
     )?;
 
@@ -267,7 +266,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));
@@ -286,7 +285,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
         canister_id,
         principal_recovery_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )? {
         AddTentativeDeviceResponse::AddedTentatively {
             verification_code, ..
@@ -302,7 +301,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
         canister_id,
         principal_1(),
         user_number,
-        verification_code,
+        &verification_code,
     )?;
 
     // use the device2 to get the info, otherwise getting the info will update the timestamp we want to verify
@@ -324,7 +323,7 @@ fn should_update_last_usage_on_exit_device_registration_mode() -> Result<(), Cal
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     env.advance_time(Duration::from_secs(1));

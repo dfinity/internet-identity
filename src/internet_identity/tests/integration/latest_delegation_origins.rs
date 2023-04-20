@@ -127,8 +127,8 @@ fn delegation_for_origin(
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        ByteBuf::from("session public key"),
+        frontend_hostname,
+        &ByteBuf::from("session public key"),
         None,
     )?;
     Ok(())

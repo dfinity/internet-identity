@@ -15,6 +15,7 @@ import {
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
 import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
 import {
@@ -299,7 +300,7 @@ export class Connection {
           findDeviceByPubkey(devices, Buffer.from(device.pubkey))
         )
         .then((device) => {
-          if (device === undefined) {
+          if (isNullish(device)) {
             // this can happen if the device has been deleted between authentication and now
             throw Error("device is undefined");
           }
@@ -395,7 +396,7 @@ export class Connection {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       ...device,
-      origin: window?.origin === undefined ? [] : [window.origin],
+      origin: isNullish(window?.origin) ? [] : [window.origin],
     });
   };
 
@@ -469,7 +470,7 @@ export class AuthenticatedConnection extends Connection {
       }
     }
 
-    if (this.actor === undefined) {
+    if (isNullish(this.actor)) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await this.requestFEDelegation(this.identity);
       this.actor = await this.createActor(this.delegationIdentity);
@@ -579,7 +580,7 @@ export class AuthenticatedConnection extends Connection {
 //
 // The return type is odd but that's what our didc version expects.
 export const readDeviceOrigin = (): [] | [string] => {
-  if (window?.origin === undefined || window.origin.length > 50) {
+  if (isNullish(window?.origin) || window.origin.length > 50) {
     return [];
   }
 
@@ -674,7 +675,7 @@ export const inferHost = (): string => {
   const IC_API_DOMAIN = "icp-api.io";
 
   const location = window?.location;
-  if (location === undefined) {
+  if (isNullish(location)) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off but we return something valid just in case.
     return "https://" + IC_API_DOMAIN;

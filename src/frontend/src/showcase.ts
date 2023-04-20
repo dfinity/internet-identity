@@ -27,6 +27,7 @@ import { showVerificationCodePage } from "./flows/addDevice/welcomeView/showVeri
 import { authnTemplateAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { dappsExplorerPage } from "./flows/dappsExplorer";
+import { getDapps } from "./flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "./flows/manage";
 import { chooseRecoveryMechanismPage } from "./flows/recovery/chooseRecoveryMechanism";
 import {
@@ -257,7 +258,8 @@ const iiPages: Record<string, () => void> = {
         return Promise.resolve();
       }
     ),
-  displayManage: () =>
+  displayManage: async () => {
+    const dapps = await getDapps();
     displayManagePage({
       userNumber,
       devices: {
@@ -293,11 +295,14 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      dapps,
       exploreDapps: () => {
         console.log("explore dapps");
       },
-    }),
-  displayManageSingle: () =>
+    });
+  },
+  displayManageSingle: async () => {
+    const dapps = await getDapps();
     displayManagePage({
       userNumber,
       devices: {
@@ -317,10 +322,12 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      dapps,
       exploreDapps: () => {
         console.log("explore dapps");
       },
-    }),
+    });
+  },
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
@@ -410,8 +417,10 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: () =>
-    dappsExplorerPage({ i18n, back: () => console.log("back") }),
+  dappsExplorer: async () => {
+    const dapps = await getDapps();
+    dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
+  },
   showMessage: () =>
     showMessagePage({
       message: "You may close this page.",

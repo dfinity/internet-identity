@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -165,6 +166,17 @@ const poll = async (
   }
 };
 
+// Dynamically load the QR code module
+const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
+  try {
+    return (await import(/* webpackChunkName: "qr-creator" */ "qr-creator"))
+      .default;
+  } catch (e) {
+    console.error(e);
+    return undefined;
+  }
+};
+
 // Displays the QR code with given link, in the given container
 const displayQR = async ({
   link: text,
@@ -173,11 +185,9 @@ const displayQR = async ({
   link: string;
   container: HTMLElement;
 }) => {
-  // Dynamically load the QR code module
-  const qrCreator: typeof QrCreator | null = (
-    await import(/* webpackChunkName: "qr-creator" */ "qr-creator")
-  ).default;
-  if (qrCreator === null) {
+  // Load the QR code library
+  const qrCreator = await loadQrCreator();
+  if (isNullish(qrCreator)) {
     toast.error("Could not load QR code");
     console.error("Could not load qr-creator module");
     return;

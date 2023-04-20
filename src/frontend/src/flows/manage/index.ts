@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import {
   DeviceData,
@@ -27,6 +28,7 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { dappsExplorer } from "../dappsExplorer";
+import { DappDescription, getDapps } from "../dappsExplorer/dapps";
 import { dappsTeaser } from "../dappsExplorer/teaser";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "../recovery/setupRecovery";
@@ -113,6 +115,7 @@ const displayManageTemplate = ({
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
+  dapps,
   exploreDapps,
 }: {
   userNumber: bigint;
@@ -120,13 +123,14 @@ const displayManageTemplate = ({
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  dapps: DappDescription[];
   exploreDapps: () => void;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
     authenticators.length <= 1 &&
-    recoveries.recoveryPhrase === undefined &&
-    recoveries.recoveryKey === undefined;
+    isNullish(recoveries.recoveryPhrase) &&
+    isNullish(recoveries.recoveryKey);
 
   const pageContentSlot = html` <section>
     <hgroup>
@@ -136,7 +140,9 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
-    <p class="t-paragraph">${dappsTeaser({ click: () => exploreDapps() })}</p>
+    <p class="t-paragraph">
+      ${dappsTeaser({ dapps, click: () => exploreDapps() })}
+    </p>
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
@@ -200,12 +206,14 @@ export const renderManage = async (
 
 export const displayManagePage = renderPage(displayManageTemplate);
 
-export const displayManage = (
+export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceData[]
-): Promise<void | AuthenticatedConnection> =>
-  new Promise((resolve) => {
+): Promise<void | AuthenticatedConnection> => {
+  // Fetch the dapps used in the teaser & explorer
+  const dapps = await getDapps();
+  return new Promise((resolve) => {
     const devices = devicesFromDeviceDatas({
       devices: devices_,
       userNumber,
@@ -264,8 +272,9 @@ export const displayManage = (
           await setupKey({ connection });
           resolve();
         },
+        dapps,
         exploreDapps: async () => {
-          await dappsExplorer();
+          await dappsExplorer({ dapps });
           // We know that the user couldn't have changed anything (the user can't delete e.g. delete
           // a device from the explorer), so we just re-display without reloading devices etc.
           // the page without
@@ -296,6 +305,7 @@ export const displayManage = (
         </button> `);
     }
   });
+};
 
 // Try to read a DeviceData as a recovery
 export const readRecovery = ({
@@ -415,7 +425,7 @@ export const domainWarning = (
     device.origin.length === 0 ? undefined : device.origin[0];
 
   // If this is the _old_ II (ic0.app) and no origin was recorded, then we can't infer much and don't show a warning.
-  if (window.origin === LEGACY_II_URL && deviceOrigin === undefined) {
+  if (window.origin === LEGACY_II_URL && isNullish(deviceOrigin)) {
     return undefined;
   }
 
@@ -426,7 +436,7 @@ export const domainWarning = (
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
-  if (deviceOrigin === undefined) {
+  if (isNullish(deviceOrigin)) {
     return html`This device may not be usable on the current URL
     (${window.origin})`;
   }

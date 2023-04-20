@@ -34,7 +34,7 @@ fn should_register_new_anchor() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        "https://some-frontend.com".to_string(),
+        "https://some-frontend.com",
     )?;
     assert_ne!(principal, Principal::anonymous());
     Ok(())
@@ -73,7 +73,7 @@ fn should_assign_correct_user_numbers() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
@@ -95,7 +95,7 @@ fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
@@ -124,7 +124,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallErro
         canister_id,
         principal_1(),
         &device1,
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
@@ -151,7 +151,7 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "wrong solution".to_string(),
             key: challenge.challenge_key,
         },
@@ -179,7 +179,7 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
@@ -232,7 +232,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key.clone(),
         },
@@ -256,7 +256,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
