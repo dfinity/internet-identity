@@ -69,9 +69,9 @@ export const stripInjectJsScript = (): {
 /**
  * Pre-render about.html
  *
- * 1. Plugin transform only /about.html
- * 2. When such file is detected, it uses lit SSR render function to render the TypeScript file to a string
- * 3. It finally replaces the JavaScript content in the HTML content as if it would be loaded at runtime with the static content that was evaluated
+ * 1. Plugin transforms only /about.html
+ * 2. When that file is detected, the lit SSR render function is used to render the TypeScript file to a string
+ * 3. The rendered HTML is then injected into the file, as it would have been loaded at runtime
  */
 export const preRenderAboutPlugin = (): PluginOption => ({
   name: "html-transform",
