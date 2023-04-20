@@ -28,6 +28,7 @@ import { chooseDeviceAddFlow } from "../addDevice/manage";
 import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
 import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
 import { dappsExplorer } from "../dappsExplorer";
+import { DappDescription, getDapps } from "../dappsExplorer/dapps";
 import { dappsTeaser } from "../dappsExplorer/teaser";
 import { recoveryWizard } from "../recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "../recovery/setupRecovery";
@@ -114,6 +115,7 @@ const displayManageTemplate = ({
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
+  dapps,
   exploreDapps,
 }: {
   userNumber: bigint;
@@ -121,6 +123,7 @@ const displayManageTemplate = ({
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  dapps: DappDescription[];
   exploreDapps: () => void;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
@@ -137,7 +140,9 @@ const displayManageTemplate = ({
       </p>
     </hgroup>
     ${anchorSection(userNumber)}
-    <p class="t-paragraph">${dappsTeaser({ click: () => exploreDapps() })}</p>
+    <p class="t-paragraph">
+      ${dappsTeaser({ dapps, click: () => exploreDapps() })}
+    </p>
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
@@ -201,12 +206,14 @@ export const renderManage = async (
 
 export const displayManagePage = renderPage(displayManageTemplate);
 
-export const displayManage = (
+export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceData[]
-): Promise<void | AuthenticatedConnection> =>
-  new Promise((resolve) => {
+): Promise<void | AuthenticatedConnection> => {
+  // Fetch the dapps used in the teaser & explorer
+  const dapps = await getDapps();
+  return new Promise((resolve) => {
     const devices = devicesFromDeviceDatas({
       devices: devices_,
       userNumber,
@@ -265,8 +272,9 @@ export const displayManage = (
           await setupKey({ connection });
           resolve();
         },
+        dapps,
         exploreDapps: async () => {
-          await dappsExplorer();
+          await dappsExplorer({ dapps });
           // We know that the user couldn't have changed anything (the user can't delete e.g. delete
           // a device from the explorer), so we just re-display without reloading devices etc.
           // the page without
@@ -297,6 +305,7 @@ export const displayManage = (
         </button> `);
     }
   });
+};
 
 // Try to read a DeviceData as a recovery
 export const readRecovery = ({
