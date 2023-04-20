@@ -28,6 +28,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
+        external: /.*\/wordlists\/(?!english).*\.json/,
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
