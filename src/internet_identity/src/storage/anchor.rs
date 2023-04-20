@@ -387,11 +387,16 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 /// This checks device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
 ///   * Only recovery phrases can be protected
+///   * Recovery phrases cannot have a credential id
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
     check_device_limits(device)?;
+
+    if device.key_type == KeyType::SeedPhrase && device.credential_id.is_some() {
+        return Err(AnchorError::RecoveryPhraseCredentialIdMismatch);
+    }
 
     if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
         return Err(AnchorError::InvalidDeviceProtection {
@@ -471,6 +476,7 @@ pub enum AnchorError {
     InvalidDeviceProtection {
         key_type: KeyType,
     },
+    RecoveryPhraseCredentialIdMismatch,
     MutationNotAllowed {
         authorized_principal: Principal,
         actual_principal: Principal,
@@ -516,6 +522,7 @@ impl fmt::Display for AnchorError {
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id.")
         }
     }
 }
