@@ -177,7 +177,7 @@ export default [
     },
     plugins: [
       ...defaults.plugins,
-      // in development, we inject canister ID when using the dev server, so that the local
+      // In development, we inject canister ID when using the dev server, so that the local
       // file can be used (instead of the HTML served by the canister)
       ...(isProduction ? [] : [injectCanisterIdPlugin()]),
     ],
