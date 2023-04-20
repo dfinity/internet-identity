@@ -1,6 +1,7 @@
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { renderPage, TemplateElement } from "../utils/lit-html";
+import { mainWindow } from "./mainWindow";
 
 const showMessageTemplate = ({
   message,
@@ -8,14 +9,14 @@ const showMessageTemplate = ({
 }: {
   message: TemplateElement;
   role?: string;
-}): TemplateResult => {
-  return html`<h1
-    style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-    data-role=${ifDefined(role)}
-  >
-    ${message}
-  </h1>`;
-};
+}): TemplateResult =>
+  mainWindow({
+    showLogo: false,
+    showFooter: false,
+    slot: html`<p class="t-paragraph t-lead" data-role=${ifDefined(role)}>
+      ${message}
+    </p>`,
+  });
 
 export const showMessagePage = renderPage(showMessageTemplate);
 

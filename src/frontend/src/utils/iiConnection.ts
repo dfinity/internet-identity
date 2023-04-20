@@ -11,6 +11,7 @@ import {
 import {
   DelegationChain,
   DelegationIdentity,
+  ECDSAKeyIdentity,
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
@@ -431,7 +432,7 @@ export class Connection {
   requestFEDelegation = async (
     identity: SignIdentity
   ): Promise<DelegationIdentity> => {
-    const sessionKey = Ed25519KeyIdentity.generate();
+    const sessionKey = await ECDSAKeyIdentity.generate({ extractable: false });
     const tenMinutesInMsec = 10 * 1000 * 60;
     // Here the security device is used. Besides creating new keys, this is the only place.
     const chain = await DelegationChain.create(
