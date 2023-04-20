@@ -53,16 +53,11 @@ export const renderAddDeviceSuccess = (
   new Promise<void>((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(
-      addDeviceSuccess({
+      addDeviceSuccessTemplate({
         ...props,
         onContinue: resolve,
+        i18n: new I18n(),
       }),
       container
     );
-  });
-
-const addDeviceSuccess = (props: Omit<AddDeviceSuccessTemplateProps, "i18n">) =>
-  addDeviceSuccessTemplate({
-    ...props,
-    i18n: new I18n(),
   });
