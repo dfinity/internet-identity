@@ -18,7 +18,6 @@ import { withLoader } from "./components/loader";
 import { showMessage, showMessagePage } from "./components/message";
 import { promptUserNumber } from "./components/promptUserNumber";
 import { toast } from "./components/toast";
-import { aboutView } from "./flows/about";
 import { chooseDeviceAddFlow } from "./flows/addDevice/manage";
 import { pollForTentativeDevicePage } from "./flows/addDevice/manage/pollForTentativeDevice";
 import { verifyTentativeDevicePage } from "./flows/addDevice/manage/verifyTentativeDevice";
@@ -147,7 +146,6 @@ const iiPages: Record<string, () => void> = {
       userNumber,
       onContinue: () => console.log("done"),
     }),
-  about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
