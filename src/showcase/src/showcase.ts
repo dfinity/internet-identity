@@ -15,11 +15,14 @@ import { mkAnchorPicker } from "../../frontend/src/components/anchorPicker";
 import { authnPages } from "../../frontend/src/components/authenticateBox";
 import { displayError } from "../../frontend/src/components/displayError";
 import { withLoader } from "../../frontend/src/components/loader";
-import { showMessage } from "../../frontend/src/components/message";
+import {
+  showMessage,
+  showMessagePage,
+} from "../../frontend/src/components/message";
 import { promptUserNumber } from "../../frontend/src/components/promptUserNumber";
 import { toast } from "../../frontend/src/components/toast";
-import { aboutView } from "../../frontend/src/flows/about";
 import { chooseDeviceAddFlow } from "../../frontend/src/flows/addDevice/manage";
+import { addDeviceSuccessPage } from "../../frontend/src/flows/addDevice/manage/addDeviceSuccess";
 import { pollForTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/pollForTentativeDevice";
 import { verifyTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/verifyTentativeDevice";
 import { deviceRegistrationDisabledInfoPage } from "../../frontend/src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
@@ -27,6 +30,7 @@ import { showVerificationCodePage } from "../../frontend/src/flows/addDevice/wel
 import { authnTemplateAuthorize } from "../../frontend/src/flows/authorize";
 import { compatibilityNotice } from "../../frontend/src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "../../frontend/src/flows/dappsExplorer";
+import { getDapps } from "../../frontend/src/flows/dappsExplorer/dapps";
 import {
   authnTemplateManage,
   displayManagePage,
@@ -90,27 +94,15 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   origin: [],
 };
 
-const simpleDevices: [DeviceData, DeviceData] = [
-  {
-    alias: "Chrome on iPhone",
-    protection: { unprotected: null },
-    pubkey: [1, 2, 3, 4],
-    key_type: { unknown: null },
-    purpose: { authentication: null },
-    credential_id: [],
-    origin: [],
-  },
-
-  {
-    alias: "Yubikey Blue",
-    protection: { unprotected: null },
-    pubkey: [1, 2, 3, 5],
-    key_type: { unknown: null },
-    purpose: { authentication: null },
-    credential_id: [],
-    origin: [],
-  },
-];
+const chromeDevice: DeviceData = {
+  alias: "Chrome on iPhone",
+  protection: { unprotected: null },
+  pubkey: [1, 2, 3, 4],
+  key_type: { unknown: null },
+  purpose: { authentication: null },
+  credential_id: [],
+  origin: [],
+};
 
 const defaultPage = () => {
   document.title = "Showcase";
@@ -156,7 +148,6 @@ const iiPages: Record<string, () => void> = {
       userNumber,
       onContinue: () => console.log("done"),
     }),
-  about: () => aboutView(),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   pickRecoveryDevice: () =>
     pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
@@ -263,7 +254,8 @@ const iiPages: Record<string, () => void> = {
         return Promise.resolve();
       }
     ),
-  displayManage: () =>
+  displayManage: async () => {
+    const dapps = await getDapps();
     displayManagePage({
       userNumber,
       devices: {
@@ -299,11 +291,14 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      dapps,
       exploreDapps: () => {
         console.log("explore dapps");
       },
-    }),
-  displayManageSingle: () =>
+    });
+  },
+  displayManageSingle: async () => {
+    const dapps = await getDapps();
     displayManagePage({
       userNumber,
       devices: {
@@ -323,10 +318,12 @@ const iiPages: Record<string, () => void> = {
       addRecoveryKey: () => {
         console.log("add recovery key");
       },
+      dapps,
       exploreDapps: () => {
         console.log("explore dapps");
       },
-    }),
+    });
+  },
   chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
@@ -348,7 +345,7 @@ const iiPages: Record<string, () => void> = {
     }),
   showVerificationCode: () =>
     showVerificationCodePage({
-      alias: simpleDevices[0].alias,
+      alias: chromeDevice.alias,
       tentativeRegistrationInfo: {
         verification_code: "123456",
         device_registration_timeout: undefined as unknown as Timestamp,
@@ -362,7 +359,7 @@ const iiPages: Record<string, () => void> = {
     }),
   verifyTentativeDevice: () =>
     verifyTentativeDevicePage({
-      alias: simpleDevices[0].alias,
+      alias: chromeDevice.alias,
       cancel: () => console.log("canceled"),
       verify: () => Promise.resolve({ retry: null }),
       doContinue: (v) => console.log("continue with:", v),
@@ -416,8 +413,20 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: () =>
-    dappsExplorerPage({ i18n, back: () => console.log("back") }),
+  dappsExplorer: async () => {
+    const dapps = await getDapps();
+    dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
+  },
+  showMessage: () =>
+    showMessagePage({
+      message: "You may close this page.",
+    }),
+  addDeviceSuccess: () =>
+    addDeviceSuccessPage({
+      i18n,
+      deviceAlias: chromeDevice.alias,
+      onContinue: () => console.log("Continue"),
+    }),
 };
 
 const showcase: TemplateResult = html`

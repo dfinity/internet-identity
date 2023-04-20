@@ -14,8 +14,7 @@ pub fn register_anchor_with_device(
     canister_id: CanisterId,
     device: &DeviceData,
 ) -> AnchorNumber {
-    let principal = Principal::self_authenticating(&device.pubkey);
-    register_anchor_with(env, canister_id, principal, device)
+    register_anchor_with(env, canister_id, device.principal(), device)
 }
 
 pub fn register_anchor_with(
@@ -30,7 +29,7 @@ pub fn register_anchor_with(
         canister_id,
         sender,
         device_data,
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },

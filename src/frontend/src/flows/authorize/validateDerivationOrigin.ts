@@ -1,4 +1,5 @@
 import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
 import { wrapError } from "../../utils/utils";
 
 // Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
@@ -26,10 +27,7 @@ export const validateDerivationOrigin = async (
   authRequestOrigin: string,
   derivationOrigin?: string
 ): Promise<ValidationResult> => {
-  if (
-    derivationOrigin === undefined ||
-    derivationOrigin === authRequestOrigin
-  ) {
+  if (isNullish(derivationOrigin) || derivationOrigin === authRequestOrigin) {
     // this is the default behaviour -> no further validation necessary
     return { result: "valid" };
   }

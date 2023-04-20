@@ -10,8 +10,7 @@ use canister_tests::framework::{
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Challenge, ChallengeAttempt, DeviceData, DeviceProtection, KeyType, Purpose,
-    RegisterResponse,
+    AnchorNumber, Challenge, ChallengeAttempt, DeviceData, RegisterResponse,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -41,7 +40,7 @@ fn should_remove_temp_key_on_device_deletion() -> Result<(), CallError> {
 
     let anchor = register_with_temp_key(&env, canister_id, temp_key, &device);
 
-    api::remove(&env, canister_id, temp_key, anchor, device.pubkey)?;
+    api::remove(&env, canister_id, temp_key, anchor, &device.pubkey)?;
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
     expect_user_error_with_message(
@@ -67,8 +66,8 @@ fn should_remove_temp_key_on_device_replacement() -> Result<(), CallError> {
         canister_id,
         temp_key,
         anchor,
-        device.pubkey,
-        device_data_2(),
+        &device.pubkey,
+        &device_data_2(),
     )?;
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
@@ -107,16 +106,15 @@ fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let device = device_data_1();
-    let temp_key = Principal::self_authenticating(&device.pubkey);
 
     let challenge = api::create_challenge(&env, canister_id).unwrap();
     let response = api::register(
         &env,
         canister_id,
-        temp_key,
+        device.principal(),
         &device,
-        challenge_solution(challenge),
-        Some(temp_key),
+        &challenge_solution(challenge),
+        Some(device.principal()),
     );
 
     expect_user_error_with_message(
@@ -184,7 +182,7 @@ fn register_with_temp_key(
         canister_id,
         temp_key,
         device,
-        challenge_solution(challenge),
+        &challenge_solution(challenge),
         Some(temp_key),
     )
     .unwrap();
@@ -206,10 +204,6 @@ fn device(n: u64) -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([n as u8; 64]),
         alias: "Device ".to_string() + n.to_string().as_str(),
-        credential_id: None,
-        purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::auth_test_device()
     }
 }

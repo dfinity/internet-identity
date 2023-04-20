@@ -24,7 +24,6 @@
     "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts jest.config.ts demos"
   },
   "devDependencies": {
-    "@lit-labs/ssr": "^2.2.3",
     "@testing-library/jest-dom": "~5",
     "@trust/webcrypto": "^0.9.2",
     "@types/jest": "~29",
@@ -53,6 +52,7 @@
     "@dfinity/candid": "0.15.5",
     "@dfinity/identity": "0.15.5",
     "@dfinity/principal": "0.15.5",
+    "@dfinity/utils": "^0.0.14",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
     "lit-html": "^2.3.1",

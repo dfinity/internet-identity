@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import {
   IdentityAnchorInfo,
   Timestamp,
@@ -5,6 +6,7 @@ import {
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
+import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
 
@@ -26,7 +28,7 @@ export const addRemoteDevice = async ({
     );
 
   let tentativeDevice = anchorInfo.device_registration[0]?.tentative_device[0];
-  if (tentativeDevice === undefined) {
+  if (isNullish(tentativeDevice)) {
     // If no device was tentatively added yet, poll until one is added
     const result = await pollForTentativeDevice(
       userNumber,
@@ -52,9 +54,13 @@ export const addRemoteDevice = async ({
     tentativeDevice = result;
   }
 
+  const { alias } = tentativeDevice;
+
   await verifyTentativeDevice({
     connection,
-    alias: tentativeDevice.alias,
+    alias,
     endTimestamp: timestamp,
   });
+
+  await renderAddDeviceSuccess({ deviceAlias: alias });
 };

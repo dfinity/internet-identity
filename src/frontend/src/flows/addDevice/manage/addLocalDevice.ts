@@ -9,6 +9,7 @@ import {
   creationOptions,
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
+import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({
@@ -61,6 +62,8 @@ export const addLocalDevice = async (
         newDevice.rawId
       )
     );
+
+    await renderAddDeviceSuccess({ deviceAlias: deviceName });
   } catch (error: unknown) {
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()

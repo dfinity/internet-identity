@@ -68,7 +68,7 @@ fn can_register_remote_device() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let verification_code = match add_response {
         AddTentativeDeviceResponse::AddedTentatively {
@@ -81,7 +81,7 @@ fn can_register_remote_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        verification_code,
+        &verification_code,
     )?;
 
     assert!(matches!(
@@ -104,7 +104,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let verification_code = match add_response {
         AddTentativeDeviceResponse::AddedTentatively {
@@ -119,7 +119,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
             canister_id,
             principal_1(),
             user_number,
-            "invalid code".to_string()
+            "invalid code"
         )?,
         VerifyTentativeDeviceResponse::WrongCode { retries_left: 2 }
     ));
@@ -129,7 +129,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        verification_code,
+        &verification_code,
     )?;
 
     assert!(matches!(
@@ -149,13 +149,7 @@ fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
     let new_device = device_data_2();
-    api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        new_device.clone(),
-    )?;
+    api::add_tentative_device(&env, canister_id, principal_2(), user_number, &new_device)?;
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
 
     assert!(matches!(
@@ -182,7 +176,7 @@ fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError
         canister_id,
         principal_2(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     assert!(matches!(
@@ -207,7 +201,7 @@ fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallE
         canister_id,
         principal_2(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     assert!(matches!(
@@ -226,13 +220,8 @@ fn reject_verification_without_tentative_device() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-    let verification_response = api::verify_tentative_device(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        "some code".to_string(),
-    )?;
+    let verification_response =
+        api::verify_tentative_device(&env, canister_id, principal_1(), user_number, "some code")?;
 
     assert!(matches!(
         verification_response,
@@ -255,7 +244,7 @@ fn reject_verification_with_wrong_code() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     for expected_retries in (0..MAX_RETRIES).rev() {
         assert!(matches!(
@@ -264,7 +253,7 @@ fn reject_verification_with_wrong_code() -> Result<(), CallError> {
                 canister_id,
                 principal_1(),
                 user_number,
-                "invalid code".to_string()
+                "invalid code"
             )?,
             VerifyTentativeDeviceResponse::WrongCode {
                 retries_left
@@ -278,7 +267,7 @@ fn reject_verification_with_wrong_code() -> Result<(), CallError> {
             canister_id,
             principal_1(),
             user_number,
-            "invalid code".to_string()
+            "invalid code"
         )?,
         VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
     ));

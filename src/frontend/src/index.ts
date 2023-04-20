@@ -2,7 +2,6 @@ import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
-import { aboutView } from "./flows/about";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
@@ -14,6 +13,7 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
+import { isNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
 
 // Polyfill Buffer globally for the browser
@@ -27,7 +27,7 @@ globalThis.Buffer = Buffer;
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
-  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
+  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -90,10 +90,6 @@ const init = async () => {
     const faqUrl =
       "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity";
     window.location.replace(faqUrl);
-  }
-
-  if (window.location.pathname === "/about") {
-    return aboutView();
   }
 
   const okOrReason = await checkRequiredFeatures(url);

@@ -39,7 +39,7 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
         canister_id,
         principal(&ic0_app_device),
         both_domains_anchor,
-        internetcomputer_org_device.clone(),
+        &internetcomputer_org_device,
     )?;
     // some activity on the other domain for the both_domains_anchor
     api::get_anchor_info(
@@ -147,7 +147,7 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
         canister_id,
         principal(&ic0_app_device),
         both_domains_anchor,
-        internetcomputer_org_device.clone(),
+        &internetcomputer_org_device,
     )?;
     // some activity on the other domain for the both_domains_anchor
     api::get_anchor_info(
@@ -501,16 +501,16 @@ fn should_count_activity_on_other_and_ii_domain() -> Result<(), CallError> {
     api::add(
         &env,
         canister_id,
-        principal(&other_origin_device),
+        other_origin_device.principal(),
         anchor_number,
-        internetcomputer_org_device.clone(),
+        &internetcomputer_org_device,
     )?;
 
     // some activity on the II domain device
     api::get_anchor_info(
         &env,
         canister_id,
-        principal(&internetcomputer_org_device),
+        internetcomputer_org_device.principal(),
         anchor_number,
     )?;
 
