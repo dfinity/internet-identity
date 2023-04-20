@@ -15,7 +15,7 @@ impl From<DeviceWithUsage> for DeviceData {
             key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
-            meta_data: device.meta_data,
+            metadata: device.metadata,
         }
     }
 }
@@ -31,7 +31,7 @@ impl From<DeviceData> for DeviceWithUsage {
             protection: device.protection,
             origin: device.origin,
             last_usage: None,
-            meta_data: device.meta_data,
+            metadata: device.metadata,
         }
     }
 }

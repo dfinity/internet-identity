@@ -61,13 +61,13 @@ export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'failed' : string };
 export interface DeviceData {
   'alias' : string,
+  'metadata' : [] | [MetadataMap],
   'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
-  'meta_data' : [] | [MetaDataMap],
 }
 export type DeviceKey = PublicKey;
 export type DeviceProtection = { 'unprotected' : null } |
@@ -79,13 +79,13 @@ export interface DeviceRegistrationInfo {
 export interface DeviceWithUsage {
   'alias' : string,
   'last_usage' : [] | [Timestamp],
+  'metadata' : [] | [MetadataMap],
   'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
-  'meta_data' : [] | [MetaDataMap],
 }
 export interface DomainActiveAnchorCounter {
   'start_timestamp' : Timestamp,
@@ -148,10 +148,10 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
-export type MetaDataMap = Array<
+export type MetadataMap = Array<
   [
     string,
-    { 'map' : MetaDataMap } |
+    { 'map' : MetadataMap } |
       { 'string' : string } |
       { 'bytes' : Uint8Array | number[] },
   ]

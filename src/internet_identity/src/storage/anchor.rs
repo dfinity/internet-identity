@@ -28,7 +28,7 @@ impl Device {
         self.key_type = device_data.key_type;
         self.protection = device_data.protection;
         self.origin = device_data.origin;
-        self.meta_data = device_data.meta_data;
+        self.metadata = device_data.metadata;
     }
 }
 
@@ -43,7 +43,7 @@ impl From<DeviceData> for Device {
             protection: device_data.protection,
             origin: device_data.origin,
             last_usage_timestamp: None,
-            meta_data: device_data.meta_data,
+            metadata: device_data.metadata,
         }
     }
 }
@@ -58,7 +58,7 @@ impl From<Device> for DeviceData {
             key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
-            meta_data: device.meta_data,
+            metadata: device.metadata,
         }
     }
 }
@@ -74,7 +74,7 @@ impl From<Device> for DeviceWithUsage {
             protection: device.protection,
             origin: device.origin,
             last_usage: device.last_usage_timestamp,
-            meta_data: device.meta_data,
+            metadata: device.metadata,
         }
     }
 }
@@ -284,7 +284,7 @@ pub struct Device {
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage_timestamp: Option<Timestamp>,
-    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
+    pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 impl Device {
@@ -293,25 +293,21 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
-            + self
-                .meta_data
-                .as_ref()
-                .map(Self::meta_data_len)
-                .unwrap_or(0)
+            + self.metadata.as_ref().map(Self::metadata_len).unwrap_or(0)
     }
 
-    fn meta_data_len(meta_data: &HashMap<String, MetaDataEntry>) -> usize {
-        meta_data
+    fn metadata_len(metadata: &HashMap<String, MetadataEntry>) -> usize {
+        metadata
             .iter()
-            .map(|(key, value)| key.len() + Self::meta_data_entry_len(value))
+            .map(|(key, value)| key.len() + Self::metadata_entry_len(value))
             .sum()
     }
 
-    fn meta_data_entry_len(entry: &MetaDataEntry) -> usize {
+    fn metadata_entry_len(entry: &MetadataEntry) -> usize {
         match entry {
-            MetaDataEntry::String(value) => value.len(),
-            MetaDataEntry::Bytes(value) => value.len(),
-            MetaDataEntry::Map(data) => Self::meta_data_len(data),
+            MetadataEntry::String(value) => value.len(),
+            MetadataEntry::Bytes(value) => value.len(),
+            MetadataEntry::Map(data) => Self::metadata_len(data),
         }
     }
 

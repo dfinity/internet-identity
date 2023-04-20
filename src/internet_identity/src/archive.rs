@@ -415,11 +415,11 @@ pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
         } else {
             Some(new.origin.clone())
         },
-        meta_data: if old.meta_data == new.meta_data {
+        metadata: if old.metadata == new.metadata {
             None
         } else {
             Some(
-                new.meta_data
+                new.metadata
                     .as_ref()
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default(),

@@ -154,7 +154,7 @@ export class Connection {
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),
-          meta_data: [],
+          metadata: [],
         },
         challengeResult,
         [tempIdentity.getPrincipal()]
@@ -518,7 +518,7 @@ export class AuthenticatedConnection extends Connection {
       purpose,
       protection,
       origin: readDeviceOrigin(),
-      meta_data: [],
+      metadata: [],
     });
   };
 

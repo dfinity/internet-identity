@@ -23,7 +23,7 @@ const recoveryPhrase: DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
-  meta_data: [],
+  metadata: [],
 };
 
 const authenticator: DeviceData = {
@@ -34,7 +34,7 @@ const authenticator: DeviceData = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
-  meta_data: [],
+  metadata: [],
 };
 
 test("recovery phrases don't have origin warnings", () => {

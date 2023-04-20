@@ -1,7 +1,7 @@
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    DeviceData, DeviceProtection, KeyType, MetaDataEntry, Purpose, Timestamp,
+    DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -126,7 +126,7 @@ fn should_enforce_cumulative_device_limit() {
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: None,
-        meta_data: None,
+        metadata: None,
     };
 
     let result = anchor.add_device(device);
@@ -167,7 +167,7 @@ fn should_allow_protection_only_on_recovery_phrases() {
         protection: DeviceProtection::Protected,
         origin: None,
         last_usage_timestamp: None,
-        meta_data: None,
+        metadata: None,
     });
 
     assert!(matches!(
@@ -340,16 +340,16 @@ fn should_update_timestamp() {
 /// Tests that `apply_data` actually applies all the writeable fields.
 #[test]
 fn should_apply_all_fields() {
-    let mut meta_data = HashMap::new();
-    meta_data.insert(
+    let mut metadata = HashMap::new();
+    metadata.insert(
         "entry1".to_string(),
-        MetaDataEntry::String("bar".to_string()),
+        MetadataEntry::String("bar".to_string()),
     );
-    meta_data.insert(
+    metadata.insert(
         "entry2".to_string(),
-        MetaDataEntry::Bytes(ByteBuf::from("foo")),
+        MetadataEntry::Bytes(ByteBuf::from("foo")),
     );
-    meta_data.insert("entry3".to_string(), MetaDataEntry::Map(meta_data.clone()));
+    metadata.insert("entry3".to_string(), MetadataEntry::Map(metadata.clone()));
 
     let device_data = DeviceData {
         pubkey: ByteBuf::from("some different public key"),
@@ -359,7 +359,7 @@ fn should_apply_all_fields() {
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Protected,
         origin: Some("https://some.other.origin".to_string()),
-        meta_data: Some(meta_data.clone()),
+        metadata: Some(metadata.clone()),
     };
     let mut device = sample_device();
     device.apply_device_data(device_data.clone());
@@ -377,7 +377,7 @@ fn sample_device() -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some("https://fooo.bar".to_string()),
         last_usage_timestamp: Some(465789),
-        meta_data: None,
+        metadata: None,
     }
 }
 
@@ -391,7 +391,7 @@ fn device(n: u8) -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some(format!("https://foo{n}.bar")),
         last_usage_timestamp: Some(n as u64),
-        meta_data: None,
+        metadata: None,
     }
 }
 
@@ -406,9 +406,9 @@ fn large_device(n: u8) -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
         last_usage_timestamp: Some(12345679),
-        meta_data: Some(HashMap::from([(
+        metadata: Some(HashMap::from([(
             "key".to_string(),
-            MetaDataEntry::String("a".repeat(40)),
+            MetadataEntry::String("a".repeat(40)),
         )])),
     }
 }
@@ -423,7 +423,7 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
         protection,
         origin: None,
         last_usage_timestamp: None,
-        meta_data: None,
+        metadata: None,
     }
 }
 

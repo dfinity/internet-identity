@@ -774,7 +774,7 @@ mod stable_memory_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
-                    meta_data: None,
+                    metadata: None,
                 },
             },
             timestamp: TIMESTAMP,

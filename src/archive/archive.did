@@ -66,6 +66,8 @@ type DeviceDataUpdate = record {
     key_type: opt KeyType;
     protection: opt DeviceProtection;
     origin: opt opt text;
+    // If present, the metadata has been changed and now contains the given keys.
+    metadata: opt vec text;
 };
 
 type Private = variant {

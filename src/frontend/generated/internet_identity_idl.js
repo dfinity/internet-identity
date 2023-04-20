@@ -1,5 +1,5 @@
 export const idlFactory = ({ IDL }) => {
-  const MetaDataMap = IDL.Rec();
+  const MetadataMap = IDL.Rec();
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -18,6 +18,18 @@ export const idlFactory = ({ IDL }) => {
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
+  MetadataMap.fill(
+    IDL.Vec(
+      IDL.Tuple(
+        IDL.Text,
+        IDL.Variant({
+          'map' : MetadataMap,
+          'string' : IDL.Text,
+          'bytes' : IDL.Vec(IDL.Nat8),
+        }),
+      )
+    )
+  );
   const DeviceProtection = IDL.Variant({
     'unprotected' : IDL.Null,
     'protected' : IDL.Null,
@@ -35,27 +47,15 @@ export const idlFactory = ({ IDL }) => {
     'recovery' : IDL.Null,
   });
   const CredentialId = IDL.Vec(IDL.Nat8);
-  MetaDataMap.fill(
-    IDL.Vec(
-      IDL.Tuple(
-        IDL.Text,
-        IDL.Variant({
-          'map' : MetaDataMap,
-          'string' : IDL.Text,
-          'bytes' : IDL.Vec(IDL.Nat8),
-        }),
-      )
-    )
-  );
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
+    'metadata' : IDL.Opt(MetadataMap),
     'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
-    'meta_data' : IDL.Opt(MetaDataMap),
   });
   const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
@@ -94,13 +94,13 @@ export const idlFactory = ({ IDL }) => {
   const DeviceWithUsage = IDL.Record({
     'alias' : IDL.Text,
     'last_usage' : IDL.Opt(Timestamp),
+    'metadata' : IDL.Opt(MetadataMap),
     'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
-    'meta_data' : IDL.Opt(MetaDataMap),
   });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),

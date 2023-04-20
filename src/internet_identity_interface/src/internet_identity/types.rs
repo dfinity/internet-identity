@@ -25,7 +25,7 @@ pub struct DeviceData {
     pub key_type: KeyType,
     pub protection: DeviceProtection,
     pub origin: Option<String>,
-    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
+    pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -38,7 +38,7 @@ pub struct DeviceWithUsage {
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage: Option<Timestamp>,
-    pub meta_data: Option<HashMap<String, MetaDataEntry>>,
+    pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -80,13 +80,13 @@ pub enum DeviceProtection {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub enum MetaDataEntry {
+pub enum MetadataEntry {
     #[serde(rename = "string")]
     String(String),
     #[serde(rename = "bytes")]
     Bytes(ByteBuf),
     #[serde(rename = "map")]
-    Map(HashMap<String, MetaDataEntry>),
+    Map(HashMap<String, MetadataEntry>),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

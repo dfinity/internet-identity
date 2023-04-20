@@ -308,7 +308,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
-                    meta_data: None,
+                    metadata: None,
                 },
             },
             timestamp,
@@ -371,9 +371,9 @@ mod pull_entries_tests {
         let mut device = DeviceData::auth_test_device();
         let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
 
-        device.meta_data = Some(HashMap::from_iter(vec![(
+        device.metadata = Some(HashMap::from_iter(vec![(
             METADATA_KEY.to_string(),
-            MetaDataEntry::String("some value".to_string()),
+            MetadataEntry::String("some value".to_string()),
         )]));
 
         ii_api::update(
@@ -404,7 +404,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
-                    meta_data: Some(vec![METADATA_KEY.to_string()]),
+                    metadata: Some(vec![METADATA_KEY.to_string()]),
                 },
             },
             timestamp,

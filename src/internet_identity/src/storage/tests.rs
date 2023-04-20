@@ -330,7 +330,7 @@ fn sample_device() -> Device {
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: Some(1234),
-        meta_data: None,
+        metadata: None,
     }
 }
 

@@ -299,9 +299,9 @@ pub fn large_size_device() -> DeviceData {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
-        meta_data: Some(HashMap::from([(
+        metadata: Some(HashMap::from([(
             "key".to_string(),
-            MetaDataEntry::String("a".repeat(100)),
+            MetadataEntry::String("a".repeat(100)),
         )])),
         ..DeviceData::auth_test_device()
     }
@@ -621,7 +621,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
                 origin: Some(Some("foo.bar".to_string())),
-                meta_data: None,
+                metadata: None,
             },
         },
         sequence_number: idx,
