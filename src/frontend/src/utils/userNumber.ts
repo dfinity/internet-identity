@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { unknownToRecord } from "./utils";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
@@ -147,7 +148,7 @@ const readAnchors = (): Anchors => {
 
   for (const ix in objects) {
     const anchor = asAnchor(objects[ix]);
-    if (anchor === undefined) {
+    if (isNullish(anchor)) {
       console.warn("Could not read anchor", objects[ix]);
       continue;
     }
@@ -161,7 +162,7 @@ const readAnchors = (): Anchors => {
 /** Try to interpret an unknown value as an anchor */
 const asAnchor = (msg: unknown): Anchor | undefined => {
   const obj: Record<string, unknown> | undefined = unknownToRecord(msg);
-  if (obj === undefined) {
+  if (isNullish(obj)) {
     return undefined;
   }
 

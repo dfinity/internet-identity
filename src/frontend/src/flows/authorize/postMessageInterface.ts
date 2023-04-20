@@ -1,6 +1,7 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
 import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
 import { LoginData } from "../../utils/flowResult";
 import { unknownToRecord } from "../../utils/utils";
 import { fetchDelegation } from "./fetchDelegation";
@@ -41,7 +42,7 @@ export interface AuthRequest {
 const asAuthRequest = (msg: unknown): AuthRequest | string => {
   const obj = unknownToRecord(msg);
 
-  if (obj === undefined) {
+  if (isNullish(obj)) {
     return "request is undefined";
   }
 

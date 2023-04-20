@@ -1,5 +1,7 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
+import { isNullish } from "@dfinity/utils";
+
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
   // Object's toString, and if not we go through the remaining types.
@@ -52,7 +54,7 @@ export function asNonEmptyArray<T>(
 
   const first = arr.shift();
 
-  if (first === undefined) {
+  if (isNullish(first)) {
     return undefined;
   }
 

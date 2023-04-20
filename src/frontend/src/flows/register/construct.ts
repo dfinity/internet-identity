@@ -1,4 +1,5 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { isNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";
 import { nextTick } from "process";
 import { DeviceData } from "../../../generated/internet_identity_types";
@@ -47,10 +48,9 @@ export const constructIdentity = async ({
   renderConstructing({ message });
   await tick();
 
-  const opts =
-    devices === undefined
-      ? creationOptions()
-      : creationOptions(await devices());
+  const opts = isNullish(devices)
+    ? creationOptions()
+    : creationOptions(await devices());
 
   /* The Identity (i.e. key pair) used when creating the anchor.
    * If "II_DUMMY_AUTH" is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
