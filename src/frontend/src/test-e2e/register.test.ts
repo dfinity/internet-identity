@@ -92,6 +92,12 @@ test("Register new identity and add additional device", async () => {
 
     await browser.pause(10_000);
 
+    // success page
+    const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+    await addDeviceSuccessView.waitForDisplay();
+    await addDeviceSuccessView.continue();
+
+    // home
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
 
