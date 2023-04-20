@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -43,7 +44,7 @@ export const mkAnchorInput = ({
     if (result === "invalid") {
       return showHint("Invalid Anchor");
     }
-    if (result === undefined) {
+    if (isNullish(result)) {
       return showHint("Please enter an Anchor");
     }
     onSubmit(result);

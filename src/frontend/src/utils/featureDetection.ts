@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { features } from "../features";
 import { wrapError } from "./utils";
 
@@ -8,7 +9,7 @@ export const checkRequiredFeatures = async (
     // do not check for webauthn compatibility if DUMMY_AUTH is enabled
     return true;
   }
-  if (window.PublicKeyCredential === undefined)
+  if (isNullish(window.PublicKeyCredential))
     return "window.PublicKeyCredential is not defined";
   if (url.hash === "#compatibilityNotice")
     return "Remove #compatibilityNotice from the URL and try again.";

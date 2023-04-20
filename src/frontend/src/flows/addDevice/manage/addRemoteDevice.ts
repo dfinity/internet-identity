@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import {
   IdentityAnchorInfo,
   Timestamp,
@@ -27,7 +28,7 @@ export const addRemoteDevice = async ({
     );
 
   let tentativeDevice = anchorInfo.device_registration[0]?.tentative_device[0];
-  if (tentativeDevice === undefined) {
+  if (isNullish(tentativeDevice)) {
     // If no device was tentatively added yet, poll until one is added
     const result = await pollForTentativeDevice(
       userNumber,
