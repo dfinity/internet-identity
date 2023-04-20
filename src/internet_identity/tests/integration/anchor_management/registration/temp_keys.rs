@@ -40,7 +40,7 @@ fn should_remove_temp_key_on_device_deletion() -> Result<(), CallError> {
 
     let anchor = register_with_temp_key(&env, canister_id, temp_key, &device);
 
-    api::remove(&env, canister_id, temp_key, anchor, device.pubkey)?;
+    api::remove(&env, canister_id, temp_key, anchor, &device.pubkey)?;
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
     expect_user_error_with_message(
@@ -66,8 +66,8 @@ fn should_remove_temp_key_on_device_replacement() -> Result<(), CallError> {
         canister_id,
         temp_key,
         anchor,
-        device.pubkey,
-        device_data_2(),
+        &device.pubkey,
+        &device_data_2(),
     )?;
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
@@ -113,7 +113,7 @@ fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), CallError> {
         canister_id,
         device.principal(),
         &device,
-        challenge_solution(challenge),
+        &challenge_solution(challenge),
         Some(device.principal()),
     );
 
@@ -182,7 +182,7 @@ fn register_with_temp_key(
         canister_id,
         temp_key,
         device,
-        challenge_solution(challenge),
+        &challenge_solution(challenge),
         Some(temp_key),
     )
     .unwrap();

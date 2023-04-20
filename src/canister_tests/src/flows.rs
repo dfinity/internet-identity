@@ -29,7 +29,7 @@ pub fn register_anchor_with(
         canister_id,
         sender,
         device_data,
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
         },
