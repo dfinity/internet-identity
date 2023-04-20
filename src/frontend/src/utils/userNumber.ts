@@ -46,7 +46,7 @@ const getAnchors = (): bigint[] => {
 
 const setAnchorUsedMigrated = (anchor: bigint) => {
   migrate();
-  return setAnchorUsed(anchor);
+  setAnchorUsed(anchor);
 };
 
 /** Set the most recently used anchor */
