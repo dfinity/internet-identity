@@ -62,10 +62,11 @@
     "@dfinity/candid": "0.15.5",
     "@dfinity/identity": "0.15.5",
     "@dfinity/principal": "0.15.5",
+    "@dfinity/utils": "^0.0.14",
     "bip39": "^3.0.4",
     "lit-html": "^2.7.2",
-    "text-encoding": "^0.7.0",
-    "qr-creator": "^1.0.0"
+    "qr-creator": "^1.0.0",
+    "text-encoding": "^0.7.0"
   },
   "engines": {
     "npm": ">=9.0.0 <10.0.0",
