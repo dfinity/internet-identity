@@ -29,7 +29,7 @@ const addDeviceSuccessTemplate = ({
     >
     <div class="l-stack">
       <button
-        @click=${onContinue}
+        @click=${() => onContinue()}
         class="c-button c-button--primary"
         id="continueToHome"
       >
