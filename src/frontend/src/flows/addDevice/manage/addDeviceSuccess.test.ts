@@ -1,32 +1,7 @@
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
-import copyJson from "./addDeviceSuccess.json";
 
 describe("addDeviceSuccess", () => {
   const deviceAlias = "Test device alias";
-
-  const { en } = copyJson;
-
-  const waitFor = (callback: () => void): Promise<void> =>
-    new Promise((resolve) => {
-      const start = Date.now();
-
-      const callCallback = () => {
-        if (Date.now() > start + 10 * 1000) {
-          resolve();
-          return;
-        }
-
-        try {
-          callback();
-          resolve();
-        } catch (err: unknown) {
-          // Ignore error and try again in a bit
-          setTimeout(callCallback, 100);
-        }
-      };
-
-      callCallback();
-    });
 
   beforeAll(() => {
     const pageContent = document.createElement("div");
