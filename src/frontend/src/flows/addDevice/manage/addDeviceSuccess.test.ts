@@ -48,7 +48,7 @@ describe("addDeviceSuccess", () => {
       deviceAlias,
     });
 
-    expect(document.querySelector("button")).not.toBeNull();
+    expect(document.querySelector('[data-action="continueToHome"]')).not.toBeNull();
   });
 
   it("should resolve promise on click to continue", (done) => {
@@ -56,6 +56,8 @@ describe("addDeviceSuccess", () => {
       deviceAlias,
     }).then(() => done());
 
-    document.querySelector("button")?.click();
+    document
+      .querySelector<HTMLButtonElement>('[data-action="continueToHome"]')
+      ?.click();
   });
 });
