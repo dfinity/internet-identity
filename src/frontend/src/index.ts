@@ -14,6 +14,7 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
+import { isNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
 
 /** Reads the canister ID from the <script> tag.
@@ -23,7 +24,7 @@ import copyJson from "./index.json";
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
-  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
+  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
       title: "Canister ID not set",
       message:

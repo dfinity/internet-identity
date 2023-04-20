@@ -1,5 +1,5 @@
 import { html, TemplateResult } from "lit-html";
-import { ifDefined } from "lit/directives/if-defined.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import { footer } from "./footer";
 import { icLogo } from "./icons";
 

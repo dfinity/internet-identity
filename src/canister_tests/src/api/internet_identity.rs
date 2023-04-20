@@ -5,7 +5,6 @@ use ic_test_state_machine_client::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types;
-use serde_bytes::ByteBuf;
 
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
@@ -30,7 +29,7 @@ pub fn register(
     canister_id: CanisterId,
     sender: Principal,
     device_data: &types::DeviceData,
-    challenge_attempt: types::ChallengeAttempt,
+    challenge_attempt: &types::ChallengeAttempt,
     temp_key: Option<Principal>,
 ) -> Result<types::RegisterResponse, CallError> {
     call_candid_as(
@@ -48,8 +47,8 @@ pub fn prepare_delegation(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    frontend_hostname: types::FrontendHostname,
-    session_key: types::SessionKey,
+    frontend_hostname: &str,
+    session_key: &types::SessionKey,
     max_time_to_live: Option<u64>,
 ) -> Result<(types::UserKey, types::Timestamp), CallError> {
     call_candid_as(
@@ -75,8 +74,8 @@ pub fn get_delegation(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    frontend_hostname: types::FrontendHostname,
-    session_key: types::SessionKey,
+    frontend_hostname: &str,
+    session_key: &types::SessionKey,
     timestamp: u64,
 ) -> Result<types::GetDelegationResponse, CallError> {
     query_candid_as(
@@ -94,7 +93,7 @@ pub fn get_principal(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    frontend_hostname: types::FrontendHostname,
+    frontend_hostname: &str,
 ) -> Result<Principal, CallError> {
     query_candid_as(
         env,
@@ -127,7 +126,7 @@ pub fn add(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    device_data: types::DeviceData,
+    device_data: &types::DeviceData,
 ) -> Result<(), CallError> {
     call_candid_as(
         env,
@@ -143,8 +142,8 @@ pub fn update(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    device_key: types::PublicKey,
-    device_data: types::DeviceData,
+    device_key: &types::PublicKey,
+    device_data: &types::DeviceData,
 ) -> Result<(), CallError> {
     call_candid_as(
         env,
@@ -160,8 +159,8 @@ pub fn replace(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    device_key: types::PublicKey,
-    device_data: types::DeviceData,
+    device_key: &types::PublicKey,
+    device_data: &types::DeviceData,
 ) -> Result<(), CallError> {
     call_candid_as(
         env,
@@ -177,7 +176,7 @@ pub fn remove(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    device_key: types::PublicKey,
+    device_key: &types::PublicKey,
 ) -> Result<(), CallError> {
     call_candid_as(
         env,
@@ -240,7 +239,7 @@ pub fn add_tentative_device(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    device_data: types::DeviceData,
+    device_data: &types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
     call_candid_as(
         env,
@@ -257,7 +256,7 @@ pub fn verify_tentative_device(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-    verification_code: types::DeviceVerificationCode,
+    verification_code: &str,
 ) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
     call_candid_as(
         env,
@@ -272,7 +271,7 @@ pub fn verify_tentative_device(
 pub fn deploy_archive(
     env: &StateMachine,
     canister_id: CanisterId,
-    wasm: ByteBuf,
+    wasm: &Vec<u8>,
 ) -> Result<types::DeployArchiveResult, CallError> {
     call_candid(env, canister_id, "deploy_archive", (wasm,)).map(|(x,)| x)
 }

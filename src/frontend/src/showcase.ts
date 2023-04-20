@@ -15,7 +15,7 @@ import { mkAnchorPicker } from "./components/anchorPicker";
 import { authnPages } from "./components/authenticateBox";
 import { displayError } from "./components/displayError";
 import { withLoader } from "./components/loader";
-import { showMessage } from "./components/message";
+import { showMessage, showMessagePage } from "./components/message";
 import { promptUserNumber } from "./components/promptUserNumber";
 import { toast } from "./components/toast";
 import { aboutView } from "./flows/about";
@@ -417,6 +417,10 @@ const iiPages: Record<string, () => void> = {
     const dapps = await getDapps();
     dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
   },
+  showMessage: () =>
+    showMessagePage({
+      message: "You may close this page.",
+    }),
 };
 
 const showcase: TemplateResult = html`
@@ -448,7 +452,7 @@ const components = (): TemplateResult => {
       moreOptions: () => console.log("More options requested"),
     }).template;
 
-  const chan = new Chan<TemplateResult>();
+  const chan = new Chan<TemplateResult>(html`loading...`);
 
   const update = () => {
     const value = savedAnchors.value?.value;

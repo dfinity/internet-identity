@@ -1,4 +1,4 @@
-import { Ed25519KeyIdentity } from "@dfinity/identity";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -15,6 +15,7 @@ import {
 import { autofocus, renderPage, withRef } from "../../utils/lit-html";
 import { Chan } from "../../utils/utils";
 
+import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
 
 // A symbol that we can differentiate from generic `T` types
@@ -39,27 +40,20 @@ export const promptCaptchaTemplate = <T>({
 }) => {
   const copy = i18n.i18n(copyJson);
 
-  // We define a few Chans that are used to update the page in a
-  // reactive way; see template returned by this function
-
-  // The image shown
-  const img = new Chan<TemplateResult>();
-
-  // The text input where the chars can be typed
-  const input: Ref<HTMLInputElement> = createRef();
-
-  // The error shown on bad input
-  const errorText = new Chan<DynamicKey | undefined>();
-  const hasError = errorText.map((e) => (e !== undefined ? "has-error" : ""));
-
-  // The "next" button behavior
-  const next = new Chan<((e: SubmitEvent) => void) | undefined>();
-  const nextDisabled = next.map((f) => f === undefined);
-  const nextCaption = new Chan<DynamicKey>();
-
-  // The "retry" button behavior
-  const retry = new Chan<(() => void) | undefined>();
-  const retryDisabled = retry.map((f) => f === undefined);
+  const spinnerImg: TemplateResult = html`
+    <div class="c-captcha-placeholder c-spinner-wrapper">
+      <div class="c-spinner">${spinner}</div>
+    </div>
+  `;
+  const captchaImg = (base64: string): TemplateResult =>
+    html`<div class="c-captcha-placeholder">
+      <img
+        src="data:image/png;base64,${base64}"
+        id="captchaImg"
+        class="c-image"
+        alt="captcha image"
+      />
+    </div>`;
 
   // The various states the component can inhabit
   type State =
@@ -68,77 +62,77 @@ export const promptCaptchaTemplate = <T>({
     | { status: "verifying" }
     | { status: "bad" };
 
+  // We define a few Chans that are used to update the page in a
+  // reactive way based on state; see template returned by this function
+  const state = new Chan<State>({ status: "requesting" });
+
+  // The image shown
+  const img: Chan<TemplateResult> = state.map({
+    f: (state) =>
+      state.status === "requesting"
+        ? spinnerImg
+        : state.status === "prompting"
+        ? captchaImg(state.challenge.png_base64)
+        : Chan.unchanged,
+    def: spinnerImg,
+  });
+
+  // The text input where the chars can be typed
+  const input: Ref<HTMLInputElement> = createRef();
+
+  // The error shown on bad input
+  const errorText = state.map(({ status }) =>
+    status === "bad" ? copy.incorrect : undefined
+  );
+  const hasError = state.map(({ status }) =>
+    status === "bad" ? "has-error" : ""
+  );
+
+  // The "next" button behavior
+  const next: Chan<((e: SubmitEvent) => void) | undefined> = state.map(
+    (state) =>
+      state.status === "prompting"
+        ? (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            doVerify(state.challenge);
+          }
+        : undefined
+  );
+
+  const nextDisabled: Chan<boolean> = next.map(isNullish);
+  const nextCaption: Chan<DynamicKey> = state.map(({ status }) =>
+    status === "requesting"
+      ? copy.generating
+      : status === "verifying"
+      ? copy.verifying
+      : copy.next
+  );
+
+  // The "retry" button behavior
+  const retry: Chan<(() => Promise<void>) | undefined> = state.map((state) =>
+    state.status === "prompting" || state.status === "bad" ? doRetry : undefined
+  );
+  const retryDisabled: Chan<boolean> = retry.map(isNullish);
+
   // On retry, request a new challenge
   const doRetry = async () => {
-    update({ status: "requesting" });
+    state.send({ status: "requesting" });
     const challenge = await requestChallenge();
-    update({ status: "prompting", challenge });
+    state.send({ status: "prompting", challenge });
   };
 
   // On verification, check the chars and either continue (on good challenge)
   // or go to "bad" state
   const doVerify = (challenge: Challenge) => {
-    update({ status: "verifying" });
+    state.send({ status: "verifying" });
     void withRef(input, async (input) => {
       const res = await verifyChallengeChars({
         chars: input.value,
         challenge,
       });
-      res === badChallenge ? update({ status: "bad" }) : onContinue(res);
+      res === badChallenge ? state.send({ status: "bad" }) : onContinue(res);
     });
-  };
-
-  // The update function, transitioning between states
-  const update = (state: State) => {
-    switch (state.status) {
-      case "requesting":
-        img.send(
-          html`
-            <div class="c-captcha-placeholder c-spinner-wrapper">
-              <div class="c-spinner">${spinner}</div>
-            </div>
-          `
-        );
-        errorText.send(undefined);
-        next.send(undefined);
-        nextCaption.send(copy.generating);
-        retry.send(undefined);
-        break;
-      case "prompting":
-        img.send(
-          html`<div class="c-captcha-placeholder">
-            <img
-              src="data:image/png;base64,${state.challenge.png_base64}"
-              id="captchaImg"
-              class="c-image"
-              alt="captcha image"
-            />
-          </div>`
-        );
-        errorText.send(undefined);
-        next.send((e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          doVerify(state.challenge);
-        });
-        nextCaption.send(copy.next);
-        retry.send(doRetry);
-        break;
-      case "verifying":
-        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
-        errorText.send(undefined);
-        next.send(undefined);
-        nextCaption.send(copy.verifying);
-        retry.send(undefined);
-        break;
-      case "bad":
-        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
-        errorText.send(copy.incorrect);
-        next.send(undefined);
-        nextCaption.send(copy.next);
-        retry.send(doRetry);
-        break;
-    }
   };
 
   // Kickstart everything
@@ -226,7 +220,9 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
-        const tempIdentity = Ed25519KeyIdentity.generate();
+        const tempIdentity = await ECDSAKeyIdentity.generate({
+          extractable: false,
+        });
         const result = await connection.register({
           identity,
           tempIdentity,
