@@ -15,7 +15,7 @@ describe("addDeviceSuccess", () => {
     });
 
     document
-      .querySelector<HTMLButtonElement>('[data-action="continueToHome"]')
+      .querySelector<HTMLButtonElement>('[data-action="next"]')
       ?.click();
 
     await result;

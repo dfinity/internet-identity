@@ -423,7 +423,7 @@ export class VerifyRemoteDeviceView extends View {
 }
 
 export class AddDeviceSuccessView extends View {
-  private readonly SELECTOR = "[data-action='continueToHome']";
+  private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
     await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });

@@ -33,7 +33,7 @@ const addDeviceSuccessTemplate = ({
       <button
         @click=${() => onContinue()}
         class="c-button c-button--primary"
-        data-action="continueToHome"
+        data-action="next"
       >
         ${continue_to_home}
       </button>
