@@ -88,6 +88,11 @@ impl From<Device> for DeviceDataWithoutAlias {
             key_type: device_data.key_type,
             protection: device_data.protection,
             origin: device_data.origin,
+            metadata_keys: device_data
+                .metadata
+                .as_ref()
+                .map(|m| m.keys().cloned().collect())
+                .unwrap_or_default(),
         }
     }
 }

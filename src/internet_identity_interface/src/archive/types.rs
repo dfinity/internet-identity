@@ -44,6 +44,8 @@ pub struct DeviceDataWithoutAlias {
     pub key_type: KeyType,
     pub protection: DeviceProtection,
     pub origin: Option<String>,
+    // Only the top level keys are archived for privacy reasons.
+    pub metadata_keys: Vec<String>,
 }
 
 // If present, the attribute has been changed to the value given.
@@ -57,7 +59,8 @@ pub struct DeviceDataUpdate {
     pub protection: Option<DeviceProtection>,
     pub origin: Option<Option<String>>,
     // If present, the metadata has been changed and now contains the given keys.
-    pub metadata: Option<Vec<String>>,
+    // Only the top level keys are archived for privacy reasons.
+    pub metadata_keys: Option<Vec<String>>,
 }
 
 // Placeholder for information that has been hidden for privacy reasons.

@@ -74,6 +74,12 @@ type DeviceData = record {
     key_type: KeyType;
     protection: DeviceProtection;
     origin: opt text;
+    // Metadata map for additional device information.
+    //
+    // Note: some fields above will be moved to the metadata map in the future.
+    // If the metadata map already contains a field with the same name, the explicit
+    // field will be dropped and the data will be lost!
+    // Consider all field names of `DeviceData` as reserved.
     metadata: opt MetadataMap;
 };
 

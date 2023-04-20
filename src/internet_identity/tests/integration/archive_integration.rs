@@ -272,6 +272,7 @@ mod pull_entries_tests {
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
                     origin: device_data_1().origin,
+                    metadata_keys: vec![],
                 },
             },
             timestamp,
@@ -308,7 +309,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
-                    metadata: None,
+                    metadata_keys: None,
                 },
             },
             timestamp,
@@ -346,6 +347,57 @@ mod pull_entries_tests {
             entries.entries.get(4).unwrap().as_ref().unwrap(),
             &delete_entry
         );
+        Ok(())
+    }
+
+    /// Test to verify that the archive pulls device metadata keys for new devices from II.
+    #[test]
+    fn should_record_metadata_for_new_device() -> Result<(), CallError> {
+        const METADATA_KEY: &str = "key";
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let mut device = DeviceData::auth_test_device();
+        device.metadata = Some(HashMap::from_iter(vec![(
+            METADATA_KEY.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]));
+        let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        // the archive polls for entries once per second
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_eq!(entries.entries.len(), 1);
+
+        let register_entry = Entry {
+            anchor,
+            operation: Operation::RegisterAnchor {
+                device: DeviceDataWithoutAlias::from(device.clone()),
+            },
+            timestamp,
+            caller: device.principal(),
+            sequence_number: 0,
+        };
+        assert_eq!(
+            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            &register_entry
+        );
+
         Ok(())
     }
 
@@ -404,7 +456,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
-                    metadata: Some(vec![METADATA_KEY.to_string()]),
+                    metadata_keys: Some(vec![METADATA_KEY.to_string()]),
                 },
             },
             timestamp,
