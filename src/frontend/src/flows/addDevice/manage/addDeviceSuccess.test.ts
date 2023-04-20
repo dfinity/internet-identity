@@ -9,13 +9,15 @@ describe("addDeviceSuccess", () => {
     document.body.appendChild(pageContent);
   });
 
-  it("should resolve promise on click to continue", (done) => {
-    renderAddDeviceSuccess({
+  it("should resolve promise on click to continue", async () => {
+    const result = renderAddDeviceSuccess({
       deviceAlias,
-    }).then(() => done());
+    });
 
     document
       .querySelector<HTMLButtonElement>('[data-action="continueToHome"]')
       ?.click();
+
+    await result;
   });
 });
