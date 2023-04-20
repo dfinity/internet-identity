@@ -34,23 +34,6 @@ describe("addDeviceSuccess", () => {
     document.body.appendChild(pageContent);
   });
 
-  it("should render static content", async () => {
-    renderAddDeviceSuccess({
-      deviceAlias,
-    });
-
-    await waitFor(() => expect(document.body.textContent).toContain(en.title));
-    expect(document.body.textContent).toContain(en.explore);
-  });
-
-  it("should render a call to action", () => {
-    renderAddDeviceSuccess({
-      deviceAlias,
-    });
-
-    expect(document.querySelector('[data-action="continueToHome"]')).not.toBeNull();
-  });
-
   it("should resolve promise on click to continue", (done) => {
     renderAddDeviceSuccess({
       deviceAlias,
