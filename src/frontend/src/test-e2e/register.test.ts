@@ -38,7 +38,6 @@ export const test_app_canister_ids = JSON.parse(
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
-const ABOUT_URL = `${II_URL}/about`;
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
