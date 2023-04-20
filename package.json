@@ -5,8 +5,7 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "dev": "vite",
-    "start": "npm run dev",
+    "start": "vite",
     "showcase": "vite --mode showcase",
     "build": "vite build",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
