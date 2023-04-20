@@ -141,6 +141,11 @@ test("Register new identity and add additional remote device", async () => {
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
+
+      // success page
+      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      await addDeviceSuccessView.waitForDisplay();
+      await addDeviceSuccessView.continue();
     });
 
     await mainView.waitForDisplay();
