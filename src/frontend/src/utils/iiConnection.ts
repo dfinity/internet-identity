@@ -395,7 +395,6 @@ export class Connection {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       ...device,
-      // TODO: use toNullable
       origin: isNullish(window?.origin) ? [] : [window.origin],
     });
   };
