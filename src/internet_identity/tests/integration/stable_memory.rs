@@ -121,8 +121,8 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
         canister_id,
         principal,
         10_030,
-        "example.com".to_string(),
-        ByteBuf::from("dummykey"),
+        "example.com",
+        &ByteBuf::from("dummykey"),
         None,
     )?;
 
@@ -132,13 +132,7 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
         hex::decode(DELEGATION_PRINCIPAL).unwrap()
     );
 
-    let principal = api::get_principal(
-        &env,
-        canister_id,
-        principal,
-        10_030,
-        "example.com".to_string(),
-    )?;
+    let principal = api::get_principal(&env, canister_id, principal, 10_030, "example.com")?;
     assert_eq!(Principal::self_authenticating(user_key), principal);
     Ok(())
 }
@@ -166,7 +160,7 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
         canister_id,
         device6.principal(),
         10_030,
-        device5.pubkey,
+        &device5.pubkey,
     )?;
 
     let devices =
@@ -181,7 +175,7 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
 fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-    let frontend_hostname = "frontend_hostname".to_string();
+    let frontend_hostname = "frontend_hostname";
     let session_key = ByteBuf::from("session_key");
 
     restore_compressed_stable_memory(
@@ -196,8 +190,8 @@ fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallErro
         canister_id,
         principal_recovery_1(),
         10_000,
-        frontend_hostname.clone(),
-        session_key.clone(),
+        frontend_hostname,
+        &session_key,
         None,
     )?;
     api::prepare_delegation(
@@ -206,7 +200,7 @@ fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallErro
         principal_recovery_2(),
         10_000,
         frontend_hostname,
-        session_key,
+        &session_key,
         None,
     )?;
     Ok(())
@@ -233,8 +227,8 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
         canister_id,
         principal_1(),
         10_000,
-        recovery_1.pubkey.clone(),
-        recovery_1.clone(),
+        &recovery_1.pubkey,
+        &recovery_1,
     );
     expect_user_error_with_message(
         result,
@@ -247,7 +241,7 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
         canister_id,
         principal_1(),
         10_000,
-        recovery_device_data_2().pubkey,
+        &recovery_device_data_2().pubkey,
     )?;
 
     // successful after removing the other one
@@ -256,8 +250,8 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
         canister_id,
         principal_1(),
         10_000,
-        recovery_1.pubkey.clone(),
-        recovery_1,
+        &recovery_1.pubkey,
+        &recovery_1,
     )?;
     Ok(())
 }

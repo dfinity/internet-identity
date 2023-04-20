@@ -11,3 +11,5 @@ export const LEGACY_II_URL_NO_PROTOCOL = "identity.ic0.app";
 
 // The legacy production II URL
 export const LEGACY_II_URL = "https://" + LEGACY_II_URL_NO_PROTOCOL;
+
+export const PORTAL_II_URL = "https://internetcomputer.org/internet-identity";
