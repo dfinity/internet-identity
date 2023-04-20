@@ -5,8 +5,8 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "start": "vite",
-    "showcase": "vite --mode showcase",
+    "start": "II_FETCH_ROOT_KEY=1 vite",
+    "showcase": "II_FETCH_ROOT_KEY=1 vite --mode showcase",
     "build": "vite build",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "generate": "npm run generate:types && npm run generate:js",

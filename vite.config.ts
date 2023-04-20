@@ -8,14 +8,6 @@ import {
 } from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
-  const envPrefix = "II_" as const;
-
-  // Expand environment - .env files - with canister IDs
-  process.env = {
-    ...loadEnv(mode ?? "development", process.cwd(), envPrefix),
-    ...process.env,
-  };
-
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
   // root = src/frontend
@@ -24,7 +16,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   return {
     envDir: "../../",
     publicDir: "assets",
-    envPrefix,
     resolve: {
       // TODO: use aliases for imports
       alias: {
@@ -72,7 +63,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     define: {
-      // TODO: replace process.env with import
       "process.env": {
         ...process.env,
       },
