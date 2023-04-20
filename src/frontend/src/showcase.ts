@@ -91,18 +91,6 @@ const chromeDevice: DeviceData = {
   origin: [],
 };
 
-const yubikeyDevice: DeviceData = {
-  alias: "Yubikey Blue",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 5],
-  key_type: { unknown: null },
-  purpose: { authentication: null },
-  credential_id: [],
-  origin: [],
-};
-
-const _simpleDevices: [DeviceData, DeviceData] = [chromeDevice, yubikeyDevice];
-
 const defaultPage = () => {
   document.title = "Showcase";
   const container = document.getElementById("pageContent") as HTMLElement;
