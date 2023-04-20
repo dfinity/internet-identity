@@ -289,13 +289,15 @@ fn should_issue_different_principals() -> Result<(), CallError> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
+    let frontend_hostname_1 = "https://dapp1.com";
+    let frontend_hostname_2 = "https://dapp2.com";
 
     let (canister_sig_key_1, _) = api::prepare_delegation(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        "https://dapp1.com",
+        frontend_hostname_1,
         &pub_session_key,
         None,
     )?;
@@ -304,7 +306,7 @@ fn should_issue_different_principals() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        "https://dapp2.com",
+        frontend_hostname_2,
         &pub_session_key,
         None,
     )?;
@@ -494,13 +496,15 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname_1 = "https://dapp1.com";
+    let frontend_hostname_2 = "https://dapp2.com";
 
     let dapp_principal_1 = api::get_principal(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        "https://dapp-1.com",
+        frontend_hostname_1,
     )?;
 
     let dapp_principal_2 = api::get_principal(
@@ -508,7 +512,7 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
         canister_id,
         principal_1(),
         user_number,
-        "https://dapp-2.com",
+        frontend_hostname_2,
     )?;
 
     assert_ne!(dapp_principal_1, dapp_principal_2);
