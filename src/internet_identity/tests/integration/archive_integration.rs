@@ -370,7 +370,7 @@ mod pull_entries_tests {
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 1);
 
-        let register_entry = Entry {
+        let expected_register_entry = Entry {
             anchor,
             operation: Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device.clone()),
@@ -381,7 +381,7 @@ mod pull_entries_tests {
         };
         assert_eq!(
             entries.entries.get(0).unwrap().as_ref().unwrap(),
-            &register_entry
+            &expected_register_entry
         );
 
         Ok(())
@@ -431,7 +431,7 @@ mod pull_entries_tests {
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 2);
 
-        let update_entry = Entry {
+        let expected_update_entry = Entry {
             anchor,
             operation: Operation::UpdateDevice {
                 device: device.pubkey.clone(),
@@ -451,7 +451,7 @@ mod pull_entries_tests {
         };
         assert_eq!(
             entries.entries.get(1).unwrap().as_ref().unwrap(),
-            &update_entry
+            &expected_update_entry
         );
 
         Ok(())

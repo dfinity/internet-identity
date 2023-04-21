@@ -9,6 +9,7 @@ use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 /// Tests that lookup is consistent with get anchor info, but without alias.
 #[test]
@@ -721,5 +722,51 @@ fn should_replace_device() -> Result<(), CallError> {
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
     assert_eq!(anchor_info.into_device_data(), vec![device_data_2()]);
+    Ok(())
+}
+
+/// Verifies that metadata is stored.
+#[test]
+fn should_keep_metadata() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = DeviceData {
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("value".to_string()),
+        )])),
+        ..DeviceData::auth_test_device()
+    };
+
+    let user_number = flows::register_anchor_with_device(&env, canister_id, &device);
+
+    let devices = api::get_anchor_info(&env, canister_id, device.principal(), user_number)?
+        .into_device_data();
+    assert_eq!(devices, vec![device]);
+    Ok(())
+}
+
+/// Verifies that reserved metadata keys are rejected.
+#[test]
+fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    let device = DeviceData {
+        metadata: Some(HashMap::from([(
+            "alias".to_string(),
+            MetadataEntry::String("value".to_string()),
+        )])),
+        ..DeviceData::auth_test_device()
+    };
+
+    let result = api::add(&env, canister_id, principal_1(), user_number, &device);
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("Metadata key 'alias' is reserved and cannot be used\\.").unwrap(),
+    );
     Ok(())
 }

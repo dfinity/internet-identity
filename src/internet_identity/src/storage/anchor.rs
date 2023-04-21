@@ -411,10 +411,33 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 /// This checks device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
 ///   * Only recovery phrases can be protected
+///   * Metadata does not contain reserved keys
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
+    const RESERVED_KEYS: [&str; 9] = [
+        "pubkey",
+        "alias",
+        "credential_id",
+        "purpose",
+        "key_type",
+        "protection",
+        "origin",
+        "last_usage_timestamp",
+        "metadata",
+    ];
+
+    if let Some(metadata) = &device.metadata {
+        for key in RESERVED_KEYS {
+            if metadata.contains_key(key) {
+                return Err(AnchorError::ReservedMetadataKey {
+                    key: key.to_string(),
+                });
+            }
+        }
+    }
+
     check_device_limits(device)?;
 
     if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
@@ -507,6 +530,9 @@ pub enum AnchorError {
     DuplicateDevice {
         device_key: DeviceKey,
     },
+    ReservedMetadataKey {
+        key: String,
+    },
 }
 
 impl fmt::Display for AnchorError {
@@ -540,6 +566,7 @@ impl fmt::Display for AnchorError {
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
+            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key)
         }
     }
 }

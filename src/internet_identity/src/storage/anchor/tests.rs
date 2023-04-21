@@ -367,6 +367,38 @@ fn should_apply_all_fields() {
     assert_eq!(DeviceData::from(device), device_data);
 }
 
+/// Tests that the reserved metadata keys are not allowed to be written to.
+#[test]
+fn should_not_allow_reserved_metadata_key() {
+    const RESERVED_KEYS: [&str; 9] = [
+        "pubkey",
+        "alias",
+        "credential_id",
+        "purpose",
+        "key_type",
+        "protection",
+        "origin",
+        "last_usage_timestamp",
+        "metadata",
+    ];
+
+    let mut anchor = Anchor::new();
+    for key in RESERVED_KEYS {
+        let mut device = sample_device();
+        device.metadata = Some(HashMap::from([(
+            key.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]));
+
+        let result = anchor.add_device(device);
+
+        assert!(matches!(
+            result,
+            Err(AnchorError::ReservedMetadataKey { .. })
+        ));
+    }
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("public key of some sample device"),

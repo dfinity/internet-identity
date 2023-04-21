@@ -28,9 +28,8 @@ pub struct DeviceData {
     // Metadata map for additional device information.
     //
     // Note: some fields above will be moved to the metadata map in the future.
-    // If the metadata map already contains a field with the same name, the explicit
-    // field will be dropped and the data will be lost!
-    // Consider all field names of `DeviceData` as reserved.
+    // All field names of `DeviceData` (such as 'alias', 'origin, etc.) are
+    // reserved and cannot be written.
     pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
