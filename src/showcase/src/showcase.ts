@@ -79,6 +79,7 @@ const recoveryPhrase: RecoveryDevice & DeviceData = {
   purpose: { recovery: null },
   credential_id: [],
   origin: [],
+  metadata: [],
 };
 
 const recoveryPhraseText =
@@ -92,6 +93,7 @@ const recoveryDevice: RecoveryDevice & DeviceData = {
   purpose: { recovery: null },
   credential_id: [],
   origin: [],
+  metadata: [],
 };
 
 const chromeDevice: DeviceData = {
@@ -102,8 +104,8 @@ const chromeDevice: DeviceData = {
   purpose: { authentication: null },
   credential_id: [],
   origin: [],
+  metadata: [],
 };
-
 const defaultPage = () => {
   document.title = "Showcase";
   const container = document.getElementById("pageContent") as HTMLElement;

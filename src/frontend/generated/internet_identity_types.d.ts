@@ -61,6 +61,7 @@ export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'failed' : string };
 export interface DeviceData {
   'alias' : string,
+  'metadata' : [] | [MetadataMap],
   'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
@@ -78,6 +79,7 @@ export interface DeviceRegistrationInfo {
 export interface DeviceWithUsage {
   'alias' : string,
   'last_usage' : [] | [Timestamp],
+  'metadata' : [] | [MetadataMap],
   'origin' : [] | [string],
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
@@ -146,6 +148,14 @@ export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null };
+export type MetadataMap = Array<
+  [
+    string,
+    { 'map' : MetadataMap } |
+      { 'string' : string } |
+      { 'bytes' : Uint8Array | number[] },
+  ]
+>;
 export interface OngoingActiveAnchorStats {
   'monthly_active_anchors' : Array<ActiveAnchorCounter>,
   'daily_active_anchors' : ActiveAnchorCounter,

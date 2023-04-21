@@ -19,6 +19,7 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -292,12 +293,16 @@ pub fn device_data_2() -> DeviceData {
     }
 }
 
-pub fn max_size_device() -> DeviceData {
+pub fn large_size_device() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([255u8; 300]),
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("a".repeat(100)),
+        )])),
         ..DeviceData::auth_test_device()
     }
 }
@@ -573,6 +578,7 @@ pub fn log_entry_1() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: None,
+                metadata_keys: None,
             },
         },
         sequence_number: 0,
@@ -592,6 +598,7 @@ pub fn log_entry_2() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: Some("foo.bar".to_string()),
+                metadata_keys: None,
             },
         },
         sequence_number: 1,
@@ -612,6 +619,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
                 origin: Some(Some("foo.bar".to_string())),
+                metadata_keys: None,
             },
         },
         sequence_number: idx,
