@@ -22,6 +22,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
+        // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
         output: {
           entryFileNames: `[name].js`,
