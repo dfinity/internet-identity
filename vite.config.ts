@@ -1,11 +1,7 @@
-import { extname, resolve } from "path";
-import { defineConfig, loadEnv, UserConfig } from "vite";
+import { extname } from "path";
+import { defineConfig, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
-import {
-  injectCanisterIdPlugin,
-  stripInjectJsScript,
-} from "./vite.plugins";
+import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // Path "../../" have to be expressed relative to the "root".
@@ -17,11 +13,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     envDir: "../../",
     publicDir: "assets",
     resolve: {
-      // TODO: use aliases for imports
       alias: {
-        $assets: resolve(__dirname, "src/frontend/assets"),
-        $app: resolve(__dirname, "src/frontend/src"),
-        $generated: resolve(__dirname, "src/frontend/generated"),
+        stream: "stream-browserify",
       },
     },
     build: {
@@ -38,9 +31,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     plugins: [
-      nodePolyfills({
-        protocolImports: true,
-      }),
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [stripInjectJsScript()] : [])],
       viteCompression({
