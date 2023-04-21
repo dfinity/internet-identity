@@ -4,11 +4,14 @@ import { delayMillis } from "./utils";
 // through an AsyncIterable.
 //
 // The countdown cannot be restarted.
-export class AsyncCountdown {
+export class AsyncCountdown<A> {
   // Create a countdown from nanoseconds
-  static fromNanos(nanos: bigint) {
+  static fromNanos<A>(nanos: bigint): AsyncCountdown<A> {
     return new AsyncCountdown(Number(nanos / BigInt(1e9)));
   }
+
+  // The value set by the countdown on timeout
+  static readonly timeout: unique symbol = Symbol("timeout");
 
   // The number of seconds elapsed since the epoch
   static seconds() {
@@ -20,8 +23,8 @@ export class AsyncCountdown {
   private stopped: boolean;
 
   // A promise that resolves once the countdown has stopped
-  private promise: Promise<void>;
-  private resolve?: () => void;
+  private promise: Promise<A | typeof AsyncCountdown.timeout>;
+  private resolve?: (a: A | typeof AsyncCountdown.timeout) => void;
 
   // when it should stop (seconds since epoch)
   constructor(private expirationSeconds: number) {
@@ -31,10 +34,16 @@ export class AsyncCountdown {
     });
   }
 
-  // Stop the countdown explicitly
-  stop() {
+  // Stop the countdown explicitly, setting a result
+  stop(a: A) {
+    this.__stop(a);
+  }
+
+  // Stop the countdown, effectively settings the result.
+  // Can be called many times but only the first result will be taken into account.
+  private __stop(a: A | typeof AsyncCountdown.timeout) {
     this.stopped = true;
-    this.resolve?.();
+    this.resolve?.(a);
   }
 
   // Number of seconds remaining
@@ -51,8 +60,12 @@ export class AsyncCountdown {
       // Yield the time, as long as the countdown has not stopped.
       // NOTE: a '0' _will_ be yielded before the countdown stop.
       yield prettifySeconds(remaining);
-      if (remaining <= 0 || this.hasStopped()) {
-        this.stop();
+
+      if (remaining <= 0) {
+        this.__stop(AsyncCountdown.timeout);
+      }
+
+      if (this.hasStopped()) {
         break;
       }
 
@@ -69,7 +82,8 @@ export class AsyncCountdown {
     return this.stopped || this.pastExpiration(); // assupmtion: don't go back in time
   }
 
-  wait(): Promise<void> {
+  // Wait until the result is available (or the 'timeout' value in case of timeout)
+  wait(): Promise<A | typeof AsyncCountdown.timeout> {
     return this.promise;
   }
 

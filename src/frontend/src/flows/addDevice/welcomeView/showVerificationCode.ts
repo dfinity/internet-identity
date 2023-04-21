@@ -6,11 +6,12 @@ import {
 } from "../../../../generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
+import { toast } from "../../../components/toast";
 import { AsyncCountdown } from "../../../utils/countdown";
 import { Connection } from "../../../utils/iiConnection";
 import { renderPage } from "../../../utils/lit-html";
 import { setAnchorUsed } from "../../../utils/userNumber";
-import { delayMillis, unreachableLax } from "../../../utils/utils";
+import { delayMillis, unknownToString } from "../../../utils/utils";
 
 type TentativeRegistrationInfo = Extract<
   AddTentativeDeviceResponse,
@@ -83,34 +84,39 @@ export const showVerificationCode = async (
   tentativeRegistrationInfo: TentativeRegistrationInfo,
   credentialToBeVerified: CredentialId
 ): Promise<"ok"> => {
-  const countdown = AsyncCountdown.fromNanos(
-    tentativeRegistrationInfo.device_registration_timeout
-  );
+  const countdown: AsyncCountdown<"match" | "canceled"> =
+    AsyncCountdown.fromNanos(
+      tentativeRegistrationInfo.device_registration_timeout
+    );
 
   showVerificationCodePage({
     alias,
     tentativeRegistrationInfo,
     remaining: countdown.remainingFormattedAsync(),
     cancel: () => {
-      countdown.stop();
+      countdown.stop("canceled");
       window.location.reload();
     },
   });
 
-  const pollResult = await poll({
-    userNumber,
-    connection,
-    credentialToBeVerified,
-    shouldStop: () => countdown.hasStopped(),
-  });
+  // Poll repeatedly
+  void (async () => {
+    const result = await poll({
+      userNumber,
+      connection,
+      credentialToBeVerified,
+      shouldStop: () => countdown.hasStopped(),
+    });
+    countdown.stop(result);
+  })();
 
-  return await handlePollResult({ userNumber, pollResult });
+  return await handlePollResult({ userNumber, result: await countdown.wait() });
 };
 
 // Poll until the user number (anchor) contains at least one device with
 // credential id equal to 'credentialToBeVerified', or until `shouldStop`
 // returns `true` for the first time.
-async function poll({
+const poll = ({
   userNumber,
   connection,
   credentialToBeVerified,
@@ -120,48 +126,50 @@ async function poll({
   connection: Connection;
   credentialToBeVerified: CredentialId;
   shouldStop: () => boolean;
-}): Promise<"timeout" | "match"> {
-  const verifyCredentials = async (): Promise<boolean> => {
-    let res = undefined;
-    try {
-      res = await anchorHasCredentials({
-        userNumber,
-        credential: credentialToBeVerified,
-        connection,
-      });
-    } catch (e) {
-      // Silently discard the error (though log in console) until we have
-      // support for e.g. toasts
-      console.warn("Error occurred when polling:", e);
+}): Promise<"match"> =>
+  // eslint-disable-next-line no-async-promise-executor
+  new Promise(async (resolve) => {
+    const verifyCredentials = async (): Promise<boolean> => {
+      try {
+        return await anchorHasCredentials({
+          userNumber,
+          credential: credentialToBeVerified,
+          connection,
+        });
+      } catch (e) {
+        toast.error(
+          "An error occurred while polling for verification: " +
+            unknownToString(e, "no details available :(")
+        );
+        console.warn("Error occurred when polling:", e);
+      }
+
+      return false;
+    };
+
+    while (!shouldStop()) {
+      if (await verifyCredentials()) {
+        resolve("match");
+        return;
+      }
+
+      // Debounce a little; in practice won't be noticed by users but
+      // will avoid hot looping in case the credential verification becomes near instantaneous.
+      await delayMillis(100);
     }
-
-    return res ?? false;
-  };
-
-  while (!shouldStop()) {
-    if (await verifyCredentials()) {
-      return "match";
-    }
-
-    // Debounce a little; in practice won't be noticed by users but
-    // will avoid hot looping in case the credential verification becomes near instantaneous.
-    await delayMillis(100);
-  }
-
-  return "timeout";
-}
+  });
 
 const handlePollResult = async ({
   userNumber,
-  pollResult,
+  result,
 }: {
   userNumber: bigint;
-  pollResult: "match" | "timeout";
+  result: "match" | "canceled" | typeof AsyncCountdown.timeout;
 }): Promise<"ok"> => {
-  if (pollResult === "match") {
+  if (result === "match") {
     setAnchorUsed(userNumber);
     return "ok";
-  } else if (pollResult === "timeout") {
+  } else if (result === AsyncCountdown.timeout) {
     await displayError({
       title: "Timeout Reached",
       message:
@@ -169,10 +177,10 @@ const handlePollResult = async ({
       primaryButton: "Ok",
     });
     return window.location.reload as never;
+  } else {
+    result satisfies "canceled";
+    return window.location.reload as never;
   }
-
-  unreachableLax(pollResult);
-  return window.location.reload as never;
 };
 
 // Returns true if the given anchor has credentials with the given credential id.
