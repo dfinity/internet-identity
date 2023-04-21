@@ -5,7 +5,7 @@ import { toast } from "../../components/toast";
 // * Only dapps using II are used
 // * All relevant logos are copied to II's assets
 // * Some logos are converted to webp
-import dappsJson from "./dapps.json";
+import type dappsJson from "./dapps.json";
 
 // Infer the type of an array's elements
 type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
@@ -15,11 +15,10 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
 export type DappDescription = ElementOf<typeof dappsJson>;
 
 // Dynamically load the dapps list
-// TODO: just for test
-// eslint-disable-next-line require-await
 const loadDapps = async (): Promise<DappDescription[] | undefined> => {
   try {
-    return dappsJson;
+    return (await import(/* webpackChunkName: "dapps" */ "./dapps.json"))
+      .default;
   } catch (e) {
     console.error(e);
     return undefined;
