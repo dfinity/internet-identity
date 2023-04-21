@@ -1,4 +1,4 @@
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -116,55 +116,57 @@ export const pollForTentativeDevicePage = renderPage(
  * @param userNumber anchor of the authenticated user
  * @param connection authenticated II connection
  */
-export const pollForTentativeDevice = (
+export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
 ): Promise<DeviceData | "timeout" | "canceled"> => {
   const i18n = new I18n();
-  const countdown = AsyncCountdown.fromNanos(endTimestamp);
-  // Show the page with the option to cancel
-  const page = new Promise<"canceled">((resolve) =>
-    pollForTentativeDevicePage({
-      cancel: () => {
-        countdown.stop();
-        resolve("canceled");
-      },
-      origin: window.origin,
-      userNumber,
-      remaining: countdown.remainingFormattedAsync(),
-      i18n,
-    })
-  );
+  const countdown: AsyncCountdown<DeviceData | "timeout" | "canceled"> =
+    AsyncCountdown.fromNanos(endTimestamp);
+  // Display the page with the option to cancel
+  pollForTentativeDevicePage({
+    cancel: () => countdown.stop("canceled"),
+    origin: window.origin,
+    userNumber,
+    remaining: countdown.remainingFormattedAsync(),
+    i18n,
+  });
 
   // Poll repeatedly
-  const polling = poll(userNumber, connection, () => countdown.hasStopped());
+  void (async () => {
+    const result = await poll(userNumber, connection, () =>
+      countdown.hasStopped()
+    );
+    countdown.stop(result);
+  })();
 
-  return Promise.race([page, polling]);
+  // Map the AsyncCountdown timeout symbol to something the caller can use
+  const result = await countdown.wait();
+  return result === AsyncCountdown.timeout ? "timeout" : result;
 };
 
-const poll = async (
+const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData | "timeout"> => {
-  for (;;) {
-    if (shouldStop()) {
-      return "timeout";
-    }
+): Promise<DeviceData> =>
+  // eslint-disable-next-line no-async-promise-executor
+  new Promise(async (resolve) => {
+    while (!shouldStop()) {
+      const anchorInfo = await connection.getAnchorInfo();
+      const tentativeDevice =
+        anchorInfo.device_registration[0]?.tentative_device[0];
+      if (nonNullish(tentativeDevice)) {
+        resolve(tentativeDevice);
+        return;
+      }
 
-    const anchorInfo = await connection.getAnchorInfo();
-    const tentativeDevice =
-      anchorInfo.device_registration[0]?.tentative_device[0];
-    if (tentativeDevice !== undefined) {
-      return tentativeDevice;
+      // Debounce a little; in practice won't be noticed by users but
+      // will avoid hot looping in case the op becomes near instantaneous.
+      await delayMillis(100);
     }
-
-    // Debounce a little; in practice won't be noticed by users but
-    // will avoid hot looping in case the op becomes near instantaneous.
-    await delayMillis(100);
-  }
-};
+  });
 
 // Dynamically load the QR code module
 const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {

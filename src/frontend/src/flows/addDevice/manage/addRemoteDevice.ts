@@ -47,7 +47,7 @@ export const addRemoteDevice = async ({
       return;
     } else if (result === "canceled") {
       // If the user canceled, disable registration mode and return
-      await connection.exitDeviceRegistrationMode();
+      await withLoader(() => connection.exitDeviceRegistrationMode());
       return;
     }
 
