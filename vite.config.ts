@@ -7,10 +7,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
   // root = src/frontend
-  // envDiv = ../../ because .env is at the base of the project
 
   return {
-    envDir: "../../",
     publicDir: "assets",
     resolve: {
       alias: {
