@@ -6,6 +6,7 @@
   "keywords": [],
   "scripts": {
     "start": "II_FETCH_ROOT_KEY=1 vite",
+    "host": "II_FETCH_ROOT_KEY=1 vite --host",
     "showcase": "II_FETCH_ROOT_KEY=1 vite --mode showcase",
     "build": "vite build",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",

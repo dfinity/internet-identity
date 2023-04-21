@@ -10,11 +10,11 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
-* Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-* CMake
-* [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-* Node.js v16+
+- [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
+- Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+- CMake
+- [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+- Node.js v16+
 
 > NOTE! If you're only going to hack on the HTML and CSS code, just run `npm run showcase`. This will start a minimal web server which serves a showcase of the pages used in the app.
 
@@ -60,14 +60,14 @@ dfx start [--clean] [--background]
 II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
-To serve the frontend locally via webpack (recommended during development), run
+To serve the frontend locally (recommended during development), run
 the following:
 
 ```bash
-npm start
+npm run start
 ```
 
-Then open `http://localhost:8080` in your browser. Webpack will reload the page whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
+Then open `http://localhost:8080` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
 
 ```bash
 npm run format && npm run lint
@@ -84,7 +84,7 @@ npm run start
 Then open `http://localhost:8081` in your browser.
 
 Make sure that the "Identity Provider" is set to "http://localhost:8080" if you
-serve the Internet Identity frontend from webpack.
+serve the Internet Identity frontend locally.
 
 **NOTE on testing on LAN:**
 
@@ -92,11 +92,11 @@ If you are testing on LAN -- for instance, connecting to an Internet Identity
 server running on your laptop from your smartphone over WiFi -- you may run
 into the following issues:
 
-* The webpage may not be accessible on LAN. By default webpack will serve the
+- The webpage may not be accessible on LAN. By default the development server will serve the
   content using the `localhost` host. Firewall rules for `localhost` are
   somewhat strict; if you cannot access the page from devices on your LAN try
-  serving with `webpack serve --host 0.0.0.0`.
-* Internet Identity may tell you that your browser is not supported. The reason
+  serving with `npm run host`.
+- Internet Identity may tell you that your browser is not supported. The reason
   for this is that some security-focused features are only enabled on `https`
   and `localhost` pages. A workaround is to use [ngrok](http://ngrok.com) to
   forward your local port over https.
@@ -111,6 +111,7 @@ npm run test:e2e
 ```
 
 Or with a specific screen size e.g.:
+
 ```bash
 npm run test:e2e-desktop
 ```
@@ -119,7 +120,6 @@ We autoformat our code using `prettier`. Running `npm run format` formats all fi
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
 
 We use `eslint` to check the frontend code. You can run it with `npm run lint`, or set up your editor to do it for you.
-
 
 ### Building the backend
 
