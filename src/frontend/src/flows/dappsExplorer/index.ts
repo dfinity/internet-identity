@@ -61,7 +61,7 @@ const dappTemplate = ({
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
-        <img src=${logo} alt=${name} />
+        <img src=${logo} alt=${name} loading="lazy" />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
