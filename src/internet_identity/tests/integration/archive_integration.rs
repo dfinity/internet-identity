@@ -460,6 +460,35 @@ mod pull_entries_tests {
         Ok(())
     }
 
+    /// Tests that II exposes metrics regarding the archive config.
+    #[test]
+    fn should_report_archive_config_metrics() -> Result<(), CallError> {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        deploy_archive_via_ii(&env, ii_canister);
+
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_entries_buffer_limit",
+            10_000f64,
+        );
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_fetch_limit",
+            10f64,
+        );
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_polling_interval",
+            10f64,
+        );
+        Ok(())
+    }
+
     /// Tests that the archive reports on fetch errors.
     #[test]
     fn should_report_call_errors() -> Result<(), CallError> {
