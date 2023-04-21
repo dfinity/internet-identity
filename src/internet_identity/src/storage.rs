@@ -64,10 +64,12 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
+use std::cell::RefCell;
 use std::convert::TryInto;
-use std::fmt;
-use std::io::{Read, Write};
+use std::io::{Error, Read, Write};
 use std::ops::RangeInclusive;
+use std::rc::Rc;
+use std::{fmt, io};
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -124,6 +126,109 @@ pub type Salt = [u8; 32];
 enum AnchorMemory<M: Memory> {
     Single(RestrictedMemory<M>),
     Managed(VirtualMemory<RestrictedMemory<M>>),
+}
+
+trait MemoryWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error>;
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>;
+    fn flush(&mut self) -> io::Result<()>;
+}
+
+struct BufferedMemoryWriter<'a, M: Memory> {
+    writer: BufferedWriter<'a, M>,
+}
+
+impl<'a, M: Memory> BufferedMemoryWriter<'a, M> {
+    fn new(memory: &'a mut M, offset: u64, buffer_size: usize) -> Self {
+        let writer = BufferedWriter::new(buffer_size, Writer::new(memory, offset));
+        Self { writer }
+    }
+}
+
+impl<M: Memory> MemoryWriter for BufferedMemoryWriter<'_, M> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        self.writer.write(buf)
+    }
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Error> {
+        self.writer.write_all(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+trait MemoryReader {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error>;
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error>;
+}
+
+struct BufferedMemoryReader<'a, M: Memory> {
+    reader: BufferedReader<'a, M>,
+}
+
+impl<'a, M: Memory> BufferedMemoryReader<'a, M> {
+    fn new(memory: &'a M, offset: u64, buffer_size: usize) -> Self {
+        let reader = BufferedReader::new(buffer_size, Reader::new(memory, offset));
+        Self { reader }
+    }
+}
+
+impl<M: Memory> MemoryReader for BufferedMemoryReader<'_, M> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.reader.read(buf)
+    }
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        self.reader.read_exact(buf)
+    }
+}
+
+impl<M: Memory> AnchorMemory<M> {
+    fn get_writer<'a>(
+        &'a mut self,
+        address: u64,
+        buffer_size: usize,
+    ) -> Rc<RefCell<dyn MemoryWriter + 'a>> {
+        match self {
+            AnchorMemory::Single(ref mut memory) => {
+                let writer: Rc<RefCell<dyn MemoryWriter>> = Rc::new(RefCell::new(
+                    BufferedMemoryWriter::new(memory, address, buffer_size),
+                ));
+                writer
+            }
+            AnchorMemory::Managed(ref mut memory) => {
+                let writer: Rc<RefCell<dyn MemoryWriter>> = Rc::new(RefCell::new(
+                    BufferedMemoryWriter::new(memory, address, buffer_size),
+                ));
+                writer
+            }
+        }
+    }
+    fn get_reader<'a>(
+        &'a self,
+        address: u64,
+        buffer_size: usize,
+    ) -> Rc<RefCell<dyn MemoryReader + 'a>> {
+        match self {
+            AnchorMemory::Single(ref memory) => {
+                let reader: Rc<RefCell<dyn MemoryReader>> = Rc::new(RefCell::new(
+                    BufferedMemoryReader::new(memory, address, buffer_size),
+                ));
+                reader
+            }
+            AnchorMemory::Managed(ref memory) => {
+                let reader: Rc<RefCell<dyn MemoryReader>> = Rc::new(RefCell::new(
+                    BufferedMemoryReader::new(memory, address, buffer_size),
+                ));
+                reader
+            }
+        }
+    }
+    fn size(&self) -> u64 {
+        match self {
+            AnchorMemory::Single(ref memory) => memory.size(),
+            AnchorMemory::Managed(ref memory) => memory.size(),
+        }
+    }
 }
 
 pub enum StableMemory<M: Memory> {
@@ -313,60 +418,15 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     fn write_entry_bytes(&mut self, record_number: u32, buf: Vec<u8>) -> Result<(), StorageError> {
-        match &self.anchor_memory {
-            AnchorMemory::Single(_) => self.write_entry_bytes_single(record_number, buf),
-            AnchorMemory::Managed(_) => self.write_entry_bytes_managed(record_number, buf),
-        }
-    }
-
-    fn write_entry_bytes_single(
-        &mut self,
-        record_number: u32,
-        buf: Vec<u8>,
-    ) -> Result<(), StorageError> {
         if buf.len() > self.candid_entry_size_limit() {
             return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
         }
 
         let address = self.record_address(record_number);
-        // use buffered writer to minimize expensive stable memory operations
-        let anchor_memory = if let AnchorMemory::Single(ref mut memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected single memory")
-        };
-        let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(anchor_memory, address),
-        );
-        writer
-            .write_all(&(buf.len() as u16).to_le_bytes())
-            .expect("memory write failed");
-        writer.write_all(&buf).expect("memory write failed");
-        writer.flush().expect("memory write failed");
-        Ok(())
-    }
-
-    fn write_entry_bytes_managed(
-        &mut self,
-        record_number: u32,
-        buf: Vec<u8>,
-    ) -> Result<(), StorageError> {
-        if buf.len() > self.candid_entry_size_limit() {
-            return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
-        }
-
-        let address = self.record_address(record_number);
-        // use buffered writer to minimize expensive stable memory operations
-        let anchor_memory = if let AnchorMemory::Managed(ref mut memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected managed memory")
-        };
-        let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(anchor_memory, address),
-        );
+        let writer_cell = self
+            .anchor_memory
+            .get_writer(address, self.header.entry_size as usize);
+        let mut writer = writer_cell.borrow_mut();
         writer
             .write_all(&(buf.len() as u16).to_le_bytes())
             .expect("memory write failed");
@@ -383,63 +443,13 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
-        match &self.anchor_memory {
-            AnchorMemory::Single(_) => self.read_entry_bytes_single(record_number),
-            AnchorMemory::Managed(_) => self.read_entry_bytes_managed(record_number),
-        }
-    }
-
-    fn read_entry_bytes_single(&self, record_number: u32) -> Vec<u8> {
         let address = self.record_address(record_number);
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
-        let anchor_memory = if let AnchorMemory::Single(ref memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected single memory")
-        };
-
-        let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(anchor_memory, address),
-        );
-
-        let mut len_buf = vec![0; 2];
-        reader
-            .read_exact(len_buf.as_mut_slice())
-            .expect("failed to read memory");
-        let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
-
-        // This error most likely indicates stable memory corruption.
-        if len > self.candid_entry_size_limit() {
-            trap(&format!(
-                "persisted value size {} exceeds maximum size {}",
-                len,
-                self.candid_entry_size_limit()
-            ))
-        }
-
-        let mut data_buf = vec![0; len];
-        reader
-            .read_exact(data_buf.as_mut_slice())
-            .expect("failed to read memory");
-        data_buf
-    }
-
-    fn read_entry_bytes_managed(&self, record_number: u32) -> Vec<u8> {
-        let address = self.record_address(record_number);
-        // the reader will check stable memory bounds
-        // use buffered reader to minimize expensive stable memory operations
-        let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected managed memory")
-        };
-        let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(anchor_memory, address),
-        );
-
+        let reader_cell = self
+            .anchor_memory
+            .get_reader(address, self.header.entry_size as usize);
+        let mut reader = reader_cell.borrow_mut();
         let mut len_buf = vec![0; 2];
         reader
             .read_exact(len_buf.as_mut_slice())
@@ -565,12 +575,6 @@ impl<M: Memory + Clone> Storage<M> {
     /// Writes the persistent state to stable memory just outside of the space allocated to the highest anchor number.
     /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
-        match &self.anchor_memory {
-            AnchorMemory::Single(_) => self.write_persistent_state_single(state),
-            AnchorMemory::Managed(_) => self.write_persistent_state_managed(state),
-        }
-    }
-    fn write_persistent_state_single(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
         // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
@@ -578,32 +582,10 @@ impl<M: Memory + Clone> Storage<M> {
 
         // In practice, for all reasonably sized persistent states (<800MB) the writes are
         // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
-        let anchor_memory = if let AnchorMemory::Single(ref mut memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected single memory")
-        };
-        let mut writer = Writer::new(anchor_memory, address);
-        writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
-        writer
-            .write_all(&(encoded_state.len() as u64).to_le_bytes())
-            .unwrap();
-        writer.write_all(&encoded_state).unwrap();
-    }
-    fn write_persistent_state_managed(&mut self, state: &PersistentState) {
-        let address = self.unused_memory_start();
-
-        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
-        let encoded_state = candid::encode_one(state).unwrap();
-
-        // In practice, for all reasonably sized persistent states (<800MB) the writes are
-        // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
-        let anchor_memory = if let AnchorMemory::Managed(ref mut memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected managed memory")
-        };
-        let mut writer = Writer::new(anchor_memory, address);
+        let writer_cell = self
+            .anchor_memory
+            .get_writer(address, self.header.entry_size as usize);
+        let mut writer = writer_cell.borrow_mut();
         writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
         writer
             .write_all(&(encoded_state.len() as u64).to_le_bytes())
@@ -614,67 +596,17 @@ impl<M: Memory + Clone> Storage<M> {
     /// Reads the persistent state from stable memory just outside of the space allocated to the highest anchor number.
     /// This is only used to restore state in `post_upgrade`.
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
-        match &self.anchor_memory {
-            AnchorMemory::Single(_) => self.read_persistent_state_single(),
-            AnchorMemory::Managed(_) => self.read_persistent_state_managed(),
-        }
-    }
-    fn read_persistent_state_single(&self) -> Result<PersistentState, PersistentStateError> {
         const WASM_PAGE_SIZE: u64 = 65536;
         let address = self.unused_memory_start();
-
-        let anchor_memory = if let AnchorMemory::Single(ref memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected single memory")
-        };
-
-        if address > anchor_memory.size() * WASM_PAGE_SIZE {
+        if address > self.anchor_memory.size() * WASM_PAGE_SIZE {
             // the address where the persistent state would be is not allocated yet
             return Err(PersistentStateError::NotFound);
         }
-        let mut reader = Reader::new(anchor_memory, address);
-        let mut magic_buf: [u8; 4] = [0; 4];
-        reader
-            .read_exact(&mut magic_buf)
-            // if we hit out of bounds here, this means that the persistent state has not been
-            // written at the expected location and thus cannot be found
-            .map_err(|_| PersistentStateError::NotFound)?;
 
-        if magic_buf != PERSISTENT_STATE_MAGIC {
-            // magic does not match --> this is not the persistent state
-            return Err(PersistentStateError::NotFound);
-        }
-
-        let mut size_buf: [u8; 8] = [0; 8];
-        reader
-            .read_exact(&mut size_buf)
-            .map_err(PersistentStateError::ReadError)?;
-
-        let size = u64::from_le_bytes(size_buf);
-        let mut data_buf = Vec::new();
-        data_buf.resize(size as usize, 0);
-        reader
-            .read_exact(data_buf.as_mut_slice())
-            .map_err(PersistentStateError::ReadError)?;
-
-        candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
-    }
-
-    fn read_persistent_state_managed(&self) -> Result<PersistentState, PersistentStateError> {
-        const WASM_PAGE_SIZE: u64 = 65536;
-        let address = self.unused_memory_start();
-
-        let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
-            memory
-        } else {
-            trap("Expected managed memory")
-        };
-        if address > anchor_memory.size() * WASM_PAGE_SIZE {
-            // the address where the persistent state would be is not allocated yet
-            return Err(PersistentStateError::NotFound);
-        }
-        let mut reader = Reader::new(anchor_memory, address);
+        let reader_cell = self
+            .anchor_memory
+            .get_reader(address, self.header.entry_size as usize);
+        let mut reader = reader_cell.borrow_mut();
         let mut magic_buf: [u8; 4] = [0; 4];
         reader
             .read_exact(&mut magic_buf)
