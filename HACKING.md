@@ -10,11 +10,11 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-- [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
-- Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-- CMake
-- [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-- Node.js v16+
+* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
+* Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+* CMake
+* [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+* Node.js v16+
 
 > NOTE! If you're only going to hack on the HTML and CSS code, just run `npm run showcase`. This will start a minimal web server which serves a showcase of the pages used in the app.
 
@@ -111,7 +111,6 @@ npm run test:e2e
 ```
 
 Or with a specific screen size e.g.:
-
 ```bash
 npm run test:e2e-desktop
 ```
@@ -120,6 +119,7 @@ We autoformat our code using `prettier`. Running `npm run format` formats all fi
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
 
 We use `eslint` to check the frontend code. You can run it with `npm run lint`, or set up your editor to do it for you.
+
 
 ### Building the backend
 
