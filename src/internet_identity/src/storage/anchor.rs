@@ -411,6 +411,7 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 /// This checks device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
 ///   * Only recovery phrases can be protected
+///   * Recovery phrases cannot have a credential id
 ///   * Metadata does not contain reserved keys
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
@@ -439,6 +440,10 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
     }
 
     check_device_limits(device)?;
+
+    if device.key_type == KeyType::SeedPhrase && device.credential_id.is_some() {
+        return Err(AnchorError::RecoveryPhraseCredentialIdMismatch);
+    }
 
     if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
         return Err(AnchorError::InvalidDeviceProtection {
@@ -518,6 +523,7 @@ pub enum AnchorError {
     InvalidDeviceProtection {
         key_type: KeyType,
     },
+    RecoveryPhraseCredentialIdMismatch,
     MutationNotAllowed {
         authorized_principal: Principal,
         actual_principal: Principal,
@@ -566,7 +572,8 @@ impl fmt::Display for AnchorError {
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
-            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key)
+            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key),
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id.")
         }
     }
 }

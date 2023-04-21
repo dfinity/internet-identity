@@ -13,6 +13,7 @@ import {
 import {
   AddDeviceAliasView,
   AddDeviceFlowSelectorView,
+  AddDeviceSuccessView,
   AddIdentityAnchorView,
   AddRemoteDeviceAliasView,
   AddRemoteDeviceInstructionsView,
@@ -38,7 +39,6 @@ export const test_app_canister_ids = JSON.parse(
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
-const ABOUT_URL = `${II_URL}/about`;
 
 const DEVICE_NAME1 = "Virtual WebAuthn device";
 const DEVICE_NAME2 = "Other WebAuthn device";
@@ -91,6 +91,12 @@ test("Register new identity and add additional device", async () => {
 
     await browser.pause(10_000);
 
+    // success page
+    const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+    await addDeviceSuccessView.waitForDisplay();
+    await addDeviceSuccessView.continue();
+
+    // home
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
 
@@ -134,6 +140,11 @@ test("Register new identity and add additional remote device", async () => {
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
+
+      // success page
+      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      await addDeviceSuccessView.waitForDisplay();
+      await addDeviceSuccessView.continue();
     });
 
     await mainView.waitForDisplay();
@@ -194,6 +205,11 @@ test("Register new identity and add additional remote device starting on new dev
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
+
+      // success page
+      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      await addDeviceSuccessView.waitForDisplay();
+      await addDeviceSuccessView.continue();
     });
 
     await mainView.waitForDisplay();

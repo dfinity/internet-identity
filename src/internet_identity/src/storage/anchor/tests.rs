@@ -321,6 +321,42 @@ fn should_not_allow_modification_of_device_key() {
 }
 
 #[test]
+fn should_not_allow_to_add_recovery_phrase_with_credential_id() {
+    let mut anchor = Anchor::new();
+    let device = Device {
+        key_type: KeyType::SeedPhrase,
+        credential_id: Some(ByteBuf::from(vec![1, 2, 3])),
+        ..sample_device()
+    };
+
+    let result = anchor.add_device(device);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::RecoveryPhraseCredentialIdMismatch)
+    ));
+}
+
+#[test]
+fn should_not_allow_to_modify_recovery_phrase_to_add_credential_id() {
+    let mut anchor = Anchor::new();
+    let mut device = Device {
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..sample_device()
+    };
+    anchor.add_device(device.clone()).unwrap();
+    device.credential_id = Some(ByteBuf::from(vec![1, 2, 3]));
+
+    let result = anchor.modify_device(&device.pubkey.clone(), device);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::RecoveryPhraseCredentialIdMismatch)
+    ));
+}
+
+#[test]
 fn should_update_timestamp() {
     let mut anchor = Anchor::new();
     let device = sample_device();
@@ -449,7 +485,7 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
     Device {
         pubkey: ByteBuf::from(vec![n; 96]),
         alias: format!("recovery phrase {n}"),
-        credential_id: Some(ByteBuf::from(vec![n; 64])),
+        credential_id: None,
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection,

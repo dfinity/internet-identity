@@ -247,9 +247,12 @@ fn should_update_protected_device() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let principal = principal_1();
-    let mut device = device_data_1();
-    device.protection = DeviceProtection::Protected;
-    device.key_type = KeyType::SeedPhrase;
+    let mut device = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
@@ -334,9 +337,12 @@ fn should_not_update_device_of_different_user() {
 fn should_not_update_protected_with_different_device() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let mut device1 = device_data_1();
-    device1.protection = DeviceProtection::Protected;
-    device1.key_type = KeyType::SeedPhrase;
+    let device1 = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
@@ -620,9 +626,12 @@ fn should_not_remove_device_of_different_user() {
 fn should_not_remove_protected_with_different_device() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let mut device1 = device_data_1();
-    device1.protection = DeviceProtection::Protected;
-    device1.key_type = KeyType::SeedPhrase;
+    let device1 = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
