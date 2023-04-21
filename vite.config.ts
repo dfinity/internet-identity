@@ -14,6 +14,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     publicDir: "assets",
     resolve: {
       alias: {
+        // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
         stream: "stream-browserify",
       },
     },
