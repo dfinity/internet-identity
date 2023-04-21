@@ -61,10 +61,10 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     },
     define: {
       "process.env": {
-        II_FETCH_ROOT_KEY: process.env.II_FETCH_ROOT_KEY,
-        II_DUMMY_AUTH: process.env.II_DUMMY_AUTH,
-        II_DUMMY_CAPTCHA: process.env.II_DUMMY_CAPTCHA,
-        II_VERSION: process.env.II_VERSION,
+        II_FETCH_ROOT_KEY: `${process.env.II_FETCH_ROOT_KEY ?? "0"}`,
+        II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
+        II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
+        II_VERSION: `${process.env.II_VERSION ?? ""}`,
       },
     },
   };
