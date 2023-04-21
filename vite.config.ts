@@ -33,8 +33,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
       commonjsOptions: {
         // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
-        strictRequires: true
-      }
+        strictRequires: true,
+      },
     },
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
