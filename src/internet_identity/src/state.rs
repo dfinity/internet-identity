@@ -1,7 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
-use crate::storage::{SomeMemory, DEFAULT_RANGE_SIZE};
+use crate::storage::{StableMemory, DEFAULT_RANGE_SIZE};
 use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::time;
@@ -216,7 +216,7 @@ pub fn init_new() {
             FIRST_ANCHOR_NUMBER,
             FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
         ),
-        SomeMemory::Single(DefaultMemoryImpl::default()),
+        StableMemory::Single(DefaultMemoryImpl::default()),
     );
     storage_replace(storage);
 }

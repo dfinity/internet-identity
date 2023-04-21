@@ -88,7 +88,7 @@ mod tests;
 // version   0: invalid
 // version 1-5: no longer supported
 // version   6: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-// version   7: like version 6, but with memory manager (in 2nd page)
+// version   7: like version 6, but with memory manager (from 2nd page on)
 // version  8+: invalid
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 6..=7;
 
@@ -127,7 +127,7 @@ enum AnchorMemory<M: Memory> {
     Managed(VirtualMemory<RestrictedMemory<M>>),
 }
 
-pub enum SomeMemory<M: Memory> {
+pub enum StableMemory<M: Memory> {
     Single(M),
     Managed(M),
 }
@@ -162,7 +162,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// the specified range.
     pub fn new(
         (id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber),
-        memory: SomeMemory<M>,
+        memory: StableMemory<M>,
     ) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
@@ -176,13 +176,13 @@ impl<M: Memory + Clone> Storage<M> {
             ));
         }
         let (header_memory, anchor_memory, maybe_memory_manager, version) = match memory {
-            SomeMemory::Single(memory) => {
+            StableMemory::Single(memory) => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..2);
                 let anchor_memory =
                     AnchorMemory::Single(RestrictedMemory::new(memory, 2..MAX_WASM_PAGES));
                 (header_memory, anchor_memory, None, 6)
             }
-            SomeMemory::Managed(memory) => {
+            StableMemory::Managed(memory) => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
                 let memory_manager = MemoryManager::init_with_bucket_size(
                     RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
@@ -429,6 +429,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     fn read_entry_bytes_managed(&self, record_number: u32) -> Vec<u8> {
         let address = self.record_address(record_number);
+        println!("Reading from address: {}", address);
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
         let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
