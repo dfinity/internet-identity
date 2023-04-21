@@ -12,7 +12,10 @@ const readCanisterId = (): string => {
       internet_identity: { local: canisterId },
     } = JSON.parse(readFileSync(canisterIdsJsonFile, "utf-8"));
 
-    assertNonNullish(canisterId);
+    assertNonNullish(
+      canisterId,
+      `Could not get canister ID from ${canisterIdsJsonFile}`
+    );
 
     console.log("Read canister ID:", canisterId);
 
