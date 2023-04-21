@@ -9,6 +9,7 @@ use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 /// Tests that lookup is consistent with get anchor info, but without alias.
 #[test]
@@ -22,14 +23,14 @@ fn should_lookup() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
 
     let mut devices = api::lookup(&env, canister_id, user_number)?;
@@ -59,7 +60,7 @@ fn should_add_additional_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let mut devices =
         api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
@@ -91,7 +92,7 @@ fn should_not_add_existing_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_1(), // this device was already added during registration
+        &device_data_1(), // this device was already added during registration
     );
 
     expect_user_error_with_message(
@@ -114,14 +115,14 @@ fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
     let result = api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_2(),
+        &recovery_device_data_2(),
     );
 
     expect_user_error_with_message(
@@ -146,7 +147,7 @@ fn should_not_add_device_for_different_user() {
         canister_id,
         principal_1(),
         user_number_2,
-        device_data_1(),
+        &device_data_1(),
     );
 
     expect_user_error_with_message(
@@ -169,7 +170,7 @@ fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
@@ -189,9 +190,9 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     for i in 0..3u8 {
-        let mut device = max_size_device();
+        let mut device = large_size_device();
         device.pubkey = ByteBuf::from([i; 300]);
-        api::add(&env, canister_id, principal_1(), user_number, device)?;
+        api::add(&env, canister_id, principal_1(), user_number, &device)?;
     }
 
     let result = api::add(
@@ -199,7 +200,7 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        max_size_device(),
+        &large_size_device(),
     );
 
     expect_user_error_with_message(
@@ -230,8 +231,8 @@ fn should_update_device() -> Result<(), CallError> {
         canister_id,
         principal,
         user_number,
-        device.clone().pubkey,
-        device.clone(),
+        &device.pubkey,
+        &device,
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
@@ -246,9 +247,12 @@ fn should_update_protected_device() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let principal = principal_1();
-    let mut device = device_data_1();
-    device.protection = DeviceProtection::Protected;
-    device.key_type = KeyType::SeedPhrase;
+    let mut device = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
@@ -262,12 +266,12 @@ fn should_update_protected_device() -> Result<(), CallError> {
         canister_id,
         principal,
         user_number,
-        device.clone().pubkey,
-        device.clone(),
+        &device.pubkey,
+        &device,
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
-    assert_eq!(anchor_info.into_device_data(), vec![device.clone()]);
+    assert_eq!(anchor_info.into_device_data(), vec![device]);
 
     Ok(())
 }
@@ -292,8 +296,8 @@ fn should_not_modify_pubkey() {
         canister_id,
         principal,
         user_number,
-        original_pubkey,
-        device,
+        &original_pubkey,
+        &device,
     );
 
     expect_user_error_with_message(
@@ -317,8 +321,8 @@ fn should_not_update_device_of_different_user() {
         canister_id,
         principal_1(),
         user_number_2,
-        device_data_2().pubkey,
-        device_data_2(),
+        &device_data_2().pubkey,
+        &device_data_2(),
     );
 
     expect_user_error_with_message(
@@ -333,9 +337,12 @@ fn should_not_update_device_of_different_user() {
 fn should_not_update_protected_with_different_device() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let mut device1 = device_data_1();
-    device1.protection = DeviceProtection::Protected;
-    device1.key_type = KeyType::SeedPhrase;
+    let device1 = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
@@ -344,7 +351,7 @@ fn should_not_update_protected_with_different_device() {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )
     .unwrap();
 
@@ -353,8 +360,8 @@ fn should_not_update_protected_with_different_device() {
         canister_id,
         principal_2(),
         user_number,
-        device1.pubkey.clone(),
-        device1, // data here doesnt' actually matter
+        &device1.pubkey,
+        &device1, // data here doesnt' actually matter
     );
 
     expect_user_error_with_message(
@@ -378,8 +385,8 @@ fn should_not_update_non_recovery_device_to_be_protected() {
         canister_id,
         principal_1(),
         user_number,
-        device1.pubkey.clone(),
-        device1, // data here doesnt' actually matter
+        &device1.pubkey,
+        &device1, // data here doesnt' actually matter
     );
 
     expect_user_error_with_message(
@@ -411,21 +418,21 @@ fn should_get_credentials() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        recovery_device_data_1(),
+        &recovery_device_data_1(),
     )?;
     api::add(
         &env,
         canister_id,
         principal_1(),
         user_number,
-        recovery_webauthn_device.clone(),
+        &recovery_webauthn_device,
     )?;
 
     let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
@@ -502,7 +509,7 @@ fn should_remove_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
     assert_eq!(anchor_info.devices.len(), 2);
@@ -516,7 +523,7 @@ fn should_remove_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
@@ -544,7 +551,7 @@ fn should_remove_protected_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
     assert!(anchor_info
@@ -557,7 +564,7 @@ fn should_remove_protected_device() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
@@ -582,7 +589,7 @@ fn should_remove_last_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_1().pubkey,
+        &device_data_1().pubkey,
     )?;
 
     let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
@@ -604,7 +611,7 @@ fn should_not_remove_device_of_different_user() {
         canister_id,
         principal_1(),
         user_number_2,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     );
 
     expect_user_error_with_message(
@@ -619,9 +626,12 @@ fn should_not_remove_device_of_different_user() {
 fn should_not_remove_protected_with_different_device() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let mut device1 = device_data_1();
-    device1.protection = DeviceProtection::Protected;
-    device1.key_type = KeyType::SeedPhrase;
+    let device1 = DeviceData {
+        protection: DeviceProtection::Protected,
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..device_data_1()
+    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal_1(), &device1);
 
@@ -630,7 +640,7 @@ fn should_not_remove_protected_with_different_device() {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )
     .unwrap();
 
@@ -639,7 +649,7 @@ fn should_not_remove_protected_with_different_device() {
         canister_id,
         principal_2(),
         user_number,
-        device1.pubkey,
+        &device1.pubkey,
     );
 
     expect_user_error_with_message(
@@ -661,7 +671,7 @@ fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     let devices =
         api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
@@ -674,7 +684,7 @@ fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
 
     let devices =
@@ -715,11 +725,57 @@ fn should_replace_device() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_1().pubkey,
-        device_data_2(),
+        &device_data_1().pubkey,
+        &device_data_2(),
     )?;
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
     assert_eq!(anchor_info.into_device_data(), vec![device_data_2()]);
+    Ok(())
+}
+
+/// Verifies that metadata is stored.
+#[test]
+fn should_keep_metadata() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = DeviceData {
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("value".to_string()),
+        )])),
+        ..DeviceData::auth_test_device()
+    };
+
+    let user_number = flows::register_anchor_with_device(&env, canister_id, &device);
+
+    let devices = api::get_anchor_info(&env, canister_id, device.principal(), user_number)?
+        .into_device_data();
+    assert_eq!(devices, vec![device]);
+    Ok(())
+}
+
+/// Verifies that reserved metadata keys are rejected.
+#[test]
+fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    let device = DeviceData {
+        metadata: Some(HashMap::from([(
+            "alias".to_string(),
+            MetadataEntry::String("value".to_string()),
+        )])),
+        ..DeviceData::auth_test_device()
+    };
+
+    let result = api::add(&env, canister_id, principal_1(), user_number, &device);
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("Metadata key 'alias' is reserved and cannot be used\\.").unwrap(),
+    );
     Ok(())
 }

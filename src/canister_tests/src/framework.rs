@@ -19,6 +19,7 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -292,12 +293,16 @@ pub fn device_data_2() -> DeviceData {
     }
 }
 
-pub fn max_size_device() -> DeviceData {
+pub fn large_size_device() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([255u8; 300]),
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("a".repeat(100)),
+        )])),
         ..DeviceData::auth_test_device()
     }
 }
@@ -443,7 +448,7 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
     let response = http_request(
         env,
         canister_id,
-        HttpRequest {
+        &HttpRequest {
             method: "GET".to_string(),
             url: "/metrics".to_string(),
             headers: vec![],
@@ -525,11 +530,7 @@ pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
-    match api::internet_identity::deploy_archive(
-        env,
-        ii_canister,
-        ByteBuf::from(ARCHIVE_WASM.clone()),
-    ) {
+    match api::internet_identity::deploy_archive(env, ii_canister, &ARCHIVE_WASM) {
         Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
         err => panic!("archive deployment failed: {err:?}"),
     }
@@ -577,6 +578,7 @@ pub fn log_entry_1() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: None,
+                metadata_keys: None,
             },
         },
         sequence_number: 0,
@@ -596,6 +598,7 @@ pub fn log_entry_2() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: Some("foo.bar".to_string()),
+                metadata_keys: None,
             },
         },
         sequence_number: 1,
@@ -616,6 +619,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
                 origin: Some(Some("foo.bar".to_string())),
+                metadata_keys: None,
             },
         },
         sequence_number: idx,

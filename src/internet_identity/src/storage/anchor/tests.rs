@@ -1,9 +1,10 @@
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    DeviceData, DeviceProtection, KeyType, Purpose, Timestamp,
+    DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
 };
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -125,6 +126,7 @@ fn should_enforce_cumulative_device_limit() {
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: None,
+        metadata: None,
     };
 
     let result = anchor.add_device(device);
@@ -165,6 +167,7 @@ fn should_allow_protection_only_on_recovery_phrases() {
         protection: DeviceProtection::Protected,
         origin: None,
         last_usage_timestamp: None,
+        metadata: None,
     });
 
     assert!(matches!(
@@ -318,6 +321,42 @@ fn should_not_allow_modification_of_device_key() {
 }
 
 #[test]
+fn should_not_allow_to_add_recovery_phrase_with_credential_id() {
+    let mut anchor = Anchor::new();
+    let device = Device {
+        key_type: KeyType::SeedPhrase,
+        credential_id: Some(ByteBuf::from(vec![1, 2, 3])),
+        ..sample_device()
+    };
+
+    let result = anchor.add_device(device);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::RecoveryPhraseCredentialIdMismatch)
+    ));
+}
+
+#[test]
+fn should_not_allow_to_modify_recovery_phrase_to_add_credential_id() {
+    let mut anchor = Anchor::new();
+    let mut device = Device {
+        key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        ..sample_device()
+    };
+    anchor.add_device(device.clone()).unwrap();
+    device.credential_id = Some(ByteBuf::from(vec![1, 2, 3]));
+
+    let result = anchor.modify_device(&device.pubkey.clone(), device);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::RecoveryPhraseCredentialIdMismatch)
+    ));
+}
+
+#[test]
 fn should_update_timestamp() {
     let mut anchor = Anchor::new();
     let device = sample_device();
@@ -337,6 +376,17 @@ fn should_update_timestamp() {
 /// Tests that `apply_data` actually applies all the writeable fields.
 #[test]
 fn should_apply_all_fields() {
+    let mut metadata = HashMap::new();
+    metadata.insert(
+        "entry1".to_string(),
+        MetadataEntry::String("bar".to_string()),
+    );
+    metadata.insert(
+        "entry2".to_string(),
+        MetadataEntry::Bytes(ByteBuf::from("foo")),
+    );
+    metadata.insert("entry3".to_string(), MetadataEntry::Map(metadata.clone()));
+
     let device_data = DeviceData {
         pubkey: ByteBuf::from("some different public key"),
         alias: "some different alias".to_string(),
@@ -345,11 +395,44 @@ fn should_apply_all_fields() {
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Protected,
         origin: Some("https://some.other.origin".to_string()),
+        metadata: Some(metadata.clone()),
     };
     let mut device = sample_device();
     device.apply_device_data(device_data.clone());
 
     assert_eq!(DeviceData::from(device), device_data);
+}
+
+/// Tests that the reserved metadata keys are not allowed to be written to.
+#[test]
+fn should_not_allow_reserved_metadata_key() {
+    const RESERVED_KEYS: [&str; 9] = [
+        "pubkey",
+        "alias",
+        "credential_id",
+        "purpose",
+        "key_type",
+        "protection",
+        "origin",
+        "last_usage_timestamp",
+        "metadata",
+    ];
+
+    let mut anchor = Anchor::new();
+    for key in RESERVED_KEYS {
+        let mut device = sample_device();
+        device.metadata = Some(HashMap::from([(
+            key.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]));
+
+        let result = anchor.add_device(device);
+
+        assert!(matches!(
+            result,
+            Err(AnchorError::ReservedMetadataKey { .. })
+        ));
+    }
 }
 
 fn sample_device() -> Device {
@@ -362,6 +445,7 @@ fn sample_device() -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some("https://fooo.bar".to_string()),
         last_usage_timestamp: Some(465789),
+        metadata: None,
     }
 }
 
@@ -375,6 +459,7 @@ fn device(n: u8) -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some(format!("https://foo{n}.bar")),
         last_usage_timestamp: Some(n as u64),
+        metadata: None,
     }
 }
 
@@ -389,6 +474,10 @@ fn large_device(n: u8) -> Device {
         protection: DeviceProtection::Unprotected,
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
         last_usage_timestamp: Some(12345679),
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("a".repeat(40)),
+        )])),
     }
 }
 
@@ -396,12 +485,13 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
     Device {
         pubkey: ByteBuf::from(vec![n; 96]),
         alias: format!("recovery phrase {n}"),
-        credential_id: Some(ByteBuf::from(vec![n; 64])),
+        credential_id: None,
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
         protection,
         origin: None,
         last_usage_timestamp: None,
+        metadata: None,
     }
 }
 

@@ -1,4 +1,4 @@
-import { Ed25519KeyIdentity } from "@dfinity/identity";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -15,6 +15,7 @@ import {
 import { autofocus, renderPage, withRef } from "../../utils/lit-html";
 import { Chan } from "../../utils/utils";
 
+import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
 
 // A symbol that we can differentiate from generic `T` types
@@ -99,7 +100,7 @@ export const promptCaptchaTemplate = <T>({
         : undefined
   );
 
-  const nextDisabled: Chan<boolean> = next.map((f) => f === undefined);
+  const nextDisabled: Chan<boolean> = next.map(isNullish);
   const nextCaption: Chan<DynamicKey> = state.map(({ status }) =>
     status === "requesting"
       ? copy.generating
@@ -112,7 +113,7 @@ export const promptCaptchaTemplate = <T>({
   const retry: Chan<(() => Promise<void>) | undefined> = state.map((state) =>
     state.status === "prompting" || state.status === "bad" ? doRetry : undefined
   );
-  const retryDisabled: Chan<boolean> = retry.map((f) => f === undefined);
+  const retryDisabled: Chan<boolean> = retry.map(isNullish);
 
   // On retry, request a new challenge
   const doRetry = async () => {
@@ -219,7 +220,9 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
-        const tempIdentity = Ed25519KeyIdentity.generate();
+        const tempIdentity = await ECDSAKeyIdentity.generate({
+          extractable: false,
+        });
         const result = await connection.register({
           identity,
           tempIdentity,

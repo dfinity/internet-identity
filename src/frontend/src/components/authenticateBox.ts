@@ -1,4 +1,5 @@
 import { html, render, TemplateResult } from "lit-html";
+import { PORTAL_II_URL } from "../config";
 import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
 import { useRecovery } from "../flows/recovery/useRecovery";
 import {
@@ -129,7 +130,7 @@ export const authnTemplates = (
       <p class="t-paragraph t-centered l-stack">
         <a
           class="t-link"
-          href="https://internetcomputer.org/internet-identity"
+          href=${PORTAL_II_URL}
           target="_blank"
           rel="noopener noreferrer"
           >Learn More</a

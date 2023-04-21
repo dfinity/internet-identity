@@ -14,6 +14,7 @@ import {
   SignIdentity,
 } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
+import { isNullish } from "@dfinity/utils";
 import borc from "borc";
 import { bufferEqual } from "./iiConnection";
 
@@ -51,7 +52,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * `getPublicKey()` is never called before `sign()`.
    */
   public getPublicKey(): PublicKey {
-    if (this._actualIdentity === undefined) {
+    if (isNullish(this._actualIdentity)) {
       throw new Error("cannot use getPublicKey() before a successful sign()");
     } else {
       return this._actualIdentity.getPublicKey();
@@ -95,7 +96,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       }
     }
 
-    if (this._actualIdentity === undefined) {
+    if (isNullish(this._actualIdentity)) {
       // Odd, user logged in with a credential we didn't provide?
       throw new Error("internal error");
     }

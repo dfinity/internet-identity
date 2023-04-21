@@ -1,10 +1,12 @@
 import { html, TemplateResult } from "lit-html";
-import { dapps } from "./dapps";
+import { DappDescription } from "./dapps";
 
 /** A teaser for the dapps explorer, acting as a button */
 export const dappsTeaser = ({
+  dapps,
   click,
 }: {
+  dapps: DappDescription[];
   click: () => void;
 }): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
@@ -18,13 +20,13 @@ export const dappsTeaser = ({
       aria-label="Show list of dapps"
     >
       <figure class="c-card__teaser c-marquee c-marquee--clickable">
-        ${marqueeList()}
+        ${marqueeList(dapps)}
       </figure>
     </button>
   </article>`;
 };
 
-const marqueeList = (): TemplateResult => {
+const marqueeList = (dapps: DappDescription[]): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 

@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -49,7 +50,7 @@ const recoverWithPhraseTemplate = <
     const strings = [];
     for (const wordRef of wordRefs) {
       const value = withRef(wordRef, (input) => input.value);
-      if (value === undefined) {
+      if (isNullish(value)) {
         return undefined;
       }
 
@@ -62,7 +63,7 @@ const recoverWithPhraseTemplate = <
   // Read phrase from the page, verify it, and confirm back to the caller on success
   const verifyAndConfirm = async () => {
     const phrase = readPhrase();
-    if (phrase === undefined) {
+    if (isNullish(phrase)) {
       toast.error("Could not read phrase");
       return;
     }
@@ -211,7 +212,7 @@ export const wordTemplate = ({
             .trimStart()
             .split(" ")
             .filter(Boolean);
-          if (word === undefined) {
+          if (isNullish(word)) {
             return;
           }
 
@@ -235,7 +236,7 @@ export const wordTemplate = ({
           const next = element
             .closest("li")
             ?.nextElementSibling?.querySelector("input");
-          if (next === undefined || next === null) {
+          if (isNullish(next)) {
             return;
           }
 

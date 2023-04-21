@@ -3,15 +3,18 @@ import { closeIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { I18n } from "../../i18n";
 import { renderPage } from "../../utils/lit-html";
-import { DappDescription, dapps } from "./dapps";
+
+import { DappDescription } from "./dapps";
 
 import copyJson from "./copy.json";
 
 /* Template for the explorer containing all dapps */
 const dappsExplorerTemplate = ({
+  dapps,
   i18n,
   back,
 }: {
+  dapps: DappDescription[];
   i18n: I18n;
   back: () => void;
 }) => {
@@ -72,9 +75,13 @@ const dappTemplate = ({
 };
 
 /* Show a list of dapps known to use Internet Identity, in a closable modal */
-export const dappsExplorer = (): Promise<void> => {
+export const dappsExplorer = ({
+  dapps,
+}: {
+  dapps: DappDescription[];
+}): Promise<void> => {
   const i18n = new I18n();
   return new Promise((resolve) =>
-    dappsExplorerPage({ i18n, back: () => resolve() })
+    dappsExplorerPage({ dapps, i18n, back: () => resolve() })
   );
 };
