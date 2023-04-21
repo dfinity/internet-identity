@@ -112,7 +112,6 @@ const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// MemoryManager parameters.
-const MEMORY_MANAGER_OFFSET: u64 = WASM_PAGE_SIZE;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(0);
 const BUCKET_SIZE_IN_PAGES: u16 = 1024;
 
@@ -429,7 +428,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     fn read_entry_bytes_managed(&self, record_number: u32) -> Vec<u8> {
         let address = self.record_address(record_number);
-        println!("Reading from address: {}", address);
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
         let anchor_memory = if let AnchorMemory::Managed(ref memory) = self.anchor_memory {
