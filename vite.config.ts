@@ -39,18 +39,20 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [stripInjectJsScript()] : [])],
-      viteCompression({
-        // II canister only supports one content type per resource. That is why we remove the original file.
-        deleteOriginFile: true,
-        // GitHub pages doesn't serve gzipped files as .js, so we disable compression
-        // for the showcase build
-        filter: (file: string): boolean =>
-          mode === "showcase"
-            ? false
-            : ![".html", ".css", ".webp", ".png", ".ico"].includes(
-                extname(file)
-              ),
-      }),
+      [
+        ...(mode !== "showcase"
+          ? [
+              viteCompression({
+                // II canister only supports one content type per resource. That is why we remove the original file.
+                deleteOriginFile: true,
+                filter: (file: string): boolean =>
+                  ![".html", ".css", ".webp", ".png", ".ico"].includes(
+                    extname(file)
+                  ),
+              }),
+            ]
+          : []),
+      ],
     ],
     optimizeDeps: {
       esbuildOptions: {
