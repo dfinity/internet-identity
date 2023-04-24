@@ -89,5 +89,13 @@ export const apiResultToLoginFlowResult = (
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
       };
     }
+    case "cancelOrTimeout": {
+      return {
+        tag: "err",
+        title: "Operation Canceled",
+        message:
+          "The interaction with your security device was canceled or timed out. Please try again.",
+      };
+    }
   }
 };

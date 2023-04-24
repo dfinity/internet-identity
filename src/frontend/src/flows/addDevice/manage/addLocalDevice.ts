@@ -9,7 +9,10 @@ import {
   creationOptions,
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
-import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
+import {
+  isCancelOrTimeout,
+  isDuplicateDeviceError,
+} from "../../../utils/webAuthnErrorUtils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
@@ -27,6 +30,14 @@ const displayAlreadyRegisteredDevice = () =>
     message: "This device has already been added to your anchor.",
     detail:
       "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
+    primaryButton: "Back to manage",
+  });
+
+const displayCancelOrTimeout = () =>
+  displayError({
+    title: "Operation canceled",
+    message:
+      "The interaction with your security device was canceled or timed out. Please try again.",
     primaryButton: "Back to manage",
   });
 
@@ -51,6 +62,8 @@ export const addLocalDevice = async (
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
       await displayAlreadyRegisteredDevice();
+    } else if (isCancelOrTimeout(error)) {
+      await displayCancelOrTimeout();
     } else {
       await displayFailedToAddDevice(
         error instanceof Error ? error : unknownError()

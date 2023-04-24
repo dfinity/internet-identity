@@ -7,6 +7,7 @@ import {
 import { Connection } from "../../utils/iiConnection";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString } from "../../utils/utils";
+import { isCancelOrTimeout } from "../../utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
@@ -46,6 +47,14 @@ export const register = async ({
       return result;
     }
   } catch (e) {
+    if (isCancelOrTimeout(e)) {
+      return {
+        tag: "err",
+        title: "Operation Canceled",
+        message:
+          "The interaction with your security device was canceled or timed out. Please try again.",
+      };
+    }
     return {
       tag: "err",
       title: "Failed to create anchor",
