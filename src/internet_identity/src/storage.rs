@@ -231,7 +231,6 @@ impl<M: Memory> AnchorMemory<M> {
 
 pub enum StableMemory<M: Memory> {
     Single(M),
-    Managed(M),
 }
 
 /// Data type responsible for managing anchor data in stable memory.
@@ -239,7 +238,6 @@ pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: AnchorMemory<M>,
-    maybe_memory_manager: Option<MemoryManager<RestrictedMemory<M>>>,
 }
 
 #[repr(packed)]
@@ -277,21 +275,12 @@ impl<M: Memory + Clone> Storage<M> {
                 "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {DEFAULT_RANGE_SIZE} entries)",
             ));
         }
-        let (header_memory, anchor_memory, maybe_memory_manager, version) = match memory {
+        let (header_memory, anchor_memory, version) = match memory {
             StableMemory::Single(memory) => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..2);
                 let anchor_memory =
                     AnchorMemory::Single(RestrictedMemory::new(memory, 2..MAX_WASM_PAGES));
-                (header_memory, anchor_memory, None, 6)
-            }
-            StableMemory::Managed(memory) => {
-                let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
-                let memory_manager = MemoryManager::init_with_bucket_size(
-                    RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
-                    BUCKET_SIZE_IN_PAGES,
-                );
-                let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
-                (header_memory, anchor_memory, Some(memory_manager), 7)
+                (header_memory, anchor_memory, 6)
             }
         };
 
@@ -308,7 +297,6 @@ impl<M: Memory + Clone> Storage<M> {
             },
             header_memory,
             anchor_memory,
-            maybe_memory_manager,
         }
     }
 
@@ -375,7 +363,6 @@ impl<M: Memory + Clone> Storage<M> {
                     memory,
                     2..MAX_WASM_PAGES,
                 )),
-                maybe_memory_manager: None,
             }),
             7 => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
@@ -387,7 +374,6 @@ impl<M: Memory + Clone> Storage<M> {
                     header,
                     header_memory,
                     anchor_memory,
-                    maybe_memory_manager: Some(memory_manager),
                 })
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
