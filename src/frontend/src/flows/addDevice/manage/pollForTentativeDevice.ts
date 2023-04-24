@@ -96,7 +96,7 @@ const pollForTentativeDeviceTemplate = ({
     <button
       @click=${() => cancel()}
       id="cancelAddRemoteDevice"
-      class="c-button c-button--secondary l-stack"
+      class="c-button c-button--secondary"
     >
       ${copy.cancel}
     </button>
