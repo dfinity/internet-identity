@@ -1,6 +1,6 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";

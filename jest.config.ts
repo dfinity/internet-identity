@@ -10,6 +10,7 @@ export default {
   testEnvironment: "jsdom",
   moduleNameMapper: {
     "dfx-generated/internet_identity": internet_identity,
+    "^\\$generated/(.*)$": "<rootDir>/src/frontend/generated/$1",
   },
   setupFiles: [`<rootDir>/src/frontend/test-setup.ts`],
 

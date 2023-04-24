@@ -1,9 +1,9 @@
-import { html } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
-} from "../../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { html } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { displayError } from "../../../components/displayError";
 import { mainWindow } from "../../../components/mainWindow";
 import { toast } from "../../../components/toast";

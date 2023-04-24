@@ -1,10 +1,10 @@
-import { WebAuthnIdentity } from "@dfinity/identity";
-import { html } from "lit-html";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
   DeviceData,
-} from "../../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { WebAuthnIdentity } from "@dfinity/identity";
+import { html } from "lit-html";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
