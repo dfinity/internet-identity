@@ -115,7 +115,11 @@ const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// MemoryManager parameters.
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(0);
-const BUCKET_SIZE_IN_PAGES: u16 = 1024;
+// The bucket size 128 is relatively low, to avoid wasting memory when using
+// multiple virtual memories for smaller amounts of data.
+// This value results in 256 GB of total managed memory, which should be enough
+// for the foreseeable future.
+const BUCKET_SIZE_IN_PAGES: u16 = 128;
 
 /// The maximum number of anchors this canister can store.
 pub const DEFAULT_RANGE_SIZE: u64 =
