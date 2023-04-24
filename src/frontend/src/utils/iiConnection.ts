@@ -43,7 +43,7 @@ import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
-import { isCancelOrTimeout } from "./webAuthnErrorUtils";
+import { isCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -245,7 +245,7 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
-      if (isCancelOrTimeout(e)) {
+      if (isCancel(e)) {
         return { kind: "cancelOrTimeout" };
       }
       if (e instanceof Error) {

@@ -18,6 +18,6 @@ export function isDuplicateDeviceError(error: unknown): boolean {
  *
  * @param error error to check
  */
-export function isCancelOrTimeout(error: unknown): boolean {
+export function isCancel(error: unknown): boolean {
   return error instanceof DOMException && error.name === "NotAllowedError";
 }

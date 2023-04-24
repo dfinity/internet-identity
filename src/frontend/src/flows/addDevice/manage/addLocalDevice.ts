@@ -10,7 +10,7 @@ import {
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
 import {
-  isCancelOrTimeout,
+  isCancel,
   isDuplicateDeviceError,
 } from "../../../utils/webAuthnErrorUtils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
@@ -62,7 +62,7 @@ export const addLocalDevice = async (
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
       await displayAlreadyRegisteredDevice();
-    } else if (isCancelOrTimeout(error)) {
+    } else if (isCancel(error)) {
       await displayCancelOrTimeout();
     } else {
       await displayFailedToAddDevice(

@@ -7,7 +7,7 @@ import {
 import { Connection } from "../../utils/iiConnection";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString } from "../../utils/utils";
-import { isCancelOrTimeout } from "../../utils/webAuthnErrorUtils";
+import { isCancel } from "../../utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
@@ -47,7 +47,7 @@ export const register = async ({
       return result;
     }
   } catch (e) {
-    if (isCancelOrTimeout(e)) {
+    if (isCancel(e)) {
       return {
         tag: "err",
         title: "Operation Canceled",

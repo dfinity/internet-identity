@@ -17,7 +17,7 @@ import {
   unreachableLax,
 } from "../../../utils/utils";
 import {
-  isCancelOrTimeout,
+  isCancel,
   isDuplicateDeviceError,
 } from "../../../utils/webAuthnErrorUtils";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
@@ -72,7 +72,7 @@ export const registerTentativeDevice = async (
       // let's help the user and fill in their anchor number.
       setAnchorUsed(userNumber);
       await displayAlreadyRegisteredDevice();
-    } else if (isCancelOrTimeout(result)) {
+    } else if (isCancel(result)) {
       await displayCancelOrTimeout();
     } else {
       await displayError({
