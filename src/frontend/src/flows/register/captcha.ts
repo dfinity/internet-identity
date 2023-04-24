@@ -1,8 +1,8 @@
+import { Challenge } from "$generated/internet_identity_types";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { Challenge } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { DynamicKey, I18n } from "../../i18n";

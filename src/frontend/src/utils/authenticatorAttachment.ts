@@ -1,4 +1,4 @@
-import { KeyType } from "../../generated/internet_identity_types";
+import { KeyType } from "$generated/internet_identity_types";
 
 /**
  * Converts a WebAuthn authenticator attachment to an II key type

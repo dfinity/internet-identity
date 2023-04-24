@@ -1,23 +1,7 @@
 /**
  * This module contains everything related to connecting to the canister.
  */
-import {
-  Actor,
-  ActorSubclass,
-  DerEncodedPublicKey,
-  HttpAgent,
-  SignIdentity,
-} from "@dfinity/agent";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  ECDSAKeyIdentity,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
-import * as tweetnacl from "tweetnacl";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
   AddTentativeDeviceResponse,
   Challenge,
@@ -37,7 +21,23 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
   _SERVICE,
-} from "../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import {
+  Actor,
+  ActorSubclass,
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
+import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
@@ -99,7 +99,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type { ChallengeResult } from "$generated/internet_identity_types";
 
 /**
  * Interface around the agent-js WebAuthnIdentity that allows us to provide

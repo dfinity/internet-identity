@@ -1,5 +1,5 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";

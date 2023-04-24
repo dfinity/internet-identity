@@ -1,7 +1,7 @@
+import { VerifyTentativeDeviceResponse } from "$generated/internet_identity_types";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref } from "lit-html/directives/ref.js";
-import { VerifyTentativeDeviceResponse } from "../../../../generated/internet_identity_types";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { mainWindow } from "../../../components/mainWindow";

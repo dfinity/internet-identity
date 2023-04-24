@@ -1,4 +1,4 @@
-import { extname } from "path";
+import { extname, resolve } from "path";
 import { defineConfig, UserConfig } from "vite";
 import viteCompression from "vite-plugin-compression";
 import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
@@ -14,6 +14,8 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       alias: {
         // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
         stream: "stream-browserify",
+        // Custom alias we are using to shorten the imports
+        $generated: resolve(__dirname, "src/frontend/generated"),
       },
     },
     build: {

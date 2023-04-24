@@ -1,5 +1,5 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { displayError } from "../../components/displayError";
 import { withLoader } from "../../components/loader";
 import {
