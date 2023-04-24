@@ -3,6 +3,7 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
+use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
@@ -10,6 +11,9 @@ use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
+
+#[allow(dead_code)]
+mod test_setup_helpers;
 
 /// Known devices that exist in the genesis memory backups.
 fn known_devices() -> [DeviceData; 6] {
@@ -256,9 +260,9 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     Ok(())
 }
 
-/// Verifies that a stable memory backup with persistent state v1 can be used for an upgrade.
+/// Verifies that a stable memory backup with persistent state can be used for an upgrade.
 #[test]
-fn should_read_persistent_state() -> Result<(), CallError> {
+fn should_read_persistent_state_v6() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -272,6 +276,27 @@ fn should_read_persistent_state() -> Result<(), CallError> {
     let devices =
         api::get_anchor_info(&env, canister_id, principal_1(), 10_005)?.into_device_data();
     assert_eq!(devices.len(), 4);
+
+    let stats = api::stats(&env, canister_id)?;
+    assert!(stats.archive_info.archive_canister.is_none());
+    assert!(stats.archive_info.archive_config.is_none());
+    Ok(())
+}
+
+#[test]
+fn should_read_persistent_state_v7() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+    restore_compressed_stable_memory(
+        &env,
+        canister_id,
+        "stable_memory/persistent_state_no_archive_v7.bin.gz",
+    );
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    let devices = api::get_anchor_info(&env, canister_id, principal_1(), 127)?.into_device_data();
+    assert_eq!(devices.len(), 7);
 
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
