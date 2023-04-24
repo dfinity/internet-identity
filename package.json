@@ -8,7 +8,7 @@
     "start": "II_FETCH_ROOT_KEY=1 vite",
     "host": "II_FETCH_ROOT_KEY=1 vite --host",
     "showcase": "II_FETCH_ROOT_KEY=1 vite --mode showcase",
-    "build": "vite build && tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
     "watch": "tsc --noEmit --watch",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "generate": "npm run generate:types && npm run generate:js",
