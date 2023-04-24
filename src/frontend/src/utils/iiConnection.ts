@@ -1,23 +1,7 @@
 /**
  * This module contains everything related to connecting to the canister.
  */
-import {
-  Actor,
-  ActorSubclass,
-  DerEncodedPublicKey,
-  HttpAgent,
-  SignIdentity,
-} from "@dfinity/agent";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  ECDSAKeyIdentity,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
-import * as tweetnacl from "tweetnacl";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
   AddTentativeDeviceResponse,
   Challenge,
@@ -37,12 +21,29 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
   _SERVICE,
-} from "../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import {
+  Actor,
+  ActorSubclass,
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
+import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { isCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -78,13 +79,15 @@ export type LoginResult =
   | UnknownUser
   | AuthFail
   | ApiError
-  | SeedPhraseFail;
+  | SeedPhraseFail
+  | CancelOrTimeout;
 export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
   | RegisterNoSpace
-  | BadChallenge;
+  | BadChallenge
+  | CancelOrTimeout;
 
 type LoginSuccess = {
   kind: "loginSuccess";
@@ -98,8 +101,9 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
+type CancelOrTimeout = { kind: "cancelOrTimeout" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type { ChallengeResult } from "$generated/internet_identity_types";
 
 /**
  * Interface around the agent-js WebAuthnIdentity that allows us to provide
@@ -241,6 +245,9 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      if (isCancel(e)) {
+        return { kind: "cancelOrTimeout" };
+      }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
       } else {

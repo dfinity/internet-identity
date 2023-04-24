@@ -1,9 +1,9 @@
-import { isNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { isNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { showWarning } from "../../banner";
 import {
   authenticateBox,

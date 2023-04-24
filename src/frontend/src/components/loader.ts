@@ -1,11 +1,8 @@
 import { html, render } from "lit-html";
+import loaderUrl from "../../assets/loader.webp";
 
 const loader = () => html` <div id="loader" class="c-loader">
-  <img
-    class="c-loader__image"
-    src=${process.env.BASER_URL ?? "" + "/loader.webp"}
-    alt="loading"
-  />
+  <img class="c-loader__image" src=${loaderUrl} alt="loading" />
 </div>`;
 
 const startLoader = () => {

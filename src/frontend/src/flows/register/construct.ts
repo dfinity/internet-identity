@@ -1,8 +1,8 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";
 import { nextTick } from "process";
-import { DeviceData } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import {

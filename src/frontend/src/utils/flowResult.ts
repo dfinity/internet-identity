@@ -1,4 +1,5 @@
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
+import { WEBAUTHN_CANCEL_TEMPLATE } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
@@ -87,6 +88,12 @@ export const apiResultToLoginFlowResult = (
         title: "Invalid Seed Phrase",
         message:
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
+      };
+    }
+    case "cancelOrTimeout": {
+      return {
+        tag: "err",
+        ...WEBAUTHN_CANCEL_TEMPLATE,
       };
     }
   }
