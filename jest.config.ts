@@ -17,6 +17,9 @@ export default {
 
   // These two transform options make sure that jest can process files that include ES modules
   // (in particular, files that have lit-html import)
-  transform: { "\\.[jt]sx?$": "ts-jest" },
+  transform: {
+    "\\.[jt]sx?$": "ts-jest",
+    "\\.(svg|png|webp)$": "<rootDir>/jest-transform.cjs",
+  },
   transformIgnorePatterns: ["node_modules/(?!@?lit)"],
 };
