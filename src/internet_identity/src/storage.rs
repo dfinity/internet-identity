@@ -131,7 +131,6 @@ enum AnchorMemory<M: Memory> {
 // Auxiliary traits and structures to encapsulate read/write operations
 // to different flavours of anchor memory.
 trait MemoryWriter {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Error>;
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>;
     fn flush(&mut self) -> io::Result<()>;
 }
@@ -148,9 +147,6 @@ impl<'a, M: Memory> BufferedMemoryWriter<'a, M> {
 }
 
 impl<M: Memory> MemoryWriter for BufferedMemoryWriter<'_, M> {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
-        self.writer.write(buf)
-    }
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Error> {
         self.writer.write_all(buf)
     }
@@ -160,7 +156,6 @@ impl<M: Memory> MemoryWriter for BufferedMemoryWriter<'_, M> {
 }
 
 trait MemoryReader {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error>;
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error>;
 }
 
@@ -176,9 +171,6 @@ impl<'a, M: Memory> BufferedMemoryReader<'a, M> {
 }
 
 impl<M: Memory> MemoryReader for BufferedMemoryReader<'_, M> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        self.reader.read(buf)
-    }
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error> {
         self.reader.read_exact(buf)
     }

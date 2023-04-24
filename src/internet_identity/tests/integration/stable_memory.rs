@@ -3,6 +3,7 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
+use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
@@ -10,6 +11,9 @@ use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
+
+#[allow(dead_code)]
+mod test_setup_helpers;
 
 /// Known devices that exist in the genesis memory backups.
 fn known_devices() -> [DeviceData; 6] {
@@ -277,44 +281,6 @@ fn should_read_persistent_state_v6() -> Result<(), CallError> {
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
     Ok(())
-}
-
-#[allow(dead_code)]
-fn prepare_persistent_state_v7() {
-    let env = env();
-    let canister_id =
-        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((127, 129)));
-
-    let challenge = api::create_challenge(&env, canister_id).expect("challenge creation failed");
-    let register_response = api::register(
-        &env,
-        canister_id,
-        principal_1(),
-        &device_data_1(),
-        &ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
-    )
-    .expect("Registration failed.");
-
-    let anchor_number = if let RegisterResponse::Registered { user_number } = register_response {
-        user_number
-    } else {
-        panic!("Missing anchor number.")
-    };
-    for d in &known_devices() {
-        api::add(&env, canister_id, principal_1(), anchor_number, d)
-            .expect("Failure adding a device");
-    }
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-    save_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/persistent_state_no_archive_v7.bin.gz",
-        "persistent_state_no_archive_v7.bin",
-    )
 }
 
 #[test]
