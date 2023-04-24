@@ -212,7 +212,8 @@ export const displayManage = async (
   devices_: DeviceData[]
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
-  const dapps = await getDapps();
+  // (dapps are suffled to encourage discovery of new dapps)
+  const dapps = shuffleArray(await getDapps());
   return new Promise((resolve) => {
     const devices = devicesFromDeviceDatas({
       devices: devices_,
@@ -452,4 +453,16 @@ export const domainWarning = (
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
+};
+
+// Return a shuffled version of the array. Adapted from
+// https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
+// to avoid shuffling in place.
+const shuffleArray = <T>(array_: T[]): T[] => {
+  const [...array] = array_;
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 };
