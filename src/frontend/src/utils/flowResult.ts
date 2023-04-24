@@ -1,3 +1,4 @@
+import { WEBAUTHN_CANCEL_TEMPLATE } from "../components/displayError";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
 
 export type LoginFlowResult =
@@ -92,9 +93,7 @@ export const apiResultToLoginFlowResult = (
     case "cancelOrTimeout": {
       return {
         tag: "err",
-        title: "Operation Canceled",
-        message:
-          "The interaction with your security device was canceled or timed out. Please try again.",
+        ...WEBAUTHN_CANCEL_TEMPLATE,
       };
     }
   }

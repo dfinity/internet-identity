@@ -1,4 +1,5 @@
 import { promptDeviceAlias } from "../../components/alias";
+import { WEBAUTHN_CANCEL_TEMPLATE } from "../../components/displayError";
 import {
   apiResultToLoginFlowResult,
   cancel,
@@ -50,9 +51,7 @@ export const register = async ({
     if (isCancel(e)) {
       return {
         tag: "err",
-        title: "Operation Canceled",
-        message:
-          "The interaction with your security device was canceled or timed out. Please try again.",
+        ...WEBAUTHN_CANCEL_TEMPLATE,
       };
     }
     return {

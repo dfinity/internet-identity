@@ -6,7 +6,10 @@ import {
   DeviceData,
 } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
-import { displayError } from "../../../components/displayError";
+import {
+  displayCancelError,
+  displayError,
+} from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 import { Connection, creationOptions } from "../../../utils/iiConnection";
@@ -30,14 +33,6 @@ const displayAlreadyRegisteredDevice = () =>
       "This device has already been added to your anchor. Try signing in directly.",
     detail:
       "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
-    primaryButton: "Ok",
-  });
-
-const displayCancelOrTimeout = () =>
-  displayError({
-    title: "Operation canceled",
-    message:
-      "The interaction with your security device was canceled or timed out. Please try again.",
     primaryButton: "Ok",
   });
 
@@ -73,7 +68,7 @@ export const registerTentativeDevice = async (
       setAnchorUsed(userNumber);
       await displayAlreadyRegisteredDevice();
     } else if (isCancel(result)) {
-      await displayCancelOrTimeout();
+      await displayCancelError("Ok");
     } else {
       await displayError({
         title: "Error adding new device",

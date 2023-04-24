@@ -1,7 +1,10 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
-import { displayError } from "../../../components/displayError";
+import {
+  displayCancelError,
+  displayError,
+} from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 import {
@@ -33,14 +36,6 @@ const displayAlreadyRegisteredDevice = () =>
     primaryButton: "Back to manage",
   });
 
-const displayCancelOrTimeout = () =>
-  displayError({
-    title: "Operation canceled",
-    message:
-      "The interaction with your security device was canceled or timed out. Please try again.",
-    primaryButton: "Back to manage",
-  });
-
 /**
  * Add a new device (i.e. a device connected to the browser the user is
  * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
@@ -63,7 +58,7 @@ export const addLocalDevice = async (
     if (isDuplicateDeviceError(error)) {
       await displayAlreadyRegisteredDevice();
     } else if (isCancel(error)) {
-      await displayCancelOrTimeout();
+      await displayCancelError("Back to manage");
     } else {
       await displayFailedToAddDevice(
         error instanceof Error ? error : unknownError()
