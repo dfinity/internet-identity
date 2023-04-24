@@ -32,7 +32,9 @@ const dappsExplorerTemplate = ({
     >
       ${closeIcon}
     </button>
-    <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
+    <div class="c-action-list">
+      ${dapps.map((dapp) => dappTemplate(dapp, copy))}
+    </div>
   `;
 
   const wrappedPageContent = mainWindow({
@@ -47,12 +49,10 @@ const dappsExplorerTemplate = ({
 export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
 /* Template for a single dapp */
-const dappTemplate = ({
-  link,
-  logo,
-  name,
-  oneLiner,
-}: DappDescription): TemplateResult => {
+const dappTemplate = (
+  { link, logo, name, oneLiner }: DappDescription,
+  copy: any
+): TemplateResult => {
   return html`
     <a
       href=${link}
@@ -69,7 +69,11 @@ const dappTemplate = ({
           ? html`<p class="t-weak">${oneLiner}</p>`
           : undefined}
       </div>
-      <span class="c-action-list__action"> ↗ </span>
+      <span class="c-action-list__action"
+        ><span class="c-button c-button--minimal c-button--secondary"
+          >${copy.open_cta}</span
+        ></span
+      >
     </a>
   `;
 };
