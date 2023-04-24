@@ -171,8 +171,7 @@ const poll = (
 // Dynamically load the QR code module
 const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
   try {
-    return (await import(/* webpackChunkName: "qr-creator" */ "qr-creator"))
-      .default;
+    return (await import("qr-creator")).default;
   } catch (e) {
     console.error(e);
     return undefined;
