@@ -33,6 +33,16 @@ const dappsExplorerTemplate = ({
       ${closeIcon}
     </button>
     <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
+    <p class="t-paragraph t-centered">
+      Want to see your dapp here?
+      <a
+        href="https://github.com/dfinity/internet-identity/issues/new"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Get in touch!</a
+      >
+    </p>
   `;
 
   const wrappedPageContent = mainWindow({
