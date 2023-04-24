@@ -2,7 +2,7 @@
  * then calls the whoami canister to check the user's principal.
  */
 
-import { Actor, HttpAgent, ActorMethod } from "@dfinity/agent";
+import { Actor, ActorMethod, HttpAgent } from "@dfinity/agent";
 import { AuthClient } from "@dfinity/auth-client";
 import type { Principal } from "@dfinity/principal";
 
