@@ -2,6 +2,9 @@
   "en": {
     "dapps_explorer": "Dapps Explorer",
     "try_these_dapps": "Try these dapps",
-    "back_to_the_previous_page": "Back to the previous page"
+    "back_to_the_previous_page": "Back to the previous page",
+
+    "add_your_dapp": "Want to see your dapp here?",
+    "get_in_touch": "Get in touch!"
   }
 }

@@ -60,14 +60,14 @@ dfx start [--clean] [--background]
 II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
 ```
 
-To serve the frontend locally via webpack (recommended during development), run
+To serve the frontend locally (recommended during development), run
 the following:
 
 ```bash
-npm start
+npm run start
 ```
 
-Then open `http://localhost:8080` in your browser. Webpack will reload the page whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
+Then open `http://localhost:8080` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
 
 ```bash
 npm run format && npm run lint
@@ -84,7 +84,7 @@ npm run start
 Then open `http://localhost:8081` in your browser.
 
 Make sure that the "Identity Provider" is set to "http://localhost:8080" if you
-serve the Internet Identity frontend from webpack.
+serve the Internet Identity frontend locally.
 
 **NOTE on testing on LAN:**
 
@@ -92,11 +92,11 @@ If you are testing on LAN -- for instance, connecting to an Internet Identity
 server running on your laptop from your smartphone over WiFi -- you may run
 into the following issues:
 
-* The webpage may not be accessible on LAN. By default webpack will serve the
+- The webpage may not be accessible on LAN. By default the development server will serve the
   content using the `localhost` host. Firewall rules for `localhost` are
   somewhat strict; if you cannot access the page from devices on your LAN try
-  serving with `webpack serve --host 0.0.0.0`.
-* Internet Identity may tell you that your browser is not supported. The reason
+  serving with `npm run host`.
+- Internet Identity may tell you that your browser is not supported. The reason
   for this is that some security-focused features are only enabled on `https`
   and `localhost` pages. A workaround is to use [ngrok](http://ngrok.com) to
   forward your local port over https.

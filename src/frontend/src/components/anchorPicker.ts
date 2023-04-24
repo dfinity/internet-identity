@@ -7,6 +7,7 @@ type PickerProps = {
   savedAnchors: NonEmptyArray<bigint>;
   pick: PickCB;
   moreOptions: () => void;
+  focus?: boolean;
 };
 
 type PickCB = (userNumber: bigint) => void;
@@ -18,8 +19,9 @@ export const mkAnchorPicker = (
 ): {
   template: TemplateResult;
 } => {
+  const focus = props.focus ?? true;
   const elems = props.savedAnchors.map((anchor, i) =>
-    anchorItem({ anchor, pick: props.pick, focus: i === 0 })
+    anchorItem({ anchor, pick: props.pick, focus: focus && i === 0 })
   );
 
   const moreOptions = html` <li class="c-list__item c-list__item--noFocusStyle">
