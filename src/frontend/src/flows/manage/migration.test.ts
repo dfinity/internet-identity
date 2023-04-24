@@ -1,4 +1,4 @@
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { DeviceData } from "$generated/internet_identity_types";
 import { domainWarning } from "../manage";
 
 function onOrigin(origin: string, fn: () => void) {

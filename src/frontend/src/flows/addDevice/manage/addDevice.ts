@@ -1,8 +1,8 @@
-import { isNullish } from "@dfinity/utils";
 import {
   IdentityAnchorInfo,
   Timestamp,
-} from "../../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { isNullish } from "@dfinity/utils";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
