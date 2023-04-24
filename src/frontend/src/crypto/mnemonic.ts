@@ -18,7 +18,7 @@ export function generate(): string {
 export const RECOVERYPHRASE_WORDCOUNT = 24;
 
 /** The list of words used to make the recovery phrase */
-// NOTE: "english" is the only one actually bundled in (see webpack config)
+// NOTE: "english" is the only one actually bundled in (see bundler config)
 export const RECOVERYPHRASE_WORDLIST: string[] = wordlists.english;
 
 /**

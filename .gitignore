@@ -13,6 +13,7 @@
 # frontend code
 node_modules/
 dist/
+dist-showcase/
 .env
 lib
 wdio.log
