@@ -256,9 +256,9 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     Ok(())
 }
 
-/// Verifies that a stable memory backup with persistent state v1 can be used for an upgrade.
+/// Verifies that a stable memory backup with persistent state can be used for an upgrade.
 #[test]
-fn should_read_persistent_state() -> Result<(), CallError> {
+fn should_read_persistent_state_v6() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -272,6 +272,65 @@ fn should_read_persistent_state() -> Result<(), CallError> {
     let devices =
         api::get_anchor_info(&env, canister_id, principal_1(), 10_005)?.into_device_data();
     assert_eq!(devices.len(), 4);
+
+    let stats = api::stats(&env, canister_id)?;
+    assert!(stats.archive_info.archive_canister.is_none());
+    assert!(stats.archive_info.archive_config.is_none());
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn prepare_persistent_state_v7() {
+    let env = env();
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((127, 129)));
+
+    let challenge = api::create_challenge(&env, canister_id).expect("challenge creation failed");
+    let register_response = api::register(
+        &env,
+        canister_id,
+        principal_1(),
+        &device_data_1(),
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        None,
+    )
+    .expect("Registration failed.");
+
+    let anchor_number = if let RegisterResponse::Registered { user_number } = register_response {
+        user_number
+    } else {
+        panic!("Missing anchor number.")
+    };
+    for d in &known_devices() {
+        api::add(&env, canister_id, principal_1(), anchor_number, d)
+            .expect("Failure adding a device");
+    }
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    save_compressed_stable_memory(
+        &env,
+        canister_id,
+        "stable_memory/persistent_state_no_archive_v7.bin.gz",
+        "persistent_state_no_archive_v7.bin",
+    )
+}
+
+#[test]
+fn should_read_persistent_state_v7() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+    restore_compressed_stable_memory(
+        &env,
+        canister_id,
+        "stable_memory/persistent_state_no_archive_v7.bin.gz",
+    );
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    let devices = api::get_anchor_info(&env, canister_id, principal_1(), 127)?.into_device_data();
+    assert_eq!(devices.len(), 7);
 
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());

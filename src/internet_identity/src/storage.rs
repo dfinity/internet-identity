@@ -128,6 +128,8 @@ enum AnchorMemory<M: Memory> {
     Managed(VirtualMemory<RestrictedMemory<M>>),
 }
 
+// Auxiliary traits and structures to encapsulate read/write operations
+// to different flavours of anchor memory.
 trait MemoryWriter {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Error>;
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>;
