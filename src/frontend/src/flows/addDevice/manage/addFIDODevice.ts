@@ -42,7 +42,7 @@ const displayAlreadyRegisteredDevice = () =>
  * @param connection authenticated II connection
  * @param devices already existing devices
  */
-export const addLocalDevice = async (
+export const addFIDODevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]

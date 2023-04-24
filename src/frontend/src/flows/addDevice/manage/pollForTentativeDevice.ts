@@ -19,12 +19,14 @@ import copyJson from "./pollForTentativeDevice.json";
 const pollForTentativeDeviceTemplate = ({
   userNumber,
   cancel,
+  useFIDO,
   remaining,
   origin,
   i18n,
 }: {
   userNumber: bigint;
   cancel: () => void;
+  useFIDO: () => void;
   remaining: AsyncIterable<string>;
   origin: string;
   i18n: I18n;
@@ -85,9 +87,16 @@ const pollForTentativeDeviceTemplate = ({
     </ol>
 
     <button
+      @click=${() => useFIDO()}
+      data-action="use-fido"
+      class="c-button c-button--primary l-stack"
+    >
+      ${copy.or_use_fido}
+    </button>
+    <button
       @click=${() => cancel()}
       id="cancelAddRemoteDevice"
-      class="c-button c-button--secondary l-stack"
+      class="c-button c-button--secondary"
     >
       ${copy.cancel}
     </button>
@@ -108,6 +117,8 @@ export const pollForTentativeDevicePage = renderPage(
   pollForTentativeDeviceTemplate
 );
 
+type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
+
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
  * @param userNumber anchor of the authenticated user
@@ -117,13 +128,14 @@ export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
-): Promise<DeviceData | "timeout" | "canceled"> => {
+): Promise<PollReturn> => {
   const i18n = new I18n();
-  const countdown: AsyncCountdown<DeviceData | "timeout" | "canceled"> =
+  const countdown: AsyncCountdown<PollReturn> =
     AsyncCountdown.fromNanos(endTimestamp);
   // Display the page with the option to cancel
   pollForTentativeDevicePage({
     cancel: () => countdown.stop("canceled"),
+    useFIDO: () => countdown.stop("use-fido"),
     origin: window.origin,
     userNumber,
     remaining: countdown.remainingFormattedAsync(),
@@ -147,7 +159,7 @@ const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData> =>
+): Promise<DeviceData | "use-fido"> =>
   // eslint-disable-next-line no-async-promise-executor
   new Promise(async (resolve) => {
     while (!shouldStop()) {

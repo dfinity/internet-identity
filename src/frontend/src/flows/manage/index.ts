@@ -24,9 +24,7 @@ import {
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
 import { unreachable } from "../../utils/utils";
-import { chooseDeviceAddFlow } from "../addDevice/manage";
-import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
-import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
+import { addDevice } from "../addDevice/manage/addDevice";
 import { dappsExplorer } from "../dappsExplorer";
 import { DappDescription, getDapps } from "../dappsExplorer/dapps";
 import { dappsTeaser } from "../dappsExplorer/teaser";
@@ -190,7 +188,7 @@ export const renderManage = async (
     }
     if (anchorInfo.device_registration.length !== 0) {
       // we are actually in a device registration process
-      await addRemoteDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection });
       continue;
     }
 
@@ -236,27 +234,8 @@ export const displayManage = async (
         userNumber,
         devices,
         onAddDevice: async () => {
-          const nextAction = await chooseDeviceAddFlow();
-          switch (nextAction) {
-            case "canceled": {
-              resolve();
-              break;
-            }
-            case "local": {
-              await addLocalDevice(userNumber, connection, devices_);
-              resolve();
-              break;
-            }
-            case "remote": {
-              await addRemoteDevice({ userNumber, connection });
-              resolve();
-              break;
-            }
-            default:
-              unreachable(nextAction);
-              resolve();
-              break;
-          }
+          await addDevice({ userNumber, connection });
+          resolve();
         },
         addRecoveryPhrase: async () => {
           await setupPhrase(userNumber, connection);
