@@ -79,7 +79,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       publicDir: "../frontend/assets",
       build: {
         ...build,
-        outDir: "../../showcase",
+        outDir: "../../dist-showcase",
       },
     };
   }
