@@ -42,8 +42,14 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       viteCompression({
         // II canister only supports one content type per resource. That is why we remove the original file.
         deleteOriginFile: true,
+        // GitHub pages doesn't serve gzipped files as .js, so we disable compression
+        // for the showcase build
         filter: (file: string): boolean =>
-          ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
+          mode === "showcase"
+            ? false
+            : ![".html", ".css", ".webp", ".png", ".ico"].includes(
+                extname(file)
+              ),
       }),
     ],
     optimizeDeps: {
