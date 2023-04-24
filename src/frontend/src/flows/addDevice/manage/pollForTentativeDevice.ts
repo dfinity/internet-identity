@@ -117,7 +117,7 @@ export const pollForTentativeDevicePage = renderPage(
   pollForTentativeDeviceTemplate
 );
 
-type PollReturn = DeviceData | "use fido" | "timeout" | "canceled";
+type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
 
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
@@ -135,7 +135,7 @@ export const pollForTentativeDevice = async (
   // Display the page with the option to cancel
   pollForTentativeDevicePage({
     cancel: () => countdown.stop("canceled"),
-    useFIDO: () => countdown.stop("use fido"),
+    useFIDO: () => countdown.stop("use-fido"),
     origin: window.origin,
     userNumber,
     remaining: countdown.remainingFormattedAsync(),
@@ -159,7 +159,7 @@ const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData | "use fido"> =>
+): Promise<DeviceData | "use-fido"> =>
   // eslint-disable-next-line no-async-promise-executor
   new Promise(async (resolve) => {
     while (!shouldStop()) {

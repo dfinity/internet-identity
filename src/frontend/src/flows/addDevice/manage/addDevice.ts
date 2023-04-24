@@ -46,7 +46,7 @@ export const addDevice = async ({
         primaryButton: "Ok",
       });
       return;
-    } else if (result === "use fido") {
+    } else if (result === "use-fido") {
       // If the user wants to add a FIDO device then we can (should) exit registration mode
       // (only used for adding extra browsers)
       await withLoader(() => connection.exitDeviceRegistrationMode());
