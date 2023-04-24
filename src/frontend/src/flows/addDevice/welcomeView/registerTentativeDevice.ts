@@ -10,13 +10,25 @@ import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 import { Connection, creationOptions } from "../../../utils/iiConnection";
+import { setAnchorUsed } from "../../../utils/userNumber";
 import {
   unknownToString,
   unreachable,
   unreachableLax,
 } from "../../../utils/utils";
+import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
+
+const displayAlreadyRegisteredDevice = () =>
+  displayError({
+    title: "Duplicate Device",
+    message:
+      "This device has already been added to your anchor. Try signing in directly.",
+    detail:
+      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
+    primaryButton: "Ok",
+  });
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
@@ -44,12 +56,19 @@ export const registerTentativeDevice = async (
   );
 
   if (result instanceof Error) {
-    await displayError({
-      title: "Error adding new device",
-      message: "Unable to register new WebAuthn Device.",
-      detail: result.message,
-      primaryButton: "Ok",
-    });
+    if (isDuplicateDeviceError(result)) {
+      // Given that this is a remote device where we get the result that authentication should work,
+      // let's help the user and fill in their anchor number.
+      setAnchorUsed(userNumber);
+      await displayAlreadyRegisteredDevice();
+    } else {
+      await displayError({
+        title: "Error adding new device",
+        message: "Unable to register new WebAuthn Device.",
+        detail: result.message,
+        primaryButton: "Ok",
+      });
+    }
     // TODO L2-309: do this without reload
     return window.location.reload() as never;
   }

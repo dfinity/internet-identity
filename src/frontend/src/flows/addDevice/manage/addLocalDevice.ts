@@ -9,6 +9,7 @@ import {
   creationOptions,
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
+import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
@@ -17,6 +18,15 @@ const displayFailedToAddDevice = (error: Error) =>
     message:
       "We failed to add the new device to this Identity Anchor. Please try again.",
     detail: error.message,
+    primaryButton: "Back to manage",
+  });
+
+const displayAlreadyRegisteredDevice = () =>
+  displayError({
+    title: "Duplicate Device",
+    message: "This device has already been added to your anchor.",
+    detail:
+      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
     primaryButton: "Back to manage",
   });
 
@@ -39,9 +49,13 @@ export const addLocalDevice = async (
       publicKey: creationOptions(devices),
     });
   } catch (error: unknown) {
-    await displayFailedToAddDevice(
-      error instanceof Error ? error : unknownError()
-    );
+    if (isDuplicateDeviceError(error)) {
+      await displayAlreadyRegisteredDevice();
+    } else {
+      await displayFailedToAddDevice(
+        error instanceof Error ? error : unknownError()
+      );
+    }
     return;
   }
   const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });
