@@ -621,8 +621,7 @@ const init = () => {
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
   const route = window.location.pathname
-    .replace(import.meta.env.BASE_URL ?? "", "")
-    .substring(1);
+    .replace(import.meta.env.BASE_URL ?? "/", "");
   const page = iiPages[route] ?? defaultPage;
 
   page();
