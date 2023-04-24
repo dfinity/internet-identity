@@ -1,10 +1,7 @@
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { DeviceData } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
-import {
-  displayCancelError,
-  displayError,
-} from "../../../components/displayError";
+import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
 import {
@@ -13,6 +10,7 @@ import {
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
 import {
+  displayCancelError,
   isCancel,
   isDuplicateDeviceError,
 } from "../../../utils/webAuthnErrorUtils";

@@ -10,12 +10,6 @@ export type ErrorOptions = {
   primaryButton: TemplateElement;
 };
 
-export const WEBAUTHN_CANCEL_TEMPLATE = {
-  title: "Operation canceled",
-  message:
-    "The interaction with your security device was canceled or timed out. Please try again.",
-};
-
 const pageContent = (options: ErrorOptions) =>
   mainWindow({
     id: "errorContainer",
@@ -48,12 +42,6 @@ export const displayError = (options: ErrorOptions): Promise<void> => {
   render(pageContent(options), container);
   return init();
 };
-
-export const displayCancelError = (primaryButton: string) =>
-  displayError({
-    ...WEBAUTHN_CANCEL_TEMPLATE,
-    primaryButton,
-  });
 
 const init = (): Promise<void> =>
   new Promise((resolve) => {

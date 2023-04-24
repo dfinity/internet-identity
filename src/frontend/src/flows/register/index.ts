@@ -1,5 +1,4 @@
 import { promptDeviceAlias } from "../../components/alias";
-import { WEBAUTHN_CANCEL_TEMPLATE } from "../../components/displayError";
 import {
   apiResultToLoginFlowResult,
   cancel,
@@ -8,7 +7,10 @@ import {
 import { Connection } from "../../utils/iiConnection";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString } from "../../utils/utils";
-import { isCancel } from "../../utils/webAuthnErrorUtils";
+import {
+  isCancel,
+  WEBAUTHN_CANCEL_TEMPLATE,
+} from "../../utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";

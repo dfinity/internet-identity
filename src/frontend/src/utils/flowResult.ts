@@ -1,5 +1,5 @@
-import { WEBAUTHN_CANCEL_TEMPLATE } from "../components/displayError";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
+import { WEBAUTHN_CANCEL_TEMPLATE } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
