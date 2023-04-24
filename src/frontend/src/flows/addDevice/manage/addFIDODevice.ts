@@ -9,7 +9,11 @@ import {
   creationOptions,
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
-import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
+import {
+  displayCancelError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "../../../utils/webAuthnErrorUtils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
@@ -51,6 +55,8 @@ export const addFIDODevice = async (
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
       await displayAlreadyRegisteredDevice();
+    } else if (isCancel(error)) {
+      await displayCancelError("Back to manage");
     } else {
       await displayFailedToAddDevice(
         error instanceof Error ? error : unknownError()

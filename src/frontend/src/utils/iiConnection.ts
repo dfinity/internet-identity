@@ -43,6 +43,7 @@ import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { isCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -78,13 +79,15 @@ export type LoginResult =
   | UnknownUser
   | AuthFail
   | ApiError
-  | SeedPhraseFail;
+  | SeedPhraseFail
+  | CancelOrTimeout;
 export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
   | RegisterNoSpace
-  | BadChallenge;
+  | BadChallenge
+  | CancelOrTimeout;
 
 type LoginSuccess = {
   kind: "loginSuccess";
@@ -98,6 +101,7 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
+type CancelOrTimeout = { kind: "cancelOrTimeout" };
 
 export type { ChallengeResult } from "$generated/internet_identity_types";
 
@@ -241,6 +245,9 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      if (isCancel(e)) {
+        return { kind: "cancelOrTimeout" };
+      }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
       } else {

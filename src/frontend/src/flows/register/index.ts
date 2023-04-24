@@ -7,6 +7,10 @@ import {
 import { Connection } from "../../utils/iiConnection";
 import { setAnchorUsed } from "../../utils/userNumber";
 import { unknownToString } from "../../utils/utils";
+import {
+  isCancel,
+  WEBAUTHN_CANCEL_TEMPLATE,
+} from "../../utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
@@ -46,6 +50,12 @@ export const register = async ({
       return result;
     }
   } catch (e) {
+    if (isCancel(e)) {
+      return {
+        tag: "err",
+        ...WEBAUTHN_CANCEL_TEMPLATE,
+      };
+    }
     return {
       tag: "err",
       title: "Failed to create anchor",
