@@ -7,12 +7,9 @@
     <!-- CSP directives injected by the canister -->
     <meta replaceme-with-csp />
     <title>Internet Identity</title>
-    <link rel="shortcut icon" type="image/jpg" href="./favicon.ico" />
-    <!-- We set "inject" to false in production, where we explicitly link to the stylesheet
-        with a <link> tag (instead of the "style-loader"-development-loaded one) -->
-    <% if (! htmlWebpackPlugin.options.inject) { %>
-    <link rel="stylesheet" href="./index.css" />
-    <% } %>
+    <link rel="shortcut icon" href="assets/favicon.ico" />
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <script type="module" src="src/index.ts"></script>
   </head>
   <body>
     <main id="pageContent" class="l-wrap" aria-live="polite"></main>
