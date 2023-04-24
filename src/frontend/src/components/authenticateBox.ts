@@ -51,7 +51,7 @@ export const authenticateBox = async (
     new Promise<LoginFlowResult>((resolve) => {
       const pages = authnPages({
         ...templates,
-        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+        addDevice: (userNumber) => asNewDevice(connection, userNumber),
         onSubmit: (userNumber) => {
           resolve(authenticate(connection, userNumber));
         },
@@ -252,9 +252,8 @@ const page = (slot: TemplateResult) => {
   render(template, container);
 };
 
-// Start the "remote device" add flow by prompting for an anchor, and then
-// adding a device to that anchor.
-const addRemoteDevice = async (connection: Connection, userNumber?: bigint) => {
+// Register this device as a new device with the anchor
+const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
   const askUserNumber = async () => {
     const result = await promptUserNumber({
