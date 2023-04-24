@@ -1,7 +1,7 @@
 import { html, TemplateResult } from "lit-html";
 import { closeIcon } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
+import { DynamicKey, I18n } from "../../i18n";
 import { renderPage } from "../../utils/lit-html";
 
 import { DappDescription } from "./dapps";
@@ -33,7 +33,7 @@ const dappsExplorerTemplate = ({
       ${closeIcon}
     </button>
     <div class="c-action-list">
-      ${dapps.map((dapp) => dappTemplate(dapp, copy))}
+      ${dapps.map((dapp) => dappTemplate(dapp, copy.open_cta))}
     </div>
   `;
 
@@ -51,7 +51,7 @@ export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 /* Template for a single dapp */
 const dappTemplate = (
   { link, logo, name, oneLiner }: DappDescription,
-  copy: any
+  open_cta_string: DynamicKey
 ): TemplateResult => {
   return html`
     <a
@@ -71,7 +71,7 @@ const dappTemplate = (
       </div>
       <span class="c-action-list__action"
         ><span class="c-button c-button--minimal c-button--secondary"
-          >${copy.open_cta}</span
+          >${open_cta_string}</span
         ></span
       >
     </a>
