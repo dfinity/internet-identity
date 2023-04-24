@@ -51,9 +51,10 @@ export const stripInjectJsScript = (): {
 } => ({
   name: "html-transform",
   transformIndexHtml(html): string {
-    return html.replace(
-      `<script type="module" crossorigin src="/index.js"></script>`,
-      ``
-    );
+    const match = `<script type="module" crossorigin src="/index.js"></script>`;
+    if (!html.includes(match)) {
+      throw new Error("Expecting script tag to replace, found none");
+    }
+    return html.replace(match, ``);
   },
 });
