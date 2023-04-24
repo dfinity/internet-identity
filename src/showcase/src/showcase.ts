@@ -458,6 +458,7 @@ const components = (): TemplateResult => {
           div.innerText = anchor.toString();
         }),
       moreOptions: () => console.log("More options requested"),
+          focus: false,
     }).template;
 
   const chan = new Chan<TemplateResult>(html`loading...`);
@@ -505,6 +506,7 @@ const components = (): TemplateResult => {
                     ),
                   onContinue: () => console.log("Done"),
                   i18n,
+                  focus: false,
                 },
                 container
               )
