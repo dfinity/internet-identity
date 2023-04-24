@@ -16,7 +16,11 @@ import {
   unreachable,
   unreachableLax,
 } from "../../../utils/utils";
-import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
+import {
+  displayCancelError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "../../../utils/webAuthnErrorUtils";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
 
@@ -61,6 +65,8 @@ export const registerTentativeDevice = async (
       // let's help the user and fill in their anchor number.
       setAnchorUsed(userNumber);
       await displayAlreadyRegisteredDevice();
+    } else if (isCancel(result)) {
+      await displayCancelError("Ok");
     } else {
       await displayError({
         title: "Error adding new device",
