@@ -14,7 +14,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       alias: {
         // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
         stream: "stream-browserify",
-        // Custom alias we are using to shorten the imports
+        // Custom alias we are using to shorten and make absolute the imports
         $generated: resolve(__dirname, "src/frontend/generated"),
       },
     },
