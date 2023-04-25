@@ -85,6 +85,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
+        "internet_identity_max_num_latest_delegation_origins",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
