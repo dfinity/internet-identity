@@ -1,5 +1,5 @@
+import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
-import { TemplateElement } from "./lit-html";
 import { webAuthnCancelTemplate } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
@@ -21,9 +21,9 @@ export type LoginFlowError = {
 } & LoginError;
 
 export type LoginError = {
-  title: TemplateElement;
-  message: TemplateElement;
-  detail?: TemplateElement;
+  title: string | DynamicKey;
+  message: string | DynamicKey;
+  detail?: string | DynamicKey;
 };
 
 /** The result of a login flow that was canceled */
