@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "wdio": "wdio run ./wdio.conf.ts",
-    "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "test": "ts-node --esm ./test.ts",
     "format": "prettier --write --plugin-search-dir=. .",
     "build": "tsc --noEmit && vite build",
