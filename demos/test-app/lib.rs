@@ -233,8 +233,8 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentType); 5] {
         ("/", index_html, ContentType::HTML),
         ("/index.html", index_html, ContentType::HTML),
         (
-            "/bundle.js",
-            include_bytes!("dist/bundle.js"),
+            "/index.js",
+            include_bytes!("dist/index.js"),
             ContentType::JS,
         ),
         // initially empty alternative origins, but can be populated using the update_alternative_origins call
