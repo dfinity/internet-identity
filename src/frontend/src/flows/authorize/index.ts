@@ -94,7 +94,7 @@ export const authnTemplateAuthorize = ({
       slot: wrap(copy.first_time_create),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
-      additionalInfo: html`${marketingBlocks.map(marketing)}`,
+      marketingBlocks: html`${marketingBlocks.map(marketing)}`,
     },
     useExisting: {
       slot: wrap(copy.use_existing_enter_anchor),

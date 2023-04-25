@@ -32,7 +32,7 @@ export type AuthnTemplates = {
     slot: TemplateResult;
     useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
     createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
-    additionalInfo: TemplateResult /** text shown below the login options usually a context explainer or marketing text */;
+    marketingBlocks: TemplateResult /** text shown below the login options usually a context explainer or marketing text */;
   };
   useExisting: {
     slot: TemplateResult;
