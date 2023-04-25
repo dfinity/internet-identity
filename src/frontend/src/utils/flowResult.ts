@@ -1,5 +1,6 @@
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
-import { WEBAUTHN_CANCEL_TEMPLATE } from "./webAuthnErrorUtils";
+import { TemplateElement } from "./lit-html";
+import { webAuthnCancelTemplate } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
@@ -20,9 +21,9 @@ export type LoginFlowError = {
 } & LoginError;
 
 export type LoginError = {
-  title: string;
-  message: string;
-  detail?: string;
+  title: TemplateElement;
+  message: TemplateElement;
+  detail?: TemplateElement;
 };
 
 /** The result of a login flow that was canceled */
@@ -93,7 +94,7 @@ export const apiResultToLoginFlowResult = (
     case "cancelOrTimeout": {
       return {
         tag: "err",
-        ...WEBAUTHN_CANCEL_TEMPLATE,
+        ...webAuthnCancelTemplate(),
       };
     }
   }

@@ -13,7 +13,7 @@ import type {
 } from "$src/utils/flowResult";
 import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
 import { Connection } from "$src/utils/iiConnection";
-import { renderPage, withRef } from "$src/utils/lit-html";
+import { renderPage, TemplateElement, withRef } from "$src/utils/lit-html";
 import { RecoveryDevice } from "$src/utils/recoveryDevice";
 import { Chan } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
@@ -26,7 +26,7 @@ const recoverWithPhraseTemplate = <
   /* The successful return type on verification */
   T extends { tag: "ok" },
   /* The error return type on verification */
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: TemplateElement }
 >({
   confirm,
   verify,
@@ -265,12 +265,12 @@ export const wordTemplate = ({
 
 type TemplateProps<
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: TemplateElement }
 > = Parameters<typeof recoverWithPhraseTemplate<T, E>>[0];
 
 export const recoverWithPhrasePage = <
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: TemplateElement }
 >(
   props: TemplateProps<T, E>
 ) => renderPage(recoverWithPhraseTemplate<T, E>)(props);
