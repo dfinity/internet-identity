@@ -139,7 +139,14 @@ const displayManageTemplate = ({
     </hgroup>
     ${anchorSection(userNumber)}
     <p class="t-paragraph">
-      ${dappsTeaser({ dapps, click: () => exploreDapps() })}
+      ${dappsTeaser({
+        dapps,
+        click: () => exploreDapps(),
+        copy: {
+          dapps_explorer: "Dapps explorer",
+          sign_into_dapps: "Sign into dapps",
+        },
+      })}
     </p>
     ${authenticatorsSection({
       authenticators,
