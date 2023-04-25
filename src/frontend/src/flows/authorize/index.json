@@ -24,24 +24,6 @@
     "first_time_create_text": "Create an Anchor",
 
     "use_existing_enter_anchor": "Enter an Anchor",
-    "pick_choose_anchor": "Choose an Anchor",
-
-    "secure_and_convenient": "Secure & Convenient",
-    "instead_of_passwords": "Instead of using passwords to sign-in, you unlock your device to authorize the use of a passkey. Passkeys are built on a standardized technology that offers protection against phishing attacks. This makes Internet Identity both more convenient and secure than traditional sign-in methods.",
-
-    "no_tracking": "No Tracking",
-    "get_privacy": "Get the privacy of many separate accounts, without the burden of managing them. When you create an account with a dapp using Internet Identity, a new set of authentication keys are created and managed for that dapp. This way, your identity cannot be tracked across dapps or websites.",
-
-    "control_your_identity": "Control Your Identity",
-    "securely_access": "You can securely access your Internet Identity from many different devices through the use of passkeys. If you ever lose trust in a device, you can easily delete the passkeys associated with the device to revoke access.",
-
-    "own_and_participate": "Own & Participate",
-    "share_and_vote": "Stake tokens and vote on the future of Internet Identity on the Network Nervous System (NNS). The NNS is decentralized control system (or DAO) that manages the Internet Computer’s functions, including Internet Identity. You can submit proposals and vote on security, upgrades, implementing changes, community governance, etc.",
-
-    "sign_in_to_web3": "Sign in to 100% Web3 dapps",
-    "manages_keys": "Internet Identity manages many keys for you and reduces the number of signature requests that you experience while exploring Web3. Internet Identity creates a public key for every dapp, so that you cannot be tracked across services. You use your device to authorize sessions instead of signing individual transactions. By signing a session, you authorize a scoped delegation that frees you to enjoy the dapp without signing every interaction.",
-
-    "opensource_and_transparent": "Open Source & Transparent",
-    "internet_identity_codebase": "The codebase for Internet Identity is open source and available for anyone to view and contribute to on GitHub. This means that developers can audit the codebase and ensure that it meets the highest standards of security and transparency."
+    "pick_choose_anchor": "Choose an Anchor"
   }
 }

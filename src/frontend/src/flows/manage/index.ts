@@ -19,6 +19,7 @@ import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
+import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import {
@@ -39,7 +40,6 @@ import {
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
-import { I18n } from "$src/i18n";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {

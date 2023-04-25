@@ -102,16 +102,6 @@ export const authenticateBox = async (
   }
 };
 
-const marketing = (block: {
-  title: DynamicKey;
-  body: DynamicKey;
-}): TemplateResult => html`
-  <div class="c-marketing-block">
-    <h2 class="t-title t-title--main">${block.title}</h2>
-    <p class="t-paragraph t-weak">${block.body}</p>
-  </div>
-`;
-
 /** The templates for the authentication pages */
 export const authnTemplates = (
   i18n: I18n,
@@ -172,7 +162,15 @@ export const authnTemplates = (
             ${props.firstTime.useExistingText}
           </button>
         </div>
-        ${marketingBlocks.map(marketing)}
+        ${marketingBlocks.map(
+          ({ title, body }) =>
+            html`
+              <div class="c-marketing-block">
+                <h2 class="t-title t-title--main">${title}</h2>
+                <p class="t-paragraph t-weak">${body}</p>
+              </div>
+            `
+        )}
         <p class="t-paragraph t-centered l-stack">
           <a
             class="t-link"

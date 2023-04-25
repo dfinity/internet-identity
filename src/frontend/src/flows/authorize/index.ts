@@ -27,7 +27,6 @@ export const authnTemplateAuthorize = ({
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
-
   const chasm =
     derivationOrigin !== undefined && derivationOrigin !== origin
       ? mkChasm({
@@ -51,7 +50,6 @@ export const authnTemplateAuthorize = ({
       ${chasm}
     </div>
   `;
-
   return {
     firstTime: {
       slot: wrap(copy.first_time_create),
