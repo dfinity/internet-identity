@@ -1,10 +1,10 @@
+import { checkmarkIcon, copyIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { warnBox } from "$src/components/warnBox";
+import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { checkmarkIcon, copyIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { toast } from "../../components/toast";
-import { warnBox } from "../../components/warnBox";
-import { renderPage, withRef } from "../../utils/lit-html";
 
 export const displayUserNumberTemplate = ({
   onContinue,

@@ -6,6 +6,7 @@
     "copy_to_clipboard": "Copy to clipboard",
     "scan_qr_or_visit_link": "Scan the QR code with your device’s camera or visit the link.",
     "sign_in_using_device": "Sign in using your device.",
+    "or_use_fido": "or add FIDO Hardware",
     "time_remaining": "Time remaining",
 
     "cancel": "Cancel",

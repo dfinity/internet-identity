@@ -1,20 +1,16 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
-import { WebAuthnIdentity } from "@dfinity/identity";
-import { displayError } from "../../components/displayError";
-import { withLoader } from "../../components/loader";
-import { fromMnemonicWithoutValidation } from "../../crypto/ed25519";
-import { generate } from "../../crypto/mnemonic";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { generate } from "$src/crypto/mnemonic";
 import {
   AuthenticatedConnection,
   creationOptions,
   IC_DERIVATION_PATH,
-} from "../../utils/iiConnection";
-import {
-  unknownToString,
-  unreachable,
-  unreachableLax,
-} from "../../utils/utils";
+} from "$src/utils/iiConnection";
+import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
+import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
+import { WebAuthnIdentity } from "@dfinity/identity";
 import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
 import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";

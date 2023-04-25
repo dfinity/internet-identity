@@ -1,4 +1,4 @@
-import { displayError } from "../components/displayError";
+import { displayError } from "$src/components/displayError";
 
 export const WEBAUTHN_CANCEL_TEMPLATE = {
   title: "Operation canceled",

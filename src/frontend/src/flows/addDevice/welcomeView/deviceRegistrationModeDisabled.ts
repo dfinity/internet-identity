@@ -1,7 +1,7 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { LEGACY_II_URL_NO_PROTOCOL } from "$src/config";
+import { renderPage } from "$src/utils/lit-html";
 import { html } from "lit-html";
-import { mainWindow } from "../../../components/mainWindow";
-import { LEGACY_II_URL_NO_PROTOCOL } from "../../../config";
-import { renderPage } from "../../../utils/lit-html";
 
 const deviceRegistrationDisabledInfoTemplate = ({
   userNumber,

@@ -22,6 +22,8 @@ import {
   VerifyTentativeDeviceResponse,
   _SERVICE,
 } from "$generated/internet_identity_types";
+import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { features } from "$src/features";
 import {
   Actor,
   ActorSubclass,
@@ -38,8 +40,6 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
-import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
-import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
@@ -227,20 +227,19 @@ export class Connection {
     devices: Omit<DeviceData, "alias">[]
   ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
-     * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
-    const identity =
-      process.env.II_DUMMY_AUTH === "1"
-        ? new DummyIdentity()
-        : MultiWebAuthnIdentity.fromCredentials(
-            devices.flatMap((device) =>
-              device.credential_id.map((credentialId: CredentialId) => ({
-                pubkey: derFromPubkey(device.pubkey),
-                credentialId: Buffer.from(credentialId),
-              }))
-            )
-          );
+    const identity = features.DUMMY_AUTH
+      ? new DummyIdentity()
+      : MultiWebAuthnIdentity.fromCredentials(
+          devices.flatMap((device) =>
+            device.credential_id.map((credentialId: CredentialId) => ({
+              pubkey: derFromPubkey(device.pubkey),
+              credentialId: Buffer.from(credentialId),
+            }))
+          )
+        );
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await this.requestFEDelegation(identity);

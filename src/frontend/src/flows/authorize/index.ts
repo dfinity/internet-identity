@@ -1,17 +1,17 @@
-import { html, render, TemplateResult } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   authenticateBox,
   AuthnTemplates,
-} from "../../components/authenticateBox";
-import { displayError } from "../../components/displayError";
-import { caretDownIcon, spinner } from "../../components/icons";
-import { showMessage } from "../../components/message";
-import { DynamicKey, I18n } from "../../i18n";
-import { Connection } from "../../utils/iiConnection";
-import { TemplateElement, withRef } from "../../utils/lit-html";
-import { unreachable } from "../../utils/utils";
-import { recoveryWizard } from "../recovery/recoveryWizard";
+} from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { caretDownIcon, spinner } from "$src/components/icons";
+import { showMessage } from "$src/components/message";
+import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { DynamicKey, I18n } from "$src/i18n";
+import { Connection } from "$src/utils/iiConnection";
+import { TemplateElement, withRef } from "$src/utils/lit-html";
+import { unreachable } from "$src/utils/utils";
+import { html, render, TemplateResult } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
 import copyJson from "./index.json";

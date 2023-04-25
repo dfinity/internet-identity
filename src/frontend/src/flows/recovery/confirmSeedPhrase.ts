@@ -1,11 +1,11 @@
+import { checkmarkIcon, warningIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { checkmarkIcon, warningIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { renderPage, withRef } from "../../utils/lit-html";
-import { Chan } from "../../utils/utils";
 
 import copyJson from "./confirmSeedPhrase.json";
 

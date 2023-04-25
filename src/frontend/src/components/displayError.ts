@@ -1,5 +1,5 @@
+import { TemplateElement } from "$src/utils/lit-html";
 import { html, render } from "lit-html";
-import { TemplateElement } from "../utils/lit-html";
 import { mainWindow } from "./mainWindow";
 import { warnBox } from "./warnBox";
 

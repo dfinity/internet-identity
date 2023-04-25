@@ -1,7 +1,7 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { warnBox } from "$src/components/warnBox";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { html, render } from "lit-html";
-import { mainWindow } from "../../components/mainWindow";
-import { warnBox } from "../../components/warnBox";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => {
   const pageContentSlot = html` <article id="warningContainer">

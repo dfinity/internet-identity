@@ -21,7 +21,6 @@ import {
 } from "../../frontend/src/components/message";
 import { promptUserNumber } from "../../frontend/src/components/promptUserNumber";
 import { toast } from "../../frontend/src/components/toast";
-import { chooseDeviceAddFlow } from "../../frontend/src/flows/addDevice/manage";
 import { addDeviceSuccessPage } from "../../frontend/src/flows/addDevice/manage/addDeviceSuccess";
 import { pollForTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/pollForTentativeDevice";
 import { verifyTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/verifyTentativeDevice";
@@ -326,10 +325,10 @@ const iiPages: Record<string, () => void> = {
       },
     });
   },
-  chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
+      useFIDO: () => console.log("use FIDO"),
       origin: "https://identity.internetcomputer.org",
       userNumber: BigInt(1234),
       remaining: {
@@ -621,8 +620,7 @@ const init = () => {
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
   const route = window.location.pathname
-    .replace(process.env.BASE_URL ?? "", "")
-    .substring(1);
+    .replace(import.meta.env.BASE_URL ?? "/", "");
   const page = iiPages[route] ?? defaultPage;
 
   page();

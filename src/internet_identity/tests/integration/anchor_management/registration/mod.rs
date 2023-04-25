@@ -323,3 +323,24 @@ fn should_report_max_rate_limit_tokens() -> Result<(), CallError> {
     );
     Ok(())
 }
+
+/// Tests that the II correctly reports the max tokens metric.
+#[test]
+fn should_report_time_per_rate_limit_token() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        arg_with_rate_limit(RateLimitConfig {
+            time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
+            max_tokens: 2,
+        }),
+    );
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_register_rate_limit_time_per_tokens_seconds",
+        1f64,
+    );
+    Ok(())
+}
