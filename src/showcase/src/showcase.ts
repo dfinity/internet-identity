@@ -461,7 +461,7 @@ const components = (): TemplateResult => {
           div.innerText = anchor.toString();
         }),
       moreOptions: () => console.log("More options requested"),
-          focus: false,
+      focus: false,
     }).template;
 
   const chan = new Chan<TemplateResult>(html`loading...`);
@@ -643,11 +643,11 @@ const init = () => {
   // '/internet-identity/myPage' -> 'myPage'
   const baseUrl = import.meta.env.BASE_URL;
   const pageName = window.location.pathname.replace(baseUrl, "");
-  if(pageName === "") {
-      defaultPage();
+  if (pageName === "") {
+    defaultPage();
   } else {
-      const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
-      page();
+    const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
+    page();
   }
 };
 
