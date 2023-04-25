@@ -44,17 +44,19 @@ export const promptCaptchaTemplate = <T>({
   const copy = i18n.i18n(copyJson);
 
   const spinnerImg: TemplateResult = html`
-    <div class="c-captcha-placeholder c-spinner-wrapper">
+    <div
+      class="c-captcha-placeholder c-spinner-wrapper"
+      aria-label="Loading image"
+    >
       <div class="c-spinner">${spinner}</div>
     </div>
   `;
   const captchaImg = (base64: string): TemplateResult =>
-    html`<div class="c-captcha-placeholder">
+    html`<div class="c-captcha-placeholder" aria-label="CAPTCHA challenge">
       <img
         src="data:image/png;base64,${base64}"
-        id="captchaImg"
         class="c-image"
-        alt="captcha image"
+        alt="CAPTCHA Characters"
       />
     </div>`;
 
