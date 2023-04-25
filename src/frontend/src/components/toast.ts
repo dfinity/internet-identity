@@ -48,6 +48,7 @@ const toastTemplate = (toast: Toast): TemplateResult => {
   };
 
   return html` <div
+    role="alert"
     class="c-toast ${asyncReplace(
       closing.map((closing) => (closing ? "c-toast--closing" : undefined))
     )}"
