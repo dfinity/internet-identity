@@ -1,12 +1,10 @@
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
-import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage } from "./flows/manage";
-import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -14,9 +12,9 @@ import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
 import { isNullish } from "@dfinity/utils";
-import copyJson from "./index.json";
 
 // Polyfill Buffer globally for the browser
+import { renderAddDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -104,17 +102,13 @@ const init = async () => {
   const addDeviceAnchor = getAddDeviceAnchor();
   if (addDeviceAnchor !== undefined) {
     // Register this device (tentatively)
-    await registerTentativeDevice(addDeviceAnchor, connection);
+    const { alias: deviceAlias } = await registerTentativeDevice(
+      addDeviceAnchor,
+      connection
+    );
 
-    const i18n = new I18n();
-    const copy = i18n.i18n(copyJson);
-
-    // Show a good bye message
-    showMessage({
-      message: copy.close_page_device_added,
-      role: "notify-device-added",
-    });
-    return;
+    // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
+    await renderAddDeviceSuccess({ deviceAlias });
   }
 
   // Simple, #-based routing

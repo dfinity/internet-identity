@@ -37,7 +37,7 @@ const displayAlreadyRegisteredDevice = () =>
 export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
-): Promise<"ok"> => {
+): Promise<{ alias: string } | never> => {
   // First, we need an alias for the device to (tentatively) add
   const alias = await promptDeviceAlias({
     title: "Add a Trusted Device",
@@ -96,13 +96,15 @@ export const registerTentativeDevice = async (
 
   // If everything went well we can now ask the user to authenticate on an existing device
   // and enter a verification code
-  return await showVerificationCode(
+  await showVerificationCode(
     userNumber,
     connection,
     device.alias,
     addResponse.added_tentatively,
     device.credential_id[0]
   );
+
+  return { alias };
 };
 
 /** Create new WebAuthn credentials */
