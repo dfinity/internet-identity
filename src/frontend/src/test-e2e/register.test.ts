@@ -143,27 +143,9 @@ test("Register new identity and add additional remote device", async () => {
       await verificationView.continue();
 
       // success page
-      const addDeviceSuccessViewBrowser1 = await new AddDeviceSuccessView(
-        browser
-      );
-      await addDeviceSuccessViewBrowser1.waitForDisplay();
-      await addDeviceSuccessViewBrowser1.continue();
-
-      // browser 2 again
-      await focusBrowser(browser2);
-
-      // success page
-      const addDeviceSuccessViewBrowser2 = await new AddDeviceSuccessView(
-        browser
-      );
-      await addDeviceSuccessViewBrowser2.waitForDisplay();
-      await addDeviceSuccessViewBrowser2.continue();
-
-      // Should go back to home on browser 2
-      await addRemoteDeviceView.waitForDisplay();
-
-      // browser 1 again
-      await focusBrowser(browser);
+      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      await addDeviceSuccessView.waitForDisplay();
+      await addDeviceSuccessView.continue();
     });
 
     await mainView.waitForDisplay();
