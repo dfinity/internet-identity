@@ -20,9 +20,9 @@
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
-    "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*'",
-    "format": "prettier --write src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts jest.config.ts demos",
-    "format-check": "prettier --check src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts jest.config.ts demos"
+    "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
+    "format": "prettier --write src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts jest.config.ts demos",
+    "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts jest.config.ts demos"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "~5",

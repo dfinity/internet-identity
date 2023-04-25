@@ -461,7 +461,7 @@ const components = (): TemplateResult => {
           div.innerText = anchor.toString();
         }),
       moreOptions: () => console.log("More options requested"),
-          focus: false,
+      focus: false,
     }).template;
 
   const chan = new Chan<TemplateResult>(html`loading...`);
@@ -625,8 +625,7 @@ const init = () => {
   // 404) but this is an dev page anyway.
   // '/myPage' -> 'myPage'
   // '/internet-identity/myPage' -> 'myPage'
-  const route = window.location.pathname
-    .replace(import.meta.env.BASE_URL, "");
+  const route = window.location.pathname.replace(import.meta.env.BASE_URL, "");
   const page = iiPages[route] ?? defaultPage;
 
   page();
