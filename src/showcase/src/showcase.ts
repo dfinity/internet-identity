@@ -433,11 +433,15 @@ const iiPages: Record<string, () => void> = {
 const showcase: TemplateResult = html`
   <h1 class="t-title t-title--main">showcase</h1>
   <div class="showcase-grid l-stack">
-    ${Object.entries(iiPages).map(([key, _]) => {
+    ${Object.entries(iiPages).map(([pageName, _]) => {
+      // '/' or '/internet-identity/'
+      const baseUrl = import.meta.env.BASE_URL ?? "/";
+      // '/myPage' or '/internet-identity/myPage'
+      const pageLink = baseUrl + pageName;
       return html`<aside>
-        <a data-page-name="${key}" href="${key}">
-          <iframe src="${key}" title="${key}"></iframe>
-          <h2>${key}</h2>
+        <a data-page-name=${pageName} href=${pageLink}>
+          <iframe src=${pageLink} title=${pageName}></iframe>
+          <h2>${pageName}</h2>
         </a>
       </aside>`;
     })}
@@ -619,8 +623,10 @@ const init = () => {
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
+  // '/myPage' -> 'myPage'
+  // '/internet-identity/myPage' -> 'myPage'
   const route = window.location.pathname
-    .replace(import.meta.env.BASE_URL ?? "/", "");
+    .replace(import.meta.env.BASE_URL, "");
   const page = iiPages[route] ?? defaultPage;
 
   page();
