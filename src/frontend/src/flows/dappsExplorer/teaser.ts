@@ -1,3 +1,4 @@
+import { DynamicKey } from "$src/i18n";
 import { html, TemplateResult } from "lit-html";
 import { DappDescription } from "./dapps";
 
@@ -5,19 +6,21 @@ import { DappDescription } from "./dapps";
 export const dappsTeaser = ({
   dapps,
   click,
+  copy: { dapps_explorer, sign_into_dapps },
 }: {
   dapps: DappDescription[];
   click: () => void;
+  copy: { dapps_explorer: DynamicKey; sign_into_dapps: DynamicKey };
 }): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
     <h3 class="t-title t-title--discrete" role="presentation">
-      Dapps explorer
+      ${dapps_explorer}
     </h3>
-    <h2 class="t-title">Explore dapps</h2>
+    <h2 class="t-title">${sign_into_dapps}</h2>
     <button
       class="c-click-area"
       @click="${() => click()}"
-      aria-label="Show list of dapps"
+      aria-label=${sign_into_dapps}
     >
       <figure class="c-card__teaser c-marquee c-marquee--clickable">
         ${marqueeList(dapps)}
