@@ -357,7 +357,7 @@ body {
   line-height: var(--rs-line-height-body);
   background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
   background-size: 100% 100%;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /**

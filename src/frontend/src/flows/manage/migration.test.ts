@@ -1,4 +1,4 @@
-import { DeviceData } from "../../../generated/internet_identity_types";
+import { DeviceData } from "$generated/internet_identity_types";
 import { domainWarning } from "../manage";
 
 function onOrigin(origin: string, fn: () => void) {
@@ -23,6 +23,7 @@ const recoveryPhrase: DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  metadata: [],
 };
 
 const authenticator: DeviceData = {
@@ -33,6 +34,7 @@ const authenticator: DeviceData = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
+  metadata: [],
 };
 
 test("recovery phrases don't have origin warnings", () => {

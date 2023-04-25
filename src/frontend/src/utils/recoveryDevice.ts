@@ -1,4 +1,4 @@
-import { DeviceData } from "../../generated/internet_identity_types";
+import { DeviceData } from "$generated/internet_identity_types";
 
 export type RecoveryDevice = Omit<DeviceData, "alias"> & {
   purpose: { recovery: null };

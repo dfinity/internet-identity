@@ -1,9 +1,9 @@
-import { isNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
 import {
   DeviceData,
   IdentityAnchorInfo,
-} from "../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { isNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { showWarning } from "../../banner";
 import {
   authenticateBox,
@@ -24,9 +24,7 @@ import {
   isRecoveryPhrase,
 } from "../../utils/recoveryDevice";
 import { unreachable } from "../../utils/utils";
-import { chooseDeviceAddFlow } from "../addDevice/manage";
-import { addLocalDevice } from "../addDevice/manage/addLocalDevice";
-import { addRemoteDevice } from "../addDevice/manage/addRemoteDevice";
+import { addDevice } from "../addDevice/manage/addDevice";
 import { dappsExplorer } from "../dappsExplorer";
 import { DappDescription, getDapps } from "../dappsExplorer/dapps";
 import { dappsTeaser } from "../dappsExplorer/teaser";
@@ -190,7 +188,7 @@ export const renderManage = async (
     }
     if (anchorInfo.device_registration.length !== 0) {
       // we are actually in a device registration process
-      await addRemoteDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection });
       continue;
     }
 
@@ -212,7 +210,8 @@ export const displayManage = async (
   devices_: DeviceData[]
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
-  const dapps = await getDapps();
+  // (dapps are suffled to encourage discovery of new dapps)
+  const dapps = shuffleArray(await getDapps());
   return new Promise((resolve) => {
     const devices = devicesFromDeviceDatas({
       devices: devices_,
@@ -235,27 +234,8 @@ export const displayManage = async (
         userNumber,
         devices,
         onAddDevice: async () => {
-          const nextAction = await chooseDeviceAddFlow();
-          switch (nextAction) {
-            case "canceled": {
-              resolve();
-              break;
-            }
-            case "local": {
-              await addLocalDevice(userNumber, connection, devices_);
-              resolve();
-              break;
-            }
-            case "remote": {
-              await addRemoteDevice({ userNumber, connection });
-              resolve();
-              break;
-            }
-            default:
-              unreachable(nextAction);
-              resolve();
-              break;
-          }
+          await addDevice({ userNumber, connection });
+          resolve();
         },
         addRecoveryPhrase: async () => {
           await setupPhrase(userNumber, connection);
@@ -452,4 +432,15 @@ export const domainWarning = (
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
+};
+
+// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
+// avoid shuffling in place.
+const shuffleArray = <T>(array_: T[]): T[] => {
+  const array = [...array_];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 };

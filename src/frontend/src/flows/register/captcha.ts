@@ -1,8 +1,8 @@
+import { Challenge } from "$generated/internet_identity_types";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { Challenge } from "../../../generated/internet_identity_types";
 import { spinner } from "../../components/icons";
 import { mainWindow } from "../../components/mainWindow";
 import { DynamicKey, I18n } from "../../i18n";
@@ -28,6 +28,7 @@ export const promptCaptchaTemplate = <T>({
   verifyChallengeChars,
   onContinue,
   i18n,
+  focus: focus_,
 }: {
   cancel: () => void;
   requestChallenge: () => Promise<Challenge>;
@@ -37,7 +38,9 @@ export const promptCaptchaTemplate = <T>({
   }) => Promise<T | typeof badChallenge>;
   onContinue: (result: T) => void;
   i18n: I18n;
+  focus?: boolean;
 }) => {
+  const focus = focus_ ?? true;
   const copy = i18n.i18n(copyJson);
 
   const spinnerImg: TemplateResult = html`
@@ -157,7 +160,7 @@ export const promptCaptchaTemplate = <T>({
         <label>
           <strong class="t-strong">${copy.instructions}</strong>
           <input
-            ${autofocus}
+            ${focus ? autofocus : undefined}
             ${ref(input)}
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"

@@ -1,5 +1,5 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { DeviceData } from "../../../../generated/internet_identity_types";
 import { promptDeviceAlias } from "../../../components/alias";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
@@ -9,6 +9,11 @@ import {
   creationOptions,
 } from "../../../utils/iiConnection";
 import { setAnchorUsed } from "../../../utils/userNumber";
+import {
+  displayCancelError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "../../../utils/webAuthnErrorUtils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
@@ -20,6 +25,15 @@ const displayFailedToAddDevice = (error: Error) =>
     primaryButton: "Back to manage",
   });
 
+const displayAlreadyRegisteredDevice = () =>
+  displayError({
+    title: "Duplicate Device",
+    message: "This device has already been added to your anchor.",
+    detail:
+      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
+    primaryButton: "Back to manage",
+  });
+
 /**
  * Add a new device (i.e. a device connected to the browser the user is
  * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
@@ -28,7 +42,7 @@ const displayFailedToAddDevice = (error: Error) =>
  * @param connection authenticated II connection
  * @param devices already existing devices
  */
-export const addLocalDevice = async (
+export const addFIDODevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
@@ -39,9 +53,15 @@ export const addLocalDevice = async (
       publicKey: creationOptions(devices),
     });
   } catch (error: unknown) {
-    await displayFailedToAddDevice(
-      error instanceof Error ? error : unknownError()
-    );
+    if (isDuplicateDeviceError(error)) {
+      await displayAlreadyRegisteredDevice();
+    } else if (isCancel(error)) {
+      await displayCancelError("Back to manage");
+    } else {
+      await displayFailedToAddDevice(
+        error instanceof Error ? error : unknownError()
+      );
+    }
     return;
   }
   const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });

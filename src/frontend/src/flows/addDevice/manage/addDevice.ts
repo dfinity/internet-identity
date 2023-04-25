@@ -1,17 +1,18 @@
-import { isNullish } from "@dfinity/utils";
 import {
   IdentityAnchorInfo,
   Timestamp,
-} from "../../../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import { isNullish } from "@dfinity/utils";
 import { displayError } from "../../../components/displayError";
 import { withLoader } from "../../../components/loader";
 import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
+import { addFIDODevice } from "./addFIDODevice";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
 
 // The flow for adding a remote (i.e. other browser, non-hardware) device
-export const addRemoteDevice = async ({
+export const addDevice = async ({
   userNumber,
   connection,
 }: {
@@ -45,9 +46,15 @@ export const addRemoteDevice = async ({
         primaryButton: "Ok",
       });
       return;
+    } else if (result === "use-fido") {
+      // If the user wants to add a FIDO device then we can (should) exit registration mode
+      // (only used for adding extra browsers)
+      await withLoader(() => connection.exitDeviceRegistrationMode());
+      await addFIDODevice(userNumber, connection, anchorInfo.devices);
+      return;
     } else if (result === "canceled") {
       // If the user canceled, disable registration mode and return
-      await connection.exitDeviceRegistrationMode();
+      await withLoader(() => connection.exitDeviceRegistrationMode());
       return;
     }
 

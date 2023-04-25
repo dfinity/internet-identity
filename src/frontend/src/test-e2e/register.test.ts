@@ -12,7 +12,6 @@ import {
 } from "./util";
 import {
   AddDeviceAliasView,
-  AddDeviceFlowSelectorView,
   AddDeviceSuccessView,
   AddIdentityAnchorView,
   AddRemoteDeviceAliasView,
@@ -80,9 +79,10 @@ test("Register new identity and add additional device", async () => {
     await addVirtualAuthenticator(browser);
     await mainView.addAdditionalDevice();
 
-    const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
-    await addDeviceFlowView.waitForDisplay();
-    await addDeviceFlowView.selectLocalDevice();
+    const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
+      browser
+    );
+    await addRemoteDeviceInstructionsView.addFIDODevice();
 
     const addDeviceAliasView = new AddDeviceAliasView(browser);
     await addDeviceAliasView.waitForDisplay();
@@ -117,9 +117,10 @@ test("Register new identity and add additional remote device", async () => {
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.addAdditionalDevice();
 
-    const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
-    await addDeviceFlowView.waitForDisplay();
-    const addDeviceLink = await addDeviceFlowView.selectRemoteDevice();
+    const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
+      browser
+    );
+    const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
@@ -183,9 +184,6 @@ test("Register new identity and add additional remote device starting on new dev
       // browser 1 again
       await focusBrowser(browser);
       await mainView.addAdditionalDevice();
-      const addDeviceFlowView = new AddDeviceFlowSelectorView(browser);
-      await addDeviceFlowView.waitForDisplay();
-      await addDeviceFlowView.selectRemoteDevice();
 
       const addRemoteDeviceInstructionsView =
         new AddRemoteDeviceInstructionsView(browser);

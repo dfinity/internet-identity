@@ -1,12 +1,9 @@
-import { isNullish } from "@dfinity/utils";
+import { DeviceData, Timestamp } from "$generated/internet_identity_types";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import type QrCreator from "qr-creator"; // XXX: import to only import the _type_ to avoid pulling in the whole module (module itself is used as a dynamic import)
-import {
-  DeviceData,
-  Timestamp,
-} from "../../../../generated/internet_identity_types";
 import { checkmarkIcon, copyIcon } from "../../../components/icons";
 import { mainWindow } from "../../../components/mainWindow";
 import { toast } from "../../../components/toast";
@@ -22,12 +19,14 @@ import copyJson from "./pollForTentativeDevice.json";
 const pollForTentativeDeviceTemplate = ({
   userNumber,
   cancel,
+  useFIDO,
   remaining,
   origin,
   i18n,
 }: {
   userNumber: bigint;
   cancel: () => void;
+  useFIDO: () => void;
   remaining: AsyncIterable<string>;
   origin: string;
   i18n: I18n;
@@ -88,9 +87,16 @@ const pollForTentativeDeviceTemplate = ({
     </ol>
 
     <button
+      @click=${() => useFIDO()}
+      data-action="use-fido"
+      class="c-button c-button--primary l-stack"
+    >
+      ${copy.or_use_fido}
+    </button>
+    <button
       @click=${() => cancel()}
       id="cancelAddRemoteDevice"
-      class="c-button c-button--secondary l-stack"
+      class="c-button c-button--secondary"
     >
       ${copy.cancel}
     </button>
@@ -111,66 +117,70 @@ export const pollForTentativeDevicePage = renderPage(
   pollForTentativeDeviceTemplate
 );
 
+type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
+
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
  * @param userNumber anchor of the authenticated user
  * @param connection authenticated II connection
  */
-export const pollForTentativeDevice = (
+export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
-): Promise<DeviceData | "timeout" | "canceled"> => {
+): Promise<PollReturn> => {
   const i18n = new I18n();
-  const countdown = AsyncCountdown.fromNanos(endTimestamp);
-  // Show the page with the option to cancel
-  const page = new Promise<"canceled">((resolve) =>
-    pollForTentativeDevicePage({
-      cancel: () => {
-        countdown.stop();
-        resolve("canceled");
-      },
-      origin: window.origin,
-      userNumber,
-      remaining: countdown.remainingFormattedAsync(),
-      i18n,
-    })
-  );
+  const countdown: AsyncCountdown<PollReturn> =
+    AsyncCountdown.fromNanos(endTimestamp);
+  // Display the page with the option to cancel
+  pollForTentativeDevicePage({
+    cancel: () => countdown.stop("canceled"),
+    useFIDO: () => countdown.stop("use-fido"),
+    origin: window.origin,
+    userNumber,
+    remaining: countdown.remainingFormattedAsync(),
+    i18n,
+  });
 
   // Poll repeatedly
-  const polling = poll(userNumber, connection, () => countdown.hasStopped());
+  void (async () => {
+    const result = await poll(userNumber, connection, () =>
+      countdown.hasStopped()
+    );
+    countdown.stop(result);
+  })();
 
-  return Promise.race([page, polling]);
+  // Map the AsyncCountdown timeout symbol to something the caller can use
+  const result = await countdown.wait();
+  return result === AsyncCountdown.timeout ? "timeout" : result;
 };
 
-const poll = async (
+const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData | "timeout"> => {
-  for (;;) {
-    if (shouldStop()) {
-      return "timeout";
-    }
+): Promise<DeviceData | "use-fido"> =>
+  // eslint-disable-next-line no-async-promise-executor
+  new Promise(async (resolve) => {
+    while (!shouldStop()) {
+      const anchorInfo = await connection.getAnchorInfo();
+      const tentativeDevice =
+        anchorInfo.device_registration[0]?.tentative_device[0];
+      if (nonNullish(tentativeDevice)) {
+        resolve(tentativeDevice);
+        return;
+      }
 
-    const anchorInfo = await connection.getAnchorInfo();
-    const tentativeDevice =
-      anchorInfo.device_registration[0]?.tentative_device[0];
-    if (tentativeDevice !== undefined) {
-      return tentativeDevice;
+      // Debounce a little; in practice won't be noticed by users but
+      // will avoid hot looping in case the op becomes near instantaneous.
+      await delayMillis(100);
     }
-
-    // Debounce a little; in practice won't be noticed by users but
-    // will avoid hot looping in case the op becomes near instantaneous.
-    await delayMillis(100);
-  }
-};
+  });
 
 // Dynamically load the QR code module
 const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
   try {
-    return (await import(/* webpackChunkName: "qr-creator" */ "qr-creator"))
-      .default;
+    return (await import("qr-creator")).default;
   } catch (e) {
     console.error(e);
     return undefined;

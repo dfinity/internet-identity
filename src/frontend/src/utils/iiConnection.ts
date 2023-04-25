@@ -1,23 +1,7 @@
 /**
  * This module contains everything related to connecting to the canister.
  */
-import {
-  Actor,
-  ActorSubclass,
-  DerEncodedPublicKey,
-  HttpAgent,
-  SignIdentity,
-} from "@dfinity/agent";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  ECDSAKeyIdentity,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
-import * as tweetnacl from "tweetnacl";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
   AddTentativeDeviceResponse,
   Challenge,
@@ -37,12 +21,29 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
   _SERVICE,
-} from "../../generated/internet_identity_types";
+} from "$generated/internet_identity_types";
+import {
+  Actor,
+  ActorSubclass,
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
+import * as tweetnacl from "tweetnacl";
 import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
 import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { isCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -78,13 +79,15 @@ export type LoginResult =
   | UnknownUser
   | AuthFail
   | ApiError
-  | SeedPhraseFail;
+  | SeedPhraseFail
+  | CancelOrTimeout;
 export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
   | RegisterNoSpace
-  | BadChallenge;
+  | BadChallenge
+  | CancelOrTimeout;
 
 type LoginSuccess = {
   kind: "loginSuccess";
@@ -98,8 +101,9 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
+type CancelOrTimeout = { kind: "cancelOrTimeout" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type { ChallengeResult } from "$generated/internet_identity_types";
 
 /**
  * Interface around the agent-js WebAuthnIdentity that allows us to provide
@@ -156,6 +160,7 @@ export class Connection {
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),
+          metadata: [],
         },
         challengeResult,
         [tempIdentity.getPrincipal()]
@@ -222,24 +227,26 @@ export class Connection {
     devices: Omit<DeviceData, "alias">[]
   ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
-     * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
-    const identity =
-      process.env.II_DUMMY_AUTH === "1"
-        ? new DummyIdentity()
-        : MultiWebAuthnIdentity.fromCredentials(
-            devices.flatMap((device) =>
-              device.credential_id.map((credentialId: CredentialId) => ({
-                pubkey: derFromPubkey(device.pubkey),
-                credentialId: Buffer.from(credentialId),
-              }))
-            )
-          );
+    const identity = features.DUMMY_AUTH
+      ? new DummyIdentity()
+      : MultiWebAuthnIdentity.fromCredentials(
+          devices.flatMap((device) =>
+            device.credential_id.map((credentialId: CredentialId) => ({
+              pubkey: derFromPubkey(device.pubkey),
+              credentialId: Buffer.from(credentialId),
+            }))
+          )
+        );
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      if (isCancel(e)) {
+        return { kind: "cancelOrTimeout" };
+      }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
       } else {
@@ -519,6 +526,7 @@ export class AuthenticatedConnection extends Connection {
       purpose,
       protection,
       origin: readDeviceOrigin(),
+      metadata: [],
     });
   };
 

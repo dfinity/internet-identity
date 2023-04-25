@@ -17,8 +17,7 @@ export type DappDescription = ElementOf<typeof dappsJson>;
 // Dynamically load the dapps list
 const loadDapps = async (): Promise<DappDescription[] | undefined> => {
   try {
-    return (await import(/* webpackChunkName: "dapps" */ "./dapps.json"))
-      .default;
+    return (await import("./dapps.json")).default;
   } catch (e) {
     console.error(e);
     return undefined;
