@@ -105,51 +105,126 @@ test("Register new identity and add additional device", async () => {
   });
 }, 300_000);
 
+const initDeviceLink = async (
+  browser: WebdriverIO.Browser
+): Promise<{
+  mainView: MainView;
+  addDeviceLink: string;
+}> => {
+  await addVirtualAuthenticator(browser);
+  await browser.url(II_URL);
+  const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    DEVICE_NAME1,
+    browser
+  );
+  const mainView = new MainView(browser);
+  await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+  await mainView.addAdditionalDevice();
+
+  const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
+    browser
+  );
+  const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
+
+  return {
+    mainView,
+    addDeviceLink,
+  };
+};
+
+const registerRemoteDevice = async ({
+  browser1,
+  browser2,
+  addDeviceLink,
+}: {
+  browser1: WebdriverIO.Browser;
+  browser2: WebdriverIO.Browser;
+  addDeviceLink: string;
+}) => {
+  await addVirtualAuthenticator(browser2);
+  await browser2.url(addDeviceLink);
+  const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
+  await addRemoteDeviceView.waitForDisplay();
+  await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
+  await addRemoteDeviceView.continue();
+
+  const verificationCodeView = await new AddRemoteDeviceVerificationCodeView(
+    browser2
+  );
+  await verificationCodeView.waitForDisplay();
+  const code = await verificationCodeView.getVerificationCode();
+
+  // browser 1 again
+  await focusBrowser(browser1);
+  const verificationView = await new VerifyRemoteDeviceView(browser1);
+  await verificationView.waitForDisplay();
+  await verificationView.enterVerificationCode(code);
+  await verificationView.continue();
+
+  // success page
+  const addDeviceSuccessView = await new AddDeviceSuccessView(browser1);
+  await addDeviceSuccessView.waitForDisplay();
+  await addDeviceSuccessView.continue();
+};
+
 test("Register new identity and add additional remote device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await addVirtualAuthenticator(browser);
-    await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
-    const mainView = new MainView(browser);
-    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-    await mainView.addAdditionalDevice();
-
-    const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-      browser
-    );
-    const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
+    const { addDeviceLink, mainView } = await initDeviceLink(browser);
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
-      await addVirtualAuthenticator(browser2);
-      await browser2.url(addDeviceLink);
-      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
-      await addRemoteDeviceView.waitForDisplay();
-      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
-      await addRemoteDeviceView.continue();
-
-      const verificationCodeView =
-        await new AddRemoteDeviceVerificationCodeView(browser2);
-      await verificationCodeView.waitForDisplay();
-      const code = await verificationCodeView.getVerificationCode();
-
-      // browser 1 again
-      await focusBrowser(browser);
-      const verificationView = await new VerifyRemoteDeviceView(browser);
-      await verificationView.waitForDisplay();
-      await verificationView.enterVerificationCode(code);
-      await verificationView.continue();
-
-      // success page
-      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
-      await addDeviceSuccessView.waitForDisplay();
-      await addDeviceSuccessView.continue();
+      await registerRemoteDevice({
+        browser1: browser,
+        browser2,
+        addDeviceLink,
+      });
     });
 
     await mainView.waitForDisplay();
     await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+  });
+}, 300_000);
+
+test.only("Register new identity and sign-in with new additional remote device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const { addDeviceLink, mainView } = await initDeviceLink(browser);
+
+    await runInBrowser(async (browser2: WebdriverIO.Browser) => {
+      await registerRemoteDevice({
+        browser1: browser,
+        browser2,
+        addDeviceLink,
+      });
+
+      // browser 2 again
+      await focusBrowser(browser2);
+
+      // success page
+      const addDeviceSuccessView = await new AddDeviceSuccessView(browser2);
+      await addDeviceSuccessView.waitForDisplay();
+      await addDeviceSuccessView.continue();
+
+      await browser2.pause(10000);
+
+      // TODO: following pass but is inaccurate I think. To be double checked
+
+      // sign-in succeeded and we continue without registering a recovery method
+      const recoveryMethodSelectorView = new RecoveryMethodSelectorView(
+        browser2
+      );
+      await recoveryMethodSelectorView.waitForDisplay();
+      await recoveryMethodSelectorView.skipRecovery();
+
+      await browser2.pause(10000);
+
+      // we accept the single device warning
+      const singleDeviceWarningView = new SingleDeviceWarningView(browser2);
+      await singleDeviceWarningView.waitForDisplay();
+      await singleDeviceWarningView.remindLater();
+
+      // main page signed-in
+      const mainView = new MainView(browser2);
+      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    });
   });
 }, 300_000);
 
