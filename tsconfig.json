@@ -18,7 +18,9 @@
     "types": ["node", "jest", "@wdio/globals/types", "vite/client"],
     "paths": {
       "$generated": ["./src/frontend/generated"],
-      "$generated/*": ["./src/frontend/generated/*"]
+      "$generated/*": ["./src/frontend/generated/*"],
+      "$src": ["./src/frontend/src"],
+      "$src/*": ["./src/frontend/src/*"]
     }
   },
   "exclude": [

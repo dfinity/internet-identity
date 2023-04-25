@@ -1,10 +1,10 @@
 /* A couple of lit-html helpers */
 
+import { toast } from "$src/components/toast";
 import { isNullish } from "@dfinity/utils";
 import { render, TemplateResult } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
-import { toast } from "../components/toast";
 
 // Helper for types that can (meaningfully) be inserted in a template
 export type TemplateElement = string | TemplateResult | DirectiveResult;

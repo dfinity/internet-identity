@@ -1,15 +1,15 @@
-import { isNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
 import {
   checkmarkRoundIcon,
   lockedIcon,
   warningIcon,
   warningRoundIcon,
-} from "../../components/icons";
+} from "$src/components/icons";
 import {
   recoveryKeyLabel,
   recoveryPhraseLabel,
-} from "../../utils/recoveryDevice";
+} from "$src/utils/recoveryDevice";
+import { isNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Devices, RecoveryKey, RecoveryPhrase } from "./types";
 

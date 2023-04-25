@@ -1,15 +1,15 @@
-import { html, render } from "lit-html";
-import { displayError } from "../../../components/displayError";
-import { mainWindow } from "../../../components/mainWindow";
+import { displayError } from "$src/components/displayError";
+import { mainWindow } from "$src/components/mainWindow";
 import {
   apiResultToLoginFlowResult,
   cancel,
   LoginFlowCanceled,
   LoginFlowSuccess,
-} from "../../../utils/flowResult";
-import { Connection } from "../../../utils/iiConnection";
-import { RecoveryDevice } from "../../../utils/recoveryDevice";
-import { unreachable } from "../../../utils/utils";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { unreachable } from "$src/utils/utils";
+import { html, render } from "lit-html";
 
 const pageContent = () => {
   const pageContentSlot = html`

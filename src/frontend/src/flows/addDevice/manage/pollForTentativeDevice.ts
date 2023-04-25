@@ -1,18 +1,18 @@
 import { DeviceData, Timestamp } from "$generated/internet_identity_types";
+import { checkmarkIcon, copyIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { I18n } from "$src/i18n";
+import { addDeviceLink } from "$src/utils/addDeviceLink";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { mount, renderPage, withRef } from "$src/utils/lit-html";
+import { delayMillis } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import type QrCreator from "qr-creator"; // XXX: import to only import the _type_ to avoid pulling in the whole module (module itself is used as a dynamic import)
-import { checkmarkIcon, copyIcon } from "../../../components/icons";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
-import { I18n } from "../../../i18n";
-import { addDeviceLink } from "../../../utils/addDeviceLink";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { mount, renderPage, withRef } from "../../../utils/lit-html";
-import { delayMillis } from "../../../utils/utils";
 
 import copyJson from "./pollForTentativeDevice.json";
 

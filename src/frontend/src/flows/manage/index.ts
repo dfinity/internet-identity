@@ -2,34 +2,34 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
-import { isNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
-import { showWarning } from "../../banner";
+import { showWarning } from "$src/banner";
 import {
   authenticateBox,
   AuthnTemplates,
-} from "../../components/authenticateBox";
-import { displayError } from "../../components/displayError";
-import { withLoader } from "../../components/loader";
-import { logoutSection } from "../../components/logout";
-import { mainWindow } from "../../components/mainWindow";
-import { toast } from "../../components/toast";
-import { LEGACY_II_URL } from "../../config";
-import { AuthenticatedConnection, Connection } from "../../utils/iiConnection";
-import { renderPage } from "../../utils/lit-html";
+} from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { logoutSection } from "$src/components/logout";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { LEGACY_II_URL } from "$src/config";
+import { addDevice } from "$src/flows/addDevice/manage/addDevice";
+import { dappsExplorer } from "$src/flows/dappsExplorer";
+import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
+import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import { renderPage } from "$src/utils/lit-html";
 import {
   hasRecoveryPhrase,
   isProtected,
   isRecoveryDevice,
   isRecoveryPhrase,
-} from "../../utils/recoveryDevice";
-import { unreachable } from "../../utils/utils";
-import { addDevice } from "../addDevice/manage/addDevice";
-import { dappsExplorer } from "../dappsExplorer";
-import { DappDescription, getDapps } from "../dappsExplorer/dapps";
-import { dappsTeaser } from "../dappsExplorer/teaser";
-import { recoveryWizard } from "../recovery/recoveryWizard";
-import { setupKey, setupPhrase } from "../recovery/setupRecovery";
+} from "$src/utils/recoveryDevice";
+import { unreachable } from "$src/utils/utils";
+import { isNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,

@@ -1,19 +1,19 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { WebAuthnIdentity } from "@dfinity/identity";
-import { promptDeviceAlias } from "../../../components/alias";
-import { displayError } from "../../../components/displayError";
-import { withLoader } from "../../../components/loader";
-import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
+import { promptDeviceAlias } from "$src/components/alias";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
   creationOptions,
-} from "../../../utils/iiConnection";
-import { setAnchorUsed } from "../../../utils/userNumber";
+} from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
 import {
   displayCancelError,
   isCancel,
   isDuplicateDeviceError,
-} from "../../../utils/webAuthnErrorUtils";
+} from "$src/utils/webAuthnErrorUtils";
+import { WebAuthnIdentity } from "@dfinity/identity";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>

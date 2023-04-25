@@ -1,16 +1,16 @@
-import { promptDeviceAlias } from "../../components/alias";
+import { promptDeviceAlias } from "$src/components/alias";
 import {
   apiResultToLoginFlowResult,
   cancel,
   LoginFlowResult,
-} from "../../utils/flowResult";
-import { Connection } from "../../utils/iiConnection";
-import { setAnchorUsed } from "../../utils/userNumber";
-import { unknownToString } from "../../utils/utils";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { unknownToString } from "$src/utils/utils";
 import {
   isCancel,
   WEBAUTHN_CANCEL_TEMPLATE,
-} from "../../utils/webAuthnErrorUtils";
+} from "$src/utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";

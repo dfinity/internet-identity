@@ -2,10 +2,10 @@ import {
   IdentityAnchorInfo,
   Timestamp,
 } from "$generated/internet_identity_types";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
-import { displayError } from "../../../components/displayError";
-import { withLoader } from "../../../components/loader";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 import { addFIDODevice } from "./addFIDODevice";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";

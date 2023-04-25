@@ -2,7 +2,7 @@ import {
   PublicKey,
   SignedDelegation,
 } from "$generated/internet_identity_types";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { AuthContext, Delegation } from "./postMessageInterface";
 
 /**

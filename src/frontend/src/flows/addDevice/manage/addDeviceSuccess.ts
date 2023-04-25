@@ -1,7 +1,7 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage } from "$src/utils/lit-html";
 import { html, render } from "lit-html";
-import { mainWindow } from "../../../components/mainWindow";
-import { I18n } from "../../../i18n";
-import { renderPage } from "../../../utils/lit-html";
 import copyJson from "./addDeviceSuccess.json";
 
 export type DeviceAlias = string;
