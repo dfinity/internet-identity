@@ -4,27 +4,25 @@ import { defineConfig, type UserConfig } from "vite";
 
 const replicaHost = "http://127.0.0.1:4943" as const;
 
-const readCanisterId = (): string => {
-  const canisterIdsJson = join(
-    process.cwd(),
-    ".dfx",
-    "local",
-    "canister_ids.json"
-  );
-  try {
-    const buffer = readFileSync(canisterIdsJson);
-    const {
-      test_app: { local },
-    } = JSON.parse(buffer.toString("utf-8"));
-    return local;
-  } catch (e: unknown) {
-    throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
-  }
-};
-
-const canisterId = readCanisterId();
-
 const rewriteRoute = (pathAndParams: string): string => {
+  const readCanisterId = (): string => {
+    const canisterIdsJson = join(
+        process.cwd(),
+        ".dfx",
+        "local",
+        "canister_ids.json"
+    );
+    try {
+      const buffer = readFileSync(canisterIdsJson);
+      const {
+        test_app: { local },
+      } = JSON.parse(buffer.toString("utf-8"));
+      return local;
+    } catch (e: unknown) {
+      throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
+    }
+  };
+
   let queryParamsString = `?`;
 
   const [path, params] = pathAndParams.split("?");
@@ -33,7 +31,7 @@ const rewriteRoute = (pathAndParams: string): string => {
     queryParamsString += `${params}&`;
   }
 
-  queryParamsString += `canisterId=${canisterId}`;
+  queryParamsString += `canisterId=${readCanisterId()}`;
 
   return path + queryParamsString;
 };
