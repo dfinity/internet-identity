@@ -1,12 +1,6 @@
 import { defineConfig, type UserConfig } from "vite";
 import { readCanisterIds } from "./vite.plugins";
 
-// npm run dev = local
-// npm run build = local
-// dfx deploy = local
-// dfx deploy --network ic = ic
-const network = process.env.DFX_NETWORK ?? ("local" as const);
-
 export default defineConfig(
   ({ mode }: UserConfig): UserConfig => ({
     root: "webapp",
@@ -20,8 +14,7 @@ export default defineConfig(
     },
     define: {
       "process.env": {
-        ...readCanisterIds({ network }),
-        DFX_NETWORK: network,
+        ...readCanisterIds(),
       },
     },
     optimizeDeps: {
