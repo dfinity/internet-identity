@@ -7,7 +7,8 @@
     "@dfinity/authentication": "^0.12.1-beta.0",
     "@dfinity/candid": "^0.12.1-beta.0",
     "@dfinity/identity": "^0.12.1-beta.0",
-    "@dfinity/principal": "^0.12.1-beta.0"
+    "@dfinity/principal": "^0.12.1-beta.0",
+    "buffer": "^6.0.3"
   },
   "scripts": {
     "build": "vite build",
