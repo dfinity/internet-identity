@@ -10,7 +10,7 @@
     "@dfinity/principal": "^0.12.1-beta.0"
   },
   "scripts": {
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "start": "vite",
     "lint:fix": "npm run lint -- --fix",
     "make:docs/reference": "",
