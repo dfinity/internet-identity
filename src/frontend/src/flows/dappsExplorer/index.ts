@@ -80,9 +80,7 @@ const dappTemplate = ({
           : undefined}
       </div>
       <span class="c-action-list__action"
-        ><i class="c-icon c-icon--link c-icon--small"
-          >${externalLinkIcon}</i
-        ></span
+        ><i class="c-icon c-icon--circle">${externalLinkIcon}</i></span
       >
     </a>
   `;
