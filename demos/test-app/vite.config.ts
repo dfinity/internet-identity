@@ -7,10 +7,10 @@ const replicaHost = "http://127.0.0.1:4943" as const;
 const rewriteRoute = (pathAndParams: string): string => {
   const readCanisterId = (): string => {
     const canisterIdsJson = join(
-        process.cwd(),
-        ".dfx",
-        "local",
-        "canister_ids.json"
+      process.cwd(),
+      ".dfx",
+      "local",
+      "canister_ids.json"
     );
     try {
       const buffer = readFileSync(canisterIdsJson);
