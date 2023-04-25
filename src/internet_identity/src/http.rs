@@ -211,7 +211,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             w.encode_gauge(
                 "internet_identity_register_rate_limit_time_per_tokens_seconds",
                 Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
-                "Min number of nanoseconds between two register calls to not exceed the rate limit (sustained).",
+                "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
             )?;
         }
         if let Some(ref stats) = persistent_state.active_anchor_stats {

@@ -464,11 +464,21 @@ mod pull_entries_tests {
     #[test]
     fn should_report_archive_config_metrics() -> Result<(), CallError> {
         let env = env();
-        let ii_canister = install_ii_canister_with_arg(
-            &env,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
-        );
+
+        let init_arg = InternetIdentityInit {
+            assigned_user_number_range: None,
+            archive_config: Some(ArchiveConfig {
+                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                entries_buffer_limit: 10_000,
+                polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+                entries_fetch_limit: 10,
+            }),
+            canister_creation_cycles_cost: Some(0),
+            register_rate_limit: None,
+            max_num_latest_delegation_origins: None,
+        };
+
+        let ii_canister = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));
         deploy_archive_via_ii(&env, ii_canister);
 
         assert_metric(
