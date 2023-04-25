@@ -34,7 +34,7 @@ ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
 
 [dev-dependencies]
-ic-test-state-machine-client = "1"
+ic-test-state-machine-client = "2"
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.3"
 regex = "1.5"

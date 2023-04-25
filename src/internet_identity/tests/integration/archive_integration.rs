@@ -637,7 +637,7 @@ mod pull_entries_tests {
         assert!(env.canister_exists(archive_canister));
 
         // stop the II canister to provoke failures
-        env.stop_canister(ii_canister)?;
+        env.stop_canister(ii_canister, None)?;
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -681,7 +681,7 @@ mod pull_entries_tests {
         assert!(env.canister_exists(archive_canister));
 
         // stop the II canister to provoke failures
-        env.stop_canister(ii_canister)?;
+        env.stop_canister(ii_canister, None)?;
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -693,7 +693,7 @@ mod pull_entries_tests {
         assert_eq!(status.call_info.last_successful_fetch, None);
 
         // start II again to resolve the issue
-        env.start_canister(ii_canister)?;
+        env.start_canister(ii_canister, None)?;
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
         // execute the timer
