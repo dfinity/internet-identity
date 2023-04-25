@@ -1,7 +1,10 @@
-import { extname, resolve } from "path";
+import { resolve } from "path";
 import { defineConfig, UserConfig } from "vite";
-import viteCompression from "vite-plugin-compression";
-import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
+import {
+  compression,
+  injectCanisterIdPlugin,
+  stripInjectJsScript,
+} from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // Path "../../" have to be expressed relative to the "root".
@@ -38,19 +41,9 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     },
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
-      [...(mode === "production" ? [stripInjectJsScript()] : [])],
       [
-        ...(mode !== "showcase"
-          ? [
-              viteCompression({
-                // II canister only supports one content type per resource. That is why we remove the original file.
-                deleteOriginFile: true,
-                filter: (file: string): boolean =>
-                  ![".html", ".css", ".webp", ".png", ".ico"].includes(
-                    extname(file)
-                  ),
-              }),
-            ]
+        ...(mode === "production"
+          ? [stripInjectJsScript(), compression()]
           : []),
       ],
     ],
