@@ -643,9 +643,12 @@ const init = () => {
   // '/internet-identity/myPage' -> 'myPage'
   const baseUrl = import.meta.env.BASE_URL;
   const pageName = window.location.pathname.replace(baseUrl, "");
-  const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
-
-  page();
+  if(pageName === "") {
+      defaultPage();
+  } else {
+      const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
+      page();
+  }
 };
 
 init();
