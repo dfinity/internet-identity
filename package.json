@@ -14,7 +14,7 @@
     "generate": "npm run generate:types && npm run generate:js",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "build:showcase": "vite build --mode showcase",
+    "build:showcase": "tsc --noEmit && vite build --mode showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
