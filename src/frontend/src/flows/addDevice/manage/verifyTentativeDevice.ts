@@ -132,7 +132,7 @@ export const verifyTentativeDevice = async ({
   connection: AuthenticatedConnection;
   alias: string;
   endTimestamp: bigint;
-}): Promise<void> => {
+}): Promise<"verified" | undefined> => {
   const countdown: AsyncCountdown<VerifyResult | "canceled"> =
     AsyncCountdown.fromNanos(endTimestamp);
 
@@ -171,7 +171,7 @@ export const verifyTentativeDevice = async ({
 
 const handleVerifyResult = async (
   result: VerifyResult | "canceled" | typeof AsyncCountdown.timeout
-) => {
+): Promise<"verified" | undefined> => {
   // If the verification worked or the user canceled, then we don't show anything special
   if (result === "canceled") {
     return;

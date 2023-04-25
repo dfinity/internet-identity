@@ -14,7 +14,7 @@ import {
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { renderAddDeviceSuccess } from "./addDeviceSuccess";
+import { addDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({
@@ -83,7 +83,7 @@ export const addFIDODevice = async (
       )
     );
 
-    await renderAddDeviceSuccess({ deviceAlias: deviceName });
+    await addDeviceSuccess({ deviceAlias: deviceName });
   } catch (error: unknown) {
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()
