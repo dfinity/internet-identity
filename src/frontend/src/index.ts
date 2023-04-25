@@ -1,12 +1,12 @@
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { authFlowManage } from "./flows/manage";
+import { authFlowManage, manage } from "./flows/manage";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -14,6 +14,10 @@ import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
 // Polyfill Buffer globally for the browser
+import {
+  authenticate,
+  handleLoginFlowResult,
+} from "$src/components/authenticateBox";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -101,13 +105,24 @@ const init = async () => {
   const addDeviceAnchor = getAddDeviceAnchor();
   if (addDeviceAnchor !== undefined) {
     // Register this device (tentatively)
-    const { alias: deviceAlias } = await registerTentativeDevice(
+    const { userNumber, alias: deviceAlias } = await registerTentativeDevice(
       addDeviceAnchor,
       connection
     );
 
     // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
     await addDeviceSuccess({ deviceAlias });
+
+    // If user "Click" continue in success page, proceed with authentication
+    const result = await authenticate(connection, userNumber);
+    const { success } = await handleLoginFlowResult(result);
+
+    // User have successfully signed-in we can jump to manage page
+    if (nonNullish(success)) {
+      const { connection: authenticatedConnection } = success;
+      await manage({ userNumber, authenticatedConnection });
+      return;
+    }
   }
 
   // Simple, #-based routing
