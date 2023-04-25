@@ -618,6 +618,22 @@ const pageContent = html`
   ${showcase} ${i18nExample()} ${components()} ${styleguide}
 `;
 
+// The 404 page
+const notFound = ({
+  baseUrl,
+  pageName,
+}: {
+  baseUrl: string;
+  pageName: string;
+}) => {
+  showMessagePage({
+    message: html`<h1>404 not found</h1>
+      <p class="t-paragraph">
+        Page '${pageName}' was not found on '${baseUrl}${pageName}'
+      </p> `,
+  });
+};
+
 const init = () => {
   // We use the URL's path to route to the correct page.
   // If we can't find a page to route to, we just show the default page.
@@ -625,9 +641,9 @@ const init = () => {
   // 404) but this is an dev page anyway.
   // '/myPage' -> 'myPage'
   // '/internet-identity/myPage' -> 'myPage'
-  const route = window.location.pathname
-    .replace(import.meta.env.BASE_URL, "");
-  const page = iiPages[route] ?? defaultPage;
+  const baseUrl = import.meta.env.BASE_URL;
+  const pageName = window.location.pathname.replace(baseUrl, "");
+  const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
 
   page();
 };
