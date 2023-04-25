@@ -2,7 +2,6 @@ import crypto from "@trust/webcrypto";
 import { TextEncoder } from "util";
 
 jest.mock("./src/environment.ts", () => ({
-  ...jest.requireActual("./src/environment.ts"),
   BASE_URL: "/",
 }));
 
