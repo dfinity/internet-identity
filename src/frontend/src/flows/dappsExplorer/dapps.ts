@@ -1,5 +1,5 @@
+import { toast } from "$root/components/toast";
 import { isNullish } from "@dfinity/utils";
-import { toast } from "../../components/toast";
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used

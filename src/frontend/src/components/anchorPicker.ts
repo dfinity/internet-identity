@@ -1,6 +1,6 @@
+import { autofocus } from "$root/utils/lit-html";
+import { NonEmptyArray } from "$root/utils/utils";
 import { html, TemplateResult } from "lit-html";
-import { autofocus } from "../utils/lit-html";
-import { NonEmptyArray } from "../utils/utils";
 import { arrowRight } from "./icons";
 
 type PickerProps = {

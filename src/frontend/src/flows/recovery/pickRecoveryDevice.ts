@@ -1,11 +1,11 @@
-import { html, render } from "lit-html";
-import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
+import { securityKeyIcon, seedPhraseIcon } from "$root/components/icons";
+import { mainWindow } from "$root/components/mainWindow";
 import {
   isRecoveryPhrase,
   RecoveryDevice,
   recoveryDeviceToLabel,
-} from "../../utils/recoveryDevice";
+} from "$root/utils/recoveryDevice";
+import { html, render } from "lit-html";
 
 const pageContent = () => {
   const pageContentSlot = html`

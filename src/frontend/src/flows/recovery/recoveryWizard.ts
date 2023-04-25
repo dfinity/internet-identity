@@ -1,6 +1,6 @@
+import { AuthenticatedConnection } from "$root/utils/iiConnection";
+import { iOSOrSafari } from "$root/utils/utils";
 import { html } from "lit-html";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
-import { iOSOrSafari } from "../../utils/utils";
 import { displaySafariWarning } from "./displaySafariWarning";
 import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
 import { setupRecovery } from "./setupRecovery";

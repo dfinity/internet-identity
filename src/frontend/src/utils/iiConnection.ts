@@ -22,6 +22,8 @@ import {
   VerifyTentativeDeviceResponse,
   _SERVICE,
 } from "$generated/internet_identity_types";
+import { fromMnemonicWithoutValidation } from "$root/crypto/ed25519";
+import { features } from "$root/features";
 import {
   Actor,
   ActorSubclass,
@@ -38,8 +40,6 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
-import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
-import { features } from "../features";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";

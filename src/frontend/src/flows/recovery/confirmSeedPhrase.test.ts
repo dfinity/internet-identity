@@ -1,6 +1,6 @@
+import { I18n } from "$root/utils/i18n";
 import { render } from "lit-html";
 import { createRef } from "lit-html/directives/ref.js";
-import { I18n } from "../../utils/i18n";
 import { confirmSeedPhrasePage, wordTemplate } from "./confirmSeedPhrase";
 
 const i18n = new I18n("en");

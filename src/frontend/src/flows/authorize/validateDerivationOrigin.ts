@@ -1,6 +1,6 @@
+import { wrapError } from "$root/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
-import { wrapError } from "../../utils/utils";
 
 // Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
 // Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).

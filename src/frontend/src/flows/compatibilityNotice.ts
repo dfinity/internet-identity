@@ -1,6 +1,6 @@
+import { compatibilityChart } from "$root/components/compatibilityChart";
+import { warnBox } from "$root/components/warnBox";
 import { html, render } from "lit-html";
-import { compatibilityChart } from "../components/compatibilityChart";
-import { warnBox } from "../components/warnBox";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
 const pageContent = (reason: string) => html`

@@ -1,8 +1,8 @@
+import { mainWindow } from "$root/components/mainWindow";
+import { warnBox } from "$root/components/warnBox";
+import { LEGACY_II_URL } from "$root/config";
+import { cancel, LoginFlowCanceled } from "$root/utils/flowResult";
 import { html, render } from "lit-html";
-import { mainWindow } from "../components/mainWindow";
-import { warnBox } from "../components/warnBox";
-import { LEGACY_II_URL } from "../config";
-import { cancel, LoginFlowCanceled } from "../utils/flowResult";
 
 const pageContent = (onCancel: () => void) => {
   const pageContentSlot = html` <hgroup>

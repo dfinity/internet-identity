@@ -1,19 +1,19 @@
 import { Challenge } from "$generated/internet_identity_types";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
-import { html, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { spinner } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { DynamicKey, I18n } from "../../i18n";
-import { cancel, LoginFlowCanceled } from "../../utils/flowResult";
+import { spinner } from "$root/components/icons";
+import { mainWindow } from "$root/components/mainWindow";
+import { DynamicKey, I18n } from "$root/i18n";
+import { cancel, LoginFlowCanceled } from "$root/utils/flowResult";
 import {
   Connection,
   IIWebAuthnIdentity,
   RegisterResult,
-} from "../../utils/iiConnection";
-import { autofocus, renderPage, withRef } from "../../utils/lit-html";
-import { Chan } from "../../utils/utils";
+} from "$root/utils/iiConnection";
+import { autofocus, renderPage, withRef } from "$root/utils/lit-html";
+import { Chan } from "$root/utils/utils";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";

@@ -1,9 +1,9 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { LoginData } from "$root/utils/flowResult";
+import { unknownToRecord } from "$root/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
-import { LoginData } from "../../utils/flowResult";
-import { unknownToRecord } from "../../utils/utils";
 import { fetchDelegation } from "./fetchDelegation";
 import { validateDerivationOrigin } from "./validateDerivationOrigin";
 

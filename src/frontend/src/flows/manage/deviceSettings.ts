@@ -1,20 +1,20 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { displayError } from "../../components/displayError";
-import { withLoader } from "../../components/loader";
+import { displayError } from "$root/components/displayError";
+import { withLoader } from "$root/components/loader";
+import { recoverWithPhrase } from "$root/flows/recovery/recoverWith/phrase";
+import { phraseWizard } from "$root/flows/recovery/setupRecovery";
 import {
   AuthenticatedConnection,
   bufferEqual,
   Connection,
-} from "../../utils/iiConnection";
+} from "$root/utils/iiConnection";
 import {
   isProtected,
   isRecoveryDevice,
   RecoveryPhrase,
-} from "../../utils/recoveryDevice";
-import { unknownToString, unreachable } from "../../utils/utils";
-import { recoverWithPhrase } from "../recovery/recoverWith/phrase";
-import { phraseWizard } from "../recovery/setupRecovery";
+} from "$root/utils/recoveryDevice";
+import { unknownToString, unreachable } from "$root/utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 
 /* Remove the device and return */
 export const deleteDevice = async ({

@@ -1,8 +1,8 @@
+import { TemplateElement } from "$root/utils/lit-html";
+import { Chan } from "$root/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { repeat } from "lit-html/directives/repeat.js";
-import { TemplateElement } from "../utils/lit-html";
-import { Chan } from "../utils/utils";
 import { closeIcon, warningIcon } from "./icons";
 
 // A toast element containing a message, and the (static) list of all toasts. The `Toast` element

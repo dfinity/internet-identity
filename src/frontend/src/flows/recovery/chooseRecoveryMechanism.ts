@@ -1,9 +1,9 @@
 import { DeviceData } from "$generated/internet_identity_types";
+import { securityKeyIcon, seedPhraseIcon } from "$root/components/icons";
+import { mainWindow } from "$root/components/mainWindow";
+import { renderPage } from "$root/utils/lit-html";
+import { hasRecoveryKey, hasRecoveryPhrase } from "$root/utils/recoveryDevice";
 import { html, TemplateResult } from "lit-html";
-import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { renderPage } from "../../utils/lit-html";
-import { hasRecoveryKey, hasRecoveryPhrase } from "../../utils/recoveryDevice";
 
 export type RecoveryMechanism = "securityKey" | "seedPhrase";
 

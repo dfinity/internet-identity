@@ -1,6 +1,6 @@
+import { PORTAL_II_URL } from "$root/config";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { PORTAL_II_URL } from "../config";
 
 export const navigationLink = ({
   labelText,

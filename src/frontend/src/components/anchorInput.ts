@@ -1,9 +1,9 @@
+import { mount, withRef } from "$root/utils/lit-html";
+import { parseUserNumber } from "$root/utils/userNumber";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { mount, withRef } from "../utils/lit-html";
-import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({

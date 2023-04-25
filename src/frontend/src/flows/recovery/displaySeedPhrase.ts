@@ -1,10 +1,10 @@
+import { checkmarkIcon, copyIcon } from "$root/components/icons";
+import { mainWindow } from "$root/components/mainWindow";
+import { toast } from "$root/components/toast";
+import { I18n } from "$root/i18n";
+import { renderPage, withRef } from "$root/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { checkmarkIcon, copyIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { toast } from "../../components/toast";
-import { I18n } from "../../i18n";
-import { renderPage, withRef } from "../../utils/lit-html";
 
 import copyJson from "./displaySeedPhrase.json";
 

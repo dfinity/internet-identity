@@ -1,6 +1,6 @@
-import { register } from "../flows/register";
-import { registerDisabled } from "../flows/registerDisabled";
-import { Connection } from "../utils/iiConnection";
+import { register } from "$root/flows/register";
+import { registerDisabled } from "$root/flows/registerDisabled";
+import { Connection } from "$root/utils/iiConnection";
 import { LoginFlowResult } from "./flowResult";
 
 /** Check that the current origin is not the explicit canister id or a raw url.

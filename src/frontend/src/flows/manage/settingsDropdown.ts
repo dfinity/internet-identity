@@ -1,5 +1,5 @@
+import { dropdownIcon } from "$root/components/icons";
 import { html, TemplateResult } from "lit-html";
-import { dropdownIcon } from "../../components/icons";
 
 export const settingsDropdown = ({
   alias,

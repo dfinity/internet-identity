@@ -1,5 +1,5 @@
+import { features } from "$root/features";
 import { isNullish } from "@dfinity/utils";
-import { features } from "../features";
 import { wrapError } from "./utils";
 
 export const checkRequiredFeatures = async (

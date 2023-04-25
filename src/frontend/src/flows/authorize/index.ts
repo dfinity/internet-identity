@@ -1,17 +1,17 @@
-import { html, render, TemplateResult } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   authenticateBox,
   AuthnTemplates,
-} from "../../components/authenticateBox";
-import { displayError } from "../../components/displayError";
-import { caretDownIcon, spinner } from "../../components/icons";
-import { showMessage } from "../../components/message";
-import { DynamicKey, I18n } from "../../i18n";
-import { Connection } from "../../utils/iiConnection";
-import { TemplateElement, withRef } from "../../utils/lit-html";
-import { unreachable } from "../../utils/utils";
-import { recoveryWizard } from "../recovery/recoveryWizard";
+} from "$root/components/authenticateBox";
+import { displayError } from "$root/components/displayError";
+import { caretDownIcon, spinner } from "$root/components/icons";
+import { showMessage } from "$root/components/message";
+import { recoveryWizard } from "$root/flows/recovery/recoveryWizard";
+import { DynamicKey, I18n } from "$root/i18n";
+import { Connection } from "$root/utils/iiConnection";
+import { TemplateElement, withRef } from "$root/utils/lit-html";
+import { unreachable } from "$root/utils/utils";
+import { html, render, TemplateResult } from "lit-html";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
 import copyJson from "./index.json";

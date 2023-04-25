@@ -1,26 +1,26 @@
+import { warningIcon } from "$root/components/icons";
+import { withLoader } from "$root/components/loader";
+import { mainWindow } from "$root/components/mainWindow";
+import { toast } from "$root/components/toast";
+import {
+  dropLeadingUserNumber,
+  RECOVERYPHRASE_WORDCOUNT,
+} from "$root/crypto/mnemonic";
+import type {
+  LoginFlowCanceled,
+  LoginFlowError,
+  LoginFlowSuccess,
+} from "$root/utils/flowResult";
+import { apiResultToLoginFlowResult } from "$root/utils/flowResult";
+import { Connection } from "$root/utils/iiConnection";
+import { renderPage, withRef } from "$root/utils/lit-html";
+import { RecoveryDevice } from "$root/utils/recoveryDevice";
+import { Chan } from "$root/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { warningIcon } from "../../../components/icons";
-import { withLoader } from "../../../components/loader";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
-import {
-  dropLeadingUserNumber,
-  RECOVERYPHRASE_WORDCOUNT,
-} from "../../../crypto/mnemonic";
-import type {
-  LoginFlowCanceled,
-  LoginFlowError,
-  LoginFlowSuccess,
-} from "../../../utils/flowResult";
-import { apiResultToLoginFlowResult } from "../../../utils/flowResult";
-import { Connection } from "../../../utils/iiConnection";
-import { renderPage, withRef } from "../../../utils/lit-html";
-import { RecoveryDevice } from "../../../utils/recoveryDevice";
-import { Chan } from "../../../utils/utils";
 
 const recoverWithPhraseTemplate = <
   /* The successful return type on verification */

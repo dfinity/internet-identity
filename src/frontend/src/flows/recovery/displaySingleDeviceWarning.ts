@@ -1,6 +1,6 @@
+import { mainWindow } from "$root/components/mainWindow";
+import { AuthenticatedConnection } from "$root/utils/iiConnection";
 import { html, render } from "lit-html";
-import { mainWindow } from "../../components/mainWindow";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => {
   const pageContentSlot = html`
