@@ -32,6 +32,7 @@ export type AuthnTemplates = {
     slot: TemplateResult;
     useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
     createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
+    additionalInfo: TemplateResult /** text shown below the login options usually a context explainer or marketing text */;
   };
   useExisting: {
     slot: TemplateResult;
@@ -127,6 +128,7 @@ export const authnTemplates = (
           ${props.firstTime.useExistingText}
         </button>
       </div>
+      ${props.firstTime.additionalInfo}
       <p class="t-paragraph t-centered l-stack">
         <a
           class="t-link"
