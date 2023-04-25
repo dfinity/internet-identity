@@ -6,7 +6,7 @@ import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
-import { renderAddDeviceSuccess } from "./addDeviceSuccess";
+import { addDeviceSuccess } from "./addDeviceSuccess";
 import { addFIDODevice } from "./addFIDODevice";
 import { pollForTentativeDevice } from "./pollForTentativeDevice";
 import { verifyTentativeDevice } from "./verifyTentativeDevice";
@@ -63,11 +63,13 @@ export const addDevice = async ({
 
   const { alias } = tentativeDevice;
 
-  await verifyTentativeDevice({
+  const result = await verifyTentativeDevice({
     connection,
     alias,
     endTimestamp: timestamp,
   });
 
-  await renderAddDeviceSuccess({ deviceAlias: alias });
+  if (result === "verified") {
+    await addDeviceSuccess({ deviceAlias: alias });
+  }
 };
