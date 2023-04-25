@@ -398,3 +398,18 @@ export const lockedIcon = html`
     />
   </svg>
 `;
+
+export const externalLinkIcon = html`<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20"
+>
+  <path
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    fill="none"
+    transform="scale(.6) translate(8 5)"
+    d="M0,20 L20,0 M10,0 L20,0 L20,10"
+  />
+</svg>`;

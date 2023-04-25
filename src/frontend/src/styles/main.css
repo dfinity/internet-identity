@@ -621,6 +621,15 @@ a:hover,
   --bgc: currentColor;
 }
 
+.c-icon--small {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.c-icon--link {
+  color: var(--rc-button);
+}
+
 :is(button, a, link, .c-dropdown):hover .c-icon--more {
   --rotate: -90deg;
   --bgc: var(--rc-interaction-text);

@@ -1,4 +1,4 @@
-import { closeIcon } from "$src/components/icons";
+import { closeIcon, externalLinkIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { renderPage } from "$src/utils/lit-html";
@@ -79,7 +79,11 @@ const dappTemplate = ({
           ? html`<p class="t-weak">${oneLiner}</p>`
           : undefined}
       </div>
-      <span class="c-action-list__action"> ↗ </span>
+      <span class="c-action-list__action"
+        ><i class="c-icon c-icon--link c-icon--small"
+          >${externalLinkIcon}</i
+        ></span
+      >
     </a>
   `;
 };
