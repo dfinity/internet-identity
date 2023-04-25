@@ -1,3 +1,5 @@
+import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
+import { isNullish } from "@dfinity/utils";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
@@ -11,10 +13,7 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
-import { isNullish } from "@dfinity/utils";
-
 // Polyfill Buffer globally for the browser
-import { renderAddDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -108,7 +107,7 @@ const init = async () => {
     );
 
     // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
-    await renderAddDeviceSuccess({ deviceAlias });
+    await addDeviceSuccess({ deviceAlias });
   }
 
   // Simple, #-based routing
