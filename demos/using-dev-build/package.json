@@ -8,7 +8,7 @@
     "test": "ts-node --esm ./test.ts",
     "format": "prettier --write --plugin-search-dir=. .",
     "build": "tsc --noEmit && vite build",
-    "start": "vite",
+    "dev": "vite",
     "proxy": "ts-node --esm ./test.ts --no-run"
   },
   "devDependencies": {

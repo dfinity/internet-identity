@@ -49,7 +49,7 @@ const addDeviceSuccessTemplate = ({
 
 export const addDeviceSuccessPage = renderPage(addDeviceSuccessTemplate);
 
-export const renderAddDeviceSuccess = (
+export const addDeviceSuccess = (
   props: Pick<AddDeviceSuccessTemplateProps, "deviceAlias">
 ): Promise<void> =>
   new Promise<void>((resolve) => {

@@ -64,7 +64,7 @@ To serve the frontend locally (recommended during development), run
 the following:
 
 ```bash
-npm run start
+npm run dev
 ```
 
 Then open `http://localhost:8080` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
@@ -78,7 +78,7 @@ Finally, to test workflows like authentication from a client application, you st
 ```bash
 cd demos/selenium-test-app
 npm ci
-npm run start
+npm run dev
 ```
 
 Then open `http://localhost:8081` in your browser.

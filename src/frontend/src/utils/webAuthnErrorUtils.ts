@@ -1,16 +1,18 @@
 import { displayError } from "$src/components/displayError";
+import { I18n } from "../i18n";
+import copyJson from "./webAuthnErrorUtils.json";
 
-export const WEBAUTHN_CANCEL_TEMPLATE = {
-  title: "Operation canceled",
-  message:
-    "The interaction with your security device was canceled or timed out. Please try again.",
+export const webAuthnCancelTemplate = () => {
+  const i18n = new I18n();
+  return i18n.i18n(copyJson);
 };
 
-export const displayCancelError = (primaryButton: string) =>
-  displayError({
-    ...WEBAUTHN_CANCEL_TEMPLATE,
+export const displayCancelError = (primaryButton: string): Promise<void> => {
+  return displayError({
+    ...webAuthnCancelTemplate(),
     primaryButton,
   });
+};
 
 /** Checks whether the error corresponds with the WebAuthnSpec for duplicate device:
  *  * https://www.w3.org/TR/webauthn-2/#sctn-createCredential (Step 20)

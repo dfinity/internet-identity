@@ -231,6 +231,7 @@ impl<M: Memory> AnchorMemory<M> {
 
 pub enum StableMemory<M: Memory> {
     Single(M),
+    #[allow(dead_code)]
     Managed(M),
 }
 
@@ -239,6 +240,7 @@ pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: AnchorMemory<M>,
+    #[allow(dead_code)]
     maybe_memory_manager: Option<MemoryManager<RestrictedMemory<M>>>,
 }
 

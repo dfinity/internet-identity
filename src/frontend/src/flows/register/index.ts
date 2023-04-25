@@ -9,7 +9,7 @@ import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString } from "$src/utils/utils";
 import {
   isCancel,
-  WEBAUTHN_CANCEL_TEMPLATE,
+  webAuthnCancelTemplate,
 } from "$src/utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
@@ -53,7 +53,7 @@ export const register = async ({
     if (isCancel(e)) {
       return {
         tag: "err",
-        ...WEBAUTHN_CANCEL_TEMPLATE,
+        ...webAuthnCancelTemplate(),
       };
     }
     return {

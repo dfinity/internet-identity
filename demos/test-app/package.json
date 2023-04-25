@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "start": "vite",
+    "dev": "vite",
     "lint:fix": "npm run lint -- --fix",
     "make:docs/reference": "",
     "publish:release": "",
