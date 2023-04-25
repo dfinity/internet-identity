@@ -37,6 +37,9 @@ export const getDapps = async (): Promise<DappDescription[]> => {
   return dapps.map((dapp) => ({
     ...dapp,
     /* fix up logo path (inherited from dfinity/portal) to match our assets */
-    logo: dapp.logo.replace("/img/showcase/", "/icons/"),
+    logo: dapp.logo.replace(
+      "/img/showcase/",
+      import.meta.env.BASE_URL + "icons/"
+    ),
   }));
 };
