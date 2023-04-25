@@ -5,7 +5,7 @@
   "description": "",
   "keywords": [],
   "scripts": {
-    "start": "II_FETCH_ROOT_KEY=1 vite",
+    "dev": "II_FETCH_ROOT_KEY=1 vite",
     "host": "II_FETCH_ROOT_KEY=1 vite --host",
     "showcase": "II_FETCH_ROOT_KEY=1 vite --mode showcase",
     "build": "tsc --noEmit && vite build",

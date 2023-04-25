@@ -18,7 +18,7 @@ To run selenium tests, do the following:
    1. The `--background` flag can be added to run in the background.
 2. Run `II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 dfx deploy --no-wallet`.
 3. Switch to the `demos/test-app` directory and run `dfx deploy --no-wallet`.
-4. Run `npm run start` from the repository root.
+4. Run `npm run dev` from the repository root.
 5. Run `scripts/start-selenium-env` from the repository root.
    1. The docker compose setup can be shut down by running `docker compose down` in the `docker-test-env` directory.
    2. The docker compose setup has to be restarted only if the canister ids change. Additional `dfx deploy` commands or changes to the front-end of II do not require a restart of the docker compose project.
