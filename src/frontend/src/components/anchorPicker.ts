@@ -26,7 +26,7 @@ export const mkAnchorPicker = (
 
   const moreOptions = html` <li class="c-list__item c-list__item--noFocusStyle">
     <button
-      class="t-link c-list__parcel c-list__parcel--fullwidth c-list__parcel--summary"
+      class="t-link c-list__parcel c-list__parcel--fullwidth"
       @click="${() => props.moreOptions()}"
       data-role="more-options"
     >
